@@ -14,7 +14,7 @@
 import R from 'ramda';
 import { BaseQueueDriver } from './BaseQueueDriver';
 
-const { Table, Entity } = require('dynamodb-toolbox');
+import { Table, Entity } from 'dynamodb-toolbox';
 const DynamoDB = require('aws-sdk/clients/dynamodb');
 
 const DocumentClient = new DynamoDB.DocumentClient();
@@ -180,25 +180,12 @@ export class DynamoDBQueueDriverConnection {
   async addToQueue(keyScore, queryKey, time, queryHandler, query, priority, options) {
     const redisHash = this.redisHash(queryKey);
 
-    const transactionOptions = {
-      TransactItems: [
-        {
-          Put: this.queue.putParams({
-            key: this.toProcessRedisKey(),
-            queryKey: redisHash,
-            keyScore,
-            inserted: time
-          })
-        },
-        {
-          Put: this.queue.putParams({
-            key: this.recentRedisKey(),
-            queryKey: redisHash,
-            inserted: time,
-          })
-        },
-        {
-          Put: this.queue.putParams({
+    try {
+      await this.table.transactWrite(
+        [
+          this.queue.putTransaction({ key: this.toProcessRedisKey(), queryKey: redisHash, keyScore, inserted: time }),
+          this.queue.putTransaction({ key: this.recentRedisKey(), queryKey: redisHash, inserted: time }),
+          this.queue.putTransaction({
             key: this.queriesDefKey(),
             queryKey: redisHash,
             inserted: time,
@@ -211,22 +198,14 @@ export class DynamoDBQueueDriverConnection {
               requestId: options.requestId,
               addedToQueueTime: new Date().getTime()
             })
-          })
-        },
-        {
-          Update: this.queueSize.updateParams({
-            key: this.queueSizeRedisKey(),
-            sk: QUEUE_SIZE_SORT_KEY,
-            size: { $add: 1 } // increment queue size by 1
-          })
-        },
-      ]
-    };
-
-    try {
-      await this.executeTransactWrite(transactionOptions);
+          }),
+          this.queueSize.updateTransaction({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY, size: { $add: 1 } }) // increment queue size by 1 })
+        ]
+      )
     } catch (err) {
       console.error('### ERROR IN ADD TO QUEUE TRANSACTION');
+      console.error(err);
+      console.log(query);
       return [0, 0, 0, 0];
     }
 
@@ -259,52 +238,20 @@ export class DynamoDBQueueDriverConnection {
 
     if (!getQueryResult || !getQueryResult.Item) return [];
 
-    const transactionOptions = {
-      TransactItems: [
-        {
-          Delete: this.queue.deleteParams({
-            key: this.activeRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.heartBeatRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.toProcessRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.recentRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.queriesDefKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.queryProcessingLockKey(queryKey),
-            queryKey: redisHash
-          })
-        }
-      ]
-    };
-
-    // TODO: I removed the await here
     try {
-      await this.executeTransactWrite(transactionOptions);
+      await this.table.transactWrite(
+        [
+          this.queue.deleteTransaction({ key: this.activeRedisKey(), queryKey: redisHash }),
+          this.queue.deleteTransaction({ key: this.heartBeatRedisKey(), queryKey: redisHash }),
+          this.queue.deleteTransaction({ key: this.toProcessRedisKey(), queryKey: redisHash }),
+          this.queue.deleteTransaction({ key: this.recentRedisKey(), queryKey: redisHash }),
+          this.queue.deleteTransaction({ key: this.queriesDefKey(), queryKey: redisHash }),
+          this.queue.deleteTransaction({ key: this.queryProcessingLockKey(queryKey), queryKey: redisHash }),
+        ]
+      )
     } catch (err) {
-
+      console.error('### ERROR EXECUTING CLEANUP TRANSACTION ###');
+      console.error(err);
     }
 
     return [JSON.parse(getQueryResult.Item.value)];
@@ -325,68 +272,26 @@ export class DynamoDBQueueDriverConnection {
       }
     }
 
-    const transactionOptions = {
-      TransactItems: [
-        {
-          Put: this.queue.putParams({
-            key: this.resultListKey(queryKey),
-            queryKey: redisHash,
-            value: JSON.stringify(executionResult),
-            inserted: new Date().getTime()
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.activeRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.heartBeatRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.toProcessRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.recentRedisKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.queriesDefKey(),
-            queryKey: redisHash
-          })
-        },
-        {
-          Delete: this.queue.deleteParams({
-            key: this.queryProcessingLockKey(queryKey),
-            queryKey: redisHash
-          })
-        }
+    return this.table.transactWrite(
+      [
+        this.queue.putTransaction({ key: this.resultListKey(queryKey), queryKey: redisHash, value: JSON.stringify(executionResult), inserted: new Date().getTime() }),
+        this.queue.deleteTransaction({ key: this.activeRedisKey(), queryKey: redisHash }),
+        this.queue.deleteTransaction({ key: this.heartBeatRedisKey(), queryKey: redisHash }),
+        this.queue.deleteTransaction({ key: this.toProcessRedisKey(), queryKey: redisHash }),
+        this.queue.deleteTransaction({ key: this.recentRedisKey(), queryKey: redisHash }),
+        this.queue.deleteTransaction({ key: this.queriesDefKey(), queryKey: redisHash }),
+        this.queue.deleteTransaction({ key: this.queryProcessingLockKey(queryKey), queryKey: redisHash }),
       ]
-    };
-
-    return this.executeTransactWrite(transactionOptions);
+    )
   }
 
   async getOrphanedQueries() {
     const orphanedTime = new Date().getTime() - this.orphanedTimeout * 1000;
-    const orphanedQueriesResult = await this.queue.query(
-      this.recentRedisKey(),
-      {
-        limit: 100, // limit to 100 items - TODO: validate this number
-        index: 'GSI1', // query the GSI1 secondary index
-        lt: orphanedTime // GSI1sk (inserted) is less than orphaned time
-      }
-    );
+    const orphanedQueriesResult = await this.queue.query(this.recentRedisKey(), {
+      limit: 100, // limit to 100 items - TODO: validate this number
+      index: 'GSI1', // query the GSI1 secondary index
+      lt: orphanedTime // GSI1sk (inserted) is less than orphaned time
+    });
 
     const queryKeys = orphanedQueriesResult.Items ? orphanedQueriesResult.Items.map(item => item.queryKey) : [];
     return queryKeys;
@@ -394,14 +299,11 @@ export class DynamoDBQueueDriverConnection {
 
   async getStalledQueries() {
     const stalledTime = new Date().getTime() - this.heartBeatTimeout * 1000;
-    const stalledQueriesResult = await this.queue.query(
-      this.heartBeatRedisKey(),
-      {
-        limit: 100, // limit to 100 items - TODO: validate this number
-        index: 'GSI1', // query the GSI1 secondary index
-        lt: stalledTime // GSI1sk (inserted) is less than stalled time
-      }
-    );
+    const stalledQueriesResult = await this.queue.query(this.heartBeatRedisKey(), {
+      limit: 100, // limit to 100 items - TODO: validate this number
+      index: 'GSI1', // query the GSI1 secondary index
+      lt: stalledTime // GSI1sk (inserted) is less than stalled time
+    });
 
     const queryKeys = stalledQueriesResult.Items ? stalledQueriesResult.Items.map(item => item.queryKey) : [];
     return queryKeys;
@@ -480,44 +382,33 @@ export class DynamoDBQueueDriverConnection {
     }
 
     // Query active keys based on concurrency
-    const queryActiveToRemoveResult = await this.queue.query(
-      this.activeRedisKey(),
-      {
-        limit: this.concurrency,
-        index: 'GSI1' // Orders by GSIsk which is inserted time
-      }
-    );
+    const queryActiveToRemoveResult = await this.queue.query(this.activeRedisKey(), {
+      limit: this.concurrency,
+      index: 'GSI1' // Orders by GSIsk which is inserted time
+    });
 
-    const activeUpdateTransactionOptions = {
-      TransactItems: []
-    };
+    const activeUpdateTransactionOptions = [];
 
     // If we already have this.concurrency amount of items, remove them
     if (queryActiveToRemoveResult.Items.length >= this.concurrency) {
       for (const query of queryActiveToRemoveResult.Items) {
-        const toRemove = {
-          Delete: this.queue.deleteParams({
-            key: this.activeRedisKey(),
-            queryKey: query.queryKey
-          })
-        };
-
-        activeUpdateTransactionOptions.TransactItems.push(toRemove);
+        activeUpdateTransactionOptions.push(
+          this.queue.deleteTransaction({ key: this.activeRedisKey(), queryKey: query.queryKey })
+        );
       }
     }
 
     // Add the active redis processing id and querykey
-    const addActiveQuery = {
-      Put: this.queue.putParams({
+    activeUpdateTransactionOptions.push(
+      this.queue.putTransaction({
         key: this.activeRedisKey(),
         queryKey: this.redisHash(queryKey),
         inserted: new Date().getTime()
       })
-    };
-    activeUpdateTransactionOptions.TransactItems.push(addActiveQuery);
+    );
 
     // Execute transaction
-    await this.executeTransactWrite(activeUpdateTransactionOptions);
+    await this.table.transactWrite(activeUpdateTransactionOptions)
     const added = 1;
 
     // Query active -> concurrency limit
@@ -528,14 +419,11 @@ export class DynamoDBQueueDriverConnection {
 
     // Get number of members in toProcess (queueSize)
     // Get the query to process
-    const getItemsTransactionOptions = {
-      TransactItems: [
-        { Get: this.queueSize.getParams({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY }) },
-        { Get: this.queue.getParams({ key: this.queriesDefKey(), queryKey: this.redisHash(queryKey) }) }
-      ]
-    };
+    const getTransactionResult = await this.table.transactGet([
+      this.queueSize.getTransaction({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY }),
+      this.queue.getTransaction({ key: this.queriesDefKey(), queryKey: this.redisHash(queryKey) }),
+    ]);
 
-    const getTransactionResult = await this.executeTransactGet(getItemsTransactionOptions);
     const queueSize = getTransactionResult.Responses[0].Item.size ?? undefined;
     const queryData = getTransactionResult.Responses[1] && getTransactionResult.Responses[1].Item
       ? JSON.parse(getTransactionResult.Responses[1].Item.value)
@@ -567,19 +455,18 @@ export class DynamoDBQueueDriverConnection {
     if (currentProcessIdResult
       && currentProcessIdResult.Item
       && currentProcessIdResult.Item.value === processingId.toString()) {
-      const removeTransaction = {
-        TransactItems: [
-          { Delete: this.queue.deleteParams({ key: lockKey, queryKey: this.redisHash(queryKey) }) }
-        ]
-      };
+
+      const removeTransaction = [
+        this.queue.deleteTransaction({ key: this.activeRedisKey(), queryKey: this.redisHash(queryKey) })
+      ];
 
       if (activated) {
-        removeTransaction.TransactItems.push({
-          Delete: this.queue.deleteParams({ key: this.activeRedisKey(), queryKey: this.redisHash(queryKey) })
-        });
+        removeTransaction.push(
+          this.queue.deleteTransaction({ key: this.activeRedisKey(), queryKey: this.redisHash(queryKey) })
+        );
       }
 
-      await this.executeTransactWrite(removeTransaction);
+      await this.table.transactWrite(removeTransaction);
       return null;
     }
 
@@ -615,38 +502,6 @@ export class DynamoDBQueueDriverConnection {
     }
 
     throw new Error(`Can't update ${queryKey} with ${JSON.stringify(toUpdate)}`);
-  }
-
-  executeTransactWrite(params) {
-    const transactionRequest = this.table.DocumentClient.transactWrite(params);
-    return this.executeTransaction(transactionRequest);
-  }
-
-  executeTransactGet(params) {
-    const transactionRequest = this.table.DocumentClient.transactGet(params);
-    return this.executeTransaction(transactionRequest);
-  }
-
-  // https://github.com/aws/aws-sdk-js/issues/2464#issuecomment-503524701
-  executeTransaction(transactionRequest) {
-    let cancellationReasons;
-    transactionRequest.on('extractError', (response) => {
-      try {
-        cancellationReasons = JSON.parse(response.httpResponse.body.toString()).CancellationReasons;
-      } catch (err) {
-        // suppress this just in case some types of errors aren't JSON parseable
-        console.error('Error extracting cancellation error', err);
-      }
-    });
-    return new Promise((resolve, reject) => {
-      transactionRequest.send((err, response) => {
-        if (err) {
-          console.error('Error performing transaction', { cancellationReasons, err });
-          return reject(err);
-        }
-        return resolve(response);
-      });
-    });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function
