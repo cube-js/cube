@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.1](https://github.com/cube-js/cube.js/compare/v0.25.0...v0.25.1) (2020-12-24)
+
+
+### Features
+
+* **@cubejs-backend/dremio-driver:** Add HTTPS support for Dremio ([#1666](https://github.com/cube-js/cube.js/issues/1666)), Thanks [@chipblox](https://github.com/chipblox) ([1143e9c](https://github.com/cube-js/cube.js/commit/1143e9cbdb78059a93e1419feff80c34ee29bdbf))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 **Note:** Version bump only for package @cubejs-backend/dremio-driver

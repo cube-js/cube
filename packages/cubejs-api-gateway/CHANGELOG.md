@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.1](https://github.com/cube-js/cube.js/compare/v0.25.0...v0.25.1) (2020-12-24)
+
+
+### Bug Fixes
+
+* **playground:** Use basePath from configuration, fix [#377](https://github.com/cube-js/cube.js/issues/377) ([c94cbce](https://github.com/cube-js/cube.js/commit/c94cbce50e31617086ec458f934fefaf779b76f4))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 

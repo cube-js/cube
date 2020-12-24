@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.1](https://github.com/cube-js/cube.js/compare/v0.25.0...v0.25.1) (2020-12-24)
+
+
+### Features
+
+* **elasticsearch-driver:** Support CUBEJS_DB_ELASTIC_QUERY_FORMAT, Thanks [@dylman79](https://github.com/dylman79) ([a7460f5](https://github.com/cube-js/cube.js/commit/a7460f5d45dc7e9d96b65f6cc36df810a5b9312e))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 **Note:** Version bump only for package @cubejs-backend/elasticsearch-driver

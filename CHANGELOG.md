@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.1](https://github.com/cube-js/cube.js/compare/v0.25.0...v0.25.1) (2020-12-24)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/schema-compiler:** Better error message for join member resolutions ([30cc3ab](https://github.com/cube-js/cube.js/commit/30cc3abc4e8c91e8d95b8794f892e1d1f2152798))
+* **@cubejs-backend/schema-compiler:** Error: TypeError: R.eq is not a function -- existing joins in rollup support ([5f62aae](https://github.com/cube-js/cube.js/commit/5f62aaee88b7ecc281437601410b10ef04d7bbf3))
+* **@cubejs-client/playground:** propagate cubejs token ([#1669](https://github.com/cube-js/cube.js/issues/1669)) ([f1fb563](https://github.com/cube-js/cube.js/commit/f1fb5634fa62b2f78cf6d8365c4a98094e114f6c))
+* **cubestore:** Merge join empty side fixes ([5e65c3e](https://github.com/cube-js/cube.js/commit/5e65c3e251c7f9d7329a601bd467a4ef3b043463))
+* **cubestore:** Non atomic primary key allocation conflicts ([073ac8c](https://github.com/cube-js/cube.js/commit/073ac8ce69cc294a15a5e59b11b2915a755ca81b))
+* **cubestore:** Pass join on sort conditions explicitly. Avoid incorrectly selected sort keys. ([b6a2e4a](https://github.com/cube-js/cube.js/commit/b6a2e4a457bd38d40d8819443a2fc4fddf7465db))
+* **playground:** Use basePath from configuration, fix [#377](https://github.com/cube-js/cube.js/issues/377) ([c94cbce](https://github.com/cube-js/cube.js/commit/c94cbce50e31617086ec458f934fefaf779b76f4))
+
+
+### Features
+
+* **@cubejs-backend/dremio-driver:** Add HTTPS support for Dremio ([#1666](https://github.com/cube-js/cube.js/issues/1666)), Thanks [@chipblox](https://github.com/chipblox) ([1143e9c](https://github.com/cube-js/cube.js/commit/1143e9cbdb78059a93e1419feff80c34ee29bdbf))
+* **athena-driver:** Support readOnly option, add typings ([a519cb8](https://github.com/cube-js/cube.js/commit/a519cb880be2bb2b872c56b092f1273291fbd397))
+* **elasticsearch-driver:** Support CUBEJS_DB_ELASTIC_QUERY_FORMAT, Thanks [@dylman79](https://github.com/dylman79) ([a7460f5](https://github.com/cube-js/cube.js/commit/a7460f5d45dc7e9d96b65f6cc36df810a5b9312e))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 
