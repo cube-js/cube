@@ -17,7 +17,7 @@ class BigQueryDriver extends BaseDriver {
       scopes: ['https://www.googleapis.com/auth/bigquery', 'https://www.googleapis.com/auth/drive'],
       projectId: process.env.CUBEJS_DB_BQ_PROJECT_ID,
       keyFilename: process.env.CUBEJS_DB_BQ_KEY_FILE,
-      pollTimeout: 15 * 1000 * 60,
+      pollTimeout: 15 * 60 * 1000,
       pollMaxInterval: 5000,
       credentials: process.env.CUBEJS_DB_BQ_CREDENTIALS ?
         JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
