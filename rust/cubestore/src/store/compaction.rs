@@ -6,6 +6,7 @@ use crate::table::parquet::ParquetTableStore;
 use crate::table::TableStore;
 use crate::CubeError;
 use async_trait::async_trait;
+use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
 use std::sync::Arc;
 
@@ -99,42 +100,89 @@ impl CompactionService for CompactionServiceImpl {
         })
         .await??;
 
-        for p in new_partitions.iter() {
-            let new_remote_path = p.get_row().get_full_name(p.get_id()).unwrap();
-            self.remote_fs.upload_file(new_remote_path.as_str()).await?;
+        let mut filtered_partitions = Vec::new();
+
+        for p in new_partitions
+            .into_iter()
+            .zip_longest(count_and_min_max.iter())
+        {
+            match p {
+                EitherOrBoth::Both(p, _) => {
+                    let new_remote_path = p.get_row().get_full_name(p.get_id()).unwrap();
+                    self.remote_fs.upload_file(new_remote_path.as_str()).await?;
+                    filtered_partitions.push(p);
+                }
+                EitherOrBoth::Left(p) => {
+                    self.meta_store.partition_table().delete(p.get_id()).await?;
+                }
+                EitherOrBoth::Right(_) => {
+                    return Err(CubeError::internal(format!(
+                        "Unexpected state during partitioning: {:?}",
+                        p
+                    )))
+                }
+            }
         }
 
         self.meta_store
             .swap_active_partitions(
                 vec![partition_id],
-                new_partitions
+                filtered_partitions
                     .iter()
                     .map(|p| p.get_id())
                     .collect::<Vec<_>>(),
                 chunks.iter().map(|c| c.get_id()).collect(),
                 count_and_min_max
-                    .into_iter()
+                    .iter()
+                    .zip_longest(count_and_min_max.iter().skip(1))
                     .enumerate()
-                    .map(|(i, (c, (min, max)))| {
-                        if i == 0 && new_partitions_count == 1 {
-                            (
-                                c,
-                                (
-                                    partition.get_row().get_min_val().as_ref().map(|_| min),
-                                    partition.get_row().get_max_val().as_ref().map(|_| max),
-                                ),
-                            )
-                        } else if i == 0 && partition.get_row().get_min_val().is_none() {
-                            (c, (None, Some(max)))
-                        } else if i == new_partitions_count - 1
-                            && partition.get_row().get_max_val().is_none()
-                        {
-                            (c, (Some(min), None))
-                        } else {
-                            (c, (Some(min), Some(max)))
+                    .map(|(i, item)| -> Result<_, CubeError> {
+                        match item {
+                            EitherOrBoth::Both((c, (min, _)), (_, (next_min, _))) => {
+                                if i == 0 && partition.get_row().get_min_val().is_none() {
+                                    Ok((*c, (None, Some(next_min.clone()))))
+                                } else if i < filtered_partitions.len() - 1 {
+                                    Ok((*c, (Some(min.clone()), Some(next_min.clone()))))
+                                } else {
+                                    Err(CubeError::internal(format!(
+                                        "Unexpected state for {} new partitions: {}, {:?}",
+                                        filtered_partitions.len(),
+                                        i,
+                                        item
+                                    )))
+                                }
+                            }
+                            EitherOrBoth::Left((c, (min, _))) => {
+                                if i == 0 && filtered_partitions.len() == 1 {
+                                    assert_eq!(partition.get_row().get_min_val().is_none(), true);
+                                    assert_eq!(partition.get_row().get_max_val().is_none(), true);
+                                    Ok((*c, (None, None)))
+                                } else if i == filtered_partitions.len() - 1 {
+                                    Ok(((
+                                        *c,
+                                        (
+                                            Some(min.clone()),
+                                            partition.get_row().get_max_val().clone(),
+                                        ),
+                                    )))
+                                } else {
+                                    Err(CubeError::internal(format!(
+                                        "Unexpected state for {} new partitions: {}, {:?}",
+                                        filtered_partitions.len(),
+                                        i,
+                                        item
+                                    )))
+                                }
+                            }
+                            EitherOrBoth::Right(_) => Err(CubeError::internal(format!(
+                                "Unexpected state for {} new partitions: {}, {:?}",
+                                filtered_partitions.len(),
+                                i,
+                                item
+                            ))),
                         }
                     })
-                    .collect::<Vec<_>>(),
+                    .collect::<Result<Vec<_>, CubeError>>()?,
             )
             .await?;
 
@@ -179,7 +227,7 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(1).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 15)
+            .create_chunk(partition.get_id(), 16)
             .await
             .unwrap();
         metastore.chunk_uploaded(2).await.unwrap();
@@ -191,7 +239,7 @@ mod tests {
                     if i.get_id() == 1 {
                         10
                     } else {
-                        15
+                        16
                     }
                 })
                     .map(|i| Row::new(vec![TableValue::String(format!("foo{}", i))]))
@@ -213,13 +261,17 @@ mod tests {
         compaction_service.compact(1).await.unwrap();
         let partition_1 = metastore.get_partition(2).await.unwrap();
         assert_eq!(partition_1.get_row().get_min_val(), &None);
+        assert_eq!(partition_1.get_row().main_table_row_count(), 14);
         assert_eq!(
             partition_1.get_row().get_max_val(),
-            &Some(Row::new(vec![TableValue::String("foo3".to_string())]))
+            // 0, 0, 1, 1, 10, 11, 12, 13, 14, 15, 2, 2, 3, 3
+            &Some(Row::new(vec![TableValue::String("foo4".to_string())]))
         );
         let partition_2 = metastore.get_partition(3).await.unwrap();
+        assert_eq!(partition_2.get_row().main_table_row_count(), 12);
         assert_eq!(
             partition_2.get_row().get_min_val(),
+            //  4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9
             &Some(Row::new(vec![TableValue::String("foo4".to_string())]))
         );
         assert_eq!(partition_2.get_row().get_max_val(), &None);

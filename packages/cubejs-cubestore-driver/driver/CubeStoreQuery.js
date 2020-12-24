@@ -42,7 +42,7 @@ class CubeStoreQuery extends BaseQuery {
   }
 
   dateTimeCast(value) {
-    return `TIMESTAMP(${value})`;
+    return `to_timestamp(${value})`;
   }
 
   subtractInterval(date, interval) {
@@ -63,9 +63,9 @@ class CubeStoreQuery extends BaseQuery {
 
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
-      ([from, to]) => `select '${from}' f, '${to}' t`
+      ([from, to]) => `select to_timestamp('${from}') date_from, to_timestamp('${to}') date_to`
     ).join(' UNION ALL ');
-    return `SELECT TIMESTAMP(dates.f) date_from, TIMESTAMP(dates.t) date_to FROM (${values}) AS dates`;
+    return values;
   }
 
   concatStringsSql(strings) {

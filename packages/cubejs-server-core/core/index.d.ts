@@ -4,6 +4,7 @@ import {
   NextFunction as ExpressNextFunction
 } from "express";
 import { NormalizedQuery as Query } from "@cubejs-backend/api-gateway";
+import { RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 
 export type CubejsServerCore = any;
 export function create(options?: CreateOptions): CubejsServerCore;
@@ -22,7 +23,7 @@ export interface CreateOptions {
   driverFactory?: (context: DriverContext) => any;
   externalDriverFactory?: (context: RequestContext) => any;
   contextToAppId?: (context: RequestContext) => string;
-  contextToDataSourceId?: (context: RequestContext) => string;
+  contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: (
     req: ExpressRequest,
@@ -44,6 +45,7 @@ export interface CreateOptions {
 
 export interface OrchestratorOptions {
   redisPrefix?: string;
+  redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;

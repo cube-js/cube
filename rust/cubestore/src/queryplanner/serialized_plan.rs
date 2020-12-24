@@ -30,6 +30,7 @@ pub struct IndexSnapshot {
     table_path: TablePath,
     index: IdRow<Index>,
     partitions: Vec<PartitionSnapshot>,
+    join_on: Option<Vec<String>>,
 }
 
 impl IndexSnapshot {
@@ -47,6 +48,10 @@ impl IndexSnapshot {
 
     pub fn partitions(&self) -> &Vec<PartitionSnapshot> {
         &self.partitions
+    }
+
+    pub fn join_on(&self) -> Option<&Vec<String>> {
+        self.join_on.as_ref()
     }
 }
 
@@ -205,7 +210,7 @@ impl SerializedLogicalPlan {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedExpr {
     Alias(Box<SerializedExpr>, String),
-    Column(String),
+    Column(String, Option<String>),
     ScalarVariable(Vec<String>),
     Literal(ScalarValue),
     BinaryExpr {
@@ -249,7 +254,7 @@ impl SerializedExpr {
     fn expr(&self) -> Expr {
         match self {
             SerializedExpr::Alias(e, a) => Expr::Alias(Box::new(e.expr()), a.to_string()),
-            SerializedExpr::Column(c) => Expr::Column(c.clone()),
+            SerializedExpr::Column(c, a) => Expr::Column(c.clone(), a.clone()),
             SerializedExpr::ScalarVariable(v) => Expr::ScalarVariable(v.clone()),
             SerializedExpr::Literal(v) => Expr::Literal(v.clone()),
             SerializedExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
@@ -315,7 +320,7 @@ impl SerializedPlan {
     ) -> Result<Self, CubeError> {
         let serialized_logical_plan = Self::serialized_logical_plan(&plan);
         let index_snapshots =
-            Self::index_snapshots_from_plan(Arc::new(plan), meta_store, Vec::new()).await?;
+            Self::index_snapshots_from_plan(Arc::new(plan), meta_store, Vec::new(), None).await?;
         Ok(SerializedPlan {
             logical_plan: Arc::new(serialized_logical_plan),
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
@@ -371,8 +376,9 @@ impl SerializedPlan {
         plan: Arc<LogicalPlan>,
         meta_store: Arc<dyn MetaStore>,
         index_snapshots: Vec<IndexSnapshot>,
+        join_on: Option<Vec<String>>,
     ) -> BoxFuture<'static, Result<Vec<IndexSnapshot>, CubeError>> {
-        async move { Self::index_snapshots_from_plan(plan, meta_store, index_snapshots).await }
+        async move { Self::index_snapshots_from_plan(plan, meta_store, index_snapshots, join_on).await }
             .boxed()
     }
 
@@ -380,6 +386,7 @@ impl SerializedPlan {
         plan: Arc<LogicalPlan>,
         meta_store: Arc<dyn MetaStore>,
         mut index_snapshots: Vec<IndexSnapshot>,
+        join_on: Option<Vec<String>>,
     ) -> Result<Vec<IndexSnapshot>, CubeError> {
         match plan.as_ref() {
             LogicalPlan::EmptyRelation { .. } => Ok(index_snapshots),
@@ -407,6 +414,35 @@ impl SerializedPlan {
                     if let Some((index, _)) = indexes
                         .into_iter()
                         .filter_map(|i| {
+                            if let Some(join_on_columns) = join_on.as_ref() {
+                                let join_columns_in_index = join_on_columns
+                                    .iter()
+                                    .map(|c| {
+                                        i.get_row()
+                                            .get_columns()
+                                            .iter()
+                                            .find(|ic| ic.get_name().as_str() == c.as_str())
+                                            .clone()
+                                    })
+                                    .collect::<Vec<_>>();
+                                if join_columns_in_index.iter().any(|c| c.is_none()) {
+                                    return None;
+                                }
+                                let join_columns_indices = CubeTable::project_to_index_positions(
+                                    &join_columns_in_index
+                                        .into_iter()
+                                        .map(|c| c.unwrap().clone())
+                                        .collect(),
+                                    &i,
+                                );
+                                if (0..join_columns_indices.len())
+                                    .map(|i| Some(i))
+                                    .collect::<HashSet<_>>()
+                                    != join_columns_indices.into_iter().collect::<HashSet<_>>()
+                                {
+                                    return None;
+                                }
+                            }
                             let projected_index_positions =
                                 CubeTable::project_to_index_positions(&projection_columns, &i);
                             let score = projected_index_positions
@@ -418,28 +454,38 @@ impl SerializedPlan {
                     {
                         index
                     } else {
+                        if let Some(join_on_columns) = join_on {
+                            return Err(CubeError::user(format!(
+                                "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
+                                name_split.join("."),
+                                join_on_columns.join(", "),
+                                &name_split[1],
+                                join_on_columns.join("_"),
+                                name_split.join("."),
+                                join_on_columns.join(", ")
+                            )));
+                        }
                         default_index
                     }
                 } else {
+                    if let Some(join_on_columns) = join_on {
+                        return Err(CubeError::internal(format!(
+                            "Can't find index to join table {} on {} and projection push down optimization has been disabled. Invalid state.",
+                            name_split.join("."),
+                            join_on_columns.join(", ")
+                        )));
+                    }
                     default_index
                 };
 
                 let partitions = meta_store
-                    .get_active_partitions_by_index_id(index.get_id())
+                    .get_active_partitions_and_chunks_by_index_id(index.get_id())
                     .await?;
-
-                let meta_store_to_move = meta_store.clone();
 
                 let mut partition_snapshots = Vec::new();
 
-                for partition in partitions.into_iter() {
-                    partition_snapshots.push(PartitionSnapshot {
-                        chunks: meta_store_to_move
-                            .clone()
-                            .get_chunks_by_partition(partition.get_id())
-                            .await?,
-                        partition,
-                    });
+                for (partition, chunks) in partitions.into_iter() {
+                    partition_snapshots.push(PartitionSnapshot { chunks, partition });
                 }
 
                 index_snapshots.push(IndexSnapshot {
@@ -449,29 +495,55 @@ impl SerializedPlan {
                         table,
                         schema: Arc::new(schema),
                     },
+                    join_on,
                 });
 
                 Ok(index_snapshots)
             }
             LogicalPlan::Projection { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Filter { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Aggregate { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Sort { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::Limit { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(input.clone(), meta_store, index_snapshots)
-                    .await
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
             }
             LogicalPlan::CreateExternalTable { .. } => Ok(index_snapshots),
             LogicalPlan::Explain { .. } => Ok(index_snapshots),
@@ -483,21 +555,52 @@ impl SerializedPlan {
                         i.clone(),
                         meta_store.clone(),
                         snapshots,
+                        join_on.clone(),
                     )
                     .await?;
                 }
                 Ok(snapshots)
             }
-            LogicalPlan::Join { left, right, .. } => {
+            LogicalPlan::Join {
+                left, right, on, ..
+            } => {
                 let mut snapshots = index_snapshots;
-                for i in vec![left, right].into_iter() {
-                    snapshots = Self::index_snapshots_from_plan_boxed(
-                        i.clone(),
-                        meta_store.clone(),
-                        snapshots,
-                    )
-                    .await?;
-                }
+                snapshots = Self::index_snapshots_from_plan_boxed(
+                    left.clone(),
+                    meta_store.clone(),
+                    snapshots,
+                    Some(
+                        join_on
+                            .as_ref()
+                            .unwrap_or(&Vec::new())
+                            .iter()
+                            .map(|c| c.to_string())
+                            .chain(
+                                on.iter()
+                                    .map(|(l, _)| l.split(".").last().unwrap().to_string()),
+                            )
+                            .collect(),
+                    ),
+                )
+                .await?;
+                snapshots = Self::index_snapshots_from_plan_boxed(
+                    right.clone(),
+                    meta_store.clone(),
+                    snapshots,
+                    Some(
+                        join_on
+                            .as_ref()
+                            .unwrap_or(&Vec::new())
+                            .iter()
+                            .map(|c| c.to_string())
+                            .chain(
+                                on.iter()
+                                    .map(|(_, r)| r.split(".").last().unwrap().to_string()),
+                            )
+                            .collect(),
+                    ),
+                )
+                .await?;
                 Ok(snapshots)
             }
         }
@@ -640,7 +743,7 @@ impl SerializedPlan {
             Expr::Alias(expr, alias) => {
                 SerializedExpr::Alias(Box::new(Self::serialized_expr(expr)), alias.to_string())
             }
-            Expr::Column(c) => SerializedExpr::Column(c.to_string()),
+            Expr::Column(c, a) => SerializedExpr::Column(c.to_string(), a.clone()),
             Expr::ScalarVariable(v) => SerializedExpr::ScalarVariable(v.clone()),
             Expr::Literal(v) => SerializedExpr::Literal(v.clone()),
             Expr::BinaryExpr { left, op, right } => SerializedExpr::BinaryExpr {

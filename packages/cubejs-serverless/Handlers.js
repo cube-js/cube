@@ -4,12 +4,12 @@ const cors = require('cors');
 const ServerCore = require('@cubejs-backend/server-core');
 
 const processHandlers = {
-  queryProcess: async (queryKey, orchestrator) => {
-    const queue = orchestrator.queryCache.getQueue();
+  queryProcess: async ({ queryKey, dataSource }, orchestrator) => {
+    const queue = orchestrator.queryCache.getQueue(dataSource);
     await queue.processQuery(queryKey);
   },
-  queryCancel: async (query, orchestrator) => {
-    const queue = orchestrator.queryCache.getQueue();
+  queryCancel: async ({ query, dataSource }, orchestrator) => {
+    const queue = orchestrator.queryCache.getQueue(dataSource);
     await queue.processCancel(query);
   },
   externalQueryProcess: async (queryKey, orchestrator) => {
@@ -20,12 +20,12 @@ const processHandlers = {
     const queue = orchestrator.queryCache.getExternalQueue();
     await queue.processCancel(query);
   },
-  preAggregationProcess: async (queryKey, orchestrator) => {
-    const queue = orchestrator.preAggregations.getQueue();
+  preAggregationProcess: async ({ queryKey, dataSource }, orchestrator) => {
+    const queue = orchestrator.preAggregations.getQueue(dataSource);
     await queue.processQuery(queryKey);
   },
-  preAggregationCancel: async (query, orchestrator) => {
-    const queue = orchestrator.preAggregations.getQueue();
+  preAggregationCancel: async ({ query, dataSource }, orchestrator) => {
+    const queue = orchestrator.preAggregations.getQueue(dataSource);
     await queue.processCancel(query);
   }
 };
@@ -38,16 +38,16 @@ class Handlers {
         ...(options && options.orchestratorOptions),
         queryCacheOptions: {
           ...(options && options.orchestratorOptions && options.orchestratorOptions.queryCacheOptions),
-          queueOptions: {
-            sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'queryProcess', context),
-            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'queryCancel', context),
+          queueOptions: (dataSource) => ({
+            sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage({ queryKey, dataSource }, 'queryProcess', context),
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage({ query, dataSource }, 'queryCancel', context),
             ...(
               options &&
               options.orchestratorOptions &&
               options.orchestratorOptions.queryCacheOptions &&
               options.orchestratorOptions.queryCacheOptions.queueOptions
             )
-          },
+          }),
           externalQueueOptions: {
             sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'externalQueryProcess', context),
             sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'externalQueryCancel', context),
@@ -61,16 +61,16 @@ class Handlers {
         },
         preAggregationsOptions: {
           ...(options && options.orchestratorOptions && options.orchestratorOptions.preAggregationsOptions),
-          queueOptions: {
-            sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage(queryKey, 'preAggregationProcess', context),
-            sendCancelMessageFn: async (query) => this.sendNotificationMessage(query, 'preAggregationCancel', context),
+          queueOptions: (dataSource) => ({
+            sendProcessMessageFn: async (queryKey) => this.sendNotificationMessage({ queryKey, dataSource }, 'preAggregationProcess', context),
+            sendCancelMessageFn: async (query) => this.sendNotificationMessage({ query, dataSource }, 'preAggregationCancel', context),
             ...(
               options &&
               options.orchestratorOptions &&
               options.orchestratorOptions.preAggregationsOptions &&
               options.orchestratorOptions.preAggregationsOptions.queueOptions
             )
-          }
+          })
         }
       })
     };
@@ -79,7 +79,7 @@ class Handlers {
 
   // eslint-disable-next-line no-unused-vars
   async sendNotificationMessage(message, type, context) {
-    throw new Error(`sendNotificationMessage is not implemented`);
+    throw new Error('sendNotificationMessage is not implemented');
   }
 
   getApiHandler() {
@@ -101,7 +101,7 @@ class Handlers {
 
   // eslint-disable-next-line no-unused-vars
   async process(event) {
-    throw new Error(`process is not implemented`);
+    throw new Error('process is not implemented');
   }
 
   async processMessage(message) {

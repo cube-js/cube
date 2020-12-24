@@ -2,7 +2,7 @@ use super::{
     BaseRocksSecondaryIndex, Column, Index, IndexId, RocksSecondaryIndex, RocksTable, TableId,
 };
 use crate::metastore::{IdRow, MetaStoreEvent};
-use crate::rocks_table_impl;
+use crate::{rocks_table_impl, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
@@ -10,13 +10,24 @@ use std::io::{Cursor, Write};
 use std::sync::Arc;
 
 impl Index {
-    pub fn new(name: String, table_id: u64, columns: Vec<Column>, sort_key_size: u64) -> Index {
-        Index {
+    pub fn try_new(
+        name: String,
+        table_id: u64,
+        columns: Vec<Column>,
+        sort_key_size: u64,
+    ) -> Result<Index, CubeError> {
+        if sort_key_size == 0 {
+            return Err(CubeError::user(format!(
+                "Sort key size can't be 0 for {}, columns: {:?}",
+                name, columns
+            )));
+        }
+        Ok(Index {
             name,
             table_id,
             columns,
             sort_key_size,
-        }
+        })
     }
 
     pub fn get_name(&self) -> &String {

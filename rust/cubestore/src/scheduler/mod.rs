@@ -1,4 +1,5 @@
 use crate::cluster::Cluster;
+use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::{MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::remotefs::RemoteFs;
@@ -16,6 +17,7 @@ pub struct SchedulerImpl {
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
     stop_sender: watch::Sender<bool>,
     stop_receiver: Mutex<watch::Receiver<bool>>,
+    config: Arc<dyn ConfigObj>,
 }
 
 impl SchedulerImpl {
@@ -24,6 +26,7 @@ impl SchedulerImpl {
         cluster: Arc<dyn Cluster>,
         remote_fs: Arc<dyn RemoteFs>,
         event_receiver: Receiver<MetaStoreEvent>,
+        config: Arc<dyn ConfigObj>,
     ) -> SchedulerImpl {
         let (tx, rx) = watch::channel(false);
         SchedulerImpl {
@@ -33,6 +36,7 @@ impl SchedulerImpl {
             event_receiver: Mutex::new(event_receiver),
             stop_sender: tx,
             stop_receiver: Mutex::new(rx),
+            config,
         }
     }
 
@@ -91,7 +95,9 @@ impl SchedulerImpl {
                         .meta_store
                         .get_chunks_by_partition(chunk.get_row().get_partition_id())
                         .await?;
-                    if chunk_sizes > 500000 || chunks.len() > 16 {
+                    if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
+                        || chunks.len() > self.config.compaction_chunks_count_threshold() as usize
+                    {
                         self.schedule_partition_to_compact(chunk.get_row().get_partition_id())
                             .await?;
                     }

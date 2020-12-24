@@ -1,0 +1,8 @@
+.algolia-autocomplete {
+  line-height: 40px;
+  width: 100%;
+}
+
+.algolia-autocomplete .ds-suggestions {
+  line-height: 1.5em;
+}

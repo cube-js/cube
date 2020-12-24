@@ -222,7 +222,7 @@ class SchemaPage extends Component {
 
     return (
       <Layout style={{ height: '100%' }}>
-        <Sider width={320} className="schema-sidebar">
+        <Sider width={340} className="schema-sidebar">
           <Tabs
             activeKey={activeTab}
             onChange={(tab) => this.setState({ activeTab: tab })}

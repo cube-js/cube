@@ -5,6 +5,8 @@
     "strict": true,                           /* Enable all strict type-checking options. */
     "allowJs": true,
     "checkJs": true,
+    "declaration": false,
+    "declarationMap": false,
     "noImplicitAny": false,                    /* Raise error on expressions and declarations with an implied 'any' type. */
     "strictNullChecks": true,                 /* Enable strict null checks. */
     "strictFunctionTypes": true,              /* Enable strict checking of function types. */

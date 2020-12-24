@@ -29,6 +29,7 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt
+      - uses: Swatinem/rust-cache@v1
       - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:

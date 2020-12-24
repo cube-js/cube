@@ -50,7 +50,7 @@ class MysqlQuery extends BaseQuery {
   }
 
   timeGroupedColumn(granularity, dimension) {
-    return GRANULARITY_TO_INTERVAL[granularity](dimension);
+    return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
   }
 
   escapeColumnName(name) {

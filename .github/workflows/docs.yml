@@ -1,9 +1,8 @@
-name: Master
+name: Documentation
 on:
   push:
     paths:
       - '.github/workflows/docs.yml'
-      - 'docs-build/**'
       - 'docs-gen/**'
       - 'docs/**'
     branches:
@@ -14,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./docs-build
+        working-directory: ./docs
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -34,7 +33,9 @@ jobs:
           aws-access-key-id: ${{ secrets.DOCS_DEPLOY_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.DOCS_DEPLOY_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
-      - name: Docs generation
+      - name: Generate API documentation
         run: sh ./docs-gen.sh
-      - name: Build
+      - name: Build Gatsby site
         run: sh ./deploy-production.sh
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}

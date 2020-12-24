@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
@@ -28,7 +29,7 @@ impl RemoteFile {
 }
 
 #[async_trait]
-pub trait RemoteFs: Send + Sync {
+pub trait RemoteFs: Send + Sync + Debug {
     async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError>;
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError>;
@@ -44,7 +45,9 @@ pub trait RemoteFs: Send + Sync {
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError>;
 }
 
+#[derive(Debug)]
 pub struct LocalDirRemoteFs {
+    remote_dir_for_debug: PathBuf,
     remote_dir: RwLock<PathBuf>,
     dir: RwLock<PathBuf>,
 }
@@ -52,6 +55,7 @@ pub struct LocalDirRemoteFs {
 impl LocalDirRemoteFs {
     pub fn new(remote_dir: PathBuf, dir: PathBuf) -> Arc<LocalDirRemoteFs> {
         Arc::new(LocalDirRemoteFs {
+            remote_dir_for_debug: remote_dir.clone(),
             remote_dir: RwLock::new(remote_dir),
             dir: RwLock::new(dir),
         })

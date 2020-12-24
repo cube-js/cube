@@ -3,45 +3,22 @@ const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const crypto = require('crypto');
-const fs = require('fs');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
-  text: 'varchar(255) CHARACTER SET utf8mb4'
+  text: 'varchar(255) CHARACTER SET utf8mb4',
+  decimal: 'decimal(38,10)',
+};
+
+const MySqlToGenericType = {
+  mediumtext: 'text',
+  mediumint: 'int'
 };
 
 class MySqlDriver extends BaseDriver {
   constructor(config) {
     super();
     const { pool, ...restConfig } = config || {};
-    let ssl;
-
-    const sslOptions = [
-      { name: 'ca', value: 'CUBEJS_DB_SSL_CA' },
-      { name: 'cert', value: 'CUBEJS_DB_SSL_CERT' },
-      { name: 'key', value: 'CUBEJS_DB_SSL_KEY' },
-      { name: 'ciphers', value: 'CUBEJS_DB_SSL_CIPHERS' },
-      { name: 'passphrase', value: 'CUBEJS_DB_SSL_PASSPHRASE' },
-    ];
-
-    if (
-      process.env.CUBEJS_DB_SSL === 'true' ||
-      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
-      sslOptions.find(o => !!process.env[o.value])
-    ) {
-      ssl = sslOptions.reduce(
-        (agg, { name, value }) => ({
-          ...agg,
-          ...(process.env[value] ? { [name]: fs.readFileSync(process.env[value]) } : {}),
-        }),
-        {}
-      );
-
-      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
-        ssl.rejectUnauthorized =
-          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
-      }
-    }
 
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
@@ -51,9 +28,11 @@ class MySqlDriver extends BaseDriver {
       password: process.env.CUBEJS_DB_PASS,
       socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
       timezone: 'Z',
-      ssl,
+      ssl: this.getSslOptions(),
+      dateStrings: true,
       ...restConfig,
     };
+
     this.pool = genericPool.createPool({
       create: async () => {
         const conn = mysql.createConnection(this.config);
@@ -70,15 +49,16 @@ class MySqlDriver extends BaseDriver {
 
         return conn;
       },
-      destroy: (connection) => promisify(connection.end.bind(connection))(),
       validate: async (connection) => {
         try {
           await connection.execute('SELECT 1');
         } catch (e) {
+          this.databasePoolError(e);
           return false;
         }
         return true;
-      }
+      },
+      destroy: (connection) => promisify(connection.end.bind(connection))(),
     }, {
       min: 0,
       max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
@@ -207,7 +187,7 @@ class MySqlDriver extends BaseDriver {
     return super.toColumnValue(value, genericType);
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -229,11 +209,19 @@ class MySqlDriver extends BaseDriver {
         VALUES ${valueParamPlaceholders}`,
           params
         );
+        for (let i = 0; i < indexesSql.length; i++) {
+          const [query, p] = indexesSql[i].sql;
+          await this.query(query, p);
+        }
       }
     } catch (e) {
       await this.dropTable(table);
       throw e;
     }
+  }
+
+  toGenericType(columnType) {
+    return MySqlToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 }
 

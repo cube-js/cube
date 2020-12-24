@@ -1,5 +1,5 @@
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { DruidClient, DruidClientBaseConfiguration, DruidClientConfiguration } from './DruidClient';
+import { DruidClient, DruidClientBaseConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
 export type DruidDriverConfiguration = DruidClientBaseConfiguration & {

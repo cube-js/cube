@@ -180,8 +180,10 @@ class CubeEvaluator extends CubeSymbols {
             aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences) || []
           ),
       measures:
-      aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
-      timeDimensions
+        aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
+      timeDimensions,
+      rollups:
+        aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences) || [],
     };
   }
 }

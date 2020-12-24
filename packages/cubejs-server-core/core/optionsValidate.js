@@ -32,6 +32,7 @@ const schemaOptions = Joi.object().keys({
   externalDriverFactory: Joi.func(),
   contextToAppId: Joi.func(),
   contextToDataSourceId: Joi.func(),
+  contextToOrchestratorId: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
   checkAuthMiddleware: Joi.func(),
@@ -62,7 +63,8 @@ const schemaOptions = Joi.object().keys({
         externalQueueOptions: schemaQueueOptions
       }),
       preAggregationsOptions: {
-        queueOptions: schemaQueueOptions
+        queueOptions: schemaQueueOptions,
+        externalRefresh: Joi.boolean(),
       },
       rollupOnlyMode: Joi.boolean()
     })

@@ -6,8 +6,10 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray,
-    TimestampNanosecondArray, UInt64Array,
+    Array, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array, Int64Decimal10Array,
+    Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array, Int64Decimal4Array,
+    Int64Decimal5Array, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
+    UInt64Array,
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
@@ -30,8 +32,10 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream};
 use itertools::Itertools;
-use log::{debug, trace, warn};
+use log::{debug, error, trace, warn};
 use mockall::automock;
+use num::BigInt;
+use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
@@ -45,12 +49,6 @@ use std::time::SystemTime;
 #[automock]
 #[async_trait]
 pub trait QueryExecutor: Send + Sync {
-    async fn execute_plan(
-        &self,
-        plan: SerializedPlan,
-        remote_to_local_names: HashMap<String, String>,
-    ) -> Result<DataFrame, CubeError>;
-
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
@@ -68,45 +66,6 @@ pub struct QueryExecutorImpl;
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
-    async fn execute_plan(
-        &self,
-        plan: SerializedPlan,
-        remote_to_local_names: HashMap<String, String>,
-    ) -> Result<DataFrame, CubeError> {
-        let plan_to_move = plan.logical_plan();
-        let ctx = self.execution_context(
-            plan.index_snapshots(),
-            remote_to_local_names,
-            HashSet::new(),
-        )?;
-        let plan_ctx = ctx.clone();
-
-        let physical_plan =
-            tokio::task::spawn_blocking(move || plan_ctx.create_physical_plan(&plan_to_move))
-                .await??;
-
-        let execution_time = SystemTime::now();
-        let results = ctx.collect(physical_plan.clone()).await?;
-        debug!(
-            "Query data processing time: {:?}",
-            execution_time.elapsed()?
-        );
-        if execution_time.elapsed()?.as_millis() > 200 {
-            warn!(
-                "Slow Query ({:?}):\n{:#?}",
-                execution_time.elapsed()?,
-                plan.logical_plan()
-            );
-            debug!(
-                "Slow Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &physical_plan
-            );
-        }
-        let data_frame = batch_to_dataframe(&results)?;
-        Ok(data_frame)
-    }
-
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
@@ -126,8 +85,10 @@ impl QueryExecutor for QueryExecutorImpl {
             available_nodes,
         )?;
 
+        trace!("Router Query Physical Plan: {:#?}", &split_plan);
+
         let execution_time = SystemTime::now();
-        let results = ctx.collect(split_plan.clone()).await?;
+        let results = ctx.collect(split_plan.clone()).await;
         debug!(
             "Query data processing time: {:?}",
             execution_time.elapsed()?
@@ -143,14 +104,20 @@ impl QueryExecutor for QueryExecutorImpl {
                 execution_time.elapsed()?,
                 &split_plan
             );
-        } else {
-            trace!(
-                "Router Query Physical Plan ({:?}): {:#?}",
+        }
+        if results.is_err() {
+            error!(
+                "Error Query ({:?}):\n{:#?}",
+                execution_time.elapsed()?,
+                serialized_plan.logical_plan()
+            );
+            error!(
+                "Error Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &split_plan
             );
         }
-        let data_frame = batch_to_dataframe(&results)?;
+        let data_frame = batch_to_dataframe(&results?)?;
         Ok(data_frame)
     }
 
@@ -171,6 +138,8 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let worker_plan = self.get_worker_split_plan(physical_plan);
 
+        trace!("Partition Query Physical Plan: {:#?}", &worker_plan);
+
         let execution_time = SystemTime::now();
         let results = ctx.collect(worker_plan.clone()).await;
         debug!(
@@ -185,6 +154,18 @@ impl QueryExecutor for QueryExecutorImpl {
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {:#?}",
+                execution_time.elapsed()?,
+                &worker_plan
+            );
+        }
+        if results.is_err() {
+            error!(
+                "Error Partition Query ({:?}):\n{:#?}",
+                execution_time.elapsed()?,
+                plan.logical_plan()
+            );
+            error!(
+                "Error Partition Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &worker_plan
             );
@@ -396,7 +377,7 @@ impl CubeTable {
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             index_snapshot
-                .table()
+                .index()
                 .get_row()
                 .get_columns()
                 .iter()
@@ -451,7 +432,6 @@ impl CubeTable {
                 partition_execs.push(arc);
             }
 
-            // TODO look up in not repartitioned parent chunks
             let chunks = partition_snapshot.chunks();
             for chunk in chunks {
                 let remote_path = chunk.get_row().get_full_name(chunk.get_id());
@@ -472,22 +452,20 @@ impl CubeTable {
             partition_execs.push(Arc::new(EmptyExec::new(false, self.schema.clone())));
         }
 
-        let projected_schema = if let Some(p) = projection {
+        let projected_schema = if let Some(p) = mapped_projection {
             Arc::new(Schema::new(
-                p.iter().map(|i| self.schema.field(*i).clone()).collect(),
+                self.schema
+                    .fields()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone()))
+                    .collect(),
             ))
         } else {
             self.schema.clone()
         };
 
-        let index = self.index_snapshot.index().get_row();
-        let sort_columns = (0..(index.sort_key_size() as usize))
-            .map(|c| index.columns()[c].get_name().to_string())
-            .take(projected_schema.fields().len())
-            .collect::<Vec<_>>();
-        let plan: Arc<dyn ExecutionPlan> = if sort_columns
-            .iter()
-            .all(|sort_column| projected_schema.index_of(sort_column).is_ok())
+        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.join_on()
         {
             Arc::new(MergeSortExec::try_new(
                 Arc::new(CubeTableExec {
@@ -495,7 +473,7 @@ impl CubeTable {
                     partition_execs,
                     index_snapshot: self.index_snapshot.clone(),
                 }),
-                sort_columns,
+                join_columns.clone(),
             )?)
         } else {
             Arc::new(MergeExec::new(Arc::new(CubeTableExec {
@@ -695,6 +673,34 @@ impl TableProvider for CubeTable {
     }
 }
 
+macro_rules! convert_array {
+    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, Decimal, $SCALE: expr, $CUT_TRAILING_ZEROS: expr) => {{
+        let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+        for i in 0..$NUM_ROWS {
+            $ROWS[i].push(if a.is_null(i) {
+                TableValue::Null
+            } else {
+                let decimal = BigDecimal::new(BigInt::from(a.value(i) as i64), $SCALE).to_string();
+                TableValue::Decimal(
+                    $CUT_TRAILING_ZEROS
+                        .replace(&decimal.to_string(), "$1$3")
+                        .to_string()
+                )
+            });
+        }
+    }};
+    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, $TABLE_TYPE: ident, $NATIVE: ty) => {{
+        let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+        for i in 0..$NUM_ROWS {
+            $ROWS[i].push(if a.is_null(i) {
+                TableValue::Null
+            } else {
+                TableValue::$TABLE_TYPE(a.value(i) as $NATIVE)
+            });
+        }
+    }};
+}
+
 pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
     let mut cols = vec![];
     let mut all_rows = vec![];
@@ -719,41 +725,49 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             rows.push(Row::new(Vec::with_capacity(batch.num_columns())));
         }
 
+        let cut_trailing_zeros = Regex::new(r"^(-?\d+\.[1-9]+)([0]+)$|^(-?\d+)(\.[0]+)$").unwrap();
+
         for column_index in 0..batch.num_columns() {
             let array = batch.column(column_index);
             let num_rows = batch.num_rows();
             match array.data_type() {
-                DataType::UInt64 => {
-                    let a = array.as_any().downcast_ref::<UInt64Array>().unwrap();
-                    for i in 0..num_rows {
-                        rows[i].push(if a.is_null(i) {
-                            TableValue::Null
-                        } else {
-                            TableValue::Int(a.value(i) as i64)
-                        });
-                    }
-                }
-                DataType::Int64 => {
-                    let a = array.as_any().downcast_ref::<Int64Array>().unwrap();
-                    for i in 0..num_rows {
-                        rows[i].push(if a.is_null(i) {
-                            TableValue::Null
-                        } else {
-                            TableValue::Int(a.value(i) as i64)
-                        });
-                    }
-                }
+                DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int, i64),
+                DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
+                            let decimal = BigDecimal::try_from(a.value(i) as f64)?;
                             TableValue::Decimal(
-                                BigDecimal::try_from(a.value(i) as f64)?.to_string(),
+                                cut_trailing_zeros
+                                    .replace(&decimal.to_string(), "$1$3")
+                                    .to_string(),
                             )
                         });
                     }
+                }
+                DataType::Int64Decimal(0) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal0Array, Decimal, 0, cut_trailing_zeros)
+                }
+                DataType::Int64Decimal(1) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal1Array, Decimal, 1, cut_trailing_zeros)
+                }
+                DataType::Int64Decimal(2) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal2Array, Decimal, 2, cut_trailing_zeros)
+                }
+                DataType::Int64Decimal(3) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal3Array, Decimal, 3, cut_trailing_zeros)
+                }
+                DataType::Int64Decimal(4) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal4Array, Decimal, 4, cut_trailing_zeros)
+                }
+                DataType::Int64Decimal(5) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal5Array, Decimal, 5, cut_trailing_zeros)
+                }
+                DataType::Int64Decimal(10) => {
+                    convert_array!(array, num_rows, rows, Int64Decimal10Array, Decimal, 10, cut_trailing_zeros)
                 }
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
@@ -813,7 +827,14 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     match arrow_type {
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
-        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Decimal),
+        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Decimal {
+            scale: 10,
+            precision: 18,
+        }),
+        DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
+            scale: scale as i32,
+            precision: 18,
+        }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16

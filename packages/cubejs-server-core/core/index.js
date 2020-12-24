@@ -1,21 +1,25 @@
 /* eslint-disable global-require */
-const ApiGateway = require('@cubejs-backend/api-gateway');
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
 const LRUCache = require('lru-cache');
 const SqlString = require('sqlstring');
 const R = require('ramda');
+const isDocker = require('is-docker');
+
+const { ApiGateway } = require('@cubejs-backend/api-gateway');
+const { track, internalExceptions, getEnv, getAnonymousId } = require('@cubejs-backend/shared');
+
 const CompilerApi = require('./CompilerApi');
 const OrchestratorApi = require('./OrchestratorApi');
 const RefreshScheduler = require('./RefreshScheduler');
 const FileRepository = require('./FileRepository');
 const DevServer = require('./DevServer');
-const track = require('./track');
 const agentCollect = require('./agentCollect');
 const { version } = require('../package.json');
 const DriverDependencies = require('./DriverDependencies');
 const optionsValidate = require('./optionsValidate');
+const DataSourceStorage = require('./DataSourceStorage');
 
 const checkEnvForPlaceholders = () => {
   const placeholderSubstr = '<YOUR_DB_';
@@ -180,6 +184,7 @@ class CubejsServerCore {
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],
+      basePath: '/cubejs-api',
       ...options
     };
     if (
@@ -215,9 +220,21 @@ class CubejsServerCore {
       maxAge: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     });
-    this.dataSourceIdToOrchestratorApi = {};
-    this.contextToAppId = options.contextToAppId || (() => process.env.CUBEJS_APP || 'STANDALONE');
-    this.contextToDataSourceId = options.contextToDataSourceId || this.defaultContextToDataSourceId.bind(this);
+
+    this.orchestratorStorage = new DataSourceStorage();
+
+    if (this.options.contextToAppId) {
+      this.contextToAppId = options.contextToAppId;
+      this.standalone = false;
+    } else {
+      this.contextToAppId = () => process.env.CUBEJS_APP || 'STANDALONE';
+      this.standalone = true;
+    }
+
+    if (options.contextToDataSourceId) {
+      throw new Error(`contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.`);
+    }
+    this.contextToOrchestratorId = options.contextToOrchestratorId || this.contextToAppId;
     this.orchestratorOptions =
       typeof options.orchestratorOptions === 'function' ?
         options.orchestratorOptions :
@@ -238,15 +255,19 @@ class CubejsServerCore {
     )) {
       this.scheduledRefreshTimer = parseInt(this.scheduledRefreshTimer, 10) * 1000;
     }
+
     if (this.scheduledRefreshTimer && typeof this.scheduledRefreshTimer === 'string') {
       this.scheduledRefreshTimer = this.scheduledRefreshTimer.toLowerCase() === 'true';
     }
+
     if (this.scheduledRefreshTimer == null) {
       this.scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
     }
+
     if (typeof this.scheduledRefreshTimer === 'boolean' && this.scheduledRefreshTimer) {
-      this.scheduledRefreshTimer = 5000;
+      this.scheduledRefreshTimer = 30000;
     }
+
     if (
       this.scheduledRefreshTimer
     ) {
@@ -273,40 +294,43 @@ class CubejsServerCore {
       );
     }
 
-    const { machineIdSync } = require('node-machine-id');
-    let anonymousId = 'unknown';
-    try {
-      anonymousId = machineIdSync();
-    } catch (e) {
-      // console.error(e);
-    }
-    this.anonymousId = anonymousId;
     this.event = async (name, props) => {
       if (!options.telemetry) {
         return;
       }
-      try {
-        if (!this.projectFingerprint) {
-          try {
-            this.projectFingerprint =
-              crypto.createHash('md5').update(JSON.stringify(await fs.readJson('package.json'))).digest('hex');
-            const coreServerJson = await fs.readJson(path.join(__dirname, '..', 'package.json'));
-            this.coreServerVersion = coreServerJson.version;
-          } catch (e) {
-            // console.error(e);
-          }
+
+      if (!this.projectFingerprint) {
+        try {
+          this.projectFingerprint = crypto.createHash('md5')
+            .update(JSON.stringify(await fs.readJson('package.json')))
+            .digest('hex');
+        } catch (e) {
+          internalExceptions(e);
         }
+      }
+
+      if (!this.anonymousId) {
+        this.anonymousId = getAnonymousId();
+      }
+
+      if (!this.coreServerVersion) {
+        this.coreServerVersion = version;
+      }
+
+      const internalExceptionsEnv = getEnv('internalExceptions');
+
+      try {
         await track({
           event: name,
-          anonymousId,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
-          imageTag: process.env.CUBEJS_DOCKER_IMAGE_TAG,
-          nodeVersion: process.version,
+          dockerVersion: getEnv('dockerImageVersion'),
+          isDocker: isDocker(),
+          internalExceptions: internalExceptionsEnv !== 'false' ? internalExceptionsEnv : undefined,
           ...props
         });
       } catch (e) {
-        // console.error(e);
+        internalExceptions(e);
       }
     };
 
@@ -402,8 +426,10 @@ class CubejsServerCore {
 
   async initApp(app) {
     checkEnvForPlaceholders();
+
     const apiGateway = this.apiGateway();
     apiGateway.initApp(app);
+
     if (this.options.devServer) {
       this.devServer.initDevEnv(app);
     } else {
@@ -416,6 +442,7 @@ class CubejsServerCore {
 
   initSubscriptionServer(sendMessage) {
     checkEnvForPlaceholders();
+
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
   }
@@ -427,12 +454,14 @@ class CubejsServerCore {
         this.getCompilerApi.bind(this),
         this.getOrchestratorApi.bind(this),
         this.logger, {
+          standalone: this.standalone,
+          dataSourceStorage: this.orchestratorStorage,
           basePath: this.options.basePath,
           checkAuthMiddleware: this.options.checkAuthMiddleware,
           checkAuth: this.options.checkAuth,
           queryTransformer: this.options.queryTransformer,
           extendContext: this.options.extendContext,
-          refreshScheduler: () => new RefreshScheduler(this)
+          refreshScheduler: () => new RefreshScheduler(this),
         }
       );
     }
@@ -464,47 +493,51 @@ class CubejsServerCore {
     return compilerApi;
   }
 
-  defaultContextToDataSourceId(context) {
-    return `${this.contextToAppId(context)}_${context.dataSource}`;
-  }
-
   getOrchestratorApi(context) {
-    const dataSourceId = this.contextToDataSourceId(context);
-    if (!this.dataSourceIdToOrchestratorApi[dataSourceId]) {
-      let driverPromise;
-      let externalPreAggregationsDriverPromise;
-      this.dataSourceIdToOrchestratorApi[dataSourceId] = this.createOrchestratorApi({
-        getDriver: async () => {
-          if (!driverPromise) {
-            const driver = await this.driverFactory(context);
-            if (driver.setLogger) {
-              driver.setLogger(this.logger);
-            }
-            driverPromise = driver.testConnection().then(() => driver).catch(e => {
-              driverPromise = null;
-              throw e;
-            });
-          }
-          return driverPromise;
-        },
-        getExternalDriverFactory: this.externalDriverFactory && (async () => {
-          if (!externalPreAggregationsDriverPromise) {
-            const driver = await this.externalDriverFactory(context);
-            if (driver.setLogger) {
-              driver.setLogger(this.logger);
-            }
-            externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
-              externalPreAggregationsDriverPromise = null;
-              throw e;
-            });
-          }
-          return externalPreAggregationsDriverPromise;
-        }),
-        redisPrefix: dataSourceId,
-        orchestratorOptions: this.orchestratorOptions(context)
-      });
+    const orchestratorId = this.contextToOrchestratorId(context);
+
+    if (this.orchestratorStorage.has(orchestratorId)) {
+      return this.orchestratorStorage.get(orchestratorId);
     }
-    return this.dataSourceIdToOrchestratorApi[dataSourceId];
+
+    const driverPromise = {};
+    let externalPreAggregationsDriverPromise;
+
+    const orchestratorApi = this.createOrchestratorApi({
+      getDriver: async (dataSource) => {
+        if (!driverPromise[dataSource || 'default']) {
+          orchestratorApi.addDataSeenSource(dataSource);
+          const driver = await this.driverFactory({ ...context, dataSource });
+          if (driver.setLogger) {
+            driver.setLogger(this.logger);
+          }
+          driverPromise[dataSource || 'default'] = driver.testConnection().then(() => driver).catch(e => {
+            driverPromise[dataSource || 'default'] = null;
+            throw e;
+          });
+        }
+        return driverPromise[dataSource || 'default'];
+      },
+      getExternalDriverFactory: this.externalDriverFactory && (async () => {
+        if (!externalPreAggregationsDriverPromise) {
+          const driver = await this.externalDriverFactory(context);
+          if (driver.setLogger) {
+            driver.setLogger(this.logger);
+          }
+          externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
+            externalPreAggregationsDriverPromise = null;
+            throw e;
+          });
+        }
+        return externalPreAggregationsDriverPromise;
+      }),
+      redisPrefix: orchestratorId,
+      orchestratorOptions: this.orchestratorOptions(context)
+    });
+
+    this.orchestratorStorage.set(orchestratorId, orchestratorApi);
+
+    return orchestratorApi;
   }
 
   createCompilerApi(repository, options) {
@@ -525,6 +558,7 @@ class CubejsServerCore {
 
   createOrchestratorApi(options) {
     options = options || {};
+
     return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
       redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
       externalDriverFactory: options.getExternalDriverFactory,
@@ -578,23 +612,13 @@ class CubejsServerCore {
     throw new Error(`Unsupported db type: ${dbType}`);
   }
 
-  testConnections() {
-    const tests = [];
-    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
-      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
-      tests.push(orchestratorApi.testConnection());
-    });
-    return Promise.all(tests);
+  async testConnections() {
+    return this.orchestratorStorage.testConnections();
   }
 
   async releaseConnections() {
-    const releases = [];
-    Object.keys(this.dataSourceIdToOrchestratorApi).forEach(dataSourceId => {
-      const orchestratorApi = this.dataSourceIdToOrchestratorApi[dataSourceId];
-      releases.push(orchestratorApi.release());
-    });
-    await Promise.all(releases);
-    this.dataSourceIdToOrchestratorApi = {};
+    await this.orchestratorStorage.releaseConnections();
+
     if (this.scheduledRefreshTimerInterval) {
       clearInterval(this.scheduledRefreshTimerInterval);
     }

@@ -1,6 +1,10 @@
 FROM node:12.19
 
+ARG IMAGE_VERSION=dev
+
+ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
+ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
@@ -116,7 +120,6 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 
-VOLUME /cube/conf
 WORKDIR /cube/conf
 
 EXPOSE 4000

@@ -88,12 +88,16 @@ class CubeSymbols {
       R.unnest,
       R.map(R.toPairs),
       R.filter(v => !!v)
-    )([cube.measures, cube.dimensions, cube.segments]);
+    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations]);
     if (duplicateNames.length > 0) {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
     return Object.assign(
-      { cubeName: () => cube.name }, cube.measures || {}, cube.dimensions || {}, cube.segments || {}
+      { cubeName: () => cube.name },
+      cube.measures || {},
+      cube.dimensions || {},
+      cube.segments || {},
+      cube.preAggregations || {}
     );
   }
 

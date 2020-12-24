@@ -24,34 +24,6 @@ class PostgresDriver extends BaseDriver {
   constructor(config) {
     super();
     this.config = config || {};
-    let ssl;
-
-    const sslOptions = [
-      { name: 'ca', value: 'CUBEJS_DB_SSL_CA' },
-      { name: 'cert', value: 'CUBEJS_DB_SSL_CERT' },
-      { name: 'key', value: 'CUBEJS_DB_SSL_KEY' },
-      { name: 'ciphers', value: 'CUBEJS_DB_SSL_CIPHERS' },
-      { name: 'passphrase', value: 'CUBEJS_DB_SSL_PASSPHRASE' },
-    ];
-
-    if (
-      process.env.CUBEJS_DB_SSL === 'true' ||
-      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
-      sslOptions.find(o => !!process.env[o.value])
-    ) {
-      ssl = sslOptions.reduce(
-        (agg, { name, value }) => ({
-          ...agg,
-          ...(process.env[value] ? { [name]: process.env[value] } : {}),
-        }),
-        {}
-      );
-
-      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
-        ssl.rejectUnauthorized =
-          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
-      }
-    }
 
     this.pool = new Pool({
       max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
@@ -61,7 +33,7 @@ class PostgresDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ssl,
+      ssl: this.getSslOptions(),
       ...config
     });
     this.pool.on('error', (err) => {
@@ -126,7 +98,7 @@ class PostgresDriver extends BaseDriver {
     return !!this.config.readOnly;
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -138,6 +110,10 @@ class PostgresDriver extends BaseDriver {
       SELECT * FROM UNNEST (${columns.map((c, columnIndex) => `${this.param(columnIndex)}::${this.fromGenericType(c.type)}[]`).join(', ')})`,
         columns.map(c => tableData.rows.map(r => r[c.name]))
       );
+      for (let i = 0; i < indexesSql.length; i++) {
+        const [query, p] = indexesSql[i].sql;
+        await this.query(query, p);
+      }
     } catch (e) {
       await this.dropTable(table);
       throw e;

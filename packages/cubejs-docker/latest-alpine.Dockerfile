@@ -1,5 +1,8 @@
 FROM node:12.19-alpine
 
+ARG IMAGE_VERSION=unknown
+
+ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
 ENV CUBEJS_DOCKER_IMAGE_TAG=alpine
 
 RUN apk add rxvt-unicode
@@ -19,7 +22,6 @@ RUN yarn install
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
 
-VOLUME /cube/conf
 WORKDIR /cube/conf
 
 EXPOSE 4000

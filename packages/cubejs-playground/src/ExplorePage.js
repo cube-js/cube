@@ -1,6 +1,7 @@
 /* global window */
 import React, { Component } from 'react';
 import cubejs from '@cubejs-client/core';
+import { CubeProvider } from '@cubejs-client/react';
 import { fetch } from 'whatwg-fetch';
 import PropTypes from 'prop-types';
 import DashboardSource from './DashboardSource';
@@ -16,18 +17,28 @@ class ExplorePage extends Component {
   async componentDidMount() {
     const res = await fetch('/playground/context');
     const result = await res.json();
+
+    const basePath = result.basePath || '/cubejs-api';
+    let apiUrl = result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, '');
+    apiUrl = `${apiUrl}${basePath}/v1`;
+
     this.setState({
       cubejsToken: result.cubejsToken,
-      apiUrl:
-        result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, ''),
+      apiUrl
     });
+
+    window['__cubejsPlayground'] = {
+      ...window['__cubejsPlayground'],
+      apiUrl,
+      token: result.cubejsToken
+    };
   }
 
   cubejsApi() {
     const { cubejsToken, apiUrl } = this.state;
     if (!this.cubejsApiInstance && cubejsToken) {
       this.cubejsApiInstance = cubejs(cubejsToken, {
-        apiUrl: `${apiUrl}/cubejs-api/v1`,
+        apiUrl
       });
     }
     return this.cubejsApiInstance;
@@ -41,14 +52,16 @@ class ExplorePage extends Component {
       (params.get('query') && JSON.parse(params.get('query'))) || {};
     return (
       (this.cubejsApi() && (
-        <PlaygroundQueryBuilder
-          query={query}
-          setQuery={(q) => history.push(`/build?query=${JSON.stringify(q)}`)}
-          cubejsApi={this.cubejsApi()}
-          apiUrl={apiUrl}
-          cubejsToken={cubejsToken}
-          dashboardSource={this.dashboardSource}
-        />
+        <CubeProvider cubejsApi={this.cubejsApi()}>
+          <PlaygroundQueryBuilder
+            query={query}
+            setQuery={(q) => history.push(`/build?query=${JSON.stringify(q)}`)}
+            cubejsApi={this.cubejsApi()}
+            apiUrl={apiUrl}
+            cubejsToken={cubejsToken}
+            dashboardSource={this.dashboardSource}
+          />
+        </CubeProvider>
       )) ||
       null
     );
@@ -59,7 +72,5 @@ ExplorePage.propTypes = {
   location: PropTypes.object.isRequired,
   history: PropTypes.object.isRequired,
 };
-
-ExplorePage.defaultProps = {};
 
 export default ExplorePage;
