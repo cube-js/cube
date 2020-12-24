@@ -106,6 +106,51 @@ describe('MySqlPreAggregations', function test() {
     ])));
   }
 
+  it('in db timezone', () => compiler.compile().then(() => {
+    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'hour',
+        dateRange: ['2017-01-02T16:00:00.000', '2017-01-02T18:00:00.000'] // TODO fix MySQL pre-aggregation return incorrect results on DST switch
+      }],
+      order: [{
+        id: 'visitors.createdAt'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+
+    const queries = tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.testQueries(
+      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1))
+    ).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        [
+          {
+            'visitors__source': 'some',
+            'visitors__created_at_hour': '2017-01-02 16:00:00',
+            'visitors__count': 1
+          }
+        ]
+      );
+    });
+  }));
+
   it('partitioned', () => compiler.compile().then(() => {
     const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
