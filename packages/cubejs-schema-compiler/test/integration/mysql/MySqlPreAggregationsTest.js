@@ -118,7 +118,7 @@ describe('MySqlPreAggregations', function test() {
       preAggregationsSchema: '',
       timeDimensions: [{
         dimension: 'visitors.createdAt',
-        granularity: 'hour',
+        granularity: 'day',
         dateRange: ['2017-01-02T16:00:00.000', '2017-01-02T18:00:00.000'] // TODO fix MySQL pre-aggregation return incorrect results on DST switch
       }],
       order: [{
@@ -143,7 +143,7 @@ describe('MySqlPreAggregations', function test() {
         [
           {
             'visitors__source': 'some',
-            'visitors__created_at_hour': '2017-01-02 16:00:00',
+            'visitors__created_at_day': '2017-01-02 00:00:00',
             'visitors__count': 1
           }
         ]
