@@ -29,17 +29,17 @@ export class QueryCache {
       cacheAndQueueDriver?: 'redis' | 'memory' | 'dynamodb';
     } = {}
   ) {
-      switch (options.cacheAndQueueDriver) {
-        case 'redis':
-          this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
-          break;
-        case 'dynamodb':
-          this.cacheDriver = new DynamoDBCacheDriver();
-          break;
-        case 'memory':
-        default:
-          this.cacheDriver = new LocalCacheDriver();
-      }
+    switch (options.cacheAndQueueDriver) {
+      case 'redis':
+        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
+        break;
+      case 'dynamodb':
+        this.cacheDriver = new DynamoDBCacheDriver();
+        break;
+      case 'memory':
+      default:
+        this.cacheDriver = new LocalCacheDriver();
+    }
   }
 
   public async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
