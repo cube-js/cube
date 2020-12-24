@@ -432,7 +432,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 | DataType::Array(_) => ColumnType::Bytes,
                 DataType::Decimal(precision, scale) => {
                     let mut precision = precision.unwrap_or(18);
-                    let mut scale = scale.unwrap_or(0);
+                    let mut scale = scale.unwrap_or(5);
                     if precision > 18 {
                         precision = 18;
                     }
@@ -850,7 +850,7 @@ mod tests {
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             let _ = service
-                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal(2), dec_value_1 decimal(18, 2))")
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
                 .await
                 .unwrap();
 
@@ -864,28 +864,28 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("7".to_string()), TableValue::Decimal("59.92".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("7.61".to_string()), TableValue::Decimal("59.92".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) from foo.values where dec_value > 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160".to_string()), TableValue::Decimal("58.92".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Decimal("58.92".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value > 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160".to_string()), TableValue::Decimal("5.892".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Decimal("5.892".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-133".to_string()), TableValue::Decimal("0.45".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Decimal("0.45".to_string())]));
         })
             .await;
     }

@@ -674,14 +674,17 @@ impl TableProvider for CubeTable {
 }
 
 macro_rules! convert_array {
-    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, Decimal, $SCALE: expr) => {{
+    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, Decimal, $SCALE: expr, $CUT_TRAILING_ZEROS: expr) => {{
         let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
         for i in 0..$NUM_ROWS {
             $ROWS[i].push(if a.is_null(i) {
                 TableValue::Null
             } else {
+                let decimal = BigDecimal::new(BigInt::from(a.value(i) as i64), $SCALE).to_string();
                 TableValue::Decimal(
-                    BigDecimal::new(BigInt::from(a.value(i) as i64), $SCALE).to_string(),
+                    $CUT_TRAILING_ZEROS
+                        .replace(&decimal.to_string(), "$1$3")
+                        .to_string()
                 )
             });
         }
@@ -722,7 +725,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             rows.push(Row::new(Vec::with_capacity(batch.num_columns())));
         }
 
-        let cut_trailing_zeros = Regex::new(r"^(-?\d+\.[1-9]*)([0]+)$").unwrap();
+        let cut_trailing_zeros = Regex::new(r"^(-?\d+\.[1-9]+)([0]+)$|^(-?\d+)(\.[0]+)$").unwrap();
 
         for column_index in 0..batch.num_columns() {
             let array = batch.column(column_index);
@@ -739,32 +742,32 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                             let decimal = BigDecimal::try_from(a.value(i) as f64)?;
                             TableValue::Decimal(
                                 cut_trailing_zeros
-                                    .replace(&decimal.to_string(), "$1")
+                                    .replace(&decimal.to_string(), "$1$3")
                                     .to_string(),
                             )
                         });
                     }
                 }
                 DataType::Int64Decimal(0) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal0Array, Decimal, 0)
+                    convert_array!(array, num_rows, rows, Int64Decimal0Array, Decimal, 0, cut_trailing_zeros)
                 }
                 DataType::Int64Decimal(1) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal1Array, Decimal, 1)
+                    convert_array!(array, num_rows, rows, Int64Decimal1Array, Decimal, 1, cut_trailing_zeros)
                 }
                 DataType::Int64Decimal(2) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal2Array, Decimal, 2)
+                    convert_array!(array, num_rows, rows, Int64Decimal2Array, Decimal, 2, cut_trailing_zeros)
                 }
                 DataType::Int64Decimal(3) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal3Array, Decimal, 3)
+                    convert_array!(array, num_rows, rows, Int64Decimal3Array, Decimal, 3, cut_trailing_zeros)
                 }
                 DataType::Int64Decimal(4) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal4Array, Decimal, 4)
+                    convert_array!(array, num_rows, rows, Int64Decimal4Array, Decimal, 4, cut_trailing_zeros)
                 }
                 DataType::Int64Decimal(5) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal5Array, Decimal, 5)
+                    convert_array!(array, num_rows, rows, Int64Decimal5Array, Decimal, 5, cut_trailing_zeros)
                 }
                 DataType::Int64Decimal(10) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal10Array, Decimal, 10)
+                    convert_array!(array, num_rows, rows, Int64Decimal10Array, Decimal, 10, cut_trailing_zeros)
                 }
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
