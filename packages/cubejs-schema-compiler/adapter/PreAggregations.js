@@ -420,8 +420,8 @@ class PreAggregations {
         const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
           existing => existing.originalFrom === target.originalFrom &&
             existing.originalTo === target.originalTo &&
-            R.eq(existing.fromMembers, target.fromMembers) &&
-            R.eq(existing.toMembers, target.toMembers)
+            R.equals(existing.fromMembers, target.fromMembers) &&
+            R.equals(existing.toMembers, target.toMembers)
         ));
         if (!nonExistingJoins.length) {
           throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
