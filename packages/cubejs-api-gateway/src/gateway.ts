@@ -677,7 +677,7 @@ export class ApiGateway {
     }
   }
 
-  protected async defaultCheckAuth(req, auth) {
+  protected async defaultCheckAuth(req: Request, auth?: string) {
     if (auth) {
       const secret = this.apiSecret;
       try {
@@ -698,11 +698,24 @@ export class ApiGateway {
     }
   }
 
+  protected extractAuthorizationHeaderWithSchema(req: Request) {
+    if (typeof req.headers.authorization === 'string') {
+      const parts = req.headers.authorization.split(' ', 2);
+      if (parts.length === 1) {
+        return parts[0];
+      }
+
+      return parts[1];
+    }
+
+    return undefined;
+  }
+
   protected checkAuth: RequestHandler = async (req, res, next) => {
-    const auth = req.headers.authorization;
+    const token = this.extractAuthorizationHeaderWithSchema(req);
 
     try {
-      await this.checkAuthFn(req, auth);
+      await this.checkAuthFn(req, token);
       if (next) {
         next();
       }
@@ -712,7 +725,7 @@ export class ApiGateway {
       } else {
         this.log(req, {
           type: 'Auth Error',
-          token: auth,
+          token,
           error: e.stack || e.toString()
         });
         res.status(500).json({ error: e.toString() });
