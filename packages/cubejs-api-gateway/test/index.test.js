@@ -94,10 +94,18 @@ describe('API Gateway', () => {
   const app = express();
   apiGateway.initApp(app);
 
-  test('working token', async () => {
+  test('bad token', async () => {
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
       .set('Authorization', 'foo')
+      .expect(403);
+    expect(res.body && res.body.error).toStrictEqual('Invalid token');
+  });
+
+  test('bad token with schema', async () => {
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'Bearer foo')
       .expect(403);
     expect(res.body && res.body.error).toStrictEqual('Invalid token');
   });
@@ -112,6 +120,17 @@ describe('API Gateway', () => {
       .get('/cubejs-api/v1/load?query={}')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(400);
+    expect(res.body && res.body.error).toStrictEqual(
+      'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
+    );
+  });
+
+  test('passes correct token with auth schema', async () => {
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={}')
+      .set('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
     expect(res.body && res.body.error).toStrictEqual(
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
     );
