@@ -1115,6 +1115,8 @@ describe('PreAggregations', function test() {
       preAggregationsSchema: '',
       order: [{
         id: 'visitors.source',
+      }, {
+        id: 'cards.visitorId',
       }],
     });
 
