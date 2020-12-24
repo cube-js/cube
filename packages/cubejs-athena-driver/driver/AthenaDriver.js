@@ -1,6 +1,7 @@
 const AWS = require('aws-sdk');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { getEnv } = require('@cubejs-backend/shared');
 const SqlString = require('sqlstring');
 
 function pause(ms) {
@@ -10,17 +11,19 @@ function pause(ms) {
 const applyParams = (query, params) => SqlString.format(query, params);
 
 class AthenaDriver extends BaseDriver {
-  constructor(config) {
+  constructor(config = {}) {
     super();
+
     this.config = {
       accessKeyId: process.env.CUBEJS_AWS_KEY,
       secretAccessKey: process.env.CUBEJS_AWS_SECRET,
       region: process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
-      pollTimeout: 15 * 60 * 1000,
-      pollMaxInterval: 5000,
-      ...config
+      ...config,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
+
     this.athena = new AWS.Athena(this.config);
     this.athena.startQueryExecutionAsync = promisify(this.athena.startQueryExecution.bind(this.athena));
     this.athena.stopQueryExecutionAsync = promisify(this.athena.stopQueryExecution.bind(this.athena));
@@ -99,16 +102,17 @@ class AthenaDriver extends BaseDriver {
       }
     });
 
-    for (let i = 0, elapsed = 0; elapsed <= this.config.pollTimeout; i++) {
+    const startedTime = Date.now();
+
+    for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
       const result = await this.awaitForJobStatus(QueryExecutionId, query, options);
       if (result) {
         return result;
       }
 
-      const waitInterval = Math.min(this.config.pollMaxInterval, 500 * i);
-      await pause(waitInterval);
-
-      elapsed += waitInterval;
+      await pause(
+        Math.min(this.config.pollMaxInterval, 500 * i)
+      );
     }
 
     throw new Error(

@@ -1,7 +1,8 @@
 /* eslint-disable no-underscore-dangle */
-const { BigQuery } = require('@google-cloud/bigquery');
 const R = require('ramda');
+const { BigQuery } = require('@google-cloud/bigquery');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { getEnv } = require('@cubejs-backend/shared');
 
 function pause(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -10,19 +11,19 @@ function pause(ms) {
 const suffixTableRegex = /^(.*?)([0-9_]+)$/;
 
 class BigQueryDriver extends BaseDriver {
-  constructor(config) {
+  constructor(config = {}) {
     super();
 
     this.options = {
       scopes: ['https://www.googleapis.com/auth/bigquery', 'https://www.googleapis.com/auth/drive'],
       projectId: process.env.CUBEJS_DB_BQ_PROJECT_ID,
       keyFilename: process.env.CUBEJS_DB_BQ_KEY_FILE,
-      pollTimeout: 15 * 60 * 1000,
-      pollMaxInterval: 5000,
       credentials: process.env.CUBEJS_DB_BQ_CREDENTIALS ?
         JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
         undefined,
-      ...config
+      ...config,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
     this.bigquery = new BigQuery(this.options);
@@ -188,16 +189,17 @@ class BigQueryDriver extends BaseDriver {
   async runQueryJob(bigQueryQuery, options, withResults = true) {
     const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
 
-    for (let i = 0, elapsed = 0; elapsed <= this.options.pollTimeout; i++) {
+    const startedTime = Date.now();
+
+    for (let i = 0; Date.now() - startedTime <= this.options.pollTimeout; i++) {
       const result = await this.awaitForJobStatus(job, options, withResults);
       if (result) {
         return result;
       }
 
-      const waitInterval = Math.min(this.options.pollMaxInterval, 200 * i);
-      await pause(waitInterval);
-
-      elapsed += waitInterval;
+      await pause(
+        Math.min(this.options.pollMaxInterval, 200 * i)
+      );
     }
 
     throw new Error(
