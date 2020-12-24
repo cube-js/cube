@@ -1438,10 +1438,10 @@ domexception@^2.0.1:
   dependencies:
     webidl-conversions "^5.0.0"
 
-dynamodb-toolbox@^0.2.0-beta.1:
-  version "0.2.0-beta.1"
-  resolved "https://registry.yarnpkg.com/dynamodb-toolbox/-/dynamodb-toolbox-0.2.0-beta.1.tgz#ae1665917307ac7e2f976ba6e759e6ddfd874ace"
-  integrity sha512-53HGoyzII0cN95B/5Yb6nzHe6IRm8W+IRmUJZURNcfB7P24TZf9b8GdzF8vuncTfoVlHecTfpjJoZmbQLDRH4A==
+dynamodb-toolbox@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/dynamodb-toolbox/-/dynamodb-toolbox-0.3.0.tgz#e34c503a9cd5f9fedf8fded9a4409fcba857cfe6"
+  integrity sha512-TVWkzvLfQK32YgZVuQV3iwQ4cyMf0+BgY8fj34z7aEBgibJNvvWiydfOVVcskRm5n+0g73v0gmhITxI1Ae425w==
 
 ecc-jsbn@~0.1.1:
   version "0.1.2"
