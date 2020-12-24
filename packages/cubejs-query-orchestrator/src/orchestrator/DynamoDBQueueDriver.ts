@@ -15,9 +15,10 @@ import R from 'ramda';
 import { BaseQueueDriver } from './BaseQueueDriver';
 
 import { Table, Entity } from 'dynamodb-toolbox';
-const DynamoDB = require('aws-sdk/clients/dynamodb');
+import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 
-const DocumentClient = new DynamoDB.DocumentClient();
+const DynamoDB = require('aws-sdk/clients/dynamodb');
+const documentClient = new DynamoDB.DocumentClient();
 
 // Need to specify a value for the single table design and we want it static
 const QUEUE_SIZE_SORT_KEY = 'empty';
@@ -26,7 +27,7 @@ const PROCESSING_COUNTER_SORT_KEY = 'empty';
 export class DynamoDBQueueDriverConnection {
   driver;
 
-  redisQueuePrefix;
+  protected readonly redisQueuePrefix: string;
 
   continueWaitTimeout;
 
@@ -36,13 +37,13 @@ export class DynamoDBQueueDriverConnection {
 
   concurrency;
 
-  tableName;
+  public readonly tableName: string;
 
-  table;
+  protected readonly table: Table;
 
-  queue;
+  protected readonly queue: Entity<{}>;
 
-  queueSize;
+  protected readonly queueSize: Entity<{}>;
 
   processingCounter;
 
@@ -70,7 +71,7 @@ export class DynamoDBQueueDriverConnection {
       },
 
       // Add the DocumentClient
-      DocumentClient
+      DocumentClient: documentClient
     });
 
     this.queue = new Entity({
@@ -290,7 +291,7 @@ export class DynamoDBQueueDriverConnection {
     const orphanedQueriesResult = await this.queue.query(this.recentRedisKey(), {
       limit: 100, // limit to 100 items - TODO: validate this number
       index: 'GSI1', // query the GSI1 secondary index
-      lt: orphanedTime // GSI1sk (inserted) is less than orphaned time
+      lt: orphanedTime.toString() // GSI1sk (inserted) is less than orphaned time
     });
 
     const queryKeys = orphanedQueriesResult.Items ? orphanedQueriesResult.Items.map(item => item.queryKey) : [];
@@ -302,7 +303,7 @@ export class DynamoDBQueueDriverConnection {
     const stalledQueriesResult = await this.queue.query(this.heartBeatRedisKey(), {
       limit: 100, // limit to 100 items - TODO: validate this number
       index: 'GSI1', // query the GSI1 secondary index
-      lt: stalledTime // GSI1sk (inserted) is less than stalled time
+      lt: stalledTime.toString() // GSI1sk (inserted) is less than stalled time
     });
 
     const queryKeys = stalledQueriesResult.Items ? stalledQueriesResult.Items.map(item => item.queryKey) : [];
@@ -422,7 +423,7 @@ export class DynamoDBQueueDriverConnection {
     const getTransactionResult = await this.table.transactGet([
       this.queueSize.getTransaction({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY }),
       this.queue.getTransaction({ key: this.queriesDefKey(), queryKey: this.redisHash(queryKey) }),
-    ]);
+    ]) as DocumentClient.TransactGetItemsOutput;
 
     const queueSize = getTransactionResult.Responses[0].Item.size ?? undefined;
     const queryData = getTransactionResult.Responses[1] && getTransactionResult.Responses[1].Item
@@ -490,7 +491,7 @@ export class DynamoDBQueueDriverConnection {
         const updateResult = await this.queue.update({
           key: this.queriesDefKey(),
           queryKey: this.redisHash(queryKey)
-        }, { returnValues: 'all_old' });
+        }, { returnValues: 'all_old' }) as DocumentClient.UpdateItemOutput;
 
         const beforeUpdate = JSON.parse(updateResult.Attributes.value);
         if (JSON.stringify(query) === JSON.stringify(beforeUpdate)) {

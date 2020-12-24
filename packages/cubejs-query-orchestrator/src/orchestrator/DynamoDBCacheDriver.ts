@@ -1,7 +1,6 @@
 import { Table, Entity } from 'dynamodb-toolbox' ;
 
 const DynamoDB = require('aws-sdk/clients/dynamodb');
-
 const DocumentClient = new DynamoDB.DocumentClient();
 
 const TTL_KEY = process.env.DYNAMODB_TTL_KEY ?? 'exp';
