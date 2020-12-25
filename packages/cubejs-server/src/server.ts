@@ -6,6 +6,7 @@ import CubeCore, {
   DatabaseType,
 } from '@cubejs-backend/server-core';
 import { getEnv } from '@cubejs-backend/shared';
+import stoppable, { StoppableServer } from 'stoppable';
 import express from 'express';
 import https from 'https';
 import http from 'http';
@@ -29,6 +30,7 @@ export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions
   webSockets?: boolean;
   initApp?: InitAppFn;
   http?: HttpOptions;
+  gracefulShutdownTimer?: number;
 }
 
 type RequireOne<T, K extends keyof T> = {
@@ -44,7 +46,7 @@ export class CubejsServer {
 
   protected redirector: http.Server | null = null;
 
-  protected server: http.Server | https.Server | null = null;
+  protected server: http.Server | StoppableServer | https.Server | null = null;
 
   protected socketServer: WebSocketServer | null = null;
 
@@ -108,7 +110,9 @@ export class CubejsServer {
       }
 
       if (enableTls) {
-        this.server = https.createServer(options, app);
+        this.server = this.config.gracefulShutdownTimer
+          ? stoppable(https.createServer(options, app), this.config.gracefulShutdownTimer)
+          : https.createServer(options, app);
       } else {
         const [major] = process.version.split('.');
         if (major === '8' && Object.keys(options).length) {
@@ -117,9 +121,13 @@ export class CubejsServer {
             'CustomWarning',
           );
 
-          this.server = http.createServer(app);
+          this.server = this.config.gracefulShutdownTimer
+            ? stoppable(http.createServer(app), this.config.gracefulShutdownTimer)
+            : http.createServer(app);
         } else {
-          this.server = http.createServer(options, app);
+          this.server = this.config.gracefulShutdownTimer
+            ? stoppable(http.createServer(options, app), this.config.gracefulShutdownTimer)
+            : http.createServer(options, app);
         }
       }
 
@@ -200,5 +208,54 @@ export class CubejsServer {
 
   public static version() {
     return version;
+  }
+
+  public registerShutdownHandler() {
+    process.on('SIGTERM', () => this.shutdown('SIGTERM'));
+    process.on('SIGINT', () => this.shutdown('SIGTERM'));
+  }
+
+  protected async shutdown(signal: string) {
+    console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdownTimer}s`);
+
+    try {
+      if (this.redirector) {
+        this.redirector.close();
+      }
+
+      const locks: Promise<any>[] = [
+        this.core.beforeShutdown()
+      ];
+
+      if (this.config.gracefulShutdownTimer) {
+        if (this.server) {
+          locks.push(
+            new Promise((resolve) => {
+              (<stoppable.StoppableServer> this.server).stop(() => {
+                resolve(true);
+              });
+            })
+          );
+        }
+
+        if (this.socketServer) {
+          locks.push(
+            this.socketServer.close()
+          );
+        }
+      }
+
+      // Await before all connections/refresh scheduler will end jobs
+      await Promise.all(locks);
+
+      await this.core.shutdown();
+
+      process.exit(0);
+    } catch (e) {
+      console.error('Fatal error during server shutting down: ');
+      console.error(e.stack || e);
+
+      process.exit(1);
+    }
   }
 }

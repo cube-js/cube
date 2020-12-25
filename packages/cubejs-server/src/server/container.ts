@@ -1,4 +1,3 @@
-import { CreateOptions } from '@cubejs-backend/server-core';
 import { isDockerImage, packageExists, PackageManifest, resolveBuiltInPackageVersion } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
@@ -12,7 +11,7 @@ import {
   isSimilarPackageRelease, parseNpmLock,
   parseYarnLock, ProjectLock,
 } from './utils';
-import { CubejsServer } from '../server';
+import { CreateOptions, CubejsServer } from '../server';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 function safetyParseSemver(version: string|null) {
@@ -212,6 +211,10 @@ export class ServerContainer {
 
     try {
       const { version, port } = await server.listen();
+
+      if (configuration.gracefulShutdownTimer) {
+        server.registerShutdownHandler();
+      }
 
       console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
     } catch (e) {

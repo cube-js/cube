@@ -24,7 +24,7 @@ export class DevServer extends Command {
     await container.runProjectDiagnostics();
 
     const configuration = await container.lookupConfiguration();
-    container.runServerInstance(configuration);
+    await container.runServerInstance(configuration);
   }
 }
 
