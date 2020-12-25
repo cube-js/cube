@@ -1,4 +1,4 @@
-/* globals describe,test,expect,jest */
+/* eslint-disable @typescript-eslint/no-shadow */
 import express from 'express';
 import request from 'supertest';
 
@@ -41,22 +41,46 @@ const compilerApi = jest.fn().mockImplementation(() => ({
 }));
 
 class DataSourceStorageMock {
-  async testConnections() {
+  public $testConnectionsDone: boolean = false;
+
+  public $testOrchestratorConnectionsDone: boolean = false;
+
+  public async testConnections() {
+    this.$testConnectionsDone = true;
+
     return [];
   }
 
-  async testOrchestratorConnections() {
+  public async testOrchestratorConnections() {
+    this.$testOrchestratorConnectionsDone = true;
+
     return [];
   }
 }
 
-const adapterApi = jest.fn().mockImplementation(() => ({
-  testConnection: () => Promise.resolve(),
-  testOrchestratorConnections: () => Promise.resolve(),
-  executeQuery: async () => ({
-    data: [{ foo__bar: 42 }],
-  }),
-}));
+class AdapterApiMock {
+  public $testConnectionsDone: boolean = false;
+
+  public $testOrchestratorConnectionsDone: boolean = false;
+
+  public async testConnection() {
+    this.$testConnectionsDone = true;
+
+    return [];
+  }
+
+  public async testOrchestratorConnections() {
+    this.$testOrchestratorConnectionsDone = true;
+
+    return [];
+  }
+
+  public async executeQuery() {
+    return {
+      data: [{ foo__bar: 42 }]
+    };
+  }
+}
 
 const logger = (type, message) => console.log({ type, ...message });
 
@@ -83,18 +107,35 @@ async function requestBothGetAndPost(app, { url, query, body }, assert) {
   }
 }
 
-describe('API Gateway', () => {
+function createApiGateway(
+  adapterApi: any = new AdapterApiMock(),
+  dataSourceStorage: any = new DataSourceStorageMock(),
+) {
   process.env.NODE_ENV = 'production';
-  const apiGateway = new ApiGateway('secret', compilerApi, adapterApi, logger, {
+
+  const apiGateway = new ApiGateway('secret', compilerApi, () => adapterApi, logger, {
     standalone: true,
-    orchestratorStorage: new DataSourceStorageMock(),
-    basePath: '/cubejs-api'
+    dataSourceStorage,
+    basePath: '/cubejs-api',
+    refreshScheduler: {},
   });
-  process.env.NODE_ENV = null;
+
+  process.env.NODE_ENV = 'unknown';
   const app = express();
   apiGateway.initApp(app);
 
+  return {
+    app,
+    apiGateway,
+    dataSourceStorage,
+    adapterApi
+  };
+}
+
+describe('API Gateway', () => {
   test('bad token', async () => {
+    const { app } = createApiGateway();
+
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
       .set('Authorization', 'foo')
@@ -103,6 +144,8 @@ describe('API Gateway', () => {
   });
 
   test('bad token with schema', async () => {
+    const { app } = createApiGateway();
+
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
       .set('Authorization', 'Bearer foo')
@@ -111,11 +154,15 @@ describe('API Gateway', () => {
   });
 
   test('requires auth', async () => {
+    const { app } = createApiGateway();
+
     const res = await request(app).get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}').expect(403);
     expect(res.body && res.body.error).toStrictEqual('Authorization header isn\'t set');
   });
 
   test('passes correct token', async () => {
+    const { app } = createApiGateway();
+
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={}')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
@@ -126,6 +173,8 @@ describe('API Gateway', () => {
   });
 
   test('passes correct token with auth schema', async () => {
+    const { app } = createApiGateway();
+
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={}')
       .set('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
@@ -137,6 +186,8 @@ describe('API Gateway', () => {
   });
 
   test('null filter values', async () => {
+    const { app } = createApiGateway();
+
     const res = await request(app)
       .get(
         '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
@@ -148,6 +199,8 @@ describe('API Gateway', () => {
   });
 
   test('dry-run', async () => {
+    const { app } = createApiGateway();
+
     const query = {
       measures: ['Foo.bar']
     };
@@ -185,6 +238,8 @@ describe('API Gateway', () => {
   });
 
   test('date range padding', async () => {
+    const { app } = createApiGateway();
+
     const res = await request(app)
       .get(
         '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"timeDimensions":[{"dimension":"Foo.time","granularity":"hour","dateRange":["2020-01-01","2020-01-01"]}]}'
@@ -199,6 +254,8 @@ describe('API Gateway', () => {
   });
 
   test('order support object format', async () => {
+    const { app } = createApiGateway();
+
     const query = {
       measures: ['Foo.bar'],
       order: {
@@ -214,6 +271,8 @@ describe('API Gateway', () => {
   });
 
   test('order support array of tuples', async () => {
+    const { app } = createApiGateway();
+
     const query = {
       measures: ['Foo.bar'],
       order: [
@@ -233,6 +292,8 @@ describe('API Gateway', () => {
   });
 
   test('post http method for load route', async () => {
+    const { app } = createApiGateway();
+
     const query = {
       measures: ['Foo.bar'],
       order: [
@@ -270,6 +331,8 @@ describe('API Gateway', () => {
     });
 
     test('multi query with a flag', async () => {
+      const { app } = createApiGateway();
+
       const res = await request(app)
         .get(`/cubejs-api/v1/load?${searchParams.toString()}`)
         .set('Content-type', 'application/json')
@@ -286,6 +349,8 @@ describe('API Gateway', () => {
     });
 
     test('multi query without a flag', async () => {
+      const { app } = createApiGateway();
+
       searchParams.delete('queryType');
 
       await request(app)
@@ -296,6 +361,8 @@ describe('API Gateway', () => {
     });
 
     test('regular query', async () => {
+      const { app } = createApiGateway();
+
       const query = JSON.stringify({
         measures: ['Foo.bar'],
         timeDimensions: [
@@ -320,8 +387,12 @@ describe('API Gateway', () => {
         data: [{ 'Foo.bar': 42 }],
       });
     });
+  });
 
-    test('readyz', async () => {
+  describe('healtchecks', () => {
+    test('readyz (standalone)', async () => {
+      const { app, adapterApi } = createApiGateway();
+
       const res = await request(app)
         .get('/readyz')
         .set('Content-type', 'application/json')
@@ -329,16 +400,77 @@ describe('API Gateway', () => {
         .expect(200);
 
       expect(res.body).toMatchObject({ health: 'HEALTH' });
+
+      console.log(adapterApi);
+      expect(adapterApi.$testConnectionsDone).toEqual(true);
+      expect(adapterApi.$testOrchestratorConnectionsDone).toEqual(true);
     });
 
-    test('livez', async () => {
+    test('readyz (standalone)', async () => {
+      const { app, adapterApi } = createApiGateway();
+
       const res = await request(app)
-        .get('/livez')
+        .get('/readyz')
         .set('Content-type', 'application/json')
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
 
       expect(res.body).toMatchObject({ health: 'HEALTH' });
+
+      console.log(adapterApi);
+      expect(adapterApi.$testConnectionsDone).toEqual(true);
+      expect(adapterApi.$testOrchestratorConnectionsDone).toEqual(true);
+    });
+
+    test('readyz (standalone) partial outage', async () => {
+      class AdapterApiUnhealthyMock extends AdapterApiMock {
+        public async testConnection() {
+          this.$testConnectionsDone = true;
+
+          throw new Error('It\'s expected exception for testing');
+
+          return [];
+        }
+      }
+
+      const { app, adapterApi } = createApiGateway(new AdapterApiUnhealthyMock());
+
+      const res = await request(app)
+        .get('/readyz')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(500);
+
+      expect(res.body).toMatchObject({ health: 'DOWN' });
+
+      console.log(adapterApi);
+      expect(adapterApi.$testConnectionsDone).toEqual(true);
+      expect(adapterApi.$testOrchestratorConnectionsDone).toEqual(false);
+    });
+
+    test('livez (standalone) partial outage', async () => {
+      class DataSourceStorageUnhealthyMock extends DataSourceStorageMock {
+        public async testConnections() {
+          this.$testConnectionsDone = true;
+
+          throw new Error('It\'s expected exception for testing');
+
+          return [];
+        }
+      }
+
+      const { app, dataSourceStorage } = createApiGateway(new AdapterApiMock(), new DataSourceStorageUnhealthyMock());
+
+      const res = await request(app)
+        .get('/livez')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(500);
+
+      expect(res.body).toMatchObject({ health: 'DOWN' });
+
+      expect(dataSourceStorage.$testConnectionsDone).toEqual(true);
+      expect(dataSourceStorage.$testOrchestratorConnectionsDone).toEqual(false);
     });
   });
 });
