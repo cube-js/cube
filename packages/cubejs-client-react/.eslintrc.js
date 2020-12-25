@@ -2,6 +2,7 @@ module.exports = {
   extends: 'airbnb',
   plugins: ['react', 'jsx-a11y', 'import'],
   rules: {
+    'object-curly-newline': 0,
     'react/jsx-no-bind': 0,
     'react/jsx-first-prop-new-line': 0,
     'react/jsx-indent-props': 0,
