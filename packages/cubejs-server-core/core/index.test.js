@@ -87,6 +87,7 @@ describe('index.test', () => {
       updateCompilerCacheKeepAlive: true,
       telemetry: false,
       allowUngroupedWithoutPrimaryKey: true,
+      scheduledRefreshConcurrency: 4,
       orchestratorOptions: {
         redisPrefix: 'some-prefix',
         queryCacheOptions: {

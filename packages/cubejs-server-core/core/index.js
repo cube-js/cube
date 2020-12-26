@@ -185,6 +185,7 @@ class CubejsServerCore {
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],
       basePath: '/cubejs-api',
+      scheduledRefreshConcurrency: parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
       ...options
     };
     if (
@@ -280,14 +281,11 @@ class CubejsServerCore {
             });
           }
           await Promise.all(contexts.map(async context => {
+            const queryingOptions = { scheduledRefreshConcurrency: this.options.scheduledRefreshConcurrency };
             if (this.scheduledRefreshTimeZones) {
-              // eslint-disable-next-line no-restricted-syntax
-              for (const timezone of this.scheduledRefreshTimeZones) {
-                await this.runScheduledRefresh(context, { timezone });
-              }
-            } else {
-              await this.runScheduledRefresh(context);
+              queryingOptions.timezones = this.scheduledRefreshTimeZones;
             }
+            await this.runScheduledRefresh(context, queryingOptions);
           }));
         },
         this.scheduledRefreshTimer
