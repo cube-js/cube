@@ -291,6 +291,11 @@ export class DynamoDBQueueDriverConnection {
         this.queue.deleteTransaction({ key: this.recentRedisKey(), queryKey: redisHash }),
         this.queue.deleteTransaction({ key: this.queriesDefKey(), queryKey: redisHash }),
         this.queue.deleteTransaction({ key: this.queryProcessingLockKey(queryKey), queryKey: redisHash }),
+        this.queueSize.updateTransaction({
+          key: this.queueSizeRedisKey(),
+          sk: QUEUE_SIZE_SORT_KEY,
+          size: { $add: -1 } // decrement queue size by 1
+        })
       ]
     );
   }
@@ -298,9 +303,11 @@ export class DynamoDBQueueDriverConnection {
   public async getOrphanedQueries() {
     const orphanedTime = new Date().getTime() - this.orphanedTimeout * 1000;
     const orphanedQueriesResult = await this.queue.query(this.recentRedisKey(), {
-      limit: 100, // limit to 100 items - TODO: validate this number
+      limit: 50, // limit to 50 items
       index: 'GSI1', // query the GSI1 secondary index
-      lt: orphanedTime.toString() // GSI1sk (inserted) is less than orphaned time
+
+      // @ts-ignore - TODO: remove when my PR is merged into dynamo-toolbox
+      lt: orphanedTime // GSI1sk (inserted) is less than orphaned time
     });
 
     const queryKeys = orphanedQueriesResult.Items ? orphanedQueriesResult.Items.map(item => item.queryKey) : [];
@@ -310,9 +317,11 @@ export class DynamoDBQueueDriverConnection {
   public async getStalledQueries() {
     const stalledTime = new Date().getTime() - this.heartBeatTimeout * 1000;
     const stalledQueriesResult = await this.queue.query(this.heartBeatRedisKey(), {
-      limit: 100, // limit to 100 items - TODO: validate this number
+      limit: 50, // limit to 50 items
       index: 'GSI1', // query the GSI1 secondary index
-      lt: stalledTime.toString() // GSI1sk (inserted) is less than stalled time
+
+      // @ts-ignore - TODO: remove when my PR is merged into dynamo-toolbox
+      lt: stalledTime // GSI1sk (inserted) is less than stalled time
     });
 
     const queryKeys = stalledQueriesResult.Items ? stalledQueriesResult.Items.map(item => item.queryKey) : [];
