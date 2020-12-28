@@ -14,21 +14,29 @@ const repo = {
   name: 'cubejs-playground-templates'
 };
 
+function shouldStartConnectionWizardFlow() {
+  return !(fs.existsSync('./.env') || fs.existsSync('./cube.js'));
+}
+
 class DevServer {
   constructor(cubejsServer) {
     this.cubejsServer = cubejsServer;
   }
 
   initDevEnv(app) {
+    const jwt = require('jsonwebtoken');
+    
     const port = process.env.PORT || 4000; // TODO
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
-    const jwt = require('jsonwebtoken');
-    const cubejsToken = jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' });
+    // todo: empty/default `apiSecret` in dev mode to allow the DB connection wizard
+    const cubejsToken = jwt.sign({}, this.cubejsServer.apiSecret || 'secret', { expiresIn: '1d' });
+    
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.');
     } else {
       console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
     }
+    
     console.log(`🦅 Dev environment available at ${apiUrl}`);
     this.cubejsServer.event('Dev Server Start');
     const serveStatic = require('serve-static');
@@ -45,13 +53,15 @@ class DevServer {
 
     app.get('/playground/context', catchErrors((req, res) => {
       this.cubejsServer.event('Dev Server Env Open');
+      
       res.json({
-        cubejsToken: jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }),
+        cubejsToken: this.cubejsServer.apiSecret && jwt.sign({}, this.cubejsServer.apiSecret, { expiresIn: '1d' }) || null,
         apiUrl: process.env.CUBEJS_API_URL,
         basePath: this.cubejsServer.options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
-        projectFingerprint: this.cubejsServer.projectFingerprint
+        projectFingerprint: this.cubejsServer.projectFingerprint,
+        shouldStartConnectionWizardFlow: shouldStartConnectionWizardFlow()
       });
     }));
 
@@ -257,7 +267,42 @@ class DevServer {
       const fetcher = process.env.TEST_TEMPLATES ? new DevPackageFetcher(repo) : new PackageFetcher(repo);
       res.json(await fetcher.manifestJSON());
     }));
-
+    
+    app.get('/playground/test-connection', catchErrors(async (req, res) => {
+      const orchestratorApi = this.cubejsServer.getOrchestratorApi();
+      
+      const badConnectionResponse = () => res.status(400).json({
+        message: 'Connection to the DB failed'
+      });
+      
+      try {
+        await orchestratorApi.testConnection();
+      } catch (e) {
+        console.error('Test connection failed', e.stack || e.toString());
+        return badConnectionResponse();
+      }
+      // try {
+      //   await orchestratorApi.testConnection();
+      // } catch (e) {
+      //   console.error('Test connection failed', e.stack || e.toString());
+      //   return badConnectionResponse();
+      // }
+      
+      res.json('ok');
+    }));
+    
+    app.post('/playground/env', catchErrors(async (req, res) => {
+      let { variables = {} } = req.body || {};
+      
+      variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
+      
+      if (fs.existsSync('./.env')) {
+        fs.removeSync('./.env');
+      }
+      fs.writeFileSync('.env', variables.join('\n'));
+      res.status(200).json('ok');
+    }));
+    
     app.use(serveStatic(path.join(__dirname, '../playground'), {
       lastModified: false,
       etag: false,

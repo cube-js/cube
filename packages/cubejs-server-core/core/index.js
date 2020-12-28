@@ -187,13 +187,13 @@ class CubejsServerCore {
       basePath: '/cubejs-api',
       ...options
     };
-    if (
-      !options.driverFactory ||
-      !options.apiSecret ||
-      !options.dbType
-    ) {
-      throw new Error('driverFactory, apiSecret, dbType are required options');
-    }
+    // if (
+    //   !options.driverFactory ||
+    //   !options.apiSecret ||
+    //   !options.dbType
+    // ) {
+    //   throw new Error('driverFactory, apiSecret, dbType are required options');
+    // }
     this.options = options;
     this.driverFactory = options.driverFactory;
     this.externalDriverFactory = options.externalDriverFactory;
@@ -232,7 +232,7 @@ class CubejsServerCore {
     }
 
     if (options.contextToDataSourceId) {
-      throw new Error(`contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.`);
+      throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
     }
     this.contextToOrchestratorId = options.contextToOrchestratorId || this.contextToAppId;
     this.orchestratorOptions =

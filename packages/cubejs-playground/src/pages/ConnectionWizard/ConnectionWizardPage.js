@@ -28,7 +28,20 @@ const Layout = styled.div`
   background-color: #fff;
 `;
 
+async function saveConnection(variables) {
+  fetch('/playground/env', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      variables,
+    }),
+  });
+}
+
 export default function ConnectionWizardPage() {
+  const [isLoading, setLoading] = useState(false);
   const [db, selectDatabase] = useState(null);
 
   return (
@@ -60,8 +73,13 @@ export default function ConnectionWizardPage() {
             <DatabaseForm
               db={db}
               deployment={{}}
-              onSubmit={(values) => console.log('submit', values)}
+              loading={isLoading}
               onCancel={() => console.log('cancel')}
+              onSubmit={(variables) => {
+                setLoading(true);
+                saveConnection(variables);
+                setLoading(false);
+              }}
             />
           </Col>
         </Row>

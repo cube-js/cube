@@ -4,7 +4,7 @@ import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
 import './index.less';
 import './index.css';
-import { Layout, Alert, notification } from 'antd';
+import { Layout, Alert, notification, Spin } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { withRouter } from 'react-router';
 import Header from './components/Header';
@@ -24,7 +24,14 @@ class App extends Component {
     return { fatalError: error };
   }
 
+  state = {
+    fatalError: null,
+    context: null,
+  };
+
   async componentDidMount() {
+    const { history } = this.props;
+
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
       const error = promiseRejectionEvent.reason;
       console.log(error);
@@ -55,10 +62,15 @@ class App extends Component {
     });
 
     const res = await fetch('/playground/context');
-    const result = await res.json();
-    setAnonymousId(result.anonymousId, {
-      coreServerVersion: result.coreServerVersion,
-      projectFingerprint: result.projectFingerprint,
+    const context = await res.json();
+    setAnonymousId(context.anonymousId, {
+      coreServerVersion: context.coreServerVersion,
+      projectFingerprint: context.projectFingerprint,
+    });
+    this.setState({ context }, () => {
+      if (context.shouldStartConnectionWizardFlow) {
+        history.push('/connection');
+      }
     });
   }
 
@@ -70,11 +82,16 @@ class App extends Component {
   }
 
   render() {
-    const { fatalError } = this.state || {};
+    const { context, fatalError } = this.state;
     const { location, children } = this.props;
+
+    if (context == null) {
+      return <Spin />;
+    }
+
     return (
       <Layout style={{ height: '100%' }}>
-        <GlobalStyles/>
+        <GlobalStyles />
         <Header selectedKeys={selectedTab(location.pathname)} />
         <Layout.Content style={{ height: '100%' }}>
           {fatalError ? (
