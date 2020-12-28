@@ -127,10 +127,12 @@ export class CubejsServerCore {
 
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    const devServer = process.env.NODE_ENV !== 'production';
 
     const options: ServerCoreInitializedOptions = {
       dbType,
       externalDbType,
+      devServer,
       driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
       dialectFactory: () => typeof dbType === 'string' &&
         CubejsServerCore.lookupDriverClass(dbType).dialectClass &&
@@ -148,7 +150,6 @@ export class CubejsServerCore {
         CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(externalDbType).dialectClass(),
       apiSecret: process.env.CUBEJS_API_SECRET,
-      devServer: process.env.NODE_ENV !== 'production',
       telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
@@ -157,8 +158,11 @@ export class CubejsServerCore {
       dashboardAppPath: 'dashboard-app',
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency: parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
+      preAggregationsSchema: getEnv('preAggregationsSchema') || (
+        devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
+      ),
+      schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       ...opts,
-      schemaPath: opts.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema',
     };
 
     if (

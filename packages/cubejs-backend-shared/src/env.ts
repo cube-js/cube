@@ -50,6 +50,8 @@ const variables = {
   internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')
     .asEnum(['exit', 'log', 'false']),
+  preAggregationsSchema: () => get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
+    .asString(),
   dbPollTimeout: () => {
     const value = process.env.CUBEJS_DB_POLL_TIMEOUT || '15m';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');
