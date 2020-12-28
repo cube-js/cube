@@ -281,7 +281,7 @@ class CubejsServerCore {
             });
           }
           await Promise.all(contexts.map(async context => {
-            const queryingOptions = { scheduledRefreshConcurrency: this.options.scheduledRefreshConcurrency };
+            const queryingOptions = { concurrency: this.options.scheduledRefreshConcurrency };
             if (this.scheduledRefreshTimeZones) {
               queryingOptions.timezones = this.scheduledRefreshTimeZones;
             }
