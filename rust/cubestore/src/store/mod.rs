@@ -8,9 +8,7 @@ extern crate bincode;
 
 use bincode::{deserialize_from, serialize_into};
 
-use crate::metastore::{
-    table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL,
-};
+use crate::metastore::{table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL, MetaStoreTable};
 use crate::remotefs::RemoteFs;
 use crate::table::{Row, TableStore, TableValue};
 use crate::CubeError;

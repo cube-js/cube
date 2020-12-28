@@ -6,9 +6,7 @@ use async_trait::async_trait;
 use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
-use crate::metastore::{
-    table::Table, IdRow, ImportFormat, Index, IndexDef, RowKey, Schema, TableId,
-};
+use crate::metastore::{table::Table, IdRow, ImportFormat, Index, IndexDef, RowKey, Schema, TableId, MetaStoreTable};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use crate::{
