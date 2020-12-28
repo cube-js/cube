@@ -1,12 +1,16 @@
-const uuid = require('uuid/v4');
-const R = require('ramda');
+import R from 'ramda';
+import uuid from 'uuid/v4';
+
+import { CubejsServerCore } from './server';
+import { CompilerApi } from './CompilerApi';
 
 export class RefreshScheduler {
-  constructor(serverCore) {
-    this.serverCore = serverCore;
+  public constructor(
+    protected readonly serverCore: CubejsServerCore,
+  ) {
   }
 
-  async refreshQueriesForPreAggregation(context, compilerApi, preAggregation, queryingOptions) {
+  protected async refreshQueriesForPreAggregation(context, compilerApi: CompilerApi, preAggregation, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
     const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity) {
@@ -26,7 +30,7 @@ export class RefreshScheduler {
             }))
         );
 
-      const extractDate = ({ data }) => {
+      const extractDate = ({ data }: any) => {
         // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
         data = JSON.parse(JSON.stringify(data));
         return data[0] && data[0][Object.keys(data[0])[0]];
@@ -84,7 +88,7 @@ export class RefreshScheduler {
     }
   }
 
-  async runScheduledRefresh(context, queryingOptions) {
+  public async runScheduledRefresh(context, queryingOptions) {
     queryingOptions = { timezones: [queryingOptions.timezone || 'UTC'], ...queryingOptions };
     const { throwErrors, ...restOptions } = queryingOptions;
     context = { requestId: `scheduler-${context && context.requestId || uuid()}`, ...context };
@@ -116,7 +120,7 @@ export class RefreshScheduler {
     return { finished: false };
   }
 
-  async refreshCubesRefreshKey(context, compilerApi, queryingOptions) {
+  protected async refreshCubesRefreshKey(context, compilerApi: CompilerApi, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
@@ -153,7 +157,7 @@ export class RefreshScheduler {
     }));
   }
 
-  async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi, queryingOptions) {
+  protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions) {
     const { timezones } = queryingOptions;
     const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
 
@@ -226,7 +230,7 @@ export class RefreshScheduler {
     };
   }
 
-  async refreshPreAggregations(context, compilerApi, queryingOptions) {
+  protected async refreshPreAggregations(context, compilerApi: CompilerApi, queryingOptions) {
     let { concurrency, workerIndices } = queryingOptions;
     concurrency = concurrency || 1;
     workerIndices = workerIndices || R.range(0, concurrency);

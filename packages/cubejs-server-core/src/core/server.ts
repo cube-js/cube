@@ -29,7 +29,6 @@ import { prodLogger, devLogger } from './logger';
 
 import DriverDependencies from './DriverDependencies';
 import optionsValidate from './optionsValidate';
-import { OrchestratorOptions } from './types';
 
 const { version } = require('../../../package.json');
 
@@ -56,9 +55,10 @@ type RequireOne<T, K extends keyof T> = {
   [P in K]-?: T[P]
 }
 
-type ServerCoreOptions = RequireOne<
+export type ServerCoreInitializedOptions = RequireOne<
   CreateOptions,
-  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'driverFactory' | 'dialectFactory'
+  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' |
+  'driverFactory' | 'dialectFactory' | 'dashboardAppPath' | 'dashboardAppPort'
 >;
 
 function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
@@ -102,7 +102,7 @@ export class CubejsServerCore {
 
   protected preAgentLogger: any;
 
-  protected readonly options: ServerCoreOptions;
+  protected readonly options: ServerCoreInitializedOptions;
 
   protected readonly contextToAppId: ContextToAppIdFn = () => process.env.CUBEJS_APP || 'STANDALONE';
 
@@ -128,7 +128,7 @@ export class CubejsServerCore {
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
 
-    const options: ServerCoreOptions = {
+    const options: ServerCoreInitializedOptions = {
       dbType,
       externalDbType,
       driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
@@ -154,6 +154,8 @@ export class CubejsServerCore {
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],
       basePath: '/cubejs-api',
+      dashboardAppPath: 'dashboard-app',
+      dashboardAppPort: 3000,
       scheduledRefreshConcurrency: parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
       ...opts,
       schemaPath: opts.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema',
@@ -463,7 +465,7 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
-  public getOrchestratorApi(context: RequestContext) {
+  public getOrchestratorApi(context: RequestContext): OrchestratorApi {
     const orchestratorId = this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
@@ -526,7 +528,7 @@ export class CubejsServerCore {
     });
   }
 
-  protected createOrchestratorApi(options) {
+  protected createOrchestratorApi(options): OrchestratorApi {
     options = options || {};
 
     return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
@@ -541,7 +543,7 @@ export class CubejsServerCore {
     return scheduler.runScheduledRefresh(context, queryingOptions);
   }
 
-  protected async getDriver() {
+  public async getDriver() {
     if (!this.driver) {
       const driver = this.driverFactory(<any>{});
       await driver.testConnection(); // TODO mutex

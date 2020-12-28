@@ -1,13 +1,16 @@
 /* eslint-disable global-require */
 // Playground version: 0.19.31
-const fs = require('fs-extra');
-const path = require('path');
-const spawn = require('cross-spawn');
+import type { ChildProcess } from 'child_process';
+import spawn from 'cross-spawn';
+import path from 'path';
+import fs from 'fs-extra';
+import type { Application as ExpressApplication } from 'express';
 
-const AppContainer = require('../dev/AppContainer');
-const DependencyTree = require('../dev/DependencyTree');
-const PackageFetcher = require('../dev/PackageFetcher');
-const DevPackageFetcher = require('../dev/DevPackageFetcher');
+import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
+import AppContainer from '../dev/AppContainer';
+import DependencyTree from '../dev/DependencyTree';
+import PackageFetcher from '../dev/PackageFetcher';
+import DevPackageFetcher from '../dev/DevPackageFetcher';
 
 const repo = {
   owner: 'cube-js',
@@ -15,11 +18,16 @@ const repo = {
 };
 
 export class DevServer {
-  constructor(cubejsServer) {
-    this.cubejsServer = cubejsServer;
+  protected applyTemplatePackagesPromise: Promise<any>|null = null;
+
+  protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> }|null = null;
+
+  public constructor(
+    protected readonly cubejsServer: CubejsServerCore,
+  ) {
   }
 
-  initDevEnv(app, options) {
+  public initDevEnv(app: ExpressApplication, options: ServerCoreInitializedOptions) {
     const port = process.env.PORT || 4000; // TODO
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
     const jwt = require('jsonwebtoken');
@@ -100,12 +108,10 @@ export class DevServer {
       res.json({ files });
     }));
 
-    const dashboardAppPath = options.dashboardAppPath || 'dashboard-app';
-
     let lastApplyTemplatePackagesError = null;
 
     app.get('/playground/dashboard-app-create-status', catchErrors(async (req, res) => {
-      const sourcePath = path.join(dashboardAppPath, 'src');
+      const sourcePath = path.join(options.dashboardAppPath, 'src');
 
       if (lastApplyTemplatePackagesError) {
         const toThrow = lastApplyTemplatePackagesError;
@@ -123,9 +129,9 @@ export class DevServer {
       }
 
       // docker-compose share a volume for /dashboard-app and directory will be empty
-      if (!fs.pathExistsSync(dashboardAppPath) || fs.readdirSync(dashboardAppPath).length === 0) {
+      if (!fs.pathExistsSync(options.dashboardAppPath) || fs.readdirSync(options.dashboardAppPath).length === 0) {
         res.status(404).json({
-          error: `Dashboard app not found in '${path.resolve(dashboardAppPath)}' directory`
+          error: `Dashboard app not found in '${path.resolve(options.dashboardAppPath)}' directory`
         });
 
         return;
@@ -133,7 +139,7 @@ export class DevServer {
 
       if (!fs.pathExistsSync(sourcePath)) {
         res.status(404).json({
-          error: `Dashboard app corrupted. Please remove '${path.resolve(dashboardAppPath)}' directory and recreate it`
+          error: `Dashboard app corrupted. Please remove '${path.resolve(options.dashboardAppPath)}' directory and recreate it`
         });
 
         return;
@@ -141,27 +147,27 @@ export class DevServer {
 
       res.json({
         status: 'created',
-        installedTemplates: AppContainer.getPackageVersions(dashboardAppPath)
+        installedTemplates: AppContainer.getPackageVersions(options.dashboardAppPath)
       });
     }));
 
-    const dashboardAppPort = options.dashboardAppPort || 3000;
-
     app.get('/playground/start-dashboard-app', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Start Dashboard App');
+
       if (!this.dashboardAppProcess) {
         this.dashboardAppProcess = spawn('npm', ['run', 'start'], {
-          cwd: dashboardAppPath,
-          env: {
+          cwd: options.dashboardAppPath,
+          env: <any>{
             ...process.env,
-            PORT: dashboardAppPort
+            PORT: options.dashboardAppPort
           }
         });
+
         this.dashboardAppProcess.dashboardUrlPromise = new Promise((resolve) => {
           this.dashboardAppProcess.stdout.on('data', (data) => {
             console.log(data.toString());
             if (data.toString().match(/Compiled/)) {
-              resolve(dashboardAppPort);
+              resolve(options.dashboardAppPort);
             }
           });
         });
@@ -176,7 +182,7 @@ export class DevServer {
       }
 
       await this.dashboardAppProcess.dashboardUrlPromise;
-      res.json({ dashboardPort: dashboardAppPort });
+      res.json({ dashboardPort: options.dashboardAppPort });
     }));
 
     app.get('/playground/dashboard-app-status', catchErrors(async (req, res) => {
@@ -185,7 +191,7 @@ export class DevServer {
       res.json({
         running: !!dashboardPort,
         dashboardPort,
-        dashboardAppPath: path.resolve(dashboardAppPath)
+        dashboardAppPath: path.resolve(options.dashboardAppPath)
       });
     }));
 
@@ -214,7 +220,7 @@ export class DevServer {
         const appContainer = new AppContainer(
           dt.getRootNode(),
           {
-            appPath: dashboardAppPath,
+            appPath: options.dashboardAppPath,
             packagesPath: response.packagesPath
           },
           templateConfig
