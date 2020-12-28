@@ -68,9 +68,19 @@ export type DatabaseType =
   | 'snowflake'
   | 'sqlite';
 
+export type ContextToAppIdFn = (context: RequestContext) => string;
+
+export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
+
+export type PreAggregationsSchemaFn = (context: RequestContext) => string;
+
+export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
+
+export type DbTypeFn = (context: RequestContext) => DatabaseType;
+
 export interface CreateOptions {
-  dbType?: DatabaseType | ((context: RequestContext) => DatabaseType);
-  externalDbType?: DatabaseType | ((context: RequestContext) => DatabaseType);
+  dbType?: DatabaseType | DbTypeFn;
+  externalDbType?: DatabaseType | ExternalDbTypeFn;
   schemaPath?: string;
   basePath?: string;
   devServer?: boolean;
@@ -80,13 +90,13 @@ export interface CreateOptions {
   dialectFactory?: (context: DriverContext) => any;
   externalDriverFactory?: (context: RequestContext) => any;
   externalDialectFactory?: (context: RequestContext) => any;
-  contextToAppId?: (context: RequestContext) => string;
+  contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   queryTransformer?: QueryTransformerFn;
-  preAggregationsSchema?: String | ((context: RequestContext) => string);
+  preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string;
   extendContext?: (req: ExpressRequest) => any;
   scheduledRefreshTimer?: boolean | number;
@@ -98,7 +108,7 @@ export interface CreateOptions {
   updateCompilerCacheKeepAlive?: boolean;
   telemetry?: boolean;
   allowUngroupedWithoutPrimaryKey?: boolean;
-  orchestratorOptions?: OrchestratorOptions | ((context: RequestContext) => OrchestratorOptions);
+  orchestratorOptions?: OrchestratorOptions | OrchestratorOptionsFn;
   allowJsDuplicatePropsInSchema?: boolean;
   // @deprecated Use contextToOrchestratorId instead.
   contextToDataSourceId?: any;

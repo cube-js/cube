@@ -1,6 +1,3 @@
-/* eslint-disable no-new */
-/* globals describe,test,expect,jest,beforeAll */
-
 import R from 'ramda';
 import { CubejsServerCore } from '../../src';
 import { RefreshScheduler } from '../../src/core/RefreshScheduler';
