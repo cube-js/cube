@@ -1,4 +1,5 @@
 use sqlparser::ast::{ObjectName, Statement as SQLStatement};
+use sqlparser::query::{OrderByExpr};
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{IsOptional, Parser, ParserError};
@@ -48,7 +49,7 @@ impl CubeStoreParser {
         let mut tokenizer = Tokenizer::new(dialect, sql);
         let tokens = tokenizer.tokenize()?;
         Ok(CubeStoreParser {
-            parser: Parser::new(tokens),
+            parser: Parser::new(tokens, dialect),
         })
     }
 
@@ -76,7 +77,7 @@ impl CubeStoreParser {
     }
 
     pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
-        let statement = self.parser.parse_create_table()?;
+        let statement = self.parser.parse_create_table(false)?;
         if let SQLStatement::CreateTable {
             name,
             columns,
@@ -113,6 +114,7 @@ impl CubeStoreParser {
                     location,
                     query,
                     without_rowid,
+                    or_replace: false,
                 },
                 indexes,
             })
@@ -126,9 +128,19 @@ impl CubeStoreParser {
         table_name: ObjectName,
     ) -> Result<SQLStatement, ParserError> {
         let index_name = self.parser.parse_object_name()?;
+
         let columns = self
             .parser
-            .parse_parenthesized_column_list(IsOptional::Mandatory)?;
+            .parse_parenthesized_column_list(IsOptional::Mandatory)?
+            .iter()
+            .map(|expr| OrderByExpr {
+                expr,
+                asc: None,
+                nulls_first: None,
+            })
+            .collect()
+        ;
+
         Ok(SQLStatement::CreateIndex {
             name: index_name,
             table_name,

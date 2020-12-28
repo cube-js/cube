@@ -126,7 +126,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#cdb2fc38c1cb8d74a516613961eadd1987de0917"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#5189c1a9d4163b9428c6835a9b0165d512aecfdd"
 dependencies = [
  "chrono",
  "csv",
@@ -147,7 +147,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#cdb2fc38c1cb8d74a516613961eadd1987de0917"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#5189c1a9d4163b9428c6835a9b0165d512aecfdd"
 dependencies = [
  "arrow",
  "bytes",
@@ -1006,7 +1006,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "smallvec",
- "sqlparser",
+ "sqlparser 0.6.1 (git+https://github.com/cube-js/sqlparse?branch=support-explain-analyze)",
  "tokio",
  "uuid",
  "warp",
@@ -1015,7 +1015,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#cdb2fc38c1cb8d74a516613961eadd1987de0917"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#5189c1a9d4163b9428c6835a9b0165d512aecfdd"
 dependencies = [
  "ahash 0.6.2",
  "arrow",
@@ -1032,7 +1032,7 @@ dependencies = [
  "rustyline",
  "serde",
  "serde_derive",
- "sqlparser",
+ "sqlparser 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
 ]
 
@@ -2461,9 +2461,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.31"
+version = "0.10.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d008f51b1acffa0d3450a68606e6a51c123012edaacb0f4e1426bd978869187"
+checksum = "038d43985d1ddca7a9900630d8cd031b56e4794eecc2e9ea39dd17aa04399a70"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -2481,9 +2481,9 @@ checksum = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.59"
+version = "0.9.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de52d8eabd217311538a39bba130d7dea1f1e118010fee7a033d966845e7d5fe"
+checksum = "921fc71883267538946025deffb622905ecad223c28efbfdef9bb59a0175f3e6"
 dependencies = [
  "autocfg 1.0.1",
  "cc",
@@ -2545,7 +2545,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#cdb2fc38c1cb8d74a516613961eadd1987de0917"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2020-12-01#5189c1a9d4163b9428c6835a9b0165d512aecfdd"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3535,6 +3535,14 @@ name = "sqlparser"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53fa7478852b3ea28f0d21a42b2d7dade24ba4aa72e22bf66982e4b587a7f608"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "sqlparser"
+version = "0.6.1"
+source = "git+https://github.com/cube-js/sqlparse?branch=support-explain-analyze#f0801db98c7bdbdc2ec23248733f5fc110d72fc7"
 dependencies = [
  "log",
 ]

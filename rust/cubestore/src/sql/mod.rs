@@ -145,8 +145,22 @@ impl SqlServiceImpl {
         schema_name: String,
         table_name: String,
         name: String,
-        columns: &Vec<Ident>,
+        order_by: &Vec<OrderByExpr>,
     ) -> Result<IdRow<Index>, CubeError> {
+        let mut columns = Vec::new();
+
+        for order in order_by.iter() {
+            match &order.expr {
+                Expr::Identifier(c) => {
+                    columns.push(c.value.to_string());
+                },
+                _ => return Err(CubeError::user(format!(
+                    "Unsupported index name expr: {}",
+                    table_name
+                )))
+            }
+        }
+
         Ok(self
             .db
             .create_index(
@@ -154,7 +168,7 @@ impl SqlServiceImpl {
                 table_name,
                 IndexDef {
                     name,
-                    columns: columns.iter().map(|c| c.value.to_string()).collect(),
+                    columns,
                 },
             )
             .await?)
