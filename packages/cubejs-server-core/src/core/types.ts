@@ -112,4 +112,6 @@ export interface CreateOptions {
   allowJsDuplicatePropsInSchema?: boolean;
   // @deprecated Use contextToOrchestratorId instead.
   contextToDataSourceId?: any;
+  dashboardAppPath?: string;
+  dashboardAppPort?: number;
 }
