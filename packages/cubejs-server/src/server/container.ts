@@ -171,17 +171,6 @@ export class ServerContainer {
       }
     }
 
-    if (manifest.devDependencies) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const pkgName of Object.keys(manifest.devDependencies)) {
-        if (!isDevPackage(pkgName)) {
-          console.log(
-            `${color.yellow('warning')} "${pkgName}" will not be installed in Cube Cloud (please move it to dependencies)`
-          );
-        }
-      }
-    }
-
     const lock = await this.parseLock();
     if (!lock) {
       return;
