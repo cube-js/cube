@@ -10,9 +10,10 @@ import { getAnonymousId, getEnv, internalExceptions, track } from '@cubejs-backe
 import type { Application as ExpressApplication } from 'express';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import type {
+  ContextToAppIdFn,
   CreateOptions,
-  DatabaseType,
-  DriverContext,
+  DatabaseType, DbTypeFn,
+  DriverContext, ExternalDbTypeFn, OrchestratorOptionsFn, PreAggregationsSchemaFn,
   RequestContext,
   SchemaFileRepository,
 } from './types';
@@ -28,6 +29,7 @@ import { prodLogger, devLogger } from './logger';
 
 import DriverDependencies from './DriverDependencies';
 import optionsValidate from './optionsValidate';
+import { OrchestratorOptions } from './types';
 
 const { version } = require('../../../package.json');
 
@@ -59,8 +61,16 @@ type ServerCoreOptions = RequireOne<
   'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'driverFactory' | 'dialectFactory'
 >;
 
+function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
+  if (typeof possibleFn === 'function') {
+    return <any>possibleFn;
+  }
+
+  return () => possibleFn;
+}
+
 export class CubejsServerCore {
-  protected readonly repository: FileRepository;
+  public readonly repository: FileRepository;
 
   protected readonly driverFactory: (context: DriverContext) => any;
 
@@ -76,27 +86,27 @@ export class CubejsServerCore {
 
   protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
-  protected contextToDbType: any;
+  protected readonly contextToDbType: DbTypeFn;
 
-  protected contextToExternalDbType: any;
+  protected contextToExternalDbType: ExternalDbTypeFn;
 
   protected compilerCache: LRUCache<string, CompilerApi>;
 
-  protected contextToAppId: any;
-
   protected contextToOrchestratorId: any;
 
-  protected preAggregationsSchema: any;
+  protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
-  protected readonly orchestratorOptions: any;
+  protected readonly orchestratorOptions: OrchestratorOptionsFn;
 
-  protected logger: any;
+  public logger: any;
 
   protected preAgentLogger: any;
 
   protected readonly options: ServerCoreOptions;
 
-  protected readonly standalone: boolean;
+  protected readonly contextToAppId: ContextToAppIdFn = () => process.env.CUBEJS_APP || 'STANDALONE';
+
+  protected readonly standalone: boolean = true;
 
   protected scheduledRefreshTimerInterval: NodeJS.Timeout|undefined;
 
@@ -125,8 +135,8 @@ export class CubejsServerCore {
       dialectFactory: () => typeof dbType === 'string' &&
         CubejsServerCore.lookupDriverClass(dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(dbType).dialectClass(),
-      externalDriverFactory: process.env.CUBEJS_EXT_DB_TYPE && (
-        () => new (CubejsServerCore.lookupDriverClass(process.env.CUBEJS_EXT_DB_TYPE))({
+      externalDriverFactory: externalDbType && (
+        () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
           host: process.env.CUBEJS_EXT_DB_HOST,
           database: process.env.CUBEJS_EXT_DB_NAME,
           port: process.env.CUBEJS_EXT_DB_PORT,
@@ -171,13 +181,11 @@ export class CubejsServerCore {
 
     this.repository = new FileRepository(options.schemaPath);
     this.repositoryFactory = options.repositoryFactory || (() => this.repository);
-    this.contextToDbType = typeof options.dbType === 'function' ? options.dbType : () => options.dbType;
-    this.contextToExternalDbType = typeof options.externalDbType === 'function'
-      ? options.externalDbType
-      : () => options.externalDbType;
-    this.preAggregationsSchema = typeof options.preAggregationsSchema === 'function'
-      ? options.preAggregationsSchema :
-      () => options.preAggregationsSchema;
+
+    this.contextToDbType = wrapToFnIfNeeded(options.dbType);
+    this.contextToExternalDbType = wrapToFnIfNeeded(options.externalDbType);
+    this.preAggregationsSchema = wrapToFnIfNeeded(options.preAggregationsSchema);
+    this.orchestratorOptions = wrapToFnIfNeeded(options.orchestratorOptions);
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: options.compilerCacheSize || 250,
@@ -188,9 +196,6 @@ export class CubejsServerCore {
     if (this.options.contextToAppId) {
       this.contextToAppId = options.contextToAppId;
       this.standalone = false;
-    } else {
-      this.contextToAppId = () => process.env.CUBEJS_APP || 'STANDALONE';
-      this.standalone = true;
     }
 
     if (options.contextToDataSourceId) {
@@ -198,12 +203,8 @@ export class CubejsServerCore {
     }
 
     this.contextToOrchestratorId = options.contextToOrchestratorId || this.contextToAppId;
-    this.orchestratorOptions =
-      typeof options.orchestratorOptions === 'function' ?
-        options.orchestratorOptions :
-        () => options.orchestratorOptions;
 
-    // proactively free up old cache values occassionally
+    // proactively free up old cache values occasionally
     if (options.maxCompilerCacheKeepAlive) {
       setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
     }
@@ -387,7 +388,7 @@ export class CubejsServerCore {
     }
   }
 
-  public static create(options) {
+  public static create(options?: CreateOptions) {
     return new CubejsServerCore(options);
   }
 
@@ -441,6 +442,7 @@ export class CubejsServerCore {
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
     if (!compilerApi) {
+      console.log(this.preAggregationsSchema(context));
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),

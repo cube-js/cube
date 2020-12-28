@@ -11,12 +11,14 @@
   "engines": {
     "node": ">=8.11.1"
   },
-  "main": "dist/src/index.js",
+  "main": "index.js",
   "types": "dist/src/index.d.ts",
   "files": [
     "README.md",
+    "core/*",
     "dist/src/*",
-    "playground"
+    "playground",
+    "index.js"
   ],
   "scripts": {
     "build": "rm -rf dist && npm run tsc",

@@ -1,7 +1,7 @@
 const express = require('serverless-express/express');
 const handler = require('serverless-express/handler');
 const cors = require('cors');
-const ServerCore = require('@cubejs-backend/server-core');
+const { CubejsServerCore } = require('@cubejs-backend/server-core');
 
 const processHandlers = {
   queryProcess: async ({ queryKey, dataSource }, orchestrator) => {
@@ -74,7 +74,7 @@ class Handlers {
         }
       })
     };
-    this.serverCore = new ServerCore(options);
+    this.serverCore = new CubejsServerCore(options);
   }
 
   // eslint-disable-next-line no-unused-vars
