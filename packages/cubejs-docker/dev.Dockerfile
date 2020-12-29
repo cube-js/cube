@@ -120,7 +120,6 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 
-VOLUME /cube/conf
 WORKDIR /cube/conf
 
 EXPOSE 4000

@@ -3,7 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
-const CubejsServerCore = require('@cubejs-backend/server-core');
+const { CubejsServerCore } = require('@cubejs-backend/server-core');
 const jwt = require('express-jwt');
 const jwksRsa = require('jwks-rsa');
 
@@ -66,4 +66,3 @@ app.listen(port, (err) => {
     `🚀 Cube.js server (${CubejsServerCore.version()}) is listening on ${port}`,
   );
 });
- 

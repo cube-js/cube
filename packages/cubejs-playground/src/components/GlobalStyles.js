@@ -132,11 +132,11 @@ const GlobalStyles = createGlobalStyle`
   .token.prolog,
   .token.doctype,
   .token.cdata {
-    color: var(--dark-03-color);
+    color: var(--dark-04-color);
   }
   
   .token.punctuation {
-    color: var(--dark-03-color);
+    color: var(--dark-04-color);
   }
   
   .namespace {

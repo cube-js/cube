@@ -46,11 +46,6 @@ export default class Search extends Component<Props> {
    */
   autocompleteSelected = (e: Event) => {
     e.stopPropagation();
-    if (window.analytics) {
-      window.analytics.track('Search Result Clicked', {
-        searchQuery: this.searchInput.value,
-      });
-    }
     // Use an anchor tag to parse the absolute url (from autocomplete.js) into a relative url
     const a = document.createElement(`a`);
     a.href = (e as Event & { _args: { url: string }[] })._args[0].url;

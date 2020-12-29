@@ -30,10 +30,14 @@ const DbTypeToGenericType = {
   'double precision': 'decimal'
 };
 
+const DB_INT_MAX = 2147483647;
+const DB_INT_MIN = -2147483648;
+
 // Order of keys is important here: from more specific to less specific
 const DbTypeValueMatcher = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
   date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
+  bigint: (v) => Number.isInteger(v) && (v > DB_INT_MAX || v < DB_INT_MIN),
   int: (v) => Number.isInteger(v) || v.toString().match(/^\d+$/),
   decimal: (v) => v instanceof Number || v.toString().match(/^\d+(\.\d+)?$/),
   boolean: (v) => v === false || v === true || v.toString().toLowerCase() === 'true' || v.toString().toLowerCase() === 'false',
@@ -114,16 +118,30 @@ export class BaseDriver {
     return ssl;
   }
 
+  /**
+   * @abstract
+   * @return Promise<Array<unknown>>
+   */
   testConnection() {
     throw new Error('Not implemented');
   }
 
+  /**
+   * @abstract
+   * @param {string} query
+   * @param {Array<unknown>} values
+   * @return Promise<Array<unknown>>
+   */
   query(query, values) {
     throw new Error('Not implemented');
   }
 
   async downloadQueryResults(query, values) {
     const rows = await this.query(query, values);
+    if (rows.length === 0) {
+      throw new Error('Unable to detect column types for pre-aggregation on empty values in readOnly mode');
+    }
+
     const fields = Object.keys(rows[0]);
 
     const types = fields.map(field => ({
@@ -288,6 +306,14 @@ export class BaseDriver {
       this.logger('SQL Query Usage', {
         ...usage,
         ...queryOptions
+      });
+    }
+  }
+
+  databasePoolError(error) {
+    if (this.logger) {
+      this.logger('Database Pool Error', {
+        error: (error.stack || error).toString()
       });
     }
   }

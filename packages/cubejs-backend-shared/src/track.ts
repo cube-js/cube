@@ -4,7 +4,7 @@ import { machineIdSync } from 'node-machine-id';
 import { internalExceptions } from './errors';
 
 export type BaseEvent = {
-  name: string,
+  event: string,
   [key: string]: any,
 };
 
@@ -38,6 +38,10 @@ async function flush(toFlush?: Array<Event>, retries: number = 10): Promise<any>
     });
 
     if (result.status !== 200 && retries > 0) {
+      internalExceptions(
+        new Error(`Probably an unexpected request caused a bad response: ${result.status}`)
+      );
+
       // eslint-disable-next-line consistent-return
       return flush(toFlush, retries - 1);
     }

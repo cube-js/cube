@@ -13,7 +13,7 @@ const generate = async (options) => {
   const generateSchemaOptions = { tables: options.tables };
 
   event({
-    name: 'Generate Schema',
+    event: 'Generate Schema',
     ...generateSchemaOptions,
   });
 
@@ -61,7 +61,7 @@ const generate = async (options) => {
   await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 
   await event({
-    name: 'Generate Schema Success',
+    event: 'Generate Schema Success',
     ...generateSchemaOptions
   });
 

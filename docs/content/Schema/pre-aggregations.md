@@ -82,7 +82,7 @@ Here:
 - Multiplied measures are measures of cubes that define `hasMany` relation involved in pre-aggregation definition join.
 
 Also order of pre-aggregations definition in cube matters.
-First matched pre-aggregation wins. 
+First matched pre-aggregation wins.
 Cubes of a measures and then cubes of dimensions are checked to find a matching `rollup`.
 However `rollup` pre-aggregations always have priority over `originalSql`.
 Thus if you have both `originalSql` and `rollup` defined, Cube.js will try to find matching `rollup` before trying to find matching `originalSql`.
@@ -305,11 +305,21 @@ const options = {
 };
 ```
 
+### Limitations
+
+By default, Cube.js uses temporary tables to extract data types from executed query while `readOnly` is `false`.
+If the driver is used in `readOnly` mode, it will use heuristics to extract data types from the database's response, but this strategy has certain limitations:
+
+- The aggregation results can be empty, and Cube.js will throw an exception because it is impossible to detect types
+- Data types can be incorrectly inferred, in rare cases
+
+We highly recommend leaving `readOnly` unset or explicitly setting it to `false` when using drivers for external pre-aggregations.
+
 ## refreshKey
 
 Cube.js also takes care of keeping pre-aggregations up to date.
 
-By default pre-aggregations use same `refreshKey` as it's cube defines.
+The default value of `refreshKey` is `every: '1 hour'`.
 
 You can set up a custom refresh check strategy by using `refreshKey`:
 
@@ -410,7 +420,7 @@ cube(`Orders`, {
       type: 'number',
       sql: 'id',
       primaryKey: true
-    }, 
+    },
     created_at: {
       type: 'time',
       sql: 'created_at'
@@ -460,14 +470,19 @@ cube(`Orders`, {
 
 ## scheduledRefresh
 
-To keep pre-aggregations always up-to-date you can mark them as `scheduledRefresh: true`.
-This instructs `RefreshScheduler` to refresh this pre-aggregation every time it's run.
-Without this flag pre-aggregations are always built on-demand.
+To keep pre-aggregations always up-to-date you can mark them as `scheduledRefresh: true`.Without this flag pre-aggregations are always built on-demand.
 `refreshKey` is used to determine if there's a need to update specific pre-aggregation on each scheduled refresh run.
 For partitioned pre-aggregations `min` and `max` dates for `timeDimensionReference` are fetched to determine range for refresh.
 
-[[warning | Note]]
-| Refresh Scheduler isn't enabled by default. You should trigger it externally. [Learn how to do it here](caching#keeping-cache-up-to-date).
+Every time scheduled refresh is run it takes every pre-aggregation partition starting with most recent ones in time and checks if it's `refreshKey` changed. If it's changed then such partition will be refreshed.
+
+In development mode, Cube.js runs the background refresh by default and will
+refresh all the pre-aggregations marked with `scheduledRefresh` parameter.
+
+Please consult [Production Checklist][link-production-checklist-refresh] for best practices on running background
+refresh in production environments.
+
+[link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
 
 Example usage:
 ```javascript
@@ -488,6 +503,15 @@ cube(`Orders`, {
   }
 });
 ```
+
+## refreshRangeStart and refreshRangeEnd
+
+Refresh range defines what partitions should be refreshed by scheduled refresh.
+Scheduled refresh will never look beyond this range.
+
+Refresh range can be used together with `updateWindow` to define granular update settings.
+Set `updateWindow` to interval in which your data can change and `refreshRangeStart` to the earliest point of time when history should be available.
+For example if `updateWindow` is `1 week` and `refreshRangeStart` is `SELECT NOW() - interval '365 day'` scheduled refresh will build historic partitions for 365 days in past and will refresh only one last week according to the `refreshKey` setting.
 
 Refresh range for partitioned pre-aggregations can be controlled using `refreshRangeStart` and `refreshRangeEnd` params:
 
@@ -570,6 +594,5 @@ cube(`Orders`, {
 When pre-aggregations are refreshed Cube.js will create new pre-aggregation table each time it's version change.
 It allows to seamlessly hot swap tables transparently for users for any database even for those without DDL transactions support.
 It leads to orphaned tables which need to be collected over time though.
-By default Cube.js will store all content versions for 10 minutes and all structure versions for 7 days. 
+By default Cube.js will store all content versions for 10 minutes and all structure versions for 7 days.
 Then it'll retain only the most recent ones and orphaned tables are dropped from database.
-

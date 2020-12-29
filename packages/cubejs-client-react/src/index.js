@@ -4,7 +4,8 @@ import QueryBuilder from './QueryBuilder.jsx';
 import isQueryPresent from './isQueryPresent';
 import CubeProvider from './CubeProvider.jsx';
 import CubeContext from './CubeContext';
-import useCubeQuery from './useCubeQuery';
+import useCubeQuery from './hooks/cube-query';
+import useDryRun from './hooks/dry-run';
 
 export {
   QueryRenderer,
@@ -13,5 +14,6 @@ export {
   isQueryPresent,
   CubeContext,
   CubeProvider,
+  useDryRun,
   useCubeQuery
 };

@@ -10,7 +10,7 @@ pub mod wal;
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::{error, info};
-use rocksdb::{DBIterator, Options, WriteBatch, WriteBatchIterator, DB};
+use rocksdb::{DBIterator, Options, WriteBatch, WriteBatchIterator, DB, MergeOperands, Snapshot, IteratorMode, ReadOptions, Direction};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time};
@@ -55,6 +55,7 @@ use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
 use tokio::time::Duration;
 use wal::WALRocksTable;
+use log::{trace};
 
 #[macro_export]
 macro_rules! format_table_value {
@@ -119,22 +120,26 @@ macro_rules! base_rocks_secondary_index {
 #[macro_export]
 macro_rules! rocks_table_impl {
     ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $delete_event: tt) => {
-        #[derive(Debug, Clone)]
-        pub(crate) struct $rocks_table {
-            db: Arc<DB>,
+        pub(crate) struct $rocks_table<'a> {
+            db: &'a DB,
+            snapshot: &'a rocksdb::Snapshot<'a>,
         }
 
-        impl $rocks_table {
-            pub fn new(db: Arc<DB>) -> $rocks_table {
-                $rocks_table { db }
+        impl<'a> $rocks_table<'a> {
+            pub fn new(db: (&'a DB, &'a rocksdb::Snapshot<'a>)) -> $rocks_table {
+                $rocks_table { db: db.0, snapshot: db.1 }
             }
         }
 
-        impl RocksTable for $rocks_table {
+        impl<'a> RocksTable for $rocks_table<'a> {
             type T = $table;
 
-            fn db(&self) -> Arc<DB> {
-                self.db.clone()
+            fn db(&self) -> &DB {
+                self.db
+            }
+
+            fn snapshot(&self) -> &rocksdb::Snapshot {
+                self.snapshot
             }
 
             fn table_id(&self) -> TableId {
@@ -164,6 +169,13 @@ macro_rules! rocks_table_impl {
 
             fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent {
                 MetaStoreEvent::$delete_event(row)
+            }
+        }
+
+        impl<'a> core::fmt::Debug for $rocks_table<'a> {
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                f.write_fmt(format_args!("{}", stringify!($rocks_table)))?;
+                Ok(())
             }
         }
     };
@@ -480,7 +492,7 @@ impl<'a> BatchPipe<'a> {
 
 #[async_trait]
 pub trait MetaStoreTable: Send + Sync {
-    type T: Serialize + Clone + Debug;
+    type T: Serialize + Clone + Debug + 'static;
 
     async fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError>;
 
@@ -489,46 +501,54 @@ pub trait MetaStoreTable: Send + Sync {
     async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError>;
 }
 
-struct MetaStoreTableImpl<
-    R: RocksTable + 'static,
-    F: Fn(Arc<DB>) -> R + Send + Sync + Clone + 'static,
-> {
-    rocks_meta_store: RocksMetaStore,
-    rocks_table_fn: F,
+#[macro_export]
+macro_rules! meta_store_table_impl {
+    ($name: ident, $table: ty, $rocks_table: ident) => {
+        pub struct $name {
+            rocks_meta_store: RocksMetaStore
+        }
+
+        impl $name {
+            fn table<'a>(db: (&'a DB, &'a Snapshot<'a>)) -> $rocks_table<'a> {
+                <$rocks_table>::new(db)
+            }
+        }
+
+        #[async_trait]
+        impl MetaStoreTable for $name {
+            type T = $table;
+
+            async fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError> {
+                self.rocks_meta_store
+                    .read_operation(move |db_ref| Ok(Self::table(db_ref).all_rows()?))
+                    .await
+            }
+
+            async fn row_by_id_or_not_found(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
+                self.rocks_meta_store
+                    .read_operation(move |db_ref| Ok(Self::table(db_ref).get_row_or_not_found(id)?))
+                    .await
+            }
+
+            async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
+                self.rocks_meta_store
+                    .write_operation(move |db_ref, batch| Ok(Self::table(db_ref).delete(id, batch)?))
+                    .await
+            }
+        }
+    }
 }
 
-#[async_trait]
-impl<R: RocksTable + 'static, F: Fn(Arc<DB>) -> R + Send + Sync + Clone + 'static> MetaStoreTable
-    for MetaStoreTableImpl<R, F>
-{
-    type T = R::T;
-
-    async fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError> {
-        let table = self.rocks_table_fn.clone();
-        self.rocks_meta_store
-            .read_operation(move |db_ref| Ok(table(db_ref).all_rows()?))
-            .await
-    }
-
-    async fn row_by_id_or_not_found(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
-        let table = self.rocks_table_fn.clone();
-        self.rocks_meta_store
-            .read_operation(move |db_ref| Ok(table(db_ref).get_row_or_not_found(id)?))
-            .await
-    }
-
-    async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
-        let table = self.rocks_table_fn.clone();
-        self.rocks_meta_store
-            .write_operation(move |db_ref, batch| Ok(table(db_ref).delete(id, batch)?))
-            .await
-    }
-}
+meta_store_table_impl!(SchemaMetaStoreTable, Schema, SchemaRocksTable);
+meta_store_table_impl!(ChunkMetaStoreTable, Chunk, ChunkRocksTable);
+meta_store_table_impl!(IndexMetaStoreTable, Index, IndexRocksTable);
+meta_store_table_impl!(PartitionMetaStoreTable, Partition, PartitionRocksTable);
+meta_store_table_impl!(TableMetaStoreTable, Table, TableRocksTable);
 
 #[async_trait]
 pub trait MetaStore: Send + Sync {
     async fn wait_for_current_seq_to_sync(&self) -> Result<(), CubeError>;
-    fn schemas_table(&self) -> Box<dyn MetaStoreTable<T = Schema>>;
+    fn schemas_table(&self) -> SchemaMetaStoreTable;
     async fn create_schema(
         &self,
         schema_name: String,
@@ -553,7 +573,7 @@ pub trait MetaStore: Send + Sync {
     async fn delete_schema(&self, schema_name: String) -> Result<(), CubeError>;
     async fn delete_schema_by_id(&self, schema_id: u64) -> Result<(), CubeError>;
 
-    fn tables_table(&self) -> Box<dyn MetaStoreTable<T = Table>>;
+    fn tables_table(&self) -> TableMetaStoreTable;
     async fn create_table(
         &self,
         schema_name: String,
@@ -573,7 +593,7 @@ pub trait MetaStore: Send + Sync {
     async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError>;
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
 
-    fn partition_table(&self) -> Box<dyn MetaStoreTable<T = Partition>>;
+    fn partition_table(&self) -> PartitionMetaStoreTable;
     async fn create_partition(&self, partition: Partition) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition_for_compaction(
@@ -589,8 +609,13 @@ pub trait MetaStore: Send + Sync {
         new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError>;
 
-    fn index_table(&self) -> Box<dyn MetaStoreTable<T = Index>>;
-    async fn create_index(&self, schema_name: String, table_name: String, index_def: IndexDef) -> Result<IdRow<Index>, CubeError>;
+    fn index_table(&self) -> IndexMetaStoreTable;
+    async fn create_index(
+        &self,
+        schema_name: String,
+        table_name: String,
+        index_def: IndexDef,
+    ) -> Result<IdRow<Index>, CubeError>;
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
     async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
     async fn get_active_partitions_by_index_id(
@@ -598,7 +623,12 @@ pub trait MetaStore: Send + Sync {
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
 
-    fn chunks_table(&self) -> Box<dyn MetaStoreTable<T = Chunk>>;
+    async fn get_active_partitions_and_chunks_by_index_id(
+        &self,
+        index_id: u64,
+    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
+
+    fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
         &self,
         partition_id: u64,
@@ -609,12 +639,13 @@ pub trait MetaStore: Send + Sync {
         &self,
         partition_id: u64,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
-    async fn get_chunks_by_partition_with_non_repartitioned(
-        &self,
-        partition_id: u64,
-    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn deactivate_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
+    async fn swap_chunks(
+        &self,
+        deactivate_ids: Vec<u64>,
+        uploaded_ids: Vec<u64>,
+    ) -> Result<(), CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
@@ -852,10 +883,11 @@ where
     }
 }
 
-trait RocksTable: Debug + Send + Sync + Clone {
+trait RocksTable: Debug + Send + Sync {
     type T: Serialize + Clone + Debug + Send;
     fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent;
-    fn db(&self) -> Arc<DB>;
+    fn db(&self) -> &DB;
+    fn snapshot(&self) -> &Snapshot;
     fn index_id(&self, index_num: IndexId) -> IndexId;
     fn table_id(&self) -> TableId;
     fn deserialize_row<'de, D>(&self, deserializer: D) -> Result<Self::T, D::Error>
@@ -893,8 +925,11 @@ trait RocksTable: Debug + Send + Sync + Clone {
         batch_pipe.batch().put(inserted_row.key, inserted_row.val);
 
         let index_row = self.insert_index_row(&row, row_id)?;
-        for row in index_row {
-            batch_pipe.batch().put(row.key, row.val);
+        for to_insert in index_row {
+            if self.snapshot().get(&to_insert.key)?.is_some() {
+                return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
+            }
+            batch_pipe.batch().put(to_insert.key, to_insert.val);
         }
 
         Ok(IdRow::new(row_id, row))
@@ -1018,19 +1053,12 @@ trait RocksTable: Debug + Send + Sync + Clone {
     fn next_table_seq(&self) -> Result<u64, CubeError> {
         let ref db = self.db();
         let seq_key = RowKey::Sequence(self.table_id());
-        let result = db.get(seq_key.to_bytes())?; // TODO merge
-        let current_seq = match result {
-            Some(v) => {
-                let mut c = Cursor::new(v);
-                c.read_u64::<BigEndian>().unwrap()
-            }
-            None => 0,
-        };
-        let next_seq = current_seq + 1;
-        let mut next_val = vec![];
-        next_val.write_u64::<BigEndian>(next_seq)?;
-        db.put(seq_key.to_bytes(), next_val)?;
-        Ok(next_seq)
+        let mut increment = vec![];
+        increment.write_u64::<BigEndian>(1)?;
+        db.merge(seq_key.to_bytes(), increment)?;
+        // TODO ensure get is called on a merged key
+        let result = db.get(seq_key.to_bytes())?.unwrap();
+        Ok(Cursor::new(result).read_u64::<BigEndian>().unwrap())
     }
 
     fn insert_row(&self, row: Vec<u8>) -> Result<(u64, KeyVal), CubeError> {
@@ -1069,7 +1097,7 @@ trait RocksTable: Debug + Send + Sync + Clone {
     }
 
     fn get_row(&self, row_id: u64) -> Result<Option<IdRow<Self::T>>, CubeError> {
-        let ref db = self.db();
+        let ref db = self.snapshot();
         let res = db.get(RowKey::Table(self.table_id(), row_id).to_bytes())?;
 
         if let Some(buffer) = res {
@@ -1128,13 +1156,16 @@ trait RocksTable: Debug + Send + Sync + Clone {
         secondary_key_val: &Vec<u8>,
         secondary_key_hash: &Vec<u8>,
     ) -> Result<Vec<u64>, CubeError> {
-        let ref db = self.db();
+        let ref db = self.snapshot();
         let key_len = secondary_key_hash.len();
         let key_min =
             RowKey::SecondaryIndex(self.index_id(secondary_id), secondary_key_hash.clone(), 0);
 
         let mut res: Vec<u64> = Vec::new();
-        let iter = db.prefix_iterator(&key_min.to_bytes()[0..(key_len + 5)]);
+
+        let mut opts = ReadOptions::default();
+        opts.set_prefix_same_as_start(true);
+        let iter = db.iterator_opt(IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward), opts);
 
         for (key, value) in iter {
             if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
@@ -1161,18 +1192,22 @@ trait RocksTable: Debug + Send + Sync + Clone {
 
     fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError> {
         let mut res = Vec::new();
-        let db = self.db();
-        for row in self.table_scan(&db)? {
+        for row in self.table_scan(self.snapshot())? {
             res.push(row?);
         }
         Ok(res)
     }
 
-    fn table_scan<'a>(&'a self, db: &'a DB) -> Result<TableScanIter<'a, Self>, CubeError> {
+    fn table_scan<'a>(&'a self, db: &'a Snapshot) -> Result<TableScanIter<'a, Self>, CubeError> {
         let my_table_id = self.table_id();
         let key_min = RowKey::Table(my_table_id, 0);
 
-        let iterator = db.prefix_iterator::<'a, 'a>(&key_min.to_bytes()[0..get_fixed_prefix()]);
+        let mut opts = ReadOptions::default();
+        opts.set_prefix_same_as_start(true);
+        let iterator = db.iterator_opt(
+            IteratorMode::From(&key_min.to_bytes()[0..get_fixed_prefix()], Direction::Forward),
+            opts
+        );
 
         Ok(TableScanIter {
             table_id: my_table_id,
@@ -1265,6 +1300,21 @@ impl WriteBatchIterator for WriteBatchContainer {
     }
 }
 
+fn meta_store_merge(_new_key: &[u8],
+                existing_val: Option<&[u8]>,
+                operands: &mut MergeOperands)
+                -> Option<Vec<u8>> {
+    let mut result: Vec<u8> = Vec::with_capacity(8);
+    let mut counter = existing_val.map(|v| {
+        Cursor::new(v).read_u64::<BigEndian>().unwrap()
+    }).unwrap_or(0);
+    for op in operands {
+        counter += Cursor::new(op).read_u64::<BigEndian>().unwrap()
+    }
+    result.write_u64::<BigEndian>(counter).unwrap();
+    Some(result)
+}
+
 impl RocksMetaStore {
     pub fn with_listener(
         path: impl AsRef<Path>,
@@ -1283,6 +1333,7 @@ impl RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_merge_operator("meta_store merge", meta_store_merge, None);
 
         let db = DB::open(&opts, path).unwrap();
         let db_arc = Arc::new(db);
@@ -1365,6 +1416,11 @@ impl RocksMetaStore {
 
                     return Ok(meta_store);
                 }
+            } else {
+                trace!(
+                    "Can't find metastore-current in {:?}",
+                    remote_fs
+                );
             }
             info!(
                 "Creating metastore from scratch in {}",
@@ -1386,14 +1442,15 @@ impl RocksMetaStore {
 
     async fn write_operation<F, R>(&self, f: F) -> Result<R, CubeError>
     where
-        F: FnOnce(Arc<DB>, &mut BatchPipe) -> Result<R, CubeError> + Send + 'static,
+        F: for<'a> FnOnce((&'a DB, &'a Snapshot<'a>), &'a mut BatchPipe) -> Result<R, CubeError> + Send + 'static,
         R: Send + 'static,
     {
         let db = self.db.write().await.clone();
         let (spawn_res, events) =
             tokio::task::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
                 let mut batch = BatchPipe::new(db.as_ref());
-                let res = f(db.clone(), &mut batch)?;
+                let snapshot = db.snapshot();
+                let res = f((db.as_ref(), &snapshot), &mut batch)?;
                 let write_result = batch.batch_write_rows()?;
                 Ok((res, write_result))
             })
@@ -1588,11 +1645,14 @@ impl RocksMetaStore {
 
     async fn read_operation<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(Arc<DB>) -> R + Send + 'static,
+        F: for<'a> FnOnce((&'a DB, &'a Snapshot<'a>)) -> R + Send + 'static,
         R: Send + 'static,
     {
         let db = self.db.read().await.clone();
-        tokio::task::spawn_blocking(move || f(db)).await.unwrap()
+        tokio::task::spawn_blocking(move || {
+            let snapshot = db.snapshot();
+            f((db.as_ref(), &snapshot))
+        }).await.unwrap()
     }
 
     fn check_if_exists(name: &String, existing_keys_len: usize) -> Result<(), CubeError> {
@@ -1646,7 +1706,6 @@ impl RocksMetaStore {
     }
 }
 
-
 impl RocksMetaStore {
     fn add_index(
         batch_pipe: &mut BatchPipe,
@@ -1654,10 +1713,19 @@ impl RocksMetaStore {
         rocks_partition: &PartitionRocksTable,
         index_cols: &Vec<Column>,
         table_id: &IdRow<Table>,
-        index_def: IndexDef) -> Result<IdRow<Index>, CubeError>
-    {
-        if let Some(not_found) = index_def.columns.iter().find(|dc| index_cols.iter().all(|c| c.name.as_str() != dc.as_str())) {
-            return Err(CubeError::user(format!("Column {} in index {} not found in table {}", not_found, index_def.name, table_id.get_row().get_table_name())));
+        index_def: IndexDef,
+    ) -> Result<IdRow<Index>, CubeError> {
+        if let Some(not_found) = index_def
+            .columns
+            .iter()
+            .find(|dc| index_cols.iter().all(|c| c.name.as_str() != dc.as_str()))
+        {
+            return Err(CubeError::user(format!(
+                "Column {} in index {} not found in table {}",
+                not_found,
+                index_def.name,
+                table_id.get_row().get_table_name()
+            )));
         }
         let (mut sorted, mut unsorted) =
             index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
@@ -1685,12 +1753,48 @@ impl RocksMetaStore {
         Ok(index_id)
     }
 
-    fn get_table_by_name(schema_name: String, table_name: String, rocks_table: TableRocksTable, rocks_schema: SchemaRocksTable) -> Result<IdRow<Table>, CubeError> {
+    fn get_table_by_name(
+        schema_name: String,
+        table_name: String,
+        rocks_table: TableRocksTable,
+        rocks_schema: SchemaRocksTable,
+    ) -> Result<IdRow<Table>, CubeError> {
         let schema_id =
             rocks_schema.get_single_row_by_index(&schema_name, &SchemaRocksIndex::Name)?;
         let index_key = TableIndexKey::ByName(schema_id.get_id(), table_name.to_string());
         let table = rocks_table.get_single_row_by_index(&index_key, &TableRocksIndex::Name)?;
         Ok(table)
+    }
+
+    fn chunks_by_partitioned_with_non_repartitioned(
+        partition_id: u64,
+        table: &ChunkRocksTable,
+        partition_table: &PartitionRocksTable,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        let mut partitions_up_to_root = Vec::new();
+        let mut current_partition = partition_table.get_row_or_not_found(partition_id)?;
+        partitions_up_to_root.push(current_partition.get_id());
+        while let Some(parent_id) = current_partition.get_row().parent_partition_id() {
+            let parent = partition_table.get_row_or_not_found(*parent_id)?;
+            partitions_up_to_root.push(parent.get_id());
+            current_partition = parent;
+        }
+
+        let mut chunks = Vec::new();
+
+        for partition_id in partitions_up_to_root.into_iter() {
+            chunks.extend(
+                table
+                    .get_rows_by_index(
+                        &ChunkIndexKey::ByPartitionId(partition_id),
+                        &ChunkRocksIndex::PartitionId,
+                    )?
+                    .into_iter()
+                    .filter(|c| c.get_row().uploaded() && c.get_row().active()),
+            );
+        }
+
+        Ok(chunks)
     }
 }
 
@@ -1707,11 +1811,10 @@ impl MetaStore for RocksMetaStore {
         Ok(())
     }
 
-    fn schemas_table(&self) -> Box<dyn MetaStoreTable<T = Schema>> {
-        Box::new(MetaStoreTableImpl {
+    fn schemas_table(&self) -> SchemaMetaStoreTable {
+        SchemaMetaStoreTable {
             rocks_meta_store: self.clone(),
-            rocks_table_fn: |db| SchemaRocksTable::new(db),
-        })
+        }
     }
 
     async fn create_schema(
@@ -1845,11 +1948,10 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    fn tables_table(&self) -> Box<dyn MetaStoreTable<T = Table>> {
-        Box::new(MetaStoreTableImpl {
+    fn tables_table(&self) -> TableMetaStoreTable {
+        TableMetaStoreTable {
             rocks_meta_store: self.clone(),
-            rocks_table_fn: |db| TableRocksTable::new(db),
-        })
+        }
     }
 
     async fn create_table(
@@ -1879,7 +1981,14 @@ impl MetaStore for RocksMetaStore {
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
             for index_def in indexes.into_iter() {
-                RocksMetaStore::add_index(batch_pipe, &rocks_index, &rocks_partition, &index_cols, &table_id, index_def)?;
+                RocksMetaStore::add_index(
+                    batch_pipe,
+                    &rocks_index,
+                    &rocks_partition,
+                    &index_cols,
+                    &table_id,
+                    index_def,
+                )?;
             }
 
             let (mut sorted, mut unsorted) =
@@ -1920,7 +2029,12 @@ impl MetaStore for RocksMetaStore {
         self.read_operation(move |db_ref| {
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref);
-            let table = RocksMetaStore::get_table_by_name(schema_name, table_name, rocks_table, rocks_schema)?;
+            let table = RocksMetaStore::get_table_by_name(
+                schema_name,
+                table_name,
+                rocks_table,
+                rocks_schema,
+            )?;
             Ok(table)
         })
         .await
@@ -1982,11 +2096,10 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    fn partition_table(&self) -> Box<dyn MetaStoreTable<T = Partition>> {
-        Box::new(MetaStoreTableImpl {
+    fn partition_table(&self) -> PartitionMetaStoreTable {
+        PartitionMetaStoreTable {
             rocks_meta_store: self.clone(),
-            rocks_table_fn: |db| PartitionRocksTable::new(db),
-        })
+        }
     }
 
     async fn create_partition(&self, partition: Partition) -> Result<IdRow<Partition>, CubeError> {
@@ -2046,9 +2159,18 @@ impl MetaStore for RocksMetaStore {
         compacted_chunk_ids: Vec<u64>,
         new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError> {
+        trace!(
+            "Swapping partitions: deactivating ({}), deactivating chunks ({}), activating ({})",
+            current_active.iter().join(", "),
+            compacted_chunk_ids.iter().join(", "),
+            new_active.iter().join(", ")
+        );
         self.write_operation(move |db_ref, batch_pipe| {
             let table = PartitionRocksTable::new(db_ref.clone());
             let chunk_table = ChunkRocksTable::new(db_ref.clone());
+
+            let mut deactivated_row_count = 0;
+            let mut activated_row_count = 0;
 
             for current in current_active.iter() {
                 let current_partition =
@@ -2068,6 +2190,7 @@ impl MetaStore for RocksMetaStore {
                     current_partition.get_row(),
                     batch_pipe,
                 )?;
+                deactivated_row_count += current_partition.get_row().main_table_row_count()
             }
 
             for (new, (count, (min_value, max_value))) in
@@ -2092,10 +2215,23 @@ impl MetaStore for RocksMetaStore {
                     new_partition.get_row(),
                     batch_pipe,
                 )?;
+                activated_row_count += count;
             }
 
             for chunk_id in compacted_chunk_ids.iter() {
+                deactivated_row_count += chunk_table.get_row_or_not_found(*chunk_id)?.get_row().get_row_count();
                 chunk_table.update_with_fn(*chunk_id, |row| row.deactivate(), batch_pipe)?;
+            }
+
+            if activated_row_count != deactivated_row_count {
+                return Err(CubeError::internal(format!(
+                    "Deactivated row count ({}) doesn't match activated row count ({}) during swap of partition ({}) and ({}) chunks to new partitions ({})",
+                    deactivated_row_count,
+                    activated_row_count,
+                    current_active.iter().join(", "),
+                    compacted_chunk_ids.iter().join(", "),
+                    new_active.iter().join(", ")
+                )))
             }
 
             Ok(())
@@ -2103,28 +2239,49 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    fn index_table(&self) -> Box<dyn MetaStoreTable<T = Index>> {
-        Box::new(MetaStoreTableImpl {
+    fn index_table(&self) -> IndexMetaStoreTable {
+        IndexMetaStoreTable {
             rocks_meta_store: self.clone(),
-            rocks_table_fn: |db| IndexRocksTable::new(db),
-        })
+        }
     }
 
-    async fn create_index(&self, schema_name: String, table_name: String, index_def: IndexDef) -> Result<IdRow<Index>, CubeError> {
+    async fn create_index(
+        &self,
+        schema_name: String,
+        table_name: String,
+        index_def: IndexDef,
+    ) -> Result<IdRow<Index>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_index = IndexRocksTable::new(db_ref.clone());
             let rocks_partition = PartitionRocksTable::new(db_ref.clone());
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
 
-            let table = RocksMetaStore::get_table_by_name(schema_name, table_name, rocks_table, rocks_schema)?;
+            let table = RocksMetaStore::get_table_by_name(
+                schema_name,
+                table_name,
+                rocks_table,
+                rocks_schema,
+            )?;
 
             if *table.get_row().has_data() {
-                return Err(CubeError::user(format!("Can't create '{}' index because '{}' table already has data", index_def.name, table.get_row().get_table_name())))
+                return Err(CubeError::user(format!(
+                    "Can't create '{}' index because '{}' table already has data",
+                    index_def.name,
+                    table.get_row().get_table_name()
+                )));
             }
 
-            Ok(RocksMetaStore::add_index(batch_pipe, &rocks_index, &rocks_partition, table.get_row().get_columns(), &table, index_def)?)
-        }).await
+            Ok(RocksMetaStore::add_index(
+                batch_pipe,
+                &rocks_index,
+                &rocks_partition,
+                table.get_row().get_columns(),
+                &table,
+                index_def,
+            )?)
+        })
+        .await
     }
 
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError> {
@@ -2173,6 +2330,34 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn get_active_partitions_and_chunks_by_index_id(
+        &self,
+        index_id: u64,
+    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
+            let rocks_partition = PartitionRocksTable::new(db_ref);
+            // TODO iterate over range
+            rocks_partition
+                .get_rows_by_index(
+                    &PartitionIndexKey::ByIndexId(index_id),
+                    &PartitionRocksIndex::IndexId,
+                )?
+                .into_iter()
+                .filter(|r| r.get_row().active)
+                .map(|p| -> Result<_, _> {
+                    let chunks = Self::chunks_by_partitioned_with_non_repartitioned(
+                        p.get_id(),
+                        &rocks_chunk,
+                        &rocks_partition,
+                    )?;
+                    Ok((p, chunks))
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .await
+    }
+
     async fn create_chunk(
         &self,
         partition_id: u64,
@@ -2214,40 +2399,6 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn get_chunks_by_partition_with_non_repartitioned(
-        &self,
-        partition_id: u64,
-    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation(move |db_ref| {
-            let table = ChunkRocksTable::new(db_ref.clone());
-            let mut partitions_up_to_root = Vec::new();
-            let partition_table = PartitionRocksTable::new(db_ref);
-            let mut current_partition = partition_table.get_row_or_not_found(partition_id)?;
-            partitions_up_to_root.push(current_partition.get_id());
-            while let Some(parent_id) = current_partition.get_row().parent_partition_id() {
-                let parent = partition_table.get_row_or_not_found(*parent_id)?;
-                partitions_up_to_root.push(parent.get_id());
-                current_partition = parent;
-            }
-
-            let mut chunks = Vec::new();
-
-            for partition_id in partitions_up_to_root.into_iter() {
-                chunks.extend(
-                    table
-                    .get_rows_by_index(
-                        &ChunkIndexKey::ByPartitionId(partition_id),
-                        &ChunkRocksIndex::PartitionId,
-                    )?
-                    .into_iter()
-                    .filter(|c| c.get_row().uploaded() && c.get_row().active())
-                );
-            }
-
-            Ok(chunks)
-        }).await
-    }
-
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let table = ChunkRocksTable::new(db_ref.clone());
@@ -2276,18 +2427,52 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    fn chunks_table(&self) -> Box<dyn MetaStoreTable<T = Chunk>> {
-        Box::new(MetaStoreTableImpl {
-            rocks_meta_store: self.clone(),
-            rocks_table_fn: |db| ChunkRocksTable::new(db),
+    async fn swap_chunks(
+        &self,
+        deactivate_ids: Vec<u64>,
+        uploaded_ids: Vec<u64>,
+    ) -> Result<(), CubeError> {
+        trace!("Swapping chunks: deactivating ({}), activating ({})", deactivate_ids.iter().join(", "), uploaded_ids.iter().join(", "));
+        self.write_operation(move |db_ref, batch_pipe| {
+            let table = ChunkRocksTable::new(db_ref.clone());
+            let mut deactivated_row_count = 0;
+            let mut activated_row_count = 0;
+            for id in deactivate_ids.iter() {
+                deactivated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
+                table.update_with_fn(*id, |row| row.deactivate(), batch_pipe)?;
+            }
+            for id in uploaded_ids.iter() {
+                activated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
+                table.update_with_fn(*id, |row| row.set_uploaded(true), batch_pipe)?;
+            }
+            if deactivate_ids.len() > 0 && activated_row_count != deactivated_row_count {
+                return Err(CubeError::internal(format!(
+                    "Deactivated row count ({}) doesn't match activated row count ({}) during swap of ({}) to ({}) chunks",
+                    deactivated_row_count,
+                    activated_row_count,
+                    deactivate_ids.iter().join(", "),
+                    uploaded_ids.iter().join(", ")
+                )))
+            }
+            Ok(())
         })
+        .await
+    }
+
+    fn chunks_table(&self) -> ChunkMetaStoreTable {
+        ChunkMetaStoreTable {
+            rocks_meta_store: self.clone(),
+        }
     }
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_wal = WALRocksTable::new(db_ref.clone());
-            TableRocksTable::new(db_ref.clone())
-                .update_with_fn(table_id, |t| t.update_has_data(true), batch_pipe)?;
+            TableRocksTable::new(db_ref.clone()).update_with_fn(
+                table_id,
+                |t| t.update_has_data(true),
+                batch_pipe,
+            )?;
 
             let wal = WAL::new(table_id, row_count);
             let id_row = rocks_wal.insert(wal, batch_pipe)?;
@@ -2421,7 +2606,6 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 }
-
 
 #[cfg(test)]
 mod tests {

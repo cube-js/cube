@@ -98,7 +98,7 @@ describe('MSSqlPreAggregations', function test() {
           timeDimensionReference: createdAt,
           granularity: 'day'
         },
-        ratio: {
+        ratioRollup: {
           type: 'rollup',
           measureReferences: [checkinsTotal, uniqueSourceCount],
           timeDimensionReference: createdAt,

@@ -112,6 +112,7 @@ describe('drill down query', () => {
       })
     ).toEqual({
       measures: [],
+      segments: [],
       dimensions: ['Orders.id', 'Orders.title'],
       filters: [
         {
@@ -136,6 +137,7 @@ describe('drill down query', () => {
       })
     ).toEqual({
       measures: [],
+      segments: [],
       dimensions: ['Orders.id', 'Orders.title'],
       filters: [
         {
@@ -160,6 +162,7 @@ describe('drill down query', () => {
       })
     ).toEqual({
       measures: [],
+      segments: [],
       dimensions: ['Orders.id', 'Orders.title'],
       filters: [
         {
@@ -188,6 +191,7 @@ describe('drill down query', () => {
     ).toEqual(
       {
         measures: [],
+        segments: [],
         dimensions: [
           'Orders.id',
           'Orders.title',

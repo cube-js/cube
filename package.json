@@ -10,8 +10,7 @@
     "lint": "lerna run lint",
     "lint:fix": "lerna run lint:fix",
     "tsc": "lerna run tsc",
-    "tsc:watch": "lerna run watch",
-    "postinstall": "is-ci || husky install"
+    "tsc:watch": "lerna run watch"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {

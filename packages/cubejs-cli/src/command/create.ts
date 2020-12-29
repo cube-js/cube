@@ -26,7 +26,7 @@ const create = async (projectName, options) => {
   const createAppOptions = { projectName, dbType: options.dbType, template: options.template };
 
   event({
-    name: 'Create App',
+    event: 'Create App',
     ...createAppOptions,
   });
 
@@ -66,7 +66,7 @@ const create = async (projectName, options) => {
   await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
 
   if (!options.dbType) {
-    const Drivers = await requireFromPackage<any>('@cubejs-backend/server-core/core/DriverDependencies.js');
+    const Drivers = await requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/DriverDependencies.js');
     const prompt = await inquirer.prompt([{
       type: 'list',
       name: 'dbType',
@@ -153,7 +153,7 @@ const create = async (projectName, options) => {
   }
 
   await event({
-    name: 'Create App Success',
+    event: 'Create App Success',
     projectName,
     dbType: options.dbType
   });

@@ -2,7 +2,7 @@ pub mod query_executor;
 pub mod serialized_plan;
 
 use crate::metastore::table::TablePath;
-use crate::metastore::MetaStore;
+use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::queryplanner::query_executor::batch_to_dataframe;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::store::DataFrame;
@@ -58,10 +58,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         logical_plan = ctx.optimize(&logical_plan)?;
 
-        trace!(
-            "Logical Plan: {:#?}",
-            &logical_plan
-        );
+        trace!("Logical Plan: {:#?}", &logical_plan);
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             QueryPlan::Select(SerializedPlan::try_new(logical_plan, self.meta_store.clone()).await?)

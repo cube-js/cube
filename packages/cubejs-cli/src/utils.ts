@@ -64,7 +64,7 @@ export const displayError = async (text: string|string[], options = {}) => {
   console.error(chalk.yellow('Need some help? -------------------------------------'));
 
   await event({
-    name: 'Error',
+    event: 'Error',
     error: Array.isArray(text) ? text.join('\n') : text.toString(),
     ...options
   });

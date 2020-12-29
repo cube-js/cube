@@ -1,4 +1,4 @@
-const CubejsServerCore = require('@cubejs-backend/server-core');
+const { CubejsServerCore } = require('@cubejs-backend/server-core');
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');

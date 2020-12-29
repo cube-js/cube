@@ -3,11 +3,11 @@ const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const crypto = require('crypto');
-const fs = require('fs');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
-  text: 'varchar(255) CHARACTER SET utf8mb4'
+  text: 'varchar(255) CHARACTER SET utf8mb4',
+  decimal: 'decimal(38,10)',
 };
 
 const MySqlToGenericType = {
@@ -49,13 +49,23 @@ class MySqlDriver extends BaseDriver {
 
         return conn;
       },
-      destroy: (connection) => promisify(connection.end.bind(connection))()
+      validate: async (connection) => {
+        try {
+          await connection.execute('SELECT 1');
+        } catch (e) {
+          this.databasePoolError(e);
+          return false;
+        }
+        return true;
+      },
+      destroy: (connection) => promisify(connection.end.bind(connection))(),
     }, {
       min: 0,
       max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
+      testOnBorrow: true,
       acquireTimeoutMillis: 20000,
       ...pool
     });

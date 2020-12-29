@@ -787,8 +787,12 @@ span.group-header {
     font-size: inherit;
     margin-top: 6px;
     position: absolute;
-    left: 5px;
+    left: -0.75rem;
     padding-right: 10px;
+
+    @media screen and (min-width: 2000px) {
+      left: 0.75rem;
+    }
 
     &:hover {
       display: inline;

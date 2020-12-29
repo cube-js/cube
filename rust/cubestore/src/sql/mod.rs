@@ -6,9 +6,7 @@ use async_trait::async_trait;
 use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
-use crate::metastore::{
-    table::Table, IdRow, ImportFormat, Index, IndexDef, RowKey, Schema, TableId,
-};
+use crate::metastore::{table::Table, IdRow, ImportFormat, Index, IndexDef, RowKey, Schema, TableId, MetaStoreTable};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use crate::{
@@ -149,11 +147,15 @@ impl SqlServiceImpl {
     ) -> Result<IdRow<Index>, CubeError> {
         Ok(self
             .db
-            .create_index(schema_name, table_name, IndexDef {
-                name,
-                columns: columns.iter().map(|c| c.value.to_string()).collect()
-            }).await?
-        )
+            .create_index(
+                schema_name,
+                table_name,
+                IndexDef {
+                    name,
+                    columns: columns.iter().map(|c| c.value.to_string()).collect(),
+                },
+            )
+            .await?)
     }
 
     async fn insert_data<'a>(
@@ -297,7 +299,10 @@ impl SqlService for SqlServiceImpl {
             } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
-                    return Err(CubeError::user(format!("Schema's name should be present in table name but found: {}", name)));
+                    return Err(CubeError::user(format!(
+                        "Schema's name should be present in table name but found: {}",
+                        name
+                    )));
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
@@ -314,13 +319,28 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(DataFrame::from(vec![res]))
             }
-            CubeStoreStatement::Statement(Statement::CreateIndex { name, table_name, columns, .. }) => {
+            CubeStoreStatement::Statement(Statement::CreateIndex {
+                name,
+                table_name,
+                columns,
+                ..
+            }) => {
                 if table_name.0.len() != 2 {
-                    return Err(CubeError::user(format!("Schema's name should be present in table name but found: {}", table_name)));
+                    return Err(CubeError::user(format!(
+                        "Schema's name should be present in table name but found: {}",
+                        table_name
+                    )));
                 }
                 let schema_name = &table_name.0[0].value;
                 let table_name = &table_name.0[1].value;
-                let res = self.create_index(schema_name.to_string(), table_name.to_string(), name.to_string(), &columns).await?;
+                let res = self
+                    .create_index(
+                        schema_name.to_string(),
+                        table_name.to_string(),
+                        name.to_string(),
+                        &columns,
+                    )
+                    .await?;
                 Ok(DataFrame::from(vec![res]))
             }
             CubeStoreStatement::Statement(Statement::Drop {
@@ -410,7 +430,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 | DataType::Array(_) => ColumnType::Bytes,
                 DataType::Decimal(precision, scale) => {
                     let mut precision = precision.unwrap_or(18);
-                    let mut scale = scale.unwrap_or(0);
+                    let mut scale = scale.unwrap_or(5);
                     if precision > 18 {
                         precision = 18;
                     }
@@ -602,13 +622,16 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::WALStore;
+    use itertools::Itertools;
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
+    use std::collections::HashSet;
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
     use std::{env, fs};
-    use std::collections::HashSet;
-    use itertools::Itertools;
+    use uuid::Uuid;
 
     #[actix_rt::test]
     async fn create_schema_test() {
@@ -825,7 +848,7 @@ mod tests {
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             let _ = service
-                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal(2), dec_value_1 decimal(18, 2))")
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
                 .await
                 .unwrap();
 
@@ -839,28 +862,28 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("7".to_string()), TableValue::Decimal("59.92".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("7.61".to_string()), TableValue::Decimal("59.92".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) from foo.values where dec_value > 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160".to_string()), TableValue::Decimal("58.92".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Decimal("58.92".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value > 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160".to_string()), TableValue::Decimal("5.892".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Decimal("5.892".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-133".to_string()), TableValue::Decimal("0.45".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Decimal("0.45".to_string())]));
         })
             .await;
     }
@@ -917,6 +940,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn group_by_decimal() {
+        Config::run_test("group_by_decimal", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value DECIMAL)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 100), (2, 200), (3, 100), (4, 100), (5, 200)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.decimal_group").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5)]));
+
+            let result = service.exec_query("SELECT count(*) from foo.decimal_group where decimal_value = 200").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+
+            let result = service.exec_query("SELECT g.decimal_value, count(*) from foo.decimal_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("100".to_string()), TableValue::Int(3)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Decimal("200".to_string()), TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn over_2k_booleans() {
         Config::test("over_2k_booleans").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
@@ -951,6 +1000,110 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(21177)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(3823)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn over_10k_join() {
+        Config::test("over_10k_join").update_config(|mut c| {
+            c.partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 50;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (amount int, email text)").await.unwrap();
+
+            service.exec_query("CREATE INDEX orders_by_email ON foo.orders (email)").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.customers (email text, system text, uuid text)").await.unwrap();
+
+            service.exec_query("CREATE INDEX customers_by_email ON foo.customers (email)").await.unwrap();
+
+            let mut join_results = Vec::new();
+
+            for batch in 0..25 {
+                let mut orders = Vec::new();
+                let mut customers = Vec::new();
+                for i in 0..1000 {
+                    let email = String::from_utf8(thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(5)
+                        .collect()
+                    ).unwrap();
+                    let domain = String::from_utf8(thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(5)
+                        .collect()
+                    ).unwrap();
+                    let email = format!("{}@{}.com", email, domain);
+                    orders.push((i, email.clone()));
+                    if i % (batch + 1) == 0 {
+                        let uuid = Uuid::new_v4().to_string();
+                        customers.push((email.clone(), uuid.clone()));
+                        if i % (batch + 1 + 10) == 0 {
+                            customers.push((email.clone(), uuid.clone()));
+                            join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String(uuid), TableValue::Int(i * 2)]))
+                        } else {
+                            join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String(uuid), TableValue::Int(i)]))
+                        }
+                    } else {
+                        join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String("".to_string()), TableValue::Int(i)]))
+                    }
+                }
+
+                let values = orders.into_iter().map(|(amount, email)| format!("({}, '{}')", amount, email)).join(", ");
+
+                service.exec_query(
+                    &format!("INSERT INTO foo.orders (amount, email) VALUES {}", values)
+                ).await.unwrap();
+
+                let values = customers.into_iter().map(|(email, uuid)| format!("('{}', 'system', '{}')", email, uuid)).join(", ");
+
+                service.exec_query(
+                    &format!("INSERT INTO foo.customers (email, system, uuid) VALUES {}", values)
+                ).await.unwrap();
+            }
+
+            join_results.sort_by_key(|r| r.values()[0].clone());
+
+            let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap();
+
+            assert_eq!(result.get_rows().len(), join_results.len());
+            for i in 0..result.get_rows().len() {
+                // println!("Actual {}: {:?}", i, &result.get_rows()[i]);
+                // println!("Expected {}: {:?}", i, &join_results[i]);
+                assert_eq!(&result.get_rows()[i], &join_results[i]);
+            }
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn high_frequency_inserts() {
+        Config::test("high_frequency_inserts").update_config(|mut c| {
+            c.partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.numbers (num int)").await.unwrap();
+
+            for i in 0..500 {
+                service.exec_query(
+                    &format!("INSERT INTO foo.numbers (num) VALUES ({})", i)
+                ).await.unwrap();
+            }
+
+            let result = service.exec_query("SELECT count(*) from foo.numbers").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(500)]));
+
+            let result = service.exec_query("SELECT sum(num) from foo.numbers").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(124750)]));
         }).await;
     }
 
