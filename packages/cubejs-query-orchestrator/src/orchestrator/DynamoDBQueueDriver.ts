@@ -18,8 +18,6 @@ import { BaseQueueDriver } from './BaseQueueDriver';
 
 const DynamoDB = require('aws-sdk/clients/dynamodb');
 
-const documentClient = new DynamoDB.DocumentClient();
-
 // Need to specify a value for the single table design and we want it static
 const QUEUE_SIZE_SORT_KEY = 'empty';
 const PROCESSING_COUNTER_SORT_KEY = 'empty';
@@ -57,6 +55,8 @@ export class DynamoDBQueueDriverConnection {
     this.driver = driver;
 
     this.tableName = options.tableName ?? process.env.CUBEJS_CACHE_TABLE;
+
+    const documentClient = new DynamoDB.DocumentClient();
 
     this.table = new Table({
       // Specify table name (used by DynamoDB)

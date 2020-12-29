@@ -2,11 +2,8 @@ import { Table, Entity } from 'dynamodb-toolbox';
 
 const DynamoDB = require('aws-sdk/clients/dynamodb');
 
-const DocumentClient = new DynamoDB.DocumentClient();
-
 const TTL_KEY = process.env.DYNAMODB_TTL_KEY ?? 'exp';
 const CACHE_TABLE_PRIMARY_KEY = `SQL_QUERY_RESULT_CACHE_${process.env.CUBEJS_APP || 'cubejs'}`;
-
 export class DynamoDBCacheDriver {
   /**
    * The dynamo-toolbox table where cache will be written
@@ -19,6 +16,8 @@ export class DynamoDBCacheDriver {
   protected readonly cache: Entity<{}>;
 
   public constructor() {
+    const DocumentClient = new DynamoDB.DocumentClient();
+    
     this.table = new Table({
       // Specify table name (used by DynamoDB)
       name: process.env.CUBEJS_CACHE_TABLE,
