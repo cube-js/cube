@@ -646,6 +646,12 @@ pub trait MetaStore: Send + Sync {
         deactivate_ids: Vec<u64>,
         uploaded_ids: Vec<u64>,
     ) -> Result<(), CubeError>;
+    async fn activate_wal(
+        &self,
+        wal_id_to_delete: u64,
+        uploaded_ids: Vec<u64>,
+        index_count: u64
+    ) -> Result<(), CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
@@ -2427,6 +2433,39 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn activate_wal(
+        &self,
+        wal_id_to_delete: u64,
+        uploaded_ids: Vec<u64>,
+        index_count: u64
+    ) -> Result<(), CubeError> {
+        trace!("Swapping chunks: deleting WAL ({}), activating chunks ({})", wal_id_to_delete, uploaded_ids.iter().join(", "));
+        self.write_operation(move |db_ref, batch_pipe| {
+            let wal_table = WALRocksTable::new(db_ref);
+            let table = ChunkRocksTable::new(db_ref);
+            let mut activated_row_count = 0;
+
+            let deactivated_row_count = wal_table.get_row_or_not_found(wal_id_to_delete)?.get_row().get_row_count();
+            wal_table.delete(wal_id_to_delete, batch_pipe)?;
+
+            for id in uploaded_ids.iter() {
+                activated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
+                table.update_with_fn(*id, |row| row.set_uploaded(true), batch_pipe)?;
+            }
+            if activated_row_count != deactivated_row_count * index_count {
+                return Err(CubeError::internal(format!(
+                    "Deactivated WAL row count ({}) doesn't match activated row count ({}) during swap of ({}) to ({}) chunks",
+                    deactivated_row_count,
+                    activated_row_count,
+                    wal_id_to_delete,
+                    uploaded_ids.iter().join(", ")
+                )))
+            }
+            Ok(())
+        })
+        .await
+    }
+
     async fn swap_chunks(
         &self,
         deactivate_ids: Vec<u64>,
@@ -2456,7 +2495,7 @@ impl MetaStore for RocksMetaStore {
             }
             Ok(())
         })
-        .await
+            .await
     }
 
     fn chunks_table(&self) -> ChunkMetaStoreTable {
