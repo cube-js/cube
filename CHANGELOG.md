@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.3](https://github.com/cube-js/cube.js/compare/v0.25.2...v0.25.3) (2020-12-28)
+
+
+### Bug Fixes
+
+* `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY` doesn't work ([1f6b505](https://github.com/cube-js/cube.js/commit/1f6b5054b1327547d86004fd95941b0f3099ca68))
+
+
+
+
+
+## [0.25.2](https://github.com/cube-js/cube.js/compare/v0.25.1...v0.25.2) (2020-12-27)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/query-orchestrator:** Throw an exception on empty pre-agg in readOnly mode, refs [#1597](https://github.com/cube-js/cube.js/issues/1597) ([17d5fdb](https://github.com/cube-js/cube.js/commit/17d5fdb82e0ce06d55e438913e32952f32db7923))
+* **@cubejs-backend/schema-compiler:** MySQL double timezone conversion ([e5f1490](https://github.com/cube-js/cube.js/commit/e5f1490a897df4f0eac062dfabbc20aca2ea2f5b))
+* **@cubejs-client/react:** prevent state updates on unmounted components ([#1684](https://github.com/cube-js/cube.js/issues/1684)) ([4f3796c](https://github.com/cube-js/cube.js/commit/4f3796c9f402a7b8b54311a08c632270be8e34c3))
+* **api-gateway:** /readyz /healthz - correct response for partial outage ([1e5bdf5](https://github.com/cube-js/cube.js/commit/1e5bdf556f6f14698945a72c0332e0f6982ba8e7))
+
+
+### Features
+
+* Ability to set timeouts for polling in BigQuery/Athena ([#1675](https://github.com/cube-js/cube.js/issues/1675)) ([dc944b1](https://github.com/cube-js/cube.js/commit/dc944b1aaacc69dd74a9d9d31ceaf43e16d37ccd)), closes [#1672](https://github.com/cube-js/cube.js/issues/1672)
+* Concurrency controls for scheduled refresh ([2132f0d](https://github.com/cube-js/cube.js/commit/2132f0dc7bb3aab994d559ea42dd0b0a934b1310))
+* **api-gateway:** Support schema inside Authorization header, fix [#1297](https://github.com/cube-js/cube.js/issues/1297) ([2549004](https://github.com/cube-js/cube.js/commit/25490048661738e273629c73368ca03f821ee096))
+* **cubestore:** Default decimal scale ([a79f98b](https://github.com/cube-js/cube.js/commit/a79f98b08c9be0688c0cea82b881230518575270))
+
+
+
+
+
+## [0.25.1](https://github.com/cube-js/cube.js/compare/v0.25.0...v0.25.1) (2020-12-24)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/schema-compiler:** Better error message for join member resolutions ([30cc3ab](https://github.com/cube-js/cube.js/commit/30cc3abc4e8c91e8d95b8794f892e1d1f2152798))
+* **@cubejs-backend/schema-compiler:** Error: TypeError: R.eq is not a function -- existing joins in rollup support ([5f62aae](https://github.com/cube-js/cube.js/commit/5f62aaee88b7ecc281437601410b10ef04d7bbf3))
+* **@cubejs-client/playground:** propagate cubejs token ([#1669](https://github.com/cube-js/cube.js/issues/1669)) ([f1fb563](https://github.com/cube-js/cube.js/commit/f1fb5634fa62b2f78cf6d8365c4a98094e114f6c))
+* **cubestore:** Merge join empty side fixes ([5e65c3e](https://github.com/cube-js/cube.js/commit/5e65c3e251c7f9d7329a601bd467a4ef3b043463))
+* **cubestore:** Non atomic primary key allocation conflicts ([073ac8c](https://github.com/cube-js/cube.js/commit/073ac8ce69cc294a15a5e59b11b2915a755ca81b))
+* **cubestore:** Pass join on sort conditions explicitly. Avoid incorrectly selected sort keys. ([b6a2e4a](https://github.com/cube-js/cube.js/commit/b6a2e4a457bd38d40d8819443a2fc4fddf7465db))
+* **playground:** Use basePath from configuration, fix [#377](https://github.com/cube-js/cube.js/issues/377) ([c94cbce](https://github.com/cube-js/cube.js/commit/c94cbce50e31617086ec458f934fefaf779b76f4))
+
+
+### Features
+
+* **@cubejs-backend/dremio-driver:** Add HTTPS support for Dremio ([#1666](https://github.com/cube-js/cube.js/issues/1666)), Thanks [@chipblox](https://github.com/chipblox) ([1143e9c](https://github.com/cube-js/cube.js/commit/1143e9cbdb78059a93e1419feff80c34ee29bdbf))
+* **athena-driver:** Support readOnly option, add typings ([a519cb8](https://github.com/cube-js/cube.js/commit/a519cb880be2bb2b872c56b092f1273291fbd397))
+* **elasticsearch-driver:** Support CUBEJS_DB_ELASTIC_QUERY_FORMAT, Thanks [@dylman79](https://github.com/dylman79) ([a7460f5](https://github.com/cube-js/cube.js/commit/a7460f5d45dc7e9d96b65f6cc36df810a5b9312e))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 

@@ -8,9 +8,7 @@ extern crate bincode;
 
 use bincode::{deserialize_from, serialize_into};
 
-use crate::metastore::{
-    table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL,
-};
+use crate::metastore::{table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL, MetaStoreTable};
 use crate::remotefs::RemoteFs;
 use crate::table::{Row, TableStore, TableValue};
 use crate::CubeError;
@@ -25,6 +23,7 @@ use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use mockall::automock;
+use log::trace;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct DataFrame {
@@ -667,6 +666,7 @@ impl ChunkStore {
             .meta_store
             .create_chunk(partition.get_id(), data.len())
             .await?;
+        trace!("New chunk allocated during partitioning: {:?}", chunk);
         let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
         let local_file = self.remote_fs.local_file(&remote_path).await?;
         tokio::task::spawn_blocking(move || -> Result<(), CubeError> {

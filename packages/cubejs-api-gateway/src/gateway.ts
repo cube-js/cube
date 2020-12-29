@@ -161,7 +161,7 @@ export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
   refreshScheduler: any;
-  basePath?: string;
+  basePath: string;
   extendContext?: ExtendContextFn;
   checkAuth?: CheckAuthFn;
   // @deprecated Please use checkAuth
@@ -205,7 +205,7 @@ export class ApiGateway {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
     this.standalone = options.standalone;
-    this.basePath = options.basePath || '/cubejs-api';
+    this.basePath = options.basePath;
 
     this.queryTransformer = options.queryTransformer || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
@@ -682,7 +682,7 @@ export class ApiGateway {
     }
   }
 
-  protected async defaultCheckAuth(req, auth) {
+  protected async defaultCheckAuth(req: Request, auth?: string) {
     if (auth) {
       const secret = this.apiSecret;
       try {
@@ -703,11 +703,24 @@ export class ApiGateway {
     }
   }
 
+  protected extractAuthorizationHeaderWithSchema(req: Request) {
+    if (typeof req.headers.authorization === 'string') {
+      const parts = req.headers.authorization.split(' ', 2);
+      if (parts.length === 1) {
+        return parts[0];
+      }
+
+      return parts[1];
+    }
+
+    return undefined;
+  }
+
   protected checkAuth: RequestHandler = async (req, res, next) => {
-    const auth = req.headers.authorization;
+    const token = this.extractAuthorizationHeaderWithSchema(req);
 
     try {
-      await this.checkAuthFn(req, auth);
+      await this.checkAuthFn(req, token);
       if (next) {
         next();
       }
@@ -717,7 +730,7 @@ export class ApiGateway {
       } else {
         this.log(req, {
           type: 'Auth Error',
-          token: auth,
+          token,
           error: e.stack || e.toString()
         });
         res.status(500).json({ error: e.toString() });
@@ -805,7 +818,7 @@ export class ApiGateway {
           error: e.stack || e.toString(),
         });
 
-        return this.healthResponse(res, health);
+        return this.healthResponse(res, 'DOWN');
       }
 
       try {
@@ -834,7 +847,7 @@ export class ApiGateway {
         error: e.stack || e.toString(),
       });
 
-      return this.healthResponse(res, health);
+      return this.healthResponse(res, 'DOWN');
     }
 
     try {

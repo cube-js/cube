@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
 
+#[derive(Debug)]
 pub struct S3RemoteFs {
     dir: RwLock<PathBuf>,
     bucket: Bucket,

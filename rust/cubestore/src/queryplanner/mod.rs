@@ -2,7 +2,7 @@ pub mod query_executor;
 pub mod serialized_plan;
 
 use crate::metastore::table::TablePath;
-use crate::metastore::MetaStore;
+use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::queryplanner::query_executor::batch_to_dataframe;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::store::DataFrame;

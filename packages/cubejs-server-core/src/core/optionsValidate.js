@@ -49,6 +49,7 @@ const schemaOptions = Joi.object().keys({
   ),
   compilerCacheSize: Joi.number().min(0).integer(),
   maxCompilerCacheKeepAlive: Joi.number().min(0).integer(),
+  scheduledRefreshConcurrency: Joi.number().min(1).integer(),
   updateCompilerCacheKeepAlive: Joi.boolean(),
   telemetry: Joi.boolean(),
   allowUngroupedWithoutPrimaryKey: Joi.boolean(),

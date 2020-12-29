@@ -3,7 +3,6 @@ use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
-use std::sync::Arc;
 
 impl Schema {
     pub fn get_name(&self) -> &String {

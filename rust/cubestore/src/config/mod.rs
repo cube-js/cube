@@ -143,6 +143,10 @@ impl Config {
                             bucket_name,
                             region: env::var("CUBESTORE_S3_REGION").unwrap(),
                         }
+                    } else if let Ok(remote_dir) = env::var("CUBESTORE_REMOTE_DIR") {
+                        FileStoreProvider::Filesystem {
+                            remote_dir: PathBuf::from(remote_dir),
+                        }
                     } else {
                         FileStoreProvider::Filesystem {
                             remote_dir: env::current_dir().unwrap().join("upstream"),

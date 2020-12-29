@@ -13,6 +13,7 @@ class ElasticSearchDriver extends BaseDriver {
       openDistro:
         (process.env.CUBEJS_DB_ELASTIC_OPENDISTRO || 'false').toLowerCase() === 'true' ||
         process.env.CUBEJS_DB_TYPE === 'odelasticsearch',
+      queryFormat: process.env.CUBEJS_DB_ELASTIC_QUERY_FORMAT || 'jdbc',
       ...config
     };
     this.client = new Client({ node: this.config.url, cloud: this.config.cloud });
@@ -28,13 +29,14 @@ class ElasticSearchDriver extends BaseDriver {
   async query(query, values) {
     try {
       const result = (await this.sqlClient.sql.query({ // TODO cursor
+        format: this.config.queryFormat,
         body: {
           query: SqlString.format(query, values)
         }
       })).body;
 
-      // TODO: Clean this up, will need a better identifier than the cloud setting
-      if (this.config.cloud) {
+      // INFO: cloud left in place for backward compatibility
+      if (this.config.cloud || this.config.queryFormat === 'jdbc') {
         const compiled = result.rows.map(
           r => result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {})
         );

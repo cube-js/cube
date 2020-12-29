@@ -4,7 +4,7 @@ const crypto = require('crypto');
 let flushPromise = null;
 const trackEvents = [];
 
-module.exports = async (event, endpointUrl, logger) => {
+export default async (event, endpointUrl, logger) => {
   trackEvents.push({
     ...event,
     id: crypto.randomBytes(16).toString('hex'),

@@ -21,10 +21,13 @@ class DremioDriver extends BaseDriver {
       port: config.port || process.env.CUBEJS_DB_PORT || 9047,
       user: config.user || process.env.CUBEJS_DB_USER,
       password: config.password || process.env.CUBEJS_DB_PASS,
-      database: config.database || process.env.CUBEJS_DB_NAME
+      database: config.database || process.env.CUBEJS_DB_NAME,
+      ssl: config.ssl || process.env.CUBEJS_DB_SSL
     };
 
-    this.config.url = `http://${this.config.host}:${this.config.port}`;
+    const protocol = (this.config.ssl === true || this.config.ssl === 'true') ? 'https' : 'http';
+
+    this.config.url = `${protocol}://${this.config.host}:${this.config.port}`;
   }
 
   async testConnection() {

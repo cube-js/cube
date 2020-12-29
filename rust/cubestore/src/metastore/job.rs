@@ -7,7 +7,6 @@ use chrono::{DateTime, Utc};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::{Cursor, Write};
-use std::sync::Arc;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum JobType {

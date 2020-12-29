@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.3](https://github.com/cube-js/cube.js/compare/v0.25.2...v0.25.3) (2020-12-28)
+
+
+### Bug Fixes
+
+* `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY` doesn't work ([1f6b505](https://github.com/cube-js/cube.js/commit/1f6b5054b1327547d86004fd95941b0f3099ca68))
+
+
+
+
+
+## [0.25.2](https://github.com/cube-js/cube.js/compare/v0.25.1...v0.25.2) (2020-12-27)
+
+
+### Features
+
+* Concurrency controls for scheduled refresh ([2132f0d](https://github.com/cube-js/cube.js/commit/2132f0dc7bb3aab994d559ea42dd0b0a934b1310))
+
+
+
+
+
+## [0.25.1](https://github.com/cube-js/cube.js/compare/v0.25.0...v0.25.1) (2020-12-24)
+
+
+### Bug Fixes
+
+* **playground:** Use basePath from configuration, fix [#377](https://github.com/cube-js/cube.js/issues/377) ([c94cbce](https://github.com/cube-js/cube.js/commit/c94cbce50e31617086ec458f934fefaf779b76f4))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 
