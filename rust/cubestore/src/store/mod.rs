@@ -307,22 +307,22 @@ impl ChunkDataStore for ChunkStore {
         let table_id = wal.get_row().table_id();
         let data = self.wal_store.get_wal(wal_id).await?;
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
+        let mut new_chunks = Vec::new();
         for index in indexes.iter() {
-            let new_chunks = self
+            new_chunks.append(&mut self
                 .partition_data_frame(
                     index.get_id(),
                     data.remap_columns(index.get_row().columns().clone())?,
                 )
-                .await?; // TODO dataframe clone
-            self.meta_store
-                .swap_chunks(
-                    Vec::new(),
-                    new_chunks.into_iter().map(|c| c.get_id()).collect(),
-                )
-                .await?;
+                .await?
+            ); // TODO dataframe clone
         }
 
-        self.meta_store.delete_wal(wal_id).await?;
+        self.meta_store.activate_wal(
+            wal_id,
+            new_chunks.into_iter().map(|c| c.get_id()).collect(),
+            indexes.len() as u64
+        ).await?;
 
         Ok(())
     }
