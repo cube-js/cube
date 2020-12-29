@@ -56,6 +56,7 @@ use tokio::sync::broadcast::Sender;
 use tokio::time::Duration;
 use wal::WALRocksTable;
 use log::{trace};
+use std::thread::sleep;
 
 #[macro_export]
 macro_rules! format_table_value {
@@ -1059,12 +1060,25 @@ trait RocksTable: Debug + Send + Sync {
     fn next_table_seq(&self) -> Result<u64, CubeError> {
         let ref db = self.db();
         let seq_key = RowKey::Sequence(self.table_id());
+        let before_merge = db.get(seq_key.to_bytes())?.map(
+            |v| Cursor::new(v).read_u64::<BigEndian>().unwrap()
+        );
+
         let mut increment = vec![];
         increment.write_u64::<BigEndian>(1)?;
         db.merge(seq_key.to_bytes(), increment)?;
-        // TODO ensure get is called on a merged key
-        let result = db.get(seq_key.to_bytes())?.unwrap();
-        Ok(Cursor::new(result).read_u64::<BigEndian>().unwrap())
+
+        for _ in 0..100 {
+            // TODO ensure get is called on a merged key. Use transactions instead
+            let next_id = db.get(seq_key.to_bytes())?.map(
+                |v| Cursor::new(v).read_u64::<BigEndian>().unwrap()
+            );
+            if next_id != before_merge {
+                return Ok(next_id.unwrap())
+            }
+            sleep(Duration::from_millis(1));
+        }
+        Err(CubeError::internal("next_table_seq wasn't able to obtain new id".to_string()))
     }
 
     fn insert_row(&self, row: Vec<u8>) -> Result<(u64, KeyVal), CubeError> {
