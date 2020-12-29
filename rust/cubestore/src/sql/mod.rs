@@ -1081,6 +1081,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn high_frequency_inserts() {
+        Config::test("high_frequency_inserts").update_config(|mut c| {
+            c.partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.numbers (num int)").await.unwrap();
+
+            for i in 0..500 {
+                service.exec_query(
+                    &format!("INSERT INTO foo.numbers (num) VALUES ({})", i)
+                ).await.unwrap();
+            }
+
+            let result = service.exec_query("SELECT count(*) from foo.numbers").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(500)]));
+
+            let result = service.exec_query("SELECT sum(num) from foo.numbers").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(124750)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn join() {
         Config::run_test("join", async move |services| {
             let service = services.sql_service;
