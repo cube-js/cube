@@ -15,9 +15,11 @@
           availableFilters,
           filters,
           setFilters,
+          pivotConfig
         }"
       >
         <v-container fluid class="pa-4 pa-md-8 pt-6 background-white">
+          <div>DEBUG: {{ pivotConfig }}</div>
           <div class="wrap">
             <v-btn
               color="primary"
@@ -27,7 +29,7 @@
               v-on:click="setMeasures(['Orders.count', 'Orders.number'])"
               >add member</v-btn
             >
-            <v-btn color="primary" depressed elevation="2" raised v-on:click="setMeasures(['Orders.count'])"
+            <v-btn color="primary" depressed elevation="2" raised v-on:click="setMeasures(['Sales.count'])"
               >remove member</v-btn
             >
 
@@ -118,10 +120,20 @@
               </v-col>
             </v-row>
 
-            <v-row>
-              <v-col cols="12" md="2">
-                <v-select label="Chart Type" outlined hide-details v-model="type" :items="['line', 'table']" /> </v-col
-            ></v-row>
+            <v-row align="center" >
+              <v-col cols="2" md="2">
+                <v-select label="Chart Type" outlined hide-details v-model="type" :items="['line', 'table']" />
+              </v-col>
+
+              <v-col cols="10" class="settings-button-group">
+                Settings:
+                <PivotConfig :pivotConfig="pivotConfig" />
+
+                <v-btn>Order</v-btn>
+                <v-btn>Limit</v-btn>
+              </v-col>
+            </v-row>
+
             <FilterComponent
               :filters="filters"
               :dimensions="availableDimensions.map((i) => i.name)"
@@ -132,7 +144,7 @@
         </v-container>
       </template>
 
-      <template v-slot="{ resultSet }">
+      <template v-slot="{ resultSet }" v-if="false">
         <div class="wrap pa-4 pa-md-8" v-if="resultSet">
           <div class="border-light pa-4 pa-md-12">
             <line-chart legend="bottom" v-if="type === 'line'" :data="series(resultSet)"></line-chart>
@@ -149,6 +161,7 @@ import cubejs from '@cubejs-client/core';
 import { QueryBuilder, GRANULARITIES } from '@cubejs-client/vue';
 import FilterComponent from './FilterComponent.vue';
 import Table from './Table';
+import PivotConfig from '@/components/dialogs/PivotConfig';
 
 const API_URL = 'https://ecom.cubecloudapp.dev';
 const CUBEJS_TOKEN =
@@ -157,10 +170,18 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`,
 });
 
+// const API_URL = 'http://localhost:4000';
+// const CUBEJS_TOKEN =
+//   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjA3NDQwMTQ0LCJleHAiOjE2MTAwMzIxNDR9.Za52BRvDvtgzqgy44QC5C35Li2RZ1RZAGy2mDdIWY70';
+// const cubejsApi = cubejs(CUBEJS_TOKEN, {
+//   apiUrl: `${API_URL}/cubejs-api/v1`,
+// });
+
 export default {
   name: 'HelloWorld',
 
   components: {
+    PivotConfig,
     QueryBuilder,
     FilterComponent,
     Table,
@@ -169,18 +190,21 @@ export default {
     let query = {};
 
     query = {
-      limit: 100,
+      measures: ['Orders.count', 'Orders.number'],
+      dimensions: ['Orders.status'],
       timeDimensions: [
         {
-          dimension: 'LineItems.createdAt',
-          granularity: 'day',
-          dateRange: 'Last 30 days',
+          dimension: 'Orders.createdAt',
+          granularity: 'month',
+          dateRange: 'this quarter'
         },
       ],
       filters: [],
     };
 
-    query = {};
+    console.log('qqq',query)
+
+    // query = {};
 
     return {
       selectedGranularity: {
@@ -201,6 +225,7 @@ export default {
       ],
       type: 'line',
       GRANULARITIES,
+      pivotConfigDialog: false
     };
   },
   methods: {
@@ -232,5 +257,13 @@ export default {
 .border-light {
   background: #ffffff;
   border-radius: 8px;
+}
+
+.settings-button-group {
+  text-align: left;
+}
+
+.settings-button-group button {
+  margin-right: 12px;
 }
 </style>

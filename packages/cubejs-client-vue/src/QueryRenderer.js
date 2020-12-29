@@ -1,4 +1,8 @@
-import { toPairs, fromPairs } from 'ramda';
+import { toPairs, fromPairs, equals } from 'ramda';
+import { isQueryPresent } from '@cubejs-client/core';
+
+// todo: remove
+const d = (v) => JSON.parse(JSON.stringify(v));
 
 export default {
   props: {
@@ -112,7 +116,12 @@ export default {
 
         const resultPromises = Promise.all(
           toPairs(queries).map(([name, query]) =>
-            this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then((r) => [name, r])
+            this.cubejsApi
+              .load(query, {
+                mutexObj: this.mutexObj,
+                mutexKey: name,
+              })
+              .then((r) => [name, r])
           )
         );
 
@@ -127,9 +136,10 @@ export default {
   watch: {
     query: {
       deep: true,
-      handler(val) {
-        console.log('has Changed!', val);
-        if (val) {
+      handler(query, prevQuery) {
+        console.log('has Changed!', d(query), d(prevQuery));
+
+        if (isQueryPresent(query) && !equals(query, prevQuery)) {
           this.load();
         }
       },

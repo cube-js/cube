@@ -8,7 +8,7 @@ export const GRANULARITIES = [
   { name: 'day', title: 'Day' },
   { name: 'week', title: 'Week' },
   { name: 'month', title: 'Month' },
-  { name: 'year', title: 'Year' }
+  { name: 'year', title: 'Year' },
 ];
 
 export function defaultOrder(query) {
@@ -16,15 +16,15 @@ export function defaultOrder(query) {
 
   if (granularity) {
     return {
-      [granularity.dimension]: 'asc'
+      [granularity.dimension]: 'asc',
     };
   } else if ((query.measures || []).length > 0 && (query.dimensions || []).length > 0) {
     return {
-      [query.measures[0]]: 'desc'
+      [query.measures[0]]: 'desc',
     };
   } else if ((query.dimensions || []).length > 0) {
     return {
-      [query.dimensions[0]]: 'asc'
+      [query.dimensions[0]]: 'asc',
     };
   }
 
@@ -59,16 +59,17 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
         (newQuery.measures || []).length === 1 &&
         oldQuery.measures[0] !== newQuery.measures[0])
     ) {
+      const currentGranularity = (newQuery.timeDimensions || [])[0].granularity;
       const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
       newQuery = {
         ...newQuery,
         timeDimensions: defaultTimeDimension
           ? [
-            {
-              dimension: defaultTimeDimension,
-              granularity,
-            },
-          ]
+              {
+                dimension: defaultTimeDimension,
+                granularity: currentGranularity || granularity
+              },
+            ]
           : [],
       };
 
@@ -177,7 +178,8 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
 
 export function isQueryPresent(query) {
   return (Array.isArray(query) ? query : [query]).every(
-    (q) => (q.measures && q.measures.length) ||
+    (q) =>
+      (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );
@@ -215,12 +217,9 @@ export function moveItemInArray(list, sourceIndex, destinationIndex) {
 export function flattenFilters(filters = []) {
   return filters.reduce((memo, filter) => {
     if (filter.or || filter.and) {
-      return [
-        ...memo,
-        ...flattenFilters(filter.or || filter.and)
-      ];
+      return [...memo, ...flattenFilters(filter.or || filter.and)];
     }
-    
+
     return [...memo, filter];
   }, []);
 }

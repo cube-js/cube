@@ -1,8 +1,10 @@
-import { isQueryPresent, defaultOrder, defaultHeuristics, GRANULARITIES } from '@cubejs-client/core';
+import { isQueryPresent, defaultOrder, defaultHeuristics, GRANULARITIES, ResultSet } from '@cubejs-client/core';
+import { equals } from 'ramda';
 import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
 
+// todo: remove
 const d = (v) => JSON.parse(JSON.stringify(v));
 
 export default {
@@ -17,10 +19,17 @@ export default {
       type: Object,
       required: true,
     },
+    disableHeuristics: {
+      type: Boolean,
+    },
+    stateChangeHeuristics: {
+      type: Function,
+    },
   },
   data() {
     return {
       meta: undefined,
+      mutex: {},
       chartType: undefined,
       measures: [],
       dimensions: [],
@@ -36,7 +45,8 @@ export default {
       renewQuery: false,
       order: null,
       prevValidatedQuery: null,
-      granularities: GRANULARITIES
+      granularities: GRANULARITIES,
+      pivotConfig: ResultSet.getNormalizedPivotConfig(this.query),
     };
   },
 
@@ -95,6 +105,7 @@ export default {
         order,
         setOrder: this.setOrder,
         setQuery: this.setQuery,
+        pivotConfig: this.pivotConfig,
       };
 
       QUERY_ELEMENTS.forEach((elementName) => {
@@ -121,9 +132,6 @@ export default {
     // Pass parent slots to child QueryRenderer component
     const children = Object.keys(this.$slots).map((slot) => createElement('template', { slot }, this.$slots[slot]));
 
-    console.log('validatedQuery', this.validatedQuery);
-
-    // return createElement('div');
     return createElement(
       QueryRenderer,
       {
@@ -199,10 +207,15 @@ export default {
         }
       }
 
-      if (isQueryPresent(validatedQuery) && this.meta) {
-        const { query, shouldApplyHeuristicOrder } = defaultHeuristics(validatedQuery, this.prevValidatedQuery, {
-          meta: this.meta,
-        });
+      if (!this.disableHeuristics && isQueryPresent(validatedQuery) && this.meta) {
+        const heuristicsFn = this.stateChangeHeuristics || defaultHeuristics;
+        const { query, shouldApplyHeuristicOrder, pivotConfig } = heuristicsFn(
+          validatedQuery,
+          this.prevValidatedQuery,
+          {
+            meta: this.meta,
+          }
+        );
 
         validatedQuery = {
           ...validatedQuery,
@@ -211,18 +224,10 @@ export default {
         };
 
         console.log('**', d(validatedQuery));
+
+        this.pivotConfig = ResultSet.getNormalizedPivotConfig(validatedQuery, pivotConfig || this.pivotConfig);
         this.copyQueryFromProps(validatedQuery);
       }
-
-      // console.log(
-      //   '??',
-      //   JSON.parse(
-      //     JSON.stringify({
-      //       prev: this.prevValidatedQuery,
-      //       cur: validatedQuery,
-      //     })
-      //   )
-      // );
 
       this.prevValidatedQuery = validatedQuery;
       return validatedQuery;
@@ -237,13 +242,31 @@ export default {
 
   methods: {
     copyQueryFromProps(query) {
-      const { measures, dimensions, segments, timeDimensions, filters, limit, offset, renewQuery, order } =
-        query || this.query;
+      const {
+        measures = [],
+        dimensions = [],
+        segments = [],
+        timeDimensions = [],
+        filters = [],
+        limit,
+        offset,
+        renewQuery,
+        order,
+      } = query || this.query;
 
-      this.measures = (measures || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'measures') }));
-      this.dimensions = (dimensions || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'dimensions') }));
-      this.segments = (segments || []).map((m, i) => ({ index: i, ...this.meta.resolveMember(m, 'segments') }));
-      this.timeDimensions = (timeDimensions || []).map((m, i) => ({
+      this.measures = measures.map((m, i) => ({
+        index: i,
+        ...this.meta.resolveMember(m, 'measures'),
+      }));
+      this.dimensions = dimensions.map((m, i) => ({
+        index: i,
+        ...this.meta.resolveMember(m, 'dimensions'),
+      }));
+      this.segments = segments.map((m, i) => ({
+        index: i,
+        ...this.meta.resolveMember(m, 'segments'),
+      }));
+      this.timeDimensions = timeDimensions.map((m, i) => ({
         ...m,
         dimension: {
           ...this.meta.resolveMember(m.dimension, 'dimensions'),
@@ -251,7 +274,7 @@ export default {
         },
         index: i,
       }));
-      this.filters = (filters || []).map((m, i) => ({
+      this.filters = filters.map((m, i) => ({
         ...m,
         member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
         operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
@@ -427,32 +450,28 @@ export default {
   },
 
   watch: {
-    // validatedQuery: {
-      // deep: true,
-      // handler(newQuery, oldQuery) {
-        // newQuery = JSON.parse(JSON.stringify(newQuery));
-        // const { query, shouldApplyHeuristicOrder } = defaultHeuristics(newQuery, oldQuery, {
-        //   meta: this.meta,
-        // });
-        // console.log('defaultHeuristics', {
-        //   newQuery,
-        //   query,
-        //   shouldApplyHeuristicOrder,
-        // });
-        //
-        // if (!equals(newQuery, query)) {
-        //   console.log('DANGER!');
-        //   this.$nextTick(() => {
-        //     this.validatedQuery = {
-        //       ...query,
-        //     };
-        //   });
-        // }
-    //   },
-    // },
+    validatedQuery: {
+      deep: true,
+      handler(query, prevQuery) {
+        if (isQueryPresent(query) && !equals(query, prevQuery)) {
+          this.cubejsApi
+            .dryRun(query, {
+              mutexObj: this.mutex,
+            })
+            .then(({ pivotQuery }) => {
+              const pivotConfig = ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig);
+
+              if (!equals(pivotConfig, this.pivotConfig)) {
+                this.pivotConfig = pivotConfig;
+              }
+            })
+            .catch((error) => console.error(error));
+        }
+      },
+    },
     query: {
       deep: true,
-      handler(cur, prev) {
+      handler() {
         if (!this.meta) {
           // this is ok as if meta has not been loaded by the time query prop has changed,
           // then the promise for loading meta (found in mounted()) will call

@@ -15,6 +15,7 @@
     "core-js": "^3.6.5",
     "vue": "^2.6.11",
     "vue-chartkick": "^0.6.0",
+    "vuedraggable": "^2.24.3",
     "vuetify": "^2.2.11"
   },
   "devDependencies": {
