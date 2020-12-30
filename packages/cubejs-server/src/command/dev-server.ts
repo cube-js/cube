@@ -22,9 +22,7 @@ export class DevServer extends Command {
       debug: options.flags.debug,
     });
     await container.runProjectDiagnostics();
-
-    const configuration = await container.lookupConfiguration();
-    await container.runServerInstance(configuration);
+    await container.start();
   }
 }
 

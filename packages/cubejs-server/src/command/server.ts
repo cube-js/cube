@@ -28,12 +28,7 @@ export class Server extends Command {
       debug: options.flags.debug,
     });
     await container.runProjectDiagnostics();
-
-    const configuration = await container.lookupConfiguration();
-    await container.runServerInstance({
-      ...configuration,
-      gracefulShutdownTimer: configuration.gracefulShutdownTimer || devMode ? 5 : 30,
-    });
+    await container.start();
   }
 }
 

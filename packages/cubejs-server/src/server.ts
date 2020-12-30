@@ -210,13 +210,10 @@ export class CubejsServer {
     return version;
   }
 
-  public registerShutdownHandler() {
-    process.on('SIGTERM', () => this.shutdown('SIGTERM'));
-    process.on('SIGINT', () => this.shutdown('SIGTERM'));
-  }
-
-  protected async shutdown(signal: string) {
-    console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdownTimer}s`);
+  public async shutdown(signal: string, graceful: boolean = true) {
+    if (graceful) {
+      console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdownTimer}s`);
+    }
 
     try {
       if (this.redirector) {
@@ -227,35 +224,35 @@ export class CubejsServer {
         this.core.beforeShutdown()
       ];
 
-      if (this.config.gracefulShutdownTimer) {
-        if (this.server) {
-          locks.push(
-            new Promise((resolve) => {
-              (<stoppable.StoppableServer> this.server).stop(() => {
-                resolve(true);
-              });
-            })
-          );
-        }
-
-        if (this.socketServer) {
-          locks.push(
-            this.socketServer.close()
-          );
-        }
+      if (this.server) {
+        locks.push(
+          new Promise((resolve) => {
+            (<stoppable.StoppableServer> this.server).stop(() => {
+              resolve(true);
+            });
+          })
+        );
       }
 
-      // Await before all connections/refresh scheduler will end jobs
-      await Promise.all(locks);
+      if (this.socketServer) {
+        locks.push(
+          this.socketServer.close()
+        );
+      }
+
+      if (graceful) {
+        // Await before all connections/refresh scheduler will end jobs
+        await Promise.all(locks);
+      }
 
       await this.core.shutdown();
 
-      process.exit(0);
+      return 0;
     } catch (e) {
       console.error('Fatal error during server shutting down: ');
       console.error(e.stack || e);
 
-      process.exit(1);
+      return 1;
     }
   }
 }

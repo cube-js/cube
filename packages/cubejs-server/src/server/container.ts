@@ -212,15 +212,15 @@ export class ServerContainer {
     try {
       const { version, port } = await server.listen();
 
-      if (configuration.gracefulShutdownTimer) {
-        server.registerShutdownHandler();
-      }
-
       console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
     } catch (e) {
       console.error('Fatal error during server start: ');
       console.error(e.stack || e);
+
+      process.exit(1);
     }
+
+    return server;
   }
 
   public async lookupConfiguration(): Promise<CreateOptions> {
@@ -255,5 +255,37 @@ export class ServerContainer {
     throw new Error(
       'Configure file must export configuration as default.'
     );
+  }
+
+  public async start() {
+    const makeInstance = async () => {
+      const configuration = await this.lookupConfiguration();
+      return this.runServerInstance({
+        ...configuration,
+        gracefulShutdownTimer: configuration.gracefulShutdownTimer || (
+          process.env.NODE_ENV === 'development' ? 5 : 30
+        ),
+      });
+    };
+
+    let server = await makeInstance();
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const bindSignal of ['SIGTERM', 'SIGINT']) {
+      // eslint-disable-next-line no-loop-func
+      process.on(bindSignal, async (signal) => {
+        process.exit(
+          await server.shutdown(signal)
+        );
+      });
+    }
+
+    process.addListener('SIGUSR1', async (signal) => {
+      console.log(`Received ${signal} signal, reloading`);
+
+      await server.shutdown(signal, true);
+
+      server = await makeInstance();
+    });
   }
 }
