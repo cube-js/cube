@@ -13,7 +13,8 @@ export interface QueueOptions {
 export interface QueryCacheOptions {
   refreshKeyRenewalThreshold?: number;
   backgroundRenew?: boolean;
-  queueOptions?: QueueOptions;
+  queueOptions?: QueueOptions | ((dataSource: string) => QueueOptions);
+  externalQueueOptions?: QueueOptions;
 }
 
 export interface PreAggregationsOptions {
