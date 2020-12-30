@@ -6,7 +6,6 @@ import CubeCore, {
   DatabaseType,
 } from '@cubejs-backend/server-core';
 import { getEnv } from '@cubejs-backend/shared';
-import stoppable, { StoppableServer } from 'stoppable';
 import express from 'express';
 import https from 'https';
 import http from 'http';
@@ -15,6 +14,7 @@ import bodyParser from 'body-parser';
 import cors, { CorsOptions } from 'cors';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
+import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
 
 const { version } = require('../package.json');
 
@@ -46,7 +46,7 @@ export class CubejsServer {
 
   protected redirector: http.Server | null = null;
 
-  protected server: http.Server | StoppableServer | https.Server | null = null;
+  protected server: GracefulHttpServer | null = null;
 
   protected socketServer: WebSocketServer | null = null;
 
@@ -110,9 +110,7 @@ export class CubejsServer {
       }
 
       if (enableTls) {
-        this.server = this.config.gracefulShutdownTimer
-          ? stoppable(https.createServer(options, app), this.config.gracefulShutdownTimer)
-          : https.createServer(options, app);
+        this.server = gracefulHttp(https.createServer(options, app));
       } else {
         const [major] = process.version.split('.');
         if (major === '8' && Object.keys(options).length) {
@@ -121,13 +119,9 @@ export class CubejsServer {
             'CustomWarning',
           );
 
-          this.server = this.config.gracefulShutdownTimer
-            ? stoppable(http.createServer(app), this.config.gracefulShutdownTimer)
-            : http.createServer(app);
+          this.server = gracefulHttp(http.createServer(app));
         } else {
-          this.server = this.config.gracefulShutdownTimer
-            ? stoppable(http.createServer(options, app), this.config.gracefulShutdownTimer)
-            : http.createServer(options, app);
+          this.server = gracefulHttp(http.createServer(options, app));
         }
       }
 
@@ -226,11 +220,7 @@ export class CubejsServer {
 
       if (this.server) {
         locks.push(
-          new Promise((resolve) => {
-            (<stoppable.StoppableServer> this.server).stop(() => {
-              resolve(true);
-            });
-          })
+          this.server.stop(this.config.gracefulShutdownTimer)
         );
       }
 
