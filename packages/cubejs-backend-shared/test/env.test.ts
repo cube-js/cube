@@ -12,7 +12,7 @@ test('convertTimeStrToMs', () => {
 
 test('convertTimeStrToMs(exception)', () => {
   expect(() => convertTimeStrToMs('', 'VARIABLE_ENV')).toThrowError(
-    `VARIABLE_ENV is a time, must be number (in seconds) or string in time format (1s, 1m, 1h)`
+    `Value "" is not valid for VARIABLE_ENV. Must be number (in seconds) or string in time format (1s, 1m, 1h).`
   );
 });
 
@@ -21,13 +21,13 @@ describe('getEnv', () => {
     process.env.PORT = '100000000';
 
     expect(() => getEnv('port')).toThrowError(
-      'PORT is a port number, should be lower or equal than 65535'
+      'Value "100000000" is not valid for PORT. Should be lower or equal than 65535.'
     );
 
     process.env.PORT = '-1000';
 
     expect(() => getEnv('port')).toThrowError(
-      'PORT is a port number, should be a positive integer'
+      'Value "-1000" is not valid for PORT. Should be a positive integer.'
     );
   });
 
@@ -51,7 +51,7 @@ describe('getEnv', () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '11fffffff';
 
     expect(() => getEnv('refreshTimer')).toThrowError(
-      'CUBEJS_SCHEDULED_REFRESH_TIMER is not valid, must be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
+      'Value "11fffffff" is not valid for CUBEJS_SCHEDULED_REFRESH_TIMER. Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
     );
   });
 
