@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.7](https://github.com/cube-js/cube.js/compare/v0.25.6...v0.25.7) (2020-12-30)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mysql-driver:** Handle mediumint(9) type ([3d135b1](https://github.com/cube-js/cube.js/commit/3d135b16eee8fa4c35c584c28b8f18e47539fa54))
+
+
+
+
+
 ## [0.25.6](https://github.com/cube-js/cube.js/compare/v0.25.5...v0.25.6) (2020-12-30)
 
 
