@@ -218,15 +218,15 @@ export class CubejsServer {
         this.core.beforeShutdown()
       ];
 
-      if (this.server) {
-        locks.push(
-          this.server.stop(this.config.gracefulShutdownTimer)
-        );
-      }
-
       if (this.socketServer) {
         locks.push(
           this.socketServer.close()
+        );
+      }
+
+      if (this.server) {
+        locks.push(
+          this.server.stop(this.config.gracefulShutdownTimer)
         );
       }
 
