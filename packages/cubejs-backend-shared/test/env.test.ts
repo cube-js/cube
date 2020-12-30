@@ -12,20 +12,36 @@ test('convertTimeStrToMs', () => {
 
 test('convertTimeStrToMs(exception)', () => {
   expect(() => convertTimeStrToMs('', 'VARIABLE_ENV')).toThrowError(
-    `Unsupported time format in VARIABLE_ENV`
+    `VARIABLE_ENV is a time, must be number (in seconds) or string in time format (1s, 1m, 1h)`
   );
 });
 
-test('getEnv(dbPollTimeout)', () => {
-  expect(getEnv('dbPollTimeout')).toBe(15 * 60);
+describe('getEnv', () => {
+  test('port(exception)', () => {
+    process.env.PORT = '100000000';
 
-  process.env.CUBEJS_DB_POLL_TIMEOUT = '1m';
-  expect(getEnv('dbPollTimeout')).toBe(60);
-});
+    expect(() => getEnv('port')).toThrowError(
+      'PORT is a port number, should be lower or equal than 65535'
+    );
 
-test('getEnv(dbPollMaxInterval)', () => {
-  expect(getEnv('dbPollMaxInterval')).toBe(5);
+    process.env.PORT = '-1000';
 
-  process.env.CUBEJS_DB_POLL_MAX_INTERVAL = '10s';
-  expect(getEnv('dbPollMaxInterval')).toBe(10);
+    expect(() => getEnv('port')).toThrowError(
+      'PORT is a port number, should be a positive integer'
+    );
+  });
+
+  test('dbPollTimeout', () => {
+    expect(getEnv('dbPollTimeout')).toBe(15 * 60);
+
+    process.env.CUBEJS_DB_POLL_TIMEOUT = '1m';
+    expect(getEnv('dbPollTimeout')).toBe(60);
+  });
+
+  test('dbPollMaxInterval', () => {
+    expect(getEnv('dbPollMaxInterval')).toBe(5);
+
+    process.env.CUBEJS_DB_POLL_MAX_INTERVAL = '10s';
+    expect(getEnv('dbPollMaxInterval')).toBe(10);
+  });
 });
