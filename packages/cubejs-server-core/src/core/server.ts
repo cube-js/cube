@@ -448,7 +448,6 @@ export class CubejsServerCore {
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
     if (!compilerApi) {
-      console.log(this.preAggregationsSchema(context));
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
