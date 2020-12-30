@@ -1,6 +1,10 @@
 import { get } from 'env-var';
 
-export function convertTimeStrToMs(input: string, envName: string) {
+export function convertTimeStrToMs(
+  input: string,
+  envName: string,
+  message: string = `${envName} is a time, must be number (in seconds) or string in time format (1s, 1m, 1h)`,
+) {
   if (/^\d+$/.test(input)) {
     return parseInt(input, 10);
   }
@@ -17,9 +21,7 @@ export function convertTimeStrToMs(input: string, envName: string) {
     }
   }
 
-  throw new Error(
-    `${envName} is a time, must be number (in seconds) or string in time format (1s, 1m, 1h)`
-  );
+  throw new Error(message);
 }
 
 export function asPortNumber(input: number, envName: string) {
@@ -34,13 +36,29 @@ export function asPortNumber(input: number, envName: string) {
   return input;
 }
 
-export function asPortOrSocket(input: string, envName: string): number|string {
+function asPortOrSocket(input: string, envName: string): number|string {
   if (/^-?\d+$/.test(input)) {
     return asPortNumber(parseInt(input, 10), envName);
   }
 
   // @todo Can we check that path for socket is valid?
   return input;
+}
+
+function asBoolOrTime(input: string, envName: string): number|boolean {
+  if (input === 'true') {
+    return true;
+  }
+
+  if (input === 'false') {
+    return false;
+  }
+
+  return convertTimeStrToMs(
+    input,
+    envName,
+    `${envName} is not valid, must be boolean or number (in seconds) or string in time format (1s, 1m, 1h)`
+  );
 }
 
 const variables = {
@@ -55,8 +73,8 @@ const variables = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
-  refreshTimer: () => get('CUBEJS_SCHEDULED_REFRESH_TIMER')
-    .asInt(),
+  refreshTimer: () => process.env.CUBEJS_SCHEDULED_REFRESH_TIMER
+    && asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER'),
   scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
     .asBool(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
