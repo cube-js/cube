@@ -30,7 +30,7 @@ export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions
   webSockets?: boolean;
   initApp?: InitAppFn;
   http?: HttpOptions;
-  gracefulShutdownTimer?: number;
+  gracefulShutdown?: number;
 }
 
 type RequireOne<T, K extends keyof T> = {
@@ -206,7 +206,7 @@ export class CubejsServer {
 
   public async shutdown(signal: string, graceful: boolean = true) {
     if (graceful) {
-      console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdownTimer}s`);
+      console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdown}s`);
     }
 
     try {
@@ -226,7 +226,7 @@ export class CubejsServer {
 
       if (this.server) {
         locks.push(
-          this.server.stop(this.config.gracefulShutdownTimer)
+          this.server.stop(this.config.gracefulShutdown)
         );
       }
 

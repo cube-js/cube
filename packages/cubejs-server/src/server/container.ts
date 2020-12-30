@@ -275,10 +275,8 @@ export class ServerContainer {
     const makeInstance = async () => {
       const configuration = await this.lookupConfiguration();
       return this.runServerInstance({
+        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : undefined,
         ...configuration,
-        gracefulShutdownTimer: configuration.gracefulShutdownTimer || (
-          process.env.NODE_ENV === 'development' ? 1 : 30
-        ),
       });
     };
 
