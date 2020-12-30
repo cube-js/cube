@@ -221,7 +221,9 @@ class MySqlDriver extends BaseDriver {
   }
 
   toGenericType(columnType) {
-    return MySqlToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+    return MySqlToGenericType[columnType.toLowerCase()] ||
+      MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
+      super.toGenericType(columnType);
   }
 }
 
