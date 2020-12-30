@@ -18,22 +18,37 @@ export function convertTimeStrToMs(input: string, envName: string) {
   }
 
   throw new Error(
-    `Unsupported time format in ${envName}`
+    `${envName} is a time, must be number (in seconds) or string in time format (1s, 1m, 1h)`
   );
+}
+
+export function asPortNumber(input: number, envName: string) {
+  if (input < 0) {
+    throw new Error(`${envName} is a port number, should be a positive integer`);
+  }
+
+  if (input > 65535) {
+    throw new Error(`${envName} is a port number, should be lower or equal than 65535`);
+  }
+
+  return input;
+}
+
+export function asPortOrSocket(input: string, envName: string): number|string {
+  if (/^-?\d+$/.test(input)) {
+    return asPortNumber(parseInt(input, 10), envName);
+  }
+
+  // @todo Can we check that path for socket is valid?
+  return input;
 }
 
 const variables = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
-  port: () => get('PORT')
-    .default(4000)
-    .required()
-    .asPortNumber(),
-  tlsPort: () => get('TLS_PORT')
-    .default(4433)
-    .required()
-    .asPortNumber(),
+  port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
+  tlsPort: () => asPortOrSocket(process.env.TLS_PORT || '4433', 'TLS_PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
     .asBoolStrict(),
