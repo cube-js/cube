@@ -19,11 +19,6 @@ export class Server extends Command {
 
     process.env.NODE_ENV = 'production';
 
-    const devMode = getEnv('devMode');
-    if (devMode) {
-      process.env.NODE_ENV = 'development';
-    }
-
     const container = new ServerContainer({
       debug: options.flags.debug,
     });

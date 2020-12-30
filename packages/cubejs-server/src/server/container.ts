@@ -1,8 +1,15 @@
-import { isDockerImage, packageExists, PackageManifest, resolveBuiltInPackageVersion } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
+import dotenv from 'dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
+import {
+  getEnv,
+  isDockerImage,
+  packageExists,
+  PackageManifest,
+  resolveBuiltInPackageVersion,
+} from '@cubejs-backend/shared';
 
 import {
   getMajorityVersion,
@@ -224,6 +231,13 @@ export class ServerContainer {
   }
 
   public async lookupConfiguration(): Promise<CreateOptions> {
+    dotenv.config();
+
+    const devMode = getEnv('devMode');
+    if (devMode) {
+      process.env.NODE_ENV = 'development';
+    }
+
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
       this.getTypeScriptCompiler().compileConfiguration();
     }
@@ -263,7 +277,7 @@ export class ServerContainer {
       return this.runServerInstance({
         ...configuration,
         gracefulShutdownTimer: configuration.gracefulShutdownTimer || (
-          process.env.NODE_ENV === 'development' ? 5 : 30
+          process.env.NODE_ENV === 'development' ? 1 : 30
         ),
       });
     };
