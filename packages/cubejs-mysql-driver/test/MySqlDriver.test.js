@@ -49,6 +49,19 @@ describe('MySqlDriver', () => {
       .toStrictEqual([{ value: "Tekirdağ" }]);
   });
 
+  test('mysql to generic type', async () => {
+    await mySqlDriver.query('CREATE TABLE test.var_types (some_big bigint(9), some_medium mediumint(9), some_small smallint(3), med_text mediumtext, long_text longtext)');
+    await mySqlDriver.query('INSERT INTO test.var_types (some_big, some_medium, some_small) VALUES (123, 345, 4)');
+    expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.var_types')).types)))
+      .toStrictEqual([
+        { name: 'some_big', type: 'int' },
+        { name: 'some_medium', type: 'int' },
+        { name: 'some_small', type: 'int' },
+        { name: 'med_text', type: 'text' },
+        { name: 'long_text', type: 'text' },
+      ]);
+  });
+
   test('boolean field', async () => {
     await mySqlDriver.uploadTable(`test.boolean`, [{ name: 'b_value', type: 'boolean' }], {
       rows: [
