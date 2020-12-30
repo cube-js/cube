@@ -21,6 +21,8 @@ use sqlparser::parser::ParserError;
 use std::backtrace::Backtrace;
 use std::num::ParseIntError;
 use tokio::sync::mpsc::error::SendError;
+use std::sync::PoisonError;
+use crate::metastore::TableId;
 
 pub mod cluster;
 pub mod config;
@@ -273,6 +275,12 @@ impl From<SetLoggerError> for CubeError {
 
 impl From<serde_json::Error> for CubeError {
     fn from(v: serde_json::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<PoisonError<std::sync::MutexGuard<'_, std::collections::HashMap<TableId, u64>>>> for CubeError {
+    fn from(v: PoisonError<std::sync::MutexGuard<'_, std::collections::HashMap<TableId, u64>>>) -> Self {
         CubeError::from_error(v)
     }
 }
