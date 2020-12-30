@@ -1,9 +1,15 @@
 import { get } from 'env-var';
 
+export class InvalidConfiguration extends Error {
+  public constructor(key: string, value: any, description: string) {
+    super(`Value "${value}" is not valid for ${key}. ${description}`);
+  }
+}
+
 export function convertTimeStrToMs(
   input: string,
   envName: string,
-  message: string = `${envName} is a time, must be number (in seconds) or string in time format (1s, 1m, 1h)`,
+  description: string = 'Must be number (in seconds) or string in time format (1s, 1m, 1h).',
 ) {
   if (/^\d+$/.test(input)) {
     return parseInt(input, 10);
@@ -21,16 +27,16 @@ export function convertTimeStrToMs(
     }
   }
 
-  throw new Error(message);
+  throw new InvalidConfiguration(envName, input, description);
 }
 
 export function asPortNumber(input: number, envName: string) {
   if (input < 0) {
-    throw new Error(`${envName} is a port number, should be a positive integer`);
+    throw new InvalidConfiguration(envName, input, 'Should be a positive integer.');
   }
 
   if (input > 65535) {
-    throw new Error(`${envName} is a port number, should be lower or equal than 65535`);
+    throw new InvalidConfiguration(envName, input, 'Should be lower or equal than 65535.');
   }
 
   return input;
@@ -57,7 +63,7 @@ function asBoolOrTime(input: string, envName: string): number|boolean {
   return convertTimeStrToMs(
     input,
     envName,
-    `${envName} is not valid, must be boolean or number (in seconds) or string in time format (1s, 1m, 1h)`
+    'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
   );
 }
 
