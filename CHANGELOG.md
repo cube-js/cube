@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.4](https://github.com/cube-js/cube.js/compare/v0.25.3...v0.25.4) (2020-12-30)
+
+
+### Bug Fixes
+
+* **cubestore:** `next_table_seq` sanity check until transactions arrive ([f9b65ea](https://github.com/cube-js/cube.js/commit/f9b65eac837d102afb2b280a124dbe341a4cc058))
+* **cubestore:** Atomic WAL activation ([0c64e69](https://github.com/cube-js/cube.js/commit/0c64e698253921973a7452cf2b0184c1a27553ef))
+* **cubestore:** Migrate to memory sequence tracking until transactions arrive ([7308a63](https://github.com/cube-js/cube.js/commit/7308a632ddba43c9333b098eca34f71686922e4d))
+* **cubestore:** Move to RocksDB Snapshot reading to ensure strong metastore read consistency ([68dac72](https://github.com/cube-js/cube.js/commit/68dac72cf6adff920c05c118cf297986e943a7f3))
+
+
+### Features
+
+* **@cubejs-backend/cubestore-driver:** Increase upload batch size to 50k ([1bebc1d](https://github.com/cube-js/cube.js/commit/1bebc1dd09845e547abea65dd24ace56a5cea40b))
+* **server-core:** Compatibility shim, for legacy imports ([2116799](https://github.com/cube-js/cube.js/commit/21167995045d7a5c0d1056dc034b14ec18205277))
+* **server-core:** Initial support for TS ([df45216](https://github.com/cube-js/cube.js/commit/df452164d8282074f926a980cbfe3284817e85a6))
+* **server-core:** Introduce CUBEJS_PRE_AGGREGATIONS_SCHEMA, use dev_preaggregations/prod_preaggregations by default ([e5bdf3d](https://github.com/cube-js/cube.js/commit/e5bdf3dfbd28d5e1c1e775c554c275304a0941f3))
+* **server-core:** Move to TS ([d7b7431](https://github.com/cube-js/cube.js/commit/d7b743156751dbc2202a7138bc7603dc6861f001))
+
+
+
+
+
 ## [0.25.3](https://github.com/cube-js/cube.js/compare/v0.25.2...v0.25.3) (2020-12-28)
 
 
