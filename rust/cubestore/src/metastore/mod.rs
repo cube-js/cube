@@ -56,7 +56,7 @@ use tokio::sync::broadcast::Sender;
 use tokio::time::Duration;
 use wal::WALRocksTable;
 use log::{trace};
-use std::thread::sleep;
+use std::sync::Mutex;
 
 #[macro_export]
 macro_rules! format_table_value {
@@ -122,13 +122,12 @@ macro_rules! base_rocks_secondary_index {
 macro_rules! rocks_table_impl {
     ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $delete_event: tt) => {
         pub(crate) struct $rocks_table<'a> {
-            db: &'a DB,
-            snapshot: &'a rocksdb::Snapshot<'a>,
+            db: crate::metastore::DbTableRef<'a>
         }
 
         impl<'a> $rocks_table<'a> {
-            pub fn new(db: (&'a DB, &'a rocksdb::Snapshot<'a>)) -> $rocks_table {
-                $rocks_table { db: db.0, snapshot: db.1 }
+            pub fn new(db: crate::metastore::DbTableRef<'a>) -> $rocks_table {
+                $rocks_table { db }
             }
         }
 
@@ -136,11 +135,15 @@ macro_rules! rocks_table_impl {
             type T = $table;
 
             fn db(&self) -> &DB {
-                self.db
+                self.db.db
             }
 
             fn snapshot(&self) -> &rocksdb::Snapshot {
-                self.snapshot
+                self.db.snapshot
+            }
+
+            fn mem_seq(&self) -> &crate::metastore::MemorySequence {
+                &self.db.mem_seq
             }
 
             fn table_id(&self) -> TableId {
@@ -491,6 +494,13 @@ impl<'a> BatchPipe<'a> {
     }
 }
 
+#[derive(Clone)]
+pub struct DbTableRef<'a> {
+    pub db: &'a DB,
+    pub snapshot: &'a Snapshot<'a>,
+    pub mem_seq: MemorySequence
+}
+
 #[async_trait]
 pub trait MetaStoreTable: Send + Sync {
     type T: Serialize + Clone + Debug + 'static;
@@ -510,7 +520,7 @@ macro_rules! meta_store_table_impl {
         }
 
         impl $name {
-            fn table<'a>(db: (&'a DB, &'a Snapshot<'a>)) -> $rocks_table<'a> {
+            fn table<'a>(db: DbTableRef<'a>) -> $rocks_table<'a> {
                 <$rocks_table>::new(db)
             }
         }
@@ -794,8 +804,24 @@ enum_from_primitive! {
 }
 
 #[derive(Clone)]
+pub struct MemorySequence {
+    seq_store: Arc<Mutex<HashMap<TableId, u64>>>
+}
+
+impl MemorySequence {
+    pub fn next_seq(&self, table_id: TableId, snapshot_value: u64) -> Result<u64, CubeError> {
+        let mut store = self.seq_store.lock()?;
+        let mut current = *store.entry(table_id).or_insert(snapshot_value);
+        current += 1;
+        store.insert(table_id, current);
+        Ok(current)
+    }
+}
+
+#[derive(Clone)]
 pub struct RocksMetaStore {
     pub db: Arc<RwLock<Arc<DB>>>,
+    seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
     listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
     remote_fs: Arc<dyn RemoteFs>,
     last_checkpoint_time: Arc<RwLock<SystemTime>>,
@@ -895,6 +921,7 @@ trait RocksTable: Debug + Send + Sync {
     fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent;
     fn db(&self) -> &DB;
     fn snapshot(&self) -> &Snapshot;
+    fn mem_seq(&self) -> &MemorySequence;
     fn index_id(&self, index_num: IndexId) -> IndexId;
     fn table_id(&self) -> TableId;
     fn deserialize_row<'de, D>(&self, deserializer: D) -> Result<Self::T, D::Error>
@@ -1060,25 +1087,17 @@ trait RocksTable: Debug + Send + Sync {
     fn next_table_seq(&self) -> Result<u64, CubeError> {
         let ref db = self.db();
         let seq_key = RowKey::Sequence(self.table_id());
-        let before_merge = db.get(seq_key.to_bytes())?.map(
+        let before_merge = self.snapshot().get(seq_key.to_bytes())?.map(
             |v| Cursor::new(v).read_u64::<BigEndian>().unwrap()
         );
 
-        let mut increment = vec![];
-        increment.write_u64::<BigEndian>(1)?;
-        db.merge(seq_key.to_bytes(), increment)?;
+        let next_seq = self.mem_seq().next_seq(self.table_id(), before_merge.unwrap_or(0))?;
 
-        for _ in 0..100 {
-            // TODO ensure get is called on a merged key. Use transactions instead
-            let next_id = db.get(seq_key.to_bytes())?.map(
-                |v| Cursor::new(v).read_u64::<BigEndian>().unwrap()
-            );
-            if next_id != before_merge {
-                return Ok(next_id.unwrap())
-            }
-            sleep(Duration::from_millis(1));
-        }
-        Err(CubeError::internal("next_table_seq wasn't able to obtain new id".to_string()))
+        let mut to_write = vec![];
+        to_write.write_u64::<BigEndian>(next_seq)?;
+        db.put(seq_key.to_bytes(), to_write)?;
+
+        Ok(next_seq)
     }
 
     fn insert_row(&self, row: Vec<u8>) -> Result<(u64, KeyVal), CubeError> {
@@ -1360,6 +1379,7 @@ impl RocksMetaStore {
 
         let meta_store = RocksMetaStore {
             db: Arc::new(RwLock::new(db_arc.clone())),
+            seq_store: Arc::new(Mutex::new(HashMap::new())),
             listeners: Arc::new(RwLock::new(listeners)),
             remote_fs,
             last_checkpoint_time: Arc::new(RwLock::new(SystemTime::now())),
@@ -1462,15 +1482,16 @@ impl RocksMetaStore {
 
     async fn write_operation<F, R>(&self, f: F) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce((&'a DB, &'a Snapshot<'a>), &'a mut BatchPipe) -> Result<R, CubeError> + Send + 'static,
+        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError> + Send + 'static,
         R: Send + 'static,
     {
         let db = self.db.write().await.clone();
+        let mem_seq = MemorySequence { seq_store: self.seq_store.clone() };
         let (spawn_res, events) =
             tokio::task::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
                 let mut batch = BatchPipe::new(db.as_ref());
                 let snapshot = db.snapshot();
-                let res = f((db.as_ref(), &snapshot), &mut batch)?;
+                let res = f(DbTableRef { db: db.as_ref(), snapshot: &snapshot, mem_seq }, &mut batch)?;
                 let write_result = batch.batch_write_rows()?;
                 Ok((res, write_result))
             })
@@ -1665,13 +1686,14 @@ impl RocksMetaStore {
 
     async fn read_operation<F, R>(&self, f: F) -> R
     where
-        F: for<'a> FnOnce((&'a DB, &'a Snapshot<'a>)) -> R + Send + 'static,
+        F: for<'a> FnOnce(DbTableRef<'a>) -> R + Send + 'static,
         R: Send + 'static,
     {
         let db = self.db.read().await.clone();
+        let mem_seq = MemorySequence { seq_store: self.seq_store.clone() };
         tokio::task::spawn_blocking(move || {
             let snapshot = db.snapshot();
-            f((db.as_ref(), &snapshot))
+            f(DbTableRef { db: db.as_ref(), snapshot: &snapshot, mem_seq })
         }).await.unwrap()
     }
 
@@ -2455,8 +2477,8 @@ impl MetaStore for RocksMetaStore {
     ) -> Result<(), CubeError> {
         trace!("Swapping chunks: deleting WAL ({}), activating chunks ({})", wal_id_to_delete, uploaded_ids.iter().join(", "));
         self.write_operation(move |db_ref, batch_pipe| {
-            let wal_table = WALRocksTable::new(db_ref);
-            let table = ChunkRocksTable::new(db_ref);
+            let wal_table = WALRocksTable::new(db_ref.clone());
+            let table = ChunkRocksTable::new(db_ref.clone());
             let mut activated_row_count = 0;
 
             let deactivated_row_count = wal_table.get_row_or_not_found(wal_id_to_delete)?.get_row().get_row_count();
