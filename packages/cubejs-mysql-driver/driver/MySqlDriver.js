@@ -12,7 +12,10 @@ const GenericTypeToMySql = {
 
 const MySqlToGenericType = {
   mediumtext: 'text',
-  mediumint: 'int'
+  longtext: 'text',
+  mediumint: 'int',
+  smallint: 'int',
+  bigint: 'int',
 };
 
 class MySqlDriver extends BaseDriver {
