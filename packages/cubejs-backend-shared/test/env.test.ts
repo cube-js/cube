@@ -31,6 +31,30 @@ describe('getEnv', () => {
     );
   });
 
+  test('refreshTimer', () => {
+    expect(getEnv('refreshTimer')).toBe(undefined);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '60';
+    expect(getEnv('refreshTimer')).toBe(60);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '1m';
+    expect(getEnv('refreshTimer')).toBe(60);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'true';
+    expect(getEnv('refreshTimer')).toBe(true);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'false';
+    expect(getEnv('refreshTimer')).toBe(false);
+  });
+
+  test('refreshTimer(exception)', () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '11fffffff';
+
+    expect(() => getEnv('refreshTimer')).toThrowError(
+      'CUBEJS_SCHEDULED_REFRESH_TIMER is not valid, must be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
+    );
+  });
+
   test('dbPollTimeout', () => {
     expect(getEnv('dbPollTimeout')).toBe(15 * 60);
 
