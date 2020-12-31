@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.8](https://github.com/cube-js/cube.js/compare/v0.25.7...v0.25.8) (2020-12-31)
+
+
+### Features
+
+* **@cubejs-backend/mysql-driver:** More int and text types support for read only pre-aggregations ([5bb2a4f](https://github.com/cube-js/cube.js/commit/5bb2a4f40efa9b602a48f594052be0eb9484d31a))
+
+
+
+
+
 ## [0.25.7](https://github.com/cube-js/cube.js/compare/v0.25.6...v0.25.7) (2020-12-30)
 
 
