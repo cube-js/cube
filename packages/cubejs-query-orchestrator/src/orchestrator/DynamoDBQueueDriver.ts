@@ -11,7 +11,6 @@
  *     sortKey: sk (number/range)
  */
 
-import R from 'ramda';
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import { Table, Entity } from 'dynamodb-toolbox';
 import { BaseQueueDriver } from './BaseQueueDriver';
@@ -334,18 +333,17 @@ export class DynamoDBQueueDriverConnection {
     let toProcess = toProcessResult ? toProcessResult.Items : [];
     toProcess = toProcess.map((item: any) => item.queryKey);
 
-    let allQueryDefs: any = {};
+    const allQueryDefs: any = {};
     if (!onlyKeys) {
       const queriesResult = await this.queue.query(this.queriesDefKey());
       // allQueryDefs = queriesResult ? queriesResult.Items : {};
-      queriesResult?.Items?.map(q => {
-        let val = JSON.parse(q.value);
-        allQueryDefs[val.stageQueryKey] = val;
-      })
+      queriesResult?.Items?.forEach(q => {
+        const value = JSON.parse(q.value);
+        allQueryDefs[value.stageQueryKey] = value;
+      });
     }
     
     return [active, toProcess, allQueryDefs];
-    // return [active, toProcess, R.map(q => { let val = JSON.parse(q.value); return { [val.stageQueryKey]: val } }, allQueryDefs || {})];
   }
 
   public async getQueryDef(queryKey) {

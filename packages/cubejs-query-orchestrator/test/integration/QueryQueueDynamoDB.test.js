@@ -1,4 +1,4 @@
-
+/* globals beforeAll, afterAll */
 const { GenericContainer } = require('testcontainers');
 const AWS = require('aws-sdk');
 const QueryQueueTest = require('../unit/QueryQueue.test');
@@ -6,8 +6,7 @@ const QueryQueueTest = require('../unit/QueryQueue.test');
 let container;
 
 const dynamodbLocalVersion = process.env.TEST_LOCAL_DYNAMO_DB_VERSION || 'latest';
-
-const dynamoPort = 8000
+const dynamoPort = 8000;
 
 beforeAll(async () => {
   container = await new GenericContainer('amazon/dynamodb-local', dynamodbLocalVersion)
@@ -29,12 +28,12 @@ beforeAll(async () => {
   const createTableParams = {
     TableName: process.env.CUBEJS_CACHE_TABLE,
     KeySchema: [
-      { AttributeName: "pk", KeyType: "HASH" },  //Partition key
-      { AttributeName: "sk", KeyType: "RANGE" }  //Sort key
+      { AttributeName: 'pk', KeyType: 'HASH' }, // Partition key
+      { AttributeName: 'sk', KeyType: 'RANGE' } // Sort key
     ],
     AttributeDefinitions: [
-      { AttributeName: "pk", AttributeType: "S" },
-      { AttributeName: "sk", AttributeType: "S" },
+      { AttributeName: 'pk', AttributeType: 'S' },
+      { AttributeName: 'sk', AttributeType: 'S' },
       { AttributeName: 'GSI1sk', AttributeType: 'N' },
     ],
     ProvisionedThroughput: {
@@ -60,12 +59,7 @@ beforeAll(async () => {
   };
 
   const dynamodb = new AWS.DynamoDB();
-
-  try {
-    await dynamodb.createTable(createTableParams).promise();
-  } catch (err) {
-    throw err;
-  }
+  await dynamodb.createTable(createTableParams).promise();
 });
 
 afterAll(async () => {
@@ -73,16 +67,13 @@ afterAll(async () => {
 
   const scanParams = {
     TableName: process.env.CUBEJS_CACHE_TABLE,
-  }
+  };
 
-  try {
-    console.log('### FINAL SCAN...')
-    const scanResult = await dynamodb.scan(scanParams).promise();
-    console.log('### SCAN RESULT:', scanResult);
-  } catch (err) {
-    throw err;
-  }
-
+  // TODO: Remove this it is for debugging the tests
+  console.log('### FINAL SCAN...');
+  const scanResult = await dynamodb.scan(scanParams).promise();
+  console.log('### SCAN RESULT:', scanResult);
+  
   if (container) await container.stop();
 });
 
