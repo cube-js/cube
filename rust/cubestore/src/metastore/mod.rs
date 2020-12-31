@@ -1459,9 +1459,14 @@ impl RocksMetaStore {
                         .await?;
                     for log_file in logs_to_batch.iter() {
                         let path_to_log = remote_fs.local_file(log_file).await?;
-                        let batch = WriteBatchContainer::read_from_file(&path_to_log).await?;
-                        let db = meta_store.db.write().await;
-                        db.write(batch.write_batch())?;
+                        let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
+                        if let Ok(batch) = batch {
+                            let db = meta_store.db.write().await;
+                            db.write(batch.write_batch())?;
+                        } else if let Err(e) = batch {
+                            error!("Corrupted metastore WAL file. Discarding: {:?} {}", log_file, e);
+                            break;
+                        }
                     }
 
                     return Ok(meta_store);
