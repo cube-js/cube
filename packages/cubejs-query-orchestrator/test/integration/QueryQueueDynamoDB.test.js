@@ -8,6 +8,8 @@ let container;
 const dynamodbLocalVersion = process.env.TEST_LOCAL_DYNAMO_DB_VERSION || 'latest';
 const dynamoPort = 8000;
 
+jest.setTimeout(30000);
+
 beforeAll(async () => {
   container = await new GenericContainer('amazon/dynamodb-local', dynamodbLocalVersion)
     .withExposedPorts(dynamoPort)
