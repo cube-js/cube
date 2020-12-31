@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.9](https://github.com/cube-js/cube.js/compare/v0.25.8...v0.25.9) (2020-12-31)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** 10k batch size upload ([d863a10](https://github.com/cube-js/cube.js/commit/d863a10b1b025577ff302b73de15ff9d9f2fb9a6))
+
+
+
+
+
 ## [0.25.8](https://github.com/cube-js/cube.js/compare/v0.25.7...v0.25.8) (2020-12-31)
 
 
