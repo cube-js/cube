@@ -1524,10 +1524,10 @@ domexception@^2.0.1:
   dependencies:
     webidl-conversions "^5.0.0"
 
-dynamodb-toolbox@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/dynamodb-toolbox/-/dynamodb-toolbox-0.3.0.tgz#e34c503a9cd5f9fedf8fded9a4409fcba857cfe6"
-  integrity sha512-TVWkzvLfQK32YgZVuQV3iwQ4cyMf0+BgY8fj34z7aEBgibJNvvWiydfOVVcskRm5n+0g73v0gmhITxI1Ae425w==
+dynamodb-toolbox@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/dynamodb-toolbox/-/dynamodb-toolbox-0.3.1.tgz#8784d4e8fe169009b8004ba9fb96145cac975868"
+  integrity sha512-nXX+1pUxEamsrhs2FLlQKA0zZv4N1+qq/HEEaGeHJAPMq3cdMtpddQUU/UppcOhNCytPlE2fs28wakXVsRuzMw==
 
 ecc-jsbn@~0.1.1:
   version "0.1.2"

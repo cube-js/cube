@@ -140,10 +140,10 @@ export class DynamoDBQueueDriverConnection {
     // First attempt at redis brpop emulation with dynamodb (copied from LocalQueueDriver)
     const resultListKey = this.resultListKey(queryKey);
     const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
-    let result = await Promise.race([
-      this.getDynamoDBResultPromise(resultListKey),
-      timeoutPromise(this.continueWaitTimeout * 1000),
-    ]);
+
+    // Sleep for continueWaitTimeout seconds
+    await timeoutPromise(this.continueWaitTimeout * 1000);
+    let result = await this.getDynamoDBResultPromise(resultListKey);
 
     // We got our data so parse and remove it
     if (result && result.Items && result.Items[0]) {
@@ -305,8 +305,6 @@ export class DynamoDBQueueDriverConnection {
     const orphanedQueriesResult = await this.queue.query(this.recentRedisKey(), {
       limit: 50, // limit to 50 items
       index: 'GSI1', // query the GSI1 secondary index
-
-      // @ts-ignore - TODO: remove when my PR is merged into dynamo-toolbox
       lt: orphanedTime // GSI1sk (inserted) is less than orphaned time
     });
 
@@ -319,8 +317,6 @@ export class DynamoDBQueueDriverConnection {
     const stalledQueriesResult = await this.queue.query(this.heartBeatRedisKey(), {
       limit: 50, // limit to 50 items
       index: 'GSI1', // query the GSI1 secondary index
-
-      // @ts-ignore - TODO: remove when my PR is merged into dynamo-toolbox
       lt: stalledTime // GSI1sk (inserted) is less than stalled time
     });
 
@@ -331,19 +327,25 @@ export class DynamoDBQueueDriverConnection {
   public async getQueryStageState(onlyKeys) {
     // DynamoDB does NOT support transactional queries
     const activeResult = await this.queue.query(this.activeRedisKey());
-    const active = activeResult ? activeResult.Items : [];
+    let active = activeResult ? activeResult.Items : [];
+    active = active.map((item: any) => item.queryKey);
 
     const toProcessResult = await this.queue.query(this.toProcessRedisKey());
-    const toProcess = toProcessResult ? toProcessResult.Items : [];
+    let toProcess = toProcessResult ? toProcessResult.Items : [];
+    toProcess = toProcess.map((item: any) => item.queryKey);
 
-    let allQueryDefs;
+    let allQueryDefs: any = {};
     if (!onlyKeys) {
       const queriesResult = await this.queue.query(this.queriesDefKey());
-      allQueryDefs = queriesResult ? queriesResult.Items : [];
+      // allQueryDefs = queriesResult ? queriesResult.Items : {};
+      queriesResult?.Items?.map(q => {
+        let val = JSON.parse(q.value);
+        allQueryDefs[val.stageQueryKey] = val;
+      })
     }
-
-    // const [active, toProcess, allQueryDefs] = await request.execAsync();
-    return [active, toProcess, R.map(q => JSON.parse(q.value), allQueryDefs || {})];
+    
+    return [active, toProcess, allQueryDefs];
+    // return [active, toProcess, R.map(q => { let val = JSON.parse(q.value); return { [val.stageQueryKey]: val } }, allQueryDefs || {})];
   }
 
   public async getQueryDef(queryKey) {
@@ -477,7 +479,7 @@ export class DynamoDBQueueDriverConnection {
       && currentProcessIdResult.Item.value === processingId.toString()
     ) {
       const removeTransaction = [
-        this.queue.deleteTransaction({ key: this.activeRedisKey(), queryKey: this.redisHash(queryKey) })
+        this.queue.deleteTransaction({ key: lockKey, queryKey: this.redisHash(queryKey) })
       ];
 
       if (activated) {

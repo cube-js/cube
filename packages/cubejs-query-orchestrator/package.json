@@ -34,7 +34,7 @@
   "dependencies": {
     "@cubejs-backend/shared": "^0.25.0",
     "aws-sdk": "^2.802.0",
-    "dynamodb-toolbox": "^0.3.0",
+    "dynamodb-toolbox": "^0.3.1",
     "generic-pool": "^3.7.1",
     "ramda": "^0.27.0",
     "redis": "^3.0.2"
