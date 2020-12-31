@@ -1001,10 +1001,20 @@ trait RocksTable: Debug + Send + Sync {
         let mut res = Vec::new();
 
         for id in row_ids {
-            res.push(self.get_row(id)?.ok_or(CubeError::internal(format!(
-                "Row exists in secondary index however missing in {:?} table: {}",
-                self, id
-            )))?)
+            if let Some(row) = self.get_row(id)? {
+                res.push(row);
+            } else {
+                let secondary_index_key = RowKey::SecondaryIndex(
+                    self.index_id(RocksSecondaryIndex::get_id(secondary_index)),
+                    secondary_index.typed_key_hash(row_key).to_be_bytes().to_vec(),
+                    id
+                );
+                self.db().delete(secondary_index_key.to_bytes())?;
+                return Err(CubeError::internal(format!(
+                    "Row exists in secondary index however missing in {:?} table: {}. Repairing index.",
+                    self, id
+                )));
+            }
         }
 
         if RocksSecondaryIndex::is_unique(secondary_index) && res.len() > 1 {
@@ -1907,20 +1917,7 @@ impl MetaStore for RocksMetaStore {
     async fn get_schema(&self, schema_name: String) -> Result<IdRow<Schema>, CubeError> {
         self.read_operation(move |db_ref| {
             let table = SchemaRocksTable::new(db_ref);
-            let existing_keys =
-                table.get_row_ids_by_index(&schema_name, &SchemaRocksIndex::Name)?;
-            RocksMetaStore::check_if_exists(&schema_name, existing_keys.len())?;
-
-            let schema_id = existing_keys[0];
-            if let Some(schema) = table.get_row(schema_id)? {
-                return Ok(schema);
-            }
-
-            let e = CubeError::user(format!(
-                "Schema with name '{}' does not exist.",
-                schema_name
-            ));
-            Err(e)
+            Ok(table.get_single_row_by_index(&schema_name, &SchemaRocksIndex::Name)?)
         })
         .await
     }
@@ -2688,6 +2685,7 @@ mod tests {
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
     use std::{env, fs};
+    use std::thread::sleep;
 
     #[test]
     fn macro_test() {
@@ -2875,6 +2873,39 @@ mod tests {
             assert!(meta_store.get_schema("foo".to_string()).await.is_err());
             assert!(meta_store.get_schema("foo1".to_string()).await.is_err());
             assert!(meta_store.get_schema("boo".to_string()).await.is_err());
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn index_repair_test() {
+        let store_path = env::current_dir().unwrap().join("index_repair_test-local");
+        let remote_store_path = env::current_dir().unwrap().join("index_repair_test-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
+
+        {
+            let meta_store = RocksMetaStore::new(store_path.join("metastore").as_path(), remote_fs);
+
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+
+            meta_store.db.write().await.delete(RowKey::Table(TableId::Schemas, 1).to_bytes()).unwrap();
+
+            let result = meta_store.get_schema("foo".to_string()).await;
+            println!("{:?}", result);
+            assert_eq!(result.is_err(), true);
+
+            sleep(Duration::from_millis(300));
+
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
