@@ -1,4 +1,4 @@
-import { createCancelablePromise, createCancelableInterval, pausePromise } from '../src';
+import { createCancelablePromise, createCancelableInterval, pausePromise, retryWithTimeout, withTimeout } from '../src';
 
 test('createCancelablePromise', async () => {
   let canceled = false;
@@ -50,7 +50,7 @@ test('createCancelablePromise(defer async + with)', async () => {
     });
 
     // This pause promise will be canceled by resolving
-    await token.with(pausePromise(10000 * 1000));
+    token.with(pausePromise(10000 * 1000));
 
     finished = true;
   });
@@ -97,7 +97,7 @@ test('createCancelablePromise(simple interval)', async () => {
   expect(finished).toEqual(1);
 });
 
-test('createCancelablePromise(cancel should wait latest execution)', async () => {
+test('createCancelableInterval(cancel should wait latest execution)', async () => {
   let started = 0;
   let finished = 0;
 
@@ -115,4 +115,74 @@ test('createCancelablePromise(cancel should wait latest execution)', async () =>
 
   expect(started).toEqual(1);
   expect(finished).toEqual(1);
+});
+
+test('withTimeout(ok)', async () => {
+  let canceled = false;
+
+  const result = await withTimeout(
+    createCancelablePromise(async (token) => {
+      token.defer(async () => {
+        canceled = true;
+      });
+
+      return 256;
+    }),
+    250
+  );
+
+  expect(result).toEqual(256);
+  expect(canceled).toEqual(false);
+});
+
+test('withTimeout(timeout)', async () => {
+  let started = false;
+  let canceled = false;
+  let finished = false;
+  let throwed = false;
+
+  try {
+    await withTimeout(
+      createCancelablePromise(async (token) => {
+        started = true;
+
+        token.defer(async () => {
+          canceled = true;
+        });
+
+        await pausePromise(10000);
+
+        finished = true;
+      }),
+      250
+    );
+  } catch (e) {
+    throwed = true;
+    expect(e.message).toEqual('Timeout reached after 250ms');
+  }
+
+  expect(throwed).toEqual(true);
+  expect(started).toEqual(true);
+  expect(canceled).toEqual(true);
+  expect(finished).toEqual(false);
+});
+
+test('retryWithTimeout', async () => {
+  let iterations = 0;
+
+  const result = await retryWithTimeout(
+    async (token) => {
+      iterations++;
+
+      if (iterations === 10) {
+        return 256;
+      }
+
+      return null;
+    },
+    { timeout: 1000, intervalPause: () => 10 }
+  );
+
+  expect(result).toEqual(256);
+  expect(iterations).toEqual(10);
 });

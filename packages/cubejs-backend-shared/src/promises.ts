@@ -1,5 +1,5 @@
 export interface CancelablePromise<T> extends Promise<T> {
-  cancel: () => Promise<any>;
+  cancel: (waitExecution?: boolean) => Promise<any>;
 }
 
 export function pausePromise(ms: number): CancelablePromise<void> {
@@ -38,7 +38,7 @@ class CancelToken {
     if (this.withQueue.length) {
       // eslint-disable-next-line no-restricted-syntax
       for (const queued of this.withQueue) {
-        await queued.cancel();
+        await queued.cancel(false);
       }
     }
   }
@@ -49,6 +49,8 @@ class CancelToken {
 
   public async with(fn: CancelablePromise<void>) {
     this.withQueue.push(fn);
+
+    return fn;
   }
 
   public isCanceled() {
@@ -62,10 +64,17 @@ export function createCancelablePromise<T>(
   const token = new CancelToken();
 
   const promise: any = fn(token);
-  promise.cancel = async () => Promise.all([
-    token.cancel(),
-    promise
-  ]);
+  promise.cancel = async (waitExecution: boolean = true) => {
+    const locks: Promise<any>[] = [
+      token.cancel(),
+    ];
+
+    if (waitExecution) {
+      locks.push(promise);
+    }
+
+    return Promise.all(locks);
+  };
 
   return promise;
 }
@@ -95,14 +104,72 @@ export function createCancelableInterval<T>(
   );
 
   return {
-    cancel: async () => {
+    cancel: async (waitExecution: boolean = true) => {
       clearInterval(timeout);
 
       if (execution) {
-        await execution.cancel();
-
-        await execution;
+        await execution.cancel(waitExecution);
       }
     }
   };
 }
+
+interface RetryWithTimeoutOptions {
+  timeout: number,
+  intervalPause: (iteration: number) => number,
+}
+
+export const withTimeout = <T>(
+  fn: CancelablePromise<T>,
+  timeout: number,
+): Promise<T> => {
+  let timer: NodeJS.Timeout|null = null;
+
+  return Promise.race<any>([
+    fn,
+    new Promise((resolve, reject) => {
+      timer = setTimeout(async () => {
+        await fn.cancel(false);
+
+        reject(new Error(`Timeout reached after ${timeout}ms`));
+      }, timeout);
+
+      fn.then(resolve).catch(reject);
+    })
+  ]).then((v) => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+
+    return v;
+  }, (err) => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+
+    throw err;
+  });
+};
+
+export const retryWithTimeout = <T>(
+  fn: (token: CancelToken) => Promise<T>,
+  { timeout, intervalPause }: RetryWithTimeoutOptions,
+) => withTimeout(
+    createCancelablePromise<T|null>(async (token) => {
+      let i = 0;
+
+      while (!token.isCanceled()) {
+        i++;
+
+        const result = await fn(token);
+        if (result) {
+          return result;
+        }
+
+        await token.with(pausePromise(intervalPause(i)));
+      }
+
+      return null;
+    }),
+    timeout
+  );
