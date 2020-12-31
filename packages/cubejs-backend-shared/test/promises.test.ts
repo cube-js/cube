@@ -60,7 +60,26 @@ test('createCancelablePromise(defer async + with)', async () => {
   expect(finished).toBe(true);
 });
 
-test('createCancelablePromise(simple interval)', async () => {
+test('createCancelableInterval(handle too fast execution)', async () => {
+  let started = 0;
+  let finished = 0;
+
+  const interval = createCancelableInterval(async (token) => {
+    started++;
+
+    await pausePromise(25);
+
+    finished++;
+  }, 10);
+
+  await pausePromise(25 * 2 + 5);
+  await interval.cancel(true);
+
+  expect(started).toEqual(2);
+  expect(finished).toEqual(2);
+});
+
+test('createCancelableInterval(simple interval)', async () => {
   let started = 0;
   let finished = 0;
   let canceled = false;

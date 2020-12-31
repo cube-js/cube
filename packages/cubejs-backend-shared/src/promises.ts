@@ -80,7 +80,7 @@ export function createCancelablePromise<T>(
 }
 
 export interface CancelableInterval {
-  cancel: () => Promise<void>,
+  cancel: (waitExecution?: boolean) => Promise<void>,
 }
 
 /**
@@ -94,6 +94,15 @@ export function createCancelableInterval<T>(
 
   const timeout = setInterval(
     async () => {
+      if (execution) {
+        process.emitWarning(
+          'Execution of previous interval was not finished, new execution will be skipped',
+          'UnexpectedBehaviour'
+        );
+
+        return;
+      }
+
       execution = createCancelablePromise(fn);
 
       await execution;
