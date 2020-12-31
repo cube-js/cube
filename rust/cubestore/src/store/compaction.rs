@@ -1,5 +1,5 @@
 use crate::config::ConfigObj;
-use crate::metastore::MetaStore;
+use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
 use crate::table::parquet::ParquetTableStore;

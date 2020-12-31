@@ -6,7 +6,6 @@ use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
 use std::io::Cursor;
-use std::sync::Arc;
 
 impl Chunk {
     pub fn new(partition_id: u64, row_count: usize) -> Chunk {

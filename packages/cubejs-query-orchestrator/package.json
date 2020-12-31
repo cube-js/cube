@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "0.25.1",
+  "version": "0.25.6",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -32,7 +32,7 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.25.0",
+    "@cubejs-backend/shared": "^0.25.6",
     "aws-sdk": "^2.802.0",
     "dynamodb-toolbox": "^0.3.1",
     "generic-pool": "^3.7.1",

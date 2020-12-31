@@ -813,7 +813,7 @@ export class ApiGateway {
           error: e.stack || e.toString(),
         });
 
-        return this.healthResponse(res, health);
+        return this.healthResponse(res, 'DOWN');
       }
 
       try {
@@ -842,7 +842,7 @@ export class ApiGateway {
         error: e.stack || e.toString(),
       });
 
-      return this.healthResponse(res, health);
+      return this.healthResponse(res, 'DOWN');
     }
 
     try {

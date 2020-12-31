@@ -1,5 +1,5 @@
 require('dotenv').config();
-const CubejsServerCore = require('@cubejs-backend/server-core'); // Deprecated
+const { CubejsServerCore } = require('@cubejs-backend/server-core'); // Deprecated
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');

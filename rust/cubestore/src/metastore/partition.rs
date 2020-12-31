@@ -8,7 +8,6 @@ use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
-use std::sync::Arc;
 
 impl Partition {
     pub fn new(index_id: u64, min_value: Option<Row>, max_value: Option<Row>) -> Partition {

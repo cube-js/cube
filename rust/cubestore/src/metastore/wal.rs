@@ -5,7 +5,6 @@ use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
-use std::sync::Arc;
 
 impl WAL {
     pub fn new(table_id: u64, row_count: usize) -> WAL {

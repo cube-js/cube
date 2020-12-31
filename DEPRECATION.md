@@ -40,6 +40,8 @@ features:
 | Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                            | v0.23.11   | January 2021 |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                              | v0.23.8    | June 2021    |
 | Deprecated | [Node.js 8](#nodejs-8)                                               | v0.22.4    | v0.26.0      |
+| Deprecated | Absolute import for @cubejs-backend/query-orchestrator               | v0.24.2    | v0.28.0      |
+| Deprecated | Absolute import for @cubejs-backend/server-core                      | v0.25.4    | v0.30.0      |
 
 ### `contextToDataSourceId`
 
@@ -100,3 +102,39 @@ Node.js 8 reached [End of Life on December 31, 2019][link-nodejs-eol]. This
 means no more updates. Please upgrade to Node.js 10 or higher.
 
 [link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+### Absolute import for @cubejs-backend/query-orchestrator
+
+**Deprecated in Release: v0.24.2**
+
+Reason: Absolute imports highly depend on a path, and all API becomes public. Now we started to provide public API as `export` from the module.
+
+Deprecated:
+
+```js
+const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+```
+
+You should use:
+
+```js
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+```
+
+### Absolute import for @cubejs-backend/server-core
+
+**Deprecated in Release: v0.25.4**
+
+Reason: Absolute imports highly depend on a path, and all API becomes public. Now we started to provide public API as `export` from the module.
+
+Deprecated:
+
+```js
+const CubejsServerCore = require('@cubejs-backend/server-core');
+```
+
+You should use:
+
+```js
+const { CubejsServerCore } = require('@cubejs-backend/server-core');
+```
