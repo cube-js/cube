@@ -1334,7 +1334,7 @@ impl WriteBatchContainer {
 
         let mut buffer = Vec::new();
         tokio::io::AsyncReadExt::read_to_end(&mut file, &mut buffer).await?;
-        let r = flexbuffers::Reader::get_root(&buffer).unwrap();
+        let r = flexbuffers::Reader::get_root(&buffer)?;
         Ok(Self::deserialize(r)?)
     }
 }
@@ -3039,6 +3039,68 @@ mod tests {
             services2
                 .meta_store
                 .get_schema("bar".to_string())
+                .await
+                .unwrap();
+        }
+
+        fs::remove_dir_all(config.local_dir()).unwrap();
+        fs::remove_dir_all(config.remote_dir()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn discard_logs() {
+        let config = Config::test("discard_logs");
+
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+
+        {
+            {
+                let services = config.configure().await;
+                services.start_processing_loops().await.unwrap();
+                services
+                    .meta_store
+                    .create_schema("foo1".to_string(), false)
+                    .await
+                    .unwrap();
+                services.meta_store.run_upload().await.unwrap();
+                services
+                    .meta_store
+                    .create_schema("foo".to_string(), false)
+                    .await
+                    .unwrap();
+                services.meta_store.upload_check_point().await.unwrap();
+                services
+                    .meta_store
+                    .create_schema("bar".to_string(), false)
+                    .await
+                    .unwrap();
+                services.meta_store.run_upload().await.unwrap();
+                services.stop_processing_loops().await.unwrap();
+            }
+            tokio::time::delay_for(Duration::from_millis(1000)).await; // TODO logger init conflict
+            fs::remove_dir_all(config.local_dir()).unwrap();
+            let list = LocalDirRemoteFs::list_recursive(config.remote_dir().clone(), "metastore-".to_string(), config.remote_dir().clone()).await.unwrap();
+            let re = Regex::new(r"(\d+).flex").unwrap();
+            let last_log = list.iter()
+                .filter(|f| re.captures(f.remote_path()).is_some())
+                .max_by_key(|f| re.captures(f.remote_path()).unwrap().get(1).map(|m| m.as_str().parse::<u64>().unwrap()))
+                .unwrap();
+            let file_path = config.remote_dir().join(last_log.remote_path());
+            println!("Truncating {:?}", file_path);
+            let file = std::fs::OpenOptions::new().write(true).open(file_path.clone()).unwrap();
+            println!("Size {}", file.metadata().unwrap().len());
+            file.set_len(50).unwrap();
+
+            let services2 = config.configure().await;
+            services2
+                .meta_store
+                .get_schema("foo1".to_string())
+                .await
+                .unwrap();
+            services2
+                .meta_store
+                .get_schema("foo".to_string())
                 .await
                 .unwrap();
         }

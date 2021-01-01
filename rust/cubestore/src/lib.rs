@@ -12,7 +12,7 @@ extern crate lazy_static;
 
 use arrow::error::ArrowError;
 use core::fmt;
-use flexbuffers::DeserializationError;
+use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
 use serde_derive::{Deserialize, Serialize};
@@ -281,6 +281,12 @@ impl From<serde_json::Error> for CubeError {
 
 impl From<PoisonError<std::sync::MutexGuard<'_, std::collections::HashMap<TableId, u64>>>> for CubeError {
     fn from(v: PoisonError<std::sync::MutexGuard<'_, std::collections::HashMap<TableId, u64>>>) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<ReaderError> for CubeError {
+    fn from(v: ReaderError) -> Self {
         CubeError::from_error(v)
     }
 }
