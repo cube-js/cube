@@ -180,7 +180,7 @@ impl LocalDirRemoteFs {
         async move { Self::list_recursive(remote_dir, remote_prefix, dir).await }.boxed()
     }
 
-    async fn list_recursive(
+    pub async fn list_recursive(
         remote_dir: PathBuf,
         remote_prefix: String,
         dir: PathBuf,
