@@ -570,15 +570,8 @@ impl SerializedPlan {
                     meta_store.clone(),
                     snapshots,
                     Some(
-                        join_on
-                            .as_ref()
-                            .unwrap_or(&Vec::new())
-                            .iter()
-                            .map(|c| c.to_string())
-                            .chain(
-                                on.iter()
-                                    .map(|(l, _)| l.split(".").last().unwrap().to_string()),
-                            )
+                        on.iter()
+                            .map(|(l, _)| l.split(".").last().unwrap().to_string())
                             .collect(),
                     ),
                 )
@@ -588,15 +581,8 @@ impl SerializedPlan {
                     meta_store.clone(),
                     snapshots,
                     Some(
-                        join_on
-                            .as_ref()
-                            .unwrap_or(&Vec::new())
-                            .iter()
-                            .map(|c| c.to_string())
-                            .chain(
-                                on.iter()
-                                    .map(|(_, r)| r.split(".").last().unwrap().to_string()),
-                            )
+                        on.iter()
+                            .map(|(_, r)| r.split(".").last().unwrap().to_string())
                             .collect(),
                     ),
                 )
