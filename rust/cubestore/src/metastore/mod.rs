@@ -2259,6 +2259,9 @@ impl MetaStore for RocksMetaStore {
                         "Current partition is not found during swap active: {}",
                         current
                     )))?;
+                // TODO this check is not atomic
+                // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (35)
+                // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (36)
                 if !current_partition.get_row().is_active() {
                     return Err(CubeError::internal(format!(
                         "Current partition is not active: {:?}",
