@@ -10,7 +10,10 @@ pub mod wal;
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::{error, info};
-use rocksdb::{DBIterator, Options, WriteBatch, WriteBatchIterator, DB, MergeOperands, Snapshot, IteratorMode, ReadOptions, Direction};
+use rocksdb::{
+    DBIterator, Direction, IteratorMode, MergeOperands, Options, ReadOptions, Snapshot, WriteBatch,
+    WriteBatchIterator, DB,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time};
@@ -34,6 +37,7 @@ use core::fmt;
 use futures::future::join_all;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
+use log::trace;
 use parquet::basic::Repetition;
 use parquet::{
     basic::{LogicalType, Type},
@@ -48,6 +52,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Mutex;
 use std::time::SystemTime;
 use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
@@ -55,8 +60,6 @@ use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
 use tokio::time::Duration;
 use wal::WALRocksTable;
-use log::{trace};
-use std::sync::Mutex;
 
 #[macro_export]
 macro_rules! format_table_value {
@@ -122,7 +125,7 @@ macro_rules! base_rocks_secondary_index {
 macro_rules! rocks_table_impl {
     ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $delete_event: tt) => {
         pub(crate) struct $rocks_table<'a> {
-            db: crate::metastore::DbTableRef<'a>
+            db: crate::metastore::DbTableRef<'a>,
         }
 
         impl<'a> $rocks_table<'a> {
@@ -498,7 +501,7 @@ impl<'a> BatchPipe<'a> {
 pub struct DbTableRef<'a> {
     pub db: &'a DB,
     pub snapshot: &'a Snapshot<'a>,
-    pub mem_seq: MemorySequence
+    pub mem_seq: MemorySequence,
 }
 
 #[async_trait]
@@ -516,7 +519,7 @@ pub trait MetaStoreTable: Send + Sync {
 macro_rules! meta_store_table_impl {
     ($name: ident, $table: ty, $rocks_table: ident) => {
         pub struct $name {
-            rocks_meta_store: RocksMetaStore
+            rocks_meta_store: RocksMetaStore,
         }
 
         impl $name {
@@ -543,11 +546,13 @@ macro_rules! meta_store_table_impl {
 
             async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
                 self.rocks_meta_store
-                    .write_operation(move |db_ref, batch| Ok(Self::table(db_ref).delete(id, batch)?))
+                    .write_operation(
+                        move |db_ref, batch| Ok(Self::table(db_ref).delete(id, batch)?),
+                    )
                     .await
             }
         }
-    }
+    };
 }
 
 meta_store_table_impl!(SchemaMetaStoreTable, Schema, SchemaRocksTable);
@@ -661,7 +666,7 @@ pub trait MetaStore: Send + Sync {
         &self,
         wal_id_to_delete: u64,
         uploaded_ids: Vec<u64>,
-        index_count: u64
+        index_count: u64,
     ) -> Result<(), CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
@@ -805,7 +810,7 @@ enum_from_primitive! {
 
 #[derive(Clone)]
 pub struct MemorySequence {
-    seq_store: Arc<Mutex<HashMap<TableId, u64>>>
+    seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
 }
 
 impl MemorySequence {
@@ -1006,8 +1011,11 @@ trait RocksTable: Debug + Send + Sync {
             } else {
                 let secondary_index_key = RowKey::SecondaryIndex(
                     self.index_id(RocksSecondaryIndex::get_id(secondary_index)),
-                    secondary_index.typed_key_hash(row_key).to_be_bytes().to_vec(),
-                    id
+                    secondary_index
+                        .typed_key_hash(row_key)
+                        .to_be_bytes()
+                        .to_vec(),
+                    id,
                 );
                 self.db().delete(secondary_index_key.to_bytes())?;
                 return Err(CubeError::internal(format!(
@@ -1097,11 +1105,14 @@ trait RocksTable: Debug + Send + Sync {
     fn next_table_seq(&self) -> Result<u64, CubeError> {
         let ref db = self.db();
         let seq_key = RowKey::Sequence(self.table_id());
-        let before_merge = self.snapshot().get(seq_key.to_bytes())?.map(
-            |v| Cursor::new(v).read_u64::<BigEndian>().unwrap()
-        );
+        let before_merge = self
+            .snapshot()
+            .get(seq_key.to_bytes())?
+            .map(|v| Cursor::new(v).read_u64::<BigEndian>().unwrap());
 
-        let next_seq = self.mem_seq().next_seq(self.table_id(), before_merge.unwrap_or(0))?;
+        let next_seq = self
+            .mem_seq()
+            .next_seq(self.table_id(), before_merge.unwrap_or(0))?;
 
         let mut to_write = vec![];
         to_write.write_u64::<BigEndian>(next_seq)?;
@@ -1214,7 +1225,10 @@ trait RocksTable: Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iter = db.iterator_opt(IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward), opts);
+        let iter = db.iterator_opt(
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+            opts,
+        );
 
         for (key, value) in iter {
             if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
@@ -1254,8 +1268,11 @@ trait RocksTable: Debug + Send + Sync {
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
         let iterator = db.iterator_opt(
-            IteratorMode::From(&key_min.to_bytes()[0..get_fixed_prefix()], Direction::Forward),
-            opts
+            IteratorMode::From(
+                &key_min.to_bytes()[0..get_fixed_prefix()],
+                Direction::Forward,
+            ),
+            opts,
         );
 
         Ok(TableScanIter {
@@ -1349,14 +1366,15 @@ impl WriteBatchIterator for WriteBatchContainer {
     }
 }
 
-fn meta_store_merge(_new_key: &[u8],
-                existing_val: Option<&[u8]>,
-                operands: &mut MergeOperands)
-                -> Option<Vec<u8>> {
+fn meta_store_merge(
+    _new_key: &[u8],
+    existing_val: Option<&[u8]>,
+    operands: &mut MergeOperands,
+) -> Option<Vec<u8>> {
     let mut result: Vec<u8> = Vec::with_capacity(8);
-    let mut counter = existing_val.map(|v| {
-        Cursor::new(v).read_u64::<BigEndian>().unwrap()
-    }).unwrap_or(0);
+    let mut counter = existing_val
+        .map(|v| Cursor::new(v).read_u64::<BigEndian>().unwrap())
+        .unwrap_or(0);
     for op in operands {
         counter += Cursor::new(op).read_u64::<BigEndian>().unwrap()
     }
@@ -1464,7 +1482,10 @@ impl RocksMetaStore {
                             let db = meta_store.db.write().await;
                             db.write(batch.write_batch())?;
                         } else if let Err(e) = batch {
-                            error!("Corrupted metastore WAL file. Discarding: {:?} {}", log_file, e);
+                            error!(
+                                "Corrupted metastore WAL file. Discarding: {:?} {}",
+                                log_file, e
+                            );
                             break;
                         }
                     }
@@ -1472,10 +1493,7 @@ impl RocksMetaStore {
                     return Ok(meta_store);
                 }
             } else {
-                trace!(
-                    "Can't find metastore-current in {:?}",
-                    remote_fs
-                );
+                trace!("Can't find metastore-current in {:?}", remote_fs);
             }
             info!(
                 "Creating metastore from scratch in {}",
@@ -1497,16 +1515,27 @@ impl RocksMetaStore {
 
     async fn write_operation<F, R>(&self, f: F) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError> + Send + 'static,
+        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+            + Send
+            + 'static,
         R: Send + 'static,
     {
         let db = self.db.write().await.clone();
-        let mem_seq = MemorySequence { seq_store: self.seq_store.clone() };
+        let mem_seq = MemorySequence {
+            seq_store: self.seq_store.clone(),
+        };
         let (spawn_res, events) =
             tokio::task::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
                 let mut batch = BatchPipe::new(db.as_ref());
                 let snapshot = db.snapshot();
-                let res = f(DbTableRef { db: db.as_ref(), snapshot: &snapshot, mem_seq }, &mut batch)?;
+                let res = f(
+                    DbTableRef {
+                        db: db.as_ref(),
+                        snapshot: &snapshot,
+                        mem_seq,
+                    },
+                    &mut batch,
+                )?;
                 let write_result = batch.batch_write_rows()?;
                 Ok((res, write_result))
             })
@@ -1705,11 +1734,19 @@ impl RocksMetaStore {
         R: Send + 'static,
     {
         let db = self.db.read().await.clone();
-        let mem_seq = MemorySequence { seq_store: self.seq_store.clone() };
+        let mem_seq = MemorySequence {
+            seq_store: self.seq_store.clone(),
+        };
         tokio::task::spawn_blocking(move || {
             let snapshot = db.snapshot();
-            f(DbTableRef { db: db.as_ref(), snapshot: &snapshot, mem_seq })
-        }).await.unwrap()
+            f(DbTableRef {
+                db: db.as_ref(),
+                snapshot: &snapshot,
+                mem_seq,
+            })
+        })
+        .await
+        .unwrap()
     }
 
     fn check_if_exists(name: &String, existing_keys_len: usize) -> Result<(), CubeError> {
@@ -2475,9 +2512,13 @@ impl MetaStore for RocksMetaStore {
         &self,
         wal_id_to_delete: u64,
         uploaded_ids: Vec<u64>,
-        index_count: u64
+        index_count: u64,
     ) -> Result<(), CubeError> {
-        trace!("Swapping chunks: deleting WAL ({}), activating chunks ({})", wal_id_to_delete, uploaded_ids.iter().join(", "));
+        trace!(
+            "Swapping chunks: deleting WAL ({}), activating chunks ({})",
+            wal_id_to_delete,
+            uploaded_ids.iter().join(", ")
+        );
         self.write_operation(move |db_ref, batch_pipe| {
             let wal_table = WALRocksTable::new(db_ref.clone());
             let table = ChunkRocksTable::new(db_ref.clone());
@@ -2509,7 +2550,11 @@ impl MetaStore for RocksMetaStore {
         deactivate_ids: Vec<u64>,
         uploaded_ids: Vec<u64>,
     ) -> Result<(), CubeError> {
-        trace!("Swapping chunks: deactivating ({}), activating ({})", deactivate_ids.iter().join(", "), uploaded_ids.iter().join(", "));
+        trace!(
+            "Swapping chunks: deactivating ({}), activating ({})",
+            deactivate_ids.iter().join(", "),
+            uploaded_ids.iter().join(", ")
+        );
         self.write_operation(move |db_ref, batch_pipe| {
             let table = ChunkRocksTable::new(db_ref.clone());
             let mut deactivated_row_count = 0;
@@ -2689,8 +2734,8 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
-    use std::{env, fs};
     use std::thread::sleep;
+    use std::{env, fs};
 
     #[test]
     fn macro_test() {
@@ -2899,7 +2944,12 @@ mod tests {
                 .await
                 .unwrap();
 
-            meta_store.db.write().await.delete(RowKey::Table(TableId::Schemas, 1).to_bytes()).unwrap();
+            meta_store
+                .db
+                .write()
+                .await
+                .delete(RowKey::Table(TableId::Schemas, 1).to_bytes())
+                .unwrap();
 
             let result = meta_store.get_schema("foo".to_string()).await;
             println!("{:?}", result);
@@ -3080,15 +3130,30 @@ mod tests {
             }
             tokio::time::delay_for(Duration::from_millis(1000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
-            let list = LocalDirRemoteFs::list_recursive(config.remote_dir().clone(), "metastore-".to_string(), config.remote_dir().clone()).await.unwrap();
+            let list = LocalDirRemoteFs::list_recursive(
+                config.remote_dir().clone(),
+                "metastore-".to_string(),
+                config.remote_dir().clone(),
+            )
+            .await
+            .unwrap();
             let re = Regex::new(r"(\d+).flex").unwrap();
-            let last_log = list.iter()
+            let last_log = list
+                .iter()
                 .filter(|f| re.captures(f.remote_path()).is_some())
-                .max_by_key(|f| re.captures(f.remote_path()).unwrap().get(1).map(|m| m.as_str().parse::<u64>().unwrap()))
+                .max_by_key(|f| {
+                    re.captures(f.remote_path())
+                        .unwrap()
+                        .get(1)
+                        .map(|m| m.as_str().parse::<u64>().unwrap())
+                })
                 .unwrap();
             let file_path = config.remote_dir().join(last_log.remote_path());
             println!("Truncating {:?}", file_path);
-            let file = std::fs::OpenOptions::new().write(true).open(file_path.clone()).unwrap();
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .open(file_path.clone())
+                .unwrap();
             println!("Size {}", file.metadata().unwrap().len());
             file.set_len(50).unwrap();
 
