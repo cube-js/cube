@@ -145,7 +145,7 @@ impl Cluster for ClusterImpl {
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if self.server_name == node_name {
             // TODO timeout config
-            timeout(Duration::from_secs(600), self.run_local_select(plan_node)).await?
+            timeout(Duration::from_secs(120), self.run_local_select(plan_node)).await?
         } else {
             unimplemented!()
         }
@@ -398,7 +398,7 @@ impl ClusterImpl {
             let mut pool = self.select_process_pool.write().await;
             *pool = Some(Arc::new(WorkerPool::new(
                 self.config_obj.select_worker_pool_size(),
-                Duration::from_secs(600),
+                Duration::from_secs(120),
             )));
         }
         for _ in 0..4 {
