@@ -1151,6 +1151,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn three_tables_join() {
+        Config::run_test("three_tables_join", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (customer_id text, product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (product_id)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (id text, city text, state text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.products (id int, name text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (customer_id, product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.products (id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT c.city, p.name, sum(o.amount) FROM foo.orders o \
+                LEFT JOIN foo.customers c ON o.customer_id = c.id \
+                LEFT JOIN foo.products p ON o.product_id = p.id \
+                GROUP BY 1, 2 ORDER BY 3 DESC"
+            ).await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]));
+            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn in_list() {
         Config::run_test("in_list", async move |services| {
             let service = services.sql_service;
