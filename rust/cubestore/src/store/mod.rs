@@ -8,7 +8,10 @@ extern crate bincode;
 
 use bincode::{deserialize_from, serialize_into};
 
-use crate::metastore::{table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL, MetaStoreTable};
+use crate::metastore::{
+    table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, MetaStoreTable, Partition,
+    WAL,
+};
 use crate::remotefs::RemoteFs;
 use crate::table::{Row, TableStore, TableValue};
 use crate::CubeError;
@@ -22,8 +25,8 @@ use std::{
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
-use mockall::automock;
 use log::trace;
+use mockall::automock;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct DataFrame {
@@ -309,20 +312,23 @@ impl ChunkDataStore for ChunkStore {
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
         let mut new_chunks = Vec::new();
         for index in indexes.iter() {
-            new_chunks.append(&mut self
-                .partition_data_frame(
-                    index.get_id(),
-                    data.remap_columns(index.get_row().columns().clone())?,
-                )
-                .await?
+            new_chunks.append(
+                &mut self
+                    .partition_data_frame(
+                        index.get_id(),
+                        data.remap_columns(index.get_row().columns().clone())?,
+                    )
+                    .await?,
             ); // TODO dataframe clone
         }
 
-        self.meta_store.activate_wal(
-            wal_id,
-            new_chunks.into_iter().map(|c| c.get_id()).collect(),
-            indexes.len() as u64
-        ).await?;
+        self.meta_store
+            .activate_wal(
+                wal_id,
+                new_chunks.into_iter().map(|c| c.get_id()).collect(),
+                indexes.len() as u64,
+            )
+            .await?;
 
         Ok(())
     }

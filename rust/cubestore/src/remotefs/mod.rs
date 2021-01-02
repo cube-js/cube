@@ -6,11 +6,11 @@ use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
+use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
-use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {

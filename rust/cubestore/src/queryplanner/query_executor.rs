@@ -684,7 +684,7 @@ macro_rules! convert_array {
                 TableValue::Decimal(
                     $CUT_TRAILING_ZEROS
                         .replace(&decimal.to_string(), "$1$3")
-                        .to_string()
+                        .to_string(),
                 )
             });
         }
@@ -748,27 +748,69 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         });
                     }
                 }
-                DataType::Int64Decimal(0) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal0Array, Decimal, 0, cut_trailing_zeros)
-                }
-                DataType::Int64Decimal(1) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal1Array, Decimal, 1, cut_trailing_zeros)
-                }
-                DataType::Int64Decimal(2) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal2Array, Decimal, 2, cut_trailing_zeros)
-                }
-                DataType::Int64Decimal(3) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal3Array, Decimal, 3, cut_trailing_zeros)
-                }
-                DataType::Int64Decimal(4) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal4Array, Decimal, 4, cut_trailing_zeros)
-                }
-                DataType::Int64Decimal(5) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal5Array, Decimal, 5, cut_trailing_zeros)
-                }
-                DataType::Int64Decimal(10) => {
-                    convert_array!(array, num_rows, rows, Int64Decimal10Array, Decimal, 10, cut_trailing_zeros)
-                }
+                DataType::Int64Decimal(0) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int64Decimal0Array,
+                    Decimal,
+                    0,
+                    cut_trailing_zeros
+                ),
+                DataType::Int64Decimal(1) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int64Decimal1Array,
+                    Decimal,
+                    1,
+                    cut_trailing_zeros
+                ),
+                DataType::Int64Decimal(2) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int64Decimal2Array,
+                    Decimal,
+                    2,
+                    cut_trailing_zeros
+                ),
+                DataType::Int64Decimal(3) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int64Decimal3Array,
+                    Decimal,
+                    3,
+                    cut_trailing_zeros
+                ),
+                DataType::Int64Decimal(4) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int64Decimal4Array,
+                    Decimal,
+                    4,
+                    cut_trailing_zeros
+                ),
+                DataType::Int64Decimal(5) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int64Decimal5Array,
+                    Decimal,
+                    5,
+                    cut_trailing_zeros
+                ),
+                DataType::Int64Decimal(10) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int64Decimal10Array,
+                    Decimal,
+                    10,
+                    cut_trailing_zeros
+                ),
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
                         .as_any()

@@ -6,7 +6,9 @@ use async_trait::async_trait;
 use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
-use crate::metastore::{table::Table, IdRow, ImportFormat, Index, IndexDef, RowKey, Schema, TableId, MetaStoreTable};
+use crate::metastore::{
+    table::Table, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable, RowKey, Schema, TableId,
+};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use crate::{
@@ -1082,29 +1084,45 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts() {
-        Config::test("high_frequency_inserts").update_config(|mut c| {
-            c.partition_split_threshold = 1000000;
-            c.compaction_chunks_count_threshold = 100;
-            c
-        }).start_test(async move |services| {
-            let service = services.sql_service;
+        Config::test("high_frequency_inserts")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
 
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.numbers (num int)").await.unwrap();
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap();
 
-            for i in 0..500 {
-                service.exec_query(
-                    &format!("INSERT INTO foo.numbers (num) VALUES ({})", i)
-                ).await.unwrap();
-            }
+                for i in 0..500 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+                }
 
-            let result = service.exec_query("SELECT count(*) from foo.numbers").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(500)]));
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(500)]));
 
-            let result = service.exec_query("SELECT sum(num) from foo.numbers").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(124750)]));
-        }).await;
+                let result = service
+                    .exec_query("SELECT sum(num) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows()[0],
+                    Row::new(vec![TableValue::Int(124750)])
+                );
+            })
+            .await;
     }
 
     #[tokio::test]
