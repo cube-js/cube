@@ -8,7 +8,6 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::panic;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::oneshot::Sender;

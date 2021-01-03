@@ -1,5 +1,4 @@
 #![feature(in_band_lifetimes)]
-#![feature(specialization)]
 #![feature(test)]
 #![feature(backtrace)]
 #![feature(async_closure)]
