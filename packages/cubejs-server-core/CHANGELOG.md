@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.11](https://github.com/cube-js/cube.js/compare/v0.25.10...v0.25.11) (2021-01-04)
+
+
+### Bug Fixes
+
+* Declare Add missing externalQueueOptions for QueryCacheOptions ([563fcdc](https://github.com/cube-js/cube.js/commit/563fcdcb943622ad8ca391182652f2eb27000079))
+
+
+
+
+
 ## [0.25.6](https://github.com/cube-js/cube.js/compare/v0.25.5...v0.25.6) (2020-12-30)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

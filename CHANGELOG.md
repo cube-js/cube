@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.11](https://github.com/cube-js/cube.js/compare/v0.25.10...v0.25.11) (2021-01-04)
+
+
+### Bug Fixes
+
+* **cubestore:** File not found if upstream mounted as a network volume ([68822ec](https://github.com/cube-js/cube.js/commit/68822ec8e0f2e7fe92ae80af1cb1b52cbbc22a61))
+* **cubestore:** Fix write metastore locking ([cbbacce](https://github.com/cube-js/cube.js/commit/cbbacce44c4f8af734095d985d834071fb2f8b24))
+* **cubestore:** Handle corrupted log files and discard them with error ([00a1c1a](https://github.com/cube-js/cube.js/commit/00a1c1a532be8cbb20a908c4bdb0e4f5eb802e71))
+* **cubestore:** Handle corrupted upstream metastore ([d547677](https://github.com/cube-js/cube.js/commit/d547677c277c2233351266add966a2b019c38e3c))
+* **cubestore:** Index repairs ([d5dc4cf](https://github.com/cube-js/cube.js/commit/d5dc4cf4f2313d1462a5d67cb5b7b7009680003a))
+* **cubestore:** Set default worker pool timeout to 2 minutes ([139c8f6](https://github.com/cube-js/cube.js/commit/139c8f6844c9b923855a1d0a235aefd58288fd14))
+* Declare Add missing externalQueueOptions for QueryCacheOptions ([563fcdc](https://github.com/cube-js/cube.js/commit/563fcdcb943622ad8ca391182652f2eb27000079))
+
+
+### Features
+
+* **cubestore:** Rebase arrow to 2020-01-02 version ([3cbb46d](https://github.com/cube-js/cube.js/commit/3cbb46d883445e2fbfb261d182e5cdaa6871bf2c))
+* **cubestore:** Three tables join support ([b776398](https://github.com/cube-js/cube.js/commit/b776398ba45bc314f12a15a2f0861d5b01dcb90a))
+
+
+
+
+
 ## [0.25.10](https://github.com/cube-js/cube.js/compare/v0.25.9...v0.25.10) (2020-12-31)
 
 
