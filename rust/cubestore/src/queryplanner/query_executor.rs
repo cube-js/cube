@@ -6,9 +6,7 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array, Int64Decimal10Array,
-    Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array, Int64Decimal4Array,
-    Int64Decimal5Array, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
+    Array, BooleanArray, Float64Array, Int64Array, DecimalArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
     UInt64Array,
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
@@ -759,67 +757,13 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         });
                     }
                 }
-                DataType::Int64Decimal(0) => convert_array!(
+                DataType::Decimal(scale, _) => convert_array!(
                     array,
                     num_rows,
                     rows,
-                    Int64Decimal0Array,
+                    DecimalArray,
                     Decimal,
-                    0,
-                    cut_trailing_zeros
-                ),
-                DataType::Int64Decimal(1) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal1Array,
-                    Decimal,
-                    1,
-                    cut_trailing_zeros
-                ),
-                DataType::Int64Decimal(2) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal2Array,
-                    Decimal,
-                    2,
-                    cut_trailing_zeros
-                ),
-                DataType::Int64Decimal(3) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal3Array,
-                    Decimal,
-                    3,
-                    cut_trailing_zeros
-                ),
-                DataType::Int64Decimal(4) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal4Array,
-                    Decimal,
-                    4,
-                    cut_trailing_zeros
-                ),
-                DataType::Int64Decimal(5) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal5Array,
-                    Decimal,
-                    5,
-                    cut_trailing_zeros
-                ),
-                DataType::Int64Decimal(10) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal10Array,
-                    Decimal,
-                    10,
+                    *scale as i64,
                     cut_trailing_zeros
                 ),
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
@@ -884,9 +828,9 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
             scale: 10,
             precision: 18,
         }),
-        DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
+        DataType::Decimal(scale, precision) => Ok(ColumnType::Decimal {
             scale: scale as i32,
-            precision: 18,
+            precision: precision as i32,
         }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8

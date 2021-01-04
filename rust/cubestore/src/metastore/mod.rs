@@ -275,9 +275,24 @@ pub enum ColumnType {
 }
 
 impl ColumnType {
+    pub fn target_precision(&self) -> i32 {
+        match self {
+            ColumnType::Decimal { precision, .. } => {
+                // @todo Move to const MAX scale
+                if *precision > 18 {
+                    18
+                } else {
+                    *precision
+                }
+            }
+            x => panic!("target_precision called on {:?}", x),
+        }
+    }
+
     pub fn target_scale(&self) -> i32 {
         match self {
             ColumnType::Decimal { scale, .. } => {
+                // @todo Move to const MAX scale
                 if *scale > 5 {
                     10
                 } else {
@@ -306,10 +321,10 @@ impl From<&Column> for parquet::schema::types::Type {
                     .build()
                     .unwrap()
             }
-            crate::metastore::ColumnType::Decimal { precision, .. } => {
+            crate::metastore::ColumnType::Decimal { .. } => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::INT64)
                     .with_logical_type(LogicalType::DECIMAL)
-                    .with_precision(*precision)
+                    .with_precision(column.get_column_type().target_precision())
                     .with_scale(column.get_column_type().target_scale())
                     .with_repetition(Repetition::OPTIONAL)
                     .build()
@@ -356,9 +371,10 @@ impl Into<Field> for Column {
                 ColumnType::Int => DataType::Int64,
                 ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
                 ColumnType::Boolean => DataType::Boolean,
-                ColumnType::Decimal { .. } => {
-                    DataType::Int64Decimal(self.column_type.target_scale() as usize)
-                }
+                ColumnType::Decimal { .. } => DataType::Decimal(
+                    self.column_type.target_scale() as usize,
+                    self.column_type.target_precision() as usize,
+                ),
                 ColumnType::Bytes => DataType::Binary,
             },
             false,
