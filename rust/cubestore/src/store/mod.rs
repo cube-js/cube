@@ -432,7 +432,7 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::{metastore::ColumnType, table::TableValue};
-    use rocksdb::{Options, DB};
+    use rocksdb::{Options, DBUtils};
     use std::fs;
     use std::path::PathBuf;
 
@@ -441,7 +441,7 @@ mod tests {
         let path = "/tmp/test_create_wal";
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = DBUtils::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -506,7 +506,7 @@ mod tests {
             let origin_data = DataFrame::new(col.clone(), first_rows);
             assert!(restored_wal == origin_data);
         }
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = DBUtils::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
@@ -519,7 +519,7 @@ mod tests {
         let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
         let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
 
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = DBUtils::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(wal_store_path.clone());
         let _ = fs::remove_dir_all(wal_remote_store_path.clone());
         let _ = fs::remove_dir_all(chunk_store_path.clone());
@@ -598,7 +598,7 @@ mod tests {
             assert!(restored_chunk.data == restored_wal_sorted.data);
             assert!(restored_chunk.data != restored_wal_not_sorted.data);
         }
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = DBUtils::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(wal_store_path.clone());
         let _ = fs::remove_dir_all(wal_remote_store_path.clone());
         let _ = fs::remove_dir_all(chunk_store_path.clone());

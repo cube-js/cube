@@ -6,7 +6,7 @@ use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
-use rocksdb::DB;
+use rocksdb::TransactionDB;
 use serde::{Deserialize, Deserializer};
 
 impl Partition {

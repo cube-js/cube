@@ -10,10 +10,7 @@ pub mod wal;
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::{error, info};
-use rocksdb::{
-    DBIterator, Direction, IteratorMode, MergeOperands, Options, ReadOptions, Snapshot, WriteBatch,
-    WriteBatchIterator, DB,
-};
+use rocksdb::{prelude::*, TransactionDB, TransactionDBOptions, IteratorMode, Direction, WriteBatch, Snapshot, DBIterator, WriteBatchIterator, MergeOperands};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time};
@@ -137,11 +134,11 @@ macro_rules! rocks_table_impl {
         impl<'a> RocksTable for $rocks_table<'a> {
             type T = $table;
 
-            fn db(&self) -> &DB {
+            fn db(&self) -> &TransactionDB {
                 self.db.db
             }
 
-            fn snapshot(&self) -> &rocksdb::Snapshot {
+            fn snapshot(&self) -> &rocksdb::Snapshot<TransactionDB> {
                 self.db.snapshot
             }
 
@@ -468,13 +465,13 @@ struct KeyVal {
 }
 
 struct BatchPipe<'a> {
-    db: &'a DB,
+    db: &'a TransactionDB,
     write_batch: WriteBatch,
     events: Vec<MetaStoreEvent>,
 }
 
 impl<'a> BatchPipe<'a> {
-    fn new(db: &'a DB) -> BatchPipe<'a> {
+    fn new(db: &'a TransactionDB) -> BatchPipe<'a> {
         BatchPipe {
             db,
             write_batch: WriteBatch::default(),
@@ -491,16 +488,18 @@ impl<'a> BatchPipe<'a> {
     }
 
     fn batch_write_rows(self) -> Result<Vec<MetaStoreEvent>, CubeError> {
-        let db = self.db;
-        db.write(self.write_batch)?;
+        let tx = self.db.transaction();
+        tx.write(self.write_batch)?;
+        tx.commit()?;
+
         Ok(self.events)
     }
 }
 
 #[derive(Clone)]
 pub struct DbTableRef<'a> {
-    pub db: &'a DB,
-    pub snapshot: &'a Snapshot<'a>,
+    pub db: &'a TransactionDB,
+    pub snapshot: &'a Snapshot<'a, TransactionDB>,
     pub mem_seq: MemorySequence,
 }
 
@@ -825,7 +824,7 @@ impl MemorySequence {
 
 #[derive(Clone)]
 pub struct RocksMetaStore {
-    pub db: Arc<RwLock<Arc<DB>>>,
+    pub db: Arc<RwLock<Arc<TransactionDB>>>,
     seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
     listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
     remote_fs: Arc<dyn RemoteFs>,
@@ -924,8 +923,8 @@ where
 trait RocksTable: Debug + Send + Sync {
     type T: Serialize + Clone + Debug + Send;
     fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent;
-    fn db(&self) -> &DB;
-    fn snapshot(&self) -> &Snapshot;
+    fn db(&self) -> &TransactionDB;
+    fn snapshot(&self) -> &Snapshot<TransactionDB>;
     fn mem_seq(&self) -> &MemorySequence;
     fn index_id(&self, index_num: IndexId) -> IndexId;
     fn table_id(&self) -> TableId;
@@ -1017,7 +1016,11 @@ trait RocksTable: Debug + Send + Sync {
                         .to_vec(),
                     id,
                 );
-                self.db().delete(secondary_index_key.to_bytes())?;
+
+                let tx = self.db().transaction();
+                tx.delete(secondary_index_key.to_bytes())?;
+                tx.commit()?;
+
                 return Err(CubeError::internal(format!(
                     "Row exists in secondary index however missing in {:?} table: {}. Repairing index.",
                     self, id
@@ -1117,7 +1120,10 @@ trait RocksTable: Debug + Send + Sync {
 
         let mut to_write = vec![];
         to_write.write_u64::<BigEndian>(next_seq)?;
-        db.put(seq_key.to_bytes(), to_write)?;
+
+        let tx = db.transaction();
+        tx.put(seq_key.to_bytes(), to_write)?;
+        tx.commit()?;
 
         Ok(next_seq)
     }
@@ -1158,8 +1164,9 @@ trait RocksTable: Debug + Send + Sync {
     }
 
     fn get_row(&self, row_id: u64) -> Result<Option<IdRow<Self::T>>, CubeError> {
-        let ref db = self.snapshot();
-        let res = db.get(RowKey::Table(self.table_id(), row_id).to_bytes())?;
+        let tx = self.db().transaction();
+        let res = tx.get(RowKey::Table(self.table_id(), row_id).to_bytes())?;
+        tx.commit()?;
 
         if let Some(buffer) = res {
             let row = self.deserialize_id_row(row_id, buffer.as_slice())?;
@@ -1262,7 +1269,7 @@ trait RocksTable: Debug + Send + Sync {
         Ok(res)
     }
 
-    fn table_scan<'a>(&'a self, db: &'a Snapshot) -> Result<TableScanIter<'a, Self>, CubeError> {
+    fn table_scan<'a>(&'a self, db: &'a Snapshot<TransactionDB>) -> Result<TableScanIter<'a, Self>, CubeError> {
         let my_table_id = self.table_id();
         let key_min = RowKey::Table(my_table_id, 0);
 
@@ -1403,7 +1410,9 @@ impl RocksMetaStore {
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
         opts.set_merge_operator("meta_store merge", meta_store_merge, None);
 
-        let db = DB::open(&opts, path).unwrap();
+        let txopts = TransactionDBOptions::default();
+
+        let db = TransactionDB::open_opt(&opts, path, &txopts).unwrap();
         let db_arc = Arc::new(db);
 
         let meta_store = RocksMetaStore {
@@ -1481,7 +1490,9 @@ impl RocksMetaStore {
                         let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
                         if let Ok(batch) = batch {
                             let db = meta_store.db.write().await;
-                            db.write(batch.write_batch())?;
+                            let tx = db.transaction();
+                            tx.write(batch.write_batch())?;
+                            tx.commit()?;
                         } else if let Err(e) = batch {
                             error!(
                                 "Corrupted metastore WAL file. Discarding: {:?} {}",
@@ -1643,7 +1654,7 @@ impl RocksMetaStore {
     }
 
     async fn upload_checkpoint(
-        db: Arc<DB>,
+        db: Arc<TransactionDB>,
         remote_fs: Arc<dyn RemoteFs>,
         checkpoint_time: &SystemTime,
     ) -> Result<(), CubeError> {

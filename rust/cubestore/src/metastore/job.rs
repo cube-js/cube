@@ -4,7 +4,7 @@ use crate::metastore::{IdRow, MetaStoreEvent, RowKey};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
-use rocksdb::DB;
+use rocksdb::TransactionDB;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::{Cursor, Write};
 

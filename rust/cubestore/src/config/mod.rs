@@ -13,7 +13,7 @@ use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
 use log::Level;
 use mockall::automock;
-use rocksdb::{Options, DB};
+use rocksdb::{Options, DBUtils};
 use simple_logger::SimpleLogger;
 use std::future::Future;
 use std::path::PathBuf;
@@ -228,7 +228,7 @@ impl Config {
 
             services.stop_processing_loops().await.unwrap();
         }
-        let _ = DB::destroy(&Options::default(), self.meta_store_path());
+        let _ = DBUtils::destroy(&Options::default(), self.meta_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }

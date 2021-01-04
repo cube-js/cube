@@ -641,7 +641,7 @@ mod tests {
     use itertools::Itertools;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
-    use rocksdb::{Options, DB};
+    use rocksdb::{Options, TransactionDB};
     use std::collections::HashSet;
     use std::fs::File;
     use std::io::Write;
@@ -652,7 +652,7 @@ mod tests {
     #[actix_rt::test]
     async fn create_schema_test() {
         let path = "/tmp/test_create_schema";
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = TransactionDB::destroy(&Options::default(), path);
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
         let _ = fs::remove_dir_all(store_path.clone());
@@ -681,7 +681,7 @@ mod tests {
                 ])
             );
         }
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = TransactionDB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
@@ -689,7 +689,7 @@ mod tests {
     #[actix_rt::test]
     async fn create_table_test() {
         let path = "/tmp/test_create_table";
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = TransactionDB::destroy(&Options::default(), path);
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
         let _ = fs::remove_dir_all(store_path.clone());
@@ -734,7 +734,7 @@ mod tests {
                 TableValue::String("false".to_string()),
             ]));
         }
-        let _ = DB::destroy(&Options::default(), path);
+        let _ = TransactionDB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }

@@ -3,7 +3,7 @@ use crate::base_rocks_secondary_index;
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
-use rocksdb::DB;
+use rocksdb::TransactionDB;
 use serde::{Deserialize, Deserializer};
 
 impl WAL {

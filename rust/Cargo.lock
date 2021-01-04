@@ -103,6 +103,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ambassador"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61874b33258f18ca7923047c12887078ccfe95c2811b03c1a09e309c19b7e50b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -478,9 +489,9 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.54.0"
+version = "0.55.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66c0bb6167449588ff70803f4127f0684f9063097eca5016f37eb52b92c2cf36"
+checksum = "75b13ce559e6433d360c26305643803cb52cfbabbc2b9c47ce04a58493dfb443"
 dependencies = [
  "bitflags",
  "cexpr",
@@ -692,9 +703,9 @@ dependencies = [
 
 [[package]]
 name = "clang-sys"
-version = "0.29.3"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe6837df1d5cba2397b835c8530f51723267e16abbf83892e9e5af4f0e5dd10a"
+checksum = "0659001ab56b791be01d4b729c44376edc6718cf389a502e579b77b758f3296c"
 dependencies = [
  "glob",
  "libc",
@@ -1015,7 +1026,7 @@ dependencies = [
  "num",
  "parquet",
  "procspawn",
- "rand 0.8.0",
+ "rand 0.8.1",
  "regex",
  "reqwest",
  "rocksdb",
@@ -1065,6 +1076,17 @@ checksum = "9f41ebddf24094fe55ed9861f925e8fd88d761e5231ec1dcc844e7fd66179b1b"
 dependencies = [
  "crossbeam-queue 0.2.3",
  "tokio",
+]
+
+[[package]]
+name = "delegate"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12e531288b600a8bea48baff926d2f16a3f68fda1cd2d59240279907ba727332"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1970,19 +1992,18 @@ checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
 
 [[package]]
 name = "libloading"
-version = "0.5.2"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
+checksum = "e9367bdfa836b7e3cf895867f7a570283444da90562980ec2263d6e1569b16bc"
 dependencies = [
- "cc",
+ "cfg-if 1.0.0",
  "winapi 0.3.9",
 ]
 
 [[package]]
 name = "librocksdb-sys"
 version = "6.11.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb5b56f651c204634b936be2f92dbb42c36867e00ff7fe2405591f3b9fa66f09"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=transaction#9d3e389328d2b8d0180dca781a794186b1868226"
 dependencies = [
  "bindgen",
  "cc",
@@ -2905,13 +2926,13 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a76330fb486679b4ace3670f117bbc9e16204005c4bde9c4bd372f45bed34f12"
+checksum = "c24fcd450d3fa2b592732565aa4f17a27a61c65ece4726353e000939b0edee34"
 dependencies = [
  "libc",
  "rand_chacha 0.3.0",
- "rand_core 0.6.0",
+ "rand_core 0.6.1",
  "rand_hc 0.3.0",
 ]
 
@@ -2942,7 +2963,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e12735cf05c9e10bf21534da50a147b924d555dc7a547c42e6bb2d5b6017ae0d"
 dependencies = [
  "ppv-lite86",
- "rand_core 0.6.0",
+ "rand_core 0.6.1",
 ]
 
 [[package]]
@@ -2971,9 +2992,9 @@ dependencies = [
 
 [[package]]
 name = "rand_core"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8b34ba8cfb21243bd8df91854c830ff0d785fff2e82ebd4434c2644cb9ada18"
+checksum = "c026d7df8b298d90ccbbc5190bd04d85e159eaf5576caeacf8741da93ccbd2e5"
 dependencies = [
  "getrandom 0.2.1",
 ]
@@ -3002,7 +3023,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3190ef7066a446f2e7f42e239d161e905420ccab01eb967c9eb27d21b2322a73"
 dependencies = [
- "rand_core 0.6.0",
+ "rand_core 0.6.1",
 ]
 
 [[package]]
@@ -3187,9 +3208,10 @@ dependencies = [
 [[package]]
 name = "rocksdb"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23d83c02c429044d58474eaf5ae31e062d0de894e21125b47437ec0edc1397e6"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=transaction#9d3e389328d2b8d0180dca781a794186b1868226"
 dependencies = [
+ "ambassador",
+ "delegate",
  "libc",
  "librocksdb-sys",
 ]

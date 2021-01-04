@@ -10,7 +10,7 @@ use crate::rocks_table_impl;
 use crate::store::DataFrame;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
-use rocksdb::DB;
+use rocksdb::TransactionDB;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
 use std::sync::Arc;

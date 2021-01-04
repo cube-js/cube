@@ -1,7 +1,7 @@
 use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, Schema, TableId};
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
-use rocksdb::DB;
+use rocksdb::TransactionDB;
 use serde::{Deserialize, Deserializer};
 
 impl Schema {
