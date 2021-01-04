@@ -4,7 +4,7 @@ use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
 use arrow::datatypes::DataType;
-use datafusion::logical_plan::{DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning};
+use datafusion::logical_plan::{DFSchemaRef, PlanType, Expr, JoinType, LogicalPlan, Operator, Partitioning};
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
 use futures::future::BoxFuture;
@@ -126,6 +126,11 @@ pub enum SerializedLogicalPlan {
         input: Arc<SerializedLogicalPlan>,
         partitioning_scheme: SerializePartitioning,
     },
+    Explain {
+        verbose: bool,
+        plan: Arc<SerializedLogicalPlan>,
+        schema: DFSchemaRef,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -185,6 +190,20 @@ impl SerializedLogicalPlan {
                     remote_to_local_names,
                     worker_partition_ids,
                 )?),
+            },
+            SerializedLogicalPlan::Explain {
+                verbose,
+                plan,
+                schema,
+            } => LogicalPlan::Explain {
+                verbose: *verbose,
+                plan: Arc::new(plan.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
+                stringified_plans: vec![],
+                schema: schema.clone(),
             },
             SerializedLogicalPlan::Union {
                 inputs,
@@ -651,7 +670,15 @@ impl SerializedPlan {
                 .await
             }
             LogicalPlan::CreateExternalTable { .. } => Ok(index_snapshots),
-            LogicalPlan::Explain { .. } => Ok(index_snapshots),
+            LogicalPlan::Explain { plan, .. } => {
+                Self::index_snapshots_from_plan_boxed(
+                    plan.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
+            },
             LogicalPlan::Extension { .. } => Ok(index_snapshots),
             LogicalPlan::Union { inputs, .. } => {
                 let mut snapshots = index_snapshots;
@@ -719,7 +746,7 @@ impl SerializedPlan {
             LogicalPlan::Sort { input, .. } => Self::is_data_select_query(input),
             LogicalPlan::Limit { input, .. } => Self::is_data_select_query(input),
             LogicalPlan::CreateExternalTable { .. } => false,
-            LogicalPlan::Explain { .. } => false,
+            LogicalPlan::Explain { plan, .. } => Self::is_data_select_query(plan),
             LogicalPlan::Extension { .. } => false,
             LogicalPlan::Union { inputs, .. } => {
                 let mut snapshots = false;
@@ -800,7 +827,11 @@ impl SerializedPlan {
                 n: *n,
             },
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
-            LogicalPlan::Explain { .. } => unimplemented!(),
+            LogicalPlan::Explain { verbose, plan, stringified_plans, schema } => SerializedLogicalPlan::Explain {
+                verbose: *verbose,
+                plan: Arc::new(Self::serialized_logical_plan(&plan)),
+                schema: schema.clone(),
+            },
             LogicalPlan::Extension { .. } => unimplemented!(),
             LogicalPlan::Union {
                 inputs,

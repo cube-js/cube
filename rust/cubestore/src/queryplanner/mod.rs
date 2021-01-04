@@ -42,7 +42,9 @@ pub struct QueryPlannerImpl {
 }
 
 pub enum QueryPlan {
+    // If SQL doesnt contain select operations
     Meta(LogicalPlan),
+    // If SQL contains select operations, We are searilizing it for distributed query execution
     Select(SerializedPlan),
 }
 
