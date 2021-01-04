@@ -2,8 +2,6 @@ use super::TimestampValue;
 use crate::metastore::{Column, ColumnType, Index};
 use crate::table::{Row, RowSortKey, TableStore, TableValue};
 use crate::CubeError;
-use datafusion::physical_plan::parquet::ParquetExec;
-use datafusion::physical_plan::ExecutionPlan;
 use parquet::column::reader::ColumnReader;
 use parquet::column::writer::ColumnWriter;
 use parquet::data_type::*;
@@ -17,7 +15,6 @@ use std::fs::File;
 use bigdecimal::{BigDecimal, Num, ToPrimitive};
 use num::integer::div_ceil;
 use num::BigInt;
-use parquet::file::metadata::RowGroupMetaData;
 use std::sync::Arc;
 
 pub struct ParquetTableStore {
@@ -119,19 +116,19 @@ impl TableStore for ParquetTableStore {
         Ok(result)
     }
 
-    fn scan_node(
-        &self,
-        file: &str,
-        columns: &Vec<Column>,
-        row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
-    ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError> {
-        Ok(Arc::new(ParquetExec::try_new_with_filter(
-            file,
-            Some(columns.iter().map(|c| c.get_index()).collect::<Vec<_>>()),
-            self.row_group_size,
-            row_group_filter,
-        )?))
-    }
+    // fn scan_node(
+    //     &self,
+    //     file: &str,
+    //     columns: &Vec<Column>,
+    //     row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
+    // ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError> {
+    //     Ok(Arc::new(ParquetExec::try_new_with_filter(
+    //         file,
+    //         Some(columns.iter().map(|c| c.get_index()).collect::<Vec<_>>()),
+    //         self.row_group_size,
+    //         row_group_filter,
+    //     )?))
+    // }
 }
 
 impl ParquetTableStore {
@@ -820,25 +817,14 @@ mod tests {
 
     extern crate test;
 
-    use arrow::array::UInt64Array;
-    use arrow::datatypes::DataType;
     use bigdecimal::BigDecimal;
     use csv::ReaderBuilder;
-    use datafusion::logical_plan::Operator;
-    use datafusion::physical_plan::expressions::{binary, Count, Literal};
-    use datafusion::physical_plan::filter::FilterExec;
-    use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
-    use datafusion::physical_plan::{expressions, ExecutionPlan};
-    use datafusion::scalar::ScalarValue;
-    use futures::executor::block_on;
-    use futures::StreamExt;
     use num::BigInt;
     use parquet::file::reader::FileReader;
     use parquet::file::statistics::Statistics;
     use std::fs::File;
     use std::io::BufReader;
     use std::mem::swap;
-    use std::sync::Arc;
     use std::time::SystemTime;
     use test::Bencher;
 
@@ -1064,6 +1050,7 @@ mod tests {
         }
     }
 
+    /*
     #[bench]
     fn filter_count_using_scan(b: &mut Bencher) {
         if let Ok((store, columns_to_read)) = prepare_donors() {
@@ -1130,6 +1117,7 @@ mod tests {
             });
         }
     }
+     */
 
     fn prepare_donors() -> Result<(ParquetTableStore, Vec<Column>), io::Error> {
         let store = ParquetTableStore {

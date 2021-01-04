@@ -239,11 +239,22 @@ mod tests {
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::CubeError;
     use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::logical_plan::ToDFSchema;
     use procspawn::{self};
     use serde::{Deserialize, Serialize};
-    use std::sync::Arc;
 
-    procspawn::enable_test_support!();
+    // Code from procspawn::enable_test_support!();
+    #[procspawn::testsupport::ctor]
+    fn __procspawn_test_support_init() {
+        // strip the crate name from the module path
+        let module_path = std::module_path!().splitn(2, "::").nth(1);
+        procspawn::testsupport::enable(module_path);
+    }
+
+    #[test]
+    fn procspawn_test_helper() {
+        procspawn::init();
+    }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     pub enum Message {
@@ -311,16 +322,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn serialize_plan() {
+    async fn serialize_plan() -> Result<(), CubeError> {
         let schema = Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
             Field::new("c2", DataType::Utf8, false),
         ]);
         let plan = SerializedLogicalPlan::EmptyRelation {
             produce_one_row: false,
-            schema: Arc::new(schema),
+            schema: schema.to_dfschema_ref()?,
         };
-        let bytes = bincode::serialize(&plan).unwrap();
-        bincode::deserialize::<SerializedLogicalPlan>(bytes.as_slice()).unwrap();
+        let bytes = bincode::serialize(&plan)?;
+        bincode::deserialize::<SerializedLogicalPlan>(bytes.as_slice())?;
+        Ok(())
     }
 }
