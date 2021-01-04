@@ -420,6 +420,33 @@ impl SqlService for SqlServiceImpl {
                 };
                 Ok(res)
             }
+            CubeStoreStatement::Statement(Statement::Explain {
+                analyze,
+                verbose,
+                statement,
+                ..
+            }) => {
+                let logical_plan = self
+                    .query_planner
+                    .logical_plan(DFStatement::Statement(Statement::Explain {
+                        analyze,
+                        verbose,
+                        statement,
+                    }))
+                    .await?;
+                // TODO distribute and combine
+                let res = match logical_plan {
+                    QueryPlan::Meta(logical_plan) => {
+                        self.query_planner.execute_meta_plan(logical_plan).await?
+                    }
+                    QueryPlan::Select(serialized) => {
+                        self.query_executor
+                            .execute_router_plan(serialized, self.cluster.clone())
+                            .await?
+                    }
+                };
+                Ok(res)
+            }
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", q))),
         }
     }
