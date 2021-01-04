@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.11](https://github.com/cube-js/cube.js/compare/v0.25.10...v0.25.11) (2021-01-04)
+
+
+### Features
+
+* **cubestore:** Rebase arrow to 2020-01-02 version ([3cbb46d](https://github.com/cube-js/cube.js/commit/3cbb46d883445e2fbfb261d182e5cdaa6871bf2c))
+
+
+
+
+
 ## [0.25.10](https://github.com/cube-js/cube.js/compare/v0.25.9...v0.25.10) (2020-12-31)
 
 
