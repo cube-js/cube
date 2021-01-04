@@ -1474,6 +1474,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn join_with_aliases() {
+        Config::run_test("join_with_aliases", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.sessions (t timestamp, id int)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.page_views (session_id int, page_view_count int)").await.unwrap();
+
+            service.exec_query("CREATE INDEX by_id ON foo.sessions (id)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.sessions (t, id) VALUES ('2020-01-01T00:00:00.000Z', 1), ('2020-01-02T00:00:00.000Z', 2), ('2020-01-03T00:00:00.000Z', 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.page_views (session_id, page_view_count) VALUES (1, 10), (2, 20), (3, 30)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT sum(`page_view_count`) from foo.sessions `sessions` JOIN foo.page_views `page_views` ON `id` = `session_id` WHERE `t` >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(50)]));
+        }).await;
+    }
+
+    #[tokio::test]
     async fn create_table_with_location() {
         Config::run_test("create_table_with_location", async move |services| {
             let service = services.sql_service;
