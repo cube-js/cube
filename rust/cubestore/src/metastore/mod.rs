@@ -1749,7 +1749,9 @@ impl RocksMetaStore {
                 snapshot: &snapshot,
                 mem_seq,
             })
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
 
         mem::drop(db);
 

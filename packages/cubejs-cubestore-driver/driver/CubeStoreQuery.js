@@ -54,7 +54,7 @@ class CubeStoreQuery extends BaseQuery {
   }
 
   timeGroupedColumn(granularity, dimension) {
-    return `date_trunc(${dimension}, '${GRANULARITY_TO_INTERVAL[granularity]}')`;
+    return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
   escapeColumnName(name) {

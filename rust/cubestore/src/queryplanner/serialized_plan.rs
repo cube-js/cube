@@ -1,16 +1,18 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition};
 use crate::queryplanner::query_executor::CubeTable;
+use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
-use arrow::datatypes::{DataType, SchemaRef};
-use datafusion::logical_plan::{Expr, JoinType, LogicalPlan, Operator, TableSource};
+use arrow::datatypes::DataType;
+use datafusion::logical_plan::{DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning};
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -76,7 +78,7 @@ pub enum SerializedLogicalPlan {
     Projection {
         expr: Vec<SerializedExpr>,
         input: Arc<SerializedLogicalPlan>,
-        schema: SchemaRef,
+        schema: DFSchemaRef,
     },
     Filter {
         predicate: SerializedExpr,
@@ -86,7 +88,7 @@ pub enum SerializedLogicalPlan {
         input: Arc<SerializedLogicalPlan>,
         group_expr: Vec<SerializedExpr>,
         aggr_expr: Vec<SerializedExpr>,
-        schema: SchemaRef,
+        schema: DFSchemaRef,
     },
     Sort {
         expr: Vec<SerializedExpr>,
@@ -94,7 +96,7 @@ pub enum SerializedLogicalPlan {
     },
     Union {
         inputs: Vec<Arc<SerializedLogicalPlan>>,
-        schema: SchemaRef,
+        schema: DFSchemaRef,
         alias: Option<String>,
     },
     Join {
@@ -102,41 +104,64 @@ pub enum SerializedLogicalPlan {
         right: Arc<SerializedLogicalPlan>,
         on: Vec<(String, String)>,
         join_type: JoinType,
-        schema: SchemaRef,
+        schema: DFSchemaRef,
     },
     TableScan {
-        schema_name: String,
+        table_name: String,
         source: SerializedTableSource,
-        table_schema: SchemaRef,
         projection: Option<Vec<usize>>,
-        projected_schema: SchemaRef,
+        projected_schema: DFSchemaRef,
+        filters: Vec<SerializedExpr>,
         alias: Option<String>,
     },
     EmptyRelation {
         produce_one_row: bool,
-        schema: SchemaRef,
+        schema: DFSchemaRef,
     },
     Limit {
         n: usize,
         input: Arc<SerializedLogicalPlan>,
     },
+    Repartition {
+        input: Arc<SerializedLogicalPlan>,
+        partitioning_scheme: SerializePartitioning,
+    },
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum SerializePartitioning {
+    RoundRobinBatch(usize),
+    Hash(Vec<SerializedExpr>, usize),
 }
 
 impl SerializedLogicalPlan {
-    fn logical_plan(&self) -> LogicalPlan {
-        match self {
+    fn logical_plan(
+        &self,
+        index_snapshots: &Vec<IndexSnapshot>,
+        remote_to_local_names: &HashMap<String, String>,
+        worker_partition_ids: &HashSet<u64>,
+    ) -> Result<LogicalPlan, CubeError> {
+        Ok(match self {
             SerializedLogicalPlan::Projection {
                 expr,
                 input,
                 schema,
             } => LogicalPlan::Projection {
                 expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan()),
+                input: Arc::new(input.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Filter { predicate, input } => LogicalPlan::Filter {
                 predicate: predicate.expr(),
-                input: Arc::new(input.logical_plan()),
+                input: Arc::new(input.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
             },
             SerializedLogicalPlan::Aggregate {
                 input,
@@ -146,37 +171,67 @@ impl SerializedLogicalPlan {
             } => LogicalPlan::Aggregate {
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggr_expr: aggr_expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan()),
+                input: Arc::new(input.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Sort { expr, input } => LogicalPlan::Sort {
                 expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan()),
+                input: Arc::new(input.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
             },
             SerializedLogicalPlan::Union {
                 inputs,
                 schema,
                 alias,
             } => LogicalPlan::Union {
-                inputs: inputs.iter().map(|p| Arc::new(p.logical_plan())).collect(),
+                inputs: inputs
+                    .iter()
+                    .map(|p| -> Result<Arc<LogicalPlan>, CubeError> {
+                        Ok(Arc::new(p.logical_plan(
+                            index_snapshots,
+                            remote_to_local_names,
+                            worker_partition_ids,
+                        )?))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
                 schema: schema.clone(),
                 alias: alias.clone(),
             },
             SerializedLogicalPlan::TableScan {
-                schema_name,
+                table_name,
                 source,
-                table_schema,
                 projection,
                 projected_schema,
+                filters,
                 alias,
             } => LogicalPlan::TableScan {
-                schema_name: schema_name.clone(),
+                table_name: table_name.clone(),
                 source: match source {
-                    SerializedTableSource::FromContext(v) => TableSource::FromContext(v.clone()),
+                    SerializedTableSource::CubeTable(v) => Arc::new(CubeTable::try_new(
+                        index_snapshots
+                            .iter()
+                            .find(|i| i.table_path.table_name() == v.table.table_name())
+                            .ok_or_else(|| {
+                                CubeError::internal(format!(
+                                    "Logical table {:?} not found in index snapshots: {:?}",
+                                    v, index_snapshots
+                                ))
+                            })?
+                            .clone(),
+                        remote_to_local_names.clone(),
+                        worker_partition_ids.clone(),
+                    )?),
                 },
-                table_schema: table_schema.clone(),
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
+                filters: filters.iter().map(|e| e.expr()).collect(),
                 alias: alias.clone(),
             },
             SerializedLogicalPlan::EmptyRelation {
@@ -188,7 +243,11 @@ impl SerializedLogicalPlan {
             },
             SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
                 n: *n,
-                input: Arc::new(input.logical_plan()),
+                input: Arc::new(input.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
             },
             SerializedLogicalPlan::Join {
                 left,
@@ -197,13 +256,37 @@ impl SerializedLogicalPlan {
                 join_type,
                 schema,
             } => LogicalPlan::Join {
-                left: Arc::new(left.logical_plan()),
-                right: Arc::new(right.logical_plan()),
+                left: Arc::new(left.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
+                right: Arc::new(right.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
                 on: on.clone(),
                 join_type: join_type.clone(),
                 schema: schema.clone(),
             },
-        }
+            SerializedLogicalPlan::Repartition {
+                input,
+                partitioning_scheme,
+            } => LogicalPlan::Repartition {
+                input: Arc::new(input.logical_plan(
+                    index_snapshots,
+                    remote_to_local_names,
+                    worker_partition_ids,
+                )?),
+                partitioning_scheme: match partitioning_scheme {
+                    SerializePartitioning::RoundRobinBatch(s) => Partitioning::RoundRobinBatch(*s),
+                    SerializePartitioning::Hash(e, s) => {
+                        Partitioning::Hash(e.iter().map(|e| e.expr()).collect(), *s)
+                    }
+                },
+            },
+        })
     }
 }
 
@@ -221,6 +304,13 @@ pub enum SerializedExpr {
     Not(Box<SerializedExpr>),
     IsNotNull(Box<SerializedExpr>),
     IsNull(Box<SerializedExpr>),
+    Negative(Box<SerializedExpr>),
+    Between {
+        expr: Box<SerializedExpr>,
+        negated: bool,
+        low: Box<SerializedExpr>,
+        high: Box<SerializedExpr>,
+    },
     Case {
         /// Optional base expression that can be compared to literal values in the "when" expressions
         expr: Option<Box<SerializedExpr>>,
@@ -304,13 +394,25 @@ impl SerializedExpr {
                     .collect(),
             },
             SerializedExpr::Wildcard => Expr::Wildcard,
+            SerializedExpr::Negative(value) => Expr::Negative(Box::new(value.expr())),
+            SerializedExpr::Between {
+                expr,
+                negated,
+                low,
+                high,
+            } => Expr::Between {
+                expr: Box::new(expr.expr()),
+                negated: *negated,
+                low: Box::new(low.expr()),
+                high: Box::new(high.expr()),
+            },
         }
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedTableSource {
-    FromContext(String),
+    CubeTable(CubeTableLogical),
 }
 
 impl SerializedPlan {
@@ -340,8 +442,15 @@ impl SerializedPlan {
         self.partition_ids_to_execute.clone()
     }
 
-    pub fn logical_plan(&self) -> LogicalPlan {
-        self.logical_plan.logical_plan()
+    pub fn logical_plan(
+        &self,
+        remote_to_local_names: &HashMap<String, String>,
+    ) -> Result<LogicalPlan, CubeError> {
+        self.logical_plan.logical_plan(
+            self.index_snapshots(),
+            remote_to_local_names,
+            &self.partition_ids_to_execute(),
+        )
     }
 
     pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
@@ -390,16 +499,12 @@ impl SerializedPlan {
     ) -> Result<Vec<IndexSnapshot>, CubeError> {
         match plan.as_ref() {
             LogicalPlan::EmptyRelation { .. } => Ok(index_snapshots),
-            LogicalPlan::InMemoryScan { .. } => Ok(index_snapshots),
-            LogicalPlan::CsvScan { .. } => Ok(index_snapshots),
-            LogicalPlan::ParquetScan { .. } => Ok(index_snapshots),
             LogicalPlan::TableScan {
-                source, projection, ..
+                table_name,
+                projection,
+                ..
             } => {
-                let name_split = match source {
-                    TableSource::FromContext(name) => name.split(".").collect::<Vec<_>>(),
-                    TableSource::FromProvider(_) => unimplemented!(),
-                };
+                let name_split = table_name.split(".").collect::<Vec<_>>();
                 let table = meta_store
                     .get_table(name_split[0].to_string(), name_split[1].to_string())
                     .await?;
@@ -589,20 +694,23 @@ impl SerializedPlan {
                 .await?;
                 Ok(snapshots)
             }
+            LogicalPlan::Repartition { input, .. } => {
+                Self::index_snapshots_from_plan_boxed(
+                    input.clone(),
+                    meta_store,
+                    index_snapshots,
+                    join_on,
+                )
+                .await
+            }
         }
     }
 
     pub fn is_data_select_query(plan: &LogicalPlan) -> bool {
         match plan {
             LogicalPlan::EmptyRelation { .. } => false,
-            LogicalPlan::InMemoryScan { .. } => false,
-            LogicalPlan::CsvScan { .. } => false,
-            LogicalPlan::ParquetScan { .. } => false,
-            LogicalPlan::TableScan { source, .. } => {
-                let name_split = match source {
-                    TableSource::FromContext(name) => name.split(".").collect::<Vec<_>>(),
-                    TableSource::FromProvider(_) => unimplemented!(),
-                };
+            LogicalPlan::TableScan { table_name, .. } => {
+                let name_split = table_name.split(".").collect::<Vec<_>>();
                 name_split[0].to_string() != "information_schema"
             }
             LogicalPlan::Projection { input, .. } => Self::is_data_select_query(input),
@@ -623,6 +731,7 @@ impl SerializedPlan {
             LogicalPlan::Join { left, right, .. } => {
                 Self::is_data_select_query(left) || Self::is_data_select_query(right)
             }
+            LogicalPlan::Repartition { input, .. } => Self::is_data_select_query(input),
         }
     }
 
@@ -635,28 +744,25 @@ impl SerializedPlan {
                 produce_one_row: *produce_one_row,
                 schema: schema.clone(),
             },
-            LogicalPlan::InMemoryScan { .. } => unimplemented!(),
-            LogicalPlan::CsvScan { .. } => unimplemented!(),
-            LogicalPlan::ParquetScan { .. } => unimplemented!(),
             LogicalPlan::TableScan {
-                schema_name,
+                table_name,
                 source,
                 alias,
                 projected_schema,
-                table_schema,
                 projection,
+                filters,
             } => SerializedLogicalPlan::TableScan {
-                schema_name: schema_name.clone(),
-                source: match source {
-                    TableSource::FromContext(name) => {
-                        SerializedTableSource::FromContext(name.to_string())
-                    }
-                    TableSource::FromProvider(_) => unimplemented!(),
+                table_name: table_name.clone(),
+                source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTableLogical>()
+                {
+                    SerializedTableSource::CubeTable(cube_table.clone())
+                } else {
+                    panic!("Unexpected table source");
                 },
                 alias: alias.clone(),
                 projected_schema: projected_schema.clone(),
-                table_schema: table_schema.clone(),
                 projection: projection.clone(),
+                filters: filters.iter().map(|e| Self::serialized_expr(e)).collect(),
             },
             LogicalPlan::Projection {
                 input,
@@ -720,6 +826,19 @@ impl SerializedPlan {
                 on: on.clone(),
                 join_type: join_type.clone(),
                 schema: schema.clone(),
+            },
+            LogicalPlan::Repartition {
+                input,
+                partitioning_scheme,
+            } => SerializedLogicalPlan::Repartition {
+                input: Arc::new(Self::serialized_logical_plan(&input)),
+                partitioning_scheme: match partitioning_scheme {
+                    Partitioning::RoundRobinBatch(s) => SerializePartitioning::RoundRobinBatch(*s),
+                    Partitioning::Hash(e, s) => SerializePartitioning::Hash(
+                        e.iter().map(|e| Self::serialized_expr(e)).collect(),
+                        *s,
+                    ),
+                },
             },
         }
     }
@@ -788,6 +907,20 @@ impl SerializedPlan {
                     .collect(),
             },
             Expr::Wildcard => SerializedExpr::Wildcard,
+            Expr::Negative(value) => {
+                SerializedExpr::Negative(Box::new(Self::serialized_expr(&value)))
+            }
+            Expr::Between {
+                expr,
+                negated,
+                low,
+                high,
+            } => SerializedExpr::Between {
+                expr: Box::new(Self::serialized_expr(&expr)),
+                negated: *negated,
+                low: Box::new(Self::serialized_expr(&low)),
+                high: Box::new(Self::serialized_expr(&high)),
+            },
         }
     }
 }

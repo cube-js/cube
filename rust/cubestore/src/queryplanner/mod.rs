@@ -12,16 +12,19 @@ use arrow::datatypes::Field;
 use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
+use datafusion::datasource::datasource::Statistics;
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::LogicalPlan;
+use datafusion::logical_plan::{Expr, LogicalPlan};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::sql::parser::Statement;
-use datafusion::sql::planner::{SchemaProvider, SqlToRel};
+use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{datasource::MemTable, datasource::TableProvider, prelude::ExecutionContext};
 use log::{debug, trace};
 use mockall::automock;
+use serde_derive::{Deserialize, Serialize};
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -79,7 +82,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 .await??;
 
         let execution_time = SystemTime::now();
-        let results = ctx.collect(physical_plan).await?;
+        let results = collect(physical_plan).await?;
         debug!(
             "Meta query data processing time: {:?}",
             execution_time.elapsed()?
@@ -133,20 +136,34 @@ impl MetaStoreSchemaProvider {
     }
 }
 
-impl SchemaProvider for MetaStoreSchemaProvider {
-    fn get_table_meta(&self, name: &str) -> Option<SchemaRef> {
-        let res = self.tables.get(name).map(|table| {
-            Arc::new(Schema::new(
-                table
-                    .table
-                    .get_row()
-                    .get_columns()
-                    .iter()
-                    .map(|c| c.clone().into())
-                    .collect::<Vec<_>>(),
-            ))
-        });
-        res.or_else(|| self.information_schema_context.state.get_table_meta(name))
+impl ContextProvider for MetaStoreSchemaProvider {
+    fn get_table_provider(&self, name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
+        let res = self
+            .tables
+            .get(name)
+            .map(|table| -> Arc<dyn TableProvider + Send + Sync> {
+                let schema = Arc::new(Schema::new(
+                    table
+                        .table
+                        .get_row()
+                        .get_columns()
+                        .iter()
+                        .map(|c| c.clone().into())
+                        .collect::<Vec<_>>(),
+                ));
+                Arc::new(CubeTableLogical {
+                    table: table.clone(),
+                    schema,
+                })
+            });
+        // TODO .unwrap
+        res.or_else(|| {
+            self.information_schema_context
+                .state
+                .lock()
+                .unwrap()
+                .get_table_provider(name)
+        })
     }
 
     fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
@@ -226,11 +243,15 @@ impl InfoSchemaTableProvider {
 
     async fn mem_table(&self) -> Result<MemTable, DataFusionError> {
         let batch = self.table.scan(self.meta_store.clone()).await?;
-        MemTable::new(batch.schema(), vec![vec![batch]])
+        MemTable::try_new(batch.schema(), vec![vec![batch]])
     }
 }
 
 impl TableProvider for InfoSchemaTableProvider {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn schema(&self) -> SchemaRef {
         self.table.schema()
     }
@@ -239,9 +260,52 @@ impl TableProvider for InfoSchemaTableProvider {
         &self,
         projection: &Option<Vec<usize>>,
         batch_size: usize,
+        filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let handle = Handle::current();
         let mem_table = handle.block_on(async move { self.mem_table().await })?;
-        mem_table.scan(projection, batch_size)
+        mem_table.scan(projection, batch_size, filters)
+    }
+
+    fn statistics(&self) -> Statistics {
+        Statistics {
+            num_rows: None,
+            total_byte_size: None,
+            column_statistics: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CubeTableLogical {
+    table: TablePath,
+    schema: SchemaRef,
+}
+
+impl TableProvider for CubeTableLogical {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+
+    fn scan(
+        &self,
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[Expr],
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        panic!("scan has been called on CubeTableLogical: serialized plan wasn't preprocessed for select");
+    }
+
+    fn statistics(&self) -> Statistics {
+        // TODO
+        Statistics {
+            num_rows: None,
+            total_byte_size: None,
+            column_statistics: None,
+        }
     }
 }

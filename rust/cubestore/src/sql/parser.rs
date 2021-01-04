@@ -1,7 +1,7 @@
 use sqlparser::ast::{ObjectName, Statement as SQLStatement};
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
-use sqlparser::parser::{IsOptional, Parser, ParserError};
+use sqlparser::parser::{Parser, ParserError};
 use sqlparser::tokenizer::{Token, Tokenizer};
 
 #[derive(Debug)]
@@ -38,17 +38,17 @@ pub enum Statement {
     },
 }
 
-pub struct CubeStoreParser {
-    parser: Parser,
+pub struct CubeStoreParser<'a> {
+    parser: Parser<'a>,
 }
 
-impl CubeStoreParser {
+impl<'a> CubeStoreParser<'a> {
     pub fn new(sql: &str) -> Result<Self, ParserError> {
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, sql);
         let tokens = tokenizer.tokenize()?;
         Ok(CubeStoreParser {
-            parser: Parser::new(tokens),
+            parser: Parser::new(tokens, dialect),
         })
     }
 
@@ -76,7 +76,7 @@ impl CubeStoreParser {
     }
 
     pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
-        let statement = self.parser.parse_create_table()?;
+        let statement = self.parser.parse_create_table(false)?;
         if let SQLStatement::CreateTable {
             name,
             columns,
@@ -86,6 +86,7 @@ impl CubeStoreParser {
             file_format,
             query,
             without_rowid,
+            or_replace,
             ..
         } = statement
         {
@@ -103,6 +104,7 @@ impl CubeStoreParser {
 
             Ok(Statement::CreateTable {
                 create_table: SQLStatement::CreateTable {
+                    or_replace,
                     name,
                     columns,
                     constraints,
@@ -126,9 +128,11 @@ impl CubeStoreParser {
         table_name: ObjectName,
     ) -> Result<SQLStatement, ParserError> {
         let index_name = self.parser.parse_object_name()?;
+        self.parser.expect_token(&Token::LParen)?;
         let columns = self
             .parser
-            .parse_parenthesized_column_list(IsOptional::Mandatory)?;
+            .parse_comma_separated(Parser::parse_order_by_expr)?;
+        self.parser.expect_token(&Token::RParen)?;
         Ok(SQLStatement::CreateIndex {
             name: index_name,
             table_name,

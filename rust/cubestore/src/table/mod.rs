@@ -1,11 +1,7 @@
-use crate::metastore::Column;
 use crate::CubeError;
-use ::parquet::file::metadata::RowGroupMetaData;
 use chrono::{SecondsFormat, TimeZone, Utc};
-use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::sync::Arc;
 
 pub(crate) mod parquet;
 
@@ -131,10 +127,10 @@ pub trait TableStore {
         limit: usize,
     ) -> Result<Vec<Row>, CubeError>;
 
-    fn scan_node(
-        &self,
-        file: &str,
-        columns: &Vec<Column>,
-        row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
-    ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError>;
+    // fn scan_node(
+    //     &self,
+    //     file: &str,
+    //     columns: &Vec<Column>,
+    //     row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
+    // ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError>;
 }

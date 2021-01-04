@@ -18,10 +18,12 @@ use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use core::fmt;
+use datafusion::datasource::datasource::Statistics;
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
-use datafusion::execution::context::ExecutionContext;
+use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
+use datafusion::logical_plan::{DFSchemaRef, Expr, ToDFSchema};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
@@ -30,7 +32,7 @@ use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::sort::SortExec;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream};
+use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, RecordBatchStream};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
@@ -71,12 +73,12 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<DataFrame, CubeError> {
-        let plan_to_move = plan.logical_plan();
-        let ctx = self.execution_context(plan.index_snapshots(), HashMap::new(), HashSet::new())?;
+        let plan_to_move = plan.logical_plan(&HashMap::new())?;
+        let ctx = self.execution_context()?;
         let plan_ctx = ctx.clone();
 
         let serialized_plan = Arc::new(plan);
-        let physical_plan = plan_ctx.create_physical_plan(&plan_to_move)?;
+        let physical_plan = plan_ctx.create_physical_plan(&plan_to_move.clone())?;
         let available_nodes = cluster.available_nodes().await?;
         let split_plan = self.get_router_split_plan(
             physical_plan,
@@ -88,7 +90,7 @@ impl QueryExecutor for QueryExecutorImpl {
         trace!("Router Query Physical Plan: {:#?}", &split_plan);
 
         let execution_time = SystemTime::now();
-        let results = ctx.collect(split_plan.clone()).await;
+        let results = collect(split_plan.clone()).await;
         debug!(
             "Query data processing time: {:?}",
             execution_time.elapsed()?
@@ -97,7 +99,7 @@ impl QueryExecutor for QueryExecutorImpl {
             warn!(
                 "Slow Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                serialized_plan.logical_plan()
+                plan_to_move
             );
             debug!(
                 "Slow Query Physical Plan ({:?}): {:#?}",
@@ -109,7 +111,7 @@ impl QueryExecutor for QueryExecutorImpl {
             error!(
                 "Error Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                serialized_plan.logical_plan()
+                plan_to_move
             );
             error!(
                 "Error Query Physical Plan ({:?}): {:#?}",
@@ -126,22 +128,18 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
     ) -> Result<Vec<RecordBatch>, CubeError> {
-        let plan_to_move = plan.logical_plan();
-        let ctx = self.execution_context(
-            plan.index_snapshots(),
-            remote_to_local_names,
-            plan.partition_ids_to_execute(),
-        )?;
+        let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
+        let ctx = self.execution_context()?;
         let plan_ctx = ctx.clone();
 
-        let physical_plan = plan_ctx.create_physical_plan(&plan_to_move)?;
+        let physical_plan = plan_ctx.create_physical_plan(&plan_to_move.clone())?;
 
         let worker_plan = self.get_worker_split_plan(physical_plan);
 
         trace!("Partition Query Physical Plan: {:#?}", &worker_plan);
 
         let execution_time = SystemTime::now();
-        let results = ctx.collect(worker_plan.clone()).await;
+        let results = collect(worker_plan.clone()).await;
         debug!(
             "Partition Query data processing time: {:?}",
             execution_time.elapsed()?
@@ -150,7 +148,7 @@ impl QueryExecutor for QueryExecutorImpl {
             warn!(
                 "Slow Partition Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                plan.logical_plan()
+                plan_to_move
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {:#?}",
@@ -162,7 +160,7 @@ impl QueryExecutor for QueryExecutorImpl {
             error!(
                 "Error Partition Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                plan.logical_plan()
+                plan_to_move
             );
             error!(
                 "Error Partition Query Physical Plan ({:?}): {:#?}",
@@ -175,23 +173,12 @@ impl QueryExecutor for QueryExecutorImpl {
 }
 
 impl QueryExecutorImpl {
-    fn execution_context(
-        &self,
-        index_snapshots: &Vec<IndexSnapshot>,
-        remote_to_local_names: HashMap<String, String>,
-        worker_partition_id: HashSet<u64>,
-    ) -> Result<Arc<ExecutionContext>, CubeError> {
-        let mut ctx = ExecutionContext::new();
-
-        for row in index_snapshots.iter() {
-            let provider = CubeTable::try_new(
-                row.clone(),
-                remote_to_local_names.clone(),
-                worker_partition_id.clone(),
-            )?; // TODO Clone
-            ctx.register_table(&row.table_name(), Box::new(provider));
-        }
-
+    fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
+        let ctx = ExecutionContext::with_config(
+            ExecutionConfig::new()
+                .with_batch_size(4096)
+                .with_concurrency(1),
+        );
         Ok(Arc::new(ctx))
     }
 
@@ -329,8 +316,13 @@ impl QueryExecutorImpl {
             ));
             Ok(execution_plan.with_new_children(vec![Arc::new(MergeExec::new(cluster_exec))])?)
         } else {
-            Ok(execution_plan
-                .with_new_children(vec![Arc::new(EmptyExec::new(false, children[0].schema()))])?)
+            // TODO .to_schema_ref()
+            Ok(
+                execution_plan.with_new_children(vec![Arc::new(EmptyExec::new(
+                    false,
+                    children[0].schema().to_schema_ref(),
+                ))])?,
+            )
         }
     }
 
@@ -362,6 +354,7 @@ impl QueryExecutorImpl {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct CubeTable {
     index_snapshot: IndexSnapshot,
     remote_to_local_names: HashMap<String, String>,
@@ -424,10 +417,11 @@ impl CubeTable {
                     .remote_to_local_names
                     .get(remote_path.as_str())
                     .expect(format!("Missing remote path {}", remote_path).as_str());
-                let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_new(
+                let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path(
                     &local_path,
                     mapped_projection.clone(),
                     batch_size,
+                    1,
                 )?);
                 partition_execs.push(arc);
             }
@@ -439,10 +433,11 @@ impl CubeTable {
                     .remote_to_local_names
                     .get(&remote_path)
                     .expect(format!("Missing remote path {}", remote_path).as_str());
-                let node = Arc::new(ParquetExec::try_new(
+                let node = Arc::new(ParquetExec::try_from_path(
                     local_path,
                     mapped_projection.clone(),
                     batch_size,
+                    1,
                 )?);
                 partition_execs.push(node);
             }
@@ -469,7 +464,7 @@ impl CubeTable {
         {
             Arc::new(MergeSortExec::try_new(
                 Arc::new(CubeTableExec {
-                    schema: projected_schema,
+                    schema: projected_schema.to_dfschema_ref()?,
                     partition_execs,
                     index_snapshot: self.index_snapshot.clone(),
                 }),
@@ -477,7 +472,7 @@ impl CubeTable {
             )?)
         } else {
             Arc::new(MergeExec::new(Arc::new(CubeTableExec {
-                schema: projected_schema,
+                schema: projected_schema.to_dfschema_ref()?,
                 partition_execs,
                 index_snapshot: self.index_snapshot.clone(),
             })))
@@ -515,7 +510,7 @@ impl CubeTable {
 
 #[derive(Debug)]
 pub struct CubeTableExec {
-    schema: SchemaRef,
+    schema: DFSchemaRef,
     index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
 }
@@ -526,7 +521,7 @@ impl ExecutionPlan for CubeTableExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
+    fn schema(&self) -> DFSchemaRef {
         self.schema.clone()
     }
 
@@ -558,7 +553,7 @@ impl ExecutionPlan for CubeTableExec {
 }
 
 pub struct ClusterSendExec {
-    schema: SchemaRef,
+    schema: DFSchemaRef,
     partitions: Vec<Vec<IdRow<Partition>>>,
     cluster: Arc<dyn Cluster>,
     available_nodes: Vec<String>,
@@ -567,7 +562,7 @@ pub struct ClusterSendExec {
 
 impl ClusterSendExec {
     pub fn new(
-        schema: SchemaRef,
+        schema: DFSchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
         available_nodes: Vec<String>,
@@ -600,7 +595,7 @@ impl ExecutionPlan for ClusterSendExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
+    fn schema(&self) -> DFSchemaRef {
         self.schema.clone()
     }
 
@@ -644,7 +639,9 @@ impl ExecutionPlan for ClusterSendExec {
                 ),
             )
             .await?;
-        let memory_exec = MemoryExec::try_new(&vec![record_batches], self.schema.clone(), None)?;
+        // TODO .to_schema_ref()
+        let memory_exec =
+            MemoryExec::try_new(&vec![record_batches], self.schema.to_schema_ref(), None)?;
         memory_exec.execute(0).await
     }
 }
@@ -659,6 +656,10 @@ impl fmt::Debug for ClusterSendExec {
 }
 
 impl TableProvider for CubeTable {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -667,9 +668,19 @@ impl TableProvider for CubeTable {
         &self,
         projection: &Option<Vec<usize>>,
         batch_size: usize,
+        _filters: &[Expr],
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         let res = self.async_scan(projection, batch_size)?;
         Ok(res)
+    }
+
+    fn statistics(&self) -> Statistics {
+        // TODO
+        Statistics {
+            num_rows: None,
+            total_byte_size: None,
+            column_statistics: None,
+        }
     }
 }
 

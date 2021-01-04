@@ -256,9 +256,11 @@ impl SqlService for SqlServiceImpl {
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(q) {
             return Ok(data_frame);
         }
-        let replaced_quote = q.replace("\\'", "''");
-        let mut parser = CubeStoreParser::new(&replaced_quote)?;
-        let ast = parser.parse_statement()?;
+        let ast = {
+            let replaced_quote = q.replace("\\'", "''");
+            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            parser.parse_statement()?
+        };
         // trace!("AST is: {:?}", ast);
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
@@ -340,7 +342,19 @@ impl SqlService for SqlServiceImpl {
                         schema_name.to_string(),
                         table_name.to_string(),
                         name.to_string(),
-                        &columns,
+                        &columns
+                            .iter()
+                            .map(|c| -> Result<_, _> {
+                                if let Expr::Identifier(ident) = &c.expr {
+                                    Ok(ident.clone())
+                                } else {
+                                    Err(CubeError::user(format!(
+                                        "Unsupported column expression in index: {:?}",
+                                        c.expr
+                                    )))
+                                }
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
                     )
                     .await?;
                 Ok(DataFrame::from(vec![res]))
@@ -1242,7 +1256,11 @@ mod tests {
                 "INSERT INTO foo.orders2 (customer_id, amount) VALUES ('b', 20), ('c', 20), ('b', 30)"
             ).await.unwrap();
 
-            let result = service.exec_query("SELECT u.customer_id, sum(u.amount) from (select * from foo.orders1 union all select * from foo.orders2) u GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+            let result = service.exec_query(
+                "SELECT `u`.customer_id, sum(`u`.amount) FROM \
+                (select * from foo.orders1 union all select * from foo.orders2) `u` \
+                WHERE `u`.customer_id like '%' GROUP BY 1 ORDER BY 2 DESC"
+            ).await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("b".to_string()), TableValue::Int(55)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("c".to_string()), TableValue::Int(20)]));
@@ -1271,6 +1289,124 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
         }).await;
+    }
+
+    #[tokio::test]
+    async fn column_escaping() {
+        Config::run_test("column_escaping", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+                .await
+                .unwrap();
+
+            service
+                .exec_query(
+                    "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)",
+                )
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query(
+                    "SELECT date_trunc('day', `timestamp`.t) `day`, sum(`timestamp`.amount) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn case_column_escaping() {
+        Config::run_test("case_column_escaping", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query(
+                "CREATE TABLE foo.timestamps (t timestamp, amount int)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT date_trunc('day', `timestamp`.t) `day`, sum(CASE WHEN `timestamp`.t > to_timestamp('2020-01-02T00:01:00.000Z') THEN `timestamp`.amount END) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1"
+            ).await.unwrap();
+
+            assert_eq!(
+                result.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])
+            );
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn inner_column_escaping() {
+        Config::run_test("inner_column_escaping", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+                .await
+                .unwrap();
+
+            service
+                .exec_query(
+                    "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)",
+                )
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query(
+                    "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `t` >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
