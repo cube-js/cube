@@ -166,12 +166,12 @@ impl ContextProvider for MetaStoreSchemaProvider {
         })
     }
 
-    fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
-        None
+    fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
+        self.information_schema_context.state.lock().unwrap().get_function_meta(name)
     }
 
-    fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
-        None
+    fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
+        self.information_schema_context.state.lock().unwrap().get_aggregate_meta(name)
     }
 }
 
