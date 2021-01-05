@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.12](https://github.com/cube-js/cube.js/compare/v0.25.11...v0.25.12) (2021-01-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** updated peer dependency version ([442a979](https://github.com/cube-js/cube.js/commit/442a979e9d5509ffcb71e48d42a4e4944eae98e1))
+
+
+
+
+
 ## [0.25.2](https://github.com/cube-js/cube.js/compare/v0.25.1...v0.25.2) (2020-12-27)
 
 

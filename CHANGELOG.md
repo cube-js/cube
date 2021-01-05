@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.12](https://github.com/cube-js/cube.js/compare/v0.25.11...v0.25.12) (2021-01-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** updated peer dependency version ([442a979](https://github.com/cube-js/cube.js/commit/442a979e9d5509ffcb71e48d42a4e4944eae98e1))
+* **cubestore:** Join aliasing fails after rebase ([67ffd4d](https://github.com/cube-js/cube.js/commit/67ffd4df087d6a27855ab3cbe334125f3ff43293))
+
+
+### Features
+
+* **cubestore:** Distribute unions across workers the same way as partitions ([52f8a77](https://github.com/cube-js/cube.js/commit/52f8a771cc97d23e86e9e00a6fe7e5d5f291bda9))
+
+
+
+
+
 ## [0.25.11](https://github.com/cube-js/cube.js/compare/v0.25.10...v0.25.11) (2021-01-04)
 
 
