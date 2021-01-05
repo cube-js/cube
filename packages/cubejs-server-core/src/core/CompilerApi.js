@@ -75,7 +75,7 @@ export class CompilerApi {
       );
 
       if (!sqlGenerator) {
-        throw new Error(`Unknown dbType for '${dataSource}' data source: ${dbType}`);
+        throw new Error(`Can't find dialect for '${dataSource}' data source: ${this.getDbType(dataSource)}`);
       }
     }
 
