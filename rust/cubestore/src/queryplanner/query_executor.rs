@@ -591,14 +591,21 @@ impl ClusterSendExec {
     ) -> Self {
         let to_multiply = union_snapshots
             .into_iter()
-            .map(|union| union.iter().flat_map(|index| {
-                index
-                    .partitions()
+            .map(|union| {
+                union
                     .iter()
-                    .map(|p| p.partition().clone())
+                    .flat_map(|index| {
+                        index
+                            .partitions()
+                            .iter()
+                            .map(|p| p.partition().clone())
+                            .collect::<Vec<_>>()
+                    })
                     .collect::<Vec<_>>()
-            }).collect::<Vec<_>>()).collect::<Vec<_>>();
-        let partitions = to_multiply.into_iter()
+            })
+            .collect::<Vec<_>>();
+        let partitions = to_multiply
+            .into_iter()
             .multi_cartesian_product()
             .collect::<Vec<Vec<_>>>();
         Self {

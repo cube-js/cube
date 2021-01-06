@@ -85,25 +85,32 @@ impl SchedulerImpl {
                     .meta_store
                     .get_partition(chunk.get_row().get_partition_id())
                     .await?;
-                if partition.get_row().is_active() {
-                    // TODO config
-                    let chunk_sizes = self
-                        .meta_store
-                        .get_partition_chunk_sizes(chunk.get_row().get_partition_id())
-                        .await?;
-                    let chunks = self
-                        .meta_store
-                        .get_chunks_by_partition(chunk.get_row().get_partition_id())
-                        .await?;
-                    if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
-                        || chunks.len() > self.config.compaction_chunks_count_threshold() as usize
-                    {
-                        self.schedule_partition_to_compact(chunk.get_row().get_partition_id())
+                if chunk.get_row().active() {
+                    if partition.get_row().is_active() {
+                        // TODO config
+                        let chunk_sizes = self
+                            .meta_store
+                            .get_partition_chunk_sizes(chunk.get_row().get_partition_id())
+                            .await?;
+                        let chunks = self
+                            .meta_store
+                            .get_chunks_by_partition(chunk.get_row().get_partition_id(), false)
+                            .await?;
+                        if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
+                            || chunks.len()
+                                > self.config.compaction_chunks_count_threshold() as usize
+                        {
+                            self.schedule_partition_to_compact(chunk.get_row().get_partition_id())
+                                .await?;
+                        }
+                    } else {
+                        self.schedule_repartition(chunk.get_row().get_partition_id())
                             .await?;
                     }
                 } else {
-                    self.schedule_repartition(chunk.get_row().get_partition_id())
-                        .await?;
+                    if !self.meta_store.is_chunk_used(chunk.get_id()).await? {
+                        self.meta_store.delete_chunk(chunk.get_id()).await?;
+                    }
                 }
             }
         }
@@ -123,10 +130,25 @@ impl SchedulerImpl {
                 .delete_file(ChunkStore::chunk_remote_path(row_id).as_str())
                 .await?
         }
+        if let MetaStoreEvent::DeletePartition(partition) = &event {
+            if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
+                self.remote_fs.delete_file(file_name.as_str()).await?;
+            }
+        }
         if let MetaStoreEvent::Update(TableId::Partitions, row_id) = event {
             let partition = self.meta_store.get_partition(row_id).await?;
             if !partition.get_row().is_active() {
                 self.schedule_repartition(row_id).await?;
+                if partition.get_row().main_table_row_count() > 0
+                    && !self
+                        .meta_store
+                        .is_partition_used(partition.get_id())
+                        .await?
+                {
+                    if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
+                        self.remote_fs.delete_file(file_name.as_str()).await?;
+                    }
+                }
             }
         }
         if let MetaStoreEvent::DeleteJob(job) = event {

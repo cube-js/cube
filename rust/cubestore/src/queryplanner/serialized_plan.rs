@@ -584,7 +584,7 @@ impl SerializedPlan {
                 };
 
                 let partitions = meta_store
-                    .get_active_partitions_and_chunks_by_index_id(index.get_id())
+                    .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
                     .await?;
 
                 let mut partition_snapshots = Vec::new();

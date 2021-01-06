@@ -646,11 +646,13 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
+    use std::time::Duration;
     use std::{env, fs};
     use uuid::Uuid;
 
     #[actix_rt::test]
     async fn create_schema_test() {
+        let config = Config::test("create_schema_test");
         let path = "/tmp/test_create_schema";
         let _ = DB::destroy(&Options::default(), path);
         let store_path = path.to_string() + &"_store".to_string();
@@ -663,7 +665,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
                 PathBuf::from(remote_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone());
+            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -688,6 +690,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn create_table_test() {
+        let config = Config::test("create_table_test");
         let path = "/tmp/test_create_table";
         let _ = DB::destroy(&Options::default(), path);
         let store_path = path.to_string() + &"_store".to_string();
@@ -699,7 +702,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
                 PathBuf::from(remote_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone());
+            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -1137,6 +1140,78 @@ mod tests {
                 );
             })
             .await;
+    }
+
+    #[tokio::test]
+    async fn inactive_partitions_cleanup() {
+        Config::test("inactive_partitions_cleanup")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap();
+
+                for i in 0..10_u64 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+                }
+
+                let listener = services.cluster.job_result_listener();
+                let active_partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                let mut last_active_partition = active_partitions.iter().next().unwrap();
+                listener
+                    .wait_for_job_results(vec![(
+                        RowKey::Table(TableId::Partitions, last_active_partition.get_id()),
+                        JobType::Repartition,
+                    )])
+                    .await
+                    .unwrap();
+
+                // TODO API to wait for all jobs to be completed and all events processed
+                tokio::time::delay_for(Duration::from_millis(500)).await;
+
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(10)]));
+
+                let active_partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                last_active_partition = active_partitions.iter().next().unwrap();
+
+                let files = services
+                    .remote_fs
+                    .list("")
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .filter(|r| r.ends_with(".parquet"))
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    files,
+                    vec![format!("{}.parquet", last_active_partition.get_id())]
+                )
+            })
+            .await
     }
 
     #[tokio::test]

@@ -28,6 +28,7 @@ pub struct CubeServices {
     pub scheduler: Arc<SchedulerImpl>,
     pub meta_store: Arc<RocksMetaStore>,
     pub cluster: Arc<ClusterImpl>,
+    pub remote_fs: Arc<dyn RemoteFs>,
 }
 
 #[derive(Clone)]
@@ -79,6 +80,10 @@ pub trait ConfigObj: Send + Sync {
     fn bind_port(&self) -> u16;
 
     fn bind_address(&self) -> &str;
+
+    fn query_timeout(&self) -> u64;
+
+    fn not_used_timeout(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +96,7 @@ pub struct ConfigObjImpl {
     pub select_worker_pool_size: usize,
     pub bind_port: u16,
     pub bind_address: String,
+    pub query_timeout: u64,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -116,6 +122,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn bind_address(&self) -> &str {
         &self.bind_address
+    }
+
+    fn query_timeout(&self) -> u64 {
+        self.query_timeout
+    }
+
+    fn not_used_timeout(&self) -> u64 {
+        self.query_timeout * 2
     }
 }
 
@@ -164,6 +178,10 @@ impl Config {
                     .ok()
                     .map(|v| v.parse::<u16>().unwrap())
                     .unwrap_or(3306u16),
+                query_timeout: env::var("CUBESTORE_QUERY_TIMEOUT")
+                    .ok()
+                    .map(|v| v.parse::<u64>().unwrap())
+                    .unwrap_or(120),
             }),
         }
     }
@@ -185,6 +203,7 @@ impl Config {
                 select_worker_pool_size: 0,
                 bind_port: 3306,
                 bind_address: "0.0.0.0".to_string(),
+                query_timeout: 60,
             }),
         }
     }
@@ -284,6 +303,7 @@ impl Config {
         let meta_store = RocksMetaStore::load_from_remote(
             self.meta_store_path().to_str().unwrap(),
             remote_fs.clone(),
+            self.config_obj.clone(),
         )
         .await
         .unwrap();
@@ -337,6 +357,7 @@ impl Config {
             scheduler: Arc::new(scheduler),
             meta_store,
             cluster,
+            remote_fs,
         }
     }
 

@@ -43,7 +43,7 @@ impl CompactionService for CompactionServiceImpl {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
         let chunks = self
             .meta_store
-            .get_chunks_by_partition(partition_id)
+            .get_chunks_by_partition(partition_id, false)
             .await?;
         let (partition, index) = self
             .meta_store

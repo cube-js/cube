@@ -638,6 +638,7 @@ mod tests {
         let meta_store = RocksMetaStore::new(
             &remote_fs.local_file("meta").await.unwrap(),
             remote_fs.clone(),
+            config.config_obj(),
         );
 
         let foo = ClusterImpl::new(

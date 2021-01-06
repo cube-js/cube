@@ -343,7 +343,7 @@ impl ChunkDataStore for ChunkStore {
         }
         let chunks = self
             .meta_store
-            .get_chunks_by_partition(partition_id)
+            .get_chunks_by_partition(partition_id, false)
             .await?;
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
@@ -429,6 +429,7 @@ impl ChunkDataStore for ChunkStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
     use crate::metastore::RocksMetaStore;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::{metastore::ColumnType, table::TableValue};
@@ -438,6 +439,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn create_wal_test() {
+        let config = Config::test("create_chunk_test");
         let path = "/tmp/test_create_wal";
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
@@ -451,7 +453,7 @@ mod tests {
                 PathBuf::from(remote_store_path.clone()),
             );
             let store = WALStore::new(
-                RocksMetaStore::new(path, remote_fs.clone()),
+                RocksMetaStore::new(path, remote_fs.clone(), config.config_obj()),
                 remote_fs.clone(),
                 10,
             );
@@ -513,6 +515,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn create_chunk_test() {
+        let config = Config::test("create_chunk_test");
         let path = "/tmp/test_create_chunk";
         let wal_store_path = path.to_string() + &"_store_wal".to_string();
         let wal_remote_store_path = path.to_string() + &"_remote_store_wal".to_string();
@@ -529,7 +532,7 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
                 PathBuf::from(chunk_remote_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone());
+            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let chunk_store =
                 ChunkStore::new(meta_store.clone(), remote_fs.clone(), wal_store.clone(), 10);
