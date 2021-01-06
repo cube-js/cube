@@ -903,6 +903,13 @@ mod tests {
                 .unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Decimal("0.45".to_string())]));
+
+            let result = service
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < '10'")
+                .await
+                .unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Decimal("0.45".to_string())]));
         })
             .await;
     }
@@ -1148,10 +1155,7 @@ mod tests {
                     .exec_query("SELECT sum(num) from foo.numbers")
                     .await
                     .unwrap();
-                assert_eq!(
-                    result.get_rows()[0],
-                    Row::new(vec![TableValue::Int(44850)])
-                );
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
             })
             .await;
     }
