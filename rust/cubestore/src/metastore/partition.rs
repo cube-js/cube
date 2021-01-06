@@ -6,8 +6,10 @@ use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
+use chrono::Utc;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
+use std::ops::Sub;
 
 impl Partition {
     pub fn new(index_id: u64, min_value: Option<Row>, max_value: Option<Row>) -> Partition {
@@ -18,6 +20,7 @@ impl Partition {
             parent_partition_id: None,
             active: true,
             main_table_row_count: 0,
+            last_used: None,
         }
     }
 
@@ -29,6 +32,7 @@ impl Partition {
             parent_partition_id: Some(id),
             active: false,
             main_table_row_count: 0,
+            last_used: None,
         }
     }
 
@@ -53,6 +57,7 @@ impl Partition {
             parent_partition_id: self.parent_partition_id,
             active,
             main_table_row_count: self.main_table_row_count,
+            last_used: self.last_used.clone(),
         }
     }
 
@@ -69,7 +74,14 @@ impl Partition {
             parent_partition_id: self.parent_partition_id,
             active: self.active,
             main_table_row_count,
+            last_used: self.last_used.clone(),
         }
+    }
+
+    pub fn update_last_used(&self) -> Self {
+        let mut new = self.clone();
+        new.last_used = Some(Utc::now());
+        new
     }
 
     pub fn get_index_id(&self) -> u64 {
@@ -86,6 +98,12 @@ impl Partition {
 
     pub fn main_table_row_count(&self) -> u64 {
         self.main_table_row_count
+    }
+
+    pub fn is_used(&self, timeout: u64) -> bool {
+        self.last_used
+            .map(|time| Utc::now().sub(time.clone()).num_seconds() < timeout as i64)
+            .unwrap_or(false)
     }
 }
 
