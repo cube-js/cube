@@ -1167,20 +1167,20 @@ mod tests {
                         .unwrap();
                 }
 
-                let listener = services.cluster.job_result_listener();
-                let active_partitions = services
-                    .meta_store
-                    .get_active_partitions_by_index_id(1)
-                    .await
-                    .unwrap();
-                let mut last_active_partition = active_partitions.iter().next().unwrap();
-                listener
-                    .wait_for_job_results(vec![(
-                        RowKey::Table(TableId::Partitions, last_active_partition.get_id()),
-                        JobType::Repartition,
-                    )])
-                    .await
-                    .unwrap();
+                // let listener = services.cluster.job_result_listener();
+                // let active_partitions = services
+                //     .meta_store
+                //     .get_active_partitions_by_index_id(1)
+                //     .await
+                //     .unwrap();
+                // let mut last_active_partition = active_partitions.iter().next().unwrap();
+                // listener
+                //     .wait_for_job_results(vec![(
+                //         RowKey::Table(TableId::Partitions, last_active_partition.get_id()),
+                //         JobType::Repartition,
+                //     )])
+                //     .await
+                //     .unwrap();
 
                 // TODO API to wait for all jobs to be completed and all events processed
                 tokio::time::delay_for(Duration::from_millis(500)).await;
@@ -1196,7 +1196,7 @@ mod tests {
                     .get_active_partitions_by_index_id(1)
                     .await
                     .unwrap();
-                last_active_partition = active_partitions.iter().next().unwrap();
+                let last_active_partition = active_partitions.iter().next().unwrap();
 
                 let files = services
                     .remote_fs
