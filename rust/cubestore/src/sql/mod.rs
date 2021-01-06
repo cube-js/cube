@@ -993,7 +993,7 @@ mod tests {
             service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value FLOAT)").await.unwrap();
 
             service.exec_query(
-                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 677863988852)"
+                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 677863988852), (2, 677863988852.123e-10), (3, 6778639882.123e+3)"
             ).await.unwrap();
         }).await;
     }
