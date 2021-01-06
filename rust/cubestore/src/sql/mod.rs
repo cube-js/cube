@@ -985,6 +985,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn float_decimal_scale() {
+        Config::run_test("float_decimal_scale", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value FLOAT)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 677863988852)"
+            ).await.unwrap();
+        }).await;
+    }
+
+    #[tokio::test]
     async fn over_2k_booleans() {
         Config::test("over_2k_booleans").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
