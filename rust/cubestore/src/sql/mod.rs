@@ -467,7 +467,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 DataType::Boolean => ColumnType::Boolean,
                 DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Decimal {
                     precision: 18,
-                    scale: 10,
+                    scale: 5,
                 },
                 DataType::Timestamp => ColumnType::Timestamp,
                 DataType::Custom(custom) => {
@@ -1117,7 +1117,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                for i in 0..500 {
+                for i in 0..300 {
                     service
                         .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
                         .await
@@ -1128,7 +1128,7 @@ mod tests {
                     .exec_query("SELECT count(*) from foo.numbers")
                     .await
                     .unwrap();
-                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(500)]));
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(300)]));
 
                 let result = service
                     .exec_query("SELECT sum(num) from foo.numbers")
@@ -1136,7 +1136,7 @@ mod tests {
                     .unwrap();
                 assert_eq!(
                     result.get_rows()[0],
-                    Row::new(vec![TableValue::Int(124750)])
+                    Row::new(vec![TableValue::Int(44850)])
                 );
             })
             .await;
