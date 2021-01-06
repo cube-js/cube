@@ -12,13 +12,13 @@ export default async (event, endpointUrl, logger) => {
   });
   const flush = async (toFlush, retries) => {
     if (!toFlush) {
-      toFlush = trackEvents.splice(0, 20);
+      toFlush = trackEvents.splice(0, 10);
     }
     if (!toFlush.length) {
       return null;
     }
     if (retries == null) {
-      retries = 10;
+      retries = 3;
     }
     try {
       const sentAt = new Date().toJSON();
