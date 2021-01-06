@@ -958,6 +958,9 @@ mod tests {
             let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
 
+            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = 'true'").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+
             let result = service.exec_query("SELECT g.bool_value, count(*) from foo.bool_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(3)]));
