@@ -198,11 +198,6 @@ export class DynamoDBQueueDriverConnection {
               requestId: options.requestId,
               addedToQueueTime: new Date().getTime()
             })
-          }),
-          this.queueSize.updateTransaction({
-            key: this.queueSizeRedisKey(),
-            sk: QUEUE_SIZE_SORT_KEY,
-            size: { $add: 1 } // increment queue size by 1 })
           })
         ]
       );
@@ -214,9 +209,16 @@ export class DynamoDBQueueDriverConnection {
     }
 
     let queueSize;
-    const queueSizeResult = await this.queueSize.get({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY });
-    if (queueSizeResult && queueSizeResult.Item) {
-      queueSize = queueSizeResult.Item.size;
+    const queueSizeResult = await this.queueSize.update({
+      key: this.queueSizeRedisKey(),
+      sk: QUEUE_SIZE_SORT_KEY,
+      size: { $add: 1 } // increment queue size by 1 })
+    }, {
+      returnValues: 'updated_new'
+    }) as DocumentClient.UpdateItemOutput;
+
+    if (queueSizeResult && queueSizeResult.Attributes) {
+      queueSize = queueSizeResult.Attributes.size;
     }
 
     return [1, 1, 1, queueSize];
@@ -251,6 +253,11 @@ export class DynamoDBQueueDriverConnection {
           this.queue.deleteTransaction({ key: this.recentRedisKey(), queryKey: redisHash }),
           this.queue.deleteTransaction({ key: this.queriesDefKey(), queryKey: redisHash }),
           this.queue.deleteTransaction({ key: this.queryProcessingLockKey(queryKey), queryKey: redisHash }),
+          this.queueSize.updateTransaction({
+            key: this.queueSizeRedisKey(),
+            sk: QUEUE_SIZE_SORT_KEY,
+            size: { $add: -1 } // decrement queue size by 1
+          })
         ]
       );
     } catch (err) {
@@ -326,12 +333,14 @@ export class DynamoDBQueueDriverConnection {
   public async getQueryStageState(onlyKeys) {
     // DynamoDB does NOT support transactional queries
     const activeResult = await this.queue.query(this.activeRedisKey());
-    let active = activeResult ? activeResult.Items : [];
-    active = active.map((item: any) => item.queryKey);
+    const active = activeResult?.Items
+      ? activeResult.Items.map((item: any) => item.queryKey)
+      : [];
 
     const toProcessResult = await this.queue.query(this.toProcessRedisKey());
-    let toProcess = toProcessResult ? toProcessResult.Items : [];
-    toProcess = toProcess.map((item: any) => item.queryKey);
+    const toProcess = toProcessResult?.Items
+      ? toProcessResult.Items.map((item: any) => item.queryKey)
+      : [];
 
     const allQueryDefs: any = {};
     if (!onlyKeys) {
@@ -342,7 +351,7 @@ export class DynamoDBQueueDriverConnection {
         allQueryDefs[value.stageQueryKey] = value;
       });
     }
-    
+
     return [active, toProcess, allQueryDefs];
   }
 
@@ -439,13 +448,20 @@ export class DynamoDBQueueDriverConnection {
 
     // Get number of members in toProcess (queueSize)
     // Get the query to process
-    const getTransactionResult = await this.table.transactGet([
-      this.queueSize.getTransaction({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY }),
-      this.queue.getTransaction({ key: this.queriesDefKey(), queryKey: this.redisHash(queryKey) }),
-    ]) as DocumentClient.TransactGetItemsOutput;
+    let getTransactionResult: DocumentClient.TransactGetItemsOutput | undefined;
 
-    const queueSize = getTransactionResult.Responses[0].Item.size ?? undefined;
-    const queryData = getTransactionResult.Responses[1] && getTransactionResult.Responses[1].Item
+    try {
+      getTransactionResult = await this.table.transactGet([
+        this.queueSize.getTransaction({ key: this.queueSizeRedisKey(), sk: QUEUE_SIZE_SORT_KEY }),
+        this.queue.getTransaction({ key: this.queriesDefKey(), queryKey: this.redisHash(queryKey) }),
+      ]) as DocumentClient.TransactGetItemsOutput;
+    } catch (err) {
+      // console.error(err);
+      getTransactionResult = undefined;
+    }
+
+    const queueSize = getTransactionResult?.Responses[0]?.Item.size ?? undefined;
+    const queryData = getTransactionResult?.Responses[1]?.Item
       ? JSON.parse(getTransactionResult.Responses[1].Item.value)
       : undefined;
 
