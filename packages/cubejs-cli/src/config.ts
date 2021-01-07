@@ -123,11 +123,11 @@ export class Config {
         auth: authToken
       };
 
-      if(payload.deploymentId) {
+      if (payload.deploymentId) {
         const dotCubeCloud = await this.loadDotCubeCloud();
-        dotCubeCloud.url = payload.url
-        dotCubeCloud.deploymentId = payload.deploymentId
-        await this.writeDotCubeCloud(dotCubeCloud)
+        dotCubeCloud.url = payload.url;
+        dotCubeCloud.deploymentId = payload.deploymentId;
+        await this.writeDotCubeCloud(dotCubeCloud);
       }
 
       await this.writeConfig(config);
