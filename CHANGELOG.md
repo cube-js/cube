@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.13](https://github.com/cube-js/cube.js/compare/v0.25.12...v0.25.13) (2021-01-07)
+
+
+### Bug Fixes
+
+* Guard from `undefined` dataSource in queue key ([6ae1fd6](https://github.com/cube-js/cube.js/commit/6ae1fd60a1e67bc73c0630b7de36b598397ce22b))
+* **cubestore:** Root Cargo.toml isn't used for docker build ([8030fe3](https://github.com/cube-js/cube.js/commit/8030fe3796acc69e6dcd88c728430007c91dded6))
+* **cubestore:** Set default scale to 5 for floats ([98d85eb](https://github.com/cube-js/cube.js/commit/98d85eb641e77225267a5e63351a4d72cf1c9531))
+* **cubestore:** Support Utf8 to Boolean cast ([7ac9892](https://github.com/cube-js/cube.js/commit/7ac98921bb6c9999e1b59499fefb9a68578513fd))
+* **cubestore:** Support Utf8 to Int64Decimal cast ([c523b46](https://github.com/cube-js/cube.js/commit/c523b4683c747d0cfcf9cc32c2319e83d56e7758))
+* Reduce agent event queue on network failures ([548fb9a](https://github.com/cube-js/cube.js/commit/548fb9a23fe5fafa9d54c92c1d9425b83fafffbe))
+
+
+### Features
+
+* **cubestore:** Drop unused chunks and partitions after compaction and repartition ([94895a2](https://github.com/cube-js/cube.js/commit/94895a20bff4c6e2932e547f6c49fa5624644098))
+* **cubestore:** Float with exp number support ([6e92c55](https://github.com/cube-js/cube.js/commit/6e92c5555efc8f76722994b2988d98850f9d10e9))
+
+
+
+
+
 ## [0.25.12](https://github.com/cube-js/cube.js/compare/v0.25.11...v0.25.12) (2021-01-05)
 
 

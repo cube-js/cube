@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.13](https://github.com/cube-js/cube.js/compare/v0.25.12...v0.25.13) (2021-01-07)
+
+
+### Bug Fixes
+
+* Reduce agent event queue on network failures ([548fb9a](https://github.com/cube-js/cube.js/commit/548fb9a23fe5fafa9d54c92c1d9425b83fafffbe))
+
+
+
+
+
 ## [0.25.11](https://github.com/cube-js/cube.js/compare/v0.25.10...v0.25.11) (2021-01-04)
 
 
