@@ -17,7 +17,7 @@ export class DynamoDBCacheDriver {
 
   public constructor() {
     const DocumentClient = new DynamoDB.DocumentClient();
-    
+
     this.table = new Table({
       // Specify table name (used by DynamoDB)
       name: process.env.CUBEJS_CACHE_TABLE,
@@ -66,11 +66,8 @@ export class DynamoDBCacheDriver {
   }
 
   public async keysStartingWith(prefix) {
-    // TODO: validate this works
-    console.log('### KEYS STARTING WITH RESULT');
-
     const result = await this.cache.query(CACHE_TABLE_PRIMARY_KEY, {
-      limit: 50, // limit to 50 items
+      limit: 100, // limit to 100 items
       beginsWith: prefix
     });
 
