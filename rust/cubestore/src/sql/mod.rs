@@ -1267,39 +1267,39 @@ mod tests {
 
             service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.orders (customer_id text, product_id int, amount int)").await.unwrap();
-            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (product_id)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.customers (id text, city text, state text)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.products (id int, name text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.orders (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
 
             service.exec_query(
-                "INSERT INTO foo.orders (customer_id, product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
             ).await.unwrap();
 
             service.exec_query(
-                "INSERT INTO foo.orders (customer_id, product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
             ).await.unwrap();
 
             service.exec_query(
-                "INSERT INTO foo.orders (customer_id, product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
             ).await.unwrap();
 
             service.exec_query(
-                "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
             ).await.unwrap();
 
             service.exec_query(
-                "INSERT INTO foo.customers (id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
             ).await.unwrap();
 
             service.exec_query(
-                "INSERT INTO foo.products (id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
             ).await.unwrap();
 
             let result = service.exec_query(
-                "SELECT c.city, p.name, sum(o.amount) FROM foo.orders o \
-                LEFT JOIN foo.customers c ON o.customer_id = c.id \
-                LEFT JOIN foo.products p ON o.product_id = p.id \
+                "SELECT city, name, sum(amount) FROM foo.orders o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
                 GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
             ).await.unwrap();
 
