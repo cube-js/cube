@@ -1319,6 +1319,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn three_tables_join_with_filter() {
+        Config::run_test("three_tables_join_with_filter", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT city, name, sum(amount) FROM foo.orders o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
+                WHERE customer_id = 'a' \
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
+            ).await.unwrap();
+
+            let expected = vec![
+                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
+            ];
+
+            assert_eq!(
+                result.get_rows(),
+                &expected
+            );
+
+        }).await;
+    }
+
+    #[tokio::test]
     async fn in_list() {
         Config::run_test("in_list", async move |services| {
             let service = services.sql_service;
