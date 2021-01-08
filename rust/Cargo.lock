@@ -132,7 +132,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#ccd180dc6e9a0c903b0fd851cf6fa3e63bf77780"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#54a0f935da1350130a28be40967af005a58c7f60"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#ccd180dc6e9a0c903b0fd851cf6fa3e63bf77780"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#54a0f935da1350130a28be40967af005a58c7f60"
 dependencies = [
  "arrow",
  "bytes 1.0.0",
@@ -1035,7 +1035,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#ccd180dc6e9a0c903b0fd851cf6fa3e63bf77780"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#54a0f935da1350130a28be40967af005a58c7f60"
 dependencies = [
  "ahash 0.6.2",
  "arrow",
@@ -1696,11 +1696,11 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84129d298a6d57d246960ff8eb831ca4af3f96d29e2e28848dae275408658e26"
+checksum = "7245cd7449cc792608c3c8a9eaf69bd4eabbabf802713748fd739c98b82f0747"
 dependencies = [
- "bytes 0.5.6",
+ "bytes 1.0.0",
  "fnv",
  "itoa",
 ]
@@ -2582,7 +2582,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#ccd180dc6e9a0c903b0fd851cf6fa3e63bf77780"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#54a0f935da1350130a28be40967af005a58c7f60"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3542,9 +3542,9 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "smallvec"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a55ca5f3b68e41c979bf8c46a6f1da892ca4db8f94023ce0bd32407573b1ac0"
+checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "snap"
