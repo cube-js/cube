@@ -147,7 +147,10 @@ impl Config {
     pub fn default() -> Config {
         Config {
             config_obj: Arc::new(ConfigObjImpl {
-                data_dir: env::current_dir().unwrap().join(".cubestore").join("data"),
+                data_dir: env::var("CUBESTORE_DATA_DIR")
+                    .ok()
+                    .map(|v| PathBuf::from(v))
+                    .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
                 partition_split_threshold: 1000000,
                 compaction_chunks_count_threshold: 4,
                 compaction_chunks_total_size_threshold: 500000,
