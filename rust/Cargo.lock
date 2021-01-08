@@ -1014,6 +1014,7 @@ dependencies = [
  "nanoid",
  "num",
  "parquet",
+ "parquet-format",
  "procspawn",
  "rand 0.8.1",
  "regex",
@@ -2599,9 +2600,9 @@ dependencies = [
 
 [[package]]
 name = "parquet-format"
-version = "2.7.0"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e63632d56fb7093c92bd62b0bc4c653adc7bac3f96c8cd7292ca8e1486a62ab"
+checksum = "a5bc6b23543b5dedc8f6cce50758a35e5582e148e0cfa26bd0cacd569cda5b71"
 dependencies = [
  "thrift",
 ]
