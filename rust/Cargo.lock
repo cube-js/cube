@@ -132,7 +132,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#f671eae82edc579cc1f85c1c93e1d7f82f623ef4"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#cb99833c158d32eae07c3c8ebaa4c5f5f94fd2eb"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#f671eae82edc579cc1f85c1c93e1d7f82f623ef4"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#cb99833c158d32eae07c3c8ebaa4c5f5f94fd2eb"
 dependencies = [
  "arrow",
  "bytes 1.0.0",
@@ -1034,7 +1034,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#f671eae82edc579cc1f85c1c93e1d7f82f623ef4"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#cb99833c158d32eae07c3c8ebaa4c5f5f94fd2eb"
 dependencies = [
  "ahash 0.6.2",
  "arrow",
@@ -1964,9 +1964,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.81"
+version = "0.2.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
+checksum = "89203f3fba0a3795506acaad8ebce3c80c0af93f994d5a1d7a0b1eeb23271929"
 
 [[package]]
 name = "libloading"
@@ -2581,7 +2581,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#f671eae82edc579cc1f85c1c93e1d7f82f623ef4"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#cb99833c158d32eae07c3c8ebaa4c5f5f94fd2eb"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3691,9 +3691,9 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d40c6d1b69745a6ec6fb1ca717914848da4b44ae29d9b3080cbee91d72a69b14"
+checksum = "bb9bc092d0d51e76b2b19d9d85534ffc9ec2db959a2523cdae0697e2972cd447"
 dependencies = [
  "lazy_static",
 ]
@@ -3983,9 +3983,9 @@ dependencies = [
 
 [[package]]
 name = "tower-layer"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a35d656f2638b288b33495d1053ea74c40dc05ec0b92084dd71ca5566c4ed1dc"
+checksum = "343bc9466d3fe6b0f960ef45960509f84480bf4fd96f92901afe7ff3df9d3a62"
 
 [[package]]
 name = "tower-limit"

@@ -1277,7 +1277,19 @@ mod tests {
             ).await.unwrap();
 
             service.exec_query(
+                "INSERT INTO foo.orders (customer_id, product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (customer_id, product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
                 "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
             ).await.unwrap();
 
             service.exec_query(
@@ -1288,11 +1300,21 @@ mod tests {
                 "SELECT c.city, p.name, sum(o.amount) FROM foo.orders o \
                 LEFT JOIN foo.customers c ON o.customer_id = c.id \
                 LEFT JOIN foo.products p ON o.product_id = p.id \
-                GROUP BY 1, 2 ORDER BY 3 DESC"
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
             ).await.unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)]));
+            let expected = vec![
+                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(20)]),
+                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
+                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(10)]),
+                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)])
+            ];
+
+            assert_eq!(
+                result.get_rows(),
+                &expected
+            );
+
         }).await;
     }
 
