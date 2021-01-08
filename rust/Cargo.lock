@@ -2012,12 +2012,11 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.12"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e3aeeb5dad71cdfb031ff8899db3e3e2bdcbc5abe7ad48e58857e42488dc4aa"
+checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
- "cfg-if 1.0.0",
- "value-bag",
+ "cfg-if 0.1.10",
 ]
 
 [[package]]
@@ -4284,15 +4283,6 @@ checksum = "9fde2f6a4bea1d6e007c4ad38c6839fa71cbb63b6dbf5b595aa38dc9b1093c11"
 dependencies = [
  "rand 0.7.3",
  "serde",
-]
-
-[[package]]
-name = "value-bag"
-version = "1.0.0-alpha.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2175b4f8663c060f0cd69f5371c1eba1d2eb7845770b7c73593ea08eafb83254"
-dependencies = [
- "ctor",
 ]
 
 [[package]]
