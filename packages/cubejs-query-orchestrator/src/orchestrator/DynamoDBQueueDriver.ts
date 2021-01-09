@@ -183,7 +183,14 @@ export class DynamoDBQueueDriverConnection {
     try {
       await this.table.transactWrite(
         [
-          this.queue.putTransaction({ key: this.toProcessRedisKey(), queryKey: redisHash, keyScore, inserted: time }),
+          this.queue.putTransaction({ 
+            key: this.toProcessRedisKey(), 
+            queryKey: redisHash, 
+            keyScore, 
+            inserted: time 
+          }, { 
+            conditions: { exists: false, attr: 'queryKey' } // prevents duplicate add but idk maybe we do not care?
+          }),
           this.queue.putTransaction({ key: this.recentRedisKey(), queryKey: redisHash, inserted: time }),
           this.queue.putTransaction({
             key: this.queriesDefKey(),

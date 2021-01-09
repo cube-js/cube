@@ -1,4 +1,4 @@
-/* globals beforeAll, afterAll */
+/* globals jest, beforeAll, afterAll */
 const { GenericContainer } = require('testcontainers');
 const AWS = require('aws-sdk');
 const QueryQueueTest = require('../unit/QueryQueue.test');
@@ -75,7 +75,7 @@ afterAll(async () => {
   console.log('### FINAL SCAN...');
   const scanResult = await dynamodb.scan(scanParams).promise();
   console.log('### SCAN RESULT:', scanResult);
-  
+
   if (container) await container.stop();
 });
 
