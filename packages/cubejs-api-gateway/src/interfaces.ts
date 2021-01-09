@@ -70,6 +70,9 @@ export type QueryTransformerFn = (query: Query, context: RequestContext) => Prom
 // @deprecated
 export type CheckAuthMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void
 
+// @deprecated
+export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void
+
 // @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
 export type CheckAuthFn = (ctx: any, authorization?: string) => any;
 
