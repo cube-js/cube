@@ -18,7 +18,14 @@ import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
 import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, RequestContext } from './interfaces';
+import {
+  CheckAuthFn,
+  CheckAuthMiddlewareFn,
+  ExtendContextFn,
+  QueryTransformerFn,
+  RequestContext,
+  RequestLoggerMiddlewareFn,
+} from './interfaces';
 import { cachedHandler } from './cached-handler';
 
 type ResponseResultFn = (message: object, extra?: { status: number }) => void;
@@ -166,10 +173,10 @@ export interface ApiGatewayOptions {
   checkAuth?: CheckAuthFn;
   // @deprecated Please use checkAuth
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
+  requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
   queryTransformer?: QueryTransformerFn;
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
-  requestLoggerMiddleware?: any;
 }
 
 export class ApiGateway {
@@ -187,11 +194,13 @@ export class ApiGateway {
 
   protected readonly extendContext?: ExtendContextFn;
 
-  protected readonly requestMiddleware: RequestHandler[];
-
   protected readonly dataSourceStorage: any;
 
   public readonly checkAuthFn: CheckAuthFn;
+
+  protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
+
+  protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   public constructor(
     protected readonly apiSecret: string,
@@ -212,16 +221,21 @@ export class ApiGateway {
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
     this.checkAuthFn = options.checkAuth || this.defaultCheckAuth.bind(this);
-
-    this.requestMiddleware = [
-      options.checkAuthMiddleware || this.checkAuth,
-      this.requestContextMiddleware,
-      options.requestLoggerMiddleware || this.requestLogger
-    ];
+    this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
+    this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger.bind(this);
   }
 
   public initApp(app: ExpressApplication) {
-    app.get(`${this.basePath}/v1/load`, this.requestMiddleware, (async (req, res) => {
+    const userMiddlewares: RequestHandler[] = [
+      this.checkAuthMiddleware,
+      this.requestContextMiddleware,
+      this.requestLoggerMiddleware
+    ];
+
+    // @todo Should we pass requestLoggerMiddleware?
+    const guestMiddlewares = [];
+
+    app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
         context: req.context,
@@ -231,7 +245,7 @@ export class ApiGateway {
     }));
 
     const jsonParser = bodyParser.json({ limit: '1mb' });
-    app.post(`${this.basePath}/v1/load`, jsonParser, this.requestMiddleware, (async (req, res) => {
+    app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.body.query,
         context: req.context,
@@ -240,7 +254,7 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`${this.basePath}/v1/subscribe`, this.requestMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
         context: req.context,
@@ -249,7 +263,7 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`${this.basePath}/v1/sql`, this.requestMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
       await this.sql({
         query: req.query.query,
         context: req.context,
@@ -257,14 +271,14 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`${this.basePath}/v1/meta`, this.requestMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
       await this.meta({
         context: req.context,
         res: this.resToResultFn(res)
       });
     }));
 
-    app.get(`${this.basePath}/v1/run-scheduled-refresh`, this.requestMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
         context: req.context,
@@ -272,7 +286,7 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`${this.basePath}/v1/dry-run`, this.requestMiddleware, (async (req, res) => {
+    app.get(`${this.basePath}/v1/dry-run`, userMiddlewares, (async (req, res) => {
       await this.dryRun({
         query: req.query.query,
         context: req.context,
@@ -280,7 +294,7 @@ export class ApiGateway {
       });
     }));
 
-    app.post(`${this.basePath}/v1/dry-run`, jsonParser, this.requestMiddleware, (async (req, res) => {
+    app.post(`${this.basePath}/v1/dry-run`, jsonParser, userMiddlewares, (async (req, res) => {
       await this.dryRun({
         query: req.body.query,
         context: req.context,
@@ -288,8 +302,8 @@ export class ApiGateway {
       });
     }));
 
-    app.get('/readyz', this.requestMiddleware, cachedHandler(this.readiness));
-    app.get('/livez', this.requestMiddleware, cachedHandler(this.liveness));
+    app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
+    app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
     app.use(this.handleErrorMiddleware);
   }
@@ -432,10 +446,11 @@ export class ApiGateway {
 
     try {
       query = this.parseQueryParam(query);
-      this.log(context, {
+      this.log({
         type: 'Load Request',
         query
-      });
+      }, context);
+
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
       const [metaConfigResult, ...sqlQueries] = await Promise.all(
@@ -446,12 +461,12 @@ export class ApiGateway {
             const loadRequestSQLStarted = new Date();
             const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
 
-            this.log(context, {
+            this.log({
               type: 'Load Request SQL',
               duration: this.duration(loadRequestSQLStarted),
               query: normalizedQueries[index],
               sqlQuery
-            });
+            }, context);
 
             return sqlQuery;
           }
@@ -498,11 +513,11 @@ export class ApiGateway {
         };
       }));
 
-      this.log(context, {
+      this.log({
         type: 'Load Request Success',
         query,
         duration: this.duration(requestStarted)
-      });
+      }, context);
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
@@ -529,10 +544,10 @@ export class ApiGateway {
   }) {
     const requestStarted = new Date();
     try {
-      this.log(context, {
+      this.log({
         type: 'Subscribe',
         query
-      });
+      }, context);
 
       let result: any = null;
       let error: any = null;
@@ -629,36 +644,36 @@ export class ApiGateway {
     e, context, query, res, requestStarted
   }: any) {
     if (e instanceof CubejsHandlerError) {
-      this.log(context, {
+      this.log({
         type: e.type,
         query,
         error: e.message,
         duration: this.duration(requestStarted)
-      });
+      }, context);
       res({ error: e.message }, { status: e.status });
     } else if (e.error === 'Continue wait') {
-      this.log(context, {
+      this.log({
         type: 'Continue wait',
         query,
         error: e.message,
         duration: this.duration(requestStarted)
-      });
+      }, context);
       res(e, { status: 200 });
     } else if (e.error) {
-      this.log(context, {
+      this.log({
         type: 'Orchestrator error',
         query,
         error: e.error,
         duration: this.duration(requestStarted)
-      });
+      }, context);
       res(e, { status: 400 });
     } else if (e.type === 'UserError') {
-      this.log(context, {
+      this.log({
         type: e.type,
         query,
         error: e.message,
         duration: this.duration(requestStarted)
-      });
+      }, context);
       res(
         {
           type: e.type,
@@ -667,12 +682,12 @@ export class ApiGateway {
         { status: 400 }
       );
     } else {
-      this.log(context, {
+      this.log({
         type: 'Internal Server Error',
         query,
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
-      });
+      }, context);
       res({ error: e.toString() }, { status: 500 });
     }
   }
@@ -686,11 +701,11 @@ export class ApiGateway {
         if (this.enforceSecurityChecks) {
           throw new UserError('Invalid token');
         } else {
-          this.log(req, {
+          this.log({
             type: 'Invalid Token',
             token: auth,
             error: e.stack || e.toString()
-          });
+          }, <any>req);
         }
       }
     } else if (this.enforceSecurityChecks) {
@@ -723,11 +738,11 @@ export class ApiGateway {
       if (e instanceof UserError) {
         res.status(403).json({ error: e.message });
       } else {
-        this.log(req, {
+        this.log({
           type: 'Auth Error',
           token,
           error: e.stack || e.toString()
-        });
+        }, <any>req);
         res.status(500).json({ error: e.toString() });
       }
     }
@@ -742,7 +757,9 @@ export class ApiGateway {
 
   protected requestLogger: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     const details = requestParser(req, res);
-    this.log(req.context, { type: 'REST API Request', ...details });
+
+    this.log({ type: 'REST API Request', ...details }, req.context);
+
     if (next) {
       next();
     }
@@ -784,12 +801,15 @@ export class ApiGateway {
     }));
   }
 
-  protected log(context, event) {
+  protected log(event: { type: string, [key: string]: any }, context?: RequestContext) {
     const { type, ...restParams } = event;
+
     this.logger(type, {
       ...restParams,
-      authInfo: context.authInfo,
-      requestId: context.requestId
+      ...(!context ? undefined : {
+        authInfo: context.authInfo,
+        requestId: context.requestId
+      })
     });
   }
 
@@ -808,7 +828,7 @@ export class ApiGateway {
       try {
         await orchestratorApi.testConnection();
       } catch (e) {
-        this.log({}, {
+        this.log({
           type: 'Internal Server Error',
           error: e.stack || e.toString(),
         });
@@ -819,7 +839,7 @@ export class ApiGateway {
       try {
         await orchestratorApi.testOrchestratorConnections();
       } catch (e) {
-        this.log({}, {
+        this.log({
           type: 'Internal Server Error',
           error: e.stack || e.toString(),
         });
@@ -837,7 +857,7 @@ export class ApiGateway {
     try {
       await this.dataSourceStorage.testConnections();
     } catch (e) {
-      this.log({}, {
+      this.log({
         type: 'Internal Server Error',
         error: e.stack || e.toString(),
       });
@@ -849,7 +869,7 @@ export class ApiGateway {
       // @todo Optimize this moment?
       await this.dataSourceStorage.testOrchestratorConnections();
     } catch (e) {
-      this.log({}, {
+      this.log({
         type: 'Internal Server Error',
         error: e.stack || e.toString(),
       });
