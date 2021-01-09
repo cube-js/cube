@@ -65,17 +65,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient();
-
-  const scanParams = {
-    TableName: process.env.CUBEJS_CACHE_TABLE,
-  };
-
-  // TODO: Remove this it is for debugging the tests
-  console.log('### FINAL SCAN...');
-  const scanResult = await dynamodb.scan(scanParams).promise();
-  console.log('### SCAN RESULT:', scanResult);
-
   if (container) await container.stop();
 });
 
