@@ -25,10 +25,10 @@ lead to security vulnerabilities. You can read more on the differences between
 CUBEJS_DEV_MODE=false
 ```
 
-## Set up Redis
+## Set up Cache and Queue
+Cube.js requires [Redis](https://redis.io/), an in-memory data structure store, or [DynamoDB](https://aws.amazon.com/dynamodb/), a NoSQL database service, to run in production.
 
-Cube.js requires [Redis](https://redis.io/), an in-memory data structure store,
-to run in production.
+### Redis
 
 It uses Redis for query caching and queue. Set the `REDIS_URL` environment
 variable to allow Cube.js to connect to Redis. If your Redis instance also has
@@ -42,7 +42,7 @@ concurrent connections.
 | Redis instances. Otherwise they will have different query queues which can
 | lead to incorrect pre-aggregation states and intermittent data access errors.
 
-### Redis Pool
+#### Redis Pool
 
 If `REDIS_URL` is provided Cube.js, will create a Redis connection pool with a
 minimum of 2 and maximum of 1000 concurrent connections, by default.
@@ -58,7 +58,19 @@ sure you have enough connections for all Cube.js server instances. A lower
 number of connections still can work, however Redis becomes a performance
 bottleneck in this case.
 
-### Running without Redis
+### DynamoDB
+
+Cube.js will use DynamoDB as the cache and queue driver. Set the `CUBEJS_CACHE_TABLE` to your DynamoDB table name. The table must be created with 
+```
+* partitionKey: pk (string/hash)
+* sortKey: sk (string/hash)
+* Global secondary index
+*   GSI1: -- GSI1 is the index name
+*     partitionKey: pk (string/hash as above)
+*     sortKey: sk (number/range)
+```
+
+### Running without Redis or DynamoDB
 
 If you want to run Cube.js in production without Redis, you can use
 `CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.
