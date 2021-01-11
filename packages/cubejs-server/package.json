@@ -13,10 +13,11 @@
     "node": ">=8.11.1"
   },
   "main": "index.js",
-  "typings": "dist/index.d.ts",
+  "typings": "dist/src/index.d.ts",
   "files": [
     "dist",
     "bin",
+    "index.js",
     "/oclif.manifest.json"
   ],
   "bin": {
@@ -31,11 +32,11 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "lint": "linter src/* tests/ --ext .ts,.js",
-    "lint:fix": "linter --fix src/* tests/ --ext .ts,js",
+    "lint": "linter src/* test/ --ext .ts,.js",
+    "lint:fix": "linter --fix src/* test/ --ext .ts,js",
     "unit": "jest",
-    "unit:debug": "jest --runInBand",
-    "jest:shapshot": "jest --updateSnapshot"
+    "unit:debug": "jest --runInBand test",
+    "jest:shapshot": "jest --updateSnapshot test"
   },
   "dependencies": {
     "@cubejs-backend/server-core": "^0.25.14",
@@ -86,7 +87,7 @@
       "^.+\\.js$": "ts-jest"
     },
     "testMatch": [
-      "<rootDir>/tests/*.(test|spec).(ts|js)"
+      "<rootDir>/test/*.(test|spec).(ts|js)"
     ]
   },
   "oclif": {

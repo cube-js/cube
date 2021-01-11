@@ -4,6 +4,7 @@
     "src",
     "test"
   ],
+  "files": ["custom.d.ts"],
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
