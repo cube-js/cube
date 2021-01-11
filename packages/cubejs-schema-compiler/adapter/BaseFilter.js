@@ -7,7 +7,7 @@ const {
 
 const BaseDimension = require('./BaseDimension');
 
-const DATE_OPERATORS = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'];
+const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'afterDate'];
 const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
 const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
@@ -18,10 +18,14 @@ class BaseFilter extends BaseDimension {
     this.query = query;
     this.operator = filter.operator;
     this.values = filter.values;
+    this.camelizeOperator = inlection.camelize(this.operator).replace(
+      /[A-Z]/,
+      (c) => (c != null ? c : '').toLowerCase(),
+    );
   }
 
   filterToWhere() {
-    if (this.operator === 'measure_filter' || this.operator === 'measureFilter') {
+    if (this.camelizeOperator === 'measureFilter') {
       return this.measureFilterToWhere();
     }
 
@@ -44,10 +48,7 @@ class BaseFilter extends BaseDimension {
   }
 
   conditionSql(columnSql) {
-    const operatorMethod = `${inlection.camelize(this.operator).replace(
-      /[A-Z]/,
-      (c) => (c != null ? c : '').toLowerCase()
-    )}Where`;
+    const operatorMethod = `${(this.camelizeOperator)}Where`;
 
     let sql = this[operatorMethod](columnSql);
     if (sql.match(this.query.paramAllocator.paramsMatchRegex)) {
@@ -84,14 +85,14 @@ class BaseFilter extends BaseDimension {
   }
 
   isWildcardOperator() {
-    return this.operator === 'contains' || this.operator === 'not_contains';
+    return this.camelizeOperator === 'contains' || this.camelizeOperator === 'notContains';
   }
 
   filterParams() {
-    if (contains(this.operator, DATE_OPERATORS)) {
+    if (contains(this.camelizeOperator, DATE_OPERATORS)) {
       return [this.inDbTimeZoneDateFrom(this.values[0]), this.inDbTimeZoneDateTo(this.values[1])];
     }
-    if (this.operator === 'set' || this.operator === 'not_set' || this.operator === 'expressionEquals') {
+    if (this.camelizeOperator === 'set' || this.camelizeOperator === 'notSet' || this.camelizeOperator === 'expressionEquals') {
       return [];
     }
     const params = this.valuesArray().filter(v => v != null);
@@ -136,9 +137,7 @@ class BaseFilter extends BaseDimension {
       if (i > 1) {
         throw new Error(`Expected only 2 parameters for timestamp filter but got: ${this.filterParams()}`);
       }
-      return this.allocateTimestampParam(
-        i === 0 ? this.inDbTimeZoneDateFrom(p) : this.inDbTimeZoneDateTo(p)
-      );
+      return this.allocateTimestampParam(p);
     });
   }
 

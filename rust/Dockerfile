@@ -21,7 +21,7 @@ RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
 RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
-COPY cubestore .
+COPY cubestore cubestore
 RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
 FROM debian:buster-slim

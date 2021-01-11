@@ -1,21 +1,21 @@
-class OrchestratorStorage {
-  constructor() {
-    this.storage = new Map();
-  }
+import type { OrchestratorApi } from './OrchestratorApi';
 
-  has(orchestratorId) {
+export class OrchestratorStorage {
+  protected readonly storage: Map<string, OrchestratorApi> = new Map();
+
+  public has(orchestratorId: string) {
     return this.storage.has(orchestratorId);
   }
 
-  get(orchestratorId) {
+  public get(orchestratorId: string) {
     return this.storage.get(orchestratorId);
   }
 
-  set(orchestratorId, orchestratorApi) {
+  public set(orchestratorId: string, orchestratorApi: OrchestratorApi) {
     return this.storage.set(orchestratorId, orchestratorApi);
   }
 
-  testConnections() {
+  public async testConnections() {
     const result = [];
 
     // eslint-disable-next-line no-restricted-syntax
@@ -26,7 +26,7 @@ class OrchestratorStorage {
     return Promise.all(result);
   }
 
-  testOrchestratorConnections() {
+  public async testOrchestratorConnections() {
     const result = [];
 
     // eslint-disable-next-line no-restricted-syntax
@@ -37,7 +37,7 @@ class OrchestratorStorage {
     return Promise.all(result);
   }
 
-  async releaseConnections() {
+  public async releaseConnections() {
     const result = [];
 
     // eslint-disable-next-line no-restricted-syntax
@@ -47,8 +47,6 @@ class OrchestratorStorage {
 
     await Promise.all(result);
 
-    this.storage = new Map();
+    this.storage.clear();
   }
 }
-
-module.exports = OrchestratorStorage;

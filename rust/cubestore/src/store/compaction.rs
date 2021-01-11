@@ -1,5 +1,5 @@
 use crate::config::ConfigObj;
-use crate::metastore::MetaStore;
+use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
 use crate::table::parquet::ParquetTableStore;
@@ -43,7 +43,7 @@ impl CompactionService for CompactionServiceImpl {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
         let chunks = self
             .meta_store
-            .get_chunks_by_partition(partition_id)
+            .get_chunks_by_partition(partition_id, false)
             .await?;
         let (partition, index) = self
             .meta_store
@@ -227,7 +227,7 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(1).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 15)
+            .create_chunk(partition.get_id(), 16)
             .await
             .unwrap();
         metastore.chunk_uploaded(2).await.unwrap();

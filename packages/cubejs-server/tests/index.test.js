@@ -3,42 +3,12 @@
 
 import http from 'http';
 import https from 'https';
+import CubejsServerCore from '@cubejs-backend/server-core';
+
 import { CubejsServer as CubeServer } from '../src/server';
 
-jest.mock('@cubejs-backend/server-core', () => {
-  const staticCreate = jest.fn();
-  const initApp = jest.fn(() => Promise.resolve());
-  const event = jest.fn(() => Promise.resolve());
-  const releaseConnections = jest.fn(() => Promise.resolve());
-
-  class CubejsServerCore {
-    static create() {
-      // eslint-disable-next-line prefer-rest-params
-      staticCreate.call(null, arguments);
-      return new CubejsServerCore();
-    }
-
-    initApp() {
-      return initApp();
-    }
-
-    event() {
-      return event();
-    }
-
-    releaseConnections() {
-      return releaseConnections();
-    }
-  }
-  CubejsServerCore.mock = {
-    staticCreate,
-    initApp,
-    event,
-    releaseConnections,
-  };
-  return CubejsServerCore;
-});
-
+// eslint-disable-next-line global-require
+jest.mock('@cubejs-backend/server-core', () => require('./__mocks__/server-core'));
 // eslint-disable-next-line global-require
 jest.mock('http', () => require('./__mocks__/http'));
 // eslint-disable-next-line global-require
@@ -52,7 +22,7 @@ describe('CubeServer', () => {
       'given that CUBEJS_ENABLE_TLS is not true, ' +
       'should create an http server that listens to the PORT',
       async () => {
-      // arrange
+        // arrange
         const server = new CubeServer();
         // act
         await server.listen();
@@ -60,6 +30,10 @@ describe('CubeServer', () => {
         expect(http.createServer).toHaveBeenCalledTimes(1);
         expect(http.__mockServer.listen).toHaveBeenCalledTimes(1);
         expect(http.__mockServer.listen.mock.calls[0][0]).toBe(4000);
+        // act
+        await server.shutdown('SIGTERM', false);
+        // assert
+        expect(CubejsServerCore.__mockServer.shutdown).toHaveBeenCalledTimes(1);
       }
     );
 

@@ -17,7 +17,7 @@ describe('cachedHandler', () => {
     const TEST_TIMEOUT = 25;
     const TEST_LIFETIME = 100;
 
-    const handler = cachedHandler(async (req, res, next) => {
+    const handler = cachedHandler(async (req, res) => {
       reqPassed++;
 
       await createAsyncLock(TEST_TIMEOUT);

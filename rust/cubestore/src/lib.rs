@@ -10,9 +10,10 @@
 #[macro_use]
 extern crate lazy_static;
 
+use crate::metastore::TableId;
 use arrow::error::ArrowError;
 use core::fmt;
-use flexbuffers::DeserializationError;
+use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
 use serde_derive::{Deserialize, Serialize};
@@ -20,6 +21,7 @@ use smallvec::alloc::fmt::{Debug, Formatter};
 use sqlparser::parser::ParserError;
 use std::backtrace::Backtrace;
 use std::num::ParseIntError;
+use std::sync::PoisonError;
 use tokio::sync::mpsc::error::SendError;
 
 pub mod cluster;
@@ -273,6 +275,28 @@ impl From<SetLoggerError> for CubeError {
 
 impl From<serde_json::Error> for CubeError {
     fn from(v: serde_json::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<PoisonError<std::sync::MutexGuard<'_, std::collections::HashMap<TableId, u64>>>>
+    for CubeError
+{
+    fn from(
+        v: PoisonError<std::sync::MutexGuard<'_, std::collections::HashMap<TableId, u64>>>,
+    ) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<ReaderError> for CubeError {
+    fn from(v: ReaderError) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<std::num::ParseFloatError> for CubeError {
+    fn from(v: std::num::ParseFloatError) -> Self {
         CubeError::from_error(v)
     }
 }

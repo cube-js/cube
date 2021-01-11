@@ -7,7 +7,6 @@ use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
 use std::io::{Cursor, Write};
-use std::sync::Arc;
 
 impl Index {
     pub fn try_new(

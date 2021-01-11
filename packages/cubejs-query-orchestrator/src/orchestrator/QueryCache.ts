@@ -169,10 +169,11 @@ export class QueryCache {
   }
 
   public getQueue(dataSource: string) {
+    dataSource = dataSource || 'default';
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource || 'default'),
+        () => this.driverFactory(dataSource),
         (client, q) => {
           this.logger('Executing SQL', {
             ...q

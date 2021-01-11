@@ -1,7 +1,8 @@
 /* eslint-disable no-underscore-dangle */
-const { BigQuery } = require('@google-cloud/bigquery');
 const R = require('ramda');
+const { BigQuery } = require('@google-cloud/bigquery');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { getEnv } = require('@cubejs-backend/shared');
 
 function pause(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -10,7 +11,7 @@ function pause(ms) {
 const suffixTableRegex = /^(.*?)([0-9_]+)$/;
 
 class BigQueryDriver extends BaseDriver {
-  constructor(config) {
+  constructor(config = {}) {
     super();
 
     this.options = {
@@ -20,7 +21,9 @@ class BigQueryDriver extends BaseDriver {
       credentials: process.env.CUBEJS_DB_BQ_CREDENTIALS ?
         JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
         undefined,
-      ...config
+      ...config,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
     this.bigquery = new BigQuery(this.options);
@@ -165,32 +168,43 @@ class BigQueryDriver extends BaseDriver {
     return this.runQueryJob(bigQueryQuery, options, false);
   }
 
+  async awaitForJobStatus(job, options, withResults) {
+    const [result] = await job.getMetadata();
+    if (result.status && result.status.state === 'DONE') {
+      if (result.status.errorResult) {
+        throw new Error(
+          result.status.errorResult.message ?
+            result.status.errorResult.message :
+            JSON.stringify(result.status.errorResult)
+        );
+      }
+      this.reportQueryUsage(result.statistics, options);
+    } else {
+      return null;
+    }
+
+    return withResults ? job.getQueryResults() : true;
+  }
+
   async runQueryJob(bigQueryQuery, options, withResults = true) {
     const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
-    const awaitForJobStatus = async () => {
-      const [result] = await job.getMetadata();
-      if (result.status && result.status.state === 'DONE') {
-        if (result.status.errorResult) {
-          throw new Error(
-            result.status.errorResult.message ?
-              result.status.errorResult.message :
-              JSON.stringify(result.status.errorResult)
-          );
-        }
-        this.reportQueryUsage(result.statistics, options);
-      } else {
-        return null;
-      }
-      return withResults ? job.getQueryResults() : true;
-    };
-    for (let i = 0; i < 15 * 60 / 5; i++) {
-      const result = await awaitForJobStatus();
+
+    const startedTime = Date.now();
+
+    for (let i = 0; Date.now() - startedTime <= this.options.pollTimeout; i++) {
+      const result = await this.awaitForJobStatus(job, options, withResults);
       if (result) {
         return result;
       }
-      await pause(Math.min(5000, 200 * i));
+
+      await pause(
+        Math.min(this.options.pollMaxInterval, 200 * i)
+      );
     }
-    throw new Error('BigQuery job timeout');
+
+    throw new Error(
+      `BigQuery job timeout reached ${this.options.pollTimeout}ms`
+    );
   }
 
   quoteIdentifier(identifier) {
