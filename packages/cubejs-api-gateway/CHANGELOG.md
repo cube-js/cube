@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.14](https://github.com/cube-js/cube.js/compare/v0.25.13...v0.25.14) (2021-01-11)
+
+
+### Bug Fixes
+
+* **gateway:** Allow healthchecks to be requested without auth ([95c0c57](https://github.com/cube-js/cube.js/commit/95c0c57d739e6ce46de958883d7dbfe04616a7a0))
+
+
+
+
+
 ## [0.25.2](https://github.com/cube-js/cube.js/compare/v0.25.1...v0.25.2) (2020-12-27)
 
 

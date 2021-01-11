@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.14](https://github.com/cube-js/cube.js/compare/v0.25.13...v0.25.14) (2021-01-11)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** useCubeQuery - clear resultSet on exception ([#1734](https://github.com/cube-js/cube.js/issues/1734)) ([a5d19ae](https://github.com/cube-js/cube.js/commit/a5d19aecffc6a613f6e0f0d9346143c4f2e335be))
+
+
+
+
+
 ## [0.25.12](https://github.com/cube-js/cube.js/compare/v0.25.11...v0.25.12) (2021-01-05)
 
 

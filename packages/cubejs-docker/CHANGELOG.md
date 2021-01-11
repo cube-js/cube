@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.14](https://github.com/cube-js/cube.js/compare/v0.25.13...v0.25.14) (2021-01-11)
+
+
+### Features
+
+* **docker:** Upgrade Node.js to Node v12.20.1 (security release) ([097a11a](https://github.com/cube-js/cube.js/commit/097a11a81402f26c90441d93bcdd8421f89bf2e8))
+
+
+
+
+
 ## [0.25.13](https://github.com/cube-js/cube.js/compare/v0.25.12...v0.25.13) (2021-01-07)
 
 **Note:** Version bump only for package @cubejs-backend/docker
