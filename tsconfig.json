@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.base.json",
+  "references": [
+    {
+      "path": "packages/cubejs-backend-shared"
+    },
+    {
+      "path": "packages/cubejs-api-gateway"
+    },
+    {
+      "path": "packages/cubejs-query-orchestrator"
+    },
+    {
+      "path": "packages/cubejs-druid-driver"
+    },
+    {
+      "path": "packages/cubejs-server-core"
+    },
+    {
+      "path": "packages/cubejs-server"
+    },
+    {
+      "path": "packages/cubejs-cli"
+    }
+  ]
+}

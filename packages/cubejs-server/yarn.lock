@@ -847,10 +847,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.25.2":
-  version "0.25.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.25.2.tgz#cb640f2c9e1349c4641fa1b330f92b1bb588d768"
-  integrity sha512-t10tpqTxa5QYz6WFMRy/btx5XiNfKy3jXo9yUCZ/JTeJs1L+EQT5VnXQI5LahYXqe5cHO+2eFJobwUXNUtqjUw==
+"@cubejs-backend/api-gateway@^0.25.14":
+  version "0.25.14"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.25.14.tgz#908ef4ae8ac6176a45eeb3a86579836e7446e557"
+  integrity sha512-w1JYzM3GAVva/6SR5+W8izAkTfYUIvleKT/8WzScubOHCRBnqUIh4h8fu87LfrPVbkG90WXQuWKNIddvq0anaQ==
   dependencies:
     "@hapi/joi" "^15.1.1"
     body-parser "^1.19.0"
@@ -874,12 +874,12 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/query-orchestrator@^0.25.4":
-  version "0.25.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.25.4.tgz#0de7a016ae7c3adf56a146403c3f62733cb5c51a"
-  integrity sha512-qqQzML9U92Emlb/uvUszLYEbZ+OoQPtDG1aun6MvjoyFwn3ucO5zcw4fPEX9I35EyakYxamybp8KV1rLYf0ymQ==
+"@cubejs-backend/query-orchestrator@^0.25.13":
+  version "0.25.13"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.25.13.tgz#152e1ddbbcb50553d1d9b52ceec99d16dfb93762"
+  integrity sha512-7ULZk5I7Z0iKpgNRThnAWx4H5bSLTmDi7pCVSyneW3lACRbpL/WrKCfIDnM65lhRC/EQee3s9zDFwflKpM7MRg==
   dependencies:
-    "@cubejs-backend/shared" "^0.25.4"
+    "@cubejs-backend/shared" "^0.25.6"
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
@@ -908,15 +908,15 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.25.4":
-  version "0.25.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.25.4.tgz#9c977655f089c479ec383eee29feeb34886e323b"
-  integrity sha512-aDDgDsnxLrc/9/zJ+s7CYC+2gKcDIZgSrMqEjWmISFDHwNSUJDEDcbXJ15dDQdJIPoWcXnU2++69/UO6xIGOdg==
+"@cubejs-backend/server-core@^0.25.14":
+  version "0.25.14"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.25.14.tgz#35c2e656d403c6a128e79ecd2bd64d53312593a7"
+  integrity sha512-8OV1Ai3xVZKBFATpyrzn1pp4aqQ7YY4+vczCWRVcKw0WpjH2u6vDyGS3DD7Gp212cirgRcqZom9WhnIM0jaEjQ==
   dependencies:
-    "@cubejs-backend/api-gateway" "^0.25.2"
-    "@cubejs-backend/query-orchestrator" "^0.25.4"
+    "@cubejs-backend/api-gateway" "^0.25.14"
+    "@cubejs-backend/query-orchestrator" "^0.25.13"
     "@cubejs-backend/schema-compiler" "^0.25.2"
-    "@cubejs-backend/shared" "^0.25.4"
+    "@cubejs-backend/shared" "^0.25.6"
     "@hapi/joi" "^15.1.1"
     codesandbox-import-utils "^2.1.12"
     cross-spawn "^7.0.1"
@@ -937,10 +937,10 @@
     sqlstring "^2.3.1"
     uuid "^3.3.3"
 
-"@cubejs-backend/shared@^0.25.4":
-  version "0.25.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.25.4.tgz#158394fc21dec1d1d35308c9888a47ba80c518e5"
-  integrity sha512-y+g2f64JMyzz+NVya95PW+l1K54ZvsHBd7BPT6zA9mMg28IsxpHb+kXDAGcQbz89XN5CHczrN4LZY77R2cJZJQ==
+"@cubejs-backend/shared@^0.25.6":
+  version "0.25.6"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.25.6.tgz#50892544737f96fa15b0750539c04b41857fe59e"
+  integrity sha512-DGMukOARNv9fkfC5RezQfQCFaNSyXFBSpI1WlVXpkYM6vKrwzUUxiLXR9+8dZ6USdYtwUgon0IdF+nK99DltqQ==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"

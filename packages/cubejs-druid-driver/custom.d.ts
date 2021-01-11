@@ -1,9 +1,5 @@
 declare module '@cubejs-backend/schema-compiler/adapter/BaseQuery' {
-  abstract class BaseQuery {
-    protected readonly timezone: string;
-
-    public escapeColumnName(identifier: string): string;
-  }
+  declare var BaseQuery: any;
 
   export default BaseQuery;
 }

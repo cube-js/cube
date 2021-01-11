@@ -1,11 +1,42 @@
 {
+  "exclude": [
+    "node_modules",
+    "dist",
+  ],
+  "files": [],
   "compilerOptions": {
+    "incremental": true,
     "lib": ["es2017"],
     "target": "es2017",
     "module": "commonjs",
+    "baseUrl": ".",
+    "paths": {
+      "@cubejs-backend/*": [
+        "packages/cubejs-api-gateway/src",
+        "packages/cubejs-cli/src",
+        "packages/cubejs-query-orchestrator/src",
+        "packages/cubejs-schema-compiler/",
+        "packages/cubejs-server/src",
+        "packages/cubejs-server-core/src",
+      ]
+    },
+    "composite": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "esModuleInterop": true
+    //
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   }
 }

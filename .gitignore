@@ -13,3 +13,4 @@ yarn-error.log
 **/.nyc_output
 **/coverage
 lerna-debug.log
+tsconfig.tsbuildinfo

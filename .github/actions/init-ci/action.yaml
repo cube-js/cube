@@ -27,4 +27,4 @@ runs:
     - name: Lerna bootstrap
       run: yarn lerna bootstrap --ignore @cubejs-backend/jdbc-driver
     - name: Lerna tsc
-      run: yarn lerna run --concurrency 1 tsc
+      run: yarn tsc
