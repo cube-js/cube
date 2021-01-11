@@ -465,10 +465,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                     ColumnType::Int
                 }
                 DataType::Boolean => ColumnType::Boolean,
-                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Decimal {
-                    precision: 18,
-                    scale: 5,
-                },
+                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Float,
                 DataType::Timestamp => ColumnType::Timestamp,
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
@@ -555,37 +552,8 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 TableValue::Int(val_int.unwrap())
             }
             ColumnType::Decimal { .. } => {
-                let decimal_val = match cell {
-                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
-                        v.parse::<f64>()
-                    }
-                    Expr::UnaryOp {
-                        op: UnaryOperator::Minus,
-                        expr,
-                    } => {
-                        if let Expr::Value(Value::Number(v)) = expr.as_ref() {
-                            v.parse::<f64>().map(|v| v * -1.0)
-                        } else {
-                            return Err(CubeError::user(format!(
-                                "Can't parse decimal from, {:?}",
-                                cell
-                            )));
-                        }
-                    }
-                    _ => {
-                        return Err(CubeError::user(format!(
-                            "Can't parse decimal from, {:?}",
-                            cell
-                        )))
-                    }
-                };
-                if let Err(e) = decimal_val {
-                    return Err(CubeError::user(format!(
-                        "Can't parse decimal from, {:?}: {}",
-                        cell, e
-                    )));
-                }
-                TableValue::Decimal(decimal_val.unwrap().to_string())
+                let decimal_val = parse_decimal(cell)?;
+                TableValue::Decimal(decimal_val.to_string())
             }
             ColumnType::Bytes => {
                 // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
@@ -623,9 +591,47 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                     )))
                 }
             },
+            ColumnType::Float => {
+                let decimal_val = parse_decimal(cell)?;
+                TableValue::Float(decimal_val.to_string())
+            }
         }
     };
     Ok(res)
+}
+
+fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
+    let decimal_val = match cell {
+        Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
+            v.parse::<f64>()
+        }
+        Expr::UnaryOp {
+            op: UnaryOperator::Minus,
+            expr,
+        } => {
+            if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+                v.parse::<f64>().map(|v| v * -1.0)
+            } else {
+                return Err(CubeError::user(format!(
+                    "Can't parse decimal from, {:?}",
+                    cell
+                )));
+            }
+        }
+        _ => {
+            return Err(CubeError::user(format!(
+                "Can't parse decimal from, {:?}",
+                cell
+            )))
+        }
+    };
+    if let Err(e) = decimal_val {
+        return Err(CubeError::user(format!(
+            "Can't parse decimal from, {:?}: {}",
+            cell, e
+        )));
+    }
+    Ok(decimal_val?)
 }
 
 #[cfg(test)]
@@ -642,7 +648,6 @@ mod tests {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
-    use std::collections::HashSet;
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
@@ -895,21 +900,21 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Decimal("5.892".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Float("5.892".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Decimal("0.45".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float("0.45".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < '10'")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Decimal("0.45".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float("0.45".to_string())]));
         })
             .await;
     }
@@ -1005,6 +1010,12 @@ mod tests {
             service.exec_query(
                 "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 677863988852), (2, 677863988852.123e-10), (3, 6778639882.123e+3)"
             ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT SUM(decimal_value) FROM foo.decimal_group"
+            ).await.unwrap();
+
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Float("7456503871042.786".to_string())])]);
         }).await;
     }
 
@@ -1110,7 +1121,7 @@ mod tests {
                 ).await.unwrap();
             }
 
-            join_results.sort_by_key(|r| r.values()[0].clone());
+            join_results.sort_by(|a, b| a.sort_key(1).cmp(&b.sort_key(1)));
 
             let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap();
 
@@ -1802,13 +1813,13 @@ mod tests {
             println!("{:?}", new_partitions);
             let intervals_set = new_partitions.into_iter()
                 .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
-                .collect::<HashSet<_>>();
+                .collect::<Vec<_>>();
             assert_eq!(intervals_set, vec![
                 (None, Some(Row::new(vec![TableValue::Int(2)]))),
                 (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
                 (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
                 (Some(Row::new(vec![TableValue::Int(27)])), None),
-            ].into_iter().collect::<HashSet<_>>());
+            ].into_iter().collect::<Vec<_>>());
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
 

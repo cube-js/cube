@@ -41,7 +41,6 @@ use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
 use std::fmt::Formatter;
 use std::io::Cursor;
 use std::pin::Pin;
@@ -779,11 +778,9 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            let decimal = BigDecimal::try_from(a.value(i) as f64)?;
-                            TableValue::Decimal(
-                                cut_trailing_zeros
-                                    .replace(&decimal.to_string(), "$1$3")
-                                    .to_string(),
+                            let decimal = a.value(i) as f64;
+                            TableValue::Float(
+                                decimal.to_string()
                             )
                         });
                     }
@@ -909,10 +906,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     match arrow_type {
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
-        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Decimal {
-            scale: 10,
-            precision: 18,
-        }),
+        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Float),
         DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
             scale: scale as i32,
             precision: 18,

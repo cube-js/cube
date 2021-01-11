@@ -294,3 +294,9 @@ impl From<ReaderError> for CubeError {
         CubeError::from_error(v)
     }
 }
+
+impl From<std::num::ParseFloatError> for CubeError {
+    fn from(v: std::num::ParseFloatError) -> Self {
+        CubeError::from_error(v)
+    }
+}

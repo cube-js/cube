@@ -34,7 +34,7 @@ enum ColumnAccessor {
     Bytes(Vec<ByteArray>),
     Int(Vec<i64>),
     Boolean(Vec<bool>),
-    // Decimal(Vec<i64>),
+    Float(Vec<f64>),
 }
 
 pub struct RowParquetReader<'a> {
@@ -199,6 +199,7 @@ impl<'a> RowParquetReader<'a> {
                         ColumnType::Decimal { .. } => ColumnAccessor::Int(vec![0; 16384]),
                         ColumnType::Timestamp => ColumnAccessor::Int(vec![0; 16384]),
                         ColumnType::Boolean => ColumnAccessor::Boolean(vec![false; 16384]),
+                        ColumnType::Float => ColumnAccessor::Float(vec![0.0; 16384]),
                     },
                     Some(vec![0; 16384]),
                 )
@@ -249,6 +250,21 @@ impl<'a> RowParquetReader<'a> {
                 }
                 ColumnAccessor::Boolean(buffer) => {
                     if let ColumnReader::BoolColumnReader(ref mut reader) = col_reader {
+                        values_read = max(
+                            values_read,
+                            reader
+                                .read_batch(
+                                    buffer.len(),
+                                    def_levels.as_mut().map(|l| l.as_mut_slice()),
+                                    None,
+                                    buffer.as_mut_slice(),
+                                )?
+                                .1,
+                        );
+                    }
+                }
+                ColumnAccessor::Float(buffer) => {
+                    if let ColumnReader::DoubleColumnReader(ref mut reader) = col_reader {
                         values_read = max(
                             values_read,
                             reader
@@ -357,6 +373,21 @@ impl<'a> RowParquetReader<'a> {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
                                         vec_result[i].push(TableValue::Boolean(value));
+                                        cur_value_index += 1;
+                                    } else {
+                                        vec_result[i].push(TableValue::Null);
+                                    }
+                                }
+                            }
+                        }
+                        ColumnType::Float => {
+                            if let ColumnAccessor::Float(buffer) = &column_accessor {
+                                for i in 0..values_read {
+                                    if levels[i] == 1 {
+                                        let value = buffer[cur_value_index];
+                                        vec_result[i].push(TableValue::Float(
+                                            value.to_string()
+                                        ));
                                         cur_value_index += 1;
                                     } else {
                                         vec_result[i].push(TableValue::Null);
@@ -617,6 +648,60 @@ impl RowParquetWriter {
                                 }
                             })
                             .collect::<Result<Vec<i64>, _>>()?;
+                        let min = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
+                            Some(column_values[0].clone())
+                        } else {
+                            None
+                        };
+                        let max = if self.sort_key_size >= column_index as u64
+                            && column_values.len() > 0
+                        {
+                            Some(column_values[column_values.len() - 1].clone())
+                        } else {
+                            None
+                        };
+                        let def_levels = self.get_def_levels(
+                            batch_size,
+                            row_batch_index,
+                            column_index,
+                            rows_in_group,
+                            column_values.len(),
+                        );
+                        typed.write_batch_with_statistics(
+                            &column_values,
+                            def_levels.as_ref().map(|b| b.as_slice()),
+                            None,
+                            &min,
+                            &max,
+                            None,
+                            None,
+                        )?;
+                    }
+                    ColumnWriter::DoubleColumnWriter(ref mut typed) => {
+                        let column = &self.columns[column_index];
+                        let column_values = (0..rows_in_group)
+                            .filter(|row_index| {
+                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                    != &TableValue::Null
+                            })
+                            .map(|row_index| -> Result<_, CubeError> {
+                                // TODO types
+                                match &self.buffer[row_batch_index * batch_size + row_index].values
+                                    [column_index]
+                                {
+                                    TableValue::Float(val) => match column.get_column_type() {
+                                        ColumnType::Float => {
+                                            Ok(val.parse::<f64>()?)
+                                        }
+                                        x => panic!("Unexpected type: {:?}", x),
+                                    },
+                                    x => panic!("Unsupported value: {:?}", x),
+                                }
+                            })
+                            .collect::<Result<Vec<f64>, _>>()?;
                         let min = if self.sort_key_size >= column_index as u64
                             && column_values.len() > 0
                         {
