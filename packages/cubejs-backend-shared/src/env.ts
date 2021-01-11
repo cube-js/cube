@@ -1,6 +1,16 @@
 import { get } from 'env-var';
 
-export function convertTimeStrToMs(input: string, envName: string) {
+export class InvalidConfiguration extends Error {
+  public constructor(key: string, value: any, description: string) {
+    super(`Value "${value}" is not valid for ${key}. ${description}`);
+  }
+}
+
+export function convertTimeStrToMs(
+  input: string,
+  envName: string,
+  description: string = 'Must be number (in seconds) or string in time format (1s, 1m, 1h).',
+) {
   if (/^\d+$/.test(input)) {
     return parseInt(input, 10);
   }
@@ -17,8 +27,43 @@ export function convertTimeStrToMs(input: string, envName: string) {
     }
   }
 
-  throw new Error(
-    `Unsupported time format in ${envName}`
+  throw new InvalidConfiguration(envName, input, description);
+}
+
+export function asPortNumber(input: number, envName: string) {
+  if (input < 0) {
+    throw new InvalidConfiguration(envName, input, 'Should be a positive integer.');
+  }
+
+  if (input > 65535) {
+    throw new InvalidConfiguration(envName, input, 'Should be lower or equal than 65535.');
+  }
+
+  return input;
+}
+
+function asPortOrSocket(input: string, envName: string): number|string {
+  if (/^-?\d+$/.test(input)) {
+    return asPortNumber(parseInt(input, 10), envName);
+  }
+
+  // @todo Can we check that path for socket is valid?
+  return input;
+}
+
+function asBoolOrTime(input: string, envName: string): number|boolean {
+  if (input === 'true') {
+    return true;
+  }
+
+  if (input === 'false') {
+    return false;
+  }
+
+  return convertTimeStrToMs(
+    input,
+    envName,
+    'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
   );
 }
 
@@ -26,22 +71,18 @@ const variables = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
-  port: () => get('PORT')
-    .default(4000)
-    .required()
-    .asPortNumber(),
-  tlsPort: () => get('TLS_PORT')
-    .default(4433)
-    .required()
-    .asPortNumber(),
+  port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
+  tlsPort: () => asPortOrSocket(process.env.TLS_PORT || '4433', 'TLS_PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
     .asBoolStrict(),
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
-  refreshTimer: () => get('CUBEJS_SCHEDULED_REFRESH_TIMER')
-    .asInt(),
+  refreshTimer: () => process.env.CUBEJS_SCHEDULED_REFRESH_TIMER
+    && asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER'),
+  gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
+    .asIntPositive(),
   scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
     .asBool(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
@@ -50,6 +91,8 @@ const variables = {
   internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')
     .asEnum(['exit', 'log', 'false']),
+  preAggregationsSchema: () => get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
+    .asString(),
   dbPollTimeout: () => {
     const value = process.env.CUBEJS_DB_POLL_TIMEOUT || '15m';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');

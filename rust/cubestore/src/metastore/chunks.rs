@@ -3,9 +3,11 @@ use crate::base_rocks_secondary_index;
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
+use chrono::Utc;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
 use std::io::Cursor;
+use std::ops::Sub;
 
 impl Chunk {
     pub fn new(partition_id: u64, row_count: usize) -> Chunk {
@@ -14,6 +16,7 @@ impl Chunk {
             row_count: row_count as u64,
             uploaded: false,
             active: false,
+            last_used: None,
         }
     }
 
@@ -35,6 +38,7 @@ impl Chunk {
             row_count: self.row_count,
             uploaded,
             active: uploaded,
+            last_used: self.last_used.clone(),
         }
     }
 
@@ -44,7 +48,14 @@ impl Chunk {
             row_count: self.row_count,
             uploaded: self.uploaded,
             active: false,
+            last_used: self.last_used.clone(),
         }
+    }
+
+    pub fn update_last_used(&self) -> Self {
+        let mut new = self.clone();
+        new.last_used = Some(Utc::now());
+        new
     }
 
     pub fn uploaded(&self) -> bool {
@@ -53,6 +64,12 @@ impl Chunk {
 
     pub fn active(&self) -> bool {
         self.active
+    }
+
+    pub fn is_used(&self, timeout: u64) -> bool {
+        self.last_used
+            .map(|time| Utc::now().sub(time.clone()).num_seconds() < timeout as i64)
+            .unwrap_or(false)
     }
 }
 

@@ -318,11 +318,12 @@ a {
       }
 
       .mainTabLink {
+        font-family: $header-font;
+        font-weight: bold;
         line-height: 32px;
         font-size: 19px;
         letter-spacing: 0.02em;
         color: $brand-color;
-        font-weight: 500;
       }
 
       .mainTabText {
@@ -530,11 +531,11 @@ span.group-header {
         }
         .ant-menu-item-group-title {
           text-transform: uppercase;
-          font-size: 13px;
-          line-height: 21px;
-          letter-spacing: 1px;
+          font-size: 0.8rem;
+          line-height: 1.125rem;
+          letter-spacing: 0.04rem;
           padding-left: 10px;
-          font-weight: bold;
+          font-weight: normal;
           color: $dark-04;
         }
       }
@@ -829,10 +830,6 @@ section[type=h2] h2 {
 		border: none;
 		padding-top: 11px;
 	}
-}
-
-section[type=h2] > :last-child :not(pre) {
-  padding-bottom: 0;
 }
 
 // md inner content styles

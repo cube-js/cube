@@ -16,8 +16,6 @@ pre[class*="language-"] {
   font-family: $code-font;
   text-align: left;
   font-weight: normal;
-  font-size: 14px;
-  line-height: 20px;
   white-space: pre;
   word-spacing: normal;
   word-break: normal;
@@ -56,7 +54,7 @@ code[class*="language-"]::selection, code[class*="language-"] ::selection {
 
 /* Code blocks */
 pre[class*="language-"] {
-  padding: 1em;
+  padding: 1rem 1rem 1.25rem;
   overflow: auto;
 }
 

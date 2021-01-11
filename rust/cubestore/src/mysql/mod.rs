@@ -8,6 +8,7 @@ use std::io;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::net::TcpListener;
+use itertools::Itertools;
 
 struct Backend {
     sql_service: Arc<dyn SqlService>,
@@ -65,7 +66,8 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     metastore::ColumnType::Int => ColumnType::MYSQL_TYPE_LONGLONG,
                     metastore::ColumnType::Decimal { .. } => ColumnType::MYSQL_TYPE_DECIMAL,
                     metastore::ColumnType::Boolean => ColumnType::MYSQL_TYPE_STRING,
-                    x => panic!("Unsupported type in MySQL adapter: {:?}", x),
+                    metastore::ColumnType::Bytes => ColumnType::MYSQL_TYPE_STRING,
+                    metastore::ColumnType::Float => ColumnType::MYSQL_TYPE_STRING
                 },
                 colflags: ColumnFlags::empty(),
             })
@@ -80,8 +82,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     TableValue::Int(i) => rw.write_col(i)?,
                     TableValue::Decimal(v) => rw.write_col(v.to_string())?,
                     TableValue::Boolean(v) => rw.write_col(v.to_string())?,
+                    TableValue::Float(v) => rw.write_col(v.to_string())?,
+                    TableValue::Bytes(b) => rw.write_col(b.iter().map(|v| v.to_string()).join(" "))?,
                     TableValue::Null => rw.write_col(Option::<String>::None)?,
-                    x => panic!("Table value is not supported for MySQL: {:?}", x),
                 }
             }
             rw.end_row()?;

@@ -8,7 +8,10 @@ extern crate bincode;
 
 use bincode::{deserialize_from, serialize_into};
 
-use crate::metastore::{table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL, MetaStoreTable};
+use crate::metastore::{
+    table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, MetaStoreTable, Partition,
+    WAL,
+};
 use crate::remotefs::RemoteFs;
 use crate::table::{Row, TableStore, TableValue};
 use crate::CubeError;
@@ -22,8 +25,8 @@ use std::{
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
-use mockall::automock;
 use log::trace;
+use mockall::automock;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct DataFrame {
@@ -307,22 +310,25 @@ impl ChunkDataStore for ChunkStore {
         let table_id = wal.get_row().table_id();
         let data = self.wal_store.get_wal(wal_id).await?;
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
+        let mut new_chunks = Vec::new();
         for index in indexes.iter() {
-            let new_chunks = self
-                .partition_data_frame(
-                    index.get_id(),
-                    data.remap_columns(index.get_row().columns().clone())?,
-                )
-                .await?; // TODO dataframe clone
-            self.meta_store
-                .swap_chunks(
-                    Vec::new(),
-                    new_chunks.into_iter().map(|c| c.get_id()).collect(),
-                )
-                .await?;
+            new_chunks.append(
+                &mut self
+                    .partition_data_frame(
+                        index.get_id(),
+                        data.remap_columns(index.get_row().columns().clone())?,
+                    )
+                    .await?,
+            ); // TODO dataframe clone
         }
 
-        self.meta_store.delete_wal(wal_id).await?;
+        self.meta_store
+            .activate_wal(
+                wal_id,
+                new_chunks.into_iter().map(|c| c.get_id()).collect(),
+                indexes.len() as u64,
+            )
+            .await?;
 
         Ok(())
     }
@@ -337,7 +343,7 @@ impl ChunkDataStore for ChunkStore {
         }
         let chunks = self
             .meta_store
-            .get_chunks_by_partition(partition_id)
+            .get_chunks_by_partition(partition_id, false)
             .await?;
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
@@ -423,6 +429,7 @@ impl ChunkDataStore for ChunkStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
     use crate::metastore::RocksMetaStore;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::{metastore::ColumnType, table::TableValue};
@@ -432,6 +439,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn create_wal_test() {
+        let config = Config::test("create_chunk_test");
         let path = "/tmp/test_create_wal";
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
@@ -445,7 +453,7 @@ mod tests {
                 PathBuf::from(remote_store_path.clone()),
             );
             let store = WALStore::new(
-                RocksMetaStore::new(path, remote_fs.clone()),
+                RocksMetaStore::new(path, remote_fs.clone(), config.config_obj()),
                 remote_fs.clone(),
                 10,
             );
@@ -507,6 +515,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn create_chunk_test() {
+        let config = Config::test("create_chunk_test");
         let path = "/tmp/test_create_chunk";
         let wal_store_path = path.to_string() + &"_store_wal".to_string();
         let wal_remote_store_path = path.to_string() + &"_remote_store_wal".to_string();
@@ -523,7 +532,7 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
                 PathBuf::from(chunk_remote_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone());
+            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let chunk_store =
                 ChunkStore::new(meta_store.clone(), remote_fs.clone(), wal_store.clone(), 10);

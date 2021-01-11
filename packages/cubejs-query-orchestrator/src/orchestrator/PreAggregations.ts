@@ -846,14 +846,15 @@ export class PreAggregations {
   }
 
   getQueue(dataSource: string) {
+    dataSource = dataSource || 'default';
     if (!this.queue[dataSource]) {
-      this.queue[dataSource] = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`, () => this.driverFactory(dataSource || 'default'), (client, q) => {
+      this.queue[dataSource] = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`, () => this.driverFactory(dataSource), (client, q) => {
         const {
           preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys
         } = q;
         const loader = new PreAggregationLoader(
           this.redisPrefix,
-          () => this.driverFactory(dataSource || 'default'),
+          () => this.driverFactory(dataSource),
           this.logger,
           this.queryCache,
           this,
@@ -861,7 +862,7 @@ export class PreAggregations {
           preAggregationsTablesToTempTables,
           new PreAggregationLoadCache(
             this.redisPrefix,
-            () => this.driverFactory(dataSource || 'default'),
+            () => this.driverFactory(dataSource),
             this.queryCache,
             this,
             { requestId }
@@ -884,6 +885,7 @@ export class PreAggregations {
   }
 
   getLoadCacheQueue(dataSource: string) {
+    dataSource = dataSource || 'default';
     if (!this.loadCacheQueue[dataSource]) {
       this.loadCacheQueue[dataSource] = QueryCache.createQueue(
         `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}_${dataSource}`,
@@ -895,7 +897,7 @@ export class PreAggregations {
             requestId
           } = q;
           const loadCache = new PreAggregationLoadCache(
-            this.redisPrefix, () => this.driverFactory(dataSource || 'default'), this.queryCache, this,
+            this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this,
             { requestId }
           );
           return loadCache.fetchTables(preAggregation);

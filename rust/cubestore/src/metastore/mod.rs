@@ -10,13 +10,17 @@ pub mod wal;
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::{error, info};
-use rocksdb::{DBIterator, Options, WriteBatch, WriteBatchIterator, DB, MergeOperands, Snapshot, IteratorMode, ReadOptions, Direction};
+use rocksdb::{
+    DBIterator, Direction, IteratorMode, MergeOperands, Options, ReadOptions, Snapshot, WriteBatch,
+    WriteBatchIterator, DB,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time};
 use tokio::fs;
 use tokio::sync::{Notify, RwLock};
 
+use crate::config::{Config, ConfigObj};
 use crate::metastore::chunks::{ChunkIndexKey, ChunkRocksIndex};
 use crate::metastore::index::IndexIndexKey;
 use crate::metastore::job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus};
@@ -29,11 +33,13 @@ use crate::table::{Row, TableValue};
 use crate::CubeError;
 use arrow::datatypes::TimeUnit::Microsecond;
 use arrow::datatypes::{DataType, Field};
+use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
-use core::fmt;
+use core::{fmt, mem};
 use futures::future::join_all;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
+use log::trace;
 use parquet::basic::Repetition;
 use parquet::{
     basic::{LogicalType, Type},
@@ -48,6 +54,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Mutex;
 use std::time::SystemTime;
 use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
@@ -55,7 +62,6 @@ use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
 use tokio::time::Duration;
 use wal::WALRocksTable;
-use log::{trace};
 
 #[macro_export]
 macro_rules! format_table_value {
@@ -121,13 +127,12 @@ macro_rules! base_rocks_secondary_index {
 macro_rules! rocks_table_impl {
     ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $delete_event: tt) => {
         pub(crate) struct $rocks_table<'a> {
-            db: &'a DB,
-            snapshot: &'a rocksdb::Snapshot<'a>,
+            db: crate::metastore::DbTableRef<'a>,
         }
 
         impl<'a> $rocks_table<'a> {
-            pub fn new(db: (&'a DB, &'a rocksdb::Snapshot<'a>)) -> $rocks_table {
-                $rocks_table { db: db.0, snapshot: db.1 }
+            pub fn new(db: crate::metastore::DbTableRef<'a>) -> $rocks_table {
+                $rocks_table { db }
             }
         }
 
@@ -135,11 +140,15 @@ macro_rules! rocks_table_impl {
             type T = $table;
 
             fn db(&self) -> &DB {
-                self.db
+                self.db.db
             }
 
             fn snapshot(&self) -> &rocksdb::Snapshot {
-                self.snapshot
+                self.db.snapshot
+            }
+
+            fn mem_seq(&self) -> &crate::metastore::MemorySequence {
+                &self.db.mem_seq
             }
 
             fn table_id(&self) -> TableId {
@@ -217,6 +226,14 @@ impl DataFrameValue<String> for Option<String> {
     }
 }
 
+impl DataFrameValue<String> for Option<DateTime<Utc>> {
+    fn value(v: &Self) -> String {
+        v.as_ref()
+            .map(|s| s.to_string())
+            .unwrap_or("NULL".to_string())
+    }
+}
+
 impl DataFrameValue<String> for Option<ImportFormat> {
     fn value(v: &Self) -> String {
         v.as_ref()
@@ -249,6 +266,7 @@ impl DataFrameValue<String> for Option<Row> {
                             TableValue::Bytes(b) => format!("{:?}", b),
                             TableValue::Boolean(b) => format!("{:?}", b),
                             TableValue::Decimal(v) => format!("{}", v),
+                            TableValue::Float(v) => format!("{}", v)
                         })
                         .join(", ")
                 )
@@ -264,6 +282,7 @@ pub enum ColumnType {
     Bytes,
     Timestamp,
     Decimal { scale: i32, precision: i32 },
+    Float,
     Boolean,
 }
 
@@ -329,6 +348,12 @@ impl From<&Column> for parquet::schema::types::Type {
                     .build()
                     .unwrap()
             }
+            ColumnType::Float => {
+                types::Type::primitive_type_builder(&column.get_name(), Type::DOUBLE)
+                    .with_repetition(Repetition::OPTIONAL)
+                    .build()
+                    .unwrap()
+            }
         }
     }
 }
@@ -353,6 +378,7 @@ impl Into<Field> for Column {
                     DataType::Int64Decimal(self.column_type.target_scale() as usize)
                 }
                 ColumnType::Bytes => DataType::Binary,
+                ColumnType::Float => DataType::Float64,
             },
             false,
         )
@@ -370,6 +396,7 @@ impl fmt::Display for Column {
                 format!("DECIMAL({}, {})", precision, scale)
             }
             ColumnType::Bytes => "BYTES".to_string(),
+            ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))
     }
@@ -404,14 +431,16 @@ pub struct IndexDef {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct Partition {
     index_id: u64,
     parent_partition_id: Option<u64>,
     min_value: Option<Row>,
     max_value: Option<Row>,
     active: bool,
-    main_table_row_count: u64
+    main_table_row_count: u64,
+    #[serde(default)]
+    last_used: Option<DateTime<Utc>>
 }
 }
 
@@ -421,7 +450,9 @@ pub struct Chunk {
     partition_id: u64,
     row_count: u64,
     uploaded: bool,
-    active: bool
+    active: bool,
+    #[serde(default)]
+    last_used: Option<DateTime<Utc>>
 }
 }
 
@@ -490,6 +521,13 @@ impl<'a> BatchPipe<'a> {
     }
 }
 
+#[derive(Clone)]
+pub struct DbTableRef<'a> {
+    pub db: &'a DB,
+    pub snapshot: &'a Snapshot<'a>,
+    pub mem_seq: MemorySequence,
+}
+
 #[async_trait]
 pub trait MetaStoreTable: Send + Sync {
     type T: Serialize + Clone + Debug + 'static;
@@ -505,11 +543,11 @@ pub trait MetaStoreTable: Send + Sync {
 macro_rules! meta_store_table_impl {
     ($name: ident, $table: ty, $rocks_table: ident) => {
         pub struct $name {
-            rocks_meta_store: RocksMetaStore
+            rocks_meta_store: RocksMetaStore,
         }
 
         impl $name {
-            fn table<'a>(db: (&'a DB, &'a Snapshot<'a>)) -> $rocks_table<'a> {
+            fn table<'a>(db: DbTableRef<'a>) -> $rocks_table<'a> {
                 <$rocks_table>::new(db)
             }
         }
@@ -532,11 +570,13 @@ macro_rules! meta_store_table_impl {
 
             async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
                 self.rocks_meta_store
-                    .write_operation(move |db_ref, batch| Ok(Self::table(db_ref).delete(id, batch)?))
+                    .write_operation(
+                        move |db_ref, batch| Ok(Self::table(db_ref).delete(id, batch)?),
+                    )
                     .await
             }
         }
-    }
+    };
 }
 
 meta_store_table_impl!(SchemaMetaStoreTable, Schema, SchemaRocksTable);
@@ -608,6 +648,7 @@ pub trait MetaStore: Send + Sync {
         compacted_chunk_ids: Vec<u64>,
         new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError>;
+    async fn is_partition_used(&self, partition_id: u64) -> Result<bool, CubeError>;
 
     fn index_table(&self) -> IndexMetaStoreTable;
     async fn create_index(
@@ -623,7 +664,7 @@ pub trait MetaStore: Send + Sync {
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
 
-    async fn get_active_partitions_and_chunks_by_index_id(
+    async fn get_active_partitions_and_chunks_by_index_id_for_select(
         &self,
         index_id: u64,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
@@ -638,6 +679,7 @@ pub trait MetaStore: Send + Sync {
     async fn get_chunks_by_partition(
         &self,
         partition_id: u64,
+        include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn deactivate_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
@@ -646,6 +688,14 @@ pub trait MetaStore: Send + Sync {
         deactivate_ids: Vec<u64>,
         uploaded_ids: Vec<u64>,
     ) -> Result<(), CubeError>;
+    async fn activate_wal(
+        &self,
+        wal_id_to_delete: u64,
+        uploaded_ids: Vec<u64>,
+        index_count: u64,
+    ) -> Result<(), CubeError>;
+    async fn is_chunk_used(&self, chunk_id: u64) -> Result<bool, CubeError>;
+    async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
@@ -787,8 +837,24 @@ enum_from_primitive! {
 }
 
 #[derive(Clone)]
+pub struct MemorySequence {
+    seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
+}
+
+impl MemorySequence {
+    pub fn next_seq(&self, table_id: TableId, snapshot_value: u64) -> Result<u64, CubeError> {
+        let mut store = self.seq_store.lock()?;
+        let mut current = *store.entry(table_id).or_insert(snapshot_value);
+        current += 1;
+        store.insert(table_id, current);
+        Ok(current)
+    }
+}
+
+#[derive(Clone)]
 pub struct RocksMetaStore {
     pub db: Arc<RwLock<Arc<DB>>>,
+    seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
     listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
     remote_fs: Arc<dyn RemoteFs>,
     last_checkpoint_time: Arc<RwLock<SystemTime>>,
@@ -797,6 +863,7 @@ pub struct RocksMetaStore {
     last_upload_seq: Arc<RwLock<u64>>,
     last_check_seq: Arc<RwLock<u64>>,
     upload_loop_enabled: Arc<RwLock<bool>>,
+    config: Arc<dyn ConfigObj>,
 }
 
 trait BaseRocksSecondaryIndex<T>: Debug {
@@ -888,6 +955,7 @@ trait RocksTable: Debug + Send + Sync {
     fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent;
     fn db(&self) -> &DB;
     fn snapshot(&self) -> &Snapshot;
+    fn mem_seq(&self) -> &MemorySequence;
     fn index_id(&self, index_num: IndexId) -> IndexId;
     fn table_id(&self) -> TableId;
     fn deserialize_row<'de, D>(&self, deserializer: D) -> Result<Self::T, D::Error>
@@ -967,10 +1035,23 @@ trait RocksTable: Debug + Send + Sync {
         let mut res = Vec::new();
 
         for id in row_ids {
-            res.push(self.get_row(id)?.ok_or(CubeError::internal(format!(
-                "Row exists in secondary index however missing in {:?} table: {}",
-                self, id
-            )))?)
+            if let Some(row) = self.get_row(id)? {
+                res.push(row);
+            } else {
+                let secondary_index_key = RowKey::SecondaryIndex(
+                    self.index_id(RocksSecondaryIndex::get_id(secondary_index)),
+                    secondary_index
+                        .typed_key_hash(row_key)
+                        .to_be_bytes()
+                        .to_vec(),
+                    id,
+                );
+                self.db().delete(secondary_index_key.to_bytes())?;
+                return Err(CubeError::internal(format!(
+                    "Row exists in secondary index however missing in {:?} table: {}. Repairing index.",
+                    self, id
+                )));
+            }
         }
 
         if RocksSecondaryIndex::is_unique(secondary_index) && res.len() > 1 {
@@ -1053,12 +1134,21 @@ trait RocksTable: Debug + Send + Sync {
     fn next_table_seq(&self) -> Result<u64, CubeError> {
         let ref db = self.db();
         let seq_key = RowKey::Sequence(self.table_id());
-        let mut increment = vec![];
-        increment.write_u64::<BigEndian>(1)?;
-        db.merge(seq_key.to_bytes(), increment)?;
-        // TODO ensure get is called on a merged key
-        let result = db.get(seq_key.to_bytes())?.unwrap();
-        Ok(Cursor::new(result).read_u64::<BigEndian>().unwrap())
+        let before_merge = self
+            .snapshot()
+            .get(seq_key.to_bytes())?
+            .map(|v| Cursor::new(v).read_u64::<BigEndian>().unwrap());
+
+        // TODO revert back merge operator if locking works
+        let next_seq = self
+            .mem_seq()
+            .next_seq(self.table_id(), before_merge.unwrap_or(0))?;
+
+        let mut to_write = vec![];
+        to_write.write_u64::<BigEndian>(next_seq)?;
+        db.put(seq_key.to_bytes(), to_write)?;
+
+        Ok(next_seq)
     }
 
     fn insert_row(&self, row: Vec<u8>) -> Result<(u64, KeyVal), CubeError> {
@@ -1165,7 +1255,10 @@ trait RocksTable: Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iter = db.iterator_opt(IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward), opts);
+        let iter = db.iterator_opt(
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+            opts,
+        );
 
         for (key, value) in iter {
             if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
@@ -1205,8 +1298,11 @@ trait RocksTable: Debug + Send + Sync {
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
         let iterator = db.iterator_opt(
-            IteratorMode::From(&key_min.to_bytes()[0..get_fixed_prefix()], Direction::Forward),
-            opts
+            IteratorMode::From(
+                &key_min.to_bytes()[0..get_fixed_prefix()],
+                Direction::Forward,
+            ),
+            opts,
         );
 
         Ok(TableScanIter {
@@ -1285,7 +1381,7 @@ impl WriteBatchContainer {
 
         let mut buffer = Vec::new();
         tokio::io::AsyncReadExt::read_to_end(&mut file, &mut buffer).await?;
-        let r = flexbuffers::Reader::get_root(&buffer).unwrap();
+        let r = flexbuffers::Reader::get_root(&buffer)?;
         Ok(Self::deserialize(r)?)
     }
 }
@@ -1300,14 +1396,15 @@ impl WriteBatchIterator for WriteBatchContainer {
     }
 }
 
-fn meta_store_merge(_new_key: &[u8],
-                existing_val: Option<&[u8]>,
-                operands: &mut MergeOperands)
-                -> Option<Vec<u8>> {
+fn meta_store_merge(
+    _new_key: &[u8],
+    existing_val: Option<&[u8]>,
+    operands: &mut MergeOperands,
+) -> Option<Vec<u8>> {
     let mut result: Vec<u8> = Vec::with_capacity(8);
-    let mut counter = existing_val.map(|v| {
-        Cursor::new(v).read_u64::<BigEndian>().unwrap()
-    }).unwrap_or(0);
+    let mut counter = existing_val
+        .map(|v| Cursor::new(v).read_u64::<BigEndian>().unwrap())
+        .unwrap_or(0);
     for op in operands {
         counter += Cursor::new(op).read_u64::<BigEndian>().unwrap()
     }
@@ -1320,8 +1417,9 @@ impl RocksMetaStore {
         path: impl AsRef<Path>,
         listeners: Vec<Sender<MetaStoreEvent>>,
         remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
     ) -> Arc<RocksMetaStore> {
-        let meta_store = RocksMetaStore::with_listener_impl(path, listeners, remote_fs);
+        let meta_store = RocksMetaStore::with_listener_impl(path, listeners, remote_fs, config);
         Arc::new(meta_store)
     }
 
@@ -1329,6 +1427,7 @@ impl RocksMetaStore {
         path: impl AsRef<Path>,
         listeners: Vec<Sender<MetaStoreEvent>>,
         remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
     ) -> RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
@@ -1340,6 +1439,7 @@ impl RocksMetaStore {
 
         let meta_store = RocksMetaStore {
             db: Arc::new(RwLock::new(db_arc.clone())),
+            seq_store: Arc::new(Mutex::new(HashMap::new())),
             listeners: Arc::new(RwLock::new(listeners)),
             remote_fs,
             last_checkpoint_time: Arc::new(RwLock::new(SystemTime::now())),
@@ -1348,17 +1448,23 @@ impl RocksMetaStore {
             last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             upload_loop_enabled: Arc::new(RwLock::new(true)),
+            config,
         };
         meta_store
     }
 
-    pub fn new(path: impl AsRef<Path>, remote_fs: Arc<dyn RemoteFs>) -> Arc<RocksMetaStore> {
-        Self::with_listener(path, vec![], remote_fs)
+    pub fn new(
+        path: impl AsRef<Path>,
+        remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Arc<RocksMetaStore> {
+        Self::with_listener(path, vec![], remote_fs, config)
     }
 
     pub async fn load_from_remote(
         path: impl AsRef<Path>,
         remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<RocksMetaStore>, CubeError> {
         if !fs::metadata(path.as_ref()).await.is_ok() {
             let re = Regex::new(r"^metastore-(\d+)").unwrap();
@@ -1402,25 +1508,30 @@ impl RocksMetaStore {
                         .await?;
                     }
 
-                    let meta_store = Self::new(path.as_ref(), remote_fs.clone());
+                    let meta_store = Self::new(path.as_ref(), remote_fs.clone(), config);
 
                     let logs_to_batch = remote_fs
                         .list(&format!("metastore-{}-logs", snapshot))
                         .await?;
                     for log_file in logs_to_batch.iter() {
                         let path_to_log = remote_fs.local_file(log_file).await?;
-                        let batch = WriteBatchContainer::read_from_file(&path_to_log).await?;
-                        let db = meta_store.db.write().await;
-                        db.write(batch.write_batch())?;
+                        let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
+                        if let Ok(batch) = batch {
+                            let db = meta_store.db.write().await;
+                            db.write(batch.write_batch())?;
+                        } else if let Err(e) = batch {
+                            error!(
+                                "Corrupted metastore WAL file. Discarding: {:?} {}",
+                                log_file, e
+                            );
+                            break;
+                        }
                     }
 
                     return Ok(meta_store);
                 }
             } else {
-                trace!(
-                    "Can't find metastore-current in {:?}",
-                    remote_fs
-                );
+                trace!("Can't find metastore-current in {:?}", remote_fs);
             }
             info!(
                 "Creating metastore from scratch in {}",
@@ -1433,7 +1544,7 @@ impl RocksMetaStore {
             );
         }
 
-        Ok(Self::new(path, remote_fs))
+        Ok(Self::new(path, remote_fs, config))
     }
 
     pub async fn add_listener(&self, listener: Sender<MetaStoreEvent>) {
@@ -1442,19 +1553,34 @@ impl RocksMetaStore {
 
     async fn write_operation<F, R>(&self, f: F) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce((&'a DB, &'a Snapshot<'a>), &'a mut BatchPipe) -> Result<R, CubeError> + Send + 'static,
+        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+            + Send
+            + 'static,
         R: Send + 'static,
     {
-        let db = self.db.write().await.clone();
+        let db = self.db.write().await;
+        let mem_seq = MemorySequence {
+            seq_store: self.seq_store.clone(),
+        };
+        let db_to_send = db.clone();
         let (spawn_res, events) =
             tokio::task::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
-                let mut batch = BatchPipe::new(db.as_ref());
-                let snapshot = db.snapshot();
-                let res = f((db.as_ref(), &snapshot), &mut batch)?;
+                let mut batch = BatchPipe::new(db_to_send.as_ref());
+                let snapshot = db_to_send.snapshot();
+                let res = f(
+                    DbTableRef {
+                        db: db_to_send.as_ref(),
+                        snapshot: &snapshot,
+                        mem_seq,
+                    },
+                    &mut batch,
+                )?;
                 let write_result = batch.batch_write_rows()?;
                 Ok((res, write_result))
             })
             .await??;
+
+        mem::drop(db);
 
         self.write_notify.notify();
 
@@ -1645,14 +1771,28 @@ impl RocksMetaStore {
 
     async fn read_operation<F, R>(&self, f: F) -> R
     where
-        F: for<'a> FnOnce((&'a DB, &'a Snapshot<'a>)) -> R + Send + 'static,
+        F: for<'a> FnOnce(DbTableRef<'a>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        let db = self.db.read().await.clone();
-        tokio::task::spawn_blocking(move || {
-            let snapshot = db.snapshot();
-            f((db.as_ref(), &snapshot))
-        }).await.unwrap()
+        let db = self.db.read().await;
+        let mem_seq = MemorySequence {
+            seq_store: self.seq_store.clone(),
+        };
+        let db_to_send = db.clone();
+        let res = tokio::task::spawn_blocking(move || {
+            let snapshot = db_to_send.snapshot();
+            f(DbTableRef {
+                db: db_to_send.as_ref(),
+                snapshot: &snapshot,
+                mem_seq,
+            })
+        })
+        .await
+        .unwrap();
+
+        mem::drop(db);
+
+        res
     }
 
     fn check_if_exists(name: &String, existing_keys_len: usize) -> Result<(), CubeError> {
@@ -1670,6 +1810,7 @@ impl RocksMetaStore {
     }
 
     pub fn prepare_test_metastore(test_name: &str) -> (Arc<LocalDirRemoteFs>, Arc<RocksMetaStore>) {
+        let config = Config::test(test_name);
         let store_path = env::current_dir()
             .unwrap()
             .join(format!("test-{}-local", test_name));
@@ -1682,6 +1823,7 @@ impl RocksMetaStore {
         let meta_store = RocksMetaStore::new(
             store_path.clone().join("metastore").as_path(),
             remote_fs.clone(),
+            config.config_obj(),
         );
         (remote_fs, meta_store)
     }
@@ -1865,20 +2007,7 @@ impl MetaStore for RocksMetaStore {
     async fn get_schema(&self, schema_name: String) -> Result<IdRow<Schema>, CubeError> {
         self.read_operation(move |db_ref| {
             let table = SchemaRocksTable::new(db_ref);
-            let existing_keys =
-                table.get_row_ids_by_index(&schema_name, &SchemaRocksIndex::Name)?;
-            RocksMetaStore::check_if_exists(&schema_name, existing_keys.len())?;
-
-            let schema_id = existing_keys[0];
-            if let Some(schema) = table.get_row(schema_id)? {
-                return Ok(schema);
-            }
-
-            let e = CubeError::user(format!(
-                "Schema with name '{}' does not exist.",
-                schema_name
-            ));
-            Err(e)
+            Ok(table.get_single_row_by_index(&schema_name, &SchemaRocksIndex::Name)?)
         })
         .await
     }
@@ -1994,7 +2123,7 @@ impl MetaStore for RocksMetaStore {
             let (mut sorted, mut unsorted) =
                 index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
                     match c.get_column_type() {
-                        ColumnType::Decimal { .. } | ColumnType::Bytes => false,
+                        ColumnType::Decimal { .. } | ColumnType::Bytes | ColumnType::Float => false,
                         _ => true,
                     }
                 });
@@ -2148,7 +2277,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_partition_chunk_sizes(&self, partition_id: u64) -> Result<u64, CubeError> {
-        let chunks = self.get_chunks_by_partition(partition_id).await?;
+        let chunks = self.get_chunks_by_partition(partition_id, false).await?;
         Ok(chunks.iter().map(|r| r.get_row().row_count).sum())
     }
 
@@ -2178,6 +2307,9 @@ impl MetaStore for RocksMetaStore {
                         "Current partition is not found during swap active: {}",
                         current
                     )))?;
+                // TODO this check is not atomic
+                // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (35)
+                // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (36)
                 if !current_partition.get_row().is_active() {
                     return Err(CubeError::internal(format!(
                         "Current partition is not active: {:?}",
@@ -2235,6 +2367,16 @@ impl MetaStore for RocksMetaStore {
             }
 
             Ok(())
+        })
+        .await
+    }
+
+    async fn is_partition_used(&self, partition_id: u64) -> Result<bool, CubeError> {
+        let timeout = self.config.not_used_timeout();
+        self.read_operation(move |db_ref| {
+            let table = PartitionRocksTable::new(db_ref);
+            let partition = table.get_row_or_not_found(partition_id)?;
+            Ok(partition.get_row().is_used(timeout))
         })
         .await
     }
@@ -2330,22 +2472,22 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn get_active_partitions_and_chunks_by_index_id(
+    async fn get_active_partitions_and_chunks_by_index_id_for_select(
         &self,
         index_id: u64,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.write_operation(move |db_ref, batch_pipe| {
             let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
             let rocks_partition = PartitionRocksTable::new(db_ref);
             // TODO iterate over range
-            rocks_partition
+            let result = rocks_partition
                 .get_rows_by_index(
                     &PartitionIndexKey::ByIndexId(index_id),
                     &PartitionRocksIndex::IndexId,
                 )?
                 .into_iter()
                 .filter(|r| r.get_row().active)
-                .map(|p| -> Result<_, _> {
+                .map(|p| -> Result<_, CubeError> {
                     let chunks = Self::chunks_by_partitioned_with_non_repartitioned(
                         p.get_id(),
                         &rocks_chunk,
@@ -2353,7 +2495,25 @@ impl MetaStore for RocksMetaStore {
                     )?;
                     Ok((p, chunks))
                 })
-                .collect::<Result<Vec<_>, _>>()
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // update last used
+            for (partition, chunks) in result.iter() {
+                rocks_partition.update_with_fn(
+                    partition.get_id(),
+                    |p| p.update_last_used(),
+                    batch_pipe,
+                )?;
+                for chunk in chunks.iter() {
+                    rocks_chunk.update_with_fn(
+                        chunk.get_id(),
+                        |c| c.update_last_used(),
+                        batch_pipe,
+                    )?;
+                }
+            }
+
+            Ok(result)
         })
         .await
     }
@@ -2384,6 +2544,7 @@ impl MetaStore for RocksMetaStore {
     async fn get_chunks_by_partition(
         &self,
         partition_id: u64,
+        include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         self.read_operation(move |db_ref| {
             let table = ChunkRocksTable::new(db_ref);
@@ -2393,7 +2554,7 @@ impl MetaStore for RocksMetaStore {
                     &ChunkRocksIndex::PartitionId,
                 )?
                 .into_iter()
-                .filter(|c| c.get_row().uploaded() && c.get_row().active())
+                .filter(|c| include_inactive || c.get_row().uploaded() && c.get_row().active())
                 .collect::<Vec<_>>())
         })
         .await
@@ -2427,12 +2588,53 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn activate_wal(
+        &self,
+        wal_id_to_delete: u64,
+        uploaded_ids: Vec<u64>,
+        index_count: u64,
+    ) -> Result<(), CubeError> {
+        trace!(
+            "Swapping chunks: deleting WAL ({}), activating chunks ({})",
+            wal_id_to_delete,
+            uploaded_ids.iter().join(", ")
+        );
+        self.write_operation(move |db_ref, batch_pipe| {
+            let wal_table = WALRocksTable::new(db_ref.clone());
+            let table = ChunkRocksTable::new(db_ref.clone());
+            let mut activated_row_count = 0;
+
+            let deactivated_row_count = wal_table.get_row_or_not_found(wal_id_to_delete)?.get_row().get_row_count();
+            wal_table.delete(wal_id_to_delete, batch_pipe)?;
+
+            for id in uploaded_ids.iter() {
+                activated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
+                table.update_with_fn(*id, |row| row.set_uploaded(true), batch_pipe)?;
+            }
+            if activated_row_count != deactivated_row_count * index_count {
+                return Err(CubeError::internal(format!(
+                    "Deactivated WAL row count ({}) doesn't match activated row count ({}) during swap of ({}) to ({}) chunks",
+                    deactivated_row_count,
+                    activated_row_count,
+                    wal_id_to_delete,
+                    uploaded_ids.iter().join(", ")
+                )))
+            }
+            Ok(())
+        })
+        .await
+    }
+
     async fn swap_chunks(
         &self,
         deactivate_ids: Vec<u64>,
         uploaded_ids: Vec<u64>,
     ) -> Result<(), CubeError> {
-        trace!("Swapping chunks: deactivating ({}), activating ({})", deactivate_ids.iter().join(", "), uploaded_ids.iter().join(", "));
+        trace!(
+            "Swapping chunks: deactivating ({}), activating ({})",
+            deactivate_ids.iter().join(", "),
+            uploaded_ids.iter().join(", ")
+        );
         self.write_operation(move |db_ref, batch_pipe| {
             let table = ChunkRocksTable::new(db_ref.clone());
             let mut deactivated_row_count = 0;
@@ -2455,6 +2657,40 @@ impl MetaStore for RocksMetaStore {
                 )))
             }
             Ok(())
+        })
+            .await
+    }
+
+    async fn is_chunk_used(&self, chunk_id: u64) -> Result<bool, CubeError> {
+        let timeout = self.config.not_used_timeout();
+        self.read_operation(move |db_ref| {
+            let table = ChunkRocksTable::new(db_ref);
+            let chunk = table.get_row_or_not_found(chunk_id)?;
+            Ok(chunk.get_row().is_used(timeout))
+        })
+        .await
+    }
+
+    async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {
+        let timeout = self.config.not_used_timeout();
+        self.write_operation(move |db_ref, batch_pipe| {
+            let chunks = ChunkRocksTable::new(db_ref.clone());
+            let chunk = chunks.get_row_or_not_found(chunk_id)?;
+
+            if chunk.get_row().is_used(timeout) {
+                return Err(CubeError::internal(format!(
+                    "Can't remove used in select chunk #{}",
+                    chunk_id
+                )));
+            }
+
+            if chunk.get_row().active() {
+                return Err(CubeError::internal(format!(
+                    "Can't remove active chunk #{}. It should be deactivated first",
+                    chunk_id
+                )));
+            }
+            Ok(chunks.delete(chunk_id, batch_pipe)?)
         })
         .await
     }
@@ -2612,6 +2848,7 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
+    use std::thread::sleep;
     use std::{env, fs};
 
     #[test]
@@ -2624,6 +2861,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn schema_test() {
+        let config = Config::test("schema_test");
         let store_path = env::current_dir().unwrap().join("test-local");
         let remote_store_path = env::current_dir().unwrap().join("test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
@@ -2631,7 +2869,11 @@ mod tests {
         let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
 
         {
-            let meta_store = RocksMetaStore::new(store_path.join("metastore").as_path(), remote_fs);
+            let meta_store = RocksMetaStore::new(
+                store_path.join("metastore").as_path(),
+                remote_fs,
+                config.config_obj(),
+            );
 
             let schema_1 = meta_store
                 .create_schema("foo".to_string(), false)
@@ -2805,16 +3047,63 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
 
+    #[tokio::test]
+    async fn index_repair_test() {
+        let config = Config::test("index_repair_test");
+        let store_path = env::current_dir().unwrap().join("index_repair_test-local");
+        let remote_store_path = env::current_dir().unwrap().join("index_repair_test-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
+
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.join("metastore").as_path(),
+                remote_fs,
+                config.config_obj(),
+            );
+
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+
+            meta_store
+                .db
+                .write()
+                .await
+                .delete(RowKey::Table(TableId::Schemas, 1).to_bytes())
+                .unwrap();
+
+            let result = meta_store.get_schema("foo".to_string()).await;
+            println!("{:?}", result);
+            assert_eq!(result.is_err(), true);
+
+            sleep(Duration::from_millis(300));
+
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
     #[actix_rt::test]
     async fn table_test() {
+        let config = Config::test("table_test");
         let store_path = env::current_dir().unwrap().join("test-table-local");
         let remote_store_path = env::current_dir().unwrap().join("test-table-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
         {
-            let meta_store =
-                RocksMetaStore::new(store_path.clone().join("metastore").as_path(), remote_fs);
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                remote_fs,
+                config.config_obj(),
+            );
 
             let schema_1 = meta_store
                 .create_schema("foo".to_string(), false)
@@ -2928,6 +3217,83 @@ mod tests {
             services2
                 .meta_store
                 .get_schema("bar".to_string())
+                .await
+                .unwrap();
+        }
+
+        fs::remove_dir_all(config.local_dir()).unwrap();
+        fs::remove_dir_all(config.remote_dir()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn discard_logs() {
+        let config = Config::test("discard_logs");
+
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+
+        {
+            {
+                let services = config.configure().await;
+                services.start_processing_loops().await.unwrap();
+                services
+                    .meta_store
+                    .create_schema("foo1".to_string(), false)
+                    .await
+                    .unwrap();
+                services.meta_store.run_upload().await.unwrap();
+                services
+                    .meta_store
+                    .create_schema("foo".to_string(), false)
+                    .await
+                    .unwrap();
+                services.meta_store.upload_check_point().await.unwrap();
+                services
+                    .meta_store
+                    .create_schema("bar".to_string(), false)
+                    .await
+                    .unwrap();
+                services.meta_store.run_upload().await.unwrap();
+                services.stop_processing_loops().await.unwrap();
+            }
+            tokio::time::delay_for(Duration::from_millis(1000)).await; // TODO logger init conflict
+            fs::remove_dir_all(config.local_dir()).unwrap();
+            let list = LocalDirRemoteFs::list_recursive(
+                config.remote_dir().clone(),
+                "metastore-".to_string(),
+                config.remote_dir().clone(),
+            )
+            .await
+            .unwrap();
+            let re = Regex::new(r"(\d+).flex").unwrap();
+            let last_log = list
+                .iter()
+                .filter(|f| re.captures(f.remote_path()).is_some())
+                .max_by_key(|f| {
+                    re.captures(f.remote_path())
+                        .unwrap()
+                        .get(1)
+                        .map(|m| m.as_str().parse::<u64>().unwrap())
+                })
+                .unwrap();
+            let file_path = config.remote_dir().join(last_log.remote_path());
+            println!("Truncating {:?}", file_path);
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .open(file_path.clone())
+                .unwrap();
+            println!("Size {}", file.metadata().unwrap().len());
+            file.set_len(50).unwrap();
+
+            let services2 = config.configure().await;
+            services2
+                .meta_store
+                .get_schema("foo1".to_string())
+                .await
+                .unwrap();
+            services2
+                .meta_store
+                .get_schema("foo".to_string())
                 .await
                 .unwrap();
         }

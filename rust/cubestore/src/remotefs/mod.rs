@@ -6,11 +6,11 @@ use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
+use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
-use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
@@ -102,13 +102,18 @@ impl RemoteFs for LocalDirRemoteFs {
         debug!("Deleting {}", remote_path);
         let remote_dir = self.remote_dir.write().await;
         let remote = remote_dir.as_path().join(remote_path);
-        fs::remove_file(remote.clone()).await?;
-        Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
+        if fs::metadata(remote.clone()).await.is_ok() {
+            fs::remove_file(remote.clone()).await?;
+            Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
+        }
 
         let dir = self.dir.write().await;
         let local = dir.as_path().join(remote_path);
-        fs::remove_file(local.clone()).await?;
-        Self::remove_empty_paths(dir.clone(), local.clone()).await?;
+        if fs::metadata(local.clone()).await.is_ok() {
+            fs::remove_file(local.clone()).await?;
+            LocalDirRemoteFs::remove_empty_paths(dir.as_path().to_path_buf(), local.clone())
+                .await?;
+        }
 
         Ok(())
     }
@@ -175,7 +180,7 @@ impl LocalDirRemoteFs {
         async move { Self::list_recursive(remote_dir, remote_prefix, dir).await }.boxed()
     }
 
-    async fn list_recursive(
+    pub async fn list_recursive(
         remote_dir: PathBuf,
         remote_prefix: String,
         dir: PathBuf,

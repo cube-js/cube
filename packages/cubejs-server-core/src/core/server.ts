@@ -6,7 +6,14 @@ import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
 
 import { ApiGateway } from '@cubejs-backend/api-gateway';
-import { getAnonymousId, getEnv, internalExceptions, track } from '@cubejs-backend/shared';
+import {
+  CancelableInterval,
+  createCancelableInterval,
+  getAnonymousId,
+  getEnv,
+  internalExceptions,
+  track,
+} from '@cubejs-backend/shared';
 import type { Application as ExpressApplication } from 'express';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import type {
@@ -108,7 +115,9 @@ export class CubejsServerCore {
 
   protected readonly standalone: boolean = true;
 
-  protected scheduledRefreshTimerInterval: NodeJS.Timeout|undefined;
+  protected maxCompilerCacheKeep: NodeJS.Timeout|null = null;
+
+  protected scheduledRefreshTimerInterval: CancelableInterval|null = null;
 
   protected driver: BaseDriver|null = null;
 
@@ -127,10 +136,12 @@ export class CubejsServerCore {
 
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    const devServer = process.env.NODE_ENV !== 'production';
 
     const options: ServerCoreInitializedOptions = {
       dbType,
       externalDbType,
+      devServer,
       driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
       dialectFactory: () => typeof dbType === 'string' &&
         CubejsServerCore.lookupDriverClass(dbType).dialectClass &&
@@ -148,7 +159,6 @@ export class CubejsServerCore {
         CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(externalDbType).dialectClass(),
       apiSecret: process.env.CUBEJS_API_SECRET,
-      devServer: process.env.NODE_ENV !== 'production',
       telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
@@ -157,8 +167,11 @@ export class CubejsServerCore {
       dashboardAppPath: 'dashboard-app',
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency: parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
+      preAggregationsSchema: getEnv('preAggregationsSchema') || (
+        devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
+      ),
+      schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       ...opts,
-      schemaPath: opts.schemaPath || process.env.CUBEJS_SCHEMA_PATH || 'schema',
     };
 
     if (
@@ -208,14 +221,14 @@ export class CubejsServerCore {
 
     // proactively free up old cache values occasionally
     if (options.maxCompilerCacheKeepAlive) {
-      setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
+      this.maxCompilerCacheKeep = setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
     }
 
     const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
       options.scheduledRefreshTimer || getEnv('refreshTimer') || getEnv('scheduledRefresh')
     );
     if (scheduledRefreshTimer) {
-      this.scheduledRefreshTimerInterval = setInterval(
+      this.scheduledRefreshTimerInterval = createCancelableInterval(
         async () => {
           const contexts = await options.scheduledRefreshContexts();
           if (contexts.length < 1) {
@@ -444,7 +457,6 @@ export class CubejsServerCore {
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
     if (!compilerApi) {
-      console.log(this.preAggregationsSchema(context));
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
@@ -593,9 +605,27 @@ export class CubejsServerCore {
   public async releaseConnections() {
     await this.orchestratorStorage.releaseConnections();
 
-    if (this.scheduledRefreshTimerInterval) {
-      clearInterval(this.scheduledRefreshTimerInterval);
+    if (this.maxCompilerCacheKeep) {
+      clearInterval(this.maxCompilerCacheKeep);
     }
+
+    if (this.scheduledRefreshTimerInterval) {
+      await this.scheduledRefreshTimerInterval.cancel();
+    }
+  }
+
+  public async beforeShutdown() {
+    if (this.maxCompilerCacheKeep) {
+      clearInterval(this.maxCompilerCacheKeep);
+    }
+
+    if (this.scheduledRefreshTimerInterval) {
+      await this.scheduledRefreshTimerInterval.cancel();
+    }
+  }
+
+  public async shutdown() {
+    return this.orchestratorStorage.releaseConnections();
   }
 
   public static version() {

@@ -35,6 +35,10 @@
 	display: inline-flex;
 }
 
+@mixin header-text() {
+  font-family: $header-font;
+}
+
 @mixin body-text() {
   font-family: $body-font;
   font-size: 17px;
