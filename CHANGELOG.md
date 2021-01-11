@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.14](https://github.com/cube-js/cube.js/compare/v0.25.13...v0.25.14) (2021-01-11)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** useCubeQuery - clear resultSet on exception ([#1734](https://github.com/cube-js/cube.js/issues/1734)) ([a5d19ae](https://github.com/cube-js/cube.js/commit/a5d19aecffc6a613f6e0f0d9346143c4f2e335be))
+* **cubestore:** filter pushdown optimization for aliased tables doesn't work ([decfa3a](https://github.com/cube-js/cube.js/commit/decfa3a9110fb4c82d125793838196eb0e0ac9a8))
+* **cubestore:** Fix parquet-format dependency as new one isn't compatible with current arrow version ([f236314](https://github.com/cube-js/cube.js/commit/f2363147796f6724c3f53d6f62527a6ec93f8fa0))
+* **cubestore:** Invalid argument error: Unable to get field named during merge resort ([031f4fe](https://github.com/cube-js/cube.js/commit/031f4fec492e821a5ef799e461785024aad09a6f))
+* **cubestore:** Log 0.4.12 dependency is broken ([a484b12](https://github.com/cube-js/cube.js/commit/a484b12d21c7c445ec94687950efb29aba205ebf))
+* **cubestore:** Merge sort early exit ([ddb292f](https://github.com/cube-js/cube.js/commit/ddb292fecc0db7f0a84199c9f932198d145a3170))
+* **cubestore:** Merge sort seg fault on empty batch ([4eb1f28](https://github.com/cube-js/cube.js/commit/4eb1f2872cea59f5c5352c28e5980d7fb276d98d))
+* **cubestore:** Remove debug output ([8706798](https://github.com/cube-js/cube.js/commit/8706798dc441895b3718167f4eac82e29b319298))
+* **cubestore:** Union merge sort support ([8cd3994](https://github.com/cube-js/cube.js/commit/8cd3994bbaafdaeb2c1ccc77c6d786ad7b85c987))
+* **gateway:** Allow healthchecks to be requested without auth ([95c0c57](https://github.com/cube-js/cube.js/commit/95c0c57d739e6ce46de958883d7dbfe04616a7a0))
+
+
+### Features
+
+* **cubestore:** Add CUBESTORE_DATA_DIR env variable ([3571916](https://github.com/cube-js/cube.js/commit/3571916c1e29ba84cd61f83aeb6611632a78b176))
+* **cubestore:** Float column type support ([f427598](https://github.com/cube-js/cube.js/commit/f4275985fdfc0679b9ba89d86f7586b8c814d9dc))
+* **cubestore:** Merge resort implementation to support three tables merge joins ([3fa675b](https://github.com/cube-js/cube.js/commit/3fa675bf9d7109c58847fe93219574e0cf287483))
+* **docker:** Upgrade Node.js to Node v12.20.1 (security release) ([097a11a](https://github.com/cube-js/cube.js/commit/097a11a81402f26c90441d93bcdd8421f89bf2e8))
+
+
+
+
+
 ## [0.25.13](https://github.com/cube-js/cube.js/compare/v0.25.12...v0.25.13) (2021-01-07)
 
 
