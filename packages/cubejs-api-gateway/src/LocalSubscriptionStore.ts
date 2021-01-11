@@ -3,7 +3,7 @@ interface LocalSubscriptionStoreOptions {
 }
 
 export class LocalSubscriptionStore {
-  protected readonly connections = {};
+  protected connections = {};
 
   protected readonly hearBeatInterval: number;
 
@@ -63,5 +63,9 @@ export class LocalSubscriptionStore {
     }
 
     return this.connections[connectionId];
+  }
+
+  public clear() {
+    this.connections = {};
   }
 }
