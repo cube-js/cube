@@ -11,11 +11,11 @@ export class DruidDriver extends BaseDriver {
 
   protected readonly client: DruidClient;
 
-  static dialectClass() {
+  public static dialectClass() {
     return DruidQuery;
   }
 
-  constructor(config?: DruidDriverConfiguration) {
+  public constructor(config?: DruidDriverConfiguration) {
     super();
 
     let url = config?.url || process.env.CUBEJS_DB_URL;

@@ -11,7 +11,7 @@ export type DruidClientConfiguration = DruidClientBaseConfiguration & {
 };
 
 export class DruidClient {
-  constructor(
+  public constructor(
     protected readonly config: DruidClientConfiguration,
   ) {
   }
