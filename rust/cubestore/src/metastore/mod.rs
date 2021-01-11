@@ -266,6 +266,7 @@ impl DataFrameValue<String> for Option<Row> {
                             TableValue::Bytes(b) => format!("{:?}", b),
                             TableValue::Boolean(b) => format!("{:?}", b),
                             TableValue::Decimal(v) => format!("{}", v),
+                            TableValue::Float(v) => format!("{}", v)
                         })
                         .join(", ")
                 )
@@ -281,6 +282,7 @@ pub enum ColumnType {
     Bytes,
     Timestamp,
     Decimal { scale: i32, precision: i32 },
+    Float,
     Boolean,
 }
 
@@ -346,6 +348,12 @@ impl From<&Column> for parquet::schema::types::Type {
                     .build()
                     .unwrap()
             }
+            ColumnType::Float => {
+                types::Type::primitive_type_builder(&column.get_name(), Type::DOUBLE)
+                    .with_repetition(Repetition::OPTIONAL)
+                    .build()
+                    .unwrap()
+            }
         }
     }
 }
@@ -370,6 +378,7 @@ impl Into<Field> for Column {
                     DataType::Int64Decimal(self.column_type.target_scale() as usize)
                 }
                 ColumnType::Bytes => DataType::Binary,
+                ColumnType::Float => DataType::Float64,
             },
             false,
         )
@@ -387,6 +396,7 @@ impl fmt::Display for Column {
                 format!("DECIMAL({}, {})", precision, scale)
             }
             ColumnType::Bytes => "BYTES".to_string(),
+            ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))
     }
@@ -421,7 +431,7 @@ pub struct IndexDef {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct Partition {
     index_id: u64,
     parent_partition_id: Option<u64>,
@@ -2113,7 +2123,7 @@ impl MetaStore for RocksMetaStore {
             let (mut sorted, mut unsorted) =
                 index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
                     match c.get_column_type() {
-                        ColumnType::Decimal { .. } | ColumnType::Bytes => false,
+                        ColumnType::Decimal { .. } | ColumnType::Bytes | ColumnType::Float => false,
                         _ => true,
                     }
                 });

@@ -5,12 +5,13 @@ use std::cmp::Ordering;
 
 pub(crate) mod parquet;
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub enum TableValue {
     Null,
     String(String),
     Int(i64),
     Decimal(String), // TODO bincode is incompatible with BigDecimal
+    Float(String), // TODO Eq
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
     Boolean(bool),
@@ -38,7 +39,7 @@ impl ToString for TimestampValue {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct Row {
     values: Vec<TableValue>,
 }
@@ -96,7 +97,17 @@ impl<'a> PartialOrd for RowSortKey<'a> {
         }
         for i in 0..self.sort_key_size {
             if self.row.values[i] != other.row.values[i] {
-                return self.row.values[i].partial_cmp(&other.row.values[i]);
+                return match (&self.row.values[i], &other.row.values[i]) {
+                    (TableValue::Null, _) => Some(Ordering::Less),
+                    (_, TableValue::Null) => Some(Ordering::Greater),
+                    (TableValue::String(a), TableValue::String(b)) => a.partial_cmp(b),
+                    (TableValue::Int(a), TableValue::Int(b)) => a.partial_cmp(b),
+                    (TableValue::Decimal(a), TableValue::Decimal(b)) => a.partial_cmp(b),
+                    (TableValue::Bytes(a), TableValue::Bytes(b)) => a.partial_cmp(b),
+                    (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.partial_cmp(b),
+                    (TableValue::Boolean(a), TableValue::Boolean(b)) => a.partial_cmp(b),
+                    (a, b) => panic!("Can't compare {:?} to {:?}", a, b)
+                };
             }
         }
         Some(Ordering::Equal)
