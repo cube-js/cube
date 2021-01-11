@@ -1,9 +1,15 @@
-import { CreateOptions } from '@cubejs-backend/server-core';
-import { isDockerImage, packageExists, PackageManifest, resolveBuiltInPackageVersion } from '@cubejs-backend/shared';
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
+import dotenv from 'dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
+import {
+  getEnv,
+  isDockerImage,
+  packageExists,
+  PackageManifest,
+  resolveBuiltInPackageVersion,
+} from '@cubejs-backend/shared';
 
 import {
   getMajorityVersion,
@@ -12,7 +18,7 @@ import {
   isSimilarPackageRelease, parseNpmLock,
   parseYarnLock, ProjectLock,
 } from './utils';
-import { CubejsServer } from '../server';
+import { CreateOptions, CubejsServer } from '../server';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 function safetyParseSemver(version: string|null) {
@@ -217,10 +223,21 @@ export class ServerContainer {
     } catch (e) {
       console.error('Fatal error during server start: ');
       console.error(e.stack || e);
+
+      process.exit(1);
     }
+
+    return server;
   }
 
   public async lookupConfiguration(): Promise<CreateOptions> {
+    dotenv.config();
+
+    const devMode = getEnv('devMode');
+    if (devMode) {
+      process.env.NODE_ENV = 'development';
+    }
+
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
       this.getTypeScriptCompiler().compileConfiguration();
     }
@@ -252,5 +269,35 @@ export class ServerContainer {
     throw new Error(
       'Configure file must export configuration as default.'
     );
+  }
+
+  public async start() {
+    const makeInstance = async () => {
+      const configuration = await this.lookupConfiguration();
+      return this.runServerInstance({
+        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : undefined,
+        ...configuration,
+      });
+    };
+
+    let server = await makeInstance();
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const bindSignal of ['SIGTERM', 'SIGINT']) {
+      // eslint-disable-next-line no-loop-func
+      process.on(bindSignal, async (signal) => {
+        process.exit(
+          await server.shutdown(signal)
+        );
+      });
+    }
+
+    process.addListener('SIGUSR1', async (signal) => {
+      console.log(`Received ${signal} signal, reloading`);
+
+      await server.shutdown(signal, true);
+
+      server = await makeInstance();
+    });
   }
 }

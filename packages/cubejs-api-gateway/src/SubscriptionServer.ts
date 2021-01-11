@@ -121,4 +121,8 @@ export class SubscriptionServer {
   public async disconnect(connectionId: string) {
     await this.subscriptionStore.cleanupSubscriptions(connectionId);
   }
+
+  public clear() {
+    this.subscriptionStore.clear();
+  }
 }

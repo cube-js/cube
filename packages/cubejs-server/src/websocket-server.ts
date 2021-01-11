@@ -4,6 +4,7 @@ import util from 'util';
 import type { CubejsServerCore } from '@cubejs-backend/server-core';
 import type http from 'http';
 import type https from 'https';
+import { CancelableInterval, createCancelableInterval } from '@cubejs-backend/shared';
 
 export interface WebSocketServerOptions {
   processSubscriptionsInterval?: number,
@@ -11,9 +12,11 @@ export interface WebSocketServerOptions {
 }
 
 export class WebSocketServer {
-  protected subscriptionsTimer: NodeJS.Timeout|null = null;
+  protected subscriptionsTimer: CancelableInterval|null = null;
 
   protected wsServer: WebSocket.Server|null = null;
+
+  protected subscriptionServer: any = null;
 
   public constructor(
     protected readonly serverCore: CubejsServerCore,
@@ -30,7 +33,7 @@ export class WebSocketServer {
 
     const connectionIdToSocket: Record<string, any> = {};
 
-    const subscriptionServer = this.serverCore.initSubscriptionServer((connectionId: string, message: any) => {
+    this.subscriptionServer = this.serverCore.initSubscriptionServer((connectionId: string, message: any) => {
       if (!connectionIdToSocket[connectionId]) {
         throw new Error(`Socket for ${connectionId} is not found found`);
       }
@@ -43,34 +46,36 @@ export class WebSocketServer {
       connectionIdToSocket[connectionId] = ws;
 
       ws.on('message', async (message) => {
-        await subscriptionServer.processMessage(connectionId, message, true);
+        await this.subscriptionServer.processMessage(connectionId, message, true);
       });
 
       ws.on('close', async () => {
-        await subscriptionServer.disconnect(connectionId);
+        await this.subscriptionServer.disconnect(connectionId);
       });
 
       ws.on('error', async () => {
-        await subscriptionServer.disconnect(connectionId);
+        await this.subscriptionServer.disconnect(connectionId);
       });
     });
 
-    this.subscriptionsTimer = setInterval(
+    this.subscriptionsTimer = createCancelableInterval(
       async () => {
-        await subscriptionServer.processSubscriptions();
+        await this.subscriptionServer.processSubscriptions();
       },
       this.options.processSubscriptionsInterval || 5 * 1000
     );
   }
 
   public async close() {
+    if (this.subscriptionsTimer) {
+      await this.subscriptionsTimer.cancel();
+    }
+
     if (this.wsServer) {
       const close = util.promisify(this.wsServer.close.bind(this.wsServer));
       await close();
     }
 
-    if (this.subscriptionsTimer) {
-      clearInterval(this.subscriptionsTimer);
-    }
+    this.subscriptionServer.clear();
   }
 }
