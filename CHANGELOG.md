@@ -3,6 +3,113 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.15](https://github.com/cube-js/cube.js/compare/v0.25.14...v0.25.15) (2021-01-12)
+
+
+### Bug Fixes
+
+* Ensure agent events are delivered with a 50k backlog ([bf0b9ec](https://github.com/cube-js/cube.js/commit/bf0b9ec9f75b5e5f996fd4da855371ef6cd641f2))
+
+
+### Features
+
+* **@cubejs-client/playground:** display slow query warning ([#1649](https://github.com/cube-js/cube.js/issues/1649)) ([ce33f88](https://github.com/cube-js/cube.js/commit/ce33f8849b96ac25dd6f242b61f81e29600f511a))
+* introduce graceful shutdown ([#1683](https://github.com/cube-js/cube.js/issues/1683)) ([118232f](https://github.com/cube-js/cube.js/commit/118232f56b6c66b7dff6ed11e914ccc107a25881))
+
+
+
+
+
+## [0.25.14](https://github.com/cube-js/cube.js/compare/v0.25.13...v0.25.14) (2021-01-11)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** useCubeQuery - clear resultSet on exception ([#1734](https://github.com/cube-js/cube.js/issues/1734)) ([a5d19ae](https://github.com/cube-js/cube.js/commit/a5d19aecffc6a613f6e0f0d9346143c4f2e335be))
+* **cubestore:** filter pushdown optimization for aliased tables doesn't work ([decfa3a](https://github.com/cube-js/cube.js/commit/decfa3a9110fb4c82d125793838196eb0e0ac9a8))
+* **cubestore:** Fix parquet-format dependency as new one isn't compatible with current arrow version ([f236314](https://github.com/cube-js/cube.js/commit/f2363147796f6724c3f53d6f62527a6ec93f8fa0))
+* **cubestore:** Invalid argument error: Unable to get field named during merge resort ([031f4fe](https://github.com/cube-js/cube.js/commit/031f4fec492e821a5ef799e461785024aad09a6f))
+* **cubestore:** Log 0.4.12 dependency is broken ([a484b12](https://github.com/cube-js/cube.js/commit/a484b12d21c7c445ec94687950efb29aba205ebf))
+* **cubestore:** Merge sort early exit ([ddb292f](https://github.com/cube-js/cube.js/commit/ddb292fecc0db7f0a84199c9f932198d145a3170))
+* **cubestore:** Merge sort seg fault on empty batch ([4eb1f28](https://github.com/cube-js/cube.js/commit/4eb1f2872cea59f5c5352c28e5980d7fb276d98d))
+* **cubestore:** Remove debug output ([8706798](https://github.com/cube-js/cube.js/commit/8706798dc441895b3718167f4eac82e29b319298))
+* **cubestore:** Union merge sort support ([8cd3994](https://github.com/cube-js/cube.js/commit/8cd3994bbaafdaeb2c1ccc77c6d786ad7b85c987))
+* **gateway:** Allow healthchecks to be requested without auth ([95c0c57](https://github.com/cube-js/cube.js/commit/95c0c57d739e6ce46de958883d7dbfe04616a7a0))
+
+
+### Features
+
+* **cubestore:** Add CUBESTORE_DATA_DIR env variable ([3571916](https://github.com/cube-js/cube.js/commit/3571916c1e29ba84cd61f83aeb6611632a78b176))
+* **cubestore:** Float column type support ([f427598](https://github.com/cube-js/cube.js/commit/f4275985fdfc0679b9ba89d86f7586b8c814d9dc))
+* **cubestore:** Merge resort implementation to support three tables merge joins ([3fa675b](https://github.com/cube-js/cube.js/commit/3fa675bf9d7109c58847fe93219574e0cf287483))
+* **docker:** Upgrade Node.js to Node v12.20.1 (security release) ([097a11a](https://github.com/cube-js/cube.js/commit/097a11a81402f26c90441d93bcdd8421f89bf2e8))
+
+
+
+
+
+## [0.25.13](https://github.com/cube-js/cube.js/compare/v0.25.12...v0.25.13) (2021-01-07)
+
+
+### Bug Fixes
+
+* Guard from `undefined` dataSource in queue key ([6ae1fd6](https://github.com/cube-js/cube.js/commit/6ae1fd60a1e67bc73c0630b7de36b598397ce22b))
+* **cubestore:** Root Cargo.toml isn't used for docker build ([8030fe3](https://github.com/cube-js/cube.js/commit/8030fe3796acc69e6dcd88c728430007c91dded6))
+* **cubestore:** Set default scale to 5 for floats ([98d85eb](https://github.com/cube-js/cube.js/commit/98d85eb641e77225267a5e63351a4d72cf1c9531))
+* **cubestore:** Support Utf8 to Boolean cast ([7ac9892](https://github.com/cube-js/cube.js/commit/7ac98921bb6c9999e1b59499fefb9a68578513fd))
+* **cubestore:** Support Utf8 to Int64Decimal cast ([c523b46](https://github.com/cube-js/cube.js/commit/c523b4683c747d0cfcf9cc32c2319e83d56e7758))
+* Reduce agent event queue on network failures ([548fb9a](https://github.com/cube-js/cube.js/commit/548fb9a23fe5fafa9d54c92c1d9425b83fafffbe))
+
+
+### Features
+
+* **cubestore:** Drop unused chunks and partitions after compaction and repartition ([94895a2](https://github.com/cube-js/cube.js/commit/94895a20bff4c6e2932e547f6c49fa5624644098))
+* **cubestore:** Float with exp number support ([6e92c55](https://github.com/cube-js/cube.js/commit/6e92c5555efc8f76722994b2988d98850f9d10e9))
+
+
+
+
+
+## [0.25.12](https://github.com/cube-js/cube.js/compare/v0.25.11...v0.25.12) (2021-01-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** updated peer dependency version ([442a979](https://github.com/cube-js/cube.js/commit/442a979e9d5509ffcb71e48d42a4e4944eae98e1))
+* **cubestore:** Join aliasing fails after rebase ([67ffd4d](https://github.com/cube-js/cube.js/commit/67ffd4df087d6a27855ab3cbe334125f3ff43293))
+
+
+### Features
+
+* **cubestore:** Distribute unions across workers the same way as partitions ([52f8a77](https://github.com/cube-js/cube.js/commit/52f8a771cc97d23e86e9e00a6fe7e5d5f291bda9))
+
+
+
+
+
+## [0.25.11](https://github.com/cube-js/cube.js/compare/v0.25.10...v0.25.11) (2021-01-04)
+
+
+### Bug Fixes
+
+* **cubestore:** File not found if upstream mounted as a network volume ([68822ec](https://github.com/cube-js/cube.js/commit/68822ec8e0f2e7fe92ae80af1cb1b52cbbc22a61))
+* **cubestore:** Fix write metastore locking ([cbbacce](https://github.com/cube-js/cube.js/commit/cbbacce44c4f8af734095d985d834071fb2f8b24))
+* **cubestore:** Handle corrupted log files and discard them with error ([00a1c1a](https://github.com/cube-js/cube.js/commit/00a1c1a532be8cbb20a908c4bdb0e4f5eb802e71))
+* **cubestore:** Handle corrupted upstream metastore ([d547677](https://github.com/cube-js/cube.js/commit/d547677c277c2233351266add966a2b019c38e3c))
+* **cubestore:** Index repairs ([d5dc4cf](https://github.com/cube-js/cube.js/commit/d5dc4cf4f2313d1462a5d67cb5b7b7009680003a))
+* **cubestore:** Set default worker pool timeout to 2 minutes ([139c8f6](https://github.com/cube-js/cube.js/commit/139c8f6844c9b923855a1d0a235aefd58288fd14))
+* Declare Add missing externalQueueOptions for QueryCacheOptions ([563fcdc](https://github.com/cube-js/cube.js/commit/563fcdcb943622ad8ca391182652f2eb27000079))
+
+
+### Features
+
+* **cubestore:** Rebase arrow to 2020-01-02 version ([3cbb46d](https://github.com/cube-js/cube.js/commit/3cbb46d883445e2fbfb261d182e5cdaa6871bf2c))
+* **cubestore:** Three tables join support ([b776398](https://github.com/cube-js/cube.js/commit/b776398ba45bc314f12a15a2f0861d5b01dcb90a))
+
+
+
+
+
 ## [0.25.10](https://github.com/cube-js/cube.js/compare/v0.25.9...v0.25.10) (2020-12-31)
 
 

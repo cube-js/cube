@@ -6,7 +6,9 @@ use async_trait::async_trait;
 use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
-use crate::metastore::{table::Table, IdRow, ImportFormat, Index, IndexDef, RowKey, Schema, TableId, MetaStoreTable};
+use crate::metastore::{
+    table::Table, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable, RowKey, Schema, TableId,
+};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use crate::{
@@ -254,9 +256,11 @@ impl SqlService for SqlServiceImpl {
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(q) {
             return Ok(data_frame);
         }
-        let replaced_quote = q.replace("\\'", "''");
-        let mut parser = CubeStoreParser::new(&replaced_quote)?;
-        let ast = parser.parse_statement()?;
+        let ast = {
+            let replaced_quote = q.replace("\\'", "''");
+            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            parser.parse_statement()?
+        };
         // trace!("AST is: {:?}", ast);
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
@@ -338,7 +342,19 @@ impl SqlService for SqlServiceImpl {
                         schema_name.to_string(),
                         table_name.to_string(),
                         name.to_string(),
-                        &columns,
+                        &columns
+                            .iter()
+                            .map(|c| -> Result<_, _> {
+                                if let Expr::Identifier(ident) = &c.expr {
+                                    Ok(ident.clone())
+                                } else {
+                                    Err(CubeError::user(format!(
+                                        "Unsupported column expression in index: {:?}",
+                                        c.expr
+                                    )))
+                                }
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
                     )
                     .await?;
                 Ok(DataFrame::from(vec![res]))
@@ -449,10 +465,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                     ColumnType::Int
                 }
                 DataType::Boolean => ColumnType::Boolean,
-                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Decimal {
-                    precision: 18,
-                    scale: 10,
-                },
+                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Float,
                 DataType::Timestamp => ColumnType::Timestamp,
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
@@ -539,37 +552,8 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 TableValue::Int(val_int.unwrap())
             }
             ColumnType::Decimal { .. } => {
-                let decimal_val = match cell {
-                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
-                        v.parse::<f64>()
-                    }
-                    Expr::UnaryOp {
-                        op: UnaryOperator::Minus,
-                        expr,
-                    } => {
-                        if let Expr::Value(Value::Number(v)) = expr.as_ref() {
-                            v.parse::<f64>().map(|v| v * -1.0)
-                        } else {
-                            return Err(CubeError::user(format!(
-                                "Can't parse decimal from, {:?}",
-                                cell
-                            )));
-                        }
-                    }
-                    _ => {
-                        return Err(CubeError::user(format!(
-                            "Can't parse decimal from, {:?}",
-                            cell
-                        )))
-                    }
-                };
-                if let Err(e) = decimal_val {
-                    return Err(CubeError::user(format!(
-                        "Can't parse decimal from, {:?}: {}",
-                        cell, e
-                    )));
-                }
-                TableValue::Decimal(decimal_val.unwrap().to_string())
+                let decimal_val = parse_decimal(cell)?;
+                TableValue::Decimal(decimal_val.to_string())
             }
             ColumnType::Bytes => {
                 // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
@@ -607,9 +591,47 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                     )))
                 }
             },
+            ColumnType::Float => {
+                let decimal_val = parse_decimal(cell)?;
+                TableValue::Float(decimal_val.to_string())
+            }
         }
     };
     Ok(res)
+}
+
+fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
+    let decimal_val = match cell {
+        Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
+            v.parse::<f64>()
+        }
+        Expr::UnaryOp {
+            op: UnaryOperator::Minus,
+            expr,
+        } => {
+            if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+                v.parse::<f64>().map(|v| v * -1.0)
+            } else {
+                return Err(CubeError::user(format!(
+                    "Can't parse decimal from, {:?}",
+                    cell
+                )));
+            }
+        }
+        _ => {
+            return Err(CubeError::user(format!(
+                "Can't parse decimal from, {:?}",
+                cell
+            )))
+        }
+    };
+    if let Err(e) = decimal_val {
+        return Err(CubeError::user(format!(
+            "Can't parse decimal from, {:?}: {}",
+            cell, e
+        )));
+    }
+    Ok(decimal_val?)
 }
 
 #[cfg(test)]
@@ -626,15 +648,16 @@ mod tests {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
-    use std::collections::HashSet;
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
+    use std::time::Duration;
     use std::{env, fs};
     use uuid::Uuid;
 
     #[actix_rt::test]
     async fn create_schema_test() {
+        let config = Config::test("create_schema_test");
         let path = "/tmp/test_create_schema";
         let _ = DB::destroy(&Options::default(), path);
         let store_path = path.to_string() + &"_store".to_string();
@@ -647,7 +670,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
                 PathBuf::from(remote_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone());
+            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -672,6 +695,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn create_table_test() {
+        let config = Config::test("create_table_test");
         let path = "/tmp/test_create_table";
         let _ = DB::destroy(&Options::default(), path);
         let store_path = path.to_string() + &"_store".to_string();
@@ -683,7 +707,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
                 PathBuf::from(remote_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone());
+            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -876,14 +900,21 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Decimal("5.892".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Float("5.892".to_string())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Decimal("0.45".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float("0.45".to_string())]));
+
+            let result = service
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < '10'")
+                .await
+                .unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float("0.45".to_string())]));
         })
             .await;
     }
@@ -932,6 +963,9 @@ mod tests {
             let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
 
+            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = 'true'").await.unwrap();
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+
             let result = service.exec_query("SELECT g.bool_value, count(*) from foo.bool_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(3)]));
@@ -962,6 +996,26 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("100".to_string()), TableValue::Int(3)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Decimal("200".to_string()), TableValue::Int(2)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn float_decimal_scale() {
+        Config::run_test("float_decimal_scale", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+            service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value FLOAT)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 677863988852), (2, 677863988852.123e-10), (3, 6778639882.123e+3)"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT SUM(decimal_value) FROM foo.decimal_group"
+            ).await.unwrap();
+
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Float("7456503871042.786".to_string())])]);
         }).await;
     }
 
@@ -1067,7 +1121,7 @@ mod tests {
                 ).await.unwrap();
             }
 
-            join_results.sort_by_key(|r| r.values()[0].clone());
+            join_results.sort_by(|a, b| a.sort_key(1).cmp(&b.sort_key(1)));
 
             let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap();
 
@@ -1082,29 +1136,114 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts() {
-        Config::test("high_frequency_inserts").update_config(|mut c| {
-            c.partition_split_threshold = 1000000;
-            c.compaction_chunks_count_threshold = 100;
-            c
-        }).start_test(async move |services| {
-            let service = services.sql_service;
+        Config::test("high_frequency_inserts")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
 
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
-            service.exec_query("CREATE TABLE foo.numbers (num int)").await.unwrap();
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap();
 
-            for i in 0..500 {
-                service.exec_query(
-                    &format!("INSERT INTO foo.numbers (num) VALUES ({})", i)
-                ).await.unwrap();
-            }
+                for i in 0..300 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+                }
 
-            let result = service.exec_query("SELECT count(*) from foo.numbers").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(500)]));
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(300)]));
 
-            let result = service.exec_query("SELECT sum(num) from foo.numbers").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(124750)]));
-        }).await;
+                let result = service
+                    .exec_query("SELECT sum(num) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn inactive_partitions_cleanup() {
+        Config::test("inactive_partitions_cleanup")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap();
+
+                for i in 0..10_u64 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+                }
+
+                // let listener = services.cluster.job_result_listener();
+                // let active_partitions = services
+                //     .meta_store
+                //     .get_active_partitions_by_index_id(1)
+                //     .await
+                //     .unwrap();
+                // let mut last_active_partition = active_partitions.iter().next().unwrap();
+                // listener
+                //     .wait_for_job_results(vec![(
+                //         RowKey::Table(TableId::Partitions, last_active_partition.get_id()),
+                //         JobType::Repartition,
+                //     )])
+                //     .await
+                //     .unwrap();
+
+                // TODO API to wait for all jobs to be completed and all events processed
+                tokio::time::delay_for(Duration::from_millis(500)).await;
+
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(10)]));
+
+                let active_partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                let last_active_partition = active_partitions.iter().next().unwrap();
+
+                let files = services
+                    .remote_fs
+                    .list("")
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .filter(|r| r.ends_with(".parquet"))
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    files,
+                    vec![format!("{}.parquet", last_active_partition.get_id())]
+                )
+            })
+            .await
     }
 
     #[tokio::test]
@@ -1129,6 +1268,178 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::Int(10)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("New York".to_string()), TableValue::Int(5)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn three_tables_join() {
+        Config::run_test("three_tables_join", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT city, name, sum(amount) FROM foo.orders o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
+            ).await.unwrap();
+
+            let expected = vec![
+                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(20)]),
+                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
+                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(10)]),
+                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)])
+            ];
+
+            assert_eq!(
+                result.get_rows(),
+                &expected
+            );
+
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn three_tables_join_with_filter() {
+        Config::run_test("three_tables_join_with_filter", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT city, name, sum(amount) FROM foo.orders o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
+                WHERE customer_id = 'a' \
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
+            ).await.unwrap();
+
+            let expected = vec![
+                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
+            ];
+
+            assert_eq!(
+                result.get_rows(),
+                &expected
+            );
+
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn three_tables_join_with_union() {
+        Config::run_test("three_tables_join_with_union", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders_1 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.orders_2 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product_1 ON foo.orders_1 (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product_2 ON foo.orders_2 (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders_2 (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT city, name, sum(amount) FROM (SELECT * FROM foo.orders_1 UNION ALL SELECT * FROM foo.orders_2) o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
+                WHERE customer_id = 'a' \
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
+            ).await.unwrap();
+
+            let expected = vec![
+                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
+            ];
+
+            assert_eq!(
+                result.get_rows(),
+                &expected
+            );
+
         }).await;
     }
 
@@ -1188,7 +1499,11 @@ mod tests {
                 "INSERT INTO foo.orders2 (customer_id, amount) VALUES ('b', 20), ('c', 20), ('b', 30)"
             ).await.unwrap();
 
-            let result = service.exec_query("SELECT u.customer_id, sum(u.amount) from (select * from foo.orders1 union all select * from foo.orders2) u GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+            let result = service.exec_query(
+                "SELECT `u`.customer_id, sum(`u`.amount) FROM \
+                (select * from foo.orders1 union all select * from foo.orders2) `u` \
+                WHERE `u`.customer_id like '%' GROUP BY 1 ORDER BY 2 DESC"
+            ).await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("b".to_string()), TableValue::Int(55)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("c".to_string()), TableValue::Int(20)]));
@@ -1217,6 +1532,124 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
         }).await;
+    }
+
+    #[tokio::test]
+    async fn column_escaping() {
+        Config::run_test("column_escaping", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+                .await
+                .unwrap();
+
+            service
+                .exec_query(
+                    "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)",
+                )
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query(
+                    "SELECT date_trunc('day', `timestamp`.t) `day`, sum(`timestamp`.amount) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn case_column_escaping() {
+        Config::run_test("case_column_escaping", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query(
+                "CREATE TABLE foo.timestamps (t timestamp, amount int)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)"
+            ).await.unwrap();
+
+            let result = service.exec_query(
+                "SELECT date_trunc('day', `timestamp`.t) `day`, sum(CASE WHEN `timestamp`.t > to_timestamp('2020-01-02T00:01:00.000Z') THEN `timestamp`.amount END) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1"
+            ).await.unwrap();
+
+            assert_eq!(
+                result.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])
+            );
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn inner_column_escaping() {
+        Config::run_test("inner_column_escaping", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+                .await
+                .unwrap();
+
+            service
+                .exec_query(
+                    "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)",
+                )
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query(
+                    "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `t` >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -1278,6 +1711,32 @@ mod tests {
             ).await.unwrap();
 
             let result = service.exec_query("SELECT sum(p.page_view_count) from foo.sessions s JOIN foo.page_views p ON s.id = p.session_id WHERE s.t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
+
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(50)]));
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn join_with_aliases() {
+        Config::run_test("join_with_aliases", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.sessions (t timestamp, id int)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.page_views (session_id int, page_view_count int)").await.unwrap();
+
+            service.exec_query("CREATE INDEX by_id ON foo.sessions (id)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.sessions (t, id) VALUES ('2020-01-01T00:00:00.000Z', 1), ('2020-01-02T00:00:00.000Z', 2), ('2020-01-03T00:00:00.000Z', 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.page_views (session_id, page_view_count) VALUES (1, 10), (2, 20), (3, 30)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT sum(`page_view_count`) from foo.sessions `sessions` JOIN foo.page_views `page_views` ON `id` = `session_id` WHERE `t` >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(50)]));
         }).await;
@@ -1354,13 +1813,13 @@ mod tests {
             println!("{:?}", new_partitions);
             let intervals_set = new_partitions.into_iter()
                 .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
-                .collect::<HashSet<_>>();
+                .collect::<Vec<_>>();
             assert_eq!(intervals_set, vec![
                 (None, Some(Row::new(vec![TableValue::Int(2)]))),
                 (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
                 (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
                 (Some(Row::new(vec![TableValue::Int(27)])), None),
-            ].into_iter().collect::<HashSet<_>>());
+            ].into_iter().collect::<Vec<_>>());
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
 

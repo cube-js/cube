@@ -1,5 +1,5 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import React, { Component } from 'react';
+import React, { Component, createContext } from 'react';
 import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
 import './index.less';
@@ -19,12 +19,32 @@ const selectedTab = (pathname) => {
   }
 };
 
+export const AppContext = createContext({
+  slowQuery: false,
+});
+
 class App extends Component {
   static getDerivedStateFromError(error) {
     return { fatalError: error };
   }
 
+  state = {
+    fatalError: null,
+    slowQuery: false,
+  };
+
   async componentDidMount() {
+    window['__cubejsPlayground'] = {
+      ...window['__cubejsPlayground'],
+      onQueryLoad: (resultSet) => {
+        if (resultSet) {
+          const { loadResponse } = resultSet.serialize();
+
+          this.setState({ slowQuery: Boolean(loadResponse.slowQuery) });
+        }
+      },
+    };
+
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
       const error = promiseRejectionEvent.reason;
       console.log(error);
@@ -70,24 +90,30 @@ class App extends Component {
   }
 
   render() {
-    const { fatalError } = this.state || {};
+    const { fatalError, slowQuery } = this.state || {};
     const { location, children } = this.props;
     return (
-      <Layout style={{ height: '100%' }}>
-        <GlobalStyles/>
-        <Header selectedKeys={selectedTab(location.pathname)} />
-        <Layout.Content style={{ height: '100%' }}>
-          {fatalError ? (
-            <Alert
-              message="Error occured while rendering"
-              description={fatalError.stack}
-              type="error"
-            />
-          ) : (
-            children
-          )}
-        </Layout.Content>
-      </Layout>
+      <AppContext.Provider
+        value={{
+          slowQuery,
+        }}
+      >
+        <Layout style={{ height: '100%' }}>
+          <GlobalStyles />
+          <Header selectedKeys={selectedTab(location.pathname)} />
+          <Layout.Content style={{ height: '100%' }}>
+            {fatalError ? (
+              <Alert
+                message="Error occured while rendering"
+                description={fatalError.stack}
+                type="error"
+              />
+            ) : (
+              children
+            )}
+          </Layout.Content>
+        </Layout>
+      </AppContext.Provider>
     );
   }
 }

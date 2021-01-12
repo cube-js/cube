@@ -86,6 +86,7 @@ export default (query, options = {}) => {
         } catch (e) {
           if (isMounted) {
             setError(e);
+            setResultSet(null);
             setLoading(false);
             setProgress(null);
           }

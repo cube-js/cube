@@ -9,7 +9,7 @@ pre, code, tt {
 	border-radius: 4px;
 	border: none;
 	letter-spacing: 0.02em;
-	background-color: $light;
+	background: rgba(122, 119, 255, 0.05);
 	color: $content-color;
 }
 
@@ -24,8 +24,6 @@ pre {
 	border-radius: 3px;
 
 	code, tt {
-		font-size: 13px;
-		line-height: 16px;
 		white-space: pre-wrap;
 		background: transparent;
 		border: none;

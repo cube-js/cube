@@ -14,6 +14,7 @@ import bodyParser from 'body-parser';
 import cors, { CorsOptions } from 'cors';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
+import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
 
 const { version } = require('../package.json');
 
@@ -29,6 +30,7 @@ export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions
   webSockets?: boolean;
   initApp?: InitAppFn;
   http?: HttpOptions;
+  gracefulShutdown?: number;
 }
 
 type RequireOne<T, K extends keyof T> = {
@@ -44,7 +46,7 @@ export class CubejsServer {
 
   protected redirector: http.Server | null = null;
 
-  protected server: http.Server | https.Server | null = null;
+  protected server: GracefulHttpServer | null = null;
 
   protected socketServer: WebSocketServer | null = null;
 
@@ -108,7 +110,7 @@ export class CubejsServer {
       }
 
       if (enableTls) {
-        this.server = https.createServer(options, app);
+        this.server = gracefulHttp(https.createServer(options, app));
       } else {
         const [major] = process.version.split('.');
         if (major === '8' && Object.keys(options).length) {
@@ -117,9 +119,9 @@ export class CubejsServer {
             'CustomWarning',
           );
 
-          this.server = http.createServer(app);
+          this.server = gracefulHttp(http.createServer(app));
         } else {
-          this.server = http.createServer(options, app);
+          this.server = gracefulHttp(http.createServer(options, app));
         }
       }
 
@@ -200,5 +202,47 @@ export class CubejsServer {
 
   public static version() {
     return version;
+  }
+
+  public async shutdown(signal: string, graceful: boolean = true) {
+    if (graceful) {
+      console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdown}s`);
+    }
+
+    try {
+      if (this.redirector) {
+        this.redirector.close();
+      }
+
+      const locks: Promise<any>[] = [
+        this.core.beforeShutdown()
+      ];
+
+      if (this.socketServer) {
+        locks.push(
+          this.socketServer.close()
+        );
+      }
+
+      if (this.server) {
+        locks.push(
+          this.server.stop(this.config.gracefulShutdown)
+        );
+      }
+
+      if (graceful) {
+        // Await before all connections/refresh scheduler will end jobs
+        await Promise.all(locks);
+      }
+
+      await this.core.shutdown();
+
+      return 0;
+    } catch (e) {
+      console.error('Fatal error during server shutting down: ');
+      console.error(e.stack || e);
+
+      return 1;
+    }
   }
 }

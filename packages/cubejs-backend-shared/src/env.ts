@@ -81,6 +81,8 @@ const variables = {
     .asBoolStrict(),
   refreshTimer: () => process.env.CUBEJS_SCHEDULED_REFRESH_TIMER
     && asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER'),
+  gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
+    .asIntPositive(),
   scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
     .asBool(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')

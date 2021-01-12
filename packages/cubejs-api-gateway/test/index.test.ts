@@ -396,7 +396,6 @@ describe('API Gateway', () => {
       const res = await request(app)
         .get('/readyz')
         .set('Content-type', 'application/json')
-        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
 
       expect(res.body).toMatchObject({ health: 'HEALTH' });
@@ -412,7 +411,6 @@ describe('API Gateway', () => {
       const res = await request(app)
         .get('/readyz')
         .set('Content-type', 'application/json')
-        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(200);
 
       expect(res.body).toMatchObject({ health: 'HEALTH' });
@@ -438,7 +436,6 @@ describe('API Gateway', () => {
       const res = await request(app)
         .get('/readyz')
         .set('Content-type', 'application/json')
-        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(500);
 
       expect(res.body).toMatchObject({ health: 'DOWN' });
@@ -464,7 +461,6 @@ describe('API Gateway', () => {
       const res = await request(app)
         .get('/livez')
         .set('Content-type', 'application/json')
-        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .expect(500);
 
       expect(res.body).toMatchObject({ health: 'DOWN' });
