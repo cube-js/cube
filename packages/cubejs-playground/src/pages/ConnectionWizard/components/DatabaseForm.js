@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button, Form, Input, Space } from 'antd';
 // import { Base64Upload } from '@cubejs-enterprise/uikit';
 

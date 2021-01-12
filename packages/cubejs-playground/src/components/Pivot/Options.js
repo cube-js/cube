@@ -1,5 +1,4 @@
 import { Checkbox } from 'antd';
-import React from 'react';
 
 export default function Options({ pivotConfig, onUpdate }) {
   return (

@@ -1,4 +1,3 @@
-import React from 'react';
 import * as PropTypes from 'prop-types';
 import { Dropdown } from 'antd';
 import { Button } from '../components';

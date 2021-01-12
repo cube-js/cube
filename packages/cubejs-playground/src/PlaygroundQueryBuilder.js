@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';

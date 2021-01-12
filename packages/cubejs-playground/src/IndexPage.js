@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { fetch } from 'whatwg-fetch';
 import { Spin } from 'antd';
 import { Redirect } from 'react-router-dom';

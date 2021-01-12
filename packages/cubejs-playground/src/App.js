@@ -1,5 +1,5 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import React, { Component, createContext } from 'react';
+import { Component, createContext } from 'react';
 import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
 import './index.less';

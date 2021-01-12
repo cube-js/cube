@@ -1,5 +1,5 @@
 /* global navigator */
-import React from 'react';
+import { Component } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -68,7 +68,7 @@ export const frameworks = [
   },
 ];
 
-class ChartContainer extends React.Component {
+class ChartContainer extends Component {
   static getDerivedStateFromProps(props, state) {
     if (
       props.isChartRendererReady &&

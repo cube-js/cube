@@ -1,4 +1,3 @@
-import React from 'react';
 import { DragDropContext } from 'react-beautiful-dnd';
 import { Row, Col } from 'antd';
 import DroppableArea from './DroppableArea';

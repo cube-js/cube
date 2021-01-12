@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileFilled, MenuOutlined, SlackOutlined } from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';

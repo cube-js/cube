@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Alert, Spin } from 'antd';
 
 import { dispatchChartEvent } from '../../utils';

@@ -1,5 +1,5 @@
 /* globals window */
-import React, { Component } from 'react';
+import { Component } from 'react';
 import '@ant-design/compatible/assets/index.css';
 import { Spin, Button, Alert } from 'antd';
 import { Link, withRouter, Redirect } from 'react-router-dom';
