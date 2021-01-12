@@ -50,8 +50,8 @@ export class CompilerApi {
     return this.dbType;
   }
 
-  getDialectClass(dataSource) {
-    return this.dialectClass && this.dialectClass({ dataSource: dataSource || 'default' });
+  getDialectClass(dataSource, dbType) {
+    return this.dialectClass && this.dialectClass({ dataSource: dataSource || 'default', dbType });
   }
 
   async getSql(query, options) {
@@ -101,7 +101,9 @@ export class CompilerApi {
   }
 
   createQueryByDataSource(compilers, query, dataSource) {
-    return this.createQuery(compilers, this.getDbType(dataSource), this.getDialectClass(dataSource), query);
+    const dbType = this.getDbType(dataSource);
+
+    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
 
   createQuery(compilers, dbType, dialectClass, query) {

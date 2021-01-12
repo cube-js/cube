@@ -19,8 +19,11 @@ import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import type {
   ContextToAppIdFn,
   CreateOptions,
-  DatabaseType, DbTypeFn,
-  DriverContext, ExternalDbTypeFn, OrchestratorOptionsFn, PreAggregationsSchemaFn,
+  DatabaseType,
+  DbTypeFn,
+  ExternalDbTypeFn,
+  OrchestratorOptionsFn,
+  PreAggregationsSchemaFn,
   RequestContext,
   SchemaFileRepository,
 } from './types';
@@ -64,8 +67,10 @@ type RequireOne<T, K extends keyof T> = {
 
 export type ServerCoreInitializedOptions = RequireOne<
   CreateOptions,
-  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' |
-  'driverFactory' | 'dialectFactory' | 'dashboardAppPath' | 'dashboardAppPort'
+  // This fields are required, because we add default values in constructor
+  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'dashboardAppPath' | 'dashboardAppPort' |
+  'driverFactory' | 'dialectFactory' |
+  'externalDriverFactory' | 'externalDialectFactory'
 >;
 
 function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
@@ -79,15 +84,7 @@ function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
 export class CubejsServerCore {
   public readonly repository: FileRepository;
 
-  protected readonly driverFactory: (context: DriverContext) => any;
-
-  protected readonly externalDriverFactory: (context: RequestContext) => any;
-
-  protected readonly externalDialectFactory: any;
-
   protected devServer: DevServer|undefined;
-
-  protected dialectFactory: any;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
@@ -143,9 +140,8 @@ export class CubejsServerCore {
       externalDbType,
       devServer,
       driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
-      dialectFactory: () => typeof dbType === 'string' &&
-        CubejsServerCore.lookupDriverClass(dbType).dialectClass &&
-        CubejsServerCore.lookupDriverClass(dbType).dialectClass(),
+      dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
       externalDriverFactory: externalDbType && (
         () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
           host: process.env.CUBEJS_EXT_DB_HOST,
@@ -183,10 +179,6 @@ export class CubejsServerCore {
     }
 
     this.options = options;
-    this.driverFactory = options.driverFactory;
-    this.externalDriverFactory = options.externalDriverFactory;
-    this.dialectFactory = options.dialectFactory;
-    this.externalDialectFactory = options.externalDialectFactory;
 
     this.logger = options.logger || (
       process.env.NODE_ENV !== 'production'
@@ -452,24 +444,26 @@ export class CubejsServerCore {
     return this.apiGatewayInstance;
   }
 
-  public getCompilerApi(context) {
+  public getCompilerApi(context: RequestContext) {
     const appId = this.contextToAppId(context);
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
+
     if (!compilerApi) {
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context), {
           dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
           externalDbType: this.contextToExternalDbType(context),
-          dialectClass: (dataSourceContext) => this.dialectFactory &&
-            this.dialectFactory({ ...context, ...dataSourceContext }),
-          externalDialectClass: this.externalDialectFactory && this.externalDialectFactory(context),
+          dialectClass: (dialectContext) => this.options.dialectFactory &&
+            this.options.dialectFactory({ ...context, ...dialectContext }),
+          externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema
         }
       );
+
       this.compilerCache.set(appId, compilerApi);
     }
 
@@ -491,7 +485,7 @@ export class CubejsServerCore {
       getDriver: async (dataSource) => {
         if (!driverPromise[dataSource || 'default']) {
           orchestratorApi.addDataSeenSource(dataSource);
-          const driver = await this.driverFactory({ ...context, dataSource });
+          const driver = await this.options.driverFactory({ ...context, dataSource });
           if (driver.setLogger) {
             driver.setLogger(this.logger);
           }
@@ -502,9 +496,9 @@ export class CubejsServerCore {
         }
         return driverPromise[dataSource || 'default'];
       },
-      getExternalDriverFactory: this.externalDriverFactory && (async () => {
+      getExternalDriverFactory: this.options.externalDriverFactory && (async () => {
         if (!externalPreAggregationsDriverPromise) {
-          const driver = await this.externalDriverFactory(context);
+          const driver = await this.options.externalDriverFactory(context);
           if (driver.setLogger) {
             driver.setLogger(this.logger);
           }
@@ -557,7 +551,7 @@ export class CubejsServerCore {
 
   public async getDriver() {
     if (!this.driver) {
-      const driver = this.driverFactory(<any>{});
+      const driver = this.options.driverFactory(<any>{});
       await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }

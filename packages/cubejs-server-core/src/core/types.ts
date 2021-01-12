@@ -39,6 +39,10 @@ export interface DriverContext extends RequestContext {
   dataSource: string;
 }
 
+export interface DialectContext extends DriverContext {
+  dbType: string;
+}
+
 export interface FileContent {
   fileName: string;
   content: string;
@@ -88,7 +92,7 @@ export interface CreateOptions {
   apiSecret?: string;
   logger?: (msg: string, params: any) => void;
   driverFactory?: (context: DriverContext) => any;
-  dialectFactory?: (context: DriverContext) => any;
+  dialectFactory?: (context: DialectContext) => any;
   externalDriverFactory?: (context: RequestContext) => any;
   externalDialectFactory?: (context: RequestContext) => any;
   contextToAppId?: ContextToAppIdFn;
