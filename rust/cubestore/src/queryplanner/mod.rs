@@ -1,10 +1,13 @@
 pub mod query_executor;
 pub mod serialized_plan;
+pub mod udfs;
 
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::queryplanner::query_executor::batch_to_dataframe;
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::queryplanner::udfs::aggregate_udf_by_kind;
+use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 use crate::store::DataFrame;
 use crate::CubeError;
 use arrow::array::StringArray;
@@ -166,12 +169,22 @@ impl ContextProvider for MetaStoreSchemaProvider {
         })
     }
 
-    fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
-        None
+    fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
+        let kind = match name {
+            "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
+            _ => return None,
+        };
+        return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
     }
 
-    fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
-        None
+    fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
+        // HyperLogLog.
+        // TODO: case-insensitive names.
+        let kind = match name {
+            "merge" | "MERGE" => CubeAggregateUDFKind::MergeHll,
+            _ => return None,
+        };
+        return Some(Arc::new(aggregate_udf_by_kind(kind).descriptor()));
     }
 }
 
