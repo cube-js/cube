@@ -23,7 +23,7 @@ ReactDOM.render(
       <Route
         key="connection"
         path="/connection"
-        component={ConnectionWizardPage}
+        component={() => <ConnectionWizardPage history={history} />}
       />
       <Route key="dashboard" path="/dashboard" component={DashboardPage} />
       <Route

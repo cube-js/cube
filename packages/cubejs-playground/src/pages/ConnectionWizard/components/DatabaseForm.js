@@ -6,6 +6,7 @@ export default function DatabaseForm({
   db,
   deployment,
   loading = false,
+  disabled = false,
   onSubmit,
   onCancel,
 }) {
@@ -67,9 +68,15 @@ export default function DatabaseForm({
         )
       )}
       <Space>
-        <Button type="primary" htmlType="submit" loading={loading}>
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={loading}
+          disabled={disabled}
+        >
           Apply
         </Button>
+
         <Button onClick={onCancel} data-qa="SetUpLater">
           Set Up Later
         </Button>

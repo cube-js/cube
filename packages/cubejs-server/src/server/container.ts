@@ -33,6 +33,7 @@ export class ServerContainer {
   public constructor(
     protected readonly configuration: { debug: boolean }
   ) {
+    console.log('ServerContainer .>>>');
   }
 
   protected getTypeScriptCompiler(): TypescriptCompilerType {
@@ -280,6 +281,8 @@ export class ServerContainer {
       });
     };
 
+    console.log('cubejs slsjdfsldfjlsdfjsldflsdlfj;');
+    
     let server = await makeInstance();
 
     // eslint-disable-next-line no-restricted-syntax
