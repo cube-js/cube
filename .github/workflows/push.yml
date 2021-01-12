@@ -71,7 +71,7 @@ jobs:
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
-        run: yarn lerna run --concurrency 1 tsc
+        run: yarn tsc
       - name: Lerna test
         run: yarn lerna run --concurrency 1 unit
 
@@ -210,7 +210,7 @@ jobs:
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
-        run: yarn lerna run --concurrency 1 tsc
+        run: yarn tsc
       - name: Run Redis Integration
         timeout-minutes: 10
         run: |
@@ -309,7 +309,7 @@ jobs:
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
-        run: yarn lerna run --concurrency 1 tsc
+        run: yarn tsc
       - name: Run MySQL Integration with 5.6
         timeout-minutes: 10
         run: |
@@ -397,7 +397,7 @@ jobs:
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
-        run: yarn lerna run --concurrency 1 tsc
+        run: yarn tsc
       - name: Run PrestoDB Integration with Postgres 12.4
         timeout-minutes: 15
         run: |

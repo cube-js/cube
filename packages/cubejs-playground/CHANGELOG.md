@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.15](https://github.com/cube-js/cube.js/compare/v0.25.14...v0.25.15) (2021-01-12)
+
+
+### Features
+
+* **@cubejs-client/playground:** display slow query warning ([#1649](https://github.com/cube-js/cube.js/issues/1649)) ([ce33f88](https://github.com/cube-js/cube.js/commit/ce33f8849b96ac25dd6f242b61f81e29600f511a))
+
+
+
+
+
 ## [0.25.14](https://github.com/cube-js/cube.js/compare/v0.25.13...v0.25.14) (2021-01-11)
 
 **Note:** Version bump only for package @cubejs-client/playground
