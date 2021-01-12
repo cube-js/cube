@@ -12,10 +12,10 @@ export default async (event, endpointUrl, logger) => {
   });
   const flush = async (toFlush, retries) => {
     if (!toFlush) {
-      toFlush = trackEvents.splice(0, 10);
+      toFlush = trackEvents.splice(0, 50);
     }
     if (!toFlush.length) {
-      return null;
+      return false;
     }
     if (retries == null) {
       retries = 3;
@@ -31,19 +31,27 @@ export default async (event, endpointUrl, logger) => {
         return flush(toFlush, retries - 1);
       }
       // console.log(await result.json());
+      return true;
     } catch (e) {
       if (retries > 0) {
         return flush(toFlush, retries - 1);
       }
       logger('Agent Error', { error: (e.stack || e).toString() });
     }
-    return null;
+    return true;
   };
-  const currentPromise = (flushPromise || Promise.resolve()).then(() => flush()).then(() => {
-    if (currentPromise === flushPromise) {
-      flushPromise = null;
+  const flushCycle = async () => {
+    for (let i = 0; i < 1000; i++) {
+      if (!await flush()) {
+        return;
+      }
     }
-  });
-  flushPromise = currentPromise;
+  };
+  if (!flushPromise) {
+    flushPromise = flushCycle().then(() => {
+      flushPromise = null;
+    });
+  }
+
   return flushPromise;
 };
