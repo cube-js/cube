@@ -12,12 +12,23 @@
     "node": ">=8.11.1"
   },
   "main": "driver/SnowflakeDriver.js",
+  "scripts": {
+    "lint": "linter driver/*",
+    "lint:fix": "linter --fix driver/*"
+  },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.25.15",
+    "date-fns-timezone": "^0.1.4",
     "snowflake-sdk": "^1.1.15"
   },
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  },
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.25.0"
   }
 }
