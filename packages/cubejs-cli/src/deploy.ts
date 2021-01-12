@@ -36,7 +36,7 @@ export class DeployDirectory {
 
   protected filter(file: string) {
     const baseName = path.basename(file);
-    return baseName !== 'node_modules' && baseName !== '.git' && baseName !== '.env';
+    return baseName !== 'dashboard-app' && baseName !== 'node_modules' && baseName !== '.git' && baseName !== '.env';
   }
 
   protected fileHash(file: string) {
