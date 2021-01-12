@@ -1,5 +1,56 @@
+/* eslint-disable no-restricted-syntax */
 const snowflake = require('snowflake-sdk');
+const { formatToTimeZone } = require('date-fns-timezone');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+
+// It's not possible to declare own map converters by passing config to snowflake-sdk
+const hydrators = [
+  {
+    types: ['fixed', 'real'],
+    toValue: (column) => {
+      if (column.isNullable()) {
+        return (value) => {
+          // We use numbers as strings by fetchAsString
+          if (value === 'NULL') {
+            return null;
+          }
+
+          return value;
+        };
+      }
+
+      // Nothing to fix, let's skip this field
+      return null;
+    },
+  },
+  {
+    // The TIMESTAMP_* variation associated with TIMESTAMP, default to TIMESTAMP_NTZ
+    types: [
+      'date',
+      // TIMESTAMP_LTZ internally stores UTC time with a specified precision.
+      'timestamp_ltz',
+      // TIMESTAMP_NTZ internally stores “wallclock” time with a specified precision.
+      // All operations are performed without taking any time zone into account.
+      'timestamp_ntz',
+      // TIMESTAMP_TZ internally stores UTC time together with an associated time zone offset.
+      // When a time zone is not provided, the session time zone offset is used.
+      'timestamp_tz'
+    ],
+    toValue: () => (value) => {
+      if (!value) {
+        return null;
+      }
+
+      return formatToTimeZone(
+        value,
+        'YYYY-MM-DDTHH:mm:ss.SSS',
+        {
+          timeZone: 'UTC'
+        }
+      );
+    },
+  }
+];
 
 class SnowflakeDriver extends BaseDriver {
   constructor(config) {
@@ -39,17 +90,43 @@ class SnowflakeDriver extends BaseDriver {
   }
 
   query(query, values) {
-    return this.initialConnectPromise.then((connection) => this.execute(connection, "ALTER SESSION SET TIMEZONE = 'UTC'")
-      .then(() => this.execute(connection, "ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600"))
+    return this.initialConnectPromise.then((connection) => this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false)
+      .then(() => this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false))
       .then(() => this.execute(connection, query, values)));
   }
 
-  execute(connection, query, values) {
+  async execute(connection, query, values, rehydrate = true) {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
       binds: values,
-      fetchAsString: ['Number', 'Date'],
+      fetchAsString: ['Number'],
       complete: (err, stmt, rows) => {
+        if (rehydrate && rows.length) {
+          const hydrationMap = {};
+          const columns = stmt.getColumns();
+
+          for (const column of columns) {
+            for (const hydrator of hydrators) {
+              if (hydrator.types.includes(column.getType())) {
+                const fnOrNull = hydrator.toValue(column);
+                if (fnOrNull) {
+                  hydrationMap[column.getName()] = fnOrNull;
+                }
+              }
+            }
+          }
+
+          if (Object.keys(hydrationMap).length) {
+            for (const row of rows) {
+              for (const [field, toValue] of Object.entries(hydrationMap)) {
+                if (row.hasOwnProperty(field)) {
+                  row[field] = toValue(row[field]);
+                }
+              }
+            }
+          }
+        }
+
         if (err) {
           reject(err);
         } else {
@@ -71,11 +148,10 @@ class SnowflakeDriver extends BaseDriver {
   }
 
   async release() {
-    return this.initialConnectPromise.then((connection) =>
-      new Promise((resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn))))
-    );
+    return this.initialConnectPromise.then((connection) => new Promise(
+      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+    ));
   }
-
 }
 
 module.exports = SnowflakeDriver;
