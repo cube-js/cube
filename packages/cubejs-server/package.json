@@ -50,7 +50,7 @@
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
-    "dotenv": "^8.2.0",
+    "cubejs-dotenv": "^8.3.0",
     "express": "^4.17.1",
     "jsonwebtoken": "^8.4.0",
     "node-machine-id": "^1.1.10",
