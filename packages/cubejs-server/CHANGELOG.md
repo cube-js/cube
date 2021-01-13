@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.16](https://github.com/cube-js/cube.js/compare/v0.25.15...v0.25.16) (2021-01-13)
+
+
+### Bug Fixes
+
+* **server:** configuration reload should overrite old env variables ([bbb5c4a](https://github.com/cube-js/cube.js/commit/bbb5c4aad249a8f62e0edccf29871abcd95feca6))
+
+
+### Features
+
+* **server:** Throw an exception when env file is not correct ([abff7fc](https://github.com/cube-js/cube.js/commit/abff7fcc11b7c226346ecb9524b98548fdc4fe09))
+
+
+
+
+
 ## [0.25.15](https://github.com/cube-js/cube.js/compare/v0.25.14...v0.25.15) (2021-01-12)
 
 
