@@ -1,4 +1,5 @@
-import { CubejsServer } from './server';
+// import { CubejsServer } from './server';
+import { ServerContainer } from './server/container';
 
 export * from './server';
 
@@ -6,4 +7,5 @@ export * from './server';
 // export * from './command/server';
 // export * from './command/dev-server';
 
-export default CubejsServer;
+export default ServerContainer;
+// export default CubejsServer;

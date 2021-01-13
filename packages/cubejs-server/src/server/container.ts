@@ -276,13 +276,11 @@ export class ServerContainer {
     const makeInstance = async () => {
       const configuration = await this.lookupConfiguration();
       return this.runServerInstance({
-        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : undefined,
+        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : 2,
         ...configuration,
       });
     };
 
-    console.log('cubejs slsjdfsldfjlsdfjsldflsdlfj;');
-    
     let server = await makeInstance();
 
     // eslint-disable-next-line no-restricted-syntax

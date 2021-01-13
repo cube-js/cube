@@ -538,9 +538,7 @@ export class CubejsServerCore {
     });
   }
 
-  protected createOrchestratorApi(options): OrchestratorApi {
-    options = options || {};
-
+  protected createOrchestratorApi(options: any = {}): OrchestratorApi {
     return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
       redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
       externalDriverFactory: options.getExternalDriverFactory,
