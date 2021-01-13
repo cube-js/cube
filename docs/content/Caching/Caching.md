@@ -15,75 +15,9 @@ To reset the **in-memory** cache in development mode, just restart the server.
 
 The second level of caching is called **pre-aggregations**, and requires explicit configuration to activate.
 
-## In-memory Cache
-
-Cube.js caches the results of executed queries using in-memory cache. The cache
-key is a generated SQL statement with any existing query-dependent
-pre-aggregations.
-
-Upon receiving an incoming request, Cube.js first checks the cache using this key.
-If nothing is found in the cache, the query is executed in the database and the result set
-is returned as well as updating the cache.
-
-If an existing value is present in the cache and the `refreshKey` value for
-the query hasn't changed, the cached value will be returned. Otherwise, a
-[query renewal](#in-memory-cache-force-query-renewal) will be performed.
-
-### Refresh Keys
-
-Cube.js takes great care to prevent unnecessary queries from hitting your database. The first stage caching system caches query results in Redis (or in the in-memory store in development), but Cube.js needs a way to know if the data powering that query result has changed. If the underlying data isn't any different, the cached result is valid and can be returned skipping that expensive query, but if there is a difference, the query needs to be re-run and its' result cached.
-
-To aid with this, Cube.js defines a `refreshKey` for each cube. [Refresh keys](cube#parameters-refresh-key) are evaluated by Cube.js to assess if the data needs to be refreshed.
-
-```js
-cube(`Orders`, {
-  // This refreshKey tells Cube.js to refresh data every 5 minutes
-  refreshKey: {
-    every: `5 minute`
-  }
-
-  // With this refreshKey Cube.js will only refresh the data if
-  // the value of previous MAX(created_at) changed
-  // By default Cube.js will check this refreshKey every 10 seconds
-  refreshKey: {
-    sql: `SELECT MAX(created_at) FROM orders`
-  }
-});
-```
-
-By default, Cube.js will check and invalidate the cache in the background when in [development mode][link-development-mode]. When development mode is disabled you can set `CUBEJS_SCHEDULED_REFRESH_TIMER=true` to enable this behavior.
-
-We recommend enabling background cache invalidation in a separate Cube.js worker for production deployments. Please consult the [Production Checklist][link-production-checklist] for more information.
-
-[link-production-checklist]: /deployment/production-checklist
-[link-development-mode]: /configuration/overview#development-mode
-[link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
-
-If background refresh is disabled, Cube.js will refresh the cache during query
-execution. Since this could lead to delays in responding to end-users, we
-recommend always enabling background refresh.
-
-### Default Refresh Keys
-
-The default values for `refreshKey` are
- * `every: '2 minute'` for BigQuery, Athena, Snowflake, and Presto.
- * `every: '10 second'` for all other databases.
-
-+You can use a custom SQL query for checking if a refresh is required by changing the [`refreshKey`](/cube#parameters-refresh-key) property in a cube's Data Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a metadata table for whatever system is managing the data to see when it last ran.
-
-
-### How to disable the cache?
-
-There's no straightforward way to disable caching in Cube.js.
-The reason for it is Cube.js is not just stores cached values but uses the cache as a point of synchronization and coordination between nodes in a cluster.
-For the sake of design simplicity, Cube.js doesn't distinguish client invocations, and all calls to the data load API are idempotent.
-This provides excellent reliability and scalability but has some drawbacks.
-One of those load data calls can't be traced to specific clients, and as a consequence, there's no guaranteed way for a client to initiate a new data loading query or know if the current invocation wasn't initiated earlier by another client.
-Only Refresh Key freshness guarantees are provided in this case.
-
-For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately.
-For these situations, the cache can effectively be disabled by setting the [`refreshKey.every`](cube#parameters-refresh-key) parameter to something very low, like `1 second`.
-``
+We do not recommend changing the default **in-memory** caching configuration
+unless it is necessary. To speed up query performance, consider using
+**pre-aggregations**.
 
 ## Pre-Aggregations
 
@@ -189,6 +123,77 @@ cube(`Orders`, {
   }
 });
 ```
+
+## In-memory Cache
+
+Cube.js caches the results of executed queries using in-memory cache. The cache
+key is a generated SQL statement with any existing query-dependent
+pre-aggregations.
+
+Upon receiving an incoming request, Cube.js first checks the cache using this key.
+If nothing is found in the cache, the query is executed in the database and the result set
+is returned as well as updating the cache.
+
+If an existing value is present in the cache and the `refreshKey` value for
+the query hasn't changed, the cached value will be returned. Otherwise, a
+[query renewal](#in-memory-cache-force-query-renewal) will be performed.
+
+### Refresh Keys
+
+Cube.js takes great care to prevent unnecessary queries from hitting your database. The first stage caching system caches query results in Redis (or in the in-memory store in development), but Cube.js needs a way to know if the data powering that query result has changed. If the underlying data isn't any different, the cached result is valid and can be returned skipping an expensive query, but if there is a difference, the query needs to be re-run and its result cached.
+
+To aid with this, Cube.js defines a `refreshKey` for each cube. [Refresh keys](cube#parameters-refresh-key) are evaluated by Cube.js to assess if the data needs to be refreshed.
+
+```js
+cube(`Orders`, {
+  // This refreshKey tells Cube.js to refresh data every 5 minutes
+  refreshKey: {
+    every: `5 minute`
+  }
+
+  // With this refreshKey Cube.js will only refresh the data if
+  // the value of previous MAX(created_at) changed
+  // By default Cube.js will check this refreshKey every 10 seconds
+  refreshKey: {
+    sql: `SELECT MAX(created_at) FROM orders`
+  }
+});
+```
+
+By default, Cube.js will check and invalidate the cache in the background when in [development mode][link-development-mode]. When development mode is disabled you can set `CUBEJS_SCHEDULED_REFRESH_TIMER=true` to enable this behavior.
+
+We recommend enabling background cache invalidation in a separate Cube.js worker for production deployments. Please consult the [Production Checklist][link-production-checklist] for more information.
+
+[link-production-checklist]: /deployment/production-checklist
+[link-development-mode]: /configuration/overview#development-mode
+[link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
+
+If background refresh is disabled, Cube.js will refresh the cache during query
+execution. Since this could lead to delays in responding to end-users, we
+recommend always enabling background refresh.
+
+### Default Refresh Keys
+
+The default values for `refreshKey` are
+ * `every: '2 minute'` for BigQuery, Athena, Snowflake, and Presto.
+ * `every: '10 second'` for all other databases.
+
++You can use a custom SQL query to check if a refresh is required by changing the [`refreshKey`](/cube#parameters-refresh-key) property in a cube's Data Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a metadata table for whatever system is managing the data to see when it last ran.
+
+
+### Disabling the cache
+
+There's no straightforward way to disable caching in Cube.js.
+The reason is that Cube.js not only stores cached values but also uses the cache as a point of synchronization and coordination between nodes in a cluster.
+For the sake of design simplicity, Cube.js doesn't distinguish client invocations, and all calls to the data load API are idempotent.
+This provides excellent reliability and scalability but has some drawbacks.
+One of those load data calls can't be traced to specific clients, and as a consequence, there's no guaranteed way for a client to initiate a new data loading query or know if the current invocation wasn't initiated earlier by another client.
+Only Refresh Key freshness guarantees are provided in this case.
+
+For situations like real-time analytics or responding to live user changes to underlying data, the `refreshKey` query cache can prevent fresh data from showing up immediately.
+For these situations, the cache can effectively be disabled by setting the [`refreshKey.every`](cube#parameters-refresh-key) parameter to something very low, like `1 second`.
+``
+
 
 ## Inspecting Queries
 To inspect whether the query hits in-memory cache, pre-aggregation, or the underlying data source, you can use the Playground or [Cube Cloud][link-cube-cloud].
