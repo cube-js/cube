@@ -6,10 +6,10 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array, Int64Decimal10Array,
-    Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array, Int64Decimal4Array,
-    Int64Decimal5Array, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
-    UInt64Array,
+    Array, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
+    Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
+    Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
+    TimestampNanosecondArray, UInt64Array,
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
@@ -712,6 +712,15 @@ impl TableProvider for CubeTable {
     }
 }
 
+macro_rules! convert_array_cast_native {
+    ($V: expr, (Vec<u8>)) => {{
+        $V.to_vec()
+    }};
+    ($V: expr, $T: ty) => {{
+        $V as $T
+    }};
+}
+
 macro_rules! convert_array {
     ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, Decimal, $SCALE: expr, $CUT_TRAILING_ZEROS: expr) => {{
         let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
@@ -728,13 +737,13 @@ macro_rules! convert_array {
             });
         }
     }};
-    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, $TABLE_TYPE: ident, $NATIVE: ty) => {{
+    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, $TABLE_TYPE: ident, $NATIVE: tt) => {{
         let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
         for i in 0..$NUM_ROWS {
             $ROWS[i].push(if a.is_null(i) {
                 TableValue::Null
             } else {
-                TableValue::$TABLE_TYPE(a.value(i) as $NATIVE)
+                TableValue::$TABLE_TYPE(convert_array_cast_native!(a.value(i), $NATIVE))
             });
         }
     }};
@@ -874,6 +883,9 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         });
                     }
                 }
+                DataType::Binary => {
+                    convert_array!(array, num_rows, rows, BinaryArray, Bytes, (Vec<u8>))
+                }
                 DataType::Utf8 => {
                     let a = array.as_any().downcast_ref::<StringArray>().unwrap();
                     for i in 0..num_rows {
@@ -904,6 +916,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
 
 pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeError> {
     match arrow_type {
+        DataType::Binary => Ok(ColumnType::Bytes),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::Float),

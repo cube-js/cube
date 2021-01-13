@@ -27,6 +27,7 @@ use crate::sql::parser::CubeStoreParser;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use parser::Statement as CubeStoreStatement;
+use hex::FromHex;
 
 #[async_trait]
 pub trait SqlService: Send + Sync {
@@ -506,6 +507,18 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<DataFrame, 
     ))
 }
 
+fn parse_binary_string(v: &Value) -> Result<Vec<u8>, CubeError> {
+    match v {
+        // TODO: unescape the string
+        Value::SingleQuotedString(s) | Value::Number(s) => Ok(s.as_bytes().to_vec()),
+        Value::HexStringLiteral(s) => Ok(Vec::from_hex(s.as_bytes())?),
+        _ => Err(CubeError::user(format!(
+            "cannot convert value to binary string: {}",
+            v
+        ))),
+    }
+}
+
 fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableValue, CubeError> {
     if let Expr::Value(Value::Null) = cell {
         return Ok(TableValue::Null);
@@ -557,16 +570,13 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
             }
             ColumnType::Bytes => {
                 // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
-                let val = if let Expr::Value(Value::Number(v)) = cell {
-                    v
+                let val;
+                if let Expr::Value(v) = cell {
+                    val = parse_binary_string(v)
                 } else {
                     return Err(CubeError::user("Corrupted data in query.".to_string()));
                 };
-                let main_vec: Vec<u8> = val
-                    .split("") // split string into words by whitespace
-                    .filter_map(|w| w.parse::<u8>().ok()) // calling ok() turns Result to Option so that filter_map can discard None values
-                    .collect();
-                TableValue::Bytes(main_vec)
+                return Ok(TableValue::Bytes(val?));
             }
             ColumnType::Timestamp => match cell {
                 Expr::Value(Value::SingleQuotedString(v)) => {
@@ -1768,6 +1778,45 @@ mod tests {
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
         }).await;
+    }
+
+    #[tokio::test]
+    async fn bytes() {
+        Config::run_test("bytes", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS s")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE s.Bytes (id int, data bytea)")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query(
+                    "INSERT INTO s.Bytes(id, data) VALUES (1, '123'), (2, X'deADbeef'), (3, 456)",
+                )
+                .await
+                .unwrap();
+
+            let result = service.exec_query("SELECT * from s.Bytes").await.unwrap();
+            let r = result.get_rows();
+            assert_eq!(r.len(), 3);
+            assert_eq!(
+                r[0].values()[1],
+                TableValue::Bytes("123".as_bytes().to_vec())
+            );
+            assert_eq!(
+                r[1].values()[1],
+                TableValue::Bytes(vec![0xde, 0xad, 0xbe, 0xef])
+            );
+            assert_eq!(
+                r[2].values()[1],
+                TableValue::Bytes("456".as_bytes().to_vec())
+            );
+        })
+        .await;
     }
 
     #[tokio::test]

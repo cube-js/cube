@@ -300,3 +300,9 @@ impl From<std::num::ParseFloatError> for CubeError {
         CubeError::from_error(v)
     }
 }
+
+impl From<hex::FromHexError> for CubeError {
+    fn from(v: hex::FromHexError) -> Self {
+        CubeError::from_error(v)
+    }
+}
