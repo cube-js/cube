@@ -87,6 +87,8 @@ const create = async (projectName, options) => {
 
   driverDependencies = Array.isArray(driverDependencies) ? driverDependencies : [driverDependencies];
   if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
+    // jdbc-driver has peerDependencies
+    driverDependencies.push('jdbc');
     driverDependencies.push('node-java-maven');
   }
 
