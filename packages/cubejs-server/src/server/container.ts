@@ -231,7 +231,10 @@ export class ServerContainer {
   }
 
   public async lookupConfiguration(): Promise<CreateOptions> {
-    dotenv.config();
+    const { error } = dotenv.config();
+    if (error) {
+      throw new Error(error.message);
+    }
 
     const devMode = getEnv('devMode');
     if (devMode) {
