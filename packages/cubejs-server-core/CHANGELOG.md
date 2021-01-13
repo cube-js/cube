@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.16](https://github.com/cube-js/cube.js/compare/v0.25.15...v0.25.16) (2021-01-13)
+
+
+### Bug Fixes
+
+* Pass dbType in DialectContext for dialectFactory ([#1756](https://github.com/cube-js/cube.js/issues/1756)) ([5cf88bf](https://github.com/cube-js/cube.js/commit/5cf88bf1eaaed1c70223631a76e3de77ecae46b7)), closes [#1728](https://github.com/cube-js/cube.js/issues/1728)
+
+
+
+
+
 ## [0.25.15](https://github.com/cube-js/cube.js/compare/v0.25.14...v0.25.15) (2021-01-12)
 
 

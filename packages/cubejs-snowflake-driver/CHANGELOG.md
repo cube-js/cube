@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.16](https://github.com/cube-js/cube.js/compare/v0.25.15...v0.25.16) (2021-01-13)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Handle null values for numbers, dates. fix [#1741](https://github.com/cube-js/cube.js/issues/1741) ([51c2bb2](https://github.com/cube-js/cube.js/commit/51c2bb21d4d46daac89f21921f5c61982ab6547f))
+
+
+
+
+
 ## [0.25.15](https://github.com/cube-js/cube.js/compare/v0.25.14...v0.25.15) (2021-01-12)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver
