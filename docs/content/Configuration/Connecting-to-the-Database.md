@@ -88,7 +88,7 @@ CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 
 ## Enabling SSL
 
-Cube.js supports SSL-encrypted connections for **Postgres**, **MongoDB** and
+Cube.js supports SSL-encrypted connections for **Postgres**, **MongoDB**, **MS SQL**, and
 **MySQL**. To enable it set the `CUBEJS_DB_SSL` environment variable to `true`.
 Cube.js can also be configured to use custom connection settings. For example,
 to use a custom CA and certificates, you could do the following:
