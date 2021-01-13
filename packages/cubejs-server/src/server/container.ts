@@ -33,7 +33,6 @@ export class ServerContainer {
   public constructor(
     protected readonly configuration: { debug: boolean }
   ) {
-    console.log('ServerContainer .>>>');
   }
 
   protected getTypeScriptCompiler(): TypescriptCompilerType {

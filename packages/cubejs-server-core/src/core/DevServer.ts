@@ -30,7 +30,6 @@ export class DevServer {
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
   ) {
-    console.log(process.env);
   }
 
   public initDevEnv(app: ExpressApplication, options: ServerCoreInitializedOptions) {
@@ -285,7 +284,6 @@ export class DevServer {
     }));
     
     app.get('/playground/test-connection', catchErrors(async (_, res) => {
-      console.log('test: ', process.env.CUBEJS_DB_PASS);
       const orchestratorApi = this.cubejsServer.getOrchestratorApi({
         authInfo: null,
         requestId: ''
@@ -305,7 +303,7 @@ export class DevServer {
     
     let restartPromise = null;
     
-    app.get('/playground/restart', catchErrors(async (_, res) => {
+    app.get('/restart', catchErrors(async (_, res) => {
       if (restartPromise === null) {
         restartPromise = new Promise<void>((resolve, reject) => {
           (async () => {

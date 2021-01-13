@@ -67,7 +67,7 @@ async function saveConnection(variables) {
       variables,
     }),
   });
-  await fetch('/playground/restart');
+  await fetch('/restart');
 }
 
 export default function ConnectionWizardPage({ history }) {
