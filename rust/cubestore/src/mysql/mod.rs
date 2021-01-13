@@ -2,13 +2,14 @@ use crate::sql::SqlService;
 use crate::table::TableValue;
 use crate::{metastore, CubeError};
 use async_trait::async_trait;
+use hex::ToHex;
+use itertools::Itertools;
 use log::{error, info, warn};
 use msql_srv::*;
 use std::io;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::net::TcpListener;
-use itertools::Itertools;
 
 struct Backend {
     sql_service: Arc<dyn SqlService>,
@@ -83,7 +84,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     TableValue::Decimal(v) => rw.write_col(v.to_string())?,
                     TableValue::Boolean(v) => rw.write_col(v.to_string())?,
                     TableValue::Float(v) => rw.write_col(v.to_string())?,
-                    TableValue::Bytes(b) => rw.write_col(b.iter().map(|v| v.to_string()).join(" "))?,
+                    TableValue::Bytes(b) => {
+                        rw.write_col(format!("0x{}", b.encode_hex_upper::<String>()))?
+                    }
                     TableValue::Null => rw.write_col(Option::<String>::None)?,
                 }
             }
