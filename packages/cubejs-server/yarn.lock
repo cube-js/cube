@@ -847,10 +847,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.25.14":
-  version "0.25.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.25.14.tgz#908ef4ae8ac6176a45eeb3a86579836e7446e557"
-  integrity sha512-w1JYzM3GAVva/6SR5+W8izAkTfYUIvleKT/8WzScubOHCRBnqUIh4h8fu87LfrPVbkG90WXQuWKNIddvq0anaQ==
+"@cubejs-backend/api-gateway@^0.25.15":
+  version "0.25.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.25.15.tgz#ba6530681be190a6539d9dc3eea03e05f43e2c3a"
+  integrity sha512-KQsN3iVHHXL6VxAxwVrAm6BUtCVy2aN1nOGsLp0C6suPDqMssf2KGd9sH/Q9lgQwXTQF2waI8VQyPh2OM128aQ==
   dependencies:
     "@hapi/joi" "^15.1.1"
     body-parser "^1.19.0"
@@ -874,12 +874,12 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/query-orchestrator@^0.25.13":
-  version "0.25.13"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.25.13.tgz#152e1ddbbcb50553d1d9b52ceec99d16dfb93762"
-  integrity sha512-7ULZk5I7Z0iKpgNRThnAWx4H5bSLTmDi7pCVSyneW3lACRbpL/WrKCfIDnM65lhRC/EQee3s9zDFwflKpM7MRg==
+"@cubejs-backend/query-orchestrator@^0.25.15":
+  version "0.25.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.25.15.tgz#7e7d4bfd06754a7ad317bc59d6198c4971f6c678"
+  integrity sha512-HldLNcqhPlNrQc7Vsgeg8jKk4O2j9OANjnspajLPS88uEsg/Qfjlus6HOgOnq0dxMB3if8sJSrdDtMVw3ra4bw==
   dependencies:
-    "@cubejs-backend/shared" "^0.25.6"
+    "@cubejs-backend/shared" "^0.25.15"
     generic-pool "^3.7.1"
     ramda "^0.27.0"
     redis "^3.0.2"
@@ -908,15 +908,15 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.25.14":
-  version "0.25.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.25.14.tgz#35c2e656d403c6a128e79ecd2bd64d53312593a7"
-  integrity sha512-8OV1Ai3xVZKBFATpyrzn1pp4aqQ7YY4+vczCWRVcKw0WpjH2u6vDyGS3DD7Gp212cirgRcqZom9WhnIM0jaEjQ==
+"@cubejs-backend/server-core@^0.25.15":
+  version "0.25.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.25.15.tgz#a48e0e2120ed3d58122c9787c3a3125c8008e9bb"
+  integrity sha512-JM0UjVUVUrOmCEpFEQCBXZYUkOf99UY4fn26N2wKmcjQpJ3uaWpSPzhBjPQkqajnfBygW+er5BPvXkXE1XQpPw==
   dependencies:
-    "@cubejs-backend/api-gateway" "^0.25.14"
-    "@cubejs-backend/query-orchestrator" "^0.25.13"
+    "@cubejs-backend/api-gateway" "^0.25.15"
+    "@cubejs-backend/query-orchestrator" "^0.25.15"
     "@cubejs-backend/schema-compiler" "^0.25.2"
-    "@cubejs-backend/shared" "^0.25.6"
+    "@cubejs-backend/shared" "^0.25.15"
     "@hapi/joi" "^15.1.1"
     codesandbox-import-utils "^2.1.12"
     cross-spawn "^7.0.1"
@@ -937,10 +937,10 @@
     sqlstring "^2.3.1"
     uuid "^3.3.3"
 
-"@cubejs-backend/shared@^0.25.6":
-  version "0.25.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.25.6.tgz#50892544737f96fa15b0750539c04b41857fe59e"
-  integrity sha512-DGMukOARNv9fkfC5RezQfQCFaNSyXFBSpI1WlVXpkYM6vKrwzUUxiLXR9+8dZ6USdYtwUgon0IdF+nK99DltqQ==
+"@cubejs-backend/shared@^0.25.15":
+  version "0.25.15"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.25.15.tgz#82d31dcb664352cce714c14aa907b6981eda85f8"
+  integrity sha512-2RsVoYbRhtE1a1Sbjfl7RYK1mUfTO3j1sMEMNODOa6DFCu17lHRNT2Gx0xjtv/+vulQab0Os/VpG68ktskcEng==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"
@@ -2480,6 +2480,11 @@ cssstyle@^2.2.0:
   dependencies:
     cssom "~0.3.6"
 
+cubejs-dotenv@^8.3.0:
+  version "8.3.0"
+  resolved "https://registry.yarnpkg.com/cubejs-dotenv/-/cubejs-dotenv-8.3.0.tgz#29d11d67077be773be40e22e93a8dba80c025c4f"
+  integrity sha512-3gm9/lMsmBOlMN2k98nYKNKLv1jaIfObI2Rk3LvGQuBXxtmeRV5j2KHx/9oFr1fZ3QsCzT2ZWVEqgfcrnPekIw==
+
 d@1, d@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/d/-/d-1.0.1.tgz#8698095372d58dbee346ffd0c7093f99f8f9eb5a"
@@ -2693,11 +2698,6 @@ domexception@^2.0.1:
   integrity sha512-yxJ2mFy/sibVQlu5qHjOkf9J3K6zgmCxgJ94u2EdvDOV09H+32LtRswEcUsmUWN72pVLOEnTSRaIVVzVQgS0dg==
   dependencies:
     webidl-conversions "^5.0.0"
-
-dotenv@^8.2.0:
-  version "8.2.0"
-  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-8.2.0.tgz#97e619259ada750eea3e4ea3e26bceea5424b16a"
-  integrity sha512-8sJ78ElpbDJBHNeBzUbUVLsqKdccaa/BXF1uPTw3GrvQTBgrQrtObr2mUrE38vzYd8cEv+m/JBfDLioYcfXoaw==
 
 ecc-jsbn@~0.1.1:
   version "0.1.2"
