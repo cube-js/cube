@@ -2,6 +2,8 @@ import redis, { ClientOpts, RedisClient, Commands } from 'redis';
 import { promisify } from 'util';
 
 export interface AsyncRedisClient extends RedisClient {
+  execAsync: () => Promise<boolean>,
+  // Commands
   brpopAsync: Commands<Promise<any>>['brpop'],
   delAsync: Commands<Promise<any>>['del'],
   getAsync: Commands<Promise<any>>['get'],
@@ -20,6 +22,12 @@ export interface AsyncRedisClient extends RedisClient {
 }
 
 function decorateRedisClient(client: RedisClient): AsyncRedisClient {
+  redis.Multi.prototype.execAsync = function execAsync() {
+    return new Promise((resolve, reject) => this.exec((err, res) => (
+      err ? reject(err) : resolve(res)
+    )));
+  };
+
   [
     'brpop',
     'del',
@@ -46,12 +54,6 @@ function decorateRedisClient(client: RedisClient): AsyncRedisClient {
 }
 
 export function createRedisClient(url: string, opts: ClientOpts = {}) {
-  redis.Multi.prototype.execAsync = function execAsync() {
-    return new Promise((resolve, reject) => this.exec((err, res) => (
-      err ? reject(err) : resolve(res)
-    )));
-  };
-
   const options: ClientOpts = {
     url,
   };
