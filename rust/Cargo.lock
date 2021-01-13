@@ -113,9 +113,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee67c11feeac938fae061b232e38e0b6d94f97a9df10e6271319325ac4c56a86"
+checksum = "afddf7f520a80dbf76e6f50a35bca42a2331ef227a28b3b6dc5c2e2338d114b1"
 
 [[package]]
 name = "arrayref"
@@ -132,7 +132,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#de8e062cc73caf5f66c3629d5b2dcb1139b432a7"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -154,10 +154,10 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#de8e062cc73caf5f66c3629d5b2dcb1139b432a7"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
 dependencies = [
  "arrow",
- "bytes 1.0.0",
+ "bytes 1.0.1",
  "futures",
  "proc-macro2",
  "prost",
@@ -292,7 +292,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.2.3",
+ "pin-project-lite 0.2.4",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -630,9 +630,9 @@ checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 
 [[package]]
 name = "bytes"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad1f8e949d755f9d79112b5bb46938e0ef9d3804a0b16dfab13aafcaa5f0fa72"
+checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
 
 [[package]]
 name = "cache-padded"
@@ -975,9 +975,9 @@ dependencies = [
 
 [[package]]
 name = "ctor"
-version = "0.1.17"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373c88d9506e2e9230f6107701b7d8425f4cb3f6df108ec3042a26e936666da5"
+checksum = "10bcb9d7dcbf7002aaffbb53eac22906b64cdcc127971dcc387d8eb7c95d5560"
 dependencies = [
  "quote",
  "syn",
@@ -1035,7 +1035,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#de8e062cc73caf5f66c3629d5b2dcb1139b432a7"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
 dependencies = [
  "ahash 0.6.2",
  "arrow",
@@ -1050,7 +1050,7 @@ dependencies = [
  "num_cpus",
  "parquet",
  "paste",
- "pin-project-lite 0.2.3",
+ "pin-project-lite 0.2.4",
  "rustyline",
  "serde",
  "serde_derive",
@@ -1291,9 +1291,9 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "flatbuffers"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4d0e80bffea40f65eb6eefd74f2bef75d3c4f5dfdf973b91449706d43369cd9"
+checksum = "40c2d2ec7bb8b17de23b328a842c84ad6a42b65d4bb6b863d1916cb4e09f8774"
 dependencies = [
  "bitflags",
  "smallvec",
@@ -1469,7 +1469,7 @@ dependencies = [
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite 0.2.3",
+ "pin-project-lite 0.2.4",
  "waker-fn",
 ]
 
@@ -1523,7 +1523,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.3",
+ "pin-project-lite 0.2.4",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1700,7 +1700,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7245cd7449cc792608c3c8a9eaf69bd4eabbabf802713748fd739c98b82f0747"
 dependencies = [
- "bytes 1.0.0",
+ "bytes 1.0.1",
  "fnv",
  "itoa",
 ]
@@ -1830,9 +1830,9 @@ dependencies = [
 
 [[package]]
 name = "integer-encoding"
-version = "1.1.5"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f4ebd0bd29be0f11973e9b3e219005661042a019fd757798c36a47c87852625"
+checksum = "f6104619c35f8835695e517cfb80fb7142139ee4b53f4d0fa4c8dca6e98fbc66"
 
 [[package]]
 name = "iovec"
@@ -2582,7 +2582,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#de8e062cc73caf5f66c3629d5b2dcb1139b432a7"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -2683,9 +2683,9 @@ checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba36e0a6cc5a4c645073f4984f1ed55d09f5857d4de7c14550baa81a39ef5a17"
+checksum = "439697af366c49a6d0a010c56a0d97685bc140ce0d377b13a2ea2aa42d64a827"
 
 [[package]]
 name = "pin-utils"
@@ -3085,9 +3085,9 @@ checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.1"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48b82c2a1e8eb6e1bfde608de2bcbebd4072aa32d056ea48a986990cd5ca0f5a"
+checksum = "05ec8ca9416c5ea37062b502703cd7fcb207736bc294f6e0cf367ac6fc234570"
 dependencies = [
  "bitflags",
 ]
@@ -3110,7 +3110,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "528532f3d801c87aec9def2add9ca802fe569e44a544afe633765267840abe64"
 dependencies = [
  "getrandom 0.2.1",
- "redox_syscall 0.2.1",
+ "redox_syscall 0.2.4",
 ]
 
 [[package]]
@@ -3173,7 +3173,7 @@ dependencies = [
  "mime_guess",
  "native-tls",
  "percent-encoding",
- "pin-project-lite 0.2.3",
+ "pin-project-lite 0.2.4",
  "rustls",
  "serde",
  "serde_json",
@@ -3397,18 +3397,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.118"
+version = "1.0.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06c64263859d87aa2eb554587e2d23183398d617427327cf2b3d0ed8c69e4800"
+checksum = "9bdd36f49e35b61d49efd8aa7fc068fd295961fd2286d0b2ee9a4c7a14e99cc3"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde-xml-rs"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efe415925cf3d0bbb2fc47d09b56ce03eef51c5d56846468a39bcc293c7a846c"
+checksum = "f0bf1ba0696ccf0872866277143ff1fd14d22eec235d2b23702f95e6660f7dfa"
 dependencies = [
  "log",
  "serde",
@@ -3418,9 +3418,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.118"
+version = "1.0.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c84d3526699cd55261af4b941e4e725444df67aa4f9e6a3564f18030d12672df"
+checksum = "552954ce79a059ddd5fd68c271592374bd15cab2274970380c000118aeffe1cd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3648,14 +3648,14 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.1.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a6e24d9338a0a5be79593e2fa15a648add6138caa803e2d5bc782c371732ca9"
+checksum = "dac1c663cfc93810f88aed9b8941d48cabf856a1b111c29a40439018d870eb22"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "libc",
- "rand 0.7.3",
- "redox_syscall 0.1.57",
+ "rand 0.8.1",
+ "redox_syscall 0.2.4",
  "remove_dir_all",
  "winapi 0.3.9",
 ]
@@ -4121,7 +4121,7 @@ checksum = "9f47026cdc4080c07e49b37087de021820269d996f581aac150ef9e5583eefe3"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
- "pin-project-lite 0.2.3",
+ "pin-project-lite 0.2.4",
  "tracing-attributes",
  "tracing-core",
 ]
@@ -4296,11 +4296,11 @@ checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
 
 [[package]]
 name = "uuid"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fde2f6a4bea1d6e007c4ad38c6839fa71cbb63b6dbf5b595aa38dc9b1093c11"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "rand 0.7.3",
+ "getrandom 0.2.1",
  "serde",
 ]
 
