@@ -2,7 +2,7 @@ import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
 
 import { createRedisClient, AsyncRedisClient } from './RedisFactory';
 
-export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
+export type CreateRedisClientFn = (url: string) => PromiseLike<AsyncRedisClient>;
 
 export interface RedisPoolOptions {
   poolMin?: number;
@@ -30,12 +30,15 @@ export class RedisPool {
       evictionRunIntervalMillis: 5000
     };
 
-    const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
+    const create = options.createClient || (async (url) => createRedisClient(url));
 
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.end(true));
 
-      this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
+      this.pool = genericPool.createPool<AsyncRedisClient>({
+        create: () => create(process.env.REDIS_URL),
+        destroy
+      }, opts);
     } else {
       // fallback to un-pooled behavior if pool max is 0
       this.create = create;
@@ -46,7 +49,7 @@ export class RedisPool {
     if (this.pool) {
       return this.pool.acquire();
     } else {
-      return this.create();
+      return this.create(process.env.REDIS_URL);
     }
   }
 
