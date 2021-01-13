@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.17](https://github.com/cube-js/cube.js/compare/v0.25.16...v0.25.17) (2021-01-13)
+
+
+### Reverts
+
+* Revert "feat(server): Throw an exception when env file is not correct" (#1763) ([f899786](https://github.com/cube-js/cube.js/commit/f899786a424a56326bdff9a6c4c87bb160f994d6)), closes [#1763](https://github.com/cube-js/cube.js/issues/1763)
+
+
+
+
+
 ## [0.25.16](https://github.com/cube-js/cube.js/compare/v0.25.15...v0.25.16) (2021-01-13)
 
 
