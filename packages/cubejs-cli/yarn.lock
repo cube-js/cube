@@ -272,10 +272,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/linter@^0.24.3":
-  version "0.24.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.24.3.tgz#9f943a69f755707118fb1b67f447378072b0dbea"
-  integrity sha512-/cSlFiTErloy6Uvgyzu1lEms5jfYj6oQXVp8ILNeJzo4r++gFvbox22CjNc7SlUN5tHC3x8sDzcJG4xqi9+7+Q==
+"@cubejs-backend/linter@^0.25.0":
+  version "0.25.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.25.0.tgz#fdb4e153ef066ddd33c924a2bffa3ad0d2fd2f2e"
+  integrity sha512-Bw0l4YDJSoXh9lqmaZ2FXjp8KPwzVtmvF2ZBtiFHxGlxKhMHdiY5ViNrJiCa7/+M8hlX+kyLeGH1zCV5LPAR1Q==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.8.2"
     "@typescript-eslint/parser" "^4.8.2"
@@ -284,12 +284,14 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/shared@^0.24.3":
-  version "0.24.3"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.24.3.tgz#f2e3d9ba99cab906e7b4953c1c475fd81fd120eb"
-  integrity sha512-r5/E5cX6cleTM9HWP/i2o0iZbbotlD10JiLT4FFcvCVcj+XPc5064w6yP84YjiwpKyBvbO+OW9JyFguZ7Lf6vw==
+"@cubejs-backend/shared@^0.25.18":
+  version "0.25.18"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.25.18.tgz#ef28ec8a6914c5c8e3fcc9f165d4e7e0937ab043"
+  integrity sha512-6+KCROklLMr03aocCfKm3wk3Qq93m0rAIenDo7qE13Qw6XycpSn6Ce5x1klOqfdFn9XY+HOWSObzV1yImxNYzQ==
   dependencies:
     env-var "^6.3.0"
+    node-fetch "^2.6.1"
+    node-machine-id "^1.1.12"
 
 "@eslint/eslintrc@^0.2.1":
   version "0.2.1"
@@ -1378,10 +1380,10 @@ combined-stream@^1.0.6, combined-stream@~1.0.6:
   dependencies:
     delayed-stream "~1.0.0"
 
-commander@^2.19.0:
-  version "2.20.3"
-  resolved "https://registry.yarnpkg.com/commander/-/commander-2.20.3.tgz#fd485e84c03eb4881c20722ba48035e8531aeb33"
-  integrity sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==
+commander@^6.2.1:
+  version "6.2.1"
+  resolved "https://registry.yarnpkg.com/commander/-/commander-6.2.1.tgz#0792eb682dfbc325999bb2b84fddddba110ac73c"
+  integrity sha512-U7VdrJFnJgo4xjrHpTzu0yrHPGImdsmD95ZlgYSEajAn2JKzDhDTPG9kBTefmObL2w/ngeZnilk+OV9CG3d7UA==
 
 compare-versions@^3.6.0:
   version "3.6.0"
@@ -3551,10 +3553,20 @@ nice-try@^1.0.4:
   resolved "https://registry.yarnpkg.com/nice-try/-/nice-try-1.0.5.tgz#a3378a7696ce7d223e88fc9b764bd7ef1089e366"
   integrity sha512-1nh45deeb5olNY7eX82BkPO7SSxR5SSYJiPTrTdFUVYwAl8CKMA5N9PjTYkHiRjisVcxcQ1HXdLhx2qxxJzLNQ==
 
+node-fetch@^2.6.1:
+  version "2.6.1"
+  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.1.tgz#045bd323631f76ed2e2b55573394416b639a0052"
+  integrity sha512-V4aYg89jEoVRxRb2fJdAg8FHvI7cEyYdVAh94HH0UIK8oJxUfkjlDQN9RbMx+bEjP7+ggMiFRprSti032Oipxw==
+
 node-int64@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/node-int64/-/node-int64-0.4.0.tgz#87a9065cdb355d3182d8f94ce11188b825c68a3b"
   integrity sha1-h6kGXNs1XTGC2PlM4RGIuCXGijs=
+
+node-machine-id@^1.1.12:
+  version "1.1.12"
+  resolved "https://registry.yarnpkg.com/node-machine-id/-/node-machine-id-1.1.12.tgz#37904eee1e59b320bb9c5d6c0a59f3b469cb6267"
+  integrity sha512-QNABxbrPa3qEIfrE6GOJ7BYIuignnJw7iQ2YPbc3Nla1HzRJjXzZOiikfF8m7eAMfichLt3M4VgLOetqgDmgGQ==
 
 node-modules-regexp@^1.0.0:
   version "1.0.0"
