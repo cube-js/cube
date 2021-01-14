@@ -1,4 +1,11 @@
-import { createCancelablePromise, createCancelableInterval, pausePromise, retryWithTimeout, withTimeout } from '../src';
+import {
+  createCancelablePromise,
+  createCancelableInterval,
+  pausePromise,
+  retryWithTimeout,
+  withTimeout,
+  withTimeoutRace,
+} from '../src';
 
 test('createCancelablePromise', async () => {
   let canceled = false;
@@ -136,10 +143,10 @@ test('createCancelableInterval(cancel should wait latest execution)', async () =
   expect(finished).toEqual(1);
 });
 
-test('withTimeout(ok)', async () => {
+test('withTimeoutRace(ok)', async () => {
   let canceled = false;
 
-  const result = await withTimeout(
+  const result = await withTimeoutRace(
     createCancelablePromise(async (token) => {
       token.defer(async () => {
         canceled = true;
@@ -154,14 +161,14 @@ test('withTimeout(ok)', async () => {
   expect(canceled).toEqual(false);
 });
 
-test('withTimeout(timeout)', async () => {
+test('withTimeoutRace(timeout)', async () => {
   let started = false;
   let canceled = false;
   let finished = false;
   let throwed = false;
 
   try {
-    await withTimeout(
+    await withTimeoutRace(
       createCancelablePromise(async (token) => {
         started = true;
 

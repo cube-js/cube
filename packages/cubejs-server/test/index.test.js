@@ -31,7 +31,7 @@ describe('CubeServer', () => {
         expect(http.__mockServer.listen).toHaveBeenCalledTimes(1);
         expect(http.__mockServer.listen.mock.calls[0][0]).toBe(4000);
         // act
-        await server.shutdown('SIGTERM', false);
+        await server.shutdown('SIGTERM', true);
         // assert
         expect(CubejsServerCore.__mockServer.shutdown).toHaveBeenCalledTimes(1);
       }
