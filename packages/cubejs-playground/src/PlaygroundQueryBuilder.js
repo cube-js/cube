@@ -84,6 +84,7 @@ export default function PlaygroundQueryBuilder({
   setQuery,
 }) {
   const ref = useRef(null);
+  const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   
@@ -270,7 +271,9 @@ export default function PlaygroundQueryBuilder({
                     error={error}
                     chartType={chartType}
                     pivotConfig={pivotConfig}
+                    framework={framework}
                     chartingLibrary={chartingLibrary}
+                    setFramework={setFramework}
                     setChartLibrary={(value) => {
                       if (ref.current) {
                         dispatchChartEvent(ref.current.contentDocument, {
