@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import R from 'ramda';
 
+import { getEnv } from '@cubejs-backend/shared';
+
 import { cancelCombinator } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
@@ -300,7 +302,7 @@ class PreAggregationLoader {
     this.externalRefresh = options.externalRefresh;
     if (this.externalRefresh && this.waitForRenew) {
       const message = 'Invalid configuration - when externalRefresh is true, it will not perform a renew, therefore you cannot wait for it using waitForRenew.';
-      if (['production', 'test'].includes(process.env.NODE_ENV)) {
+      if (['production', 'test'].includes(getEnv('nodeEnv'))) {
         throw new Error(message);
       } else {
         this.logger('Invalid Configuration', {

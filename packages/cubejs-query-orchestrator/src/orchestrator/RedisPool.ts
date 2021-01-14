@@ -1,12 +1,26 @@
+/* eslint-disable global-require */
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
+import { getEnv } from '@cubejs-backend/shared';
+import AsyncRedisClient from './AsyncRedisClient';
+import RedisClientOptions from './RedisClientOptions';
+import { createRedisClient as createNodeRedisClient } from './RedisFactory';
+import { createRedisSentinelClient } from './RedisSentinelFactory';
 
-import { createRedisClient, AsyncRedisClient } from './RedisFactory';
+function createRedisClient(url: string, opts: RedisClientOptions = {}) {
+  if (getEnv('redisUseIORedis')) {
+    return createRedisSentinelClient(url, opts);
+  }
+
+  return createNodeRedisClient(url, opts);
+}
 
 export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
 
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
+  idleTimeoutSeconds?: number;
+  softIdleTimeoutSeconds?: number;
   createClient?: CreateRedisClientFn;
   destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
 }
@@ -17,14 +31,12 @@ export class RedisPool {
   protected readonly pool: Pool<AsyncRedisClient>|null = null;
 
   protected readonly create: CreateRedisClientFn|null = null;
-  
+
   protected poolErrors: number = 0;
 
   public constructor(options: RedisPoolOptions = {}) {
-    const defaultMin = process.env.CUBEJS_REDIS_POOL_MIN ? parseInt(process.env.CUBEJS_REDIS_POOL_MIN, 10) : 2;
-    const defaultMax = process.env.CUBEJS_REDIS_POOL_MAX ? parseInt(process.env.CUBEJS_REDIS_POOL_MAX, 10) : 1000;
-    const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : defaultMin;
-    const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : defaultMax;
+    const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : getEnv('redisPoolMin');
+    const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : getEnv('redisPoolMax');
 
     const opts: PoolOptions = {
       min,
@@ -33,14 +45,14 @@ export class RedisPool {
       idleTimeoutMillis: 5000,
       evictionRunIntervalMillis: 5000
     };
-    
-    const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
+
+    const create = options.createClient || (async () => createRedisClient(getEnv('redisUrl')));
 
     if (max > 0) {
-      const destroy = options.destroyClient || (async (client) => client.end(true));
+      const destroy = options.destroyClient || (async (client) => client.end());
 
       this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
-      
+
       this.pool.on('factoryCreateError', (error) => {
         this.poolErrors++;
         // prevent the infinite loop when pool creation fails too many times

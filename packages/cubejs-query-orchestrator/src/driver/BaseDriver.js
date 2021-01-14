@@ -1,6 +1,6 @@
 import { reduce } from 'ramda';
 import fs from 'fs';
-import { isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
+import { getEnv, isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
 
 import { cancelCombinator } from './utils';
 
@@ -73,8 +73,8 @@ export class BaseDriver {
     ];
 
     if (
-      process.env.CUBEJS_DB_SSL === 'true' ||
-      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
+      getEnv('dbSsl') ||
+      getEnv('dbSslRejectUnauthorized') ||
       sslOptions.find(o => !!process.env[o.value])
     ) {
       ssl = sslOptions.reduce(
@@ -112,10 +112,7 @@ export class BaseDriver {
         {}
       );
 
-      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
-        ssl.rejectUnauthorized =
-          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
-      }
+      ssl.rejectUnauthorized = getEnv('dbSslRejectUnauthorized');
     }
 
     return ssl;

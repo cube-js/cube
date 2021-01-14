@@ -33,12 +33,14 @@
   "dependencies": {
     "@cubejs-backend/shared": "^0.26.2",
     "generic-pool": "^3.7.1",
+    "ioredis": "^4.19.4",
     "ramda": "^0.27.0",
     "redis": "^3.0.2"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.0",
     "@types/generic-pool": "^3.1.9",
+    "@types/ioredis": "^4.19.3",
     "@types/jest": "^26.0.15",
     "@types/node": "^8.10.66",
     "@types/ramda": "^0.27.32",

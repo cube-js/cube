@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
@@ -33,8 +34,9 @@ export class QueryOrchestrator {
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;
 
-    const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
-      process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
+    const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
+      getEnv('nodeEnv') === 'production' || getEnv('redisUrl') ||
+      (getEnv('redisUseIORedis') && getEnv('redisSentinel')) ? 'redis' : 'memory'
     );
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
