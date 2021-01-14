@@ -5,7 +5,7 @@ import CubeCore, {
   CubejsServerCore,
   DatabaseType,
 } from '@cubejs-backend/server-core';
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, withTimeout } from '@cubejs-backend/shared';
 import express from 'express';
 import https from 'https';
 import http from 'http';
@@ -212,6 +212,14 @@ export class CubejsServer {
     }
 
     try {
+      const timeoutKiller = withTimeout(
+        () => {
+          console.error('Unable to stop Cube.js in expected time, force kill');
+          process.exit(1);
+        },
+        (this.config.gracefulShutdown || 2) * 1000,
+      );
+
       if (this.redirector) {
         this.redirector.close();
       }
@@ -228,7 +236,9 @@ export class CubejsServer {
 
       if (this.server) {
         locks.push(
-          this.server.stop(this.config.gracefulShutdown)
+          this.server.stop(
+            (this.config.gracefulShutdown || 2) * 1000
+          )
         );
       }
 
@@ -238,6 +248,7 @@ export class CubejsServer {
       }
 
       await this.core.shutdown();
+      await timeoutKiller.cancel();
 
       return 0;
     } catch (e) {
