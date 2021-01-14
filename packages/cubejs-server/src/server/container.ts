@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
-import dotenv from 'dotenv';
+import dotenv from 'cubejs-dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import {
   getEnv,
@@ -231,7 +231,9 @@ export class ServerContainer {
   }
 
   public async lookupConfiguration(): Promise<CreateOptions> {
-    dotenv.config();
+    dotenv.config({
+      override: true,
+    });
 
     const devMode = getEnv('devMode');
     if (devMode) {

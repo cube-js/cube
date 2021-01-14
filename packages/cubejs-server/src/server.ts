@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import dotenv from 'cubejs-dotenv';
 
 import CubeCore, {
   CreateOptions as CoreCreateOptions,
@@ -18,7 +18,9 @@ import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
 
 const { version } = require('../package.json');
 
-dotenv.config();
+dotenv.config({
+  override: true,
+});
 
 export type InitAppFn = (app: express.Application) => void | Promise<void>;
 
