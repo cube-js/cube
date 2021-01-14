@@ -128,7 +128,23 @@ interface RetryWithTimeoutOptions {
   intervalPause: (iteration: number) => number,
 }
 
-export const withTimeout = <T>(
+export const withTimeout = (
+  fn: (...args: any[]) => void,
+  timeout: number,
+): CancelablePromise<any> => {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  let cancel: Function = () => {};
+
+  const promise: any = new Promise(() => {
+    const timer = setTimeout(fn, timeout);
+    cancel = () => clearTimeout(timer);
+  });
+  promise.cancel = cancel;
+
+  return promise;
+};
+
+export const withTimeoutRace = <T>(
   fn: CancelablePromise<T>,
   timeout: number,
 ): Promise<T> => {
@@ -163,7 +179,7 @@ export const withTimeout = <T>(
 export const retryWithTimeout = <T>(
   fn: (token: CancelToken) => Promise<T>,
   { timeout, intervalPause }: RetryWithTimeoutOptions,
-) => withTimeout(
+) => withTimeoutRace(
     createCancelablePromise<T|null>(async (token) => {
       let i = 0;
 
