@@ -6,6 +6,7 @@ import App from './App';
 import Header from './Header';
 import reportWebVitals from './reportWebVitals';
 import { layout, content } from './index.module.less';
+import "./index.less";
 
 const { Content } = Layout;
 
