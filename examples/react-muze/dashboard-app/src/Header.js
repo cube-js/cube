@@ -3,7 +3,7 @@ import { SlackOutlined, GithubOutlined, FileFilled, CloseOutlined, MenuOutlined 
 import { useMediaQuery } from 'react-responsive';
 import logoCube from './logo-cube.svg';
 import logoMuze from './logo-muze.svg';
-import { divider, muze, logo, x } from './Header.module.less';
+import { divider, muze, logo, logo2, x } from './Header.module.less';
 
 const { Header: AntHeader } = Layout;
 const { Link, Text } = Typography;
@@ -11,7 +11,7 @@ const { Item, ItemGroup } = Menu;
 
 const DesktopMenu = () => (
   <Space>
-    <Text>cube.js</Text>
+    <Text>Cube.js</Text>
     <Button
       ghost
       target="_blank"
@@ -110,7 +110,7 @@ const Header = () => {
     <AntHeader>
       <Row justify="space-between">
         <Col>
-          <Space>
+          <Space size={10} align='baseline'>
             <Link href="https://cube.dev" target="_blank">
               <Image
                 className={logo}
@@ -121,12 +121,14 @@ const Header = () => {
             </Link>
             <CloseOutlined className={x} />
             <Link href="https://muzejs.org" target="_blank">
-              <Space size={4}>
+              <Space size={4} align='top'>
                 <Image
-                  className={logo}
+                  className={logo2}
                   src={logoMuze}
                   alt="MuzeJS"
                   preview={false}
+                  width={30}
+                  height={40}
                 />
                 <Text className={muze}>Muze</Text>
               </Space>
