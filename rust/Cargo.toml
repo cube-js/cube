@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "cubestore"
+    "cubestore",
+    "cubehll",
 ]
 
 [patch.crates-io]
