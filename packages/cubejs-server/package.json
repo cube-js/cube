@@ -88,7 +88,8 @@
     },
     "testMatch": [
       "<rootDir>/test/*.(test|spec).(ts|js)"
-    ]
+    ],
+    "testEnvironment": "node"
   },
   "oclif": {
     "commands": "./dist/command",
