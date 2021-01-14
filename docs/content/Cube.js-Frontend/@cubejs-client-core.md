@@ -730,11 +730,14 @@ Name | Type | Description |
 ------ | ------ | ------ |
 apiUrl | string | URL of your Cube.js Backend. By default, in the development environment it is `http://localhost:4000/cubejs-api/v1` |
 credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
-method? | "GET" &#124; "POST" &#124; | HTTP method, by default it use GET. |
 headers? | Record‹string, string› | - |
 parseDateMeasures? | boolean | - |
 pollInterval? | number | - |
 transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
+
+### DateRange
+
+> **DateRange**: *string | [string, string]*
 
 ### DrillDownLocator
 
@@ -1005,15 +1008,26 @@ type | string &#124; number |
 
 ### TimeDimension
 
+> **TimeDimension**: *[TimeDimensionComparison](#types-time-dimension-comparison) | [TimeDimensionRanged](#types-time-dimension-ranged)*
+
+### TimeDimensionBase
+
 Name | Type |
 ------ | ------ |
-dateRange? | string &#124; string[] |
 dimension | string |
 granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
+
+### TimeDimensionComparison
+
+> **TimeDimensionComparison**: *[TimeDimensionBase](#types-time-dimension-base) & object*
 
 ### TimeDimensionGranularity
 
 > **TimeDimensionGranularity**: *"second" | "minute" | "hour" | "day" | "week" | "month" | "year"*
+
+### TimeDimensionRanged
+
+> **TimeDimensionRanged**: *[TimeDimensionBase](#types-time-dimension-base) & object*
 
 ### TransportOptions
 

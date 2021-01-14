@@ -22,7 +22,7 @@ options][link-config].
 | `CUBEJS_APP`                         | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to `cubejs`                                                                  | A valid string                                            |
 | `CUBEJS_SCHEDULED_REFRESH_TIMER`     | If `true`, enabled scheduled refreshes. Can also be set to a number representing how many seconds to wait before triggering another refresh. Defaults to `false`                                   | `true`, `false` or a valid number of seconds              |
 | `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` | A comma-separated [list of timezones to schedule refreshes for](/config#options-reference-scheduled-refresh-timer).                                                                                | [A valid timezone from the tz database][link-tz-database] |
-| `CUBEJS_PRE_AGGREGATIONS_SCHEMA`     | [Schema name](/config#options-reference-pre-aggregations-schema) to use for storing pre-aggregations. Defaults to `dev_pre_aggregations`/`prod_pre_aggregations` for development/production mode.    | A valid string                                            |
+| `CUBEJS_PRE_AGGREGATIONS_SCHEMA`     | [Schema name](/config#options-reference-pre-aggregations-schema) to use for storing pre-aggregations. Defaults to `dev_pre_aggregations`/`prod_pre_aggregations` for development/production mode.  | A valid string                                            |
 | `CUBEJS_SCHEMA_PATH`                 | The path where Cube.js loads schemas from. Defaults to `schema`                                                                                                                                    | A valid folder containing Cube.js schemas                 |
 | `CUBEJS_TELEMETRY`                   | If `true`, then send telemetry to CubeJS. Defaults to `true`                                                                                                                                       | `true`, `false`                                           |
 | `CUBEJS_WEB_SOCKETS`                 | If `true`, then use WebSocket for data fetching. Defaults to `true`                                                                                                                                | `true`, `false`                                           |
@@ -34,7 +34,11 @@ options][link-config].
 | `REDIS_TLS`                          | If `true`, then the connection to the Redis server is protected by TLS authentication. Defaults to `false`                                                                                         | `true`, `false`                                           |
 | `CUBEJS_REDIS_POOL_MAX`              | The maximum number of connections to keep active in the Redis connection pool. Must be higher than `CUBEJS_REDIS_POOL_MIN`. Defaults to `1000`                                                     | A valid number of connections.                            |
 | `CUBEJS_REDIS_POOL_MIN`              | The minimum number of connections to keep active in the Redis connection pool. Must be lower than `CUBEJS_REDIS_POOL_MAX`. Defaults to `2`                                                         | A valid number of connections                             |
+| `CUBEJS_REDIS_USE_IOREDIS`           | Use [`ioredis`][gh-ioredis] instead of[ `redis`][gh-node-redis]. Defaults to `false`                                                                                                               | `true`, `false`                                       		|
+| `CUBEJS_REDIS_SENTINEL`              | The host and port for a Redis Sentinel server, e.g my-sentinel-host:26379                                                                                                                          | A valid Redis Sentinel host and port                      |
 
+[gh-ioredis]: https://github.com/luin/ioredis
+[gh-node-redis]: https://github.com/NodeRedis/node-redis
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
 ## Database Connection

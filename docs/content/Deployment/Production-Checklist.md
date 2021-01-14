@@ -39,6 +39,25 @@ password, please set it via the `REDIS_PASSWORD` environment variable. Set the
 connections. Ensure your Redis cluster allows at least 15 concurrent
 connections.
 
+### Redis Sentinel
+
+Redis provides functionality for high availability through
+[`Redis Sentinel`][redis-sentinel].
+
+For Redis Sentinel support, the npm package [`ioredis`][gh-ioredis] needs to be
+used instead of[ `redis`][gh-node-redis]. This is done by setting the
+`CUBEJS_REDIS_USE_IOREDIS` environment variable to `true`. Then set
+`CUBEJS_REDIS_SENTINEL` to the address and port (`host:port`) to allow Cube.js
+to connect to the Redis Sentinel. The `REDIS_URL` environment variable should
+not be set in this case.
+
+Ioredis is usable with redis as well and the choice of type is done by setting
+either `CUBEJS_REDIS_SENTINEL ` or `REDIS_URL`;
+
+[redis-sentinel]: https://redis.io/topics/sentinel
+[gh-ioredis]: https://github.com/luin/ioredis
+[gh-node-redis]: https://github.com/NodeRedis/node-redis
+
 <!-- prettier-ignore-start -->
 [[warning | Note]]
 | Cube.js server instances used by same tenant environments should have same

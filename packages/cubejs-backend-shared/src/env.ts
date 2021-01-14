@@ -99,7 +99,35 @@ const variables = {
   dbPollMaxInterval: () => {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
-  }
+  },
+  redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
+    .default('2')
+    .asInt(),
+  redisPoolMax: () => get('CUBEJS_REDIS_POOL_MAX')
+    .default('1000')
+    .asInt(),
+  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
+    .default('false')
+    .asBoolStrict(),
+  redisUrl: () => get('REDIS_URL')
+    .asString(),
+  dbSsl: () => get('CUBEJS_DB_SSL')
+    .default('false')
+    .asBoolStrict(),
+  dbSslRejectUnauthorized: () => get('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED')
+    .default('false')
+    .asBoolStrict(),
+  nodeEnv: () => get('NODE_ENV')
+    .asString(),
+  cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
+    .asString(),
+  redisSentinel: () => get('CUBEJS_REDIS_SENTINEL')
+    .asString(),
+  redisPassword: () => get('REDIS_PASSWORD')
+    .asString(),
+  redisTls: () => get('REDIS_TLS')
+    .default('false')
+    .asBoolStrict()
 };
 
 type Vars = typeof variables;
