@@ -2049,7 +2049,7 @@ class BaseQuery {
                 preAggregation.refreshKey.updateWindow
               );
             }
-          }Do
+          }
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
             return {
               queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`)],
