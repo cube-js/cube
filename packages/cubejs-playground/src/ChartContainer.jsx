@@ -96,9 +96,9 @@ class ChartContainer extends React.Component {
       );
       let codeExample = '';
       
-      if (state.framework === 'react') {
+      if (props.framework === 'react') {
         codeExample = codesandboxFiles['index.js'];
-      } else if (state.framework === 'angular') {
+      } else if (props.framework === 'angular') {
         codeExample = codesandboxFiles['src/app/query-renderer/query-renderer.component.ts'];
       }
 
@@ -117,7 +117,6 @@ class ChartContainer extends React.Component {
     super(props);
     this.state = {
       showCode: false,
-      framework: 'react',
       chartRendererError: null
     };
   }
@@ -130,7 +129,6 @@ class ChartContainer extends React.Component {
       redirectToDashboard,
       showCode,
       addingToDashboard,
-      framework,
       chartRendererError
     } = this.state;
     const {
@@ -146,6 +144,8 @@ class ChartContainer extends React.Component {
       setChartLibrary,
       chartLibraries,
       history,
+      framework,
+      setFramework,
       onChartRendererReadyChange,
     } = this.props;
 
@@ -185,7 +185,7 @@ class ChartContainer extends React.Component {
       <Menu
         onClick={(e) => {
           playgroundAction('Set Framework', { framework: e.key });
-          this.setState({ framework: e.key });
+          setFramework(e.key);
           onChartRendererReadyChange(false);
           setChartLibrary(chartLibraries[e.key]?.[0]?.value || null);
         }}
