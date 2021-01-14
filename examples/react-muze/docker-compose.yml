@@ -1,0 +1,34 @@
+
+version: '2.2'
+
+services:
+# Example of PostgreSQL configuration, uncomment if you want to use postgres
+#  postgres:
+#    image: postgres:12.4
+#    environment:
+#      POSTGRES_USER: 'test'
+#      POSTGRES_PASSWORD: 'test'
+#      POSTGRES_DB: 'test'
+
+  cube:
+    image: cubejs/cube:latest
+    #depends_on:
+    #  - postgres
+    #links:
+    #  - postgres
+    ports:
+      # It's better to use random port binding for 4000/3000 ports
+      # without it you will not able to start multiple projects inside docker
+      # - 4000
+      # - 3000
+      # 4000 is a port for Cube.js API
+      - 4000:4000
+      # 3000 is a port for Playground web-server
+      - 3000:3000
+    env_file: .env
+    volumes:
+      # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
+      # - .:/cube/conf
+      - ./dashboard-app:/cube/conf/dashboard-app
+      - ./cube.js:/cube/conf/cube.js
+      - ./schema:/cube/conf/schema
