@@ -54,5 +54,8 @@
   "license": "Apache-2.0",
   "eslintConfig": {
     "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "testEnvironment": "node"
   }
 }
