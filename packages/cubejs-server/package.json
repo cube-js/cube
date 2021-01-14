@@ -13,7 +13,7 @@
     "node": ">=8.11.1"
   },
   "main": "index.js",
-  "typings": "dist/src/index.d.ts",
+  "typings": "dist/index.d.ts",
   "files": [
     "dist",
     "bin",
