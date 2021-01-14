@@ -55,3 +55,4 @@ reqwest = { version = "0.10.8", features = ["json", "rustls-tls"], default-featu
 nanoid = "0.3.0"
 rand = "0.8.0"
 parquet-format = "=2.6.1"
+hex = "0.4.2"

@@ -329,7 +329,7 @@ impl From<&Column> for parquet::schema::types::Type {
             }
             crate::metastore::ColumnType::Bytes => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::BYTE_ARRAY)
-                    .with_logical_type(LogicalType::LIST)
+                    .with_logical_type(LogicalType::NONE)
                     .with_repetition(Repetition::OPTIONAL)
                     .build()
                     .unwrap()
