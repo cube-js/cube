@@ -287,7 +287,7 @@ export class DevServer {
       });
       
       try {
-        orchestratorApi.seenDataSources = { default: true };
+        orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
       } catch (error) {
         return res.status(400).json({

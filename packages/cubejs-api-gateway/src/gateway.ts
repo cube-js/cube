@@ -832,7 +832,7 @@ export class ApiGateway {
 
       try {
         // todo: test other data sources
-        orchestratorApi.seenDatasources = { default: true };
+        orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
       } catch (e) {
         this.log({

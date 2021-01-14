@@ -3,11 +3,11 @@ import pt from 'promise-timeout';
 import { QueryOrchestrator, ContinueWaitError } from '@cubejs-backend/query-orchestrator';
 
 export class OrchestratorApi {
-  public seenDataSources: { [dataSource: string]: boolean };
+  private seenDataSources: { [dataSource: string]: boolean } = {};
   
-  protected orchestrator: QueryOrchestrator;
+  protected readonly orchestrator: QueryOrchestrator;
   
-  protected externalDriverFactory: any;
+  protected readonly externalDriverFactory: any;
   
   public constructor(protected driverFactory, protected logger, protected options: any = {}) {
     const { externalDriverFactory } = options;
@@ -16,7 +16,6 @@ export class OrchestratorApi {
     this.driverFactory = driverFactory;
     this.externalDriverFactory = externalDriverFactory;
     this.logger = logger;
-    this.seenDataSources = {};
   }
 
   public async executeQuery(query) {
