@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.18](https://github.com/cube-js/cube.js/compare/v0.25.17...v0.25.18) (2021-01-14)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** ng number, crash ([#1770](https://github.com/cube-js/cube.js/issues/1770)) ([a2bce37](https://github.com/cube-js/cube.js/commit/a2bce37db86efe521410ddf7f30030c8c65b210b))
+
+
+
+
+
 ## [0.25.15](https://github.com/cube-js/cube.js/compare/v0.25.14...v0.25.15) (2021-01-12)
 
 

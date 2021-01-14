@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.18](https://github.com/cube-js/cube.js/compare/v0.25.17...v0.25.18) (2021-01-14)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** ng number, crash ([#1770](https://github.com/cube-js/cube.js/issues/1770)) ([a2bce37](https://github.com/cube-js/cube.js/commit/a2bce37db86efe521410ddf7f30030c8c65b210b))
+* **server:** Wrong path to typings. fix [#1766](https://github.com/cube-js/cube.js/issues/1766) ([59d279d](https://github.com/cube-js/cube.js/commit/59d279deef446fdfc6ebdd40c3bb9817b618fe88))
+
+
+### Features
+
+* **server:** Kill Cube.js if it's stuck in gracefull shutdown ([0874de8](https://github.com/cube-js/cube.js/commit/0874de8a1b7216d783d947914e2396b35f17d130))
+
+
+
+
+
 ## [0.25.17](https://github.com/cube-js/cube.js/compare/v0.25.16...v0.25.17) (2021-01-13)
 
 
