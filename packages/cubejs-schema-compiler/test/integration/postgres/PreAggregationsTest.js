@@ -133,7 +133,12 @@ describe('PreAggregations', function test() {
           dimensionReferences: [source],
           timeDimensionReference: createdAt,
           granularity: 'day',
-          partitionGranularity: 'month'
+          partitionGranularity: 'month',
+          refreshKey: {
+            every: '1 hour',
+            incremental: true,
+            updateWindow: '7 day'
+          }
         },
         partitionedHourly: {
           type: 'rollup',
@@ -818,6 +823,53 @@ describe('PreAggregations', function test() {
             'visitors__checkins_total': '6'
           }
         ]
+      );
+    });
+  }));
+
+  it('incremental renewal threshold', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.checkinsTotal'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: [
+          new Date(new Date().getTime() - 60 * 24 * 60 * 60 * 1000).toJSON().substring(0, 10),
+          new Date().toJSON().substring(0, 10)
+        ]
+      }],
+      order: [{
+        id: 'visitors.createdAt'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+    const partitionedTables = preAggregationsDescription
+      .filter(({ tableName }) => tableName.indexOf('visitors_partitioned') === 0);
+
+    partitionedTables[0].refreshKeyRenewalThresholds[0].should.be.equal(86400);
+    partitionedTables[partitionedTables.length - 1].refreshKeyRenewalThresholds[0].should.be.equal(300);
+
+    const queries = tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.testQueries(
+      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1042))
+    ).then(res => {
+      console.log(JSON.stringify(res));
+      res.should.be.deepEqual(
+        []
       );
     });
   }));
