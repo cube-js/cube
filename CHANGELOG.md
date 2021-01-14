@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.19](https://github.com/cube-js/cube.js/compare/v0.25.18...v0.25.19) (2021-01-14)
+
+
+### Bug Fixes
+
+* Do not renew historical refresh keys during scheduled refresh ([e5fbb12](https://github.com/cube-js/cube.js/commit/e5fbb120d5e848468999de59ba536b95be2e67e9))
+
+
+### Features
+
+* **cubestore:** Improve support for the binary data type ([#1759](https://github.com/cube-js/cube.js/issues/1759)) ([925f813](https://github.com/cube-js/cube.js/commit/925f81368494e1128eadd097462814d9a87493f8))
+
+
+
+
+
 ## [0.25.18](https://github.com/cube-js/cube.js/compare/v0.25.17...v0.25.18) (2021-01-14)
 
 
