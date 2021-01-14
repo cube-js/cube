@@ -116,10 +116,6 @@ const Header = ({ selectedKeys }) => {
             <Link to="/schema">Schema</Link>
           </StyledMenuItem>
           
-          <StyledMenuItem key="/connection">
-            <Link to="/connection">Connection</Link>
-          </StyledMenuItem>
-          
           <StyledMenuButton
             noMargin
             key="slack"

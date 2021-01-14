@@ -4,6 +4,7 @@ import type { ChildProcess } from 'child_process';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
+import crypto from 'crypto';
 import type { Application as ExpressApplication } from 'express';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
@@ -17,10 +18,6 @@ const repo = {
   owner: 'cube-js',
   name: 'cubejs-playground-templates'
 };
-
-function shouldStartConnectionWizardFlow() {
-  return !(fs.existsSync('./.env') || fs.existsSync('./cube.js'));
-}
 
 export class DevServer {
   protected applyTemplatePackagesPromise: Promise<any>|null = null;
@@ -68,7 +65,7 @@ export class DevServer {
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         projectFingerprint: this.cubejsServer.projectFingerprint,
-        shouldStartConnectionWizardFlow: shouldStartConnectionWizardFlow()
+        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists()
       });
     }));
 
@@ -326,6 +323,9 @@ export class DevServer {
     app.post('/playground/env', catchErrors(async (req, res) => {
       let { variables = {} } = req.body || {};
       
+      if (!variables.CUBEJS_API_SECRET) {
+        variables.CUBEJS_API_SECRET = crypto.randomBytes(64).toString('hex');
+      }
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
       
       if (fs.existsSync('./.env')) {

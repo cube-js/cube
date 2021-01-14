@@ -169,14 +169,17 @@ export class CubejsServerCore {
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       ...opts,
     };
-    // if (
-    //   !options.driverFactory ||
-    //   !options.apiSecret ||
-    //   !options.dbType
-    // ) {
-    //   throw new Error('driverFactory, apiSecret, dbType are required options');
-    // }
     this.options = options;
+    
+    if (
+      this.options.devServer && this.configFileExists() && (
+        !options.driverFactory ||
+        !options.apiSecret ||
+        !options.dbType
+      )
+    ) {
+      throw new Error('driverFactory, apiSecret, dbType are required options');
+    }
 
     this.logger = options.logger || (
       process.env.NODE_ENV !== 'production'
@@ -340,6 +343,10 @@ export class CubejsServerCore {
 
       this.event('Server Start');
     }
+  }
+  
+  public configFileExists(): boolean {
+    return (fs.existsSync('./.env') || fs.existsSync('./cube.js'));
   }
 
   protected detectScheduledRefreshTimer(scheduledRefreshTimer?: string | number | boolean): number|null {
