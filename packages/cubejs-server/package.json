@@ -50,7 +50,7 @@
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
-    "cubejs-dotenv": "^8.3.0",
+    "cubejs-dotenv": "git://github.com/cube-js/dotenv.git#v8.3.0",
     "express": "^4.17.1",
     "jsonwebtoken": "^8.4.0",
     "node-machine-id": "^1.1.10",
@@ -61,7 +61,9 @@
   "devDependencies": {
     "@cubejs-backend/linter": "^0.25.0",
     "@oclif/dev-cli": "^1.23.1",
+    "@types/body-parser": "^1.19.0",
     "@types/cors": "^2.8.8",
+    "@types/express": "^4.17.11",
     "@types/node": "^10.0.10",
     "@types/semver": "^7.3.4",
     "@types/ws": "^7.2.9",
