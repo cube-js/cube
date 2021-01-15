@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.20](https://github.com/cube-js/cube.js/compare/v0.25.19...v0.25.20) (2021-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+
+
+
+
 ## [0.25.19](https://github.com/cube-js/cube.js/compare/v0.25.18...v0.25.19) (2021-01-14)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver
