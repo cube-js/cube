@@ -7,6 +7,12 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 
+type QueryWithParams = [string, any[]] | string;
+type Query = {
+  requestId?: string;
+  dataSource: string;
+};
+
 export class QueryCache {
   protected readonly cacheDriver: CacheDriverInterface;
 
@@ -34,9 +40,10 @@ export class QueryCache {
   }
 
   public async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
-    const replacePreAggregationTableNames = (queryAndParams) => QueryCache.replacePreAggregationTableNames(
-      queryAndParams, preAggregationsTablesToTempTables
-    );
+    const replacePreAggregationTableNames = (queryAndParams: QueryWithParams) => QueryCache
+      .replacePreAggregationTableNames(
+        queryAndParams, preAggregationsTablesToTempTables
+      );
 
     const query = replacePreAggregationTableNames(queryBody.query);
     let queuePriority = 10;
@@ -47,17 +54,12 @@ export class QueryCache {
     const forceNoCache = queryBody.forceNoCache || false;
     const { values } = queryBody;
     const cacheKeyQueries =
-      (
-        queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.queries ||
-        queryBody.cacheKeyQueries ||
-        []
-      ).map(replacePreAggregationTableNames);
+      this.cacheKeyQueriesFrom(queryBody).map(replacePreAggregationTableNames);
 
     const renewalThreshold = queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.renewalThreshold;
-    const refreshKeyRenewalThresholds = queryBody.cacheKeyQueries &&
-      queryBody.cacheKeyQueries.refreshKeyRenewalThresholds;
+    const refreshKeyRenewalThresholds = this.getRefreshKeyRenewalThresholds(queryBody);
 
-    const expireSecs = queryBody.expireSecs || 24 * 3600;
+    const expireSecs = this.getExpireSecs(queryBody);
 
     if (!cacheKeyQueries) {
       return {
@@ -129,6 +131,21 @@ export class QueryCache {
     };
   }
 
+  private getRefreshKeyRenewalThresholds(queryBody) {
+    return queryBody.cacheKeyQueries &&
+      queryBody.cacheKeyQueries.refreshKeyRenewalThresholds;
+  }
+
+  private getExpireSecs(queryBody): number {
+    return queryBody.expireSecs || 24 * 3600;
+  }
+
+  private cacheKeyQueriesFrom(queryBody): QueryWithParams[] {
+    return queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.queries ||
+      queryBody.cacheKeyQueries ||
+      [];
+  }
+
   public static queryCacheKey(queryBody) {
     return [queryBody.query, queryBody.values, (queryBody.preAggregations || []).map(p => p.loadSql)];
   }
@@ -141,7 +158,7 @@ export class QueryCache {
     );
   }
 
-  public static replacePreAggregationTableNames(queryAndParams, preAggregationsTablesToTempTables) {
+  public static replacePreAggregationTableNames(queryAndParams: QueryWithParams, preAggregationsTablesToTempTables) {
     const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
@@ -273,22 +290,7 @@ export class QueryCache {
   }) {
     options = options || { dataSource: 'default' };
     return Promise.all(
-      cacheKeyQueries.map((q, i) => this.cacheQueryResult(
-        Array.isArray(q) ? q[0] : q,
-        Array.isArray(q) ? q[1] : [],
-        q,
-        expireSecs,
-        {
-          renewalThreshold:
-            this.options.refreshKeyRenewalThreshold ||
-            (options.refreshKeyRenewalThresholds || [])[i] ||
-            2 * 60,
-          renewalKey: q,
-          waitForRenew: !options.skipRefreshKeyWaitForRenew,
-          requestId: options.requestId,
-          dataSource: options.dataSource
-        }
-      ))
+      this.loadRefreshKeys(cacheKeyQueries, expireSecs, options)
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
@@ -320,9 +322,45 @@ export class QueryCache {
       ));
   }
 
+  public loadRefreshKeysFromQuery(query: Query) {
+    return this.loadRefreshKeys(this.cacheKeyQueriesFrom(query), this.getExpireSecs(query), {
+      requestId: query.requestId,
+      dataSource: query.dataSource,
+      refreshKeyRenewalThresholds: this.getRefreshKeyRenewalThresholds(query)
+    });
+  }
+
+  public loadRefreshKeys(
+    cacheKeyQueries: QueryWithParams[],
+    expireSecs: number,
+    options: {
+      requestId?: string;
+      skipRefreshKeyWaitForRenew?: boolean;
+      refreshKeyRenewalThresholds?: Array<number>;
+      dataSource: string
+    }
+  ) {
+    return cacheKeyQueries.map((q, i) => this.cacheQueryResult(
+      Array.isArray(q) ? q[0] : q,
+      Array.isArray(q) ? q[1] : [],
+      q,
+      expireSecs,
+      {
+        renewalThreshold:
+          this.options.refreshKeyRenewalThreshold ||
+          (options.refreshKeyRenewalThresholds || [])[i] ||
+          2 * 60,
+        renewalKey: q,
+        waitForRenew: !options.skipRefreshKeyWaitForRenew,
+        requestId: options.requestId,
+        dataSource: options.dataSource,
+      },
+    ));
+  }
+
   public cacheQueryResult(query, values, cacheKey, expiration, options: {
     renewalThreshold?: number,
-    renewalKey?: object,
+    renewalKey?: any,
     priority?: number,
     external?: boolean,
     requestId?: string,
