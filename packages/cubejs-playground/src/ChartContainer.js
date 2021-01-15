@@ -1,4 +1,3 @@
-/* global navigator */
 import { Component } from 'react';
 import {
   CodeOutlined,
