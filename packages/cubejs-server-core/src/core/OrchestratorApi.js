@@ -25,7 +25,9 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      let fetchQueryPromise = this.orchestrator.fetchQuery(query);
+      let fetchQueryPromise = query.loadRefreshKeysOnly ?
+        this.orchestrator.loadRefreshKeys(query) :
+        this.orchestrator.fetchQuery(query);
 
       fetchQueryPromise = pt.timeout(fetchQueryPromise, 5 * 1000);
 
@@ -49,7 +51,7 @@ export class OrchestratorApi {
         });
 
         const fromCache = await this.orchestrator.resultFromCacheIfExists(query);
-        if (!query.renewQuery && fromCache) {
+        if (!query.renewQuery && fromCache && !query.scheduledRefresh) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
@@ -62,7 +64,7 @@ export class OrchestratorApi {
           };
         }
 
-        throw { error: 'Continue wait', stage: await this.orchestrator.queryStage(query) };
+        throw { error: 'Continue wait', stage: !query.scheduledRefresh ? await this.orchestrator.queryStage(query) : null };
       }
 
       this.logger('Error querying db', {
