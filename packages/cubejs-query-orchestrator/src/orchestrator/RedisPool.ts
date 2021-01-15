@@ -1,18 +1,16 @@
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
+import { createRedisClient } from './RedisFactory';
+import Redis from 'ioredis';
 
-import { createRedisClient, AsyncRedisClient } from './RedisFactory';
-
-export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
-
+export type CreateRedisClientFn = () => PromiseLike<Redis.Redis>;
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
   createClient?: CreateRedisClientFn;
-  destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
+  destroyClient?: (client: Redis.Redis) => PromiseLike<void>;
 }
-
 export class RedisPool {
-  protected readonly pool: Pool<AsyncRedisClient>|null = null;
+  protected readonly pool: Pool<Redis.Redis>|null = null;
 
   protected readonly create: CreateRedisClientFn|null = null;
 
@@ -33,9 +31,9 @@ export class RedisPool {
     const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
 
     if (max > 0) {
-      const destroy = options.destroyClient || (async (client) => client.end(true));
+      const destroy = options.destroyClient || (async (client) => client.disconnect());
 
-      this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
+      this.pool = genericPool.createPool<Redis.Redis>({ create, destroy }, opts);
     } else {
       // fallback to un-pooled behavior if pool max is 0
       this.create = create;
