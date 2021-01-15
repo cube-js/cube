@@ -87,6 +87,10 @@ export class QueryOrchestrator {
       });
   }
 
+  public async loadRefreshKeys(query) {
+    return this.queryCache.loadRefreshKeysFromQuery(query);
+  }
+
   public async queryStage(queryBody: any) {
     const preAggregationsQueryStageStateByDataSource = {};
 

@@ -26,7 +26,8 @@ export class RefreshScheduler {
               values: sql[1],
               continueWait: true,
               cacheKeyQueries: [],
-              dataSource
+              dataSource,
+              scheduledRefresh: true,
             }))
         );
 
@@ -148,10 +149,11 @@ export class RefreshScheduler {
         await orchestratorApi.executeQuery({
           ...sqlQuery,
           preAggregations: [],
-          query: 'SELECT 1', // TODO get rid off it
           continueWait: true,
           renewQuery: true,
-          requestId: context.requestId
+          requestId: context.requestId,
+          scheduledRefresh: true,
+          loadRefreshKeysOnly: true
         });
       }));
     }));
@@ -208,7 +210,8 @@ export class RefreshScheduler {
           continueWait: true,
           renewQuery: true,
           requestId: context.requestId,
-          timezone: timezones[timezoneCursor]
+          timezone: timezones[timezoneCursor],
+          scheduledRefresh: true,
         };
       } else {
         finishedPartitions[`${preAggregationCursor}_${timezoneCursor}`] = true;
