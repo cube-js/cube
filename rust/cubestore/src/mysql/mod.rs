@@ -3,7 +3,6 @@ use crate::table::TableValue;
 use crate::{metastore, CubeError};
 use async_trait::async_trait;
 use hex::ToHex;
-use itertools::Itertools;
 use log::{error, info, warn};
 use msql_srv::*;
 use std::io;
