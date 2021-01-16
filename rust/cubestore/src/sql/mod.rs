@@ -648,7 +648,7 @@ fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
 mod tests {
     use super::*;
     use crate::cluster::MockCluster;
-    use crate::config::Config;
+    use crate::config::{Config, FileStoreProvider};
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
@@ -1450,6 +1450,86 @@ mod tests {
                 &expected
             );
 
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn cluster() {
+        Config::test("cluster_router").update_config(|mut config| {
+            config.select_workers = vec!["127.0.0.1:4306".to_string(), "127.0.0.1:4307".to_string()];
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders_1 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.orders_2 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product_1 ON foo.orders_1 (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE INDEX orders_by_product_2 ON foo.orders_2 (orders_product_id)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
+            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders_2 (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
+            ).await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+            ).await.unwrap();
+
+            Config::test("cluster_worker_1").update_config(|mut config| {
+                config.worker_bind_address = Some("127.0.0.1:4306".to_string());
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: env::current_dir()
+                        .unwrap()
+                        .join("cluster_router-upstream".to_string()),
+                };
+                config
+            }).start_test_worker(async move |_| {
+                Config::test("cluster_worker_2").update_config(|mut config| {
+                    config.worker_bind_address = Some("127.0.0.1:4307".to_string());
+                    config.store_provider = FileStoreProvider::Filesystem {
+                        remote_dir: env::current_dir()
+                            .unwrap()
+                            .join("cluster_router-upstream".to_string()),
+                    };
+                    config
+                }).start_test_worker(async move |_| {
+                    let result = service.exec_query(
+                        "SELECT city, name, sum(amount) FROM (SELECT * FROM foo.orders_1 UNION ALL SELECT * FROM foo.orders_2) o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
+                WHERE customer_id = 'a' \
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
+                    ).await.unwrap();
+
+                    let expected = vec![
+                        Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
+                    ];
+
+                    assert_eq!(
+                        result.get_rows(),
+                        &expected
+                    );
+                }).await;
+            }).await;
         }).await;
     }
 

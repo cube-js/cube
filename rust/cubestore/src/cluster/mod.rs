@@ -1,10 +1,11 @@
 pub mod worker_pool;
+pub mod message;
 
 use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
+use crate::metastore::{IdRow, MetaStore, RowKey, TableId, Partition};
 use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
@@ -29,12 +30,15 @@ use std::time::Duration;
 use std::time::SystemTime;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, TcpListener};
 use tokio::runtime::Handle;
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::{broadcast, oneshot, Notify, RwLock};
+use tokio::sync::{broadcast, oneshot, Notify, RwLock, watch};
 use tokio::time::timeout;
 use tokio::{fs, time};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use crate::cluster::message::NetworkMessage;
 
 #[automock]
 #[async_trait]
@@ -54,6 +58,8 @@ pub trait Cluster: Send + Sync {
     async fn download(&self, remote_path: &str) -> Result<String, CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
+
+    async fn node_name_by_partitions(&self, partitions: &Vec<IdRow<Partition>>) -> Result<String, CubeError>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -82,6 +88,8 @@ pub struct ClusterImpl {
     >,
     config_obj: Arc<dyn ConfigObj>,
     query_executor: Arc<dyn QueryExecutor>,
+    close_worker_socket_tx: watch::Sender<bool>,
+    close_worker_socket_rx: RwLock<watch::Receiver<bool>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -145,9 +153,9 @@ impl Cluster for ClusterImpl {
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if self.server_name == node_name {
             // TODO timeout config
-            timeout(Duration::from_secs(120), self.run_local_select(plan_node)).await?
+            timeout(Duration::from_secs(self.config_obj.query_timeout()), self.run_local_select(plan_node)).await?
         } else {
-            unimplemented!()
+            timeout(Duration::from_secs(self.config_obj.query_timeout()), self.send_select_to_worker(node_name, plan_node)).await?
         }
     }
 
@@ -167,6 +175,19 @@ impl Cluster for ClusterImpl {
         JobResultListener {
             receiver: self.event_sender.subscribe(),
         }
+    }
+
+    async fn node_name_by_partitions(&self, partitions: &Vec<IdRow<Partition>>) -> Result<String, CubeError> {
+        let workers = self.config_obj.select_workers();
+        if workers.is_empty() {
+            return Ok(self.server_name.to_string());
+        }
+
+        let mut hasher = DefaultHasher::new();
+        for p in partitions.iter() {
+            p.get_id().hash(&mut hasher);
+        }
+        Ok(workers[(hasher.finish() % workers.len() as u64) as usize].to_string())
     }
 }
 
@@ -374,6 +395,7 @@ impl ClusterImpl {
         query_executor: Arc<dyn QueryExecutor>,
     ) -> Arc<ClusterImpl> {
         let (sender, receiver) = broadcast::channel(10000); // TODO config
+        let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
         Arc::new(ClusterImpl {
             server_name,
             server_addresses,
@@ -390,7 +412,22 @@ impl ClusterImpl {
             select_process_pool: RwLock::new(None),
             config_obj,
             query_executor,
+            close_worker_socket_tx,
+            close_worker_socket_rx: RwLock::new(close_worker_socket_rx)
         })
+    }
+
+    pub fn is_select_worker(&self) -> bool {
+        self.config_obj.worker_bind_address().is_some()
+    }
+
+    pub async fn wait_for_worker_to_close(&self) {
+        let mut receiver = self.close_worker_socket_rx.read().await.clone();
+        loop {
+            if let Some(true) = receiver.recv().await {
+                return;
+            }
+        }
     }
 
     pub async fn start_processing_loops(&self) {
@@ -398,24 +435,26 @@ impl ClusterImpl {
             let mut pool = self.select_process_pool.write().await;
             *pool = Some(Arc::new(WorkerPool::new(
                 self.config_obj.select_worker_pool_size(),
-                Duration::from_secs(120),
+                Duration::from_secs(self.config_obj.query_timeout()),
             )));
         }
-        for _ in 0..4 {
-            // TODO number of job event loops
-            let job_runner = JobRunner {
-                meta_store: self.meta_store.clone(),
-                chunk_store: self.chunk_store.clone(),
-                compaction_service: self.compaction_service.clone(),
-                import_service: self.import_service.clone(),
-                server_name: self.server_name.clone(),
-                notify: self.job_notify.clone(),
-                event_sender: self.event_sender.clone(),
-                jobs_enabled: self.jobs_enabled.clone(),
-            };
-            tokio::spawn(async move {
-                job_runner.processing_loop().await;
-            });
+        if !self.is_select_worker() {
+            for _ in 0..4 {
+                // TODO number of job event loops
+                let job_runner = JobRunner {
+                    meta_store: self.meta_store.clone(),
+                    chunk_store: self.chunk_store.clone(),
+                    compaction_service: self.compaction_service.clone(),
+                    import_service: self.import_service.clone(),
+                    server_name: self.server_name.clone(),
+                    notify: self.job_notify.clone(),
+                    event_sender: self.event_sender.clone(),
+                    jobs_enabled: self.jobs_enabled.clone(),
+                };
+                tokio::spawn(async move {
+                    job_runner.processing_loop().await;
+                });
+            }
         }
     }
 
@@ -429,6 +468,69 @@ impl ClusterImpl {
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
             pool.stop_workers().await?;
         }
+        self.close_worker_socket_tx.broadcast(true)?;
+        Ok(())
+    }
+
+    pub async fn send_select_to_worker(&self, worker_node: String, plan: SerializedPlan) -> Result<Vec<RecordBatch>, CubeError> {
+        let mut stream = timeout(self.connect_timeout, TcpStream::connect(worker_node)).await??;
+        NetworkMessage::Select(plan).send(&mut stream).await?;
+        let response = NetworkMessage::receive(&mut stream).await?;
+        match response {
+            NetworkMessage::SelectResult(res) => {
+                res.and_then(|r| r.read())
+            }
+            NetworkMessage::Select(_) => panic!("Router received Select as a response")
+        }
+    }
+
+    pub async fn listen_on_worker_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
+        if let Some(address) = cluster.config_obj.worker_bind_address() {
+            let mut listener = TcpListener::bind(address.clone()).await?;
+
+            info!("Worker port open on {}", address);
+
+            loop {
+                let mut stop_receiver = cluster.close_worker_socket_rx.write().await;
+                let (mut socket, _) = tokio::select! {
+                    Some(stopped) = stop_receiver.recv() => {
+                        if stopped {
+                            return Ok(());
+                        } else {
+                            continue;
+                        }
+                    }
+                    accept_res = listener.accept() => {
+                        match accept_res {
+                            Ok(res) => res,
+                            Err(err) => {
+                                error!("Network error: {}", err);
+                                continue;
+                            }
+                        }
+                    }
+                };
+                let cluster_to_move = cluster.clone();
+
+                tokio::spawn(async move {
+                    let res = NetworkMessage::receive(&mut socket).await;
+                    match res {
+                        Ok(message) => match message {
+                            NetworkMessage::Select(plan) => {
+                                let res = cluster_to_move.run_local_select_serialized(plan).await;
+                                if let Err(err) = NetworkMessage::SelectResult(res).send(&mut socket).await {
+                                    error!("Network error: {}", err);
+                                }
+                            }
+                            NetworkMessage::SelectResult(_) => {
+                                panic!("WorkerResult should not be sent to worker");
+                            }
+                        }
+                        Err(err) => error!("Network error: {}", err)
+                    }
+                });
+            }
+        }
         Ok(())
     }
 
@@ -436,6 +538,13 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
     ) -> Result<Vec<RecordBatch>, CubeError> {
+        self.run_local_select_serialized(plan_node).await?.read()
+    }
+
+    async fn run_local_select_serialized(
+        &self,
+        plan_node: SerializedPlan,
+    ) -> Result<SerializedRecordBatchStream, CubeError> {
         let start = SystemTime::now();
         debug!("Running select: {:?}", plan_node);
         let to_download = plan_node.files_to_download();
@@ -471,7 +580,7 @@ impl ClusterImpl {
             )
         };
         info!("Running select completed ({:?})", start.elapsed()?);
-        res?.read()
+        res
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {

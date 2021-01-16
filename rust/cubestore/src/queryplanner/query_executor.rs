@@ -658,7 +658,7 @@ impl ExecutionPlan for ClusterSendExec {
         let record_batches = self
             .cluster
             .run_select(
-                self.available_nodes[0].clone(), // TODO find node by partition
+                self.cluster.node_name_by_partitions(&self.partitions[partition]).await?,
                 self.serialized_plan.with_partition_id_to_execute(
                     self.partitions[partition]
                         .iter()
