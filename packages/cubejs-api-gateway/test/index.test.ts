@@ -62,7 +62,7 @@ class AdapterApiMock {
   public $testConnectionsDone: boolean = false;
 
   public $testOrchestratorConnectionsDone: boolean = false;
-
+  
   public async testConnection() {
     this.$testConnectionsDone = true;
 
@@ -79,6 +79,10 @@ class AdapterApiMock {
     return {
       data: [{ foo__bar: 42 }]
     };
+  }
+  
+  public addDataSeenSource() {
+    return undefined;
   }
 }
 
