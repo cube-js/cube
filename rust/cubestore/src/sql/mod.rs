@@ -26,8 +26,8 @@ use crate::queryplanner::query_executor::QueryExecutor;
 use crate::sql::parser::CubeStoreParser;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
-use parser::Statement as CubeStoreStatement;
 use hex::FromHex;
+use parser::Statement as CubeStoreStatement;
 
 #[async_trait]
 pub trait SqlService: Send + Sync {

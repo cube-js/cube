@@ -1,14 +1,14 @@
-use crate::queryplanner::serialized_plan::SerializedPlan;
-use serde::{Serialize, Deserialize};
-use tokio::net::TcpStream;
-use crate::CubeError;
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::CubeError;
+use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetworkMessage {
     Select(SerializedPlan),
-    SelectResult(Result<SerializedRecordBatchStream, CubeError>)
+    SelectResult(Result<SerializedRecordBatchStream, CubeError>),
 }
 
 impl NetworkMessage {
