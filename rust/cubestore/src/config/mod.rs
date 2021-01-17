@@ -64,8 +64,14 @@ impl CubeServices {
 #[derive(Debug, Clone)]
 pub enum FileStoreProvider {
     Local,
-    Filesystem { remote_dir: PathBuf },
-    S3 { region: String, bucket_name: String },
+    Filesystem {
+        remote_dir: PathBuf,
+    },
+    S3 {
+        region: String,
+        bucket_name: String,
+        sub_path: Option<String>,
+    },
 }
 
 pub struct Config {
@@ -178,6 +184,7 @@ impl Config {
                         FileStoreProvider::S3 {
                             bucket_name,
                             region: env::var("CUBESTORE_S3_REGION").unwrap(),
+                            sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
                         }
                     } else if let Ok(remote_dir) = env::var("CUBESTORE_REMOTE_DIR") {
                         FileStoreProvider::Filesystem {
@@ -210,7 +217,7 @@ impl Config {
                     .unwrap_or(Vec::new()),
                 worker_bind_address: env::var("CUBESTORE_WORKER_PORT")
                     .ok()
-                    .map(|v| format!("0.0.0.0:{}", v))
+                    .map(|v| format!("0.0.0.0:{}", v)),
             }),
         }
     }
@@ -250,23 +257,26 @@ impl Config {
     }
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
-        where
-            T: Future + Send + 'static,
-            T::Output: Send + 'static,
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
     {
         self.start_test_with_options(true, test_fn).await
     }
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
-        where
-            T: Future + Send + 'static,
-            T::Output: Send + 'static,
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
     {
         self.start_test_with_options(false, test_fn).await
     }
 
-    pub async fn start_test_with_options<T>(&self, clean_remote: bool, test_fn: impl FnOnce(CubeServices) -> T)
-    where
+    pub async fn start_test_with_options<T>(
+        &self,
+        clean_remote: bool,
+        test_fn: impl FnOnce(CubeServices) -> T,
+    ) where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
@@ -338,10 +348,12 @@ impl Config {
             FileStoreProvider::S3 {
                 region,
                 bucket_name,
+                sub_path,
             } => S3RemoteFs::new(
                 self.config_obj.data_dir.clone(),
                 region.to_string(),
                 bucket_name.to_string(),
+                sub_path.clone(),
             )?,
             FileStoreProvider::Local => unimplemented!(), // TODO
         })
