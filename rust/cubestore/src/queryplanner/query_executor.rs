@@ -658,7 +658,9 @@ impl ExecutionPlan for ClusterSendExec {
         let record_batches = self
             .cluster
             .run_select(
-                self.cluster.node_name_by_partitions(&self.partitions[partition]).await?,
+                self.cluster
+                    .node_name_by_partitions(&self.partitions[partition])
+                    .await?,
                 self.serialized_plan.with_partition_id_to_execute(
                     self.partitions[partition]
                         .iter()
@@ -788,9 +790,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                             TableValue::Null
                         } else {
                             let decimal = a.value(i) as f64;
-                            TableValue::Float(
-                                decimal.to_string()
-                            )
+                            TableValue::Float(decimal.to_string())
                         });
                     }
                 }
