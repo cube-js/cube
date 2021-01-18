@@ -28,7 +28,6 @@ use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use hex::FromHex;
 use parser::Statement as CubeStoreStatement;
-use hex::FromHex;
 
 #[async_trait]
 pub trait SqlService: Send + Sync {
