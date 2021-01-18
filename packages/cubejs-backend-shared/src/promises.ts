@@ -7,10 +7,14 @@ export function pausePromise(ms: number): CancelablePromise<void> {
     //
   };
 
-  const promise: any = new Promise((resolve) => {
-    cancel = resolve;
+  const promise: any = new Promise<void>((resolve) => {
+    const timeout = setTimeout(resolve, ms);
 
-    setTimeout(resolve, ms);
+    cancel = () => {
+      clearTimeout(timeout);
+
+      resolve();
+    };
   });
   promise.cancel = cancel;
 
@@ -36,10 +40,9 @@ class CancelToken {
     }
 
     if (this.withQueue.length) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const queued of this.withQueue) {
-        await queued.cancel(false);
-      }
+      await Promise.all(
+        this.withQueue.map((queued) => queued.cancel())
+      );
     }
   }
 
@@ -88,28 +91,32 @@ export interface CancelableInterval {
  */
 export function createCancelableInterval<T>(
   fn: (token: CancelToken) => Promise<T>,
-  interval: number,
+  options: {
+    interval: number,
+    onDuplicatedExecution?: () => any,
+  },
 ): CancelableInterval {
   let execution: CancelablePromise<T>|null = null;
 
   const timeout = setInterval(
     async () => {
       if (execution) {
-        process.emitWarning(
-          'Execution of previous interval was not finished, new execution will be skipped',
-          'UnexpectedBehaviour'
-        );
+        if (options.onDuplicatedExecution) {
+          options.onDuplicatedExecution();
+        }
 
         return;
       }
 
-      execution = createCancelablePromise(fn);
+      try {
+        execution = createCancelablePromise(fn);
 
-      await execution;
-
-      execution = null;
+        await execution;
+      } finally {
+        execution = null;
+      }
     },
-    interval,
+    options.interval,
   );
 
   return {
