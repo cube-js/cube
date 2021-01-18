@@ -172,13 +172,15 @@ export class CubejsServerCore {
     this.options = options;
     
     if (
-      this.options.devServer && this.configFileExists() && (
+      !this.options.devServer || (this.options.devServer && this.configFileExists())
+    ) {
+      if (
         !options.driverFactory ||
         !options.apiSecret ||
         !options.dbType
-      )
-    ) {
-      throw new Error('driverFactory, apiSecret, dbType are required options');
+      ) {
+        throw new Error('driverFactory, apiSecret, dbType are required options');
+      }
     }
 
     this.logger = options.logger || (
