@@ -57,7 +57,7 @@ test('createCancelablePromise(defer async + with)', async () => {
     });
 
     // This pause promise will be canceled by resolving
-    token.with(pausePromise(10000 * 1000));
+    token.with(pausePromise(25 * 1000));
 
     finished = true;
   });
@@ -70,6 +70,7 @@ test('createCancelablePromise(defer async + with)', async () => {
 test('createCancelableInterval(handle too fast execution)', async () => {
   let started = 0;
   let finished = 0;
+  let onDuplicatedExecution = 0;
 
   const interval = createCancelableInterval(async (token) => {
     started++;
@@ -77,13 +78,19 @@ test('createCancelableInterval(handle too fast execution)', async () => {
     await pausePromise(25);
 
     finished++;
-  }, 10);
+  }, {
+    interval: 10,
+    onDuplicatedExecution: () => {
+      onDuplicatedExecution++;
+    },
+  });
 
   await pausePromise(25 * 2 + 5);
   await interval.cancel(true);
 
   expect(started).toEqual(2);
   expect(finished).toEqual(2);
+  expect(onDuplicatedExecution).toBeLessThanOrEqual(3);
 });
 
 test('createCancelableInterval(simple interval)', async () => {
@@ -97,7 +104,7 @@ test('createCancelableInterval(simple interval)', async () => {
     await pausePromise(25);
 
     if (token.isCanceled()) {
-      console.log('canceling');
+      // console.log('canceling');
 
       canceled = true;
 
@@ -107,7 +114,9 @@ test('createCancelableInterval(simple interval)', async () => {
     await pausePromise(25);
 
     finished++;
-  }, 100);
+  }, {
+    interval: 100,
+  });
 
   await pausePromise(100 + 25 + 25 + 10);
 
@@ -116,7 +125,7 @@ test('createCancelableInterval(simple interval)', async () => {
 
   await pausePromise(50);
 
-  await interval.cancel();
+  await interval.cancel(true);
 
   expect(canceled).toEqual(true);
   expect(started).toEqual(2);
@@ -133,7 +142,9 @@ test('createCancelableInterval(cancel should wait latest execution)', async () =
     await pausePromise(250);
 
     finished++;
-  }, 100);
+  }, {
+    interval: 100,
+  });
 
   await pausePromise(100);
 
@@ -165,7 +176,6 @@ test('withTimeoutRace(timeout)', async () => {
   let started = false;
   let canceled = false;
   let finished = false;
-  let throwed = false;
 
   try {
     await withTimeoutRace(
@@ -176,18 +186,18 @@ test('withTimeoutRace(timeout)', async () => {
           canceled = true;
         });
 
-        await pausePromise(10000);
+        await pausePromise(1000);
 
         finished = true;
       }),
       250
     );
+
+    throw new Error('Unexpected');
   } catch (e) {
-    throwed = true;
     expect(e.message).toEqual('Timeout reached after 250ms');
   }
 
-  expect(throwed).toEqual(true);
   expect(started).toEqual(true);
   expect(canceled).toEqual(true);
   expect(finished).toEqual(false);
