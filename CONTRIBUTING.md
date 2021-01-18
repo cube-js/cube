@@ -63,7 +63,7 @@ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/c
 
 ### Cube.js Server
 
-Cube.js is written in plain JS, but some parts already migrated to TypeScript.
+Cube.js is written in plain JavaScript, but some parts have already been migrated to TypeScript.
 
 1. After cloning Cube.js repository run `$ yarn install` and `$ yarn lerna bootstrap` in root directory.
 2. Use `yarn tsc:watch` to start TypeScript compiler in watch mode.
