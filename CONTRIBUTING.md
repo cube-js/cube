@@ -28,7 +28,7 @@ Cube.js works with Node.js 8+ and uses yarn as a package manager.
 
 ### Cube.js Docker
 
-Cube.js offers two different types of docker's image:
+Cube.js offers two different types of Docker image:
 
 - Stable (building from published release on npm)
 - Dev (building from source files, needed to test unpublished changes)
