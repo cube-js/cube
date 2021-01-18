@@ -11,10 +11,14 @@ export interface RedisPoolOptions {
   destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
 }
 
+const MAX_ALLOWED_POOL_ERRORS = 100;
+
 export class RedisPool {
   protected readonly pool: Pool<AsyncRedisClient>|null = null;
 
   protected readonly create: CreateRedisClientFn|null = null;
+  
+  protected poolErrors: number = 0;
 
   public constructor(options: RedisPoolOptions = {}) {
     const defaultMin = process.env.CUBEJS_REDIS_POOL_MIN ? parseInt(process.env.CUBEJS_REDIS_POOL_MIN, 10) : 2;
@@ -29,13 +33,23 @@ export class RedisPool {
       idleTimeoutMillis: 5000,
       evictionRunIntervalMillis: 5000
     };
-
+    
     const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
 
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.end(true));
 
       this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
+      
+      this.pool.on('factoryCreateError', (error) => {
+        this.poolErrors++;
+        // prevent the infinite loop when pool creation fails too many times
+        if (this.poolErrors > MAX_ALLOWED_POOL_ERRORS) {
+          // @ts-ignore
+          // eslint-disable-next-line
+          this.pool._waitingClientsQueue.dequeue().reject(error);
+        }
+      });
     } else {
       // fallback to un-pooled behavior if pool max is 0
       this.create = create;
