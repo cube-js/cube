@@ -11,7 +11,7 @@ pub enum TableValue {
     String(String),
     Int(i64),
     Decimal(String), // TODO bincode is incompatible with BigDecimal
-    Float(String), // TODO Eq
+    Float(String),   // TODO Eq
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
     Boolean(bool),
@@ -106,7 +106,7 @@ impl<'a> PartialOrd for RowSortKey<'a> {
                     (TableValue::Bytes(a), TableValue::Bytes(b)) => a.partial_cmp(b),
                     (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.partial_cmp(b),
                     (TableValue::Boolean(a), TableValue::Boolean(b)) => a.partial_cmp(b),
-                    (a, b) => panic!("Can't compare {:?} to {:?}", a, b)
+                    (a, b) => panic!("Can't compare {:?} to {:?}", a, b),
                 };
             }
         }

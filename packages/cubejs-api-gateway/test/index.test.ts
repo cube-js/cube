@@ -63,8 +63,6 @@ class AdapterApiMock {
 
   public $testOrchestratorConnectionsDone: boolean = false;
 
-  private seenDataSources: { [dataSource: string]: boolean } = {};
-  
   public async testConnection() {
     this.$testConnectionsDone = true;
 
@@ -83,8 +81,8 @@ class AdapterApiMock {
     };
   }
   
-  public addDataSeenSource(dataSource: string) {
-    this.seenDataSources[dataSource] = true;
+  public addDataSeenSource() {
+    return undefined;
   }
 }
 

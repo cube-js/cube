@@ -3,7 +3,6 @@ use crate::table::TableValue;
 use crate::{metastore, CubeError};
 use async_trait::async_trait;
 use hex::ToHex;
-use itertools::Itertools;
 use log::{error, info, warn};
 use msql_srv::*;
 use std::io;
@@ -68,7 +67,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     metastore::ColumnType::Decimal { .. } => ColumnType::MYSQL_TYPE_DECIMAL,
                     metastore::ColumnType::Boolean => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Bytes => ColumnType::MYSQL_TYPE_STRING,
-                    metastore::ColumnType::Float => ColumnType::MYSQL_TYPE_STRING
+                    metastore::ColumnType::Float => ColumnType::MYSQL_TYPE_STRING,
                 },
                 colflags: ColumnFlags::empty(),
             })
