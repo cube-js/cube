@@ -12,7 +12,9 @@
     "node": ">=8.11.1"
   },
   "files": [
-    "dist/src"
+    "dist/src",
+    "adapter",
+    "scaffolding"
   ],
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",

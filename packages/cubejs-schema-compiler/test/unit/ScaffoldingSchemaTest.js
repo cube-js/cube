@@ -77,7 +77,7 @@ describe('ScaffoldingSchema', () => {
           'attributes': []
         }],
       }
-    }, driver);
+    });
     const schemaForTables = schema.generateForTables(['public.orders', 'public.customers', 'public.accounts']);
     schemaForTables.should.be.deepEqual([
       {
