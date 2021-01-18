@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cd parser && antlr -Dlanguage=JavaScript GenericSql.g4
+cd src/parser && antlr -Dlanguage=JavaScript GenericSql.g4
