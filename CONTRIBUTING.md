@@ -53,7 +53,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 4. Use `$ yarn build` in the repository root to build CommonJS and UMD modules.
 5. Use `$ yarn link @cubejs-client/core` and/or `$ yarn link @cubejs-client/react` in your project to test changes applied.
 6. Use `$ yarn test` where available to test your changes.
-7. Ensure to commit CommonJS and UMD modules as part of your commit.
+7. Ensure that any CommonJS and UMD modules are included as part of your commit.
 
 To get set up quickly, you can perform 1) and 2) with one line from the `cube.js` clone root folder:
 
