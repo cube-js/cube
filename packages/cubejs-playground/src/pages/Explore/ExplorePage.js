@@ -1,4 +1,3 @@
-/* global window */
 import { Component } from 'react';
 import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';

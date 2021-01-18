@@ -1,4 +1,3 @@
-/* globals window */
 import { Component } from 'react';
 import '@ant-design/compatible/assets/index.css';
 import { Spin, Button, Alert } from 'antd';

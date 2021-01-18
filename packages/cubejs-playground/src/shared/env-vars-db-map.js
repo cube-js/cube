@@ -24,7 +24,7 @@ const BASE_CRED = [
 
 const DB_NAME = { env: 'CUBEJS_DB_NAME', title: 'Database' };
 
-export default [
+const envVarsDbMap = [
   {
     databases: [
       { title: 'PostgreSQL', driver: 'postgres', logo: logoPostgres },
@@ -130,3 +130,5 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
     settings: [{ env: 'CUBEJS_DB_URL', title: 'URL' }, ...BASE_CRED],
   },
 ];
+
+export default envVarsDbMap;
