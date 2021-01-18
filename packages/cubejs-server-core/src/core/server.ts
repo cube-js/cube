@@ -239,7 +239,12 @@ export class CubejsServerCore {
             await this.runScheduledRefresh(context, queryingOptions);
           }));
         },
-        scheduledRefreshTimer
+        {
+          interval: scheduledRefreshTimer,
+          onDuplicatedExecution: () => this.logger('Refresh Scheduler Interval Error', {
+            error: `Previous interval was not finished with ${scheduledRefreshTimer} interval`
+          })
+        }
       );
     }
 

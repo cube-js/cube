@@ -58,11 +58,18 @@ export class WebSocketServer {
       });
     });
 
+    const processSubscriptionsInterval = this.options.processSubscriptionsInterval || 5 * 1000;
+
     this.subscriptionsTimer = createCancelableInterval(
       async () => {
         await this.subscriptionServer.processSubscriptions();
       },
-      this.options.processSubscriptionsInterval || 5 * 1000
+      {
+        interval: processSubscriptionsInterval,
+        onDuplicatedExecution: () => this.serverCore.logger('WebSocket Server Interval Error', {
+          error: `Previous interval was not finished with ${processSubscriptionsInterval} interval`
+        }),
+      }
     );
   }
 
