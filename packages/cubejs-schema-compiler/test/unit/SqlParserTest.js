@@ -1,6 +1,7 @@
 /* eslint-disable quote-props */
 /* globals it,describe */
-const SqlParser = require('../../parser/SqlParser');
+import SqlParser from '../../src/parser/SqlParser';
+
 require('should');
 
 describe('SqlParser', () => {

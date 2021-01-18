@@ -1,6 +1,6 @@
-const PrepareCompiler = require('../../compiler/PrepareCompiler');
+import { prepareCompiler as originalPrepareCompiler } from '../../src/compiler/PrepareCompiler';
 
-exports.prepareCompiler = (content, options) => PrepareCompiler.prepareCompiler({
+export const prepareCompiler = (content, options) => originalPrepareCompiler({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
     { fileName: 'main.js', content }

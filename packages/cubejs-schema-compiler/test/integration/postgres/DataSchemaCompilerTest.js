@@ -1,17 +1,17 @@
 /* globals it, describe, after */
 /* eslint-disable quote-props */
-const CompileError = require('../../../compiler/CompileError');
-const PostgresQuery = require('../../../adapter/PostgresQuery');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
-const MainPrepareCompiler = require('../../../compiler/PrepareCompiler');
-// eslint-disable-next-line import/no-extraneous-dependencies
-require('should');
+import { CompileError } from '../../../src/compiler/CompileError';
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareCompiler as originalPrepareCompiler } from '../../../src/compiler/PrepareCompiler';
+import { PostgresDBRunner } from './PostgresDBRunner';
 
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./PostgresDBRunner');
+require('should');
 
 describe('DataSchemaCompiler', function test() {
   this.timeout(200000);
+
+  const dbRunner = new PostgresDBRunner();
 
   after(async () => {
     await dbRunner.tearDown();
@@ -214,7 +214,7 @@ describe('DataSchemaCompiler', function test() {
   });
 
   it('calculated metrics', () => {
-    const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -287,7 +287,7 @@ describe('DataSchemaCompiler', function test() {
   });
 
   it('static dimension case', () => {
-    const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -418,7 +418,7 @@ describe('DataSchemaCompiler', function test() {
   });
 
   it('export import', () => {
-    const { compiler, cubeEvaluator, joinGraph } = MainPrepareCompiler.prepareCompiler({
+    const { compiler, cubeEvaluator, joinGraph } = originalPrepareCompiler({
       dataSchemaFiles: () => Promise.resolve([
         {
           fileName: 'main.js',
@@ -489,7 +489,7 @@ describe('DataSchemaCompiler', function test() {
   });
 
   it('dashboard templates', () => {
-    const { compiler, contextEvaluator, dashboardTemplateEvaluator } = prepareCompiler(`
+    const { compiler, dashboardTemplateEvaluator } = prepareCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors

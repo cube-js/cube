@@ -1,9 +1,11 @@
-const { Duration, TemporalUnit } = require('node-duration');
-const { GenericContainer, Wait } = require('testcontainers');
-const sql = require('mssql');
-const BaseDbRunner = require('../postgres/BaseDbRunner');
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { Duration, TemporalUnit } from 'node-duration';
+import { GenericContainer, Wait } from 'testcontainers';
+import sql from 'mssql';
 
-class MSSqlDbRunner extends BaseDbRunner {
+import { BaseDbRunner } from '../postgres/BaseDbRunner';
+
+export class MSSqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
     return {
       testQueries: async (queries, fixture) => {
@@ -107,5 +109,3 @@ class MSSqlDbRunner extends BaseDbRunner {
     return 1433;
   }
 }
-
-module.exports = new MSSqlDbRunner();

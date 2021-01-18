@@ -1,22 +1,23 @@
 /* eslint-disable quote-props */
 /* globals describe, after, it */
-const UserError = require('../../../compiler/UserError');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
+import { UserError } from '../../../src/compiler/UserError';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { ClickHouseDbRunner } from './ClickHouseDbRunner';
+import { debugLog, logSqlAndParams } from '../../unit/TestUtil';
+import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+
 require('should');
-
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./ClickHouseDbRunner');
-
-const { debugLog, logSqlAndParams } = require('../../unit/TestUtil');
 
 describe('ClickHouse JoinGraph', function test() {
   this.timeout(200000);
+
+  const dbRunner = new ClickHouseDbRunner();
 
   after(async () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -293,7 +294,7 @@ describe('ClickHouse JoinGraph', function test() {
     const result = compiler.compile().then(() => {
       debugLog(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
 
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.visitor_revenue',
           'visitors.visitor_count',
@@ -352,19 +353,20 @@ describe('ClickHouse JoinGraph', function test() {
     return result;
   });
 
-  function runQueryTest(q, expectedResult) {
-    return compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  async function runQueryTest(q, expectedResult) {
+    await compiler.compile();
 
-      logSqlAndParams(query);
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
-        res.should.be.deepEqual(
-          expectedResult
-        );
-      });
-    });
+    logSqlAndParams(query);
+
+    const result = await dbRunner.testQuery(query.buildSqlAndParams());
+
+    debugLog(JSON.stringify(result));
+
+    result.should.be.deepEqual(
+      expectedResult
+    );
   }
 
   it('simple join total', () => runQueryTest({
@@ -390,7 +392,7 @@ describe('ClickHouse JoinGraph', function test() {
   // FAILS - need to finish query to override ::timestamptz
   it.skip('running total', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.revenueRunning'
         ],
@@ -628,7 +630,7 @@ describe('ClickHouse JoinGraph', function test() {
   // uniq, uniqCombined, uniqHLL12, need to pick one to use and implement it in query
   it.skip('hll rolling', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.countDistinctApproxRolling'
         ],
@@ -654,7 +656,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('calculated join', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitor_checkins.revenue_per_checkin'
         ],
@@ -677,7 +679,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('filter join', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitor_checkins.google_sourced_checkins'
         ],
@@ -700,7 +702,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('filter join not multiplied', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitor_checkins.google_sourced_checkins'
         ],
@@ -725,7 +727,7 @@ describe('ClickHouse JoinGraph', function test() {
   });
 
   it('having filter', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -761,7 +763,7 @@ describe('ClickHouse JoinGraph', function test() {
   }));
 
   it('having filter without measure', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -797,7 +799,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   // FAILS - doesnt support OR in JOIN
   it.skip('having filter without measure with join', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -827,7 +829,7 @@ describe('ClickHouse JoinGraph', function test() {
   }));
 
   it('having filter without measure single multiplied', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -862,7 +864,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   it('subquery', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.visitor_count'
         ],
@@ -915,7 +917,7 @@ describe('ClickHouse JoinGraph', function test() {
   // FAILS Error: Unknown identifier: visitors.created_at_date
   it.skip('average subquery', () => {
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.averageCheckins'
         ],
@@ -1051,7 +1053,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   // TODO
   it.skip('join rollup pre-aggregation', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.per_visitor_revenue'
       ],
@@ -1101,7 +1103,7 @@ describe('ClickHouse JoinGraph', function test() {
 
   // TODO
   it.skip('join rollup total pre-aggregation', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.visitor_revenue'
       ],
@@ -1143,7 +1145,7 @@ describe('ClickHouse JoinGraph', function test() {
   }));
 
   it('user context', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -1165,7 +1167,7 @@ describe('ClickHouse JoinGraph', function test() {
   }));
 
   it('user context array', () => compiler.compile().then(() => {
-    const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],

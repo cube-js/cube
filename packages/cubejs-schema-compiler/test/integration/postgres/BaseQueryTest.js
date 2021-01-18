@@ -1,22 +1,23 @@
 /* globals it, describe, after */
 /* eslint-disable quote-props */
-const moment = require('moment-timezone');
-const UserError = require('../../../compiler/UserError');
-const PostgresQuery = require('../../../adapter/PostgresQuery');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
-require('should');
+import moment from 'moment-timezone';
+import { UserError } from '../../../src/compiler/UserError';
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { PostgresDBRunner } from './PostgresDBRunner';
 
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./PostgresDBRunner');
+require('should');
 
 describe('SQL Generation', function test() {
   this.timeout(90000);
+
+  const dbRunner = new PostgresDBRunner();
 
   after(async () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(` 
+  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(` 
     cube('cards', {
       sql: \`
       select * from cards

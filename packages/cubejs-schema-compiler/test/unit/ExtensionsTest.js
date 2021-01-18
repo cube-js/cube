@@ -1,10 +1,9 @@
 /* globals it,describe */
 /* eslint-disable quote-props */
-const PostgresQuery = require('../../adapter/PostgresQuery');
-const PrepareCompiler = require('./PrepareCompiler');
-require('should');
+import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { prepareCompiler } from './PrepareCompiler';
 
-const { prepareCompiler } = PrepareCompiler;
+require('should');
 
 describe('Extensions', () => {
   const {
