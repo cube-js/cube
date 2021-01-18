@@ -11,15 +11,24 @@
   "engines": {
     "node": ">=8.11.1"
   },
+  "files": [
+    "dist/src"
+  ],
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "nyc --reporter=lcov mocha test/unit",
-    "integration": "nyc --reporter=lcov mocha test/integration/*",
-    "integration:mssql": "nyc --reporter=lcov mocha test/integration/mssql",
-    "integration:mysql": "nyc --reporter=lcov mocha test/integration/mysql",
-    "integration:postgres": "nyc --reporter=lcov mocha test/integration/postgres",
-    "integration:clickhouse": "nyc --reporter=lcov mocha test/integration/clickhouse",
-    "lint": "eslint -c ../../.eslintrc.js adapter/*.js compiler/*.js extensions/*.js scaffolding/*.js parser/SqlParser.js test/*/*.js"
+    "unit": "nyc --reporter=lcov mocha --full-trace dist/test/unit",
+    "integration": "nyc --reporter=lcov mocha --full-trace dist/test/integration/*",
+    "integration:mssql": "nyc --reporter=lcov mocha --full-trace dist/test/integration/mssql",
+    "integration:mysql": "nyc --reporter=lcov mocha --full-trace dist/test/integration/mysql",
+    "integration:postgres": "nyc --reporter=lcov mocha --full-trace dist/test/integration/postgres",
+    "integration:clickhouse": "nyc --reporter=lcov mocha --full-trace dist/test/integration/clickhouse",
+    "lint": "linter src/* test/* --ext .ts,.js",
+    "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
   },
   "dependencies": {
     "@babel/core": "^7.4.0",
@@ -30,6 +39,7 @@
     "@babel/traverse": "^7.4.0",
     "@babel/types": "^7.4.0",
     "@hapi/joi": "^15.1.1",
+    "@types/ramda": "^0.27.34",
     "antlr4": "4.8.0",
     "cron-parser": "^2.16.3",
     "humps": "^2.0.1",
@@ -43,11 +53,14 @@
   },
   "devDependencies": {
     "@apla/clickhouse": "^1.5.5",
+    "@cubejs-backend/linter": "^0.25.0",
     "@types/hapi__joi": "^17.1.0",
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
+    "@types/inflection": "^1.5.28",
+    "@types/lru-cache": "^5.1.0",
+    "@types/mocha": "^8.2.0",
+    "@types/node": "^8.10.66",
+    "@types/sqlstring": "^2.3.0",
+    "@types/uuid": "^3.4.9",
     "istanbul": "^0.4.5",
     "mocha": "^8.0.1",
     "mssql": "^6.1.0",
@@ -57,9 +70,18 @@
     "request": "^2.88.0",
     "request-promise": "^4.2.4",
     "should": "^13.2.3",
+    "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
     "testcontainers": "^2.4.0",
+    "typescript": "^4.1.3",
     "uuid": "^3.3.2"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "nyc": {
+    "source-map": true,
+    "produce-source-map": true
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
 }

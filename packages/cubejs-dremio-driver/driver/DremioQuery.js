@@ -1,7 +1,5 @@
 const moment = require('moment-timezone');
-
-const BaseQuery = require('@cubejs-backend/schema-compiler/adapter/BaseQuery');
-const BaseFilter = require('@cubejs-backend/schema-compiler/adapter/BaseFilter');
+const { BaseFilter, BaseQuery } = require('@cubejs-backend/schema-compiler');
 
 const GRANULARITY_TO_INTERVAL = {
   week: (date) => `DATE_TRUNC('week', ${date})`,

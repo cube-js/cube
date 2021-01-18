@@ -1,21 +1,22 @@
 /* globals it, describe, after */
 /* eslint-disable quote-props */
-const UserError = require('../../../compiler/UserError');
-const PostgresQuery = require('../../../adapter/PostgresQuery');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
-require('should');
+import { UserError } from '../../../src/compiler/UserError';
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { PostgresDBRunner } from './PostgresDBRunner';
 
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./PostgresDBRunner');
+require('should');
 
 describe('SQL Generation', function test() {
   this.timeout(90000);
+
+  const dbRunner = new PostgresDBRunner();
 
   after(async () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator, transformer } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -348,7 +349,8 @@ describe('SQL Generation', function test() {
     await compiler.compile();
 
     try {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      // eslint-disable-next-line no-new
+      new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         'measures': [
           'visitors.visitor_count'
         ],
@@ -877,7 +879,8 @@ describe('SQL Generation', function test() {
     await compiler.compile();
 
     try {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      // eslint-disable-next-line no-new
+      new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.visitor_count'
         ],
@@ -890,28 +893,28 @@ describe('SQL Generation', function test() {
           {
             and: [
               { and: [
-                  {
-                    or: [
-                      {
-                        and: [
-                          {
-                            measure: 'visitors.source',
-                            operator: 'equals',
-                            values: ['some']
-                          }
-                        ]
-                      },
-                      {
-                        and: [
-                          {
-                            dimension: 'visitors_source',
-                            operator: 'equals',
-                            values: ['google']
-                          }
-                        ]
-                      }
-                    ]
-                  }]
+                {
+                  or: [
+                    {
+                      and: [
+                        {
+                          measure: 'visitors.source',
+                          operator: 'equals',
+                          values: ['some']
+                        }
+                      ]
+                    },
+                    {
+                      and: [
+                        {
+                          dimension: 'visitors_source',
+                          operator: 'equals',
+                          values: ['google']
+                        }
+                      ]
+                    }
+                  ]
+                }]
               }]
           }],
         order: [{

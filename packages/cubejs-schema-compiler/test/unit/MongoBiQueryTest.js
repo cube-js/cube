@@ -1,10 +1,9 @@
-/* globals it, describe, after */
+/* globals it, describe */
 /* eslint-disable quote-props */
-const MongoBiQuery = require('../../adapter/MongoBiQuery');
-const PrepareCompiler = require('./PrepareCompiler');
-require('should');
+import { MongoBiQuery } from '../../src/adapter/MongoBiQuery';
+import { prepareCompiler } from './PrepareCompiler';
 
-const { prepareCompiler } = PrepareCompiler;
+require('should');
 
 describe('MongoBiQuery', () => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
