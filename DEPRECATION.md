@@ -42,6 +42,7 @@ features:
 | Deprecated | [Node.js 8](#nodejs-8)                                               | v0.22.4    | v0.26.0      |
 | Deprecated | Absolute import for @cubejs-backend/query-orchestrator               | v0.24.2    | v0.28.0      |
 | Deprecated | Absolute import for @cubejs-backend/server-core                      | v0.25.4    | v0.30.0      |
+| Deprecated | Absolute import for @cubejs-backend/schema-compiler                  | v0.25.21   | v0.32.0      |
 
 ### `contextToDataSourceId`
 
@@ -137,4 +138,22 @@ You should use:
 
 ```js
 const { CubejsServerCore } = require('@cubejs-backend/server-core');
+```
+
+### Absolute import for @cubejs-backend/schema-compiler
+
+**Deprecated in Release: v0.25.21**
+
+Reason: Absolute imports highly depend on a path, and all API becomes public. Now we started to provide public API as `export` from the module.
+
+Deprecated:
+
+```js
+const BaseQuery = require('@cubejs-backend/schema-compiler/adapter/BaseQuery');
+```
+
+You should use:
+
+```js
+const { BaseQuery } = require('@cubejs-backend/schema-compiler');
 ```

@@ -7,7 +7,6 @@ export * from './BaseSegment';
 export * from './BaseTimeDimension';
 export * from './ParamAllocator';
 export * from './PreAggregations';
-export * from './PrestodbQuery';
 export * from './QueryBuilder';
 export * from './QueryCache';
 
@@ -15,7 +14,8 @@ export * from './QueryCache';
 export * from './MysqlQuery';
 export * from './PostgresQuery';
 
-// Candidates to move in drivers
+// Candidates to move from this package to drivers packages
+// export * from './PrestodbQuery';
 // export * from './RedshiftQuery';
 // export * from './SnowflakeQuery';
 // export * from './SqliteQuery';
