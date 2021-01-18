@@ -1,7 +1,8 @@
 /* eslint-disable quote-props */
 /* globals it,describe */
-const ScaffoldingSchema = require('../../scaffolding/ScaffoldingSchema');
-const ScaffoldingTemplate = require('../../scaffolding/ScaffoldingTemplate');
+import { ScaffoldingSchema } from '../../src/scaffolding/ScaffoldingSchema';
+import { ScaffoldingTemplate } from '../../src/scaffolding/ScaffoldingTemplate';
+
 require('should');
 
 const driver = {

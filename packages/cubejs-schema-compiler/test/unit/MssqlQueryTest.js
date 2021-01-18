@@ -1,10 +1,9 @@
-/* globals it, describe, after */
+/* globals it, describe */
 /* eslint-disable quote-props */
-const MssqlQuery = require('../../adapter/MssqlQuery');
-const PrepareCompiler = require('./PrepareCompiler');
-require('should');
+import { MssqlQuery } from '../../src/adapter/MssqlQuery';
+import { prepareCompiler } from './PrepareCompiler';
 
-const { prepareCompiler } = PrepareCompiler;
+require('should');
 
 describe('MssqlQuery', () => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`

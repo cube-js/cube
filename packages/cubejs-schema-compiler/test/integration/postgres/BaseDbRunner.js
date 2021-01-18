@@ -1,4 +1,4 @@
-class BaseDbRunner {
+export class BaseDbRunner {
   testQuery(query, fixture) {
     return this.testQueries([query], fixture);
   }
@@ -25,7 +25,7 @@ class BaseDbRunner {
     }
   }
 
-  // eslint-disable-next-line no-unused-vars
+  // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
   async connectionLazyInit(port) {
     throw new Error('Not implemented');
   }
@@ -38,5 +38,3 @@ class BaseDbRunner {
     throw new Error('Not implemented');
   }
 }
-
-module.exports = BaseDbRunner;

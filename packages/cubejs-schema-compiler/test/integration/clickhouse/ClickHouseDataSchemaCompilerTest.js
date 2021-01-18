@@ -1,14 +1,14 @@
 /* eslint-disable quote-props */
 /* globals describe, before, after, it */
-const CompileError = require('../../../compiler/CompileError');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
-const MainPrepareCompiler = require('../../../compiler/PrepareCompiler');
+import { CompileError } from '../../../src/compiler/CompileError';
+import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
+
+import { prepareCompiler as testPrepareCompiler } from '../../unit/PrepareCompiler';
+import { ClickHouseDbRunner } from './ClickHouseDbRunner';
+import { logSqlAndParams } from '../../unit/TestUtil';
+
 require('should');
-
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./ClickHouseDbRunner');
-
-const { debugLog, logSqlAndParams } = require('../../unit/TestUtil');
 
 describe('ClickHouse DataSchemaCompiler', function test() {
   this.timeout(200000);
@@ -17,12 +17,14 @@ describe('ClickHouse DataSchemaCompiler', function test() {
     this.timeout(200000);
   });
 
+  const dbRunner = new ClickHouseDbRunner();
+
   after(async () => {
     await dbRunner.tearDown();
   });
 
   it('gutter', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -57,7 +59,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   it('error', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = testPrepareCompiler(`
     cube({}, {
       measures: {}
     })
@@ -73,7 +75,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   it('duplicate member', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -108,7 +110,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   it('calculated metrics', () => {
-    const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -146,7 +148,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
     })
     `);
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visitors.visitor_count'],
         timeDimensions: [{
           dimension: 'visitors.created_at',
@@ -182,7 +184,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   it('static dimension case', () => {
-    const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -217,7 +219,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
     })
     `);
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visitors.visitor_count'],
         dimensions: ['visitors.status'],
         timezone: 'America/Los_Angeles',
@@ -242,7 +244,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   it('dynamic dimension case', () => {
-    const { compiler, transformer, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -291,7 +293,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
     })
     `);
     const result = compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visitors.visitor_count'],
         dimensions: ['visitors.enabled_source'],
         timezone: 'America/Los_Angeles',
@@ -316,7 +318,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
       cube('visitors', {
         sql: \`
         select * from visitors
@@ -360,7 +362,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       it(`filtered dates ${operator}`, async () => {
         await compiler.compile();
 
-        const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+        const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
           measures: [],
           dimensions: ['visitors.created_at'],
           timeDimensions: [],
@@ -385,7 +387,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   }
 
   it('export import', () => {
-    const { compiler, cubeEvaluator, joinGraph } = MainPrepareCompiler.prepareCompiler({
+    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler({
       dataSchemaFiles: () => Promise.resolve([
         {
           fileName: 'main.js',
@@ -410,7 +412,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
       ])
     }, { adapter: dbRunner.adapter });
     return compiler.compile().then(() => {
-      const query = dbRunner.newQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['Main.count'],
         dimensions: [],
         timeDimensions: [],
@@ -423,7 +425,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   it('contexts', () => {
-    const { compiler, contextEvaluator } = prepareCompiler(`
+    const { compiler, contextEvaluator } = testPrepareCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -456,7 +458,7 @@ describe('ClickHouse DataSchemaCompiler', function test() {
   });
 
   it('dashboard templates', () => {
-    const { compiler, contextEvaluator, dashboardTemplateEvaluator } = prepareCompiler(`
+    const { compiler, dashboardTemplateEvaluator } = testPrepareCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors

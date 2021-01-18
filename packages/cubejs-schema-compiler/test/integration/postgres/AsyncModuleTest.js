@@ -1,14 +1,16 @@
 /* eslint-disable quote-props */
 /* globals describe, it, after */
-const PostgresQuery = require('../../../adapter/PostgresQuery');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
-require('should');
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
 
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./PostgresDBRunner');
+import { PostgresDBRunner } from './PostgresDBRunner';
+
+require('should');
 
 describe('AsyncModule', function test() {
   this.timeout(20000);
+
+  const dbRunner = new PostgresDBRunner();
 
   after(async () => {
     await dbRunner.tearDown();

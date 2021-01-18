@@ -15,7 +15,7 @@
         "packages/cubejs-api-gateway/src",
         "packages/cubejs-cli/src",
         "packages/cubejs-query-orchestrator/src",
-        "packages/cubejs-schema-compiler/",
+        "packages/cubejs-schema-compiler/src",
         "packages/cubejs-server/src",
         "packages/cubejs-server-core/src",
       ]

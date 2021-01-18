@@ -1,8 +1,5 @@
 const moment = require('moment-timezone');
-
-const BaseQuery = require('@cubejs-backend/schema-compiler/adapter/BaseQuery');
-const BaseFilter = require('@cubejs-backend/schema-compiler/adapter/BaseFilter');
-const UserError = require('@cubejs-backend/schema-compiler/compiler/UserError');
+const { BaseQuery, BaseFilter, UserError } = require('@cubejs-backend/schema-compiler');
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'day',
