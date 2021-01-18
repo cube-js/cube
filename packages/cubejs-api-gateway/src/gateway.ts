@@ -831,6 +831,8 @@ export class ApiGateway {
       const orchestratorApi = await this.adapterApi({});
 
       try {
+        // todo: test other data sources
+        orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
       } catch (e) {
         this.log({
