@@ -11,6 +11,11 @@ menuOrder: 16
 
 You can use subquery dimensions to **reference measures from other cubes inside a dimension**. Under the hood, it behaves [like the correlated subquery](https://en.wikipedia.org/wiki/Correlated_subquery), but is implemented via joins for performance optimization and portability.
 
+<!-- prettier-ignore-start -->
+[[warning | Warning]]
+| You cannot use subquery dimensions to reference measures from the same cube.
+<!-- prettier-ignore-end -->
+
 Consider the following data schema, where we have `Deals` and `Sales Managers`. `Deals` belong to `Sales Managers` and have the `amount` dimension. What we want is to calculate the amount of deals for `Sales Managers`.
 
 ![subquery-1.png](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Guides/subquery-1.png)
