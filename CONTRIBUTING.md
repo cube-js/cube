@@ -69,7 +69,7 @@ In case you need to tweak it a little bit please follow [Implementing Driver](#i
 2. Copy it, adjust SQL generation accordingly and put it in driver package. Driver package will obtain `@cubejs-backend/schema-compiler` dependency from that point.
 3. Add `static dialectClass()` method to your driver class which returns `BaseQuery` implementation for the database. For example:
 ```javascript
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const FooQuery = require('./FooQuery');
 
 class FooDriver extends BaseDriver {
