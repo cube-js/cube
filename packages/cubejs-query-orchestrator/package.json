@@ -41,7 +41,7 @@
     "@types/generic-pool": "^3.1.9",
     "@types/ioredis": "^4.17.11",
     "@types/jest": "^26.0.15",
-    "@types/node": "^12.20.1",
+    "@types/node": "^12.20.10",
     "@types/ramda": "^0.27.32",
     "@types/redis": "^2.8.28",
     "jest": "^26.6.3",
