@@ -36,7 +36,7 @@ If the request takes too long to be processed, Cube.js Backend responds with ```
 Possible reasons of **Continue wait**:
 
  * The query requested is heavy and it takes some time for the database to process it.
- * There are many queries requested and Cube.js backend queues them to save database from overloading. 
+ * There are many queries requested and Cube.js backend queues them to save database from overloading.
 
 ### Error Handling
 
@@ -71,8 +71,8 @@ Response
 * `query` - The query passed via params. It can be an array of queries and in such case it will be treated as a [Data Blending](/data-blending) query.
 * `data` - Formatted dataset of query results.
 * `annotation` - Metadata for query. Contains descriptions for all query items.
-  * `title` - Human readable title from data schema. 
-  * `shortTitle` - Short title for visualization usage (ex. chart overlay) 
+  * `title` - Human readable title from data schema.
+  * `shortTitle` - Short title for visualization usage (ex. chart overlay)
   * `type` - Data type
 
 Example request:
@@ -128,9 +128,10 @@ Example response:
   }
 }
 ```
-
+<!-- prettier-ignore-start -->
 [[warning | Note]]
-| Currently all fetched numericals are returned in the same format as driver returns it without any additional processing. Most of drivers return numerical values as strings instead of javascript integer or float to ensure there's no loss of significance. Client code should take care of parsing such numerical values. 
+| Currently all fetched numericals are returned in the same format as driver returns it without any additional processing. Most of drivers return numerical values as strings instead of javascript integer or float to ensure there's no loss of significance. Client code should take care of parsing such numerical values.
+<!-- prettier-ignore-end -->
 
 ### /v1/sql
 
@@ -279,4 +280,86 @@ curl \
  -G \
  --data-urlencode 'queryingOptions={"timezone":"UTC"}' \
  http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
-````
+```
+
+### /readyz
+
+Returns the ready state of the deployment.
+
+**Single-tenant:** Ensures the orchestration layer is operational and tests the connection to the default `dataSource`.
+
+**Multi-tenant:** Tests connections per-tenant. If no connections exist, it will report as successful.
+
+Example request:
+
+```bash
+curl -i http://localhost:4000/readyz
+```
+
+Successful example response:
+```bash
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 19
+ETag: W/"13-MyluqxoYxC0tUxBeZCnbaWYVLhg"
+Date: Mon, 18 Jan 2021 15:39:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"health":"HEALTH"}
+```
+
+Failure example response:
+```bash
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 19
+ETag: W/"13-MyluqxoYxC0tUxBeZCnbaWYVLhg"
+Date: Mon, 18 Jan 2021 15:39:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"health":"DOWN"}
+```
+
+### /livez
+
+Returns the liveness state of the deployment. This is confirmed by testing any existing connections to `dataSource`. If no connections exist, it will report as successful.
+
+```bash
+curl -i http://localhost:4000/livez
+```
+
+Successful example response:
+```bash
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 19
+ETag: W/"13-MyluqxoYxC0tUxBeZCnbaWYVLhg"
+Date: Mon, 18 Jan 2021 15:39:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"health":"HEALTH"}
+```
+
+Failure example response:
+```bash
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 19
+ETag: W/"13-MyluqxoYxC0tUxBeZCnbaWYVLhg"
+Date: Mon, 18 Jan 2021 15:39:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"health":"DOWN"}
+```
