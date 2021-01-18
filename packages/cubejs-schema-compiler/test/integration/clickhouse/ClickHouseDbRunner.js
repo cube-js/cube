@@ -1,44 +1,51 @@
 /* eslint-disable */
-const ClickHouse = require('@apla/clickhouse');
-const { GenericContainer } = require('testcontainers');
-const sqlstring = require('sqlstring');
-const uuidv4 = require('uuid/v4');
-
-const ClickHouseQuery = require('../../../adapter/ClickHouseQuery');
+import ClickHouse from '@apla/clickhouse';
+import { GenericContainer } from 'testcontainers';
+import { format as formatSql } from 'sqlstring';
+import uuidv4 from 'uuid/v4';
 
 process.env.TZ = 'GMT';
 
-exports.newQuery = (a, b) => new ClickHouseQuery(a, b);
+export class ClickHouseDbRunner {
+  adapter = 'clickhouse';
+  container = null;
 
-// let engine = 'MergeTree PARTITION BY id ORDER BY (id) SETTINGS index_granularity = 8192'
-const engine = 'Memory';
-let container;
-exports.gutterDataSet = async function (clickHouse) {
-  await clickHouse.querying(`
+  tearDown = async () => {
+    if (this.container) {
+      await this.container.stop();
+      this.container = null;
+    }
+  }
+
+  gutterDataSet = async function (clickHouse) {
+    // let engine = 'MergeTree PARTITION BY id ORDER BY (id) SETTINGS index_granularity = 8192'
+    const engine = 'Memory';
+
+    await clickHouse.querying(`
     CREATE TEMPORARY TABLE visitors (id UInt64, amount UInt64, created_at DateTime, updated_at DateTime, status UInt64, source Nullable(String), latitude Float64, longitude Float64)
     ENGINE = ${engine}
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-  await clickHouse.querying(`
+      await clickHouse.querying(`
     CREATE TEMPORARY TABLE visitor_checkins (id UInt64, visitor_id UInt64, created_at DateTime, source Nullable(String))
     ENGINE = ${engine}
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-  await clickHouse.querying(`
+      await clickHouse.querying(`
     CREATE TEMPORARY TABLE cards (id UInt64, visitor_id UInt64, visitor_checkin_id UInt64)
     ENGINE = ${engine}
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
 
-  await clickHouse.querying(`
-    INSERT INTO
-    visitors
-    (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
-    (1, 100, '2017-01-02 16:00:00', '2017-01-29 16:00:00', 1, 'some', 120.120, 40.60),
-    (2, 200, '2017-01-04 16:00:00', '2017-01-14 16:00:00', 1, 'some', 120.120, 58.60),
-    (3, 300, '2017-01-05 16:00:00', '2017-01-19 16:00:00', 2, 'google', 120.120, 70.60),
-    (4, 400, '2017-01-06 16:00:00', '2017-01-24 16:00:00', 2, null, 120.120, 10.60),
-    (5, 500, '2017-01-06 16:00:00', '2017-01-24 16:00:00', 2, null, 120.120, 58.10),
-    (6, 500, '2016-09-06 16:00:00', '2016-09-06 16:00:00', 2, null, 120.120, 58.10)
-  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-  await clickHouse.querying(`
+      await clickHouse.querying(`
+      INSERT INTO
+      visitors
+      (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
+      (1, 100, '2017-01-02 16:00:00', '2017-01-29 16:00:00', 1, 'some', 120.120, 40.60),
+      (2, 200, '2017-01-04 16:00:00', '2017-01-14 16:00:00', 1, 'some', 120.120, 58.60),
+      (3, 300, '2017-01-05 16:00:00', '2017-01-19 16:00:00', 2, 'google', 120.120, 70.60),
+      (4, 400, '2017-01-06 16:00:00', '2017-01-24 16:00:00', 2, null, 120.120, 10.60),
+      (5, 500, '2017-01-06 16:00:00', '2017-01-24 16:00:00', 2, null, 120.120, 58.10),
+      (6, 500, '2016-09-06 16:00:00', '2016-09-06 16:00:00', 2, null, 120.120, 58.10)
+    `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
+      await clickHouse.querying(`
     INSERT INTO
     visitor_checkins
     (id, visitor_id, created_at, source) VALUES
@@ -49,7 +56,7 @@ exports.gutterDataSet = async function (clickHouse) {
     (5, 2, '2017-01-04 16:00:00', null),
     (6, 3, '2017-01-05 16:00:00', null)
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-  await clickHouse.querying(`
+      await clickHouse.querying(`
     INSERT INTO
     cards
     (id, visitor_id, visitor_checkin_id) VALUES
@@ -57,44 +64,42 @@ exports.gutterDataSet = async function (clickHouse) {
     (2, 1, 2),
     (3, 3, 6)
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } });
-};
+  };
 
-exports.testQuery = (queryAndParams, prepareDataSet) => exports.testQueries([queryAndParams], prepareDataSet)
-  .then(res => res[0]);
+  testQueries = async (queries, prepareDataSet) => {
+    if (!this.container && !process.env.TEST_CLICKHOUSE_HOST) {
+      this.container = await new GenericContainer('yandex/clickhouse-server')
+        .withExposedPorts(8123)
+        .start();
+    }
 
-exports.testQueries = async (queries, prepareDataSet) => {
-  if (!container && !process.env.TEST_CLICKHOUSE_HOST) {
-    container = await new GenericContainer('yandex/clickhouse-server')
-      .withExposedPorts(8123)
-      .start();
-  }
+    const clickHouse = new ClickHouse({
+      host: 'localhost',
+      port: process.env.TEST_CLICKHOUSE_HOST ? 8123 : this.container.getMappedPort(8123),
+    });
 
-  const clickHouse = new ClickHouse({
-    host: 'localhost',
-    port: process.env.TEST_CLICKHOUSE_HOST ? 8123 : container.getMappedPort(8123),
-  });
+    clickHouse.sessionId = uuidv4(); // needed for tests to use temporary tables
 
-  clickHouse.sessionId = uuidv4(); // needed for tests to use temporary tables
+    prepareDataSet = prepareDataSet || this.gutterDataSet;
+    await prepareDataSet(clickHouse);
 
+    const requests = [];
 
-  prepareDataSet = prepareDataSet || exports.gutterDataSet;
-  await prepareDataSet(clickHouse);
-  const results = [];
-  for ([query, params] of queries) {
-    results.push(_normaliseResponse((await clickHouse.querying(sqlstring.format(query, params), {
-      dataObjects: true,
-      queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' }
-    }))));
-  }
-  return results;
-};
+    for (const [query, params] of queries) {
+      requests.push(clickHouse.querying(formatSql(query, params), {
+        dataObjects: true,
+        queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' }
+      }));
+    }
 
-exports.tearDown = async () => {
-  if (container) {
-    await container.stop();
-    container = null;
-  }
-};
+    const results = await Promise.all(requests);
+
+    return results.map(_normaliseResponse);
+  };
+
+  testQuery = async (queryAndParams, prepareDataSet) => this.testQueries([queryAndParams], prepareDataSet)
+    .then(res => res[0]);
+}
 
 //
 //
@@ -125,5 +130,3 @@ function _normaliseResponse(res) {
   }
   return res.data;
 }
-
-exports.adapter = 'clickhouse';

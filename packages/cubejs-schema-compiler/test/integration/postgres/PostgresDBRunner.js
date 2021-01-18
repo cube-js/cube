@@ -1,10 +1,10 @@
 const pgp = require('pg-promise')();
-const { GenericContainer, Wait } = require('testcontainers');
-const BaseDbRunner = require('./BaseDbRunner');
+const { GenericContainer } = require('testcontainers');
+const { BaseDbRunner } = require('./BaseDbRunner');
 
 process.env.TZ = 'GMT';
 
-class PostgresDBRunner extends BaseDbRunner {
+export class PostgresDBRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
     const db = pgp({
       host: 'localhost',
@@ -84,5 +84,3 @@ class PostgresDBRunner extends BaseDbRunner {
     return 5432;
   }
 }
-
-module.exports = new PostgresDBRunner();

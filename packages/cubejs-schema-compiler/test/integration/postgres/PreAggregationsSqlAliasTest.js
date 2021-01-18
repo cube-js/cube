@@ -1,17 +1,17 @@
 /* eslint-disable quote-props */
 /* globals it, describe, after */
-const R = require('ramda');
+import R from 'ramda';
+import { UserError } from '../../../src/compiler/UserError';
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { PostgresDBRunner } from './PostgresDBRunner';
+
 const should = require('should');
-const UserError = require('../../../compiler/UserError');
-
-const PostgresQuery = require('../../../adapter/PostgresQuery');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
-
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./DbRunner');
 
 describe('PreAggregations', function test() {
   this.timeout(200000);
+
+  const dbRunner = new PostgresDBRunner();
 
   after(async () => {
     await dbRunner.tearDown();
@@ -296,7 +296,7 @@ describe('PreAggregations', function test() {
 
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
     should(preAggregationsDescription[0].tableName).be.equal('rvis_rollupalias20170101');
-  
+
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
@@ -310,7 +310,7 @@ describe('PreAggregations', function test() {
       );
     });
   }));
-  
+
   it('simple pre-aggregation with sqlAlias', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
@@ -330,7 +330,7 @@ describe('PreAggregations', function test() {
 
     const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
     should(preAggregationsDescription[0].tableName).be.equal('vis_visitors_alias_d20170101');
-  
+
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
@@ -356,7 +356,7 @@ describe('PreAggregations', function test() {
       );
     });
   }));
-  
+
   it('immutable partition default refreshKey', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [

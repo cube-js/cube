@@ -1,15 +1,16 @@
 /* globals describe,it,after */
 /* eslint-disable quote-props */
-const R = require('ramda');
+import R from 'ramda';
+import { MysqlQuery } from '../../../src/adapter/MysqlQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { MySqlDbRunner } from './MySqlDbRunner';
+
 require('should');
-
-const MySqlQuery = require('../../../adapter/MysqlQuery');
-const { prepareCompiler } = require('../../unit/PrepareCompiler');
-
-const dbRunner = require('./MySqlDbRunner');
 
 describe('MySqlPreAggregations', function test() {
   this.timeout(300000);
+
+  const dbRunner = new MySqlDbRunner();
 
   after(async () => {
     await dbRunner.tearDown();
@@ -107,7 +108,7 @@ describe('MySqlPreAggregations', function test() {
   }
 
   it('in db timezone', () => compiler.compile().then(() => {
-    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
       ],
@@ -152,7 +153,7 @@ describe('MySqlPreAggregations', function test() {
   }));
 
   it('partitioned', () => compiler.compile().then(() => {
-    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
       ],
@@ -212,7 +213,7 @@ describe('MySqlPreAggregations', function test() {
   }));
 
   it('partitioned scheduled refresh', () => compiler.compile().then(async () => {
-    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
       ],
@@ -247,7 +248,7 @@ describe('MySqlPreAggregations', function test() {
   }));
 
   it('segment', () => compiler.compile().then(() => {
-    const query = new MySqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
       ],

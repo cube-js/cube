@@ -8,6 +8,9 @@
       "path": "packages/cubejs-api-gateway"
     },
     {
+      "path": "packages/cubejs-schema-compiler"
+    },
+    {
       "path": "packages/cubejs-query-orchestrator"
     },
     {
