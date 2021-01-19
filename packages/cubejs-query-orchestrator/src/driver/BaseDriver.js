@@ -17,6 +17,9 @@ const sortByKeys = (unordered) => {
 const DbTypeToGenericType = {
   'timestamp without time zone': 'timestamp',
   integer: 'int',
+  int8: 'int',
+  int4: 'int',
+  int2: 'int',
   'character varying': 'text',
   varchar: 'text',
   nvarchar: 'text',
