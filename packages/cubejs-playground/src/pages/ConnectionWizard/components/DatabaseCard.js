@@ -11,7 +11,7 @@ export default function DatabaseCard({ db }) {
     <Card>
       <Row align="middle" justify="space-between">
         <Col flex="40px">
-          <Image src={db.logo} />
+          <Image src={db.logo} preview={false} />
         </Col>
 
         <Col>
