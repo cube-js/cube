@@ -289,7 +289,9 @@ export class DevServer {
       try {
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
+        this.cubejsServer.event('test_database_connection_success');
       } catch (error) {
+        this.cubejsServer.event('test_database_connection_error');
         return res.status(400).json({
           error: error.toString()
         });

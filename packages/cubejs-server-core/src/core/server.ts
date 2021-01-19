@@ -133,7 +133,7 @@ export class CubejsServerCore {
 
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
-    const devServer = process.env.NODE_ENV !== 'production';
+    const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
 
     const options: ServerCoreInitializedOptions = {
       dbType,
@@ -287,6 +287,10 @@ export class CubejsServerCore {
     };
 
     this.initAgent();
+        
+    if (this.options.devServer && !this.configFileExists()) {
+      this.event('first_server_start');
+    }
 
     if (this.options.devServer) {
       this.devServer = new DevServer(this);

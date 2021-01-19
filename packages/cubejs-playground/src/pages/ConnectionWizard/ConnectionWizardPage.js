@@ -123,7 +123,7 @@ export default function ConnectionWizardPage({ history }) {
                     setTestConnectionResult({
                       success: true,
                     });
-                    history.push('/build');
+                    history.push('/schema');
                   } catch (error) {
                     setTestConnectionResult({
                       success: false,
