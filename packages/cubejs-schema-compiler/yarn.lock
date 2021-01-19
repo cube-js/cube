@@ -1559,10 +1559,15 @@ ansi-styles@^4.0.0, ansi-styles@^4.1.0:
   dependencies:
     color-convert "^2.0.1"
 
-antlr4@4.8.0:
-  version "4.8.0"
-  resolved "https://registry.yarnpkg.com/antlr4/-/antlr4-4.8.0.tgz#f938ec171be7fc2855cd3a533e87647185b32b6a"
-  integrity sha512-en/MxQ4OkPgGJQ3wD/muzj1uDnFSzdFIhc2+c6bHZokWkuBb6RRvFjpWhPxWLbgQvaEzldJZ0GSQpfSAaE3hqg==
+antlr4ts-cli@^0.5.0-alpha.4:
+  version "0.5.0-alpha.4"
+  resolved "https://registry.yarnpkg.com/antlr4ts-cli/-/antlr4ts-cli-0.5.0-alpha.4.tgz#f3bfc37f10131e78d7b981c397a2aaa0450b67f6"
+  integrity sha512-lVPVBTA2CVHRYILSKilL6Jd4hAumhSZZWA7UbQNQrmaSSj7dPmmYaN4bOmZG79cOy0lS00i4LY68JZZjZMWVrw==
+
+antlr4ts@^0.5.0-alpha.4:
+  version "0.5.0-alpha.4"
+  resolved "https://registry.yarnpkg.com/antlr4ts/-/antlr4ts-0.5.0-alpha.4.tgz#71702865a87478ed0b40c0709f422cf14d51652a"
+  integrity sha512-WPQDt1B74OfPv/IMS2ekXAKkTZIHl88uMetg6q3OTqgFxZ/dxDXI0EWLyZid/1Pe6hTftyg5N7gel5wNAGxXyQ==
 
 any-promise@^1.1.0:
   version "1.3.0"
