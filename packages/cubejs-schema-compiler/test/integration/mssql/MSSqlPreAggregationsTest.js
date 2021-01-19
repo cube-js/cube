@@ -1,15 +1,16 @@
 /* globals describe,it,after */
 /* eslint-disable quote-props */
-const R = require('ramda');
+import R from 'ramda';
+import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { MSSqlDbRunner } from './MSSqlDbRunner';
+
 require('should');
-
-const MSSqlQuery = require('../../../adapter/MssqlQuery');
-const { prepareCompiler } = require('../../unit/PrepareCompiler');
-
-const dbRunner = require('./MSSqlDbRunner');
 
 describe('MSSqlPreAggregations', function test() {
   this.timeout(200000);
+
+  const dbRunner = new MSSqlDbRunner();
 
   after(async () => {
     await dbRunner.tearDown();
@@ -192,7 +193,7 @@ describe('MSSqlPreAggregations', function test() {
   }
 
   it('simple pre-aggregation', () => compiler.compile().then(() => {
-    const query = new MSSqlQuery(
+    const query = new MssqlQuery(
       { joinGraph, cubeEvaluator, compiler },
       {
         measures: ['visitors.count'],
@@ -247,7 +248,7 @@ describe('MSSqlPreAggregations', function test() {
   }));
 
   it('leaf measure pre-aggregation', () => compiler.compile().then(() => {
-    const query = new MSSqlQuery(
+    const query = new MssqlQuery(
       { joinGraph, cubeEvaluator, compiler },
       {
         measures: ['visitors.ratio'],
@@ -303,7 +304,7 @@ describe('MSSqlPreAggregations', function test() {
   }));
 
   it('segment', () => compiler.compile().then(() => {
-    const query = new MSSqlQuery(
+    const query = new MssqlQuery(
       { joinGraph, cubeEvaluator, compiler },
       {
         measures: ['visitors.checkinsTotal'],

@@ -1,5 +1,8 @@
-import { useContext } from 'react';
-import { AppContext } from '../App';
+import { useContext, createContext } from 'react';
+
+export const AppContext = createContext({
+  slowQuery: false,
+});
 
 export default function useSlowQuery() {
   const { slowQuery } = useContext(AppContext);

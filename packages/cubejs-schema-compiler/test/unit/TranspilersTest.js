@@ -1,9 +1,8 @@
 /* globals it,describe */
 /* eslint-disable quote-props */
-const PrepareCompiler = require('./PrepareCompiler');
-require('should');
+import { prepareCompiler } from './PrepareCompiler';
 
-const { prepareCompiler } = PrepareCompiler;
+require('should');
 
 describe('Transpilers', () => {
   it('CubeCheckDuplicatePropTranspiler', async () => {

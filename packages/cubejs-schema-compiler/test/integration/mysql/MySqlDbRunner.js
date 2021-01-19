@@ -1,10 +1,10 @@
-const { GenericContainer } = require('testcontainers');
-const mysql = require('mysql');
-const { promisify } = require('util');
+import { promisify } from 'util';
+import { GenericContainer } from 'testcontainers';
+import mysql from 'mysql';
 
-const BaseDbRunner = require('../postgres/BaseDbRunner');
+import { BaseDbRunner } from '../postgres/BaseDbRunner';
 
-class MSSqlDbRunner extends BaseDbRunner {
+export class MySqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
     return {
       testQueries: async (queries, fixture) => {
@@ -86,5 +86,3 @@ class MSSqlDbRunner extends BaseDbRunner {
     return 3306;
   }
 }
-
-module.exports = new MSSqlDbRunner();

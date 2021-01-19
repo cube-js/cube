@@ -1,14 +1,14 @@
 /* eslint-disable quote-props */
 /* globals it, describe, after */
-const R = require('ramda');
+import R from 'ramda';
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
+import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { PostgresDBRunner } from './PostgresDBRunner';
 
-const PostgresQuery = require('../../../adapter/PostgresQuery');
-const BigqueryQuery = require('../../../adapter/BigqueryQuery');
-const PrepareCompiler = require('../../unit/PrepareCompiler');
 require('should');
 
-const { prepareCompiler } = PrepareCompiler;
-const dbRunner = require('./PostgresDBRunner');
+const dbRunner = new PostgresDBRunner();
 
 describe('PreAggregations', function test() {
   this.timeout(200000);

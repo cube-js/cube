@@ -1,7 +1,8 @@
 /* eslint-disable quote-props */
 /* globals it,describe */
-const ScaffoldingSchema = require('../../scaffolding/ScaffoldingSchema');
-const ScaffoldingTemplate = require('../../scaffolding/ScaffoldingTemplate');
+import { ScaffoldingSchema } from '../../src/scaffolding/ScaffoldingSchema';
+import { ScaffoldingTemplate } from '../../src/scaffolding/ScaffoldingTemplate';
+
 require('should');
 
 const driver = {
@@ -76,7 +77,7 @@ describe('ScaffoldingSchema', () => {
           'attributes': []
         }],
       }
-    }, driver);
+    });
     const schemaForTables = schema.generateForTables(['public.orders', 'public.customers', 'public.accounts']);
     schemaForTables.should.be.deepEqual([
       {

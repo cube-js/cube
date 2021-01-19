@@ -1,40 +1,8 @@
-class BaseSegment {
-  constructor(query, segment) {
-    this.query = query;
-    this.segment = segment;
-  }
+const { BaseSegment } = require('../dist/src/adapter/BaseSegment');
 
-  filterToWhere() {
-    return this.query.segmentSql(this);
-  }
-
-  filterParams() {
-    return [];
-  }
-
-  segmentDefinition() {
-    return this.query.cubeEvaluator.segmentByPath(this.segment);
-  }
-
-  definition() {
-    return this.segmentDefinition();
-  }
-
-  getMembers() {
-    return [this];
-  }
-  
-  cube() {
-    return this.query.cubeEvaluator.cubeFromPath(this.segment);
-  }
-
-  sqlDefinition() {
-    return this.segmentDefinition().sql;
-  }
-
-  path() {
-    return this.query.cubeEvaluator.parsePath('segments', this.segment);
-  }
-}
+process.emitWarning(
+  'Using absolute import with @cubejs-backend/schema-compiler is deprecated',
+  'DeprecationWarning'
+);
 
 module.exports = BaseSegment;

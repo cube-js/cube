@@ -385,9 +385,7 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Float(
-                                            value.to_string()
-                                        ));
+                                        vec_result[i].push(TableValue::Float(value.to_string()));
                                         cur_value_index += 1;
                                     } else {
                                         vec_result[i].push(TableValue::Null);
@@ -693,9 +691,7 @@ impl RowParquetWriter {
                                     [column_index]
                                 {
                                     TableValue::Float(val) => match column.get_column_type() {
-                                        ColumnType::Float => {
-                                            Ok(val.parse::<f64>()?)
-                                        }
+                                        ColumnType::Float => Ok(val.parse::<f64>()?),
                                         x => panic!("Unexpected type: {:?}", x),
                                     },
                                     x => panic!("Unsupported value: {:?}", x),

@@ -49,15 +49,19 @@ fn main() {
 
         track_event("Cube Store Start".to_string(), HashMap::new()).await;
 
-        MySqlServer::listen(
-            format!(
-                "{}:{}",
-                config.config_obj().bind_address(),
-                config.config_obj().bind_port()
-            ),
-            services.sql_service.clone(),
-        )
-        .await
-        .unwrap();
+        if !services.cluster.is_select_worker() {
+            MySqlServer::listen(
+                format!(
+                    "{}:{}",
+                    config.config_obj().bind_address(),
+                    config.config_obj().bind_port()
+                ),
+                services.sql_service.clone(),
+            )
+            .await
+            .unwrap();
+        } else {
+            services.cluster.wait_for_worker_to_close().await;
+        }
     });
 }

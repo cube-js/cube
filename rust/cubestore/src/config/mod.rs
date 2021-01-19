@@ -39,10 +39,15 @@ pub struct WorkerServices {
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
         self.cluster.start_processing_loops().await;
-        let meta_store = self.meta_store.clone();
-        tokio::spawn(async move { meta_store.run_upload_loop().await });
-        let scheduler = self.scheduler.clone();
-        tokio::spawn(async move { scheduler.run_scheduler().await });
+        if !self.cluster.is_select_worker() {
+            let meta_store = self.meta_store.clone();
+            tokio::spawn(async move { meta_store.run_upload_loop().await });
+            let scheduler = self.scheduler.clone();
+            tokio::spawn(async move { scheduler.run_scheduler().await });
+        } else {
+            let cluster = self.cluster.clone();
+            tokio::spawn(async move { ClusterImpl::listen_on_worker_port(cluster).await });
+        }
         start_track_event_loop().await;
         Ok(())
     }
@@ -59,8 +64,14 @@ impl CubeServices {
 #[derive(Debug, Clone)]
 pub enum FileStoreProvider {
     Local,
-    Filesystem { remote_dir: PathBuf },
-    S3 { region: String, bucket_name: String },
+    Filesystem {
+        remote_dir: PathBuf,
+    },
+    S3 {
+        region: String,
+        bucket_name: String,
+        sub_path: Option<String>,
+    },
 }
 
 pub struct Config {
@@ -84,6 +95,10 @@ pub trait ConfigObj: Send + Sync {
     fn query_timeout(&self) -> u64;
 
     fn not_used_timeout(&self) -> u64;
+
+    fn select_workers(&self) -> &Vec<String>;
+
+    fn worker_bind_address(&self) -> &Option<String>;
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +112,8 @@ pub struct ConfigObjImpl {
     pub bind_port: u16,
     pub bind_address: String,
     pub query_timeout: u64,
+    pub select_workers: Vec<String>,
+    pub worker_bind_address: Option<String>,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -131,6 +148,14 @@ impl ConfigObj for ConfigObjImpl {
     fn not_used_timeout(&self) -> u64 {
         self.query_timeout * 2
     }
+
+    fn select_workers(&self) -> &Vec<String> {
+        &self.select_workers
+    }
+
+    fn worker_bind_address(&self) -> &Option<String> {
+        &self.worker_bind_address
+    }
 }
 
 lazy_static! {
@@ -159,6 +184,7 @@ impl Config {
                         FileStoreProvider::S3 {
                             bucket_name,
                             region: env::var("CUBESTORE_S3_REGION").unwrap(),
+                            sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
                         }
                     } else if let Ok(remote_dir) = env::var("CUBESTORE_REMOTE_DIR") {
                         FileStoreProvider::Filesystem {
@@ -185,6 +211,13 @@ impl Config {
                     .ok()
                     .map(|v| v.parse::<u64>().unwrap())
                     .unwrap_or(120),
+                select_workers: env::var("CUBESTORE_WORKERS")
+                    .ok()
+                    .map(|v| v.split(",").map(|s| s.to_string()).collect())
+                    .unwrap_or(Vec::new()),
+                worker_bind_address: env::var("CUBESTORE_WORKER_PORT")
+                    .ok()
+                    .map(|v| format!("0.0.0.0:{}", v)),
             }),
         }
     }
@@ -206,7 +239,9 @@ impl Config {
                 select_worker_pool_size: 0,
                 bind_port: 3306,
                 bind_address: "0.0.0.0".to_string(),
-                query_timeout: 60,
+                query_timeout: 15,
+                select_workers: Vec::new(),
+                worker_bind_address: None,
             }),
         }
     }
@@ -226,6 +261,25 @@ impl Config {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
+        self.start_test_with_options(true, test_fn).await
+    }
+
+    pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        self.start_test_with_options(false, test_fn).await
+    }
+
+    pub async fn start_test_with_options<T>(
+        &self,
+        clean_remote: bool,
+        test_fn: impl FnOnce(CubeServices) -> T,
+    ) where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
             if !*initialized {
@@ -241,7 +295,9 @@ impl Config {
         let store_path = self.local_dir().clone();
         let remote_store_path = self.remote_dir().clone();
         let _ = fs::remove_dir_all(store_path.clone());
-        let _ = fs::remove_dir_all(remote_store_path.clone());
+        if clean_remote {
+            let _ = fs::remove_dir_all(remote_store_path.clone());
+        }
         {
             let services = self.configure().await;
             services.start_processing_loops().await.unwrap();
@@ -252,7 +308,9 @@ impl Config {
         }
         let _ = DB::destroy(&Options::default(), self.meta_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
-        let _ = fs::remove_dir_all(remote_store_path.clone());
+        if clean_remote {
+            let _ = fs::remove_dir_all(remote_store_path.clone());
+        }
     }
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
@@ -290,10 +348,12 @@ impl Config {
             FileStoreProvider::S3 {
                 region,
                 bucket_name,
+                sub_path,
             } => S3RemoteFs::new(
                 self.config_obj.data_dir.clone(),
                 region.to_string(),
                 bucket_name.to_string(),
+                sub_path.clone(),
             )?,
             FileStoreProvider::Local => unimplemented!(), // TODO
         })

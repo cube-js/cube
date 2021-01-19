@@ -15,15 +15,22 @@ use tokio::sync::RwLock;
 pub struct S3RemoteFs {
     dir: RwLock<PathBuf>,
     bucket: Bucket,
+    sub_path: Option<String>,
 }
 
 impl S3RemoteFs {
-    pub fn new(dir: PathBuf, region: String, bucket_name: String) -> Result<Arc<Self>, CubeError> {
+    pub fn new(
+        dir: PathBuf,
+        region: String,
+        bucket_name: String,
+        sub_path: Option<String>,
+    ) -> Result<Arc<Self>, CubeError> {
         let credentials = Credentials::default()?;
         let bucket = Bucket::new(&bucket_name, region.parse()?, credentials)?;
         Ok(Arc::new(Self {
             dir: RwLock::new(dir),
             bucket,
+            sub_path,
         }))
     }
 }
@@ -36,7 +43,7 @@ impl RemoteFs for S3RemoteFs {
             .bucket
             .put_object_stream(
                 self.dir.read().await.as_path().join(remote_path),
-                format!("/{}", remote_path),
+                self.s3_path(remote_path),
             )
             .await?;
         if status_code != 200 {
@@ -57,7 +64,7 @@ impl RemoteFs for S3RemoteFs {
             let mut output_file = std::fs::File::create(path.as_str())?;
             let status_code = self
                 .bucket
-                .get_object_stream(S3RemoteFs::s3_path(remote_path), &mut output_file)
+                .get_object_stream(self.s3_path(remote_path), &mut output_file)
                 .await?;
             if status_code != 200 {
                 return Err(CubeError::user(format!(
@@ -71,10 +78,7 @@ impl RemoteFs for S3RemoteFs {
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
         debug!("Deleting {}", remote_path);
-        let (_, status_code) = self
-            .bucket
-            .delete_object(S3RemoteFs::s3_path(remote_path))
-            .await?;
+        let (_, status_code) = self.bucket.delete_object(self.s3_path(remote_path)).await?;
         if status_code != 204 {
             return Err(CubeError::user(format!(
                 "S3 delete returned non OK status: {}",
@@ -103,7 +107,7 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        let list = self.bucket.list(remote_prefix.to_string(), None).await?;
+        let list = self.bucket.list(self.s3_path(remote_prefix), None).await?;
         let leading_slash = Regex::new(r"^/").unwrap();
         let result = list
             .iter()
@@ -134,7 +138,14 @@ impl RemoteFs for S3RemoteFs {
 }
 
 impl S3RemoteFs {
-    fn s3_path(remote_path: &str) -> String {
-        format!("/{}", remote_path)
+    fn s3_path(&self, remote_path: &str) -> String {
+        format!(
+            "{}/{}",
+            self.sub_path
+                .as_ref()
+                .map(|p| format!("/{}", p))
+                .unwrap_or_else(|| "".to_string()),
+            remote_path
+        )
     }
 }

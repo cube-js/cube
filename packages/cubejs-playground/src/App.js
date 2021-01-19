@@ -1,5 +1,5 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import React, { Component, createContext } from 'react';
+import React, { Component } from 'react';
 import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
 import './index.less';
@@ -10,6 +10,7 @@ import { withRouter } from 'react-router';
 import Header from './components/Header';
 import { event, setAnonymousId } from './events';
 import GlobalStyles from './components/GlobalStyles';
+import { AppContext } from './hooks/slow-query';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
@@ -18,10 +19,6 @@ const selectedTab = (pathname) => {
     return [pathname];
   }
 };
-
-export const AppContext = createContext({
-  slowQuery: false,
-});
 
 class App extends Component {
   static getDerivedStateFromError(error) {

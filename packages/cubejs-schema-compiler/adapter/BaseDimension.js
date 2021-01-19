@@ -1,66 +1,8 @@
-class BaseDimension {
-  constructor(query, dimension) {
-    this.query = query;
-    this.dimension = dimension;
-  }
+const { BaseDimension } = require('../dist/src/adapter/BaseDimension');
 
-  selectColumns() {
-    return [`${this.dimensionSql()} ${this.aliasName()}`];
-  }
-
-  cumulativeSelectColumns() {
-    return [`${this.aliasName()}`];
-  }
-
-  dimensionSql() {
-    if (this.query.cubeEvaluator.isSegment(this.dimension)) {
-      return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
-    }
-    return this.query.dimensionSql(this);
-  }
-
-  sqlDefinition() {
-    return this.dimensionDefinition().sql;
-  }
-
-  getMembers() {
-    return [this];
-  }
-
-  cube() {
-    return this.query.cubeEvaluator.cubeFromPath(this.dimension);
-  }
-
-  dimensionDefinition() {
-    if (this.query.cubeEvaluator.isSegment(this.dimension)) {
-      return this.query.cubeEvaluator.segmentByPath(this.dimension);
-    }
-    return this.query.cubeEvaluator.dimensionByPath(this.dimension);
-  }
-
-  definition() {
-    return this.dimensionDefinition();
-  }
-
-  aliasName() {
-    // Require should be here because of cycle depend
-    return this.query.escapeColumnName(this.unescapedAliasName());
-  }
-
-  unescapedAliasName() {
-    return this.query.aliasName(this.dimension);
-  }
-
-  dateFieldType() {
-    return this.dimensionDefinition().fieldType;
-  }
-
-  path() {
-    if (this.query.cubeEvaluator.isSegment(this.dimension)) {
-      return this.query.cubeEvaluator.parsePath('segments', this.dimension);
-    }
-    return this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
-  }
-}
+process.emitWarning(
+  'Using absolute import with @cubejs-backend/schema-compiler is deprecated',
+  'DeprecationWarning'
+);
 
 module.exports = BaseDimension;
