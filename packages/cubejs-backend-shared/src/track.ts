@@ -70,6 +70,10 @@ export function getAnonymousId() {
 }
 
 export async function track(opts: BaseEvent) {
+  if (process.env.CI) {
+    return Promise.resolve();
+  }
+  
   trackEvents.push({
     ...opts,
     id: crypto.randomBytes(16).toString('hex'),
