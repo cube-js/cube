@@ -1,4 +1,4 @@
-const SqlParser = require('../../src/parser/SqlParser');
+const { SqlParser } = require('../../src/parser/SqlParser');
 
 describe('SqlParser', () => {
   it('basic where', () => {
