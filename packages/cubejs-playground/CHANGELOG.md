@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.21](https://github.com/cube-js/cube.js/compare/v0.25.20...v0.25.21) (2021-01-19)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** avoid styles override ([4bdae02](https://github.com/cube-js/cube.js/commit/4bdae024d3d866acebb054e01106ed621a51a445))
+
+
+
+
+
 ## [0.25.18](https://github.com/cube-js/cube.js/compare/v0.25.17...v0.25.18) (2021-01-14)
 
 
