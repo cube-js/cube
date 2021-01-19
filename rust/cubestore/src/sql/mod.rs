@@ -27,6 +27,7 @@ use crate::sql::parser::CubeStoreParser;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use hex::FromHex;
+use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 
 #[async_trait]
@@ -507,10 +508,37 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<DataFrame, 
     ))
 }
 
+fn decode_byte(s: &str) -> Option<u8> {
+    let v = s.as_bytes();
+    if v.len() != 2 {
+        return None;
+    }
+    let decode_char = |c| match c {
+        b'a'..=b'f' => Some(10 + c - b'a'),
+        b'A'..=b'F' => Some(10 + c - b'A'),
+        b'0'..=b'9' => Some(c - b'0'),
+        _ => None,
+    };
+    let v0 = decode_char(v[0])?;
+    let v1 = decode_char(v[1])?;
+    return Some(v0 * 16 + v1);
+}
+
 fn parse_binary_string(v: &Value) -> Result<Vec<u8>, CubeError> {
     match v {
-        // TODO: unescape the string
-        Value::SingleQuotedString(s) | Value::Number(s) => Ok(s.as_bytes().to_vec()),
+        Value::Number(s) => Ok(s.as_bytes().to_vec()),
+        // We interpret strings of the form '0f 0a 14 ff' as a list of hex-encoded bytes.
+        // MySQL will store bytes of the string itself instead and we should do the same.
+        // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
+        Value::SingleQuotedString(s) => s
+            .split(' ')
+            .filter(|b| !b.is_empty())
+            .map(|s| {
+                decode_byte(s).ok_or_else(|| {
+                    CubeError::user(format!("cannot convert value to binary string: {}", v))
+                })
+            })
+            .try_collect(),
         Value::HexStringLiteral(s) => Ok(Vec::from_hex(s.as_bytes())?),
         _ => Err(CubeError::user(format!(
             "cannot convert value to binary string: {}",
@@ -1875,7 +1903,7 @@ mod tests {
                 .unwrap();
             let _ = service
                 .exec_query(
-                    "INSERT INTO s.Bytes(id, data) VALUES (1, '123'), (2, X'deADbeef'), (3, 456)",
+                    "INSERT INTO s.Bytes(id, data) VALUES (1, '01 ff 1a'), (2, X'deADbeef'), (3, 456)",
                 )
                 .await
                 .unwrap();
@@ -1885,7 +1913,7 @@ mod tests {
             assert_eq!(r.len(), 3);
             assert_eq!(
                 r[0].values()[1],
-                TableValue::Bytes("123".as_bytes().to_vec())
+                TableValue::Bytes(vec![0x01, 0xff, 0x1a])
             );
             assert_eq!(
                 r[1].values()[1],
