@@ -136,7 +136,7 @@ asyncModule(async () => {
 });
 ```
 
-## Usage with `schemaVersion`
+## Usage with schemaVersion
 
 It is also useful to be able to recompile the schema when there are changes in
 the underlying input data. For this purpose, the [`schemaVersion`
@@ -158,7 +158,7 @@ module.exports = {
 
 [link-config-schema-version]: /config#options-reference-schema-version
 
-## Usage with `COMPILE_CONTEXT`
+## Usage with COMPILE_CONTEXT
 
 The `COMPILE_CONTEXT` global object can also be used in conjunction with async
 schema creation to allow for multi-tenant deployments of Cube.js.
@@ -207,7 +207,7 @@ asyncModule(async () => {
 });
 ```
 
-## Usage with `dataSource`
+## Usage with dataSource
 
 When using multiple databases, you'll need to ensure you set the
 [`dataSource`][ref-schema-datasource] property for any asynchronously-created
