@@ -1,14 +1,14 @@
 import Redis, { RedisOptions } from 'ioredis';
 
 export async function createRedisClient(url: string): Promise<Redis.Redis> {
-  let options: RedisOptions = {};
+  const options: RedisOptions = {};
 
   const [host, portStr] = (process.env.REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
   const port = portStr ? Number(portStr) : 6379;
 
   if (process.env.REDIS_SENTINEL) {
     options.sentinels = [{ host, port }];
-    options.name = "mymaster"
+    options.name = 'mymaster';
   } else {
     options.host = host;
     options.port = port;

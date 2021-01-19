@@ -1,6 +1,6 @@
+import Redis from 'ioredis';
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
 import { createRedisClient } from './RedisFactory';
-import Redis from 'ioredis';
 
 export type CreateRedisClientFn = () => PromiseLike<Redis.Redis>;
 export interface RedisPoolOptions {

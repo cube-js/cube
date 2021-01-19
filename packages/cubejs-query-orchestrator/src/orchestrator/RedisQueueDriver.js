@@ -49,7 +49,8 @@ export class RedisQueueDriverConnection {
         })
       ])
       .zcard(this.toProcessRedisKey())
-      .exec().then((arr) => arr.map((skipFirst) => skipFirst[1]));
+      .exec()
+      .then((arr) => arr.map((skipFirst) => skipFirst[1]));
   }
 
   getToProcessQueries() {
@@ -70,7 +71,8 @@ export class RedisQueueDriverConnection {
       .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
       .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
       .del(this.queryProcessingLockKey(queryKey))
-      .exec().then((arr) => arr.map((skipFirst) => skipFirst[1]));
+      .exec()
+      .then((arr) => arr.map((skipFirst) => skipFirst[1]));
     return [JSON.parse(query), ...restResult];
   }
 
@@ -90,7 +92,8 @@ export class RedisQueueDriverConnection {
         .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
         .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
         .del(this.queryProcessingLockKey(queryKey))
-        .exec().then((arr) => arr.map((skipFirst) => skipFirst[1]));
+        .exec()
+        .then((arr) => arr.map((skipFirst) => skipFirst[1]));
     } finally {
       await this.redisClient.unwatch();
     }
@@ -115,7 +118,7 @@ export class RedisQueueDriverConnection {
     if (!onlyKeys) {
       request = request.hgetall(this.queriesDefKey());
     }
-    const [active, toProcess, allQueryDefs] = await request.exec().then((arr) => arr.map((skipFirst) => skipFirst[1]))
+    const [active, toProcess, allQueryDefs] = await request.exec().then((arr) => arr.map((skipFirst) => skipFirst[1]));
     return [active, toProcess, R.map(q => JSON.parse(q), allQueryDefs || {})];
   }
 
@@ -153,7 +156,8 @@ export class RedisQueueDriverConnection {
           .hget(([this.queriesDefKey(), this.redisHash(queryKey)]))
           .set(lockKey, processingId, 'NX')
           .zadd([this.heartBeatRedisKey(), 'NX', new Date().getTime(), this.redisHash(queryKey)])
-          .exec().then((arr) => arr.map((skipFirst) => skipFirst[1]));
+          .exec()
+          .then((arr) => arr.map((skipFirst) => skipFirst[1]));
       if (result) {
         result[4] = JSON.parse(result[4]);
       }
@@ -199,7 +203,8 @@ export class RedisQueueDriverConnection {
             .multi()
             .hget([this.queriesDefKey(), this.redisHash(queryKey)])
             .hset([this.queriesDefKey(), this.redisHash(queryKey), JSON.stringify({ ...query, ...toUpdate })])
-            .exec().then((arr) => arr.map((skipFirst) => skipFirst[1]));
+            .exec()
+            .then((arr) => arr.map((skipFirst) => skipFirst[1]));
           beforeUpdate = JSON.parse(beforeUpdate);
           if (JSON.stringify(query) === JSON.stringify(beforeUpdate)) {
             return true;
