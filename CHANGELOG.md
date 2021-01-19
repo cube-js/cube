@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.21](https://github.com/cube-js/cube.js/compare/v0.25.20...v0.25.21) (2021-01-19)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/api-gateway:** readiness fix ([#1791](https://github.com/cube-js/cube.js/issues/1791)) ([d5dad60](https://github.com/cube-js/cube.js/commit/d5dad60e1dda655d67d5d8df4f4d6ee4345dbe42))
+* **@cubejs-backend/query-orchestrator:** prevent generic pool infinite loop ([#1793](https://github.com/cube-js/cube.js/issues/1793)) ([d4129c4](https://github.com/cube-js/cube.js/commit/d4129c4d71b4afa66f62ae5d9666fcd9a08d9187))
+* **@cubejs-client/playground:** avoid styles override ([4bdae02](https://github.com/cube-js/cube.js/commit/4bdae024d3d866acebb054e01106ed621a51a445))
+
+
+### Features
+
+* **cubestore:** Cluster support ([4846080](https://github.com/cube-js/cube.js/commit/48460807c9228a0b4db9193e6b36b5895a5d57b8))
+* **cubestore:** S3 sub path support ([0cabd4c](https://github.com/cube-js/cube.js/commit/0cabd4c0820af8c4e4dbd338588bd49274e294c2))
+* **schema-compiler:** Initial support for TS ([5926067](https://github.com/cube-js/cube.js/commit/5926067bf5314c7cbddfe59f26dd0ae3b8b60293))
+
+
+
+
+
 ## [0.25.20](https://github.com/cube-js/cube.js/compare/v0.25.19...v0.25.20) (2021-01-15)
 
 
