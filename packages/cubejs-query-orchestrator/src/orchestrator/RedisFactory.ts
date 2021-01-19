@@ -22,5 +22,5 @@ export async function createRedisClient(url: string): Promise<Redis.Redis> {
     options.password = process.env.REDIS_PASSWORD;
   }
 
-  return Promise.resolve(new Redis(options));
+  return new Redis(options);
 }
