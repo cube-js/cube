@@ -14,7 +14,7 @@ import { BaseGroupFilter } from './BaseGroupFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
-import SqlParser from '../parser/SqlParser';
+import { SqlParser } from '../parser/SqlParser';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
