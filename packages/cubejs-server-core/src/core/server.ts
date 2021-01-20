@@ -316,26 +316,29 @@ export class CubejsServerCore {
         oldLogger(msg, params);
       });
       let causeErrorPromise;
-      process.on('uncaughtException', async (e) => {
-        console.error(e.stack || e);
-        if (e.message && e.message.indexOf('Redis connection to') !== -1) {
-          console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
-          if (process.platform.indexOf('win') === 0) {
-            console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
-          } else if (process.platform.indexOf('darwin') === 0) {
-            console.log('💾 To install Redis on Mac please use https://redis.io/topics/quickstart or `$ brew install redis`');
-          } else {
-            console.log('💾 To install Redis please use https://redis.io/topics/quickstart');
+      
+      if (!process.env.CI) {
+        process.on('uncaughtException', async (e) => {
+          console.error(e.stack || e);
+          if (e.message && e.message.indexOf('Redis connection to') !== -1) {
+            console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
+            if (process.platform.indexOf('win') === 0) {
+              console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
+            } else if (process.platform.indexOf('darwin') === 0) {
+              console.log('💾 To install Redis on Mac please use https://redis.io/topics/quickstart or `$ brew install redis`');
+            } else {
+              console.log('💾 To install Redis please use https://redis.io/topics/quickstart');
+            }
           }
-        }
-        if (!causeErrorPromise) {
-          causeErrorPromise = this.event('Dev Server Fatal Error', {
-            error: (e.stack || e.message || e).toString()
-          });
-        }
-        await causeErrorPromise;
-        process.exit(1);
-      });
+          if (!causeErrorPromise) {
+            causeErrorPromise = this.event('Dev Server Fatal Error', {
+              error: (e.stack || e.message || e).toString()
+            });
+          }
+          await causeErrorPromise;
+          process.exit(1);
+        });
+      }
     } else {
       const oldLogger = this.logger;
       let loadRequestCount = 0;

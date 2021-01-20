@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import fetch from 'node-fetch';
-import { machineIdSync } from 'node-machine-id';
+import ip from 'ip';
 import { internalExceptions } from './errors';
 
 export type BaseEvent = {
@@ -60,7 +60,7 @@ async function flush(toFlush?: Array<Event>, retries: number = 10): Promise<any>
 let anonymousId: string = 'unknown';
 
 try {
-  anonymousId = machineIdSync();
+  anonymousId = ip.address();
 } catch (e) {
   internalExceptions(e);
 }
