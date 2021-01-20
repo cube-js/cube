@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
 import { createRedisClient } from './RedisFactory';
 
