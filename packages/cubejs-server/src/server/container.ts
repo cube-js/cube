@@ -277,7 +277,7 @@ export class ServerContainer {
     const makeInstance = async () => {
       const configuration = await this.lookupConfiguration();
       return this.runServerInstance({
-        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : 15,
+        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : 2,
         ...configuration,
       });
     };
@@ -289,7 +289,7 @@ export class ServerContainer {
       // eslint-disable-next-line no-loop-func
       process.on(bindSignal, async (signal) => {
         process.exit(
-          await server.shutdown(signal)
+          await server.shutdown(signal, true)
         );
       });
     }
