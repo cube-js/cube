@@ -16,12 +16,16 @@ WORKDIR /usr/src
 WORKDIR /build/cubestore
 COPY Cargo.toml .
 COPY Cargo.lock .
+COPY cubehll/Cargo.toml cubehll/Cargo.toml
+RUN mkdir -p cubehll/src && \
+    echo "// dummy file" > cubehll/src/lib.rs
 COPY cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
 RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
 COPY cubestore cubestore
+COPY cubehll cubehll
 RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release
 
 FROM debian:buster-slim
