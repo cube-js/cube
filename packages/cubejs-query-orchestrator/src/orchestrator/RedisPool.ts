@@ -2,7 +2,7 @@ import { Redis } from 'ioredis';
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
 import { createRedisClient } from './RedisFactory';
 
-export type CreateRedisClientFn = () => PromiseLike<Redis.Redis>;
+export type CreateRedisClientFn = () => PromiseLike<Redis>;
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
