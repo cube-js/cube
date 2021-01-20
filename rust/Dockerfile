@@ -30,7 +30,7 @@ WORKDIR /cube
 
 RUN set -ex; \
 	apt-get update; \
-	apt-get install -y libssl1.1
+	apt-get install -y libssl1.1 curl
 
 COPY --from=builder /build/cubestore/target/release/cubestored .
 
