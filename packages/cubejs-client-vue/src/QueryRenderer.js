@@ -1,4 +1,8 @@
-import { toPairs, fromPairs } from 'ramda';
+import { toPairs, fromPairs, equals } from 'ramda';
+import { isQueryPresent } from '@cubejs-client/core';
+
+// todo: remove
+const d = (v) => JSON.parse(JSON.stringify(v));
 
 export default {
   props: {
@@ -74,14 +78,7 @@ export default {
       slot = $scopedSlots.error ? $scopedSlots.error({ error, sqlQuery }) : slot;
     }
 
-    return createElement(
-      'div',
-      {},
-      [
-        controls,
-        slot,
-      ],
-    );
+    return createElement('div', {}, [controls, slot]);
   },
   methods: {
     async load() {
@@ -97,7 +94,10 @@ export default {
             this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
             this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
           } else {
-            this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
+            this.resultSet = await this.cubejsApi.load(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'query',
+            });
           }
         }
 
@@ -114,10 +114,16 @@ export default {
         this.error = undefined;
         this.loading = true;
 
-        const resultPromises = Promise.all(toPairs(queries).map(
-          ([name, query]) =>
-          this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
-        ));
+        const resultPromises = Promise.all(
+          toPairs(queries).map(([name, query]) =>
+            this.cubejsApi
+              .load(query, {
+                mutexObj: this.mutexObj,
+                mutexKey: name,
+              })
+              .then((r) => [name, r])
+          )
+        );
 
         this.resultSet = fromPairs(await resultPromises);
         this.loading = false;
@@ -129,12 +135,14 @@ export default {
   },
   watch: {
     query: {
-      handler(val) {
-        if (val) {
+      deep: true,
+      handler(query, prevQuery) {
+        console.log('has Changed!', d(query), d(prevQuery));
+
+        if (isQueryPresent(query) && !equals(query, prevQuery)) {
           this.load();
         }
       },
-      deep: true,
     },
     queries: {
       handler(val) {
