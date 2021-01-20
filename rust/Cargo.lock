@@ -132,7 +132,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#81eabb45654f7793920b698bd1eafe031afda93e"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#81eabb45654f7793920b698bd1eafe031afda93e"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -984,6 +984,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cubehll"
+version = "0.1.0"
+dependencies = [
+ "byteorder",
+ "hex",
+ "itertools 0.10.0",
+ "twox-hash",
+]
+
+[[package]]
 name = "cubestore"
 version = "0.1.0"
 dependencies = [
@@ -1000,6 +1010,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "csv",
+ "cubehll",
  "datafusion",
  "deadqueue",
  "enum_primitive",
@@ -1036,7 +1047,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#81eabb45654f7793920b698bd1eafe031afda93e"
 dependencies = [
  "ahash 0.6.2",
  "arrow",
@@ -1887,6 +1898,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37d572918e350e82412fe766d24b15e6682fb2ed2bbe018280caa810397cb319"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2583,7 +2603,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#09d31b6b0ea45d02bd534701d458bba90e7d16fc"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-02#81eabb45654f7793920b698bd1eafe031afda93e"
 dependencies = [
  "arrow",
  "base64 0.13.0",

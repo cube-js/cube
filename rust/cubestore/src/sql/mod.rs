@@ -27,6 +27,7 @@ use crate::sql::parser::CubeStoreParser;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use hex::FromHex;
+use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 
 #[async_trait]
@@ -470,13 +471,13 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 DataType::Timestamp => ColumnType::Timestamp,
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
-                    if custom_type_name == "mediumint" {
-                        ColumnType::Int
-                    } else {
-                        return Err(CubeError::user(format!(
-                            "Custom type '{}' is not supported",
-                            custom
-                        )));
+                    match custom_type_name.as_str() {
+                        "mediumint" => ColumnType::Int,
+                        "varbinary" => ColumnType::Bytes,
+                        "hyperloglog" => ColumnType::HyperLogLog,
+                        _ => return Err(CubeError::user(format!(
+                                "Custom type '{}' is not supported",
+                                custom)))
                     }
                 }
                 DataType::Regclass => {
@@ -507,10 +508,46 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<DataFrame, 
     ))
 }
 
+fn decode_byte(s: &str) -> Option<u8> {
+    let v = s.as_bytes();
+    if v.len() != 2 {
+        return None;
+    }
+    let decode_char = |c| match c {
+        b'a'..=b'f' => Some(10 + c - b'a'),
+        b'A'..=b'F' => Some(10 + c - b'A'),
+        b'0'..=b'9' => Some(c - b'0'),
+        _ => None,
+    };
+    let v0 = decode_char(v[0])?;
+    let v1 = decode_char(v[1])?;
+    return Some(v0 * 16 + v1);
+}
+
+fn parse_hyper_log_log(v: &Value) -> Result<Vec<u8>, CubeError> {
+    let bytes = parse_binary_string(v)?;
+    // TODO: check without memory allocations. this is run on hot path.
+    if let Err(e) = cubehll::HllSketch::read(&bytes) {
+        return Err(e.into());
+    }
+    return Ok(bytes);
+}
+
 fn parse_binary_string(v: &Value) -> Result<Vec<u8>, CubeError> {
     match v {
-        // TODO: unescape the string
-        Value::SingleQuotedString(s) | Value::Number(s) => Ok(s.as_bytes().to_vec()),
+        Value::Number(s) => Ok(s.as_bytes().to_vec()),
+        // We interpret strings of the form '0f 0a 14 ff' as a list of hex-encoded bytes.
+        // MySQL will store bytes of the string itself instead and we should do the same.
+        // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
+        Value::SingleQuotedString(s) => s
+            .split(' ')
+            .filter(|b| !b.is_empty())
+            .map(|s| {
+                decode_byte(s).ok_or_else(|| {
+                    CubeError::user(format!("cannot convert value to binary string: {}", v))
+                })
+            })
+            .try_collect(),
         Value::HexStringLiteral(s) => Ok(Vec::from_hex(s.as_bytes())?),
         _ => Err(CubeError::user(format!(
             "cannot convert value to binary string: {}",
@@ -569,10 +606,18 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 TableValue::Decimal(decimal_val.to_string())
             }
             ColumnType::Bytes => {
-                // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
                 let val;
                 if let Expr::Value(v) = cell {
                     val = parse_binary_string(v)
+                } else {
+                    return Err(CubeError::user("Corrupted data in query.".to_string()));
+                };
+                return Ok(TableValue::Bytes(val?));
+            }
+            ColumnType::HyperLogLog => {
+                let val;
+                if let Expr::Value(v) = cell {
+                    val = parse_hyper_log_log(v)
                 } else {
                     return Err(CubeError::user("Corrupted data in query.".to_string()));
                 };
@@ -1875,7 +1920,7 @@ mod tests {
                 .unwrap();
             let _ = service
                 .exec_query(
-                    "INSERT INTO s.Bytes(id, data) VALUES (1, '123'), (2, X'deADbeef'), (3, 456)",
+                    "INSERT INTO s.Bytes(id, data) VALUES (1, '01 ff 1a'), (2, X'deADbeef'), (3, 456)",
                 )
                 .await
                 .unwrap();
@@ -1885,7 +1930,7 @@ mod tests {
             assert_eq!(r.len(), 3);
             assert_eq!(
                 r[0].values()[1],
-                TableValue::Bytes("123".as_bytes().to_vec())
+                TableValue::Bytes(vec![0x01, 0xff, 0x1a])
             );
             assert_eq!(
                 r[1].values()[1],
@@ -1898,6 +1943,80 @@ mod tests {
         })
         .await;
     }
+    #[tokio::test]
+    async fn hyperloglog() {
+        Config::run_test("hyperloglog", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE hll.sketches (id int, hll varbinary)")
+                .await
+                .unwrap();
+
+            let sparse = "X'020C0200C02FF58941D5F0C6'";
+            let dense = "X'030C004020000001000000000000000000000000000000000000050020000001030100000410000000004102100000000000000051000020000020003220000003102000000000001200042000000001000200000002000000100000030040000000010040003010000000000100002000000000000000000031000020000000000000000000100000200302000000000000000000001002000000000002204000000001000001000200400000000000001000020031100000000080000000002003000000100000000100110000000000000000000010000000000000000000000020000001320205000100000612000000000004100020100000000000000000001000000002200000100000001000001020000000000020000000000000001000010300060000010000000000070100003000000000000020000000000001000010000104000000000000000000101000100000001401000000000000000000000000000100010000000000000000000000000400020000000002002300010000000000040000041000200005100000000000001000000000100000203010000000000000000000000000001006000100000000000000300100001000100254200000000000101100040000000020000010000050000000501000000000101020000000010000000003000000000200000102100000000204007000000200010000033000000000061000000000000000000000000000000000100001000001000000013000000003000000000002000000000000010001000000000000000000020010000020000000100001000000000000001000103000000000000000000020020000001000000000100001000000000000000020220200200000001001000010100000000200000000000001000002000000011000000000101200000000000000000000000000000000000000100130000000000000000000100000120000300040000000002000000000000000000000100000000070000100000000301000000401200002020000000000601030001510000000000000110100000000000000000050000000010000100000000000000000100022000100000101054010001000000000000001000001000000002000000000100000000000021000001000002000000000100000000000000000000951000000100000000000000000000000000102000200000000000000010000010000000000100002000000000000000000010000000000000010000000010000000102010000000010520100000021010100000030000000000000000100000001000000022000330051000000100000000000040003020000010000020000100000013000000102020000000050000000020010000000000000000101200C000100000001200400000000010000001000000000100010000000001000001000000100000000010000000004000000002000013102000100000000000000000000000600000010000000000000020000000000001000000000030000000000000020000000001000001000000000010000003002000003000200070001001003030010000000003000000000000020000006000000000000000011000000010000200000000000500000000000000020500000000003000000000000000004000030000100000000103000001000000000000200002004200000020000000030000000000000000000000002000100000000000000002000000000000000010020101000000005250000010000000000023010000001000000000000500002001000123100030011000020001310600000000000021000023000003000000000000000001000000000000220200000000004040000020201000000010201000000000020000400010000050000000000000000000000010000020000000000000000000000000000000000102000010000000000000000000000002010000200200000000000000000000000000100000000000000000200400000000010000000000000000000000000000000010000200300000000000100110000000000000000000000000010000030000001000000000010000010200013000000000000200000001000001200010000000010000000000001000000000000100000000410000040000001000100010000100000002001010000000000000000001000000000000010000000000000000000000002000000000001100001000000001010000000000000002200000000004000000000000100010000000000600000000100300000000000000000000010000003000000000000000000310000010100006000010001000000000000001010101000100000000000000000000000000000201000000000000000700010000030000000000000021000000000000000001020000000030000100001000000000000000000000004010100000000000000000000004000000040100000040100100001000000000300000100000000010010000300000200000000000001302000000000000000000100100000400030000001001000100100002300000004030000002010000220100000000000002000000010010000000003010500000000300000000005020102000200000000000000020100000000000000000000000011000000023000000000010000101000000000000010020040200040000020000004000020000000001000000000100000200000010000000000030100010001000000100000000000600400000000002000000000000132000000900010000000030021400000000004100006000304000000000000010000106000001300020000'";
+
+            service.exec_query(&format!("INSERT INTO hll.sketches (id, hll) VALUES (1, {s}), (2, {d}), (3, {s}), (4, {d})", s = sparse, d = dense)).await.unwrap();
+
+            //  Check cardinality.
+            let result = service
+                .exec_query("SELECT id, cardinality(hll) as cnt from hll.sketches WHERE id < 3 ORDER BY 1")
+                .await
+                .unwrap();
+            assert_eq!(
+                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
+                vec![vec![TableValue::Int(1), TableValue::Int(2)],
+                     vec![TableValue::Int(2), TableValue::Int(655)]]);
+            // Check merge and cardinality.
+            let result = service
+                .exec_query("SELECT cardinality(merge(hll)) from hll.sketches WHERE id < 3")
+                .await
+                .unwrap();
+            assert_eq!(
+                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
+                vec![vec![TableValue::Int(657)]]);
+
+            // Now merge all 4 HLLs, results should stay the same.
+            let result = service
+                .exec_query("SELECT cardinality(merge(hll)) from hll.sketches")
+                .await
+                .unwrap();
+            assert_eq!(
+                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
+                vec![vec![TableValue::Int(657)]]);
+
+            // TODO: add format checks on insert and test invalid inputs.
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn hyperloglog_inserts() {
+        Config::run_test("hyperloglog_inserts", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE hll.sketches (id int, hll hyperloglog)")
+                .await
+                .unwrap();
+
+            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'')")
+                .await.expect_err("should not allow invalid HLL");
+            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6')")
+                .await.expect("should allow valid HLL");
+            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')")
+                .await.expect_err("should not allow invalid HLL (with extra bytes)");
+        }).await;
+    }
+
 
     #[tokio::test]
     async fn compaction() {

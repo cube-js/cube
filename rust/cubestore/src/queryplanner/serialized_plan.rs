@@ -1,6 +1,11 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition};
 use crate::queryplanner::query_executor::CubeTable;
+use crate::queryplanner::udfs::aggregate_udf_by_kind;
+use crate::queryplanner::udfs::{
+    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
+    CubeScalarUDFKind,
+};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
 use arrow::datatypes::DataType;
@@ -332,10 +337,18 @@ pub enum SerializedExpr {
         fun: functions::BuiltinScalarFunction,
         args: Vec<SerializedExpr>,
     },
+    ScalarUDF {
+        fun: CubeScalarUDFKind,
+        args: Vec<SerializedExpr>,
+    },
     AggregateFunction {
         fun: aggregates::AggregateFunction,
         args: Vec<SerializedExpr>,
         distinct: bool,
+    },
+    AggregateUDF {
+        fun: CubeAggregateUDFKind,
+        args: Vec<SerializedExpr>,
     },
     Wildcard,
 }
@@ -372,6 +385,10 @@ impl SerializedExpr {
                 fun: fun.clone(),
                 args: args.iter().map(|e| e.expr()).collect(),
             },
+            SerializedExpr::ScalarUDF { fun, args } => Expr::ScalarUDF {
+                fun: Arc::new(scalar_udf_by_kind(*fun).descriptor()),
+                args: args.iter().map(|e| e.expr()).collect(),
+            },
             SerializedExpr::AggregateFunction {
                 fun,
                 args,
@@ -380,6 +397,10 @@ impl SerializedExpr {
                 fun: fun.clone(),
                 args: args.iter().map(|e| e.expr()).collect(),
                 distinct: *distinct,
+            },
+            SerializedExpr::AggregateUDF { fun, args } => Expr::AggregateUDF {
+                fun: Arc::new(aggregate_udf_by_kind(*fun).descriptor()),
+                args: args.iter().map(|e| e.expr()).collect(),
             },
             SerializedExpr::Case {
                 expr,
@@ -876,7 +897,10 @@ impl SerializedPlan {
                 fun: fun.clone(),
                 args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
             },
-            Expr::ScalarUDF { .. } => unimplemented!(),
+            Expr::ScalarUDF { fun, args } => SerializedExpr::ScalarUDF {
+                fun: scalar_kind_by_name(&fun.name).unwrap(),
+                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
+            },
             Expr::AggregateFunction {
                 fun,
                 args,
@@ -886,7 +910,10 @@ impl SerializedPlan {
                 args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
                 distinct: *distinct,
             },
-            Expr::AggregateUDF { .. } => unimplemented!(),
+            Expr::AggregateUDF { fun, args } => SerializedExpr::AggregateUDF {
+                fun: aggregate_kind_by_name(&fun.name).unwrap(),
+                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
+            },
             Expr::Case {
                 expr,
                 when_then_expr,
