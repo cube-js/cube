@@ -294,10 +294,24 @@ export class ServerContainer {
       });
     }
 
+    let restartHandler: Promise<0|1>|null = null;
+
     process.addListener('SIGUSR1', async (signal) => {
       console.log(`Received ${signal} signal, reloading`);
 
-      await server.shutdown(signal, true);
+      if (restartHandler) {
+        console.log(`Unable to restart server while it's already restarting`);
+
+        return;
+      }
+
+      try {
+        restartHandler = server.shutdown(signal, true);
+
+        await restartHandler;
+      } finally {
+        restartHandler = null;
+      }
 
       server = await makeInstance();
     });
