@@ -280,6 +280,7 @@ pub enum ColumnType {
     String,
     Int,
     Bytes,
+    HyperLogLog, // HLL Sketches, compatible with presto.
     Timestamp,
     Decimal { scale: i32, precision: i32 },
     Float,
@@ -327,7 +328,7 @@ impl From<&Column> for parquet::schema::types::Type {
                     .build()
                     .unwrap()
             }
-            crate::metastore::ColumnType::Bytes => {
+            crate::metastore::ColumnType::Bytes | ColumnType::HyperLogLog => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::BYTE_ARRAY)
                     .with_logical_type(LogicalType::NONE)
                     .with_repetition(Repetition::OPTIONAL)
@@ -378,6 +379,7 @@ impl Into<Field> for Column {
                     DataType::Int64Decimal(self.column_type.target_scale() as usize)
                 }
                 ColumnType::Bytes => DataType::Binary,
+                ColumnType::HyperLogLog => DataType::Binary,
                 ColumnType::Float => DataType::Float64,
             },
             false,
@@ -396,6 +398,7 @@ impl fmt::Display for Column {
                 format!("DECIMAL({}, {})", precision, scale)
             }
             ColumnType::Bytes => "BYTES".to_string(),
+            ColumnType::HyperLogLog => "HYPERLOGLOG".to_string(),
             ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))

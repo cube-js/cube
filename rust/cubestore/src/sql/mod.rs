@@ -471,15 +471,13 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 DataType::Timestamp => ColumnType::Timestamp,
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
-                    if custom_type_name == "mediumint" {
-                        ColumnType::Int
-                    } else if custom_type_name == "varbinary" {
-                        ColumnType::Bytes
-                    } else {
-                        return Err(CubeError::user(format!(
-                            "Custom type '{}' is not supported",
-                            custom
-                        )));
+                    match custom_type_name.as_str() {
+                        "mediumint" => ColumnType::Int,
+                        "varbinary" => ColumnType::Bytes,
+                        "hyperloglog" => ColumnType::HyperLogLog,
+                        _ => return Err(CubeError::user(format!(
+                                "Custom type '{}' is not supported",
+                                custom)))
                     }
                 }
                 DataType::Regclass => {
@@ -524,6 +522,15 @@ fn decode_byte(s: &str) -> Option<u8> {
     let v0 = decode_char(v[0])?;
     let v1 = decode_char(v[1])?;
     return Some(v0 * 16 + v1);
+}
+
+fn parse_hyper_log_log(v: &Value) -> Result<Vec<u8>, CubeError> {
+    let bytes = parse_binary_string(v)?;
+    // TODO: check without memory allocations. this is run on hot path.
+    if let Err(e) = cubehll::HllSketch::read(&bytes) {
+        return Err(e.into());
+    }
+    return Ok(bytes);
 }
 
 fn parse_binary_string(v: &Value) -> Result<Vec<u8>, CubeError> {
@@ -599,10 +606,18 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 TableValue::Decimal(decimal_val.to_string())
             }
             ColumnType::Bytes => {
-                // TODO What we need to do with Bytes, now it  just convert each element of string to u8 item of Vec<u8>
                 let val;
                 if let Expr::Value(v) = cell {
                     val = parse_binary_string(v)
+                } else {
+                    return Err(CubeError::user("Corrupted data in query.".to_string()));
+                };
+                return Ok(TableValue::Bytes(val?));
+            }
+            ColumnType::HyperLogLog => {
+                let val;
+                if let Expr::Value(v) = cell {
+                    val = parse_hyper_log_log(v)
                 } else {
                     return Err(CubeError::user("Corrupted data in query.".to_string()));
                 };
@@ -1928,7 +1943,6 @@ mod tests {
         })
         .await;
     }
-
     #[tokio::test]
     async fn hyperloglog() {
         Config::run_test("hyperloglog", async move |services| {
@@ -1979,6 +1993,30 @@ mod tests {
         })
         .await;
     }
+
+    #[tokio::test]
+    async fn hyperloglog_inserts() {
+        Config::run_test("hyperloglog_inserts", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE hll.sketches (id int, hll hyperloglog)")
+                .await
+                .unwrap();
+
+            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'')")
+                .await.expect_err("should not allow invalid HLL");
+            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6')")
+                .await.expect("should allow valid HLL");
+            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')")
+                .await.expect_err("should not allow invalid HLL (with extra bytes)");
+        }).await;
+    }
+
 
     #[tokio::test]
     async fn compaction() {

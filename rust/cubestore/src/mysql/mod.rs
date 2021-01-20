@@ -67,6 +67,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     metastore::ColumnType::Decimal { .. } => ColumnType::MYSQL_TYPE_DECIMAL,
                     metastore::ColumnType::Boolean => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Bytes => ColumnType::MYSQL_TYPE_STRING,
+                    metastore::ColumnType::HyperLogLog => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Float => ColumnType::MYSQL_TYPE_STRING,
                 },
                 colflags: ColumnFlags::empty(),
