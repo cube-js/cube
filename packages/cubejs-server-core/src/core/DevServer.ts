@@ -316,7 +316,13 @@ export class DevServer {
       if (fs.existsSync('./.env')) {
         fs.removeSync('./.env');
       }
+
+      if (!fs.existsSync('./schema')) {
+        fs.mkdirSync('./schema');
+      }
+
       fs.writeFileSync('.env', variables.join('\n'));
+
       res.status(200).json('ok');
     }));
   }
