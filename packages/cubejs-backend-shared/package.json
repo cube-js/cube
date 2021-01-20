@@ -23,7 +23,6 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.25.0",
-    "@types/ip": "^1.1.0",
     "@types/jest": "^26.0.16",
     "@types/node-fetch": "^2.5.7",
     "jest": "^26.6.3",
@@ -31,8 +30,8 @@
   },
   "dependencies": {
     "env-var": "^6.3.0",
-    "ip": "^1.1.5",
-    "node-fetch": "^2.6.1"
+    "node-fetch": "^2.6.1",
+    "node-machine-id": "^1.1.12"
   },
   "publishConfig": {
     "access": "public"
