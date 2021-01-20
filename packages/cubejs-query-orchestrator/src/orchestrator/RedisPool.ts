@@ -7,7 +7,7 @@ export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
   createClient?: CreateRedisClientFn;
-  destroyClient?: (client: Redis.Redis) => PromiseLike<void>;
+  destroyClient?: (client: Redis) => PromiseLike<void>;
 }
 
 const MAX_ALLOWED_POOL_ERRORS = 100;
