@@ -102,7 +102,7 @@ export class CubejsServerCore {
 
   protected readonly orchestratorOptions: OrchestratorOptionsFn;
 
-  public logger: any;
+  public logger: (type: string, params: Record<string, any>) => void;
 
   protected preAgentLogger: any;
 
@@ -611,7 +611,7 @@ export class CubejsServerCore {
     }
 
     if (this.scheduledRefreshTimerInterval) {
-      await this.scheduledRefreshTimerInterval.cancel();
+      await this.scheduledRefreshTimerInterval.cancel(true);
     }
   }
 

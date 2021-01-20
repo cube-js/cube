@@ -214,10 +214,14 @@ export class CubejsServer {
     try {
       const timeoutKiller = withTimeout(
         () => {
-          console.error('Unable to stop Cube.js in expected time, force kill');
+          this.core.logger('Graceful Shutdown Timeout Kill', {
+            error: 'Unable to stop Cube.js in expected time, force kill',
+          });
+
           process.exit(1);
         },
-        (this.config.gracefulShutdown || 2) * 1000,
+        // this.server.stop can be closed in this.config.gracefulShutdown, let's add 1s before kill
+        ((this.config.gracefulShutdown || 2) + 1) * 1000,
       );
 
       if (this.redirector) {
