@@ -126,9 +126,26 @@ describe('index.test', () => {
 
   test('Should throw error, dbType is required', () => {
     delete process.env.CUBEJS_DB_TYPE;
-
-    expect(() => new CubejsServerCore({}))
+    
+    expect(() => {
+      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
+      // eslint-disable-next-line
+      new CubejsServerCore({});
+      jest.restoreAllMocks();
+    })
       .toThrowError(/driverFactory, apiSecret, dbType are required options/);
+  });
+  
+  test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
+    delete process.env.CUBEJS_DB_TYPE;
+    
+    expect(() => {
+      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => false);
+      // eslint-disable-next-line
+      new CubejsServerCore({});
+      jest.restoreAllMocks();
+    })
+      .not.toThrow();
   });
 
   const expectRefreshTimerOption = (input, output, setProduction: boolean = false) => {

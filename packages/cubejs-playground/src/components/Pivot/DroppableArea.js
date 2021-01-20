@@ -1,4 +1,3 @@
-import React from 'react';
 import { Typography } from 'antd';
 import { Droppable } from 'react-beautiful-dnd';
 import Item from './Item';

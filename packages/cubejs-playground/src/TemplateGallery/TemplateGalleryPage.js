@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import styled from 'styled-components';
 import '@ant-design/compatible/assets/index.css';
 import { Col, Row, Spin, Typography } from 'antd';

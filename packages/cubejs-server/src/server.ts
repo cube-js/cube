@@ -62,7 +62,7 @@ export class CubejsServer {
           allowedHeaders: 'authorization,content-type,x-request-id',
           ...config.http?.cors
         }
-      }
+      },
     };
 
     this.core = CubeCore.create(config);

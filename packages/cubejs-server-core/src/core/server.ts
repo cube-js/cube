@@ -133,7 +133,7 @@ export class CubejsServerCore {
 
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
-    const devServer = process.env.NODE_ENV !== 'production';
+    const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
 
     const options: ServerCoreInitializedOptions = {
       dbType,
@@ -169,16 +169,19 @@ export class CubejsServerCore {
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       ...opts,
     };
-
-    if (
-      !options.driverFactory ||
-      !options.apiSecret ||
-      !options.dbType
-    ) {
-      throw new Error('driverFactory, apiSecret, dbType are required options');
-    }
-
     this.options = options;
+    
+    if (
+      !this.options.devServer || (this.options.devServer && this.configFileExists())
+    ) {
+      if (
+        !options.driverFactory ||
+        !options.apiSecret ||
+        !options.dbType
+      ) {
+        throw new Error('driverFactory, apiSecret, dbType are required options');
+      }
+    }
 
     this.logger = options.logger || (
       process.env.NODE_ENV !== 'production'
@@ -256,7 +259,7 @@ export class CubejsServerCore {
       if (!this.projectFingerprint) {
         try {
           this.projectFingerprint = crypto.createHash('md5')
-            .update(JSON.stringify(await fs.readJson('package.json')))
+            .update(JSON.stringify(fs.readJsonSync('package.json')))
             .digest('hex');
         } catch (e) {
           internalExceptions(e);
@@ -289,6 +292,10 @@ export class CubejsServerCore {
     };
 
     this.initAgent();
+        
+    if (this.options.devServer && !this.configFileExists()) {
+      this.event('first_server_start');
+    }
 
     if (this.options.devServer) {
       this.devServer = new DevServer(this);
@@ -309,26 +316,29 @@ export class CubejsServerCore {
         oldLogger(msg, params);
       });
       let causeErrorPromise;
-      process.on('uncaughtException', async (e) => {
-        console.error(e.stack || e);
-        if (e.message && e.message.indexOf('Redis connection to') !== -1) {
-          console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
-          if (process.platform.indexOf('win') === 0) {
-            console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
-          } else if (process.platform.indexOf('darwin') === 0) {
-            console.log('💾 To install Redis on Mac please use https://redis.io/topics/quickstart or `$ brew install redis`');
-          } else {
-            console.log('💾 To install Redis please use https://redis.io/topics/quickstart');
+      
+      if (!process.env.CI) {
+        process.on('uncaughtException', async (e) => {
+          console.error(e.stack || e);
+          if (e.message && e.message.indexOf('Redis connection to') !== -1) {
+            console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
+            if (process.platform.indexOf('win') === 0) {
+              console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
+            } else if (process.platform.indexOf('darwin') === 0) {
+              console.log('💾 To install Redis on Mac please use https://redis.io/topics/quickstart or `$ brew install redis`');
+            } else {
+              console.log('💾 To install Redis please use https://redis.io/topics/quickstart');
+            }
           }
-        }
-        if (!causeErrorPromise) {
-          causeErrorPromise = this.event('Dev Server Fatal Error', {
-            error: (e.stack || e.message || e).toString()
-          });
-        }
-        await causeErrorPromise;
-        process.exit(1);
-      });
+          if (!causeErrorPromise) {
+            causeErrorPromise = this.event('Dev Server Fatal Error', {
+              error: (e.stack || e.message || e).toString()
+            });
+          }
+          await causeErrorPromise;
+          process.exit(1);
+        });
+      }
     } else {
       const oldLogger = this.logger;
       let loadRequestCount = 0;
@@ -347,6 +357,10 @@ export class CubejsServerCore {
 
       this.event('Server Start');
     }
+  }
+  
+  public configFileExists(): boolean {
+    return (fs.existsSync('./.env') || fs.existsSync('./cube.js'));
   }
 
   protected detectScheduledRefreshTimer(scheduledRefreshTimer?: string | number | boolean): number|null {
@@ -539,9 +553,7 @@ export class CubejsServerCore {
     });
   }
 
-  protected createOrchestratorApi(options): OrchestratorApi {
-    options = options || {};
-
+  protected createOrchestratorApi(options: any = {}): OrchestratorApi {
     return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
       redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
       externalDriverFactory: options.getExternalDriverFactory,

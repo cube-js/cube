@@ -1,4 +1,3 @@
-/* globals window */
 import fetch from './playgroundFetch';
 
 const fetchWithRetry = (url, options, retries) =>

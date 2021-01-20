@@ -1,4 +1,3 @@
-import React from 'react';
 import * as PropTypes from 'prop-types';
 import { PlusOutlined } from '@ant-design/icons';
 import MemberDropdown from './MemberDropdown';

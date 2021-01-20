@@ -1,4 +1,3 @@
-import React from 'react';
 import { Typography, Radio } from 'antd';
 import { Draggable } from 'react-beautiful-dnd';
 import { DragOutlined } from '@ant-design/icons';
