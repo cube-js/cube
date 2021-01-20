@@ -25,15 +25,35 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 Cube.js works with Node.js 8+ and uses yarn as a package manager.
 
 ## Development Workflow
+
+### Cube.js Docker
+
+Cube.js offers two different types of Docker image:
+
+- Stable (building from published release on npm)
+- Dev (building from source files, needed to test unpublished changes)
+
+For more information, take a look at [Docker Development Guide](./packages/cubejs-docker/DEVELOPMENT.md).
+
+#### Stable Docker Release
+
+1. After cloning Cube.js repository run `$ yarn` in `packages/cubejs-docker` to install dependencies.
+2. Use `$ docker build -t cubejs/cube:latest -f latest.Dockerfile` in `packages/cubejs-docker` to build stable docker image.
+
+#### Development
+
+1. After cloning Cube.js repository run `$ yarn` and `$ yarn lerna bootstrap` to install dependencies.
+2. Use `$ docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build stable development image.
+
 ### Cube.js Client
 
-1. After cloning Cube.js repository run `$ yarn` in `packages/cubejs-client-core` and `packages/cubejs-client-react` to install dependencies.
+1. After cloning Cube.js repository run `$ yarn install` and `$ yarn lerna bootstrap` in root directory.
 2. Use `$ yarn link` to add these packages to link registry.
 3. Perform required code changes.
 4. Use `$ yarn build` in the repository root to build CommonJS and UMD modules.
 5. Use `$ yarn link @cubejs-client/core` and/or `$ yarn link @cubejs-client/react` in your project to test changes applied.
 6. Use `$ yarn test` where available to test your changes.
-7. Ensure commit CommonJS and UMD modules as part of your commit.
+7. Ensure that any CommonJS and UMD modules are included as part of your commit.
 
 To get set up quickly, you can perform 1) and 2) with one line from the `cube.js` clone root folder:
 
@@ -41,15 +61,26 @@ To get set up quickly, you can perform 1) and 2) with one line from the `cube.js
 cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/cubejs-client-react && yarn && yarn link && cd ../..
 ```
 
+### Cube.js Server
+
+Cube.js is written in plain JavaScript, but some parts have already been migrated to TypeScript.
+
+1. After cloning Cube.js repository run `$ yarn install` and `$ yarn lerna bootstrap` in root directory.
+2. Use `yarn tsc:watch` to start TypeScript compiler in watch mode.
+3. Use `$ yarn link` in `packages/cubejs-<pkg>` to add these package to link registry.
+3. Create or choose an existed project for testing.
+4. Use `$ yarn link @cubejs-backend/cubejs-<pkg>` inside your testing project to link changed package in it.
+5. Use `$ yarn dev` to start your testing project and verify changes.
+
 ### Implementing Driver
 
 1. Copy existing driver package structure and name it in `@cubejs-backend/<db-name>-driver` format.
-`@cubejs-backend/mysql-driver` is very good candidate for copying this structure.
+`@cubejs-backend/mysql-driver` is a very good candidate for copying this structure.
 2. Please do not copy *CHANGELOG.md*.
 3. Name driver class and adjust package.json, README.md accordingly.
 4. As a rule of thumb please use only Pure JS libraries as a dependencies where possible.
 It increases driver adoption rate a lot.
-5. Typically you need to implement only `query()` and `testConnection()` methods of driver.
+5. Typically, you need to implement only `query()` and `testConnection()` methods of driver.
 The rest will be done by `BaseDriver` class.
 6. If db requires connection pooling prefer use `generic-pool` implementation with settings similar to other db packages.
 7. Make sure your driver has `release()` method in case DB expects graceful shutdowns for connections.
@@ -60,8 +91,8 @@ The rest will be done by `BaseDriver` class.
 
 If there's existing JDBC Driver in place for Database of interest you can just create `DbTypes` configuration inside
 [cubejs-jdbc-driver/driver/JDBCDriver.js](https://github.com/statsbotco/cube.js/blob/master/packages/cubejs-jdbc-driver/driver/JDBCDriver.js#L31).
-Most of times no additional adjustments required for base `JDBCDriver` implementation as JDBC is pretty standard.
-In case you need to tweak it a little bit please follow [Implementing Driver](#implementing-driver) steps but use `JDBCDriver` as your base driver class.
+Most of the time no additional adjustments required for base `JDBCDriver` implementation as JDBC is pretty standard.
+In case you need to tweak it a little please follow [Implementing Driver](#implementing-driver) steps but use `JDBCDriver` as your base driver class.
 
 ### Implementing SQL Dialect
 
@@ -79,7 +110,7 @@ class FooDriver extends BaseDriver {
   }
 }
 ```
-If driver class contains `static dialectClass()` method it'll be used to lookup corresponding SQL dialect. Otherwise default dialect for the database type will be used.
+If driver class contains `static dialectClass()` method it'll be used to lookup corresponding SQL dialect. Otherwise, it will use the default dialect for the database type.
 
 ### Publishing Driver npm Package
 
@@ -124,7 +155,7 @@ Now your project will be using the local packages.
 
 We're passionate about what code can do rather how it's formatted.
 But in order to make code and docs maintainable following style guides will be enforced.
-Following these guidelines is not a requirement but you can save some time for maintainers if you apply those to your contribution beforehand.
+Following these guidelines is not a requirement, but you can save some time for maintainers if you apply those to your contribution beforehand.
 
 ### Code
 
