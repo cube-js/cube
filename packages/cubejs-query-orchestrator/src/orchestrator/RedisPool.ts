@@ -38,7 +38,7 @@ export class RedisPool {
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.disconnect());
 
-      this.pool = genericPool.createPool<Redis.Redis>({ create, destroy }, opts);
+      this.pool = genericPool.createPool<Redis>({ create, destroy }, opts);
 
       this.pool.on('factoryCreateError', (error) => {
         this.poolErrors++;
