@@ -1,4 +1,3 @@
-import React from 'react';
 import { CaretDownOutlined } from '@ant-design/icons';
 import { Form } from '@ant-design/compatible';
 import '@ant-design/compatible/assets/index.css';

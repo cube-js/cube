@@ -826,7 +826,7 @@ export class ApiGateway {
 
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
-
+    
     if (this.standalone) {
       const orchestratorApi = await this.adapterApi({});
 

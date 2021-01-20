@@ -1,4 +1,3 @@
-import React from 'react';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
 import DraggableItem from './DraggableItem';
 

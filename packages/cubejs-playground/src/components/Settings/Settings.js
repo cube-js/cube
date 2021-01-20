@@ -1,4 +1,3 @@
-import React from 'react';
 import { Divider, Spin } from 'antd';
 import Axes from '../Pivot/Axes';
 import Options from '../Pivot/Options';

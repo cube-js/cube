@@ -4,6 +4,7 @@ import type { ChildProcess } from 'child_process';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
+import crypto from 'crypto';
 import type { Application as ExpressApplication } from 'express';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
@@ -11,6 +12,7 @@ import AppContainer from '../dev/AppContainer';
 import DependencyTree from '../dev/DependencyTree';
 import PackageFetcher from '../dev/PackageFetcher';
 import DevPackageFetcher from '../dev/DevPackageFetcher';
+import { executeCommand } from '../dev/utils';
 
 const repo = {
   owner: 'cube-js',
@@ -28,10 +30,13 @@ export class DevServer {
   }
 
   public initDevEnv(app: ExpressApplication, options: ServerCoreInitializedOptions) {
+    const jwt = require('jsonwebtoken');
     const port = process.env.PORT || 4000; // TODO
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
-    const jwt = require('jsonwebtoken');
-    const cubejsToken = jwt.sign({}, options.apiSecret, { expiresIn: '1d' });
+    
+    // todo: empty/default `apiSecret` in dev mode to allow the DB connection wizard
+    const cubejsToken = jwt.sign({}, options.apiSecret || 'secret', { expiresIn: '1d' });
+    
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.');
     } else {
@@ -54,12 +59,13 @@ export class DevServer {
     app.get('/playground/context', catchErrors((req, res) => {
       this.cubejsServer.event('Dev Server Env Open');
       res.json({
-        cubejsToken: jwt.sign({}, options.apiSecret, { expiresIn: '1d' }),
+        cubejsToken,
         apiUrl: process.env.CUBEJS_API_URL,
         basePath: options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
-        projectFingerprint: this.cubejsServer.projectFingerprint
+        projectFingerprint: this.cubejsServer.projectFingerprint,
+        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists()
       });
     }));
 
@@ -272,6 +278,63 @@ export class DevServer {
           res.setHeader('Cache-Control', 'no-cache');
         }
       }
+    }));
+    
+    app.get('/playground/test-connection', catchErrors(async (_, res) => {
+      const orchestratorApi = this.cubejsServer.getOrchestratorApi({
+        authInfo: null,
+        requestId: ''
+      });
+      
+      try {
+        orchestratorApi.addDataSeenSource('default');
+        await orchestratorApi.testConnection();
+        this.cubejsServer.event('test_database_connection_success');
+      } catch (error) {
+        this.cubejsServer.event('test_database_connection_error');
+        return res.status(400).json({
+          error: error.toString()
+        });
+      }
+      
+      return res.json('ok');
+    }));
+    
+    let restartPromise = null;
+    
+    app.get('/restart', catchErrors(async (_, res) => {
+      if (restartPromise === null) {
+        restartPromise = new Promise<void>((resolve, reject) => {
+          (async () => {
+            try {
+              await executeCommand('kill', ['-SIGUSR1', process.pid]);
+              resolve();
+            } catch (error) {
+              reject();
+            }
+            restartPromise = null;
+          })();
+        });
+      } else {
+        return res.json('Restart is in progress');
+      }
+      
+      return res.json('Restarting...');
+    }));
+    
+    app.post('/playground/env', catchErrors(async (req, res) => {
+      let { variables = {} } = req.body || {};
+      
+      if (!variables.CUBEJS_API_SECRET) {
+        variables.CUBEJS_API_SECRET = crypto.randomBytes(64).toString('hex');
+      }
+      variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
+      
+      if (fs.existsSync('./.env')) {
+        fs.removeSync('./.env');
+      }
+      fs.writeFileSync('.env', variables.join('\n'));
+      res.status(200).json('ok');
     }));
   }
 }

@@ -1,4 +1,3 @@
-import React from 'react';
 import styled from 'styled-components';
 import * as PropTypes from 'prop-types';
 import { CloseOutlined } from '@ant-design/icons';

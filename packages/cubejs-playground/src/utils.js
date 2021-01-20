@@ -93,3 +93,12 @@ export function dispatchChartEvent(document, detail) {
 
   document.dispatchEvent(myEvent);
 }
+
+export function fetchWithTimeout(url, options, timeout) {
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), timeout)
+    )
+  ]);
+}

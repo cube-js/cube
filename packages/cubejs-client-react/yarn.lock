@@ -38,10 +38,10 @@
   dependencies:
     regenerator-runtime "^0.13.4"
 
-"@cubejs-client/core@^0.24.9":
-  version "0.24.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.24.9.tgz#b581ab83b1e20d0b4ac9d6dc444c035ba179e390"
-  integrity sha512-o9q3/ji9oNu6XnSv+bTvbnydfxWATBfEM951RA0DuakwPn7hW7r7AAPs52g6sUpWi8mUEsMnCw4ah4BIISzduA==
+"@cubejs-client/core@^0.25.0":
+  version "0.25.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.25.0.tgz#8b7fac7c333d72803b2dcac33d403702d9107f51"
+  integrity sha512-/Zu23svhCmWaYTCHjZbEvM4jrkFQrCe8JRYmg6GteP9fmmjH5QBnJ60qS8fyYP3c0VSWIkDNBp1e3/+DaR/s+Q==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"

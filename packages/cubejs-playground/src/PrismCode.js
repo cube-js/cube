@@ -1,7 +1,7 @@
-import React from 'react';
+import { Component } from 'react';
 import Prism from 'prismjs';
 
-class PrismCode extends React.Component {
+class PrismCode extends Component {
   componentDidMount() {
     Prism.highlightAll();
   }

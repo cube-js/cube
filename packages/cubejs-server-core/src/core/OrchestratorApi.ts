@@ -1,20 +1,24 @@
 /* eslint-disable no-throw-literal */
-const pt = require('promise-timeout');
-const { QueryOrchestrator, ContinueWaitError } = require('@cubejs-backend/query-orchestrator');
+import pt from 'promise-timeout';
+import { QueryOrchestrator, ContinueWaitError } from '@cubejs-backend/query-orchestrator';
 
 export class OrchestratorApi {
-  constructor(driverFactory, logger, options) {
-    options = options || {};
-    this.options = options;
+  private seenDataSources: { [dataSource: string]: boolean } = {};
+  
+  protected readonly orchestrator: QueryOrchestrator;
+  
+  protected readonly externalDriverFactory: any;
+  
+  public constructor(protected driverFactory, protected logger, protected options: any = {}) {
+    const { externalDriverFactory } = options;
+    
     this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
     this.driverFactory = driverFactory;
-    const { externalDriverFactory } = options;
     this.externalDriverFactory = externalDriverFactory;
     this.logger = logger;
-    this.seenDataSources = {};
   }
 
-  async executeQuery(query) {
+  public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
@@ -78,25 +82,25 @@ export class OrchestratorApi {
     }
   }
 
-  testConnection() {
+  public async testConnection() {
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.testDriverConnection(this.driverFactory, ds)),
       this.testDriverConnection(this.externalDriverFactory)
     ]);
   }
 
-  async testOrchestratorConnections() {
+  public async testOrchestratorConnections() {
     return this.orchestrator.testConnections();
   }
 
-  async testDriverConnection(driverFn, dataSource) {
+  public async testDriverConnection(driverFn, dataSource: string = 'default') {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       await driver.testConnection();
     }
   }
 
-  release() {
+  public async release() {
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
       this.releaseDriver(this.externalDriverFactory),
@@ -104,7 +108,7 @@ export class OrchestratorApi {
     ]);
   }
 
-  async releaseDriver(driverFn, dataSource) {
+  protected async releaseDriver(driverFn, dataSource: string = 'default') {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       if (driver.release) {
@@ -113,7 +117,7 @@ export class OrchestratorApi {
     }
   }
 
-  addDataSeenSource(dataSource) {
+  public addDataSeenSource(dataSource) {
     this.seenDataSources[dataSource] = true;
   }
 }

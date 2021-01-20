@@ -62,7 +62,7 @@ class AdapterApiMock {
   public $testConnectionsDone: boolean = false;
 
   public $testOrchestratorConnectionsDone: boolean = false;
-  
+
   public async testConnection() {
     this.$testConnectionsDone = true;
 
