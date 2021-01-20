@@ -1,0 +1,11 @@
+[package]
+name = "cubezetasketch"
+version = "0.1.0"
+authors = ["Cube Dev, Inc."]
+edition = "2018"
+license = "Apache-2.0"
+description = "HyperLogLog++ implementation ported from ZetaSketch"
+
+[dependencies]
+itertools = "0.10.0"
+protobuf = "2.20.0"
