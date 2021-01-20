@@ -10,7 +10,7 @@ export default function ConnectionTest({ loading, result }) {
       </>
     );
   }
-  
+
   if (result?.success) {
     return (
       <Typography.Text type="success">
@@ -35,7 +35,7 @@ export default function ConnectionTest({ loading, result }) {
           description={(() => (
             <>
               <p style={{ paddingLeft: 20 }}>
-                Cube Cloud was unable to connect to the specifield database.
+                Cube.js was unable to connect to the specified database.
               </p>
               <p style={{ paddingLeft: 20 }}>
                 The database returned the following error:
