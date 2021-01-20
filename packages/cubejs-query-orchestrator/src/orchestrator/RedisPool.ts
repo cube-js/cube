@@ -13,7 +13,7 @@ export interface RedisPoolOptions {
 const MAX_ALLOWED_POOL_ERRORS = 100;
 
 export class RedisPool {
-  protected readonly pool: Pool<Redis.Redis>|null = null;
+  protected readonly pool: Pool<Redis>|null = null;
 
   protected readonly create: CreateRedisClientFn|null = null;
 
