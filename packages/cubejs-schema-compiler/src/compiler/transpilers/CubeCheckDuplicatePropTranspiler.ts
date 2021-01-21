@@ -1,13 +1,16 @@
+import { TranspilerInterface, TraverseObject } from './transpiler.interface';
+
 const TYPE = {
   OBJECT_EXPRESSION: 'ObjectExpression',
   STRING_LITERAL: 'StringLiteral',
   IDENTIFIER: 'Identifier'
 };
 
-export class CubeCheckDuplicatePropTranspiler {
-  traverseObject() {
+export class CubeCheckDuplicatePropTranspiler implements TranspilerInterface {
+  public traverseObject(): TraverseObject {
     return {
       CallExpression: path => {
+        // @ts-ignore @todo Unsafely?
         if (path.node.callee.name === 'cube') {
           path.node.arguments.forEach(arg => {
             if (arg && arg.type === TYPE.OBJECT_EXPRESSION) {
@@ -19,7 +22,7 @@ export class CubeCheckDuplicatePropTranspiler {
     };
   }
 
-  compileExpression(expr) {
+  protected compileExpression(expr) {
     if (expr.type === TYPE.IDENTIFIER) {
       return expr.name;
     }
@@ -31,7 +34,7 @@ export class CubeCheckDuplicatePropTranspiler {
     return null;
   }
 
-  checkExpression(astObjectExpression) {
+  protected checkExpression(astObjectExpression) {
     const unique = new Set();
 
     astObjectExpression.properties.forEach(prop => {
@@ -44,7 +47,7 @@ export class CubeCheckDuplicatePropTranspiler {
         const keyName = this.compileExpression(key);
         if (keyName) {
           if (unique.has(keyName)) {
-            const error = new SyntaxError(`Duplicate property parsing ${keyName}`);
+            const error: any = new SyntaxError(`Duplicate property parsing ${keyName}`);
             error.loc = loc.start;
             throw error;
           }

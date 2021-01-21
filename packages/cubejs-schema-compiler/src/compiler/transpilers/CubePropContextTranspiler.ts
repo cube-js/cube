@@ -1,13 +1,17 @@
 import * as t from '@babel/types';
 import R from 'ramda';
+import { TranspilerInterface, TraverseObject } from './transpiler.interface';
+import type { CubeSymbols } from '../CubeSymbols';
+import type { CubeDictionary } from '../CubeDictionary';
 
-export class CubePropContextTranspiler {
-  constructor(cubeSymbols, cubeDictionary) {
-    this.cubeSymbols = cubeSymbols;
-    this.cubeDictionary = cubeDictionary;
+export class CubePropContextTranspiler implements TranspilerInterface {
+  public constructor(
+    protected readonly cubeSymbols: CubeSymbols,
+    protected readonly cubeDictionary: CubeDictionary,
+  ) {
   }
 
-  traverseObject() {
+  public traverseObject(): TraverseObject {
     const self = this;
     return {
       CallExpression(path) {
@@ -23,8 +27,10 @@ export class CubePropContextTranspiler {
               self.knownIdentifiersInjectVisitor('extends', name => self.cubeDictionary.resolveCube(name))
             );
           }
+          // @ts-ignore @todo Unsafely?
         } else if (path.node.callee.name === 'context') {
           args[args.length - 1].traverse(self.sqlAndReferencesFieldVisitor(null));
+          // @ts-ignore @todo Unsafely?
         } else if (path.node.callee.name === 'dashboardTemplate') {
           args[args.length - 1].traverse(self.shortNamedReferencesFieldVisitor(null));
         }
@@ -32,21 +38,21 @@ export class CubePropContextTranspiler {
     };
   }
 
-  sqlAndReferencesFieldVisitor(cubeName) {
+  protected sqlAndReferencesFieldVisitor(cubeName) {
     return this.knownIdentifiersInjectVisitor(
       /^(sql|measureReferences|dimensionReferences|segmentReferences|timeDimensionReference|rollupReferences|drillMembers|drillMemberReferences|contextMembers|columns)$/,
       name => this.cubeSymbols.resolveSymbol(cubeName, name) || this.cubeSymbols.isCurrentCube(name)
     );
   }
 
-  shortNamedReferencesFieldVisitor(cubeName) {
+  protected shortNamedReferencesFieldVisitor(cubeName) {
     return this.knownIdentifiersInjectVisitor(
       /^.*(measures|dimensions|segments|measure|dimension|segment|member)$/,
       name => this.cubeSymbols.resolveSymbol(cubeName, name) || this.cubeSymbols.isCurrentCube(name)
     );
   }
 
-  knownIdentifiersInjectVisitor(field, resolveSymbol) {
+  protected knownIdentifiersInjectVisitor(field, resolveSymbol) {
     const self = this;
     return {
       ObjectProperty(path) {
@@ -63,7 +69,7 @@ export class CubePropContextTranspiler {
     };
   }
 
-  collectKnownIdentifiers(resolveSymbol, path) {
+  protected collectKnownIdentifiers(resolveSymbol, path) {
     const identifiers = [];
     const self = this;
     if (path.node.type === 'Identifier') {
@@ -77,7 +83,7 @@ export class CubePropContextTranspiler {
     return R.uniq(identifiers);
   }
 
-  matchAndPushIdentifier(path, resolveSymbol, identifiers) {
+  protected matchAndPushIdentifier(path, resolveSymbol, identifiers) {
     if (
       (!path.parent ||
         (path.parent.type !== 'MemberExpression' || path.parent.type === 'MemberExpression' && path.key !== 'property')
