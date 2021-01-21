@@ -1,4 +1,3 @@
-import React from 'react';
 import * as PropTypes from 'prop-types';
 import { Menu as AntdMenu } from 'antd';
 import ButtonDropdown from './ButtonDropdown';

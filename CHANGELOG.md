@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.22](https://github.com/cube-js/cube.js/compare/v0.25.21...v0.25.22) (2021-01-21)
+
+
+### Bug Fixes
+
+* **cubestore:** Add curl as a dependency for certs ([d364fc4](https://github.com/cube-js/cube.js/commit/d364fc454f013667001a9932ebd1e894c5a4b5fc))
+* **cubestore:** Try to fix Invalid Parquet file on worker nodes ([aab87c8](https://github.com/cube-js/cube.js/commit/aab87c85ddaca156d20895efd29785b673bc5e2d))
+* **playground:** Create schema directory on changing env ([f99f6cc](https://github.com/cube-js/cube.js/commit/f99f6cc658ffdd9f2ec58dcbfa3b2be67ca67bf8))
+* **server:** Unexpected kill on graceful shutdown ([fc99239](https://github.com/cube-js/cube.js/commit/fc992398037719e5d7cc56b35f5e52e59d7c71f2))
+* **server-core:** Clear refresh uncaughtException for DevServer ([1ea4882](https://github.com/cube-js/cube.js/commit/1ea4882c8afd8b13f7637bb641120dc104096515))
+
+
+### Features
+
+* Log warnings from createCancelableInterval ([44d09c4](https://github.com/cube-js/cube.js/commit/44d09c44da6ddfa845dd457bb766172698c8f334))
+* **@cubejs-client/playground:** Database connection wizard ([#1671](https://github.com/cube-js/cube.js/issues/1671)) ([ba30883](https://github.com/cube-js/cube.js/commit/ba30883617c806c9f19ed6c879d0b0c2d656aae1))
+* **cubestore:** Add column type for HLL ([#1827](https://github.com/cube-js/cube.js/issues/1827)) ([df97052](https://github.com/cube-js/cube.js/commit/df970523c5413a171578e14abdb792ce4c260fbe))
+* **server:** Guard multiple restart in same time ([45f19b8](https://github.com/cube-js/cube.js/commit/45f19b84cd2eb2818e5053a4d5ae025b8aa2497c))
+
+
+
+
+
 ## [0.25.21](https://github.com/cube-js/cube.js/compare/v0.25.20...v0.25.21) (2021-01-19)
 
 

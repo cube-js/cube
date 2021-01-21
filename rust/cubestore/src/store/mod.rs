@@ -236,9 +236,10 @@ impl WALDataStore for WALStore {
             Ok(())
         })
         .await??;
-        self.remote_fs
-            .upload_file(&WALStore::wal_remote_path(wal.get_id()))
-            .await?;
+        // TODO do not upload WAL to speed up S3 uploads
+        // self.remote_fs
+        //     .upload_file(&WALStore::wal_remote_path(wal.get_id()))
+        //     .await?;
         self.meta_store.wal_uploaded(wal.get_id()).await?;
         Ok(wal)
     }

@@ -1,10 +1,10 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import React, { Component } from 'react';
+import { Component } from 'react';
 import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
 import './index.less';
 import './index.css';
-import { Layout, Alert, notification } from 'antd';
+import { Layout, Alert, notification, Spin } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { withRouter } from 'react-router';
 import Header from './components/Header';
@@ -27,10 +27,13 @@ class App extends Component {
 
   state = {
     fatalError: null,
-    slowQuery: false,
+    context: null,
+    slowQuery: false
   };
 
   async componentDidMount() {
+    const { history } = this.props;
+
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
       onQueryLoad: (resultSet) => {
@@ -72,10 +75,15 @@ class App extends Component {
     });
 
     const res = await fetch('/playground/context');
-    const result = await res.json();
-    setAnonymousId(result.anonymousId, {
-      coreServerVersion: result.coreServerVersion,
-      projectFingerprint: result.projectFingerprint,
+    const context = await res.json();
+    setAnonymousId(context.anonymousId, {
+      coreServerVersion: context.coreServerVersion,
+      projectFingerprint: context.projectFingerprint,
+    });
+    this.setState({ context }, () => {
+      if (context.shouldStartConnectionWizardFlow) {
+        history.push('/connection');
+      }
     });
   }
 
@@ -87,8 +95,13 @@ class App extends Component {
   }
 
   render() {
-    const { fatalError, slowQuery } = this.state || {};
+    const { context, fatalError, slowQuery } = this.state || {};
     const { location, children } = this.props;
+
+    if (context == null) {
+      return <Spin />;
+    }
+
     return (
       <AppContext.Provider
         value={{

@@ -203,6 +203,62 @@ test('withTimeoutRace(timeout)', async () => {
   expect(finished).toEqual(false);
 });
 
+test('withTimeout(fired)', async () => {
+  let cbFired = false;
+  let isFulfilled = false;
+
+  const promise = withTimeout(
+    async (token) => {
+      cbFired = true;
+    },
+    50
+  );
+  promise.then(
+    (v) => {
+      isFulfilled = true;
+    },
+  );
+
+  await pausePromise(100);
+
+  expect(isFulfilled).toEqual(true);
+  expect(cbFired).toEqual(true);
+});
+
+test('withTimeout(cancellation)', async () => {
+  let cbFired = false;
+  let isFulfilled = false;
+  let isPending = true;
+  let isRejected = false;
+
+  const promise = withTimeout(
+    async (token) => {
+      cbFired = true;
+    },
+    1000
+  );
+  promise.then(
+    (v) => {
+      isFulfilled = true;
+      isPending = false;
+      return v;
+    },
+    () => {
+      isRejected = true;
+      isPending = false;
+    },
+  );
+
+  expect(isPending).toEqual(true);
+
+  await promise.cancel();
+
+  expect(isFulfilled).toEqual(true);
+  expect(isPending).toEqual(false);
+  expect(isRejected).toEqual(false);
+  expect(cbFired).toEqual(false);
+});
+
 test('retryWithTimeout', async () => {
   let iterations = 0;
 

@@ -70,6 +70,12 @@ export function getAnonymousId() {
 }
 
 export async function track(opts: BaseEvent) {
+  // fixes the issue with async tests
+  // the promise returned from this function can be executed after the test has finished
+  if (process.env.CI) {
+    return Promise.resolve();
+  }
+  
   trackEvents.push({
     ...opts,
     id: crypto.randomBytes(16).toString('hex'),

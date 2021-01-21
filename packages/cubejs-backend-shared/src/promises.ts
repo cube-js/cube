@@ -142,9 +142,18 @@ export const withTimeout = (
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   let cancel: Function = () => {};
 
-  const promise: any = new Promise(() => {
-    const timer = setTimeout(fn, timeout);
-    cancel = () => clearTimeout(timer);
+  const promise: any = new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      fn();
+
+      resolve();
+    }, timeout);
+
+    cancel = () => {
+      clearTimeout(timer);
+
+      resolve();
+    };
   });
   promise.cancel = cancel;
 

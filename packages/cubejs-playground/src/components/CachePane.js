@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Table, Tabs } from 'antd';
 import { QueryRenderer } from '@cubejs-client/react';

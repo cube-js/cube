@@ -1,10 +1,10 @@
-/* globals window */
-import React, { Component } from 'react';
+import { Component } from 'react';
 import '@ant-design/compatible/assets/index.css';
 import { Spin, Button, Alert } from 'antd';
 import { Link, withRouter, Redirect } from 'react-router-dom';
-import DashboardSource from './DashboardSource';
-import fetch from './playgroundFetch';
+
+import DashboardSource from '../../DashboardSource';
+import fetch from '../../playgroundFetch';
 
 const Frame = ({ children }) => (
   <div style={{ textAlign: 'center', marginTop: 50 }}>{children}</div>

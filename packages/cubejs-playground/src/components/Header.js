@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileFilled, MenuOutlined, SlackOutlined } from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';
@@ -108,12 +107,15 @@ const Header = ({ selectedKeys }) => {
           <StyledMenuItem key="/build">
             <Link to="/build">Build</Link>
           </StyledMenuItem>
+          
           <StyledMenuItem key="/dashboard">
             <Link to="/dashboard">Dashboard App</Link>
           </StyledMenuItem>
+          
           <StyledMenuItem key="/schema">
             <Link to="/schema">Schema</Link>
           </StyledMenuItem>
+          
           <StyledMenuButton
             noMargin
             key="slack"

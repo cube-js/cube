@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.25.0",
+  "version": "0.25.22",
   "author": "Cube Dev, Inc.",
   "repository": {
     "type": "git",
@@ -27,7 +27,7 @@
   },
   "scripts": {
     "build": "yarn ng build && rm dist/package.json",
-    "watch": "yarn ng build --watch && rm dist/package.json",
+    "ng:watch": "yarn ng build --watch && rm dist/package.json",
     "dev": "yarn build && yalc publish --push"
   },
   "devDependencies": {

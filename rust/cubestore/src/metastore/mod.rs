@@ -60,7 +60,7 @@ use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
 use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
-use tokio::time::Duration;
+use tokio::time::{Duration, delay_for};
 use wal::WALRocksTable;
 
 #[macro_export]
@@ -280,6 +280,7 @@ pub enum ColumnType {
     String,
     Int,
     Bytes,
+    HyperLogLog, // HLL Sketches, compatible with presto.
     Timestamp,
     Decimal { scale: i32, precision: i32 },
     Float,
@@ -327,7 +328,7 @@ impl From<&Column> for parquet::schema::types::Type {
                     .build()
                     .unwrap()
             }
-            crate::metastore::ColumnType::Bytes => {
+            crate::metastore::ColumnType::Bytes | ColumnType::HyperLogLog => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::BYTE_ARRAY)
                     .with_logical_type(LogicalType::NONE)
                     .with_repetition(Repetition::OPTIONAL)
@@ -378,6 +379,7 @@ impl Into<Field> for Column {
                     DataType::Int64Decimal(self.column_type.target_scale() as usize)
                 }
                 ColumnType::Bytes => DataType::Binary,
+                ColumnType::HyperLogLog => DataType::Binary,
                 ColumnType::Float => DataType::Float64,
             },
             false,
@@ -396,6 +398,7 @@ impl fmt::Display for Column {
                 format!("DECIMAL({}, {})", precision, scale)
             }
             ColumnType::Bytes => "BYTES".to_string(),
+            ColumnType::HyperLogLog => "HYPERLOGLOG".to_string(),
             ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))
@@ -1613,8 +1616,9 @@ impl RocksMetaStore {
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = self.db.read().await.latest_sequence_number();
         if last_check_seq == last_db_seq {
-            let _ =
-                tokio::time::timeout(Duration::from_secs(5), self.write_notify.notified()).await;
+            delay_for(Duration::from_secs(60)).await;
+            // let _ =
+            //     tokio::time::timeout(Duration::from_secs(30), self.write_notify.notified()).await;
             // TODO
         }
         let last_upload_seq = self.last_upload_seq().await;
@@ -1651,7 +1655,7 @@ impl RocksMetaStore {
         }
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
-        if last_checkpoint_time + time::Duration::from_secs(60) < SystemTime::now() {
+        if last_checkpoint_time + time::Duration::from_secs(300) < SystemTime::now() {
             self.upload_check_point().await?;
         }
 

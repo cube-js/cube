@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { fetch } from 'whatwg-fetch';
 import { Spin } from 'antd';
 import { Redirect } from 'react-router-dom';
@@ -10,15 +10,23 @@ class IndexPage extends Component {
   }
 
   async componentDidMount() {
+    this.mounted = true;
     await this.loadFiles();
+  }
+
+  componentWillUnmount() {
+    this.mounted = false;
   }
 
   async loadFiles() {
     const res = await fetch('/playground/files');
     const result = await res.json();
-    this.setState({
-      files: result.files,
-    });
+
+    if (this.mounted) {
+      this.setState({
+        files: result.files,
+      });
+    }
   }
 
   render() {

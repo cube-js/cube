@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.22](https://github.com/cube-js/cube.js/compare/v0.25.21...v0.25.22) (2021-01-21)
+
+
+### Features
+
+* **cubestore:** Add column type for HLL ([#1827](https://github.com/cube-js/cube.js/issues/1827)) ([df97052](https://github.com/cube-js/cube.js/commit/df970523c5413a171578e14abdb792ce4c260fbe))
+
+
+
+
+
 ## [0.25.21](https://github.com/cube-js/cube.js/compare/v0.25.20...v0.25.21) (2021-01-19)
 
 
