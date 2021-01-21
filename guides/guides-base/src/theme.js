@@ -40,7 +40,7 @@ export const sharedStyles = {
       font-size: 26px;
     }
 
-    p {
+    p, li {
       line-height: 28px;
     }
 

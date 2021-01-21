@@ -3,14 +3,23 @@ order: 1
 title: "Overview"
 ---
 
-Angular 🅰️ is the web framework of choice for many professional developers. According to [Stack Overflow Developer Survey 2020](https://insights.stackoverflow.com/survey/2020#technology-web-frameworks), only just about ~10 % of developers prefer React to Angular.
+There are many ways to visualize data, but when it comes to location-based (or geospatial) data, map-based data visualizations are the most comprehensible and graphic.
 
-[Material](https://material.angular.io) is the reference implementation of [Material Design](https://material.io/design/) components for Angular. It provides a lot of ready-to-use components to build web applications, including dashboards, fast and easy.
+In this guide, we'll explore how to build a map data visualization with JavaScript (and React) using [MapBox](https://www.mapbox.com), a very popular set of tools for working with maps, navigation, and location-based search, etc.
 
-In this guide, we'll learn how to build a full-stack dashboard with KPIs, charts, and a data table. We'll go from data in the database to the interactive, filterable, and searchable dashboard.
+We'll also learn how to make this map data visualization interactive (or dynamic), allowing users to control what data is being visualized on the map.
 
-We're going to use Cube.js for our analytics API. It removes all the hustle of building the API layer, generating SQL, and querying the database. It also provides many production-grade features like multi-level caching for optimal performance, multi-tenancy, security, and more.
+To make this guide even more interesting, we'll use [Stack Overflow](https://stackoverflow.com/questions) open dataset, publicly available in [Google BigQuery](https://console.cloud.google.com/marketplace/product/stack-exchange/stack-overflow) and on [Kaggle](https://www.kaggle.com/stackoverflow/stackoverflow). With this dataset, we'll be able to find answers to the following questions:
 
-Below you can see an animated image of the application we're going to build. Also, check out the [live demo](https://angular-dashboard-demo.cube.dev) and the [full source code](https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui) available on GitHub.
+- Where do Stack Overflow users live?
+- Is there any correlation between Stack Overflow users' locations and their ratings?
+- What is the total and average Stack Oerflow users' rating by country?
+- Is there any difference between the locations of people who ask and answer questions?
 
-![](/images/image-8.gif)
+Also, to host and serve this dataset via an API, we'll use [PostgreSQL](https://www.postgresql.org) as a database and [Cube.js](https://cube.dev) as an analytical API platfrom which allows to bootstrap an backend for an analytical app in minutes.
+
+So, that's our plan — and let's get hacking! 🤘
+
+Oh, wait! Here's what our result is going to look like! Amazing, huh?
+
+![](/images/demo.gif)
