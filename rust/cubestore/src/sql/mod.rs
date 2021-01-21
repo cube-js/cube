@@ -7,7 +7,8 @@ use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
 use crate::metastore::{
-    table::Table, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable, RowKey, Schema, TableId,
+    table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable, RowKey, Schema,
+    TableId,
 };
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
@@ -490,7 +491,8 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                     match custom_type_name.as_str() {
                         "mediumint" => ColumnType::Int,
                         "varbinary" => ColumnType::Bytes,
-                        "hyperloglog" => ColumnType::HyperLogLog,
+                        "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
+                        "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
@@ -543,11 +545,16 @@ fn decode_byte(s: &str) -> Option<u8> {
     return Some(v0 * 16 + v1);
 }
 
-fn parse_hyper_log_log(v: &Value) -> Result<Vec<u8>, CubeError> {
+fn parse_hyper_log_log(v: &Value, f: HllFlavour) -> Result<Vec<u8>, CubeError> {
     let bytes = parse_binary_string(v)?;
     // TODO: check without memory allocations. this is run on hot path.
-    if let Err(e) = cubehll::HllSketch::read(&bytes) {
-        return Err(e.into());
+    match f {
+        HllFlavour::Airlift => {
+            cubehll::HllSketch::read(&bytes)?;
+        }
+        HllFlavour::ZetaSketch => {
+            cubezetasketch::HyperLogLogPlusPlus::read(&bytes)?;
+        }
     }
     return Ok(bytes);
 }
@@ -633,10 +640,10 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 };
                 return Ok(TableValue::Bytes(val?));
             }
-            ColumnType::HyperLogLog => {
+            &ColumnType::HyperLogLog(f) => {
                 let val;
                 if let Expr::Value(v) = cell {
-                    val = parse_hyper_log_log(v)
+                    val = parse_hyper_log_log(v, f)
                 } else {
                     return Err(CubeError::user("Corrupted data in query.".to_string()));
                 };

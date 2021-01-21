@@ -1,3 +1,4 @@
+pub mod hll;
 pub mod query_executor;
 pub mod serialized_plan;
 pub mod udfs;

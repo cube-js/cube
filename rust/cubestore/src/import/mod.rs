@@ -90,7 +90,7 @@ impl ImportFormat {
                                     .map(|d| TableValue::Decimal(d.to_string()))
                                     .unwrap_or(TableValue::Null),
                                 ColumnType::Bytes => unimplemented!(),
-                                ColumnType::HyperLogLog => unimplemented!(),
+                                ColumnType::HyperLogLog(_) => unimplemented!(),
                                 ColumnType::Timestamp => timestamp_from_string(value)?,
                                 ColumnType::Float => {
                                     TableValue::Float(value.parse::<f64>()?.to_string())

@@ -1,7 +1,7 @@
+use crate::queryplanner::hll::Hll;
 use crate::CubeError;
 use arrow::array::{Array, BinaryArray, UInt64Builder};
 use arrow::datatypes::DataType;
-use cubehll::HllSketch;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
 use datafusion::physical_plan::udaf::AggregateUDF;
@@ -126,7 +126,7 @@ impl CubeAggregateUDF for HllMergeUDF {
 struct HllMergeAccumulator {
     // TODO: store sketch for empty set from the start.
     //       this requires storing index_bit_len in the type.
-    acc: Option<HllSketch>,
+    acc: Option<Hll>,
 }
 
 impl Accumulator for HllMergeAccumulator {
@@ -183,20 +183,18 @@ impl Accumulator for HllMergeAccumulator {
 }
 
 impl HllMergeAccumulator {
-    fn merge_sketch(&mut self, s: HllSketch) -> Result<(), DataFusionError> {
+    fn merge_sketch(&mut self, s: Hll) -> Result<(), DataFusionError> {
         if self.acc.is_none() {
             self.acc = Some(s);
             return Ok(());
         } else if let Some(acc_s) = &mut self.acc {
-            if acc_s.index_bit_len() != s.index_bit_len() {
-                return Err(CubeError::internal(format!(
-                    "cannot merge two HLL sketches with different number of buckets: {} and {}",
-                    s.num_buckets(),
-                    acc_s.num_buckets()
-                ))
+            if !acc_s.is_compatible(&s) {
+                return Err(CubeError::internal(
+                    "cannot merge two incompatible HLL sketches".to_string(),
+                )
                 .into());
             }
-            acc_s.merge_with(&s);
+            acc_s.merge_with(&s)?;
         } else {
             unreachable!("impossible");
         }
@@ -204,6 +202,6 @@ impl HllMergeAccumulator {
     }
 }
 
-fn read_sketch(data: &[u8]) -> Result<HllSketch, DataFusionError> {
-    return HllSketch::read(&data).map_err(|e| DataFusionError::Execution(e.message));
+fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
+    return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
 }
