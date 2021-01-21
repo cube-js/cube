@@ -1,17 +1,13 @@
 import { CubeValidator } from './CubeValidator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
-import { CubeCheckDuplicatePropTranspiler } from './CubeCheckDuplicatePropTranspiler';
-import { CubePropContextTranspiler } from './CubePropContextTranspiler';
-import { ImportExportTranspiler } from './ImportExportTranspiler';
+import { CubeCheckDuplicatePropTranspiler, CubePropContextTranspiler, ImportExportTranspiler, TranspilerInterface } from './transpilers';
+import { Funnels, RefreshKeys, Reflection } from '../extensions';
 import { CubeSymbols } from './CubeSymbols';
 import { CubeDictionary } from './CubeDictionary';
 import { CubeEvaluator } from './CubeEvaluator';
 import { ContextEvaluator } from './ContextEvaluator';
 import { DashboardTemplateEvaluator } from './DashboardTemplateEvaluator';
 import { JoinGraph } from './JoinGraph';
-import { Funnels } from '../extensions/Funnels';
-import { RefreshKeys } from '../extensions/RefreshKeys';
-import { Reflection } from '../extensions/Reflection';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
 
@@ -27,7 +23,7 @@ export const prepareCompiler = (repo, options) => {
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
 
-  const transpilers = [
+  const transpilers: TranspilerInterface[] = [
     new ImportExportTranspiler(),
     new CubePropContextTranspiler(cubeSymbols, cubeDictionary),
   ];

@@ -1,20 +1,18 @@
 import inflection from 'inflection';
+import { AbstractExtension } from './extension.abstract';
 
-export class Funnels {
-  constructor(cubeFactory, compiler) {
-    this.cubeFactory = cubeFactory;
-    this.compiler = compiler;
-  }
-
+export class Funnels extends AbstractExtension {
   // TODO check timeToConvert is absent on first step
   // TODO name can be a title
-  eventFunnel(funnelDefinition) {
+  public eventFunnel(funnelDefinition) {
     if (!funnelDefinition.userId || !funnelDefinition.userId.sql) {
       throw new Error('userId.sql is not defined'); // TODO schema check
     }
+
     if (!funnelDefinition.time || !funnelDefinition.time.sql) {
       throw new Error('time.sql is not defined'); // TODO schema check
     }
+
     if (!funnelDefinition.steps || !funnelDefinition.steps.length) {
       throw new Error('steps are not defined'); // TODO schema check
     }
@@ -81,7 +79,7 @@ ${eventJoin.join('\nLEFT JOIN\n')}
     });
   }
 
-  eventCubeJoin(funnelDefinition, step, prevStep) {
+  protected eventCubeJoin(funnelDefinition, step, prevStep) {
     const sql = this.compiler.contextQuery().evaluateSql(
       null,
       (step.eventsCube || step.eventsView || step.eventsTable).sql
@@ -100,19 +98,19 @@ ${eventJoin.join('\nLEFT JOIN\n')}
     return `(select ${this.compiler.contextQuery().evaluateSql(null, (step.userId || funnelDefinition.userId).sql)} user_id${nextJoin}, ${this.compiler.contextQuery().evaluateSql(null, (step.time || funnelDefinition.time).sql)} t from ${fromSql}) ${this.eventsTableName(step)}${joinSql}`;
   }
 
-  eventsTableName(step) {
+  protected eventsTableName(step) {
     return `${this.inflect(step)}_events`;
   }
 
-  stepUserIdColumnName(step) {
+  protected stepUserIdColumnName(step) {
     return `${this.inflect(step)}_user_id`;
   }
 
-  inflect(step) {
+  protected inflect(step) {
     return inflection.underscore(inflection.camelize(step.name.replace(/[^A-Za-z0-9]+/g, '_')));
   }
 
-  stepSegmentSelect(funnelDefinition, step) {
+  protected stepSegmentSelect(funnelDefinition, step) {
     return `SELECT ${this.stepUserIdColumnName(step)} user_id, ${this.stepUserIdColumnName(funnelDefinition.steps[0])} first_step_user_id, t, '${inflection.titleize(step.name)}' step FROM joined_events`;
   }
 }
