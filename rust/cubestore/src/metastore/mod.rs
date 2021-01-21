@@ -60,7 +60,7 @@ use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
 use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
-use tokio::time::Duration;
+use tokio::time::{Duration, delay_for};
 use wal::WALRocksTable;
 
 #[macro_export]
@@ -1616,8 +1616,9 @@ impl RocksMetaStore {
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = self.db.read().await.latest_sequence_number();
         if last_check_seq == last_db_seq {
-            let _ =
-                tokio::time::timeout(Duration::from_secs(5), self.write_notify.notified()).await;
+            delay_for(Duration::from_secs(60)).await;
+            // let _ =
+            //     tokio::time::timeout(Duration::from_secs(30), self.write_notify.notified()).await;
             // TODO
         }
         let last_upload_seq = self.last_upload_seq().await;
@@ -1654,7 +1655,7 @@ impl RocksMetaStore {
         }
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
-        if last_checkpoint_time + time::Duration::from_secs(60) < SystemTime::now() {
+        if last_checkpoint_time + time::Duration::from_secs(300) < SystemTime::now() {
             self.upload_check_point().await?;
         }
 

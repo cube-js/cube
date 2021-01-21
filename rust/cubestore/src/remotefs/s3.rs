@@ -2,7 +2,7 @@ use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use log::debug;
+use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
 use s3::Bucket;
@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
 use std::io::Write;
+use std::time::SystemTime;
 
 #[derive(Debug)]
 pub struct S3RemoteFs {
@@ -39,6 +40,7 @@ impl S3RemoteFs {
 #[async_trait]
 impl RemoteFs for S3RemoteFs {
     async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let status_code = self
             .bucket
@@ -47,6 +49,7 @@ impl RemoteFs for S3RemoteFs {
                 self.s3_path(remote_path),
             )
             .await?;
+        info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 200 {
             return Err(CubeError::user(format!(
                 "S3 upload returned non OK status: {}",
@@ -61,6 +64,7 @@ impl RemoteFs for S3RemoteFs {
         let path = local.to_str().unwrap().to_owned();
         fs::create_dir_all(local.parent().unwrap()).await?;
         if !local.exists() {
+            let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let mut output_file = std::fs::File::create(path.as_str())?;
             let status_code = self
@@ -69,6 +73,7 @@ impl RemoteFs for S3RemoteFs {
                 .await?;
             // TODO async
             output_file.flush()?;
+            info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "S3 download returned non OK status: {}",
@@ -80,8 +85,10 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         let (_, status_code) = self.bucket.delete_object(self.s3_path(remote_path)).await?;
+        info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 204 {
             return Err(CubeError::user(format!(
                 "S3 delete returned non OK status: {}",
@@ -111,7 +118,7 @@ impl RemoteFs for S3RemoteFs {
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let list = self.bucket.list(self.s3_path(remote_prefix), None).await?;
-        let leading_slash = Regex::new(r"^/").unwrap();
+        let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()
             .flat_map(|res| {
@@ -146,7 +153,7 @@ impl S3RemoteFs {
             "{}/{}",
             self.sub_path
                 .as_ref()
-                .map(|p| format!("/{}", p))
+                .map(|p| p.to_string())
                 .unwrap_or_else(|| "".to_string()),
             remote_path
         )
