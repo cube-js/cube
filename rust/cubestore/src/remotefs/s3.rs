@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
+use std::io::Write;
 
 #[derive(Debug)]
 pub struct S3RemoteFs {
@@ -66,6 +67,8 @@ impl RemoteFs for S3RemoteFs {
                 .bucket
                 .get_object_stream(self.s3_path(remote_path), &mut output_file)
                 .await?;
+            // TODO async
+            output_file.flush()?;
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "S3 download returned non OK status: {}",
