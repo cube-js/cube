@@ -246,6 +246,49 @@ describe('QueryOrchestrator', () => {
     expect(externalMockDriver.executedQueries.join(',')).toMatch(/SELECT \* FROM stb_pre_aggregations\.orders.*, stb_pre_aggregations\.customers.*/);
   });
 
+  test('non default data source pre-aggregation', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders, stb_pre_aggregations.customers',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders', []],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        dataSource: 'foo'
+      }],
+      renewQuery: true,
+      requestId: 'non default data source pre-aggregation',
+      dataSource: 'foo',
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    console.log(result.data[0]);
+    expect(fooMockDriver.executedQueries.join(',')).toMatch(/CREATE TABLE stb_pre_aggregations.orders/);
+    expect(mockDriver.executedQueries.length).toEqual(0);
+  });
+
+  test('non default data source query', async () => {
+    const query = {
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      renewQuery: true,
+      requestId: 'non default data source query',
+      dataSource: 'foo',
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    console.log(result.data[0]);
+    expect(fooMockDriver.executedQueries.join(',')).toMatch(/orders/);
+    expect(mockDriver.executedQueries.length).toEqual(0);
+  });
+
   test('silent truncate', async () => {
     const query = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count_and_very_very_very_very_very_very_long20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',

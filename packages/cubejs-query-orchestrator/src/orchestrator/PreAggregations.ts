@@ -114,9 +114,9 @@ class PreAggregationLoadCache {
 
   constructor(redisPrefix, clientFactory: DriverFactory, queryCache, preAggregations, options: {
     requestId?: string,
-    dataSource?: string
+    dataSource: string
   }) {
-    options = options || {};
+    options = options || { dataSource: 'default' };
     this.redisPrefix = `${redisPrefix}_${options.dataSource}`;
     this.dataSource = options.dataSource;
     this.driverFactory = clientFactory;
@@ -203,7 +203,8 @@ class PreAggregationLoadCache {
           renewalKey: keyQuery,
           waitForRenew,
           priority,
-          requestId: this.requestId
+          requestId: this.requestId,
+          dataSource: this.dataSource
         }
       );
     }
@@ -819,7 +820,8 @@ export class PreAggregations {
       if (!loadCacheByDataSource[dataSource]) {
         loadCacheByDataSource[dataSource] =
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource || 'default'), this.queryCache, this, {
-            requestId: queryBody.requestId
+            requestId: queryBody.requestId,
+            dataSource
           });
       }
       return loadCacheByDataSource[dataSource];
@@ -865,7 +867,7 @@ export class PreAggregations {
             () => this.driverFactory(dataSource),
             this.queryCache,
             this,
-            { requestId }
+            { requestId, dataSource }
           ),
           { requestId, externalRefresh: this.externalRefresh }
         );
@@ -898,7 +900,7 @@ export class PreAggregations {
           } = q;
           const loadCache = new PreAggregationLoadCache(
             this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this,
-            { requestId }
+            { requestId, dataSource }
           );
           return loadCache.fetchTables(preAggregation);
         }, {
