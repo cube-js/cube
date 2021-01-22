@@ -47,10 +47,10 @@ export function createRedisClient(url: string, opts: ClientOpts = {}) {
     options.password = process.env.REDIS_PASSWORD;
   }
 
-  return decorateRedisClient(
+  return Promise.resolve(decorateRedisClient(
     redis.createClient({
       ...options,
       ...opts,
     })
-  );
+  ));
 }

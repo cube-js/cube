@@ -1,6 +1,51 @@
-import Redis, { Redis as redis, RedisOptions } from 'ioredis';
+import { promisify } from 'util';
+import Redis, { Redis as redis, RedisOptions, Pipeline } from 'ioredis';
+
+Pipeline.prototype.execAsync = function execAsync() {
+  return this.exec()
+    .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
+}
 
 export function createRedisSentinelClient(url: string, opts: RedisOptions): PromiseLike<redis> {
+  return addAsyncMethods(createIORedisClient(url, opts));
+}
+
+function addAsyncMethods(client: redis): PromiseLike<redis> {
+  return client
+    .then((client) => {
+      [
+        'brpop',
+        'del',
+        'get',
+        'hget',
+        'rpop',
+        'set',
+        'zadd',
+        'zrange',
+        'zrangebyscore',
+        'keys',
+        'watch',
+        'unwatch',
+        'incr',
+        'decr',
+        'lpush',
+      ].forEach(
+        k => {
+          client[`${k}Async`] = client[k];
+        }
+      );
+
+        /*
+        client.prototype.Multi.execAsync = function execAsync() {
+          return this.exec()
+            .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
+        }
+        */
+      return client;
+    });
+}
+
+function createIORedisClient(url: string, opts: RedisOptions): PromiseLike<redis> {
   const [host, portStr] = (process.env.REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
   const port = portStr ? Number(portStr) : 6379;
 
@@ -30,19 +75,19 @@ export function createRedisSentinelClient(url: string, opts: RedisOptions): Prom
   const client = new Redis(options);
 
   client.on('connect', () => {
-    console.debug('Redis connection established');
+    debugLog('Redis connection established');
   });
 
   client.on('ready', () => {
-    console.debug('Redis ready');
+    debugLog('Redis ready');
   });
 
   client.on('close', () => {
-    console.debug('Redis connection closed');
+    debugLog('Redis connection closed');
   });
 
   client.on('end', () => {
-    console.debug('Redis connection ended');
+    debugLog('Redis connection ended');
   });
 
   client.on('error', (e) => {
@@ -54,4 +99,10 @@ export function createRedisSentinelClient(url: string, opts: RedisOptions): Prom
   });
 
   return client.connect().then(() => client);
+}
+
+function debugLog(msg) {
+  if (process.env.FLAG_ENABLE_REDIS_SENTINEL_DEBUG) {
+    console.debug(msg);
+  }
 }
