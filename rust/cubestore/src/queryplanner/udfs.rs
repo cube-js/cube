@@ -1,6 +1,7 @@
 use crate::CubeError;
 use arrow::array::{Array, BinaryArray, UInt64Builder};
 use arrow::datatypes::DataType;
+use cubehll::HllSketch;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
 use datafusion::physical_plan::udaf::AggregateUDF;
@@ -9,7 +10,6 @@ use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
-use cubehll::HllSketch;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeScalarUDFKind {
@@ -207,4 +207,3 @@ impl HllMergeAccumulator {
 fn read_sketch(data: &[u8]) -> Result<HllSketch, DataFusionError> {
     return HllSketch::read(&data).map_err(|e| DataFusionError::Execution(e.message));
 }
-

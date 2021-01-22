@@ -1,3 +1,4 @@
+pub mod queue;
 pub mod s3;
 
 use crate::CubeError;

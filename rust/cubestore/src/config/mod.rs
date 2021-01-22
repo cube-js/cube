@@ -3,6 +3,7 @@ use crate::import::ImportServiceImpl;
 use crate::metastore::RocksMetaStore;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::QueryPlannerImpl;
+use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
@@ -11,6 +12,7 @@ use crate::store::compaction::CompactionServiceImpl;
 use crate::store::{ChunkStore, WALStore};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
+use log::debug;
 use log::Level;
 use mockall::automock;
 use rocksdb::{Options, DB};
@@ -28,7 +30,7 @@ pub struct CubeServices {
     pub scheduler: Arc<SchedulerImpl>,
     pub meta_store: Arc<RocksMetaStore>,
     pub cluster: Arc<ClusterImpl>,
-    pub remote_fs: Arc<dyn RemoteFs>,
+    pub remote_fs: Arc<QueueRemoteFs>,
 }
 
 #[derive(Clone)]
@@ -39,6 +41,7 @@ pub struct WorkerServices {
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
         self.cluster.start_processing_loops().await;
+        QueueRemoteFs::start_processing_loops(self.remote_fs.clone());
         if !self.cluster.is_select_worker() {
             let meta_store = self.meta_store.clone();
             tokio::spawn(async move { meta_store.run_upload_loop().await });
@@ -54,6 +57,7 @@ impl CubeServices {
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
         self.cluster.stop_processing_loops().await?;
+        self.remote_fs.stop_processing_loops()?;
         self.meta_store.stop_processing_loops().await;
         self.scheduler.stop_processing_loops()?;
         stop_track_event_loop().await;
@@ -99,6 +103,10 @@ pub trait ConfigObj: Send + Sync {
     fn select_workers(&self) -> &Vec<String>;
 
     fn worker_bind_address(&self) -> &Option<String>;
+
+    fn download_concurrency(&self) -> u64;
+
+    fn upload_concurrency(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +122,8 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
+    pub upload_concurrency: u64,
+    pub download_concurrency: u64,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -155,6 +165,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn worker_bind_address(&self) -> &Option<String> {
         &self.worker_bind_address
+    }
+
+    fn download_concurrency(&self) -> u64 {
+        self.download_concurrency
+    }
+
+    fn upload_concurrency(&self) -> u64 {
+        self.upload_concurrency
     }
 }
 
@@ -218,6 +236,8 @@ impl Config {
                 worker_bind_address: env::var("CUBESTORE_WORKER_PORT")
                     .ok()
                     .map(|v| format!("0.0.0.0:{}", v)),
+                upload_concurrency: 4,
+                download_concurrency: 8,
             }),
         }
     }
@@ -242,6 +262,8 @@ impl Config {
                 query_timeout: 15,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
+                upload_concurrency: 4,
+                download_concurrency: 8,
             }),
         }
     }
@@ -293,10 +315,14 @@ impl Config {
         }
 
         let store_path = self.local_dir().clone();
-        let remote_store_path = self.remote_dir().clone();
+        let remote_fs = self.remote_fs().unwrap();
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let _ = fs::remove_dir_all(remote_store_path.clone());
+            let remote_files = remote_fs.list("").await.unwrap();
+            for file in remote_files {
+                debug!("Cleaning {}", file);
+                let _ = remote_fs.delete_file(file.as_str()).await.unwrap();
+            }
         }
         {
             let services = self.configure().await;
@@ -309,7 +335,10 @@ impl Config {
         let _ = DB::destroy(&Options::default(), self.meta_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let _ = fs::remove_dir_all(remote_store_path.clone());
+            let remote_files = remote_fs.list("").await.unwrap();
+            for file in remote_files {
+                let _ = remote_fs.delete_file(file.as_str()).await.unwrap();
+            }
         }
     }
 
@@ -360,12 +389,14 @@ impl Config {
     }
 
     pub async fn configure(&self) -> CubeServices {
-        let remote_fs = self.remote_fs().unwrap();
+        let original_remote_fs = self.remote_fs().unwrap();
+        let remote_fs = QueueRemoteFs::new(self.config_obj.clone(), original_remote_fs.clone());
         let (event_sender, event_receiver) = broadcast::channel(10000); // TODO config
 
         let meta_store = RocksMetaStore::load_from_remote(
             self.meta_store_path().to_str().unwrap(),
-            remote_fs.clone(),
+            // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+            original_remote_fs,
             self.config_obj.clone(),
         )
         .await

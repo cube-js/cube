@@ -194,7 +194,9 @@ impl<'a> RowParquetReader<'a> {
                     c.get_index(),
                     match c.get_column_type() {
                         ColumnType::String => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
-                        ColumnType::Bytes | ColumnType::HyperLogLog => ColumnAccessor::Bytes(vec![ByteArray::new(); 16384]),
+                        ColumnType::Bytes | ColumnType::HyperLogLog => {
+                            ColumnAccessor::Bytes(vec![ByteArray::new(); 16384])
+                        }
                         ColumnType::Int => ColumnAccessor::Int(vec![0; 16384]),
                         ColumnType::Decimal { .. } => ColumnAccessor::Int(vec![0; 16384]),
                         ColumnType::Timestamp => ColumnAccessor::Int(vec![0; 16384]),

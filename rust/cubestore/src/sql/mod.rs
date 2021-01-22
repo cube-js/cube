@@ -475,9 +475,12 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                         "mediumint" => ColumnType::Int,
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog,
-                        _ => return Err(CubeError::user(format!(
+                        _ => {
+                            return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
-                                custom)))
+                                custom
+                            )))
+                        }
                     }
                 }
                 DataType::Regclass => {
@@ -697,7 +700,7 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::LocalDirRemoteFs;
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use crate::store::WALStore;
     use itertools::Itertools;
     use rand::distributions::Alphanumeric;
@@ -1225,6 +1228,80 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn high_frequency_inserts_s3() {
+        Config::test("high_frequency_inserts_s3")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c.store_provider = FileStoreProvider::S3 {
+                    region: "us-west-2".to_string(),
+                    bucket_name: "cube-store-ci-test".to_string(),
+                    sub_path: Some("high_frequency_inserts_s3".to_string()),
+                };
+                c.select_workers = vec!["127.0.0.1:4306".to_string()];
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                Config::test("high_frequency_inserts_worker_1")
+                    .update_config(|mut c| {
+                        c.worker_bind_address = Some("127.0.0.1:4306".to_string());
+                        c.store_provider = FileStoreProvider::S3 {
+                            region: "us-west-2".to_string(),
+                            bucket_name: "cube-store-ci-test".to_string(),
+                            sub_path: Some("high_frequency_inserts_s3".to_string()),
+                        };
+                        c
+                    })
+                    .start_test_worker(async move |_| {
+                        service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                        service
+                            .exec_query("CREATE TABLE foo.numbers (num int)")
+                            .await
+                            .unwrap();
+
+                        for _ in 0..3 {
+                            let mut values = Vec::new();
+                            for i in 0..100000 {
+                                values.push(i);
+                            }
+
+                            let values = values.into_iter().map(|v| format!("({})", v)).join(", ");
+                            service
+                                .exec_query(&format!(
+                                    "INSERT INTO foo.numbers (num) VALUES {}",
+                                    values
+                                ))
+                                .await
+                                .unwrap();
+                        }
+
+                        let (first_query, second_query) = futures::future::join(
+                            service.exec_query("SELECT count(*) from foo.numbers"),
+                            service.exec_query("SELECT sum(num) from foo.numbers"),
+                        )
+                        .await;
+
+                        let result = first_query.unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(300000)])
+                        );
+
+                        let result = second_query.unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(300000 / 2 * 99999)])
+                        );
+                    })
+                    .await;
             })
             .await;
     }
@@ -2008,15 +2085,25 @@ mod tests {
                 .await
                 .unwrap();
 
-            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'')")
-                .await.expect_err("should not allow invalid HLL");
-            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6')")
-                .await.expect("should allow valid HLL");
-            service.exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')")
-                .await.expect_err("should not allow invalid HLL (with extra bytes)");
-        }).await;
+            service
+                .exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'')")
+                .await
+                .expect_err("should not allow invalid HLL");
+            service
+                .exec_query(
+                    "INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6')",
+                )
+                .await
+                .expect("should allow valid HLL");
+            service
+                .exec_query(
+                    "INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')",
+                )
+                .await
+                .expect_err("should not allow invalid HLL (with extra bytes)");
+        })
+        .await;
     }
-
 
     #[tokio::test]
     async fn compaction() {
