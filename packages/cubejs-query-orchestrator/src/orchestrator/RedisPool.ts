@@ -1,22 +1,34 @@
-import { Redis } from 'ioredis';
+/* eslint-disable global-require */
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
-import { createRedisClient } from './RedisFactory';
+import AsyncRedisClient from './AsyncRedisClient';
+import RedisClientOptions from './RedisClientOptions';
+import { createRedisClient as createNodeRedisClient } from './RedisFactory';
+import { createRedisSentinelClient } from './RedisSentinelFactory';
 
-export type CreateRedisClientFn = () => PromiseLike<Redis>;
+function createRedisClient(url: string, opts: RedisClientOptions = {}) {
+  if (process.env.FLAG_ENABLE_REDIS_SENTINEL) {
+    return createRedisSentinelClient(url, opts);
+  }
+
+  return createNodeRedisClient(url, opts);
+}
+
+export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
+
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
   createClient?: CreateRedisClientFn;
-  destroyClient?: (client: Redis) => PromiseLike<void>;
+  destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
 }
 
 const MAX_ALLOWED_POOL_ERRORS = 100;
 
 export class RedisPool {
-  protected readonly pool: Pool<Redis>|null = null;
+  protected readonly pool: Pool<AsyncRedisClient>|null = null;
 
   protected readonly create: CreateRedisClientFn|null = null;
-
+  
   protected poolErrors: number = 0;
 
   public constructor(options: RedisPoolOptions = {}) {
@@ -32,14 +44,14 @@ export class RedisPool {
       idleTimeoutMillis: 5000,
       evictionRunIntervalMillis: 5000
     };
-
+    
     const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
 
     if (max > 0) {
-      const destroy = options.destroyClient || (async (client) => client.disconnect());
+      const destroy = options.destroyClient || (async (client) => client.end(true));
 
-      this.pool = genericPool.createPool<Redis>({ create, destroy }, opts);
-
+      this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
+      
       this.pool.on('factoryCreateError', (error) => {
         this.poolErrors++;
         // prevent the infinite loop when pool creation fails too many times

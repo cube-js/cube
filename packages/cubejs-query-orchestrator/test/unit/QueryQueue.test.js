@@ -152,18 +152,18 @@ const QueryQueueTest = (name, options) => {
       // console.log(await redisClient.getQueryAndRemove('race1'));
 
       if (redisClient.redisClient) {
-        await redisClient2.redisClient.set(redisClient.queryProcessingLockKey('race'), '100');
-        await redisClient.redisClient.watch(redisClient.queryProcessingLockKey('race'));
-        await redisClient2.redisClient.set(redisClient.queryProcessingLockKey('race'), Math.random());
+        await redisClient2.redisClient.setAsync(redisClient.queryProcessingLockKey('race'), '100');
+        await redisClient.redisClient.watchAsync(redisClient.queryProcessingLockKey('race'));
+        await redisClient2.redisClient.setAsync(redisClient.queryProcessingLockKey('race'), Math.random());
 
         const res = await redisClient.redisClient.multi()
           .set(redisClient.queryProcessingLockKey('race'), '100')
           .set(redisClient.queryProcessingLockKey('race1'), '100')
-          .exec();
+          .execAsync();
 
         expect(res).toBe(null);
-        await redisClient.redisClient.del(redisClient.queryProcessingLockKey('race'));
-        await redisClient.redisClient.del(redisClient.queryProcessingLockKey('race1'));
+        await redisClient.redisClient.delAsync(redisClient.queryProcessingLockKey('race'));
+        await redisClient.redisClient.delAsync(redisClient.queryProcessingLockKey('race1'));
       }
 
       await queue.reconcileQueue();

@@ -291,10 +291,10 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/shared@^0.25.18":
-  version "0.25.18"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.25.18.tgz#ef28ec8a6914c5c8e3fcc9f165d4e7e0937ab043"
-  integrity sha512-6+KCROklLMr03aocCfKm3wk3Qq93m0rAIenDo7qE13Qw6XycpSn6Ce5x1klOqfdFn9XY+HOWSObzV1yImxNYzQ==
+"@cubejs-backend/shared@^0.25.22":
+  version "0.25.22"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.25.22.tgz#8c16cebe24afac314f59fff320f8a1b9516f02ae"
+  integrity sha512-mAnmMx0bRoOPTxaKdAgxBSHQS9cwUcvnwXBS1bvUxeounaM1q/569iW2cn6K9Wm99/vZbdMLh6u0px1S6iBFfA==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"
@@ -582,13 +582,6 @@
   version "4.1.4"
   resolved "https://registry.yarnpkg.com/@types/graceful-fs/-/graceful-fs-4.1.4.tgz#4ff9f641a7c6d1a3508ff88bc3141b152772e753"
   integrity sha512-mWA/4zFQhfvOA8zWkXobwJvBD7vzcxgrOQ0J5CH1votGqdq9m7+FwtGaqyCZqC3NyyBkc9z4m+iry4LlqcMWJg==
-  dependencies:
-    "@types/node" "*"
-
-"@types/ioredis@^4.17.11":
-  version "4.17.11"
-  resolved "https://registry.yarnpkg.com/@types/ioredis/-/ioredis-4.17.11.tgz#08ee0324ec0c0770b025a66a9fb6534ca1d87c8e"
-  integrity sha512-XAg9kOLyClyyP2BjfO9NWQmDDJFTNxvz2qkE+BMBfQoAN0/o6X53X2gefgfm4bn89A9462DyzNEL1q23oeCRSg==
   dependencies:
     "@types/node" "*"
 
@@ -1390,6 +1383,11 @@ denque@^1.1.0:
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/denque/-/denque-1.5.0.tgz#773de0686ff2d8ec2ff92914316a47b73b1c73de"
   integrity sha512-CYiCSgIF1p6EUByQPlGkKnP1M9g0ZV3qMIrqMqZqdwazygIA/YP2vrbcyl1h/WppKJTdl1F85cXIle+394iDAQ==
+
+denque@^1.4.1:
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/denque/-/denque-1.4.1.tgz#6744ff7641c148c3f8a69c307e51235c1f4a37cf"
+  integrity sha512-OfzPuSZKGcgr96rf1oODnfjqBFmr1DVoc/TrItj3Ohe0Ah1C5WX5Baquw/9U9KovnQ88EqmJbD66rKYUQYN1tQ==
 
 detect-newline@^3.0.0:
   version "3.1.0"
@@ -3673,7 +3671,7 @@ read-pkg@^5.2.0:
     parse-json "^5.0.0"
     type-fest "^0.6.0"
 
-redis-commands@1.6.0:
+redis-commands@1.6.0, redis-commands@^1.5.0:
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/redis-commands/-/redis-commands-1.6.0.tgz#36d4ca42ae9ed29815cdb30ad9f97982eba1ce23"
   integrity sha512-2jnZ0IkjZxvguITjFTrGiLyzQZcTvaw8DAaCXxZq/dsHXz7KfMQ3OUJy7Tz9vnRtZRVz6VRCPDvruvU8Ts44wQ==
@@ -3689,6 +3687,16 @@ redis-parser@^3.0.0:
   integrity sha1-tm2CjNyv5rS4pCin3vTGvKwxyLQ=
   dependencies:
     redis-errors "^1.0.0"
+
+redis@^3.0.2:
+  version "3.0.2"
+  resolved "https://registry.yarnpkg.com/redis/-/redis-3.0.2.tgz#bd47067b8a4a3e6a2e556e57f71cc82c7360150a"
+  integrity sha512-PNhLCrjU6vKVuMOyFu7oSP296mwBkcE6lrAjruBYG5LgdSqtRBoVQIylrMyVZD/lkF24RSNNatzvYag6HRBHjQ==
+  dependencies:
+    denque "^1.4.1"
+    redis-commands "^1.5.0"
+    redis-errors "^1.2.0"
+    redis-parser "^3.0.0"
 
 regex-not@^1.0.0, regex-not@^1.0.2:
   version "1.0.2"
