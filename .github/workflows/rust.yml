@@ -30,16 +30,16 @@ jobs:
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
-      - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/Cargo.toml -j 4
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --manifest-path rust/Cargo.toml -j 1 -- --check
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --manifest-path rust/Cargo.toml -j 4
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
