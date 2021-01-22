@@ -1,6 +1,7 @@
 export class CompileError extends Error {
-  constructor(messages) {
+  public constructor(
+    protected readonly messages: string[],
+  ) {
     super(`Compile errors:\n${messages.join('\n')}`);
-    this.messages = messages;
   }
 }

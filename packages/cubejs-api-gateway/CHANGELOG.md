@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.23](https://github.com/cube-js/cube.js/compare/v0.25.22...v0.25.23) (2021-01-22)
+
+
+### Bug Fixes
+
+* **api-gateway:** Validate a case when chrono can return empty array ([#1848](https://github.com/cube-js/cube.js/issues/1848)) ([e7349f7](https://github.com/cube-js/cube.js/commit/e7349f7bd71800e51a9c1d7cefecc8783bd886d6))
+
+
+
+
+
 ## [0.25.22](https://github.com/cube-js/cube.js/compare/v0.25.21...v0.25.22) (2021-01-21)
 
 

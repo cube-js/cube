@@ -60,7 +60,7 @@ use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
 use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
-use tokio::time::{Duration, delay_for};
+use tokio::time::{delay_for, Duration};
 use wal::WALRocksTable;
 
 #[macro_export]

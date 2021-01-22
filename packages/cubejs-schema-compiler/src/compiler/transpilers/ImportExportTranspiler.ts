@@ -1,7 +1,8 @@
 import * as t from '@babel/types';
+import { TranspilerInterface, TraverseObject } from './transpiler.interface';
 
-export class ImportExportTranspiler {
-  traverseObject() {
+export class ImportExportTranspiler implements TranspilerInterface {
+  public traverseObject(): TraverseObject {
     return {
       ImportDeclaration(path) {
         const specifiers = path.get('specifiers');

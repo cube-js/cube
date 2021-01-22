@@ -62,4 +62,10 @@ describe('dateParser', () => {
       [dateParser('last 7 days', 'UTC')[0], dateParser('today', 'UTC')[1]]
     );
   });
+
+  test('unexpected date', () => {
+    expect(() => dateParser('unexpected date', 'UTC')).toThrowError(
+      'Can\'t parse date: \'unexpected date\'',
+    );
+  });
 });

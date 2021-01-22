@@ -6,12 +6,13 @@ use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
 use s3::Bucket;
+use std::env;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tokio::fs;
 use tokio::sync::RwLock;
-use std::io::Write;
-use std::time::SystemTime;
 
 #[derive(Debug)]
 pub struct S3RemoteFs {
@@ -27,7 +28,13 @@ impl S3RemoteFs {
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        let credentials = Credentials::default()?;
+        let credentials = Credentials::new(
+            env::var("CUBESTORE_AWS_ACCESS_KEY_ID").as_deref().ok(),
+            env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").as_deref().ok(),
+            None,
+            None,
+            None,
+        )?;
         let bucket = Bucket::new(&bucket_name, region.parse()?, credentials)?;
         Ok(Arc::new(Self {
             dir: RwLock::new(dir),

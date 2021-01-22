@@ -11,8 +11,10 @@
 extern crate lazy_static;
 
 use crate::metastore::TableId;
+use crate::remotefs::queue::RemoteFsOpResult;
 use arrow::error::ArrowError;
 use core::fmt;
+use cubehll::HllError;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
@@ -22,8 +24,8 @@ use sqlparser::parser::ParserError;
 use std::backtrace::Backtrace;
 use std::num::ParseIntError;
 use std::sync::PoisonError;
+use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
-use cubehll::HllError;
 
 pub mod cluster;
 pub mod config;
@@ -132,6 +134,12 @@ impl From<tokio::task::JoinError> for CubeError {
 
 impl From<SendError<metastore::MetaStoreEvent>> for CubeError {
     fn from(v: SendError<metastore::MetaStoreEvent>) -> Self {
+        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+    }
+}
+
+impl From<broadcast::SendError<RemoteFsOpResult>> for CubeError {
+    fn from(v: broadcast::SendError<RemoteFsOpResult>) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }
@@ -309,6 +317,7 @@ impl From<hex::FromHexError> for CubeError {
 }
 
 impl From<HllError> for CubeError {
-    fn from(v: HllError) -> Self { return CubeError::from_error(v) }
+    fn from(v: HllError) -> Self {
+        return CubeError::from_error(v);
+    }
 }
-
