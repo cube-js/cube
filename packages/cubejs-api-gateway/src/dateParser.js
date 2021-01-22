@@ -70,9 +70,10 @@ export function dateParser(dateString, timezone, now = new Date()) {
     momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   } else {
     const results = chrono.parse(dateString, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
-    if (!results) {
+    if (!results || !results.length) {
       throw new UserError(`Can't parse date: '${dateString}'`);
     }
+
     const exactGranularity = ['second', 'minute', 'hour'].find(g => dateString.indexOf(g) !== -1) || 'day';
     momentRange = results[0].end ? [
       momentFromResult(results[0].start, timezone),
