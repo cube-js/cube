@@ -1,4 +1,4 @@
-/* globals describe, beforeEach, afterEach, test, expect */
+/* globals jest, describe, beforeEach, afterEach, test, expect */
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
@@ -94,6 +94,7 @@ class ExternalMockDriver extends MockDriver {
 }
 
 describe('QueryOrchestrator', () => {
+  jest.setTimeout(15000);
   let mockDriver = null;
   let fooMockDriver = null;
   let barMockDriver = null;
@@ -111,7 +112,7 @@ describe('QueryOrchestrator', () => {
     (msg, params) => console.log(new Date().toJSON(), msg, params), {
       preAggregationsOptions: {
         queueOptions: {
-          executionTimeout: 1
+          executionTimeout: 2
         },
         usedTablePersistTime: 1
       },
@@ -464,7 +465,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('continue serve old tables cache without resetting it', async () => {
-    mockDriver.tablesQueryDelay = 300;
+    mockDriver.tablesQueryDelay = 600;
     const requestId = 'continue serve old tables cache without resetting it';
     const baseQuery = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d20181103',
@@ -495,7 +496,7 @@ describe('QueryOrchestrator', () => {
       requestId: `${requestId}: start refresh`
     });
 
-    await mockDriver.delay(100);
+    await mockDriver.delay(200);
 
     let firstResolve = null;
 
@@ -512,7 +513,7 @@ describe('QueryOrchestrator', () => {
           firstResolve = 'query';
         }
       }),
-      mockDriver.delay(150).then(() => {
+      mockDriver.delay(300).then(() => {
         if (!firstResolve) {
           firstResolve = 'delay';
         }
