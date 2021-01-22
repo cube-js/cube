@@ -19,9 +19,9 @@ class Index extends React.Component {
         <Helmet title={config.siteTitle} />
         <Header githubUrl={config.githubUrl} />
         <Hero
-          title="Angular Dashboard with Material"
-          subtitle="Learn how to build a Angular Dashboard with Material and Cube.js"
-          demoUrl="https://angular-dashboard-demo.cube.dev/"
+          title="JavaScript Map Data Visualization with Mapbox"
+          subtitle="Learn how to build a map-based data visualization with Mapbox, Cube.js, and React"
+          demoUrl="https://mapbox-demo.cube.dev"
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={
@@ -34,23 +34,23 @@ class Index extends React.Component {
         <Feature
           imageAlign="left"
           image={featureOneImg}
-          metaTitle="MATERIAL UI DASHBOARD"
-          title="Build an Interactive Multi-Page Dashboard with Angular, Material UI, and Cube.js"
-          text="Explore how to create your own Angular Material UI dashboard. You will learn step by step how to build a comprehensive dashboard which retrieves and visualizes data from your database without writing SQL code."
+          metaTitle="MAP-BASED DATA VISUALIZATION"
+          title="Learn How to Visualize Geospatial Data"
+          text="Explore how to work with GeoJSON-encoded locations and create comprehensible and graphic map-based data visualizations."
         />
         <Feature
           imageAlign="right"
           image={featureTwoImg}
-          metaTitle="DATA SCHEMA"
-          title="Build an Analytics API with Cube.js"
-          text="You will learn how to model data with Cube.js data schema and build a clean API interface to power your analytics dashboard. This guide shows how to create complex metrics and describe relationships in the data."
+          metaTitle="CUBE.JS FOR API"
+          title="Bootstrap an API for Your App in Minutes"
+          text="Learn how to create an API with Cube.js, a powerful open-source analytical API platform, and define a data schema for your dataset."
         />
         <Feature
           imageAlign="left"
           image={featureThreeImg}
-          metaTitle="DATA VISUALIZATION TECHNIQUES"
-          title="Learn How to Use Various Chart Types to Visualize Data"
-          text="Explore how to work with such Material UI components as Bar Chart, Doughnut Chart, and Data Table. Learn the essentials of using these components to build convenient visualizations for business metrics and KPIs."
+          metaTitle="MAPBOX FOR DATAVIZ"
+          title="Learn How to Create Heatmaps, Point Density Maps, and Choropleth Maps"
+          text="Explore how to work with different map primitives provided by Mapbox, a very popular set of tools for working with maps, navigation, and location-based search, etc."
         />
         <PartsListing partsEdges={partsEdges} />
         <Footer />

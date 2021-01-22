@@ -1,16 +1,16 @@
 const config = {
-  siteTitle: "Angular Dashboard with Material", // Site title.
-  siteTitleShort: "Angular Dashboard with Material", // Short site title for homescreen (PWA). Preferably should be under 12 characters to prevent truncation.
-  siteTitleAlt: "Angular Dashboard with Material", // Alternative site title for SEO.
+  siteTitle: "JavaScript Map Data Visualization with Mapbox", // Site title.
+  siteTitleShort: "JavaScript Map Data Visualization with Mapbox", // Short site title for homescreen (PWA). Preferably should be under 12 characters to prevent truncation.
+  siteTitleAlt: "JavaScript Map Data Visualization with Mapbox", // Alternative site title for SEO.
   siteLogo: "/logos/icon.png", // Logo used for SEO and manifest.
   previewImage: "/logos/preview.png",
-  siteUrl: "https://angular-dashboard.cube.dev", // Domain of your website without pathPrefix.
-  siteDescription: "How to build Angular Material Dashboard with Cube.js.", // Website description used for RSS feeds/meta description tag.
+  siteUrl: "https://mapbox-guide.cube.dev", // Domain of your website without pathPrefix.
+  siteDescription: "Learn how to build a map-based data visualization with Mapbox, Cube.js, and React", // Website description used for RSS feeds/meta description tag.
   googleAnalyticsID: "UA-70480064-3", // GA tracking ID.
   themeColor: "#c62828", // Used for setting manifest and progress theme colors.
   backgroundColor: "#e0e0e0", // Used for setting manifest background color.
   pathPrefix: "",
-  githubUrl: "https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui"
+  githubUrl: "https://github.com/cube-js/cube.js/tree/master/guides/mapbox"
 };
 
 // Validate
