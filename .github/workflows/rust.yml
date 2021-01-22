@@ -34,7 +34,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --manifest-path rust/Cargo.toml -j 1 -- --check
+          args: --manifest-path rust/Cargo.toml -- --check
       - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:
