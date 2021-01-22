@@ -22,4 +22,6 @@ So, that's our plan — and let's get hacking! 🤘
 
 Oh, wait! Here's what our result is going to look like! Amazing, huh?
 
-![](/images/demo.gif)
+[![](/images/demo.gif)](https://mapbox-demo.cube.dev)
+
+If you can't wait, feel free to study the [demo](https://mapbox-demo.cube.dev) and the [source code](https://github.com/cube-js/cube.js/tree/master/examples/mapbox) on GitHub.
