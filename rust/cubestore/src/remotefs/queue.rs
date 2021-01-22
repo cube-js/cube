@@ -48,7 +48,7 @@ pub enum RemoteFsOpResult {
 impl QueueRemoteFs {
     pub fn new(config: Arc<dyn ConfigObj>, remote_fs: Arc<dyn RemoteFs>) -> Arc<Self> {
         let (stopped_tx, stopped_rx) = watch::channel(false);
-        let (tx, rx) = broadcast::channel(128);
+        let (tx, rx) = broadcast::channel(16384);
         Arc::new(Self {
             config,
             remote_fs,
