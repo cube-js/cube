@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.23](https://github.com/cube-js/cube.js/compare/v0.25.22...v0.25.23) (2021-01-22)
+
+
+### Bug Fixes
+
+* Map int2/4/8 to generic int type. fix [#1796](https://github.com/cube-js/cube.js/issues/1796) ([78e20eb](https://github.com/cube-js/cube.js/commit/78e20eb304eda3086cda7dbc4ea5d33ef877facb))
+* **api-gateway:** Validate a case when chrono can return empty array ([#1848](https://github.com/cube-js/cube.js/issues/1848)) ([e7349f7](https://github.com/cube-js/cube.js/commit/e7349f7bd71800e51a9c1d7cefecc8783bd886d6))
+* **cubestore:** Increase queue buffer to avoid lagging on wait ([2605bdf](https://github.com/cube-js/cube.js/commit/2605bdf69cd4c19b80a51ec0f526c8d1dffb9681))
+* **cubestore:** Queue uploads and downloads to avoid reads on unfinished S3 streams ([b94eb26](https://github.com/cube-js/cube.js/commit/b94eb266b98b2cbec494882931df8f3fbb40882a))
+* **cubestore:** Speed up S3 uploads ([d7062c8](https://github.com/cube-js/cube.js/commit/d7062c825c96412c43e36b3fd09a2f630396117c))
+
+
+### Features
+
+* **schema-compiler:** Move some parts to TS ([2ad0e2e](https://github.com/cube-js/cube.js/commit/2ad0e2e377fce52f4967fc73ae2486d4365f3ac4))
+
+
+
+
+
 ## [0.25.22](https://github.com/cube-js/cube.js/compare/v0.25.21...v0.25.22) (2021-01-21)
 
 
