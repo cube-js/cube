@@ -135,8 +135,9 @@ If nothing is found in the cache, the query is executed in the database and the 
 is returned as well as updating the cache.
 
 If an existing value is present in the cache and the `refreshKey` value for
-the query hasn't changed, the cached value will be returned. Otherwise, a
-[query renewal](#in-memory-cache-force-query-renewal) will be performed.
+the query hasn't changed, the cached value will be returned. Otherwise, a SQL query will be executed either against the pre-aggregations storage or the source database to populate the cache with the results and return them.
+
+
 
 ### Refresh Keys
 
