@@ -22,7 +22,6 @@ class CubeStoreDriver extends BaseDriver {
       password: process.env.CUBEJS_DB_PASS,
       socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
       timezone: 'Z',
-      ssl: this.getSslOptions(),
       ...restConfig,
     };
     this.pool = genericPool.createPool({
