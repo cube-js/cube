@@ -37,16 +37,20 @@ features:
 | ---------- | ------------------------------------------------------------------------------------------------------------------ | ---------- | ------------ |
 | Deprecated | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0      |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                            | v0.23.8    | June 2021    |
-| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | January 2021 |
+| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | v0.26.0      |
 | Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                               | v0.24.0    | June 2021    |
 | Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator) | v0.24.2    | v0.28.0      |
 | Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                  | v0.25.0    | v0.25.0      |
 | Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)               | v0.25.4    | v0.30.0      |
 | Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)       | v0.25.21   | v0.32.0      |
+| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                      | v0.26.0    |              |
+| Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    |              |
+| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |              |
+| Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |              |
 
 ### Node.js 8
 
-**Deprecated in Release: v0.22.4**
+**Removed in Release: v0.26.0**
 
 Node.js 8 reached [End of Life on December 31, 2019][link-nodejs-eol]. This
 means no more updates. Please upgrade to Node.js 10 or higher.
@@ -160,3 +164,44 @@ You should use:
 ```javascript
 const { BaseQuery } = require('@cubejs-backend/schema-compiler');
 ```
+
+### `checkAuthMiddleware`
+
+**Deprecated in Release: v0.26.0**
+
+Previously our authentication mechanism was tightly bound to Express. Due to the
+[deprecation of the Express-based API](#embedding-cubejs-within-express), we
+want our authentication API to be generic and not transport-specific. We now
+recommend using [`checkAuth`][ref-checkauth] as a transport-agnostic method of
+authentication. This means the same authentication logic can be reused for both
+HTTP and Websockets transports.
+
+[ref-checkauth]: https://cube.dev/docs/config#options-reference-check-auth
+
+### Node.js 10
+
+**Deprecated in Release: v0.26.0**
+
+Node.js 10 reaches [End of Life on April 30, 2021][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 12 or higher.
+
+[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+### `USER_CONTEXT`
+
+**Deprecated in Release: v0.26.0**
+
+There are three names for effectively the same concept, and we wanted to take
+the opportunity to simplify this.
+
+`USER_CONTEXT` has been renamed to `SECURITY_CONTEXT`.
+
+### `authInfo`
+
+**Deprecated in Release: v0.26.0**
+
+The `authInfo` parameter to `checkAuth` no longer wraps the decoded JWT under
+the `u` property. It has also been renamed to
+[`securityContext`][ref-security-context].
+
+[ref-security-context]: /
