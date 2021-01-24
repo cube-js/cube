@@ -43,13 +43,13 @@ cube(`Sessions`, {
     },
 
     usersCount: {
-      type: `countDistinct`,
+      type: `countDistinctApprox`,
       sql: `domain_userid`,
       title: "Users"
     },
 
     newUsersCount: {
-      type: `countDistinct`,
+      type: `countDistinctApprox`,
       sql: `domain_userid`,
       filters: [
         { sql: `${type} = 'New'` }
@@ -216,68 +216,21 @@ cube(`Sessions`, {
   },
 
   preAggregations: {
-    original: {
-      type: `originalSql`,
-      refreshKey: {
-        every: `5 minutes`
-      },
-      external: true,
-      scheduledRefresh: true,
-      indexes: {
-        sessionId: {
-          columns: [`session_id`, `events_count`]
-        }
-      }
-    },
     additive: {
       type: `rollup`,
-      measureReferences: [totalDuration, bouncedCount, count],
+      measureReferences: [usersCount, newUsersCount, totalDuration, bouncedCount, count],
       segmentReferences: [bouncedSessions, directTraffic, searchTraffic, newUsers],
-      dimensionReferences: [landingPage],
+      dimensionReferences: [landingPage, language, type, country, city, sourceMedium, referrerSource, referrerMedium],
       timeDimensionReference: sessionStart,
       granularity: `hour`,
       refreshKey: {
-        every: `5 minutes`
-      },
-      external: true,
-      scheduledRefresh: true
-    }
-  }
-});
-
-cube(`SessionUsers`, {
-  extends: Sessions,
-//  sqlAlias: `su`,
-
-  sql: `select distinct
-  date_trunc('hour', session_start) as session_start,
-  session_id,
-  domain_userid,
-  session_index,
-  br_lang,
-  page_url_path,
-  geo_country,
-  geo_city,
-  referrer_source,
-  referrer_medium,
-  events_count
-  from ${Sessions.sql()}`,
-
-  preAggregations: {
-    main: {
-      type: `originalSql`,
-      refreshKey: {
-        every: `5 minutes`
+        every: `5 minutes`,
+        incremental: true,
+        updateWindow: `1 day`
       },
       external: true,
       scheduledRefresh: true,
-      partitionGranularity: `month`,
-      timeDimensionReference: sessionStart,
-      indexes: {
-        sessionId: {
-          columns: [`session_id`]
-        }
-      }
+      partitionGranularity: 'month',
     }
   }
 });

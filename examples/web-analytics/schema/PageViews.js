@@ -27,7 +27,7 @@ cube(`PageViews`, {
     },
 
     uniqPageviews: {
-      type: `countDistinct`,
+      type: `countDistinctApprox`,
       sql: `session_id`
     },
 
@@ -78,7 +78,7 @@ cube(`PageViews`, {
   preAggregations: {
     additive: {
       type: `rollup`,
-      measureReferences: [pageviews, exits, count, totalTimeOnPageSeconds],
+      measureReferences: [uniqPageviews, pageviews, exits, count, totalTimeOnPageSeconds],
       timeDimensionReference: time,
       dimensionReferences: [pageUrlPath, pageTitle],
       segmentReferences: [
@@ -89,37 +89,13 @@ cube(`PageViews`, {
       ],
       granularity: `hour`,
       refreshKey: {
-        every: `5 minutes`
+        every: `5 minutes`,
+        incremental: true,
+        updateWindow: `1 day`
       },
-      external: true,
-      scheduledRefresh: true
-    }
-  }
-});
-
-cube(`PageUsers`, {
-  extends: PageViews,
-
-  sql: `select distinct
-  date_trunc('hour', derived_tstamp) as derived_tstamp,
-  session_id
-  from ${Events.sql()}`,
-
-  preAggregations: {
-    main: {
-      type: `originalSql`,
-      refreshKey: {
-        every: `5 minutes`
-      },
-      partitionGranularity: `month`,
-      timeDimensionReference: time,
       external: true,
       scheduledRefresh: true,
-      indexes: {
-        sessionId: {
-          columns: ['session_id']
-        }
-      }
+      partitionGranularity: `month`
     }
   }
 });

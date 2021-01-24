@@ -76,10 +76,6 @@ cube(`Events`, {
     Sessions: {
       relationship: `belongsTo`,
       sql: `${CUBE}.session_id = ${Sessions.id}`
-    },
-    SessionUsers: {
-      relationship: `belongsTo`,
-      sql: `${CUBE}.session_id = ${SessionUsers.id}`
     }
   },
 
@@ -89,7 +85,7 @@ cube(`Events`, {
     },
 
     usersCount: {
-      type: `countDistinct`,
+      type: `countDistinctApprox`,
       sql: `domain_userid`,
       title: `Users`
     }
@@ -105,17 +101,6 @@ cube(`Events`, {
     time: {
       sql: `derived_tstamp`,
       type: `time`
-    }
-  },
-
-  preAggregations: {
-    original: {
-      type: `originalSql`,
-      refreshKey: {
-        every: `5 minutes`
-      },
-      external: true,
-      scheduledRefresh: true
     }
   }
 });

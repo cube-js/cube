@@ -14,19 +14,19 @@ const queries = {
     chartType: 'pie',
     legend: 'vertical',
     query: {
-      measures: ['SessionUsers.usersCount'],
-      dimensions: ['SessionUsers.sourceMedium'],
+      measures: ['Sessions.usersCount'],
+      dimensions: ['Sessions.sourceMedium'],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart'
+        dimension: 'Sessions.sessionStart'
       }]
     }
   },
   usersOvertime: {
     chartType: 'line',
     query: {
-      measures: ['SessionUsers.usersCount'],
+      measures: ['Sessions.usersCount'],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart',
+        dimension: 'Sessions.sessionStart',
         granularity: 'day'
       }]
     }
@@ -35,12 +35,12 @@ const queries = {
   tableQuery: {
     query: {
       measures: [
-        "SessionUsers.count",
-        "SessionUsers.usersCount",
-        "SessionUsers.newUsersCount"
+        "Sessions.count",
+        "Sessions.usersCount",
+        "Sessions.newUsersCount"
       ],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart'
+        dimension: 'Sessions.sessionStart'
       }]
     },
     chartType: 'table'
@@ -48,9 +48,9 @@ const queries = {
 }
 
 const dimensionOptions = {
-  "Top Sources/Mediums": "SessionUsers.sourceMedium",
-  "Top Sources": "SessionUsers.referrerSource",
-  "Top Mediums": "SessionUsers.referrerMedium"
+  "Top Sources/Mediums": "Sessions.sourceMedium",
+  "Top Sources": "Sessions.referrerSource",
+  "Top Mediums": "Sessions.referrerMedium"
 };
 
 const withPrimaryDimension = ({ query, ...vizState }, dimension) => ({
