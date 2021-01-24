@@ -1235,6 +1235,9 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts_s3() {
+        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+            return;
+        }
         Config::test("high_frequency_inserts_s3")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
@@ -1309,6 +1312,9 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts_gcs() {
+        if env::var("SERVICE_ACCOUNT_JSON").is_err() {
+            return;
+        }
         Config::test("high_frequency_inserts_gcs")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
