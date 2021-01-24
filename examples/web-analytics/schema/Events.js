@@ -1,6 +1,6 @@
 cube(`Events`, {
   refreshKey: {
-    every: `5 minutes`
+    every: `4 hour`
   },
 
   sql: `
