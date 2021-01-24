@@ -112,7 +112,7 @@ impl MySqlServer {
         address: String,
         sql_service: Arc<dyn SqlService>,
     ) -> Result<(), CubeError> {
-        let mut listener = TcpListener::bind(address.clone()).await?;
+        let listener = TcpListener::bind(address.clone()).await?;
 
         info!("MySQL port open on {}", address);
 

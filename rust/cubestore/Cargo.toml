@@ -12,7 +12,7 @@ repository = "https://github.com/cube-js/cube.js"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1.0", features = ["full", "rt"] }
 warp = "0.2"
 sqlparser = "0.7.0"
 serde_derive = "1.0.115"
@@ -57,3 +57,7 @@ nanoid = "0.3.0"
 rand = "0.8.0"
 parquet-format = "=2.6.1"
 hex = "0.4.2"
+cloud-storage = "0.7.0"
+tokio-util = { version = "0.6.2", features=["compat"] }
+futures-timer = "3.0.2"
+tokio-stream = { version = "0.1.2", features=["io-util"] }

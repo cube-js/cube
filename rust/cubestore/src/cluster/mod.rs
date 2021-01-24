@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use core::mem;
 use futures::future::join_all;
-use futures::FutureExt;
+use futures_timer::Delay;
 use itertools::Itertools;
 use log::{debug, error, info};
 use mockall::automock;
@@ -31,14 +31,13 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
+use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::Handle;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{broadcast, oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
-use tokio::{fs, time};
 
 #[automock]
 #[async_trait]
@@ -102,19 +101,17 @@ pub enum WorkerMessage {
 
 pub struct WorkerProcessor;
 
+#[async_trait]
 impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProcessor {
-    fn process(args: WorkerMessage) -> Result<SerializedRecordBatchStream, CubeError> {
+    async fn process(args: WorkerMessage) -> Result<SerializedRecordBatchStream, CubeError> {
         match args {
             WorkerMessage::Select(plan_node, remote_to_local_names) => {
                 debug!("Running select in worker started: {:?}", plan_node);
-                let handle = Handle::current();
                 let plan_node_to_send = plan_node.clone();
-                let res = handle.block_on(async move {
-                    Config::current_worker_services()
-                        .query_executor
-                        .execute_worker_plan(plan_node_to_send, remote_to_local_names)
-                        .await
-                });
+                let res = Config::current_worker_services()
+                    .query_executor
+                    .execute_worker_plan(plan_node_to_send, remote_to_local_names)
+                    .await;
                 debug!("Running select in worker completed: {:?}", plan_node);
                 SerializedRecordBatchStream::write(res?)
             }
@@ -142,7 +139,7 @@ lazy_static! {
 impl Cluster for ClusterImpl {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError> {
         if self.server_name == node_name {
-            self.job_notify.notify();
+            self.job_notify.notify_waiters();
             Ok(())
         } else {
             unimplemented!()
@@ -253,10 +250,10 @@ impl JobRunner {
                 return;
             }
             let res = tokio::select! {
-                _ = self.notify.notified().fuse() => {
+                _ = self.notify.notified() => {
                     self.fetch_and_process().await
                 }
-                _ = time::delay_for(Duration::from_secs(5)) => {
+                _ = Delay::new(Duration::from_secs(5)) => {
                     self.fetch_and_process().await
                 }
             };
@@ -285,10 +282,10 @@ impl JobRunner {
         let heart_beat_timer = tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = tx.closed().fuse() => {
+                    _ = tx.closed() => {
                         break;
                     }
-                    _ = time::delay_for(Duration::from_secs(30)) => {
+                    _ = Delay::new(Duration::from_secs(30)) => {
                         let _ = meta_store.update_heart_beat(job_id).await; // TODO handle result
                     }
                 }
@@ -438,7 +435,10 @@ impl ClusterImpl {
     pub async fn wait_for_worker_to_close(&self) {
         let mut receiver = self.close_worker_socket_rx.read().await.clone();
         loop {
-            if let Some(true) = receiver.recv().await {
+            if receiver.changed().await.is_err() {
+                return;
+            }
+            if *receiver.borrow() {
                 return;
             }
         }
@@ -477,12 +477,12 @@ impl ClusterImpl {
         *jobs_enabled = false;
         for _ in 0..4 {
             // TODO number of job event loops
-            self.job_notify.notify();
+            self.job_notify.notify_waiters();
         }
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
             pool.stop_workers().await?;
         }
-        self.close_worker_socket_tx.broadcast(true)?;
+        self.close_worker_socket_tx.send(true)?;
         Ok(())
     }
 
@@ -502,15 +502,15 @@ impl ClusterImpl {
 
     pub async fn listen_on_worker_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
         if let Some(address) = cluster.config_obj.worker_bind_address() {
-            let mut listener = TcpListener::bind(address.clone()).await?;
+            let listener = TcpListener::bind(address.clone()).await?;
 
             info!("Worker port open on {}", address);
 
             loop {
                 let mut stop_receiver = cluster.close_worker_socket_rx.write().await;
                 let (mut socket, _) = tokio::select! {
-                    Some(stopped) = stop_receiver.recv() => {
-                        if stopped {
+                    res = stop_receiver.changed() => {
+                        if res.is_err() || *stop_receiver.borrow() {
                             return Ok(());
                         } else {
                             continue;
@@ -624,11 +624,13 @@ impl ClusterImpl {
         {
             let mut heart_beat_file = File::create(heart_beat_path.clone()).await?;
 
-            heart_beat_file.write_u64(
-                SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)?
-                    .as_secs(),
-            );
+            heart_beat_file
+                .write_u64(
+                    SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)?
+                        .as_secs(),
+                )
+                .await?;
             heart_beat_file.flush().await?;
         }
 
@@ -701,10 +703,6 @@ mod tests {
             unimplemented!()
         }
 
-        async fn delete_wal(&self, _wal_id: u64) -> Result<(), CubeError> {
-            unimplemented!()
-        }
-
         fn get_wal_chunk_size(&self) -> usize {
             unimplemented!()
         }
@@ -744,7 +742,7 @@ mod tests {
         }
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn elect_leader() {
         let config = Config::test("leader");
         let local = env::temp_dir().join(Path::new("local-leader"));

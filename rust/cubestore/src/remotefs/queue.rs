@@ -73,8 +73,8 @@ impl QueueRemoteFs {
                         to_process = to_move.upload_queue.pop() => {
                             to_process
                         }
-                        stopped = stopped_rx.recv() => {
-                            if let Some(true) = stopped {
+                        res = stopped_rx.changed() => {
+                            if res.is_err() || *stopped_rx.borrow() {
                                 return;
                             }
                             continue;
@@ -97,8 +97,8 @@ impl QueueRemoteFs {
                         to_process = to_move.download_queue.pop() => {
                             to_process
                         }
-                        stopped = stopped_rx.recv() => {
-                            if let Some(true) = stopped {
+                        res = stopped_rx.changed() => {
+                            if res.is_err() || *stopped_rx.borrow() {
                                 return;
                             }
                             continue;
@@ -114,7 +114,7 @@ impl QueueRemoteFs {
     }
 
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        Ok(self.stopped_tx.broadcast(true)?)
+        Ok(self.stopped_tx.send(true)?)
     }
 
     async fn upload_loop(&self, to_process: RemoteFsOp) -> Result<(), CubeError> {

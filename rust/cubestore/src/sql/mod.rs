@@ -702,6 +702,7 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use crate::store::WALStore;
+    use futures_timer::Delay;
     use itertools::Itertools;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
@@ -713,7 +714,7 @@ mod tests {
     use std::{env, fs};
     use uuid::Uuid;
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn create_schema_test() {
         let config = Config::test("create_schema_test");
         let path = "/tmp/test_create_schema";
@@ -751,7 +752,7 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn create_table_test() {
         let config = Config::test("create_table_test");
         let path = "/tmp/test_create_table";
@@ -1234,6 +1235,9 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts_s3() {
+        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+            return;
+        }
         Config::test("high_frequency_inserts_s3")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
@@ -1256,6 +1260,81 @@ mod tests {
                             region: "us-west-2".to_string(),
                             bucket_name: "cube-store-ci-test".to_string(),
                             sub_path: Some("high_frequency_inserts_s3".to_string()),
+                        };
+                        c
+                    })
+                    .start_test_worker(async move |_| {
+                        service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                        service
+                            .exec_query("CREATE TABLE foo.numbers (num int)")
+                            .await
+                            .unwrap();
+
+                        for _ in 0..3 {
+                            let mut values = Vec::new();
+                            for i in 0..100000 {
+                                values.push(i);
+                            }
+
+                            let values = values.into_iter().map(|v| format!("({})", v)).join(", ");
+                            service
+                                .exec_query(&format!(
+                                    "INSERT INTO foo.numbers (num) VALUES {}",
+                                    values
+                                ))
+                                .await
+                                .unwrap();
+                        }
+
+                        let (first_query, second_query) = futures::future::join(
+                            service.exec_query("SELECT count(*) from foo.numbers"),
+                            service.exec_query("SELECT sum(num) from foo.numbers"),
+                        )
+                        .await;
+
+                        let result = first_query.unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(300000)])
+                        );
+
+                        let result = second_query.unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(300000 / 2 * 99999)])
+                        );
+                    })
+                    .await;
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn high_frequency_inserts_gcs() {
+        if env::var("SERVICE_ACCOUNT_JSON").is_err() {
+            return;
+        }
+        Config::test("high_frequency_inserts_gcs")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c.store_provider = FileStoreProvider::GCS {
+                    bucket_name: "cube-store-ci-test".to_string(),
+                    sub_path: Some("high_frequency_inserts_gcs".to_string()),
+                };
+                c.select_workers = vec!["127.0.0.1:4312".to_string()];
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                Config::test("high_frequency_inserts_gcs_worker_1")
+                    .update_config(|mut c| {
+                        c.worker_bind_address = Some("127.0.0.1:4312".to_string());
+                        c.store_provider = FileStoreProvider::GCS {
+                            bucket_name: "cube-store-ci-test".to_string(),
+                            sub_path: Some("high_frequency_inserts_gcs".to_string()),
                         };
                         c
                     })
@@ -1347,7 +1426,7 @@ mod tests {
                 //     .unwrap();
 
                 // TODO API to wait for all jobs to be completed and all events processed
-                tokio::time::delay_for(Duration::from_millis(500)).await;
+                Delay::new(Duration::from_millis(500)).await;
 
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")

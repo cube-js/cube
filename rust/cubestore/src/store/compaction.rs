@@ -198,7 +198,7 @@ mod tests {
     use crate::store::{DataFrame, MockChunkDataStore};
     use crate::table::{Row, TableValue};
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn compaction() {
         let (remote_fs, metastore) = RocksMetaStore::prepare_test_metastore("compaction");
         let mut chunk_store = MockChunkDataStore::new();

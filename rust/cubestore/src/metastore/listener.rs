@@ -96,7 +96,7 @@ impl MetastoreListenerImpl {
             .drain_filter(|(_, wait_fn)| wait_fn(event.clone()))
             .collect::<Vec<_>>();
         for (notify, _) in to_notify {
-            notify.notify();
+            notify.notify_waiters();
         }
         Ok(())
     }

@@ -35,7 +35,7 @@ impl EventSender {
             Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         );
         self.events.lock().await.push(properties);
-        self.notify.notify();
+        self.notify.notify_waiters();
     }
 
     pub async fn send_loop(&self) {
@@ -58,7 +58,7 @@ impl EventSender {
     pub async fn stop_loop(&self) {
         let mut stopped = self.stopped.write().await;
         *stopped = true;
-        self.notify.notify();
+        self.notify.notify_waiters();
     }
 
     async fn send_events(mut to_send: Vec<HashMap<String, String>>) -> Result<(), CubeError> {

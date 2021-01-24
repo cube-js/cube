@@ -1,3 +1,4 @@
+pub mod gcs;
 pub mod queue;
 pub mod s3;
 

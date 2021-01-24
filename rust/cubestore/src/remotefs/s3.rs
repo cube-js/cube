@@ -49,13 +49,13 @@ impl RemoteFs for S3RemoteFs {
     async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
-        let status_code = self
-            .bucket
-            .put_object_stream(
-                self.dir.read().await.as_path().join(remote_path),
-                self.s3_path(remote_path),
-            )
-            .await?;
+        let path = self.s3_path(remote_path);
+        let bucket = self.bucket.clone();
+        let local_path = self.dir.read().await.as_path().join(remote_path);
+        let status_code = tokio::task::spawn_blocking(move || {
+            bucket.put_object_stream_blocking(local_path, path)
+        })
+        .await??;
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 200 {
             return Err(CubeError::user(format!(
@@ -68,18 +68,21 @@ impl RemoteFs for S3RemoteFs {
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local = self.dir.write().await.as_path().join(remote_path);
-        let path = local.to_str().unwrap().to_owned();
+        let local_path = local.to_str().unwrap().to_owned();
+        let local_to_move = local_path.clone();
         fs::create_dir_all(local.parent().unwrap()).await?;
         if !local.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
-            let mut output_file = std::fs::File::create(path.as_str())?;
-            let status_code = self
-                .bucket
-                .get_object_stream(self.s3_path(remote_path), &mut output_file)
-                .await?;
-            // TODO async
-            output_file.flush()?;
+            let path = self.s3_path(remote_path);
+            let bucket = self.bucket.clone();
+            let status_code = tokio::task::spawn_blocking(move || {
+                let mut output_file = std::fs::File::create(local_to_move.as_str())?;
+                let res = bucket.get_object_stream_blocking(path.as_str(), &mut output_file);
+                output_file.flush()?;
+                res
+            })
+            .await??;
             info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
             if status_code != 200 {
                 return Err(CubeError::user(format!(
@@ -88,13 +91,16 @@ impl RemoteFs for S3RemoteFs {
                 )));
             }
         }
-        Ok(path)
+        Ok(local_path)
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
-        let (_, status_code) = self.bucket.delete_object(self.s3_path(remote_path)).await?;
+        let path = self.s3_path(remote_path);
+        let bucket = self.bucket.clone();
+        let (_, status_code) =
+            tokio::task::spawn_blocking(move || bucket.delete_object_blocking(path)).await??;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 204 {
             return Err(CubeError::user(format!(
@@ -124,11 +130,13 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        let list = self.bucket.list(self.s3_path(remote_prefix), None).await?;
+        let path = self.s3_path(remote_prefix);
+        let bucket = self.bucket.clone();
+        let list = tokio::task::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()
-            .flat_map(|res| {
+            .flat_map(|(res, _)| {
                 res.contents
                     .iter()
                     .map(|o| -> Result<RemoteFile, CubeError> {
