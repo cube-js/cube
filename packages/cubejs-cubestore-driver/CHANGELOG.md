@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.25](https://github.com/cube-js/cube.js/compare/v0.25.24...v0.25.25) (2021-01-24)
+
+
+### Bug Fixes
+
+* **cubestore:** Ignore CUBEJS_DB_SSL env ([86f06f7](https://github.com/cube-js/cube.js/commit/86f06f7955b3d230c9398953fec76c2569460701))
+
+
+
+
+
 ## [0.25.24](https://github.com/cube-js/cube.js/compare/v0.25.23...v0.25.24) (2021-01-22)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver
