@@ -3,7 +3,7 @@ use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::{MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::remotefs::RemoteFs;
-use crate::store::{ChunkStore, WALStore};
+use crate::store::ChunkStore;
 use crate::CubeError;
 use log::error;
 use std::sync::Arc;
@@ -45,8 +45,8 @@ impl SchedulerImpl {
             let mut stop_receiver = self.stop_receiver.lock().await;
             let mut event_receiver = self.event_receiver.lock().await;
             let event = tokio::select! {
-                Some(stopped) = stop_receiver.recv() => {
-                    if stopped {
+                res = stop_receiver.changed() => {
+                    if res.is_err() || *stop_receiver.borrow() {
                         return Ok(());
                     } else {
                         continue;
@@ -64,7 +64,7 @@ impl SchedulerImpl {
     }
 
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        Ok(self.stop_sender.broadcast(true)?)
+        Ok(self.stop_sender.send(true)?)
     }
 
     async fn process_event(&self, event: MetaStoreEvent) -> Result<(), CubeError> {
@@ -120,11 +120,11 @@ impl SchedulerImpl {
                 self.schedule_table_import(row_id).await?;
             }
         }
-        if let MetaStoreEvent::Delete(TableId::WALs, row_id) = event {
-            self.remote_fs
-                .delete_file(WALStore::wal_remote_path(row_id).as_str())
-                .await?
-        }
+        // if let MetaStoreEvent::Delete(TableId::WALs, row_id) = event {
+        //     self.remote_fs
+        //         .delete_file(WALStore::wal_remote_path(row_id).as_str())
+        //         .await?
+        // }
         if let MetaStoreEvent::Delete(TableId::Chunks, row_id) = event {
             self.remote_fs
                 .delete_file(ChunkStore::chunk_remote_path(row_id).as_str())

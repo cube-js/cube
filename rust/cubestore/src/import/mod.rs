@@ -5,13 +5,13 @@ use crate::CubeError;
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
 use core::mem;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use mockall::automock;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::stream::Stream;
+use tokio_stream::wrappers::LinesStream;
 
 impl ImportFormat {
     async fn row_stream(
@@ -23,7 +23,7 @@ impl ImportFormat {
             ImportFormat::CSV => {
                 let file = File::open(location).await?;
                 let lines = BufReader::new(file).lines();
-                let rows = lines.map(move |line| -> Result<Row, CubeError> {
+                let rows = LinesStream::new(lines).map(move |line| -> Result<Row, CubeError> {
                     let str = line?;
                     let mut remaining: &str = str.as_str();
                     let mut row = Vec::with_capacity(columns.len());

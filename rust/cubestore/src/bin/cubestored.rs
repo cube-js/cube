@@ -27,21 +27,15 @@ fn main() {
         .with_module_level("cubestore", log_level.to_level_filter());
     ReportingLogger::init(Box::new(logger), log_level.to_level_filter()).unwrap();
 
-    let mut runtime = Builder::new()
-        .enable_all()
-        .threaded_scheduler()
-        .build()
-        .unwrap();
-
     let config = Config::default();
 
     config.configure_worker();
 
     debug!("New process started");
 
-    runtime.enter(|| {
-        procspawn::init();
-    });
+    procspawn::init();
+
+    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
     runtime.block_on(async move {
         let services = config.configure().await;

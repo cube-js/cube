@@ -15,23 +15,25 @@ use arrow::datatypes::Field;
 use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
+use core::fmt;
 use datafusion::datasource::datasource::Statistics;
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{Expr, LogicalPlan};
+use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::{collect, ExecutionPlan};
+use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRecordBatchStream};
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
-use datafusion::{datasource::MemTable, datasource::TableProvider, prelude::ExecutionContext};
+use datafusion::{datasource::TableProvider, prelude::ExecutionContext};
 use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
+use smallvec::alloc::fmt::Formatter;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::runtime::Handle;
 
 #[automock]
 #[async_trait]
@@ -188,6 +190,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum InfoSchemaTable {
     Tables,
     Schemata,
@@ -253,11 +256,6 @@ impl InfoSchemaTableProvider {
     fn new(meta_store: Arc<dyn MetaStore>, table: InfoSchemaTable) -> InfoSchemaTableProvider {
         InfoSchemaTableProvider { meta_store, table }
     }
-
-    async fn mem_table(&self) -> Result<MemTable, DataFusionError> {
-        let batch = self.table.scan(self.meta_store.clone()).await?;
-        MemTable::try_new(batch.schema(), vec![vec![batch]])
-    }
 }
 
 impl TableProvider for InfoSchemaTableProvider {
@@ -271,13 +269,15 @@ impl TableProvider for InfoSchemaTableProvider {
 
     fn scan(
         &self,
-        projection: &Option<Vec<usize>>,
-        batch_size: usize,
-        filters: &[Expr],
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let handle = Handle::current();
-        let mem_table = handle.block_on(async move { self.mem_table().await })?;
-        mem_table.scan(projection, batch_size, filters)
+        let exec = InfoSchemaTableExec {
+            meta_store: self.meta_store.clone(),
+            table: self.table.clone(),
+        };
+        Ok(Arc::new(exec))
     }
 
     fn statistics(&self) -> Statistics {
@@ -286,6 +286,54 @@ impl TableProvider for InfoSchemaTableProvider {
             total_byte_size: None,
             column_statistics: None,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct InfoSchemaTableExec {
+    meta_store: Arc<dyn MetaStore>,
+    table: InfoSchemaTable,
+}
+
+impl fmt::Debug for InfoSchemaTableExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_fmt(format_args!("{:?}", self.table))
+    }
+}
+
+#[async_trait]
+impl ExecutionPlan for InfoSchemaTableExec {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> DFSchemaRef {
+        self.table.schema().to_dfschema_ref().unwrap()
+    }
+
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(1)
+    }
+
+    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+        vec![]
+    }
+
+    fn with_new_children(
+        &self,
+        _children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        Ok(Arc::new(self.clone()))
+    }
+
+    async fn execute(
+        &self,
+        partition: usize,
+    ) -> Result<SendableRecordBatchStream, DataFusionError> {
+        let batch = self.table.scan(self.meta_store.clone()).await?;
+        let schema = batch.schema();
+        let mem_exec = MemoryExec::try_new(&vec![vec![batch]], schema, None)?;
+        mem_exec.execute(partition).await
     }
 }
 
