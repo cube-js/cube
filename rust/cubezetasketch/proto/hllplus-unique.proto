@@ -1,0 +1,114 @@
+/*
+ * Copyright 2019 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Serialized state of HyperLogLogPlusPlus aggregator.
+
+syntax = "proto2";
+
+package zetasketch;
+
+import "aggregator.proto";
+import "unique-stats.proto";
+
+option java_package = "com.google.protos.zetasketch";
+
+extend AggregatorStatsProto {
+  // This field id should match AggregatorType.HYPERLOGLOG_PLUS_UNIQUE
+  optional UniqueStatsProto hyperloglog_plus_unique_stats = 112;
+}
+
+// Represents an HLL++ aggregator in either sparse or normal representation.
+// For more details on the algorithm, the representations and the concepts
+// please check the HLL++ paper (https://goo.gl/pc916Z).
+message HyperLogLogPlusUniqueStateProto {
+  // No longer used
+  reserved 1;
+
+  // Size of sparse list, i.e., how many different indexes are present in
+  // "sparse_data".
+  optional int32 sparse_size = 2;
+
+  // Precision / number of buckets for the normal representation.
+  //
+  // This field is used slightly differently across the v1 and v2 versions of
+  // the algorithm (see the encoding_version field in the AggregatorStateProto):
+  //
+  //   * In v1 this field is the total number of buckets 2^p where "p" is the
+  //     requested precision. Accepted values are powers of two in the [2^10,
+  //     2^24] interval.
+  //   * In v2 this field is the precision "p" directly. Accepted values are in
+  //     the range [10, 24].
+  //
+  // Encoding the precision rather than the number of buckets allows us to save
+  // 1-2 bytes which makes a fair difference when storing many small
+  // cardinalities.
+  //
+  // Note that different implementations might choose to not support the whole
+  // range of precisions from [10, 24].
+  optional int32 precision_or_num_buckets = 3;
+
+  // Precision / number of buckets for sparse representation.
+  //
+  // This field is used slightly differently across the v1 and v2 versions of
+  // the algorithm (see the encoding_version field in the AggregatorStateProto):
+  //
+  //   * In v1 this field is 2^sp where "sp" is the sparse precision. Accepted
+  //     values are powers of two in the [2^p, 2^25] interval.
+  //   * In v2 this field represents the precision "sp" directly. Accepted
+  //     values are in the range [p, 25].
+  //
+  // Encoding the precision rather than the number of buckets allows us to save
+  // 2-3 bytes which makes a fair difference when storing many small
+  // cardinalities.
+  optional int32 sparse_precision_or_num_buckets = 4;
+
+  // Normal data representation. If this field is populated, there are exactly
+  // 2^p bytes in it.
+  //
+  // data[idx] represents rhoW for the substream with the given "idx". See the
+  // the HLL++ paper (https://goo.gl/pc916Z) for a description of how "rhoW" and
+  // "idx" are computed.
+  optional bytes data = 5 [ctype = CORD];
+
+  // Sparse data representation.
+  //
+  // IMPORTANT: It is considered an error if the size of this field is bigger
+  // than precision_or_num_buckets (v1), resp. 2^precision_or_num_buckets (v2).
+  // The normal encoding should be used in this case since the memory usage
+  // would be smaller.
+  //
+  // For a sorted list of unsigned integers representing sparse data encodings,
+  // this field contains the varint encoding for the differences between
+  // consecutive values in the list:
+  //   list[0], list[1] - list[0], ... , list[n] - list[n - 1]
+  // Note: if "encoding_version" of the enclosing AggregatorStateProto is 1, the
+  // diffs are encoded as signed varints using ZigZag encoding and the
+  // sparse encodings are the ones defined in the HLL++ paper
+  // (https://goo.gl/pc916Z), i.e., different than the ones below.
+  //
+  // In v2, there are two encodings possible for a value in sparse data format:
+  // enc(idx, rhoW) = 1) 1 << (max(sp, p+6)) | (idx >> (sp - p)) | rhoW
+  //                    if the last sp - p bits of idx are all 0;
+  //                  2) idx, otherwise.
+  optional bytes sparse_data = 6 [ctype = CORD];
+
+  reserved 7;
+}
+
+extend AggregatorStateProto {
+  // This field id should match AggregatorType.HYPERLOGLOG_PLUS_UNIQUE
+  optional HyperLogLogPlusUniqueStateProto hyperloglogplus_unique_state = 112;
+}
