@@ -15,6 +15,8 @@ import cors, { CorsOptions } from 'cors';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
 import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
+import { gracefulMiddleware } from './graceful-middleware';
+import { ServerStatusHandler } from './server-status';
 
 const { version } = require('../package.json');
 
@@ -52,6 +54,8 @@ export class CubejsServer {
 
   protected socketServer: WebSocketServer | null = null;
 
+  protected readonly status: ServerStatusHandler = new ServerStatusHandler();
+
   public constructor(config: CreateOptions = {}) {
     this.config = {
       ...config,
@@ -77,9 +81,12 @@ export class CubejsServer {
       }
 
       const app = express();
-
       app.use(cors(this.config.http.cors));
       app.use(bodyParser.json({ limit: '50mb' }));
+
+      if (this.config.gracefulShutdown) {
+        app.use(gracefulMiddleware(this.status, this.config.gracefulShutdown));
+      }
 
       if (this.config.initApp) {
         await this.config.initApp(app);
@@ -207,10 +214,6 @@ export class CubejsServer {
   }
 
   public async shutdown(signal: string, graceful: boolean = true) {
-    if (graceful) {
-      console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdown}s`);
-    }
-
     try {
       const timeoutKiller = withTimeout(
         () => {
@@ -223,6 +226,8 @@ export class CubejsServer {
         // this.server.stop can be closed in this.config.gracefulShutdown, let's add 1s before kill
         ((this.config.gracefulShutdown || 2) + 1) * 1000,
       );
+
+      this.status.shutdown();
 
       if (this.redirector) {
         this.redirector.close();
