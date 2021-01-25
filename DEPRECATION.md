@@ -169,13 +169,21 @@ const { BaseQuery } = require('@cubejs-backend/schema-compiler');
 
 **Deprecated in Release: v0.26.0**
 
-Previously our authentication mechanism was tightly bound to Express. Due to the
-[deprecation of the Express-based API](#embedding-cubejs-within-express), we
-want our authentication API to be generic and not transport-specific. We now
-recommend using [`checkAuth`][ref-checkauth] as a transport-agnostic method of
-authentication. This means the same authentication logic can be reused for both
-HTTP and Websockets transports.
+> 
 
+Motivation:
+
+1. The `checkAuthMiddleware` was tightly bound to Express, [which was deprecated](#embedding-cubejs-within-express).
+2. HTTP is not only the transport for Cube.js, We support WebSocket server, which can be a default way in the feature. In this case
+   we want our authentication API to be not transport-specific.
+
+We now recommend using [`checkAuth`][ref-checkauth] as a transport-agnostic method of
+authentication. This means the same authentication logic can be reused for both
+HTTP and Websockets transports. 
+
+If you are using custom authorization, please take a (look at the documentation)[link-custom-auth]
+
+[link-custom-auth]: https://cube.dev/docs/security#custom-authentication
 [ref-checkauth]: https://cube.dev/docs/config#options-reference-check-auth
 
 ### Node.js 10
@@ -196,6 +204,22 @@ the opportunity to simplify this.
 
 `USER_CONTEXT` has been renamed to `SECURITY_CONTEXT`.
 
+Deprecated:
+
+```js
+cube(`visitors`, {
+  sql: `select * from visitors WHERE ${USER_CONTEXT.source.filter('source')}`
+});
+```
+
+You should use:
+
+```js
+cube(`visitors`, {
+  sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter('source')}`
+});
+```
+
 ### `authInfo`
 
 **Deprecated in Release: v0.26.0**
@@ -205,3 +229,33 @@ the `u` property. It has also been renamed to
 [`securityContext`][ref-security-context].
 
 [ref-security-context]: /
+
+Deprecated:
+
+```js
+const server = new CubejsServer({
+  checkAuth: async (req, auth) => {
+    // this one!
+    req.authInfo = jwt.verify(auth, pem);
+  },
+  contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
+  preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`,
+});
+```
+
+You should use:
+
+>> Attention: `authInfo` renamed across all configuration. Check all functions for `authInfo` and rename it to `securityContext`.
+
+```js
+const server = new CubejsServer({
+  checkAuth: async (req, auth) => {
+    // this one!
+    req.securityContext = jwt.verify(auth, pem);
+  },
+  // this one
+  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
+  // this one
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
+});
+```
