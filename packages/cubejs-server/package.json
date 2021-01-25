@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
-  "version": "0.25.26",
+  "version": "0.25.27",
   "types": "index.d.ts",
   "repository": {
     "type": "git",

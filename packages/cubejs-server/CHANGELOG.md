@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.27](https://github.com/cube-js/cube.js/compare/v0.25.26...v0.25.27) (2021-01-25)
+
+
+### Features
+
+* **server:** Dont accept new request(s) during shutdown ([#1855](https://github.com/cube-js/cube.js/issues/1855)) ([78f8f0b](https://github.com/cube-js/cube.js/commit/78f8f0ba395f061c5acb9055c2a83c2d573b950c))
+
+
+
+
+
 ## [0.25.26](https://github.com/cube-js/cube.js/compare/v0.25.25...v0.25.26) (2021-01-25)
 
 **Note:** Version bump only for package @cubejs-backend/server

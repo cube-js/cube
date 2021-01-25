@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.27](https://github.com/cube-js/cube.js/compare/v0.25.26...v0.25.27) (2021-01-25)
+
+
+### Bug Fixes
+
+* **mongobi-driver:** authSwitchHandler api is deprecated, please use new authPlugins api ([5ee9349](https://github.com/cube-js/cube.js/commit/5ee93497972f1cbd0436f0179c2959867e4b3101))
+
+
+
+
+
 ## [0.25.26](https://github.com/cube-js/cube.js/compare/v0.25.25...v0.25.26) (2021-01-25)
 
 **Note:** Version bump only for package @cubejs-backend/mongobi-driver
