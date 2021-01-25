@@ -142,8 +142,19 @@ class CubeStoreDriver extends BaseDriver {
   }
 
   async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
+    if (tableData.csvFile) {
+      const createTableSql = this.createTableSql(table, columns);
+      const indexes =
+        indexesSql.map(s => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
+      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ?`;
+      await this.query(createTableSqlWithLocation, [tableData.csvFile]).catch(e => {
+        e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+        throw e;
+      });
+      return;
+    }
     if (!tableData.rows) {
-      throw new Error(`${this.constructor} driver supports only rows upload`);
+      throw new Error(`${this.constructor} driver supports only rows and CSV upload`);
     }
     await this.createTable(table, columns);
     try {
@@ -176,6 +187,12 @@ class CubeStoreDriver extends BaseDriver {
 
   static dialectClass() {
     return CubeStoreQuery;
+  }
+
+  capabilities() {
+    return {
+      csvImport: true
+    };
   }
 }
 

@@ -24,6 +24,7 @@ use crate::cluster::{Cluster, JobEvent};
 use crate::metastore::job::JobType;
 use crate::queryplanner::query_executor::QueryExecutor;
 use crate::sql::parser::CubeStoreParser;
+use chrono::{TimeZone, Utc};
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use hex::FromHex;
@@ -83,7 +84,19 @@ impl SqlServiceImpl {
             if let Statement::CreateIndex { name, columns, .. } = index {
                 indexes_to_create.push(IndexDef {
                     name: name.to_string(),
-                    columns: columns.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
+                    columns: columns
+                        .iter()
+                        .map(|c| {
+                            if let Expr::Identifier(ident) = &c.expr {
+                                Ok(ident.value.to_string())
+                            } else {
+                                Err(CubeError::internal(format!(
+                                    "Unexpected column expression: {:?}",
+                                    c.expr
+                                )))
+                            }
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
                 });
             }
         }
@@ -100,12 +113,15 @@ impl SqlServiceImpl {
                     indexes_to_create,
                 )
                 .await?;
-            listener
+            let import_res = listener
                 .wait_for_job_result(
                     RowKey::Table(TableId::Tables, table.get_id()),
                     JobType::TableImport,
                 )
                 .await?;
+            if let JobEvent::Error(_, _, e) = import_res {
+                return Err(CubeError::user(format!("Create table failed: {}", e)));
+            }
             let wal_listener = self.cluster.job_result_listener();
             let wals = self.db.get_wals_for_table(table.get_id()).await?;
             let events = wal_listener
@@ -627,9 +643,7 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 return Ok(TableValue::Bytes(val?));
             }
             ColumnType::Timestamp => match cell {
-                Expr::Value(Value::SingleQuotedString(v)) => {
-                    TableValue::Timestamp(TimestampValue::new(string_to_timestamp_nanos(v)?))
-                }
+                Expr::Value(Value::SingleQuotedString(v)) => timestamp_from_string(v)?,
                 x => {
                     return Err(CubeError::user(format!(
                         "Can't parse timestamp from, {:?}",
@@ -656,6 +670,16 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
         }
     };
     Ok(res)
+}
+
+pub fn timestamp_from_string(v: &str) -> Result<TableValue, CubeError> {
+    let result = string_to_timestamp_nanos(v).or_else(|_| {
+        if let Ok(ts) = Utc.datetime_from_str(v, "%Y-%m-%d %H:%M:%S UTC") {
+            return Ok(ts.timestamp_nanos());
+        }
+        return Err(CubeError::user(format!("Can't parse timestamp: {}", v)));
+    });
+    Ok(TableValue::Timestamp(TimestampValue::new(result?)))
 }
 
 fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
@@ -2044,14 +2068,15 @@ mod tests {
 
                 let mut file = File::create(dir.clone()).unwrap();
 
-                file.write_all("1,San Francisco\n".as_bytes()).unwrap();
-                file.write_all("2,New York\n".as_bytes()).unwrap();
+                file.write_all("id,city,t\n".as_bytes()).unwrap();
+                file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("2,New York,2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
 
                 dir
             };
 
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text) INDEX persons_city (city, id) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
+            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text, t timestamp) INDEX persons_city (`city`, `id`) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
             let res = service.exec_query("CREATE INDEX by_city ON Foo.Persons (city)").await;
             let error = format!("{:?}", res);
             assert!(error.contains("has data"));

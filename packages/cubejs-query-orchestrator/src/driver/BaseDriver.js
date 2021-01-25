@@ -220,7 +220,8 @@ export class BaseDriver {
     return 10000;
   }
 
-  async downloadTable(table) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async downloadTable(table, options) {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
@@ -319,5 +320,9 @@ export class BaseDriver {
         error: (error.stack || error).toString()
       });
     }
+  }
+
+  capabilities() {
+    return {};
   }
 }
