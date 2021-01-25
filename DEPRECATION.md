@@ -33,30 +33,50 @@ features:
   migrate to alternatives. In such cases, a warning may be printed, and users
   should not rely on this feature.
 
-| Status     | Feature                                                              | Deprecated | Remove       |
-| ---------- | -------------------------------------------------------------------- | ---------- | ------------ |
-| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                    | v0.25.0    | v0.25.0      |
-| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express) | v0.24.0    | June 2021    |
-| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                            | v0.23.11   | January 2021 |
-| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                              | v0.23.8    | June 2021    |
-| Deprecated | [Node.js 8](#nodejs-8)                                               | v0.22.4    | v0.26.0      |
-| Deprecated | Absolute import for @cubejs-backend/query-orchestrator               | v0.24.2    | v0.28.0      |
-| Deprecated | Absolute import for @cubejs-backend/server-core                      | v0.25.4    | v0.30.0      |
-| Deprecated | Absolute import for @cubejs-backend/schema-compiler                  | v0.25.21   | v0.32.0      |
+| Status     | Feature                                                                                                            | Deprecated | Remove       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ | ---------- | ------------ |
+| Deprecated | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0      |
+| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                            | v0.23.8    | June 2021    |
+| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | v0.26.0      |
+| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                               | v0.24.0    | June 2021    |
+| Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator) | v0.24.2    | v0.28.0      |
+| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                  | v0.25.0    | v0.25.0      |
+| Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)               | v0.25.4    | v0.30.0      |
+| Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)       | v0.25.21   | v0.32.0      |
+| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                      | v0.26.0    |              |
+| Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    |              |
+| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |              |
+| Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |              |
 
-### `contextToDataSourceId`
+### Node.js 8
 
-**Removed in Release: v0.25.0**
+**Removed in Release: v0.26.0**
 
-The `contextToDataSourceId` option in the `cube.js` configuration file has been
-replaced by [`contextToOrchestratorId`][link-contexttoorchestratorid]. Prior to
-this change, multi-tenant setups were forced to share a Query Orchestrator
-instance. Now orchestrator instances can be shared by Cube.js instances and
-across different tenants, if need be. Single-tenant setups should consider
-removing the `contextToDataSourceId` property completely.
+Node.js 8 reached [End of Life on December 31, 2019][link-nodejs-eol]. This
+means no more updates. Please upgrade to Node.js 10 or higher.
 
-[link-contexttoorchestratorid]:
-  https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
+[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+### `hearBeatInterval`
+
+**Deprecated in Release: v0.23.8**
+
+This option for [`@cubejs-client/ws-transport`][link-hearbeatinterval] has been
+replaced by `heartBeatInterval`.
+
+[link-hearbeatinterval]:
+  https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
+
+### `CUBEJS_ENABLE_TLS`
+
+**Deprecated in Release: v0.23.11**
+
+We no longer recommend setting TLS options via Cube.js. Developers should set up
+TLS on a load balancer or reverse proxy instead. [Read more
+here][link-enable-https].
+
+[link-enable-https]:
+  https://cube.dev/docs/deployment/production-checklist#enable-https
 
 ### Embedding Cube.js within Express
 
@@ -74,86 +94,114 @@ microservices, if necessary).
 [link-migration]:
   https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
 
-### `CUBEJS_ENABLE_TLS`
-
-**Deprecated in Release: v0.23.11**
-
-We no longer recommend setting TLS options via Cube.js. Developers should set up
-TLS on a load balancer or reverse proxy instead. [Read more
-here][link-enable-https].
-
-[link-enable-https]:
-  https://cube.dev/docs/deployment/production-checklist#enable-https
-
-### `hearBeatInterval`
-
-**Deprecated in Release: v0.23.8**
-
-This option for [`@cubejs-client/ws-transport`][link-hearbeatinterval] has been
-replaced by `heartBeatInterval`.
-
-[link-hearbeatinterval]:
-  https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
-
-### Node.js 8
-
-**Deprecated in Release: v0.22.4**
-
-Node.js 8 reached [End of Life on December 31, 2019][link-nodejs-eol]. This
-means no more updates. Please upgrade to Node.js 10 or higher.
-
-[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
-
-### Absolute import for @cubejs-backend/query-orchestrator
+### Absolute import for `@cubejs-backend/query-orchestrator`
 
 **Deprecated in Release: v0.24.2**
 
-Reason: Absolute imports highly depend on a path, and all API becomes public. Now we started to provide public API as `export` from the module.
+Absolute imports highly depend on a path, and all API becomes public. We now
+provide a public API from the package directly.
 
 Deprecated:
 
-```js
+```javascript
 const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
 ```
 
 You should use:
 
-```js
+```javascript
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 ```
 
-### Absolute import for @cubejs-backend/server-core
+### `contextToDataSourceId`
+
+**Removed in Release: v0.25.0**
+
+The `contextToDataSourceId` option in the `cube.js` configuration file has been
+replaced by [`contextToOrchestratorId`][link-contexttoorchestratorid]. Prior to
+this change, multi-tenant setups were forced to share a Query Orchestrator
+instance. Now orchestrator instances can be shared by Cube.js instances and
+across different tenants, if need be. Single-tenant setups should consider
+removing the `contextToDataSourceId` property completely.
+
+[link-contexttoorchestratorid]:
+  https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
+
+### Absolute import for `@cubejs-backend/server-core`
 
 **Deprecated in Release: v0.25.4**
 
-Reason: Absolute imports highly depend on a path, and all API becomes public. Now we started to provide public API as `export` from the module.
+Absolute imports highly depend on a path, and all API becomes public. We now
+provide a public API from the package directly.
 
 Deprecated:
 
-```js
+```javascript
 const CubejsServerCore = require('@cubejs-backend/server-core');
 ```
 
 You should use:
 
-```js
+```javascript
 const { CubejsServerCore } = require('@cubejs-backend/server-core');
 ```
 
-### Absolute import for @cubejs-backend/schema-compiler
+### Absolute import for `@cubejs-backend/schema-compiler`
 
 **Deprecated in Release: v0.25.21**
 
-Reason: Absolute imports highly depend on a path, and all API becomes public. Now we started to provide public API as `export` from the module.
+Absolute imports highly depend on a path, and all API becomes public. We now
+provide a public API from the package directly.
 
 Deprecated:
 
-```js
+```javascript
 const BaseQuery = require('@cubejs-backend/schema-compiler/adapter/BaseQuery');
 ```
 
 You should use:
 
-```js
+```javascript
 const { BaseQuery } = require('@cubejs-backend/schema-compiler');
 ```
+
+### `checkAuthMiddleware`
+
+**Deprecated in Release: v0.26.0**
+
+Previously our authentication mechanism was tightly bound to Express. Due to the
+[deprecation of the Express-based API](#embedding-cubejs-within-express), we
+want our authentication API to be generic and not transport-specific. We now
+recommend using [`checkAuth`][ref-checkauth] as a transport-agnostic method of
+authentication. This means the same authentication logic can be reused for both
+HTTP and Websockets transports.
+
+[ref-checkauth]: https://cube.dev/docs/config#options-reference-check-auth
+
+### Node.js 10
+
+**Deprecated in Release: v0.26.0**
+
+Node.js 10 reaches [End of Life on April 30, 2021][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 12 or higher.
+
+[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+### `USER_CONTEXT`
+
+**Deprecated in Release: v0.26.0**
+
+There are three names for effectively the same concept, and we wanted to take
+the opportunity to simplify this.
+
+`USER_CONTEXT` has been renamed to `SECURITY_CONTEXT`.
+
+### `authInfo`
+
+**Deprecated in Release: v0.26.0**
+
+The `authInfo` parameter to `checkAuth` no longer wraps the decoded JWT under
+the `u` property. It has also been renamed to
+[`securityContext`][ref-security-context].
+
+[ref-security-context]: /
