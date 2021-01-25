@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.28](https://github.com/cube-js/cube.js/compare/v0.25.27...v0.25.28) (2021-01-25)
+
+
+### Bug Fixes
+
+* dependency version resolution ([f314ec5](https://github.com/cube-js/cube.js/commit/f314ec54d15c4c01b9eca602f5587d0896bdca23))
+* **cubestore:** merge() and cardinality() now work on empty inputs ([#1875](https://github.com/cube-js/cube.js/issues/1875)) ([0e35861](https://github.com/cube-js/cube.js/commit/0e358612a133cdd0004d5e03b47e963a8dc66df6))
+
+
+### Features
+
+* **cubestore:** HyperLogLog++ support for BigQuery ([#1872](https://github.com/cube-js/cube.js/issues/1872)) ([357ecef](https://github.com/cube-js/cube.js/commit/357eceffcf56f46634b4f7de7550cfbe77911c2d))
+
+
+
+
+
 ## [0.25.27](https://github.com/cube-js/cube.js/compare/v0.25.26...v0.25.27) (2021-01-25)
 
 
