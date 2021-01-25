@@ -1,48 +1,9 @@
-import { promisify } from 'util';
 import Redis, { Redis as redis, RedisOptions, Pipeline } from 'ioredis';
 
-Pipeline.prototype.execAsync = function execAsync() {
-  return this.exec()
-    .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
-}
-
-export function createRedisSentinelClient(url: string, opts: RedisOptions): PromiseLike<redis> {
-  return addAsyncMethods(createIORedisClient(url, opts));
-}
-
-function addAsyncMethods(client: redis): PromiseLike<redis> {
-  return client
-    .then((client) => {
-      [
-        'brpop',
-        'del',
-        'get',
-        'hget',
-        'rpop',
-        'set',
-        'zadd',
-        'zrange',
-        'zrangebyscore',
-        'keys',
-        'watch',
-        'unwatch',
-        'incr',
-        'decr',
-        'lpush',
-      ].forEach(
-        k => {
-          client[`${k}Async`] = client[k];
-        }
-      );
-
-        /*
-        client.prototype.Multi.execAsync = function execAsync() {
-          return this.exec()
-            .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
-        }
-        */
-      return client;
-    });
+function debugLog(msg) {
+  if (process.env.FLAG_ENABLE_REDIS_SENTINEL_DEBUG) {
+    console.debug(msg);
+  }
 }
 
 function createIORedisClient(url: string, opts: RedisOptions): PromiseLike<redis> {
@@ -101,8 +62,40 @@ function createIORedisClient(url: string, opts: RedisOptions): PromiseLike<redis
   return client.connect().then(() => client);
 }
 
-function debugLog(msg) {
-  if (process.env.FLAG_ENABLE_REDIS_SENTINEL_DEBUG) {
-    console.debug(msg);
-  }
+Pipeline.prototype.execAsync = function execAsync() {
+  return this.exec()
+    .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
+};
+
+function addAsyncMethods(client: redis): PromiseLike<redis> {
+  return client
+    .then((toAugment) => {
+      [
+        'brpop',
+        'del',
+        'get',
+        'hget',
+        'rpop',
+        'set',
+        'zadd',
+        'zrange',
+        'zrangebyscore',
+        'keys',
+        'watch',
+        'unwatch',
+        'incr',
+        'decr',
+        'lpush',
+      ].forEach(
+        k => {
+          toAugment[`${k}Async`] = toAugment[k];
+        }
+      );
+
+      return toAugment;
+    });
+}
+
+export function createRedisSentinelClient(url: string, opts: RedisOptions): PromiseLike<redis> {
+  return addAsyncMethods(createIORedisClient(url, opts));
 }
