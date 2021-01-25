@@ -213,17 +213,21 @@ module.exports = {
 
 ### contextToOrchestratorId
 
-`contextToOrchestratorId` is a function to determine a caching key for Query Orchestrator instance.
-Query Orchestrator instance holds database connections, execution queues, pre-aggregation table caches.
-By default, returns the same value as `contextToAppId`.
+`contextToOrchestratorId` is a function to determine a caching key for Query
+Orchestrator instance. Query Orchestrator instance holds database connections,
+execution queues, pre-aggregation table caches. By default, returns the same
+value as `contextToAppId`.
 
-Override it only in case multiple tenants should share the same execution queue and database connections while having different schemas instead of default Query Orchestrator per tenant strategy. 
+Override it only in case multiple tenants should share the same execution queue
+and database connections while having different schemas instead of default Query
+Orchestrator per tenant strategy.
 
 Called on each request.
 
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}_${authInfo.user_id}`,
+  contextToAppId: ({ authInfo }) =>
+    `CUBEJS_APP_${authInfo.tenantId}_${authInfo.user_id}`,
   contextToOrchestratorId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`,
 };
 ```
@@ -434,9 +438,12 @@ with options [from here][link-express-cors-opts].
 
 ### orchestratorOptions
 
-You can pass this object to set advanced options for Cube.js Query Orchestrator.
+<!-- prettier-ignore-start -->
+[[warning | ]]
+| We **strongly** recommend leaving these options set to the defaults. Changing these values can result in application instability and/or downtime.
+<!-- prettier-ignore-end -->
 
-_Please note that this is advanced configuration._
+You can pass this object to set advanced options for Cube.js Query Orchestrator.
 
 | Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                                      | Default Value           |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
@@ -475,13 +482,13 @@ module.exports = {
 
 Timeout and interval options' values are in seconds.
 
-| Option              | Description                                                                                                  | Default Value |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
+| Option              | Description                                                                                                                                    | Default Value |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. | `2`           |
-| continueWaitTimeout | Long polling interval                                                                                        | `5`           |
-| executionTimeout    | Total timeout of single query                                                                                | `600`         |
-| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                   | `120`         |
-| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled. | `30`          |
+| continueWaitTimeout | Long polling interval                                                                                                                          | `5`           |
+| executionTimeout    | Total timeout of single query                                                                                                                  | `600`         |
+| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                     | `120`         |
+| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                   | `30`          |
 
 ## RequestContext
 
