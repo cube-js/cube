@@ -143,7 +143,6 @@ class CubeStoreDriver extends BaseDriver {
 
   async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     if (tableData.csvFile) {
-      console.log(tableData);
       const createTableSql = this.createTableSql(table, columns);
       const indexes =
         indexesSql.map(s => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
