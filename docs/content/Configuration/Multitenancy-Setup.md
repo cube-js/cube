@@ -23,8 +23,8 @@ The options are:
 All of the above options are functions, which you provide to Cube.js in [cube.js
 config file](config). The
 functions accept one argument - context object, which has a nested object -
-[authInfo](config#request-context-auth-info), which acts as a container, where you can provide all the necessary data to identify user, organization, app, etc.
-By default [authInfo](config#request-context-auth-info) is defined by [Cube.js API Token](security).
+[securityContext](config#request-context-security-context), which acts as a container, where you can provide all the necessary data to identify user, organization, app, etc.
+By default [securityContext](config#request-context-security-context) is defined by [Cube.js API Token](security).
 
 There're several multitenancy setup scenarios that can be achieved by using combinations of these configuration options.
 
@@ -78,14 +78,14 @@ module.exports = {
 };
 ```
 
-### User Context vs Multitenant Compile Context
+### Security Context vs Multitenant Compile Context
 
-As a rule of thumb [USER_CONTEXT](cube#context-variables-user-context) should be used in scenarios when you want to define row level security within the same database for different users of such database.
+As a rule of thumb [SECURITY_CONTEXT](cube#context-variables-security-context) should be used in scenarios when you want to define row level security within the same database for different users of such database.
 For example to separate access of two ecommerce administrators who work on different product categories within same ecommerce store.
 
 ```javascript
 cube(`Products`, {
-  sql: `select * from products where ${USER_CONTEXT.categoryId.filter('categoryId')}`
+  sql: `select * from products where ${SECURITY_CONTEXT.categoryId.filter('categoryId')}`
 })
 ```
 
@@ -93,31 +93,31 @@ On other hand Multitenant [COMPILE_CONTEXT](cube#context-variables-compile-conte
 For example if you provide SaaS ecommerce hosting and each of your customers has separate database then each ecommerce store should be modelled as a separate tenant.
 
 ```javascript
-const { authInfo: { tenantId } } = COMPILE_CONTEXT;
+const { securityContext: { tenantId } } = COMPILE_CONTEXT;
 
 cube(`Products`, {
   sql: `select * from ${tenantId}.products`
 })
 ```
 
-### User Context vs queryTransformer
+### Security Context vs queryTransformer
 
-[USER_CONTEXT](cube#context-variables-user-context) great for use cases where you want to get explicit control over filtering of underlying data seen by users.
+[SECURITY_CONTEXT](cube#context-variables-security-context) great for use cases where you want to get explicit control over filtering of underlying data seen by users.
 However for use cases where you want to reuse pre-aggregation tables for different users or even tenants [queryTransformer](config#options-reference-query-transformer) is much better choice.
-[queryTransformer](config#options-reference-query-transformer) is also very convenient way of enforcing row level security by means of join logic defined in your cubes instead of embedding [USER_CONTEXT](cube#context-variables-user-context) filtering boiler plate into each cube.
+[queryTransformer](config#options-reference-query-transformer) is also very convenient way of enforcing row level security by means of join logic defined in your cubes instead of embedding [SECURITY_CONTEXT](cube#context-variables-security-context) filtering boiler plate into each cube.
 Together with [contextToOrchestratorId](config#options-reference-context-to-orchestrator-id) it allows to define both row level security filtering as well as reuse the same pre-aggregation set for each tenant.
 
 ## Same DB Instance with per Tenant Row Level Security
 
 Per tenant row level security can be achieved by providing [queryTransformer](config#options-reference-query-transformer) which adds tenant identifier filter to the original query.
-It uses [authInfo](config#request-context-auth-info) to determine which tenant is requesting the data.
+It uses [securityContext](config#request-context-security-context) to determine which tenant is requesting the data.
 This way in fact every tenant starts to see it's own data however all the resources like query queue and pre-aggregations are shared between all the tenants.
 
 **cube.js:**
 ```javascript
 module.exports = {
-  queryTransformer: (query, { authInfo }) => {
-    const user = authInfo.u;
+  queryTransformer: (query, { securityContext }) => {
+    const user = securityContext.u;
     if (user.id) {
       query.filters.push({
         member: 'Users.id',
@@ -151,7 +151,7 @@ const cubejsToken = jwt.sign(
 );
 ```
 
-Now, we can access them as [authInfo](config#request-context-auth-info) object inside the context object.
+Now, we can access them as [securityContext](config#request-context-security-context) object inside the context object.
 Let's first use [contextToAppId](config#options-reference-context-to-app-id) to create a dynamic Cube.js App ID for every combination of `appId` and `userId`.
 
 [[warning | Note]]
@@ -161,7 +161,7 @@ Let's first use [contextToAppId](config#options-reference-context-to-app-id) to 
 **cube.js:**
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`
 };
 ```
 
@@ -172,10 +172,10 @@ Next, we can use [driverFactory](config#options-reference-driver-factory) to dyn
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
-  driverFactory: ({ authInfo }) =>
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
+  driverFactory: ({ securityContext }) =>
     new PostgresDriver({
-      database: `my_app_${authInfo.appId}_${authInfo.userId}`
+      database: `my_app_${securityContext.appId}_${securityContext.userId}`
     })
 };
 ```
@@ -183,13 +183,13 @@ module.exports = {
 ## Same DB Instance with per Tenant Pre-Aggregations
 
 To support per tenant pre-aggregation of data within same database instance you should provide [preAggregationsSchema](config#options-reference-pre-aggregations-schema) option.
-You should use [authInfo](config#request-context-auth-info) to determine tenant which requesting the data.
+You should use [securityContext](config#request-context-security-context) to determine tenant which requesting the data.
 
 **cube.js:**
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`
 };
 ```
 
@@ -200,7 +200,7 @@ What if for application with ID 3 data is stored not in Postgres, but in MongoDB
 We can instruct Cube.js to connect to MongoDB in that case, instead of
 Postgres. For that purpose we'll use [dbType](config#options-reference-db-type) option to dynamically set database
 type. We also need to modify our [driverFactory](config#options-reference-driver-factory) option.
-You should use [authInfo](config#request-context-auth-info) to determine tenant which requesting the data.
+You should use [securityContext](config#request-context-security-context) to determine tenant which requesting the data.
 
 **cube.js:**
 ```javascript
@@ -208,23 +208,23 @@ const PostgresDriver = require("@cubejs-backend/postgres-driver");
 const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
 
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
-  dbType: ({ authInfo }) => {
-    if (authInfo.appId === 3) {
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
+  dbType: ({ securityContext }) => {
+    if (securityContext.appId === 3) {
       return 'mongobi';
     } else {
       return 'postgres';
     }
   },
-  driverFactory: ({ authInfo }) => {
-    if (authInfo.appId === 3) {
+  driverFactory: ({ securityContext }) => {
+    if (securityContext.appId === 3) {
       return new MongoBIDriver({
-        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+        database: `my_app_${securityContext.appId}_${securityContext.userId}`,
         port: 3307
       })
     } else {
       return new PostgresDriver({
-        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+        database: `my_app_${securityContext.appId}_${securityContext.userId}`
       })
     }
   }
@@ -243,27 +243,27 @@ const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
 
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}_${authInfo.userId}`,
-  dbType: ({ authInfo }) => {
-    if (authInfo.appId === 3) {
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
+  dbType: ({ securityContext }) => {
+    if (securityContext.appId === 3) {
       return 'mongobi';
     } else {
       return 'postgres';
     }
   },
-  driverFactory: ({ authInfo }) => {
-    if (authInfo.appId === 3) {
+  driverFactory: ({ securityContext }) => {
+    if (securityContext.appId === 3) {
       return new MongoBIDriver({
-        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+        database: `my_app_${securityContext.appId}_${securityContext.userId}`,
         port: 3307
       })
     } else {
       return new PostgresDriver({
-        database: `my_app_${authInfo.appId}_${authInfo.userId}`
+        database: `my_app_${securityContext.appId}_${securityContext.userId}`
       })
     }
   },
-  repositoryFactory: ({ authInfo }) => new FileRepository(`schema/${authInfo.appId}`)
+  repositoryFactory: ({ securityContext }) => new FileRepository(`schema/${securityContext.appId}`)
 };
 ```
 
@@ -279,10 +279,10 @@ const AWSHandlers = require('@cubejs-backend/serverless-aws');
 const PostgresDriver = require("@cubejs-backend/postgres-driver");
 
 module.exports = new AWSHandlers({
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.appId}`,
-  driverFactory: ({ authInfo }) =>
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.appId}`,
+  driverFactory: ({ securityContext }) =>
     new PostgresDriver({
-      database: `my_app_${authInfo.appId}`
+      database: `my_app_${securityContext.appId}`
     })
 });
 ```

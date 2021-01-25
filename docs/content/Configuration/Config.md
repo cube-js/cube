@@ -37,7 +37,6 @@ You can provide the following configuration options to Cube.js.
   contextToOrchestratorId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => SchemaFileRepository,
   checkAuth: (req: ExpressRequest, authorization: String) => any,
-  checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
@@ -85,7 +84,7 @@ QueueOptions {
 }
 
 RequestContext {
-  authInfo: Object,
+  securityContext: Object,
   requestId: String
 }
 
@@ -209,7 +208,7 @@ Called on each request.
 
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`,
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.user_id}`,
 };
 ```
 
@@ -228,9 +227,8 @@ Called on each request.
 
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) =>
-    `CUBEJS_APP_${authInfo.tenantId}_${authInfo.user_id}`,
-  contextToOrchestratorId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`,
+  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.tenantId}_${securityContext.user_id}`,
+  contextToOrchestratorId: ({ securityContext }) => `CUBEJS_APP_${securityContext.tenantId}`,
 };
 ```
 
@@ -249,13 +247,13 @@ const FileRepository = require('@cubejs-backend/server-core/core/FileRepository'
 
 // using built-in SchemaFileRepository implementation and supplying the path to schema files
 module.exports = {
-  repositoryFactory: ({ authInfo }) =>
-    new FileRepository(`schema/${authInfo.appId}`),
+  repositoryFactory: ({ securityContext }) =>
+    new FileRepository(`schema/${securityContext.appId}`),
 };
 
 // supplying your own SchemaFileRepository implementation to return array of files
 module.exports = {
-  repositoryFactory: ({ authInfo }) => {
+  repositoryFactory: ({ securityContext }) => {
     return {
       dataSchemaFiles: async () =>
         await Promise.resolve([
@@ -270,11 +268,11 @@ module.exports = {
 
 Used in both REST and Websocket API. Can be `async` functon. Default
 implementation parses [JSON Web Tokens (JWT)](https://jwt.io/) in
-`Authorization` header and sets payload to `req.authInfo` if it's verified. More
+`Authorization` header and sets payload to `req.securityContext` if it's verified. More
 info on how to generate such tokens is [here](security#security-context).
 
-You can set `req.authInfo = { u: { ...userContextObj } }` inside the middleware
-if you want to customize [USER_CONTEXT](cube#context-variables-user-context).
+You can set `req.securityContext = { u: { ...userContextObj } }` inside the middleware
+if you want to customize [SECURITY_CONTEXT](cube#context-variables-security-context).
 
 Called on each request.
 
@@ -286,15 +284,6 @@ module.exports = {
   checkAuth: (req, auth) => {},
 };
 ```
-
-### checkAuthMiddleware
-
-This is an
-[Express Middleware](https://expressjs.com/en/guide/using-middleware.html) for
-authentication. Default implementation calls
-[checkAuth](#options-reference-check-auth).
-
-Called on each request.
 
 ### queryTransformer
 
@@ -309,8 +298,8 @@ where needed.
 
 ```javascript
 module.exports = {
-  queryTransformer: (query, { authInfo }) => {
-    const user = authInfo.u;
+  queryTransformer: (query, { securityContext }) => {
+    const user = securityContext.u;
     if (user.filterByRegion) {
       query.filters.push({
         member: 'Regions.id',
@@ -335,8 +324,7 @@ Called once per [appId](#options-reference-context-to-app-id).
 
 ```javascript
 module.exports = {
-  preAggregationsSchema: ({ authInfo }) =>
-    `pre_aggregations_${authInfo.tenantId}`,
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.tenantId}`,
 };
 ```
 
@@ -356,7 +344,7 @@ single tenant environments.
 const tenantIdToDbVersion = {};
 
 module.exports = {
-  schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId],
+  schemaVersion: ({ securityContext }) => tenantIdToDbVersion[securityContext.tenantId],
 };
 ```
 
@@ -548,12 +536,12 @@ Timeout and interval options' values are in seconds.
 
 `RequestContext` object is filled by context data on a HTTP request level.
 
-### authInfo
+### securityContext
 
-Defined as `req.authInfo` which should be set by
+Defined as `req.securityContext` which should be set by
 [checkAuth](#options-reference-check-auth). Default implementation of
 [checkAuth](#options-reference-check-auth) uses [JWT Security Token](security)
-payload and sets it to `req.authInfo`.
+payload and sets it to `req.securityContext`.
 
 ## SchemaFileRepository
 
@@ -573,7 +561,7 @@ class ApiFileRepository {
 }
 
 module.exports = {
-  repositoryFactory: ({ authInfo }) => new ApiFileRepository(),
+  repositoryFactory: ({ securityContext }) => new ApiFileRepository(),
 };
 ```
 

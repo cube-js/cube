@@ -162,7 +162,7 @@ module.exports = {
     const decoded = jwt.decode(auth, { complete: true });
     const jwk = _.find(jwks.keys, x => x.kid === decoded.header.kid);
     const pem = jwkToPem(jwk);
-    req.authInfo = jwt.verify(auth, pem);
+    req.securityContext = jwt.verify(auth, pem);
   }
 };
 ```

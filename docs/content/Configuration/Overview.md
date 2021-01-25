@@ -126,11 +126,10 @@ const server = new CubejsServer({
     const decoded = jwt.decode(auth, { complete: true });
     const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
     const pem = jwkToPem(jwk);
-    req.authInfo = jwt.verify(auth, pem);
+    req.securityContext = jwt.verify(auth, pem);
   },
-  contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) =>
-    'pre_aggregations_${authInfo.userId}',
+  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
 });
 
 server
@@ -158,10 +157,9 @@ module.exports = {
     const decoded = jwt.decode(auth, { complete: true });
     const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
     const pem = jwkToPem(jwk);
-    req.authInfo = jwt.verify(auth, pem);
+    req.securityContext = jwt.verify(auth, pem);
   },
-  contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) =>
-    'pre_aggregations_${authInfo.userId}',
+  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
 };
 ```
