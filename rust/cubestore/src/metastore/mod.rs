@@ -30,6 +30,7 @@ use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
+use crate::util::WorkerLoop;
 use crate::CubeError;
 use arrow::datatypes::TimeUnit::Microsecond;
 use arrow::datatypes::{DataType, Field};
@@ -37,6 +38,7 @@ use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::{fmt, mem};
 use futures::future::join_all;
+use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
 use log::trace;
@@ -55,12 +57,11 @@ use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Mutex;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
 use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
-use tokio::time::{delay_for, Duration};
 use wal::WALRocksTable;
 
 #[macro_export]
@@ -865,7 +866,7 @@ pub struct RocksMetaStore {
     write_completed_notify: Arc<Notify>,
     last_upload_seq: Arc<RwLock<u64>>,
     last_check_seq: Arc<RwLock<u64>>,
-    upload_loop_enabled: Arc<RwLock<bool>>,
+    upload_loop: Arc<WorkerLoop>,
     config: Arc<dyn ConfigObj>,
 }
 
@@ -1450,7 +1451,7 @@ impl RocksMetaStore {
             write_completed_notify: Arc::new(Notify::new()),
             last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
-            upload_loop_enabled: Arc::new(RwLock::new(true)),
+            upload_loop: Arc::new(WorkerLoop::new("Meta Store Upload")),
             config,
         };
         meta_store
@@ -1585,7 +1586,7 @@ impl RocksMetaStore {
 
         mem::drop(db);
 
-        self.write_notify.notify();
+        self.write_notify.notify_waiters();
 
         for listener in self.listeners.read().await.clone().iter_mut() {
             for event in events.iter() {
@@ -1596,30 +1597,23 @@ impl RocksMetaStore {
         Ok(spawn_res)
     }
 
-    pub async fn run_upload_loop(&self) {
-        loop {
-            if !*self.upload_loop_enabled.read().await {
-                return;
-            }
-            if let Err(e) = self.run_upload().await {
-                error!("Error in metastore upload loop: {}", e);
-            }
-        }
+    pub fn run_upload_loop(meta_store: Arc<Self>) {
+        meta_store.upload_loop.process(
+            meta_store.clone(),
+            async move |_| Ok(Delay::new(Duration::from_secs(60)).await),
+            async move |m, _| m.run_upload().await,
+        );
     }
 
     pub async fn stop_processing_loops(&self) {
-        let mut upload_loop_enabled = self.upload_loop_enabled.write().await;
-        *upload_loop_enabled = false;
+        self.upload_loop.stop();
     }
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = self.db.read().await.latest_sequence_number();
         if last_check_seq == last_db_seq {
-            delay_for(Duration::from_secs(60)).await;
-            // let _ =
-            //     tokio::time::timeout(Duration::from_secs(30), self.write_notify.notified()).await;
-            // TODO
+            return Ok(());
         }
         let last_upload_seq = self.last_upload_seq().await;
         let (serializer, min, max) = {
@@ -1651,7 +1645,7 @@ impl RocksMetaStore {
             self.remote_fs.upload_file(&log_name).await?;
             let mut seq = self.last_upload_seq.write().await;
             *seq = max.unwrap();
-            self.write_completed_notify.notify();
+            self.write_completed_notify.notify_waiters();
         }
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
@@ -1671,7 +1665,7 @@ impl RocksMetaStore {
         let db = self.db.write().await.clone();
         *check_point_time = SystemTime::now();
         RocksMetaStore::upload_checkpoint(db, remote_fs, &check_point_time).await?;
-        self.write_completed_notify.notify();
+        self.write_completed_notify.notify_waiters();
         Ok(())
     }
 
@@ -2852,7 +2846,9 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
+    use futures_timer::Delay;
     use std::thread::sleep;
+    use std::time::Duration;
     use std::{env, fs};
 
     #[test]
@@ -2863,7 +2859,7 @@ mod tests {
         assert_eq!(format_table_value!(s, name, String), "foo");
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn schema_test() {
         let config = Config::test("schema_test");
         let store_path = env::current_dir().unwrap().join("test-local");
@@ -3094,7 +3090,7 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn table_test() {
         let config = Config::test("table_test");
         let store_path = env::current_dir().unwrap().join("test-table-local");
@@ -3204,7 +3200,7 @@ mod tests {
                 services.meta_store.run_upload().await.unwrap();
                 services.stop_processing_loops().await.unwrap();
             }
-            tokio::time::delay_for(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
 
             let services2 = config.configure().await;
@@ -3260,7 +3256,7 @@ mod tests {
                 services.meta_store.run_upload().await.unwrap();
                 services.stop_processing_loops().await.unwrap();
             }
-            tokio::time::delay_for(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),

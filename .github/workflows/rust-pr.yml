@@ -1,7 +1,7 @@
 name: Rust
 
 on:
-  push:
+  pull_request:
     paths:
       - '.github/workflows/rust.yml'
       - 'rust/**'
@@ -43,10 +43,6 @@ jobs:
           args: --manifest-path rust/Cargo.toml -j 4
       - name: Run cargo test
         uses: actions-rs/cargo@v1
-        env:
-          CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
-          CUBESTORE_AWS_SECRET_ACCESS_KEY: ${{ secrets.CUBESTORE_AWS_SECRET_ACCESS_KEY }}
-          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         with:
           command: test
           args: --manifest-path rust/Cargo.toml -j 1

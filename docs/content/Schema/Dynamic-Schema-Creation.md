@@ -67,7 +67,7 @@ export const transformMeasures = (measures) => {
     return {
       ...result,
       [dimensionName]: convertStringPropToFunction(
-        ['sql, drillMembers'],
+        ['sql', 'drillMembers'],
         dimensionDefinition
       ),
     };

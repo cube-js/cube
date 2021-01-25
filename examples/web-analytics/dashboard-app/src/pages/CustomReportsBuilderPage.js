@@ -21,18 +21,18 @@ import {
 } from "../graphql/mutations";
 
 const allowedMembers = [
-  "SessionUsers.usersCount",
-  "SessionUsers.newUsersCount",
-  "SessionUsers.count",
-  "SessionUsers.bounceRate",
-  "SessionUsers.bouncedCount",
-  "SessionUsers.sessionsPerUser",
+  "Sessions.usersCount",
+  "Sessions.newUsersCount",
+  "Sessions.count",
+  "Sessions.bounceRate",
+  "Sessions.bouncedCount",
+  "Sessions.sessionsPerUser",
 
-  "SessionUsers.landingPage",
-  "SessionUsers.referrerMedium",
-  "SessionUsers.referrerSource",
-  "SessionUsers.sourceMedium",
-  "SessionUsers.type"
+  "Sessions.landingPage",
+  "Sessions.referrerMedium",
+  "Sessions.referrerSource",
+  "Sessions.sourceMedium",
+  "Sessions.type"
 ];
 
 const whiteListMembers = (members, type, query) => {

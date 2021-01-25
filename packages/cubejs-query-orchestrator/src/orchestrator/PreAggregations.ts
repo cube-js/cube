@@ -114,9 +114,9 @@ class PreAggregationLoadCache {
 
   constructor(redisPrefix, clientFactory: DriverFactory, queryCache, preAggregations, options: {
     requestId?: string,
-    dataSource?: string
+    dataSource: string
   }) {
-    options = options || {};
+    options = options || { dataSource: 'default' };
     this.redisPrefix = `${redisPrefix}_${options.dataSource}`;
     this.dataSource = options.dataSource;
     this.driverFactory = clientFactory;
@@ -203,7 +203,8 @@ class PreAggregationLoadCache {
           renewalKey: keyQuery,
           waitForRenew,
           priority,
-          requestId: this.requestId
+          requestId: this.requestId,
+          dataSource: this.dataSource
         }
       );
     }
@@ -591,7 +592,7 @@ class PreAggregationLoader {
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
-  async refreshImplTempTableExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
+  async refreshImplTempTableExternalStrategy(client: BaseDriver, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
@@ -635,7 +636,7 @@ class PreAggregationLoader {
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
-  async downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn) {
+  async downloadTempExternalPreAggregation(client: BaseDriver, newVersionEntry, saveCancelFn) {
     if (!client.downloadTable) {
       throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
     }
@@ -644,7 +645,9 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    const tableData = await saveCancelFn(client.downloadTable(table));
+    const externalDriver = await this.externalDriverFactory();
+    const { csvImport } = externalDriver.capabilities && externalDriver.capabilities();
+    const tableData = await saveCancelFn(client.downloadTable(table, { csvImport }));
     tableData.types = await saveCancelFn(client.tableColumnTypes(table));
     return tableData;
   }
@@ -817,9 +820,11 @@ export class PreAggregations {
     const loadCacheByDataSource = {};
     const getLoadCacheByDataSource = (dataSource) => {
       if (!loadCacheByDataSource[dataSource]) {
+        dataSource = dataSource || 'default';
         loadCacheByDataSource[dataSource] =
-          new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource || 'default'), this.queryCache, this, {
-            requestId: queryBody.requestId
+          new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
+            requestId: queryBody.requestId,
+            dataSource
           });
       }
       return loadCacheByDataSource[dataSource];
@@ -865,7 +870,7 @@ export class PreAggregations {
             () => this.driverFactory(dataSource),
             this.queryCache,
             this,
-            { requestId }
+            { requestId, dataSource }
           ),
           { requestId, externalRefresh: this.externalRefresh }
         );
@@ -898,7 +903,7 @@ export class PreAggregations {
           } = q;
           const loadCache = new PreAggregationLoadCache(
             this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this,
-            { requestId }
+            { requestId, dataSource }
           );
           return loadCache.fetchTables(preAggregation);
         }, {

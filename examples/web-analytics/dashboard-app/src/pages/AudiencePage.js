@@ -10,9 +10,9 @@ const queries = {
   usersCount: {
     chartType: 'number',
     query: {
-      measures: ['SessionUsers.usersCount'],
+      measures: ['Sessions.usersCount'],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart'
+        dimension: 'Sessions.sessionStart'
       }]
     }
   },
@@ -27,9 +27,9 @@ const queries = {
   newUsersCount: {
     chartType: 'number',
     query: {
-      measures: ['SessionUsers.newUsersCount'],
+      measures: ['Sessions.newUsersCount'],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart'
+        dimension: 'Sessions.sessionStart'
       }]
     }
   },
@@ -51,9 +51,9 @@ const queries = {
   averageNumberSessions: {
     chartType: 'number',
     query: {
-      measures: ['SessionUsers.sessionsPerUser'],
+      measures: ['Sessions.sessionsPerUser'],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart'
+        dimension: 'Sessions.sessionStart'
       }]
     }
   },
@@ -61,10 +61,10 @@ const queries = {
   usersByType: {
     chartType: 'pie',
     query: {
-      measures: ['SessionUsers.usersCount'],
-      dimensions: ['SessionUsers.type'],
+      measures: ['Sessions.usersCount'],
+      dimensions: ['Sessions.type'],
       timeDimensions: [{
-        dimension: 'SessionUsers.sessionStart'
+        dimension: 'Sessions.sessionStart'
       }]
     }
   }
@@ -72,10 +72,10 @@ const queries = {
 
 const overTimeQueries = {
   "Users": {
-    measures: ["SessionUsers.usersCount"],
+    measures: ["Sessions.usersCount"],
     timeDimensions: [{
       granularity: 'day',
-      dimension: "SessionUsers.sessionStart"
+      dimension: "Sessions.sessionStart"
     }]
   },
   "Sessions": {
@@ -155,7 +155,7 @@ const AudiencePage = ({ withTime }) => {
               ...vizState,
               query: {
                 ...query,
-                dimensions: ["SessionUsers.language"]
+                dimensions: ["Sessions.language"]
               }
             })
           },
@@ -165,7 +165,7 @@ const AudiencePage = ({ withTime }) => {
               ...vizState,
               query: {
                 ...query,
-                dimensions: ["SessionUsers.country"]
+                dimensions: ["Sessions.country"]
               }
             })
           },
@@ -175,7 +175,7 @@ const AudiencePage = ({ withTime }) => {
               ...vizState,
               query: {
                 ...query,
-                dimensions: ["SessionUsers.city"]
+                dimensions: ["Sessions.city"]
               }
             })
           }]

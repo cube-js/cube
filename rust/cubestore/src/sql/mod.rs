@@ -24,6 +24,7 @@ use crate::cluster::{Cluster, JobEvent};
 use crate::metastore::job::JobType;
 use crate::queryplanner::query_executor::QueryExecutor;
 use crate::sql::parser::CubeStoreParser;
+use chrono::{TimeZone, Utc};
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use hex::FromHex;
@@ -83,7 +84,19 @@ impl SqlServiceImpl {
             if let Statement::CreateIndex { name, columns, .. } = index {
                 indexes_to_create.push(IndexDef {
                     name: name.to_string(),
-                    columns: columns.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
+                    columns: columns
+                        .iter()
+                        .map(|c| {
+                            if let Expr::Identifier(ident) = &c.expr {
+                                Ok(ident.value.to_string())
+                            } else {
+                                Err(CubeError::internal(format!(
+                                    "Unexpected column expression: {:?}",
+                                    c.expr
+                                )))
+                            }
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
                 });
             }
         }
@@ -100,12 +113,15 @@ impl SqlServiceImpl {
                     indexes_to_create,
                 )
                 .await?;
-            listener
+            let import_res = listener
                 .wait_for_job_result(
                     RowKey::Table(TableId::Tables, table.get_id()),
                     JobType::TableImport,
                 )
                 .await?;
+            if let JobEvent::Error(_, _, e) = import_res {
+                return Err(CubeError::user(format!("Create table failed: {}", e)));
+            }
             let wal_listener = self.cluster.job_result_listener();
             let wals = self.db.get_wals_for_table(table.get_id()).await?;
             let events = wal_listener
@@ -627,9 +643,7 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 return Ok(TableValue::Bytes(val?));
             }
             ColumnType::Timestamp => match cell {
-                Expr::Value(Value::SingleQuotedString(v)) => {
-                    TableValue::Timestamp(TimestampValue::new(string_to_timestamp_nanos(v)?))
-                }
+                Expr::Value(Value::SingleQuotedString(v)) => timestamp_from_string(v)?,
                 x => {
                     return Err(CubeError::user(format!(
                         "Can't parse timestamp from, {:?}",
@@ -656,6 +670,16 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
         }
     };
     Ok(res)
+}
+
+pub fn timestamp_from_string(v: &str) -> Result<TableValue, CubeError> {
+    let result = string_to_timestamp_nanos(v).or_else(|_| {
+        if let Ok(ts) = Utc.datetime_from_str(v, "%Y-%m-%d %H:%M:%S UTC") {
+            return Ok(ts.timestamp_nanos());
+        }
+        return Err(CubeError::user(format!("Can't parse timestamp: {}", v)));
+    });
+    Ok(TableValue::Timestamp(TimestampValue::new(result?)))
 }
 
 fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
@@ -702,6 +726,7 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use crate::store::WALStore;
+    use futures_timer::Delay;
     use itertools::Itertools;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
@@ -713,7 +738,7 @@ mod tests {
     use std::{env, fs};
     use uuid::Uuid;
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn create_schema_test() {
         let config = Config::test("create_schema_test");
         let path = "/tmp/test_create_schema";
@@ -751,7 +776,7 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn create_table_test() {
         let config = Config::test("create_table_test");
         let path = "/tmp/test_create_table";
@@ -1234,6 +1259,9 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts_s3() {
+        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+            return;
+        }
         Config::test("high_frequency_inserts_s3")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
@@ -1256,6 +1284,81 @@ mod tests {
                             region: "us-west-2".to_string(),
                             bucket_name: "cube-store-ci-test".to_string(),
                             sub_path: Some("high_frequency_inserts_s3".to_string()),
+                        };
+                        c
+                    })
+                    .start_test_worker(async move |_| {
+                        service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                        service
+                            .exec_query("CREATE TABLE foo.numbers (num int)")
+                            .await
+                            .unwrap();
+
+                        for _ in 0..3 {
+                            let mut values = Vec::new();
+                            for i in 0..100000 {
+                                values.push(i);
+                            }
+
+                            let values = values.into_iter().map(|v| format!("({})", v)).join(", ");
+                            service
+                                .exec_query(&format!(
+                                    "INSERT INTO foo.numbers (num) VALUES {}",
+                                    values
+                                ))
+                                .await
+                                .unwrap();
+                        }
+
+                        let (first_query, second_query) = futures::future::join(
+                            service.exec_query("SELECT count(*) from foo.numbers"),
+                            service.exec_query("SELECT sum(num) from foo.numbers"),
+                        )
+                        .await;
+
+                        let result = first_query.unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(300000)])
+                        );
+
+                        let result = second_query.unwrap();
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(300000 / 2 * 99999)])
+                        );
+                    })
+                    .await;
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn high_frequency_inserts_gcs() {
+        if env::var("SERVICE_ACCOUNT_JSON").is_err() {
+            return;
+        }
+        Config::test("high_frequency_inserts_gcs")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c.store_provider = FileStoreProvider::GCS {
+                    bucket_name: "cube-store-ci-test".to_string(),
+                    sub_path: Some("high_frequency_inserts_gcs".to_string()),
+                };
+                c.select_workers = vec!["127.0.0.1:4312".to_string()];
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                Config::test("high_frequency_inserts_gcs_worker_1")
+                    .update_config(|mut c| {
+                        c.worker_bind_address = Some("127.0.0.1:4312".to_string());
+                        c.store_provider = FileStoreProvider::GCS {
+                            bucket_name: "cube-store-ci-test".to_string(),
+                            sub_path: Some("high_frequency_inserts_gcs".to_string()),
                         };
                         c
                     })
@@ -1347,7 +1450,7 @@ mod tests {
                 //     .unwrap();
 
                 // TODO API to wait for all jobs to be completed and all events processed
-                tokio::time::delay_for(Duration::from_millis(500)).await;
+                Delay::new(Duration::from_millis(500)).await;
 
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")
@@ -1965,14 +2068,15 @@ mod tests {
 
                 let mut file = File::create(dir.clone()).unwrap();
 
-                file.write_all("1,San Francisco\n".as_bytes()).unwrap();
-                file.write_all("2,New York\n".as_bytes()).unwrap();
+                file.write_all("id,city,t\n".as_bytes()).unwrap();
+                file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("2,New York,2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
 
                 dir
             };
 
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text) INDEX persons_city (city, id) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
+            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text, t timestamp) INDEX persons_city (`city`, `id`) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
             let res = service.exec_query("CREATE INDEX by_city ON Foo.Persons (city)").await;
             let error = format!("{:?}", res);
             assert!(error.contains("has data"));

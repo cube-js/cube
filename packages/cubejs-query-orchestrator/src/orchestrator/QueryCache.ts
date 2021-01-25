@@ -96,6 +96,7 @@ export class QueryCache {
       this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
         requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource,
         refreshKeyRenewalThresholds
       });
 
@@ -121,6 +122,7 @@ export class QueryCache {
       this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
         requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource,
         refreshKeyRenewalThresholds
       });
     }
@@ -269,7 +271,13 @@ export class QueryCache {
     return queue;
   }
 
-  public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
+  public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {
+    requestId?: string,
+    skipRefreshKeyWaitForRenew?: boolean,
+    external?: boolean,
+    refreshKeyRenewalThresholds?: Array<number>
+    dataSource: string
+  }) {
     this.renewQuery(
       query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
     ).catch(e => {

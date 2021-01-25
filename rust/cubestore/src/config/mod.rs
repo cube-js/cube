@@ -3,6 +3,7 @@ use crate::import::ImportServiceImpl;
 use crate::metastore::RocksMetaStore;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::QueryPlannerImpl;
+use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
@@ -43,8 +44,7 @@ impl CubeServices {
         self.cluster.start_processing_loops().await;
         QueueRemoteFs::start_processing_loops(self.remote_fs.clone());
         if !self.cluster.is_select_worker() {
-            let meta_store = self.meta_store.clone();
-            tokio::spawn(async move { meta_store.run_upload_loop().await });
+            RocksMetaStore::run_upload_loop(self.meta_store.clone());
             let scheduler = self.scheduler.clone();
             tokio::spawn(async move { scheduler.run_scheduler().await });
         } else {
@@ -73,6 +73,10 @@ pub enum FileStoreProvider {
     },
     S3 {
         region: String,
+        bucket_name: String,
+        sub_path: Option<String>,
+    },
+    GCS {
         bucket_name: String,
         sub_path: Option<String>,
     },
@@ -203,6 +207,11 @@ impl Config {
                             bucket_name,
                             region: env::var("CUBESTORE_S3_REGION").unwrap(),
                             sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
+                        }
+                    } else if let Ok(bucket_name) = env::var("CUBESTORE_GCS_BUCKET") {
+                        FileStoreProvider::GCS {
+                            bucket_name,
+                            sub_path: env::var("CUBESTORE_GCS_SUB_PATH").ok(),
                         }
                     } else if let Ok(remote_dir) = env::var("CUBESTORE_REMOTE_DIR") {
                         FileStoreProvider::Filesystem {
@@ -381,6 +390,14 @@ impl Config {
             } => S3RemoteFs::new(
                 self.config_obj.data_dir.clone(),
                 region.to_string(),
+                bucket_name.to_string(),
+                sub_path.clone(),
+            )?,
+            FileStoreProvider::GCS {
+                bucket_name,
+                sub_path,
+            } => GCSRemoteFs::new(
+                self.config_obj.data_dir.clone(),
                 bucket_name.to_string(),
                 sub_path.clone(),
             )?,

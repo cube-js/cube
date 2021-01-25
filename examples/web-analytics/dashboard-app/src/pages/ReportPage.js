@@ -40,7 +40,7 @@ const withTimeFunc = ({ query, ...vizState }, begin, end, segment) => {
   const granularity = timeDimensionObj.granularity || null;
   const segmentCube = (query) => {
     const measureCube = query.measures[0].split(".")[0];
-    if (['PageViews', 'PageUsers'].indexOf(measureCube) !== -1) {
+    if (['PageViews'].indexOf(measureCube) !== -1) {
       return 'Sessions';
     }
     return measureCube;

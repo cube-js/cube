@@ -188,7 +188,6 @@ fn load<T: de::DeserializeOwned>(path: String) -> Result<T, CubeError> {
 pub trait WALDataStore: Send + Sync {
     async fn add_wal(&self, table: IdRow<Table>, data: DataFrame) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<DataFrame, CubeError>;
-    async fn delete_wal(&self, wal_id: u64) -> Result<(), CubeError>;
     fn get_wal_chunk_size(&self) -> usize;
 }
 
@@ -261,12 +260,6 @@ impl WALDataStore for WALStore {
             })
             .await??,
         )
-    }
-
-    async fn delete_wal(&self, wal_id: u64) -> Result<(), CubeError> {
-        let remote_path = WALStore::wal_remote_path(wal_id);
-        self.remote_fs.delete_file(&remote_path).await?;
-        Ok(())
     }
 
     fn get_wal_chunk_size(&self) -> usize {
@@ -438,7 +431,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn create_wal_test() {
         let config = Config::test("create_chunk_test");
         let path = "/tmp/test_create_wal";
@@ -514,7 +507,7 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn create_chunk_test() {
         let config = Config::test("create_chunk_test");
         let path = "/tmp/test_create_chunk";

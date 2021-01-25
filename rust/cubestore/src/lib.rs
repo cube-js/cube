@@ -1,5 +1,4 @@
 #![feature(in_band_lifetimes)]
-#![feature(specialization)]
 #![feature(test)]
 #![feature(backtrace)]
 #![feature(async_closure)]
@@ -26,6 +25,7 @@ use std::num::ParseIntError;
 use std::sync::PoisonError;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
+use tokio::time::error::Elapsed;
 
 pub mod cluster;
 pub mod config;
@@ -40,6 +40,7 @@ pub mod sql;
 pub mod store;
 pub mod table;
 pub mod telemetry;
+pub mod util;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
@@ -138,8 +139,8 @@ impl From<SendError<metastore::MetaStoreEvent>> for CubeError {
     }
 }
 
-impl From<broadcast::SendError<RemoteFsOpResult>> for CubeError {
-    fn from(v: broadcast::SendError<RemoteFsOpResult>) -> Self {
+impl From<broadcast::error::SendError<RemoteFsOpResult>> for CubeError {
+    fn from(v: broadcast::error::SendError<RemoteFsOpResult>) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }
@@ -150,8 +151,8 @@ impl From<std::time::SystemTimeError> for CubeError {
     }
 }
 
-impl From<tokio::time::Elapsed> for CubeError {
-    fn from(v: tokio::time::Elapsed) -> Self {
+impl From<Elapsed> for CubeError {
+    fn from(v: Elapsed) -> Self {
         CubeError::internal(v.to_string())
     }
 }
@@ -174,20 +175,20 @@ impl From<arrow::error::ArrowError> for CubeError {
     }
 }
 
-impl From<tokio::sync::broadcast::RecvError> for CubeError {
-    fn from(v: tokio::sync::broadcast::RecvError) -> Self {
+impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
+    fn from(v: tokio::sync::broadcast::error::RecvError) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }
 
-impl From<tokio::sync::broadcast::SendError<metastore::MetaStoreEvent>> for CubeError {
-    fn from(v: tokio::sync::broadcast::SendError<metastore::MetaStoreEvent>) -> Self {
+impl From<tokio::sync::broadcast::error::SendError<metastore::MetaStoreEvent>> for CubeError {
+    fn from(v: tokio::sync::broadcast::error::SendError<metastore::MetaStoreEvent>) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }
 
-impl From<tokio::sync::broadcast::SendError<cluster::JobEvent>> for CubeError {
-    fn from(v: tokio::sync::broadcast::SendError<cluster::JobEvent>) -> Self {
+impl From<tokio::sync::broadcast::error::SendError<cluster::JobEvent>> for CubeError {
+    fn from(v: tokio::sync::broadcast::error::SendError<cluster::JobEvent>) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }
@@ -318,6 +319,12 @@ impl From<hex::FromHexError> for CubeError {
 
 impl From<HllError> for CubeError {
     fn from(v: HllError) -> Self {
+        return CubeError::from_error(v);
+    }
+}
+
+impl From<cloud_storage::Error> for CubeError {
+    fn from(v: cloud_storage::Error) -> Self {
         return CubeError::from_error(v);
     }
 }

@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.26](https://github.com/cube-js/cube.js/compare/v0.25.25...v0.25.26) (2021-01-25)
+
+
+### Features
+
+* BigQuery CSV pre-aggregation download support ([#1867](https://github.com/cube-js/cube.js/issues/1867)) ([5a2ea3f](https://github.com/cube-js/cube.js/commit/5a2ea3f27058a01bf08f697495c8ccce5abf9fa2))
+
+
+
+
+
+## [0.25.25](https://github.com/cube-js/cube.js/compare/v0.25.24...v0.25.25) (2021-01-24)
+
+
+### Bug Fixes
+
+* **cubestore:** Ignore CUBEJS_DB_SSL env ([86f06f7](https://github.com/cube-js/cube.js/commit/86f06f7955b3d230c9398953fec76c2569460701))
+
+
+
+
+
+## [0.25.24](https://github.com/cube-js/cube.js/compare/v0.25.23...v0.25.24) (2021-01-22)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
 ## [0.25.23](https://github.com/cube-js/cube.js/compare/v0.25.22...v0.25.23) (2021-01-22)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver
