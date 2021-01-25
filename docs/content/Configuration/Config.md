@@ -37,7 +37,6 @@ You can provide the following configuration options to Cube.js.
   contextToOrchestratorId: (context: RequestContext) => String,
   repositoryFactory: (context: RequestContext) => SchemaFileRepository,
   checkAuth: (req: ExpressRequest, authorization: String) => any,
-  checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
   queryTransformer: (query: Object, context: RequestContext) => Object,
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
@@ -280,15 +279,6 @@ module.exports = {
   checkAuth: (req, auth) => {},
 };
 ```
-
-### checkAuthMiddleware
-
-This is an
-[Express Middleware](https://expressjs.com/en/guide/using-middleware.html) for
-authentication. Default implementation calls
-[checkAuth](#options-reference-check-auth).
-
-Called on each request.
 
 ### queryTransformer
 
