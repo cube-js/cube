@@ -2155,8 +2155,7 @@ mod tests {
                 .exec_query("SELECT id, cardinality(hll) as cnt from hll.sketches WHERE id < 3 ORDER BY 1")
                 .await
                 .unwrap();
-            assert_eq!(
-                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
+            assert_eq!(to_rows(&result),
                 vec![vec![TableValue::Int(1), TableValue::Int(2)],
                      vec![TableValue::Int(2), TableValue::Int(655)]]);
             // Check merge and cardinality.
@@ -2164,20 +2163,45 @@ mod tests {
                 .exec_query("SELECT cardinality(merge(hll)) from hll.sketches WHERE id < 3")
                 .await
                 .unwrap();
-            assert_eq!(
-                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
-                vec![vec![TableValue::Int(657)]]);
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(657)]]);
 
             // Now merge all 4 HLLs, results should stay the same.
             let result = service
                 .exec_query("SELECT cardinality(merge(hll)) from hll.sketches")
                 .await
                 .unwrap();
-            assert_eq!(
-                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
-                vec![vec![TableValue::Int(657)]]);
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(657)]]);
 
             // TODO: add format checks on insert and test invalid inputs.
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn hyperloglog_empty_inputs() {
+        Config::run_test("hyperloglog_empty_inputs", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE hll.sketches (id int, hll varbinary)")
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query("SELECT cardinality(merge(hll)) from hll.sketches")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(0)]]);
+
+            let result = service
+                .exec_query("SELECT merge(hll) from hll.sketches")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Bytes(vec![])]]);
         })
         .await;
     }
@@ -2271,6 +2295,14 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(20)]));
         }).await;
+    }
+
+    fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
+        return d
+            .get_rows()
+            .iter()
+            .map(|r| r.values().clone())
+            .collect_vec();
     }
 }
 
