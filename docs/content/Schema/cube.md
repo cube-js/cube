@@ -411,18 +411,18 @@ cube(`Events`, {
 });
 ```
 
-### User Context
+### Security Context
 
-`USER_CONTEXT` is a user security object that is passed by the Cube.js Client.
+`SECURITY_CONTEXT` is a user security object that is passed by the Cube.js Client.
 
-Please see [Security Context section](security#security-context) on how to set `USER_CONTEXT` value.
+Please see [Security Context section](security#security-context) on how to set `SECRUITY_CONTEXT` value.
 
-User context is suitable for the row level security implementation.
+Security context is suitable for the row level security implementation.
 For example, if you have an `orders` table that contains an `email` field you can restrict all queries to render results that belong only to the current user as follows:
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM orders WHERE ${USER_CONTEXT.email.filter('email')}`,
+  sql: `SELECT * FROM orders WHERE ${SECURITY_CONTEXT.email.filter('email')}`,
 
   dimensions: {
     date: {
@@ -437,7 +437,7 @@ To ensure filter value presents for all requests `requiredFilter` can be used:
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM orders WHERE ${USER_CONTEXT.email.requiredFilter('email')}`,
+  sql: `SELECT * FROM orders WHERE ${SECURITY_CONTEXT.email.requiredFilter('email')}`,
 
   dimensions: {
     date: {
@@ -458,7 +458,7 @@ For example:
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM ${USER_CONTEXT.type.unsafeValue() === 'employee' ? 'employee' : 'public'}.orders`,
+  sql: `SELECT * FROM ${SECURITY_CONTEXT.type.unsafeValue() === 'employee' ? 'employee' : 'public'}.orders`,
 
   dimensions: {
     date: {
@@ -499,13 +499,13 @@ cube(`visitors`, {
 ### Compile context
 
 There's global `COMPILE_CONTEXT` that captured as [RequestContext](@cubejs-backend-server-core#request-context) at the time of schema compilation.
-It contains `authInfo` and any other variables provided by [extendContext](@cubejs-backend-server-core#options-reference-extend-context).
+It contains `securityContext` and any other variables provided by [extendContext](@cubejs-backend-server-core#options-reference-extend-context).
 
 [[warning | Note]]
-| While `authInfo` defined in `COMPILE_CONTEXT` it doesn't change it's value for different users. It may change however for different tenants.
+| While `securityContext` defined in `COMPILE_CONTEXT` it doesn't change it's value for different users. It may change however for different tenants.
 
 ```javascript
-const { authInfo: { deploymentId } } = COMPILE_CONTEXT;
+const { securityContext: { deploymentId } } = COMPILE_CONTEXT;
 
 const schemaName = `user_${deploymentId}`;
 
