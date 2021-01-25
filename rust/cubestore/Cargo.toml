@@ -52,7 +52,7 @@ aws-region = "0.22.1"
 procspawn = { version = "0.9.0", features = ["test-support"] }
 deadqueue = "0.1.0"
 ipc-channel = "0.14.1"
-reqwest = { version = "0.10.8", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
 rand = "0.8.0"
 parquet-format = "=2.6.1"

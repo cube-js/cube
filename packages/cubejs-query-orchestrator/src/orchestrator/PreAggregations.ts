@@ -592,7 +592,7 @@ class PreAggregationLoader {
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
-  async refreshImplTempTableExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
+  async refreshImplTempTableExternalStrategy(client: BaseDriver, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
@@ -636,7 +636,7 @@ class PreAggregationLoader {
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
-  async downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn) {
+  async downloadTempExternalPreAggregation(client: BaseDriver, newVersionEntry, saveCancelFn) {
     if (!client.downloadTable) {
       throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
     }
@@ -645,7 +645,9 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    const tableData = await saveCancelFn(client.downloadTable(table));
+    const externalDriver = await this.externalDriverFactory();
+    const { csvImport } = externalDriver.capabilities && externalDriver.capabilities();
+    const tableData = await saveCancelFn(client.downloadTable(table, { csvImport }));
     tableData.types = await saveCancelFn(client.tableColumnTypes(table));
     return tableData;
   }

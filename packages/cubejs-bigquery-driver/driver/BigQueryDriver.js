@@ -1,6 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 const R = require('ramda');
 const { BigQuery } = require('@google-cloud/bigquery');
+const { Storage } = require('@google-cloud/storage');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const { getEnv } = require('@cubejs-backend/shared');
 
@@ -21,12 +22,17 @@ class BigQueryDriver extends BaseDriver {
       credentials: process.env.CUBEJS_DB_BQ_CREDENTIALS ?
         JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
         undefined,
+      exportBucket: process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
     this.bigquery = new BigQuery(this.options);
+    if (this.options.exportBucket) {
+      this.storage = new Storage(this.options);
+      this.bucket = this.storage.bucket(this.options.exportBucket);
+    }
 
     this.mapFieldsRecursive = this.mapFieldsRecursive.bind(this);
     this.tablesSchema = this.tablesSchema.bind(this);
@@ -155,6 +161,22 @@ class BigQueryDriver extends BaseDriver {
     await this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }
 
+  async downloadTable(table, options) {
+    if (options && options.csvImport && this.bucket) {
+      const destination = this.bucket.file(`${table}.csv`);
+      const [schema, tableName] = table.split('.');
+      const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
+      const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV' });
+      await this.waitForJobResult(job, { table }, false);
+      const [url] = await destination.getSignedUrl({
+        action: 'read',
+        expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+      });
+      return { csvFile: url };
+    }
+    return super.downloadTable(table, options);
+  }
+
   async loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
     const [dataSet, tableName] = preAggregationTableName.split('.');
     const bigQueryQuery = {
@@ -188,7 +210,10 @@ class BigQueryDriver extends BaseDriver {
 
   async runQueryJob(bigQueryQuery, options, withResults = true) {
     const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
+    return this.waitForJobResult(job, options, withResults);
+  }
 
+  async waitForJobResult(job, options, withResults) {
     const startedTime = Date.now();
 
     for (let i = 0; Date.now() - startedTime <= this.options.pollTimeout; i++) {
@@ -198,12 +223,12 @@ class BigQueryDriver extends BaseDriver {
       }
 
       await pause(
-        Math.min(this.options.pollMaxInterval, 200 * i)
+        Math.min(this.options.pollMaxInterval, 200 * i),
       );
     }
 
     throw new Error(
-      `BigQuery job timeout reached ${this.options.pollTimeout}ms`
+      `BigQuery job timeout reached ${this.options.pollTimeout}ms`,
     );
   }
 
