@@ -91,7 +91,13 @@ impl CubeScalarUDF for HllCardinality {
                 for s in sketches {
                     match s {
                         None => r.append_null()?,
-                        Some(d) => r.append_value(read_sketch(d)?.cardinality())?,
+                        Some(d) => {
+                            if d.len() == 0 {
+                                r.append_value(0)?
+                            } else {
+                                r.append_value(read_sketch(d)?.cardinality())?
+                            }
+                        }
                     }
                 }
                 return Ok(Arc::new(r.finish()));
