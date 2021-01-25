@@ -12,6 +12,7 @@ repository = "https://github.com/cube-js/cube.js"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt"] }
 warp = "0.2"
 sqlparser = "0.7.0"

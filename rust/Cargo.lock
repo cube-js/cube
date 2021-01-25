@@ -1058,6 +1058,7 @@ dependencies = [
  "async-trait",
  "aws-creds",
  "aws-region",
+ "base64 0.13.0",
  "bigdecimal 0.2.0",
  "bincode",
  "byteorder",
