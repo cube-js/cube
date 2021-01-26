@@ -77,11 +77,11 @@ describe('createCancelableInterval', () => {
     const interval = createCancelableInterval(async (token) => {
       started++;
 
-      await pausePromise(25);
+      await pausePromise(100);
 
       finished++;
     }, {
-      interval: 10,
+      interval: 50,
       onDuplicatedExecution: (intervalId) => {
         expect(Number.isInteger(intervalId)).toBeTruthy();
 
@@ -89,24 +89,31 @@ describe('createCancelableInterval', () => {
       },
       onDuplicatedStateResolved: (intervalId, elapsed) => {
         expect(Number.isInteger(intervalId)).toBeTruthy();
-        expect(elapsed).toBeGreaterThanOrEqual(25);
+        expect(elapsed).toBeGreaterThanOrEqual(50 - 5);
 
         onDuplicatedStateResolved++;
       }
     });
 
-    await pausePromise(25 * 2 + 5);
+    /**
+     * Interval is 50, when execution is 100
+     * Let's wait 4 intervals, which will do 2 executions
+     */
+    await pausePromise(100 * 2 + 25);
     await interval.cancel(true);
 
-    expect(started).toEqual(2);
-    expect(finished).toEqual(2);
-    expect(onDuplicatedExecution).toBeLessThanOrEqual(3);
-    expect(onDuplicatedStateResolved).toBeLessThanOrEqual(2);
+    expect(started).toBeGreaterThanOrEqual(2);
+    expect(finished).toEqual(started);
+
+    expect(onDuplicatedExecution).toBeGreaterThanOrEqual(started);
+    expect(onDuplicatedStateResolved).toEqual(onDuplicatedExecution);
   });
 
   test('simple interval', async () => {
     let started = 0;
     let finished = 0;
+    let onDuplicatedExecution = 0;
+    let onDuplicatedStateResolved = 0;
     let canceled = false;
 
     const interval = createCancelableInterval(async (token) => {
@@ -127,6 +134,12 @@ describe('createCancelableInterval', () => {
       finished++;
     }, {
       interval: 100,
+      onDuplicatedExecution: () => {
+        onDuplicatedExecution++;
+      },
+      onDuplicatedStateResolved: () => {
+        onDuplicatedStateResolved++;
+      }
     });
 
     await pausePromise(100 + 25 + 25 + 10);
@@ -141,6 +154,10 @@ describe('createCancelableInterval', () => {
     expect(canceled).toEqual(true);
     expect(started).toEqual(2);
     expect(finished).toEqual(1);
+
+    // Interval 100ms, when execution takes ~50ms
+    expect(onDuplicatedExecution).toEqual(0);
+    expect(onDuplicatedStateResolved).toEqual(0);
   });
 
   test('cancel should wait latest execution', async () => {

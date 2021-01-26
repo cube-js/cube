@@ -100,7 +100,7 @@ export function createCancelableInterval<T>(
   let execution: CancelablePromise<T>|null = null;
   let startTime: number|null = null;
   let intervalId: number = 0;
-  let duplicatedExecutionTracked: boolean = true;
+  let duplicatedExecutionTracked: boolean = false;
 
   const timeout = setInterval(
     async () => {
