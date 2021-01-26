@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
 use core::mem;
 use futures::{Stream, StreamExt};
+use itertools::Itertools;
 use mockall::automock;
 use std::env;
 use std::pin::Pin;
@@ -15,7 +16,6 @@ use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
-use itertools::Itertools;
 
 impl ImportFormat {
     async fn row_stream(
@@ -67,7 +67,9 @@ impl ImportFormat {
                                 // This is tricky indices structure: it remembers indices of inserts
                                 // with regards to moving element indices due to these inserts.
                                 // It saves some column resorting trips.
-                                let insert_pos = mapping.iter().find_position(|(col_index, _)| *col_index > i)
+                                let insert_pos = mapping
+                                    .iter()
+                                    .find_position(|(col_index, _)| *col_index > i)
                                     .map(|(insert_pos, _)| insert_pos)
                                     .unwrap_or_else(|| mapping.len());
                                 mapping_insert_indices.push(insert_pos);
@@ -78,44 +80,44 @@ impl ImportFormat {
                             return Ok(None);
                         }
 
-
-                        let resolved_mapping = header_mapping
-                            .as_ref()
-                            .ok_or(CubeError::user(
-                                "Header is required for CSV import".to_string(),
-                            ))?;
+                        let resolved_mapping = header_mapping.as_ref().ok_or(CubeError::user(
+                            "Header is required for CSV import".to_string(),
+                        ))?;
 
                         let mut row = Vec::with_capacity(columns.len());
 
-                        for (i, (_, column)) in resolved_mapping
-                            .iter().enumerate()
-                        {
+                        for (i, (_, column)) in resolved_mapping.iter().enumerate() {
                             let value = parser.next_value()?;
 
                             if &value == "" {
                                 row.insert(mapping_insert_indices[i], TableValue::Null);
                             } else {
-                                row.insert(mapping_insert_indices[i], match column.get_column_type() {
-                                    ColumnType::String => TableValue::String(value),
-                                    ColumnType::Int => value
-                                        .parse()
-                                        .map(|v| TableValue::Int(v))
-                                        .unwrap_or(TableValue::Null),
-                                    ColumnType::Decimal { .. } => {
-                                        BigDecimal::from_str_radix(value.as_str(), 10)
-                                            .map(|d| TableValue::Decimal(d.to_string()))
-                                            .unwrap_or(TableValue::Null)
-                                    }
-                                    ColumnType::Bytes => unimplemented!(),
-                                    ColumnType::HyperLogLog(_) => unimplemented!(),
-                                    ColumnType::Timestamp => timestamp_from_string(value.as_str())?,
-                                    ColumnType::Float => {
-                                        TableValue::Float(value.parse::<f64>()?.to_string())
-                                    }
-                                    ColumnType::Boolean => {
-                                        TableValue::Boolean(value.to_lowercase() == "true")
-                                    }
-                                });
+                                row.insert(
+                                    mapping_insert_indices[i],
+                                    match column.get_column_type() {
+                                        ColumnType::String => TableValue::String(value),
+                                        ColumnType::Int => value
+                                            .parse()
+                                            .map(|v| TableValue::Int(v))
+                                            .unwrap_or(TableValue::Null),
+                                        ColumnType::Decimal { .. } => {
+                                            BigDecimal::from_str_radix(value.as_str(), 10)
+                                                .map(|d| TableValue::Decimal(d.to_string()))
+                                                .unwrap_or(TableValue::Null)
+                                        }
+                                        ColumnType::Bytes => unimplemented!(),
+                                        ColumnType::HyperLogLog(_) => unimplemented!(),
+                                        ColumnType::Timestamp => {
+                                            timestamp_from_string(value.as_str())?
+                                        }
+                                        ColumnType::Float => {
+                                            TableValue::Float(value.parse::<f64>()?.to_string())
+                                        }
+                                        ColumnType::Boolean => {
+                                            TableValue::Boolean(value.to_lowercase() == "true")
+                                        }
+                                    },
+                                );
                             }
 
                             parser.advance()?;
@@ -159,7 +161,7 @@ impl<'a> CsvLineParser<'a> {
                 self.line
             )))?;
             let res: String = self.remaining[1..closing_index].replace("\"\"", "\"");
-            self.remaining = self.remaining[(closing_index+1)..].as_ref();
+            self.remaining = self.remaining[(closing_index + 1)..].as_ref();
             res
         } else {
             let next_comma = self.remaining.find(",").unwrap_or(self.remaining.len());
