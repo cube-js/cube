@@ -335,3 +335,9 @@ impl From<cloud_storage::Error> for CubeError {
         return CubeError::from_error(v);
     }
 }
+
+impl From<base64::DecodeError> for CubeError {
+    fn from(v: base64::DecodeError) -> Self {
+        return CubeError::from_error(v);
+    }
+}
