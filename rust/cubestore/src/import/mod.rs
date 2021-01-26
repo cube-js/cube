@@ -16,6 +16,7 @@ use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
+use crate::config::ConfigObj;
 
 impl ImportFormat {
     async fn row_stream(
@@ -188,16 +189,19 @@ pub trait ImportService: Send + Sync {
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
     wal_store: Arc<dyn WALDataStore>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
         wal_store: Arc<dyn WALDataStore>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
             wal_store,
+            config_obj,
         })
     }
 }
@@ -233,7 +237,7 @@ impl ImportService for ImportServiceImpl {
         while let Some(row) = row_stream.next().await {
             if let Some(row) = row? {
                 rows.push(row);
-                if rows.len() >= 500000 {
+                if rows.len() >= self.config_obj.wal_split_threshold() as usize {
                     let mut to_add = Vec::new();
                     mem::swap(&mut rows, &mut to_add);
                     self.wal_store

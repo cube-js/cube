@@ -94,6 +94,8 @@ pub trait ConfigObj: Send + Sync {
 
     fn compaction_chunks_count_threshold(&self) -> u64;
 
+    fn wal_split_threshold(&self) -> u64;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn bind_port(&self) -> u16;
@@ -118,6 +120,7 @@ pub struct ConfigObjImpl {
     pub partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
@@ -141,6 +144,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
         self.compaction_chunks_count_threshold
+    }
+
+    fn wal_split_threshold(&self) -> u64 {
+        self.wal_split_threshold
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -247,6 +254,10 @@ impl Config {
                     .map(|v| format!("0.0.0.0:{}", v)),
                 upload_concurrency: 4,
                 download_concurrency: 8,
+                wal_split_threshold: env::var("CUBESTORE_WAL_SPLIT_THRESHOLD")
+                    .ok()
+                    .map(|v| v.parse::<u64>().unwrap())
+                    .unwrap_or(262144),
             }),
         }
     }
@@ -273,6 +284,7 @@ impl Config {
                 worker_bind_address: None,
                 upload_concurrency: 4,
                 download_concurrency: 8,
+                wal_split_threshold: 262144,
             }),
         }
     }
@@ -419,7 +431,7 @@ impl Config {
         .await
         .unwrap();
         meta_store.add_listener(event_sender).await;
-        let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 500000);
+        let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), self.config_obj.wal_split_threshold() as usize);
         let chunk_store = ChunkStore::new(
             meta_store.clone(),
             remote_fs.clone(),
@@ -432,7 +444,7 @@ impl Config {
             remote_fs.clone(),
             self.config_obj.clone(),
         );
-        let import_service = ImportServiceImpl::new(meta_store.clone(), wal_store.clone());
+        let import_service = ImportServiceImpl::new(meta_store.clone(), wal_store.clone(), self.config_obj.clone());
         let query_planner = QueryPlannerImpl::new(meta_store.clone());
         let query_executor = Arc::new(QueryExecutorImpl);
         let cluster = ClusterImpl::new(
