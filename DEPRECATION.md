@@ -98,7 +98,7 @@ microservices, if necessary).
 
 **Deprecated in Release: v0.24.2**
 
-Absolute imports highly depend on a path, and all API becomes public. We now
+Absolute imports are highly dependent on a path, and all API becomes public. We now
 provide a public API from the package directly.
 
 Deprecated:
@@ -131,7 +131,7 @@ removing the `contextToDataSourceId` property completely.
 
 **Deprecated in Release: v0.25.4**
 
-Absolute imports highly depend on a path, and all API becomes public. We now
+Absolute imports are highly dependent on a path, and all API becomes public. We now
 provide a public API from the package directly.
 
 Deprecated:
@@ -150,7 +150,7 @@ const { CubejsServerCore } = require('@cubejs-backend/server-core');
 
 **Deprecated in Release: v0.25.21**
 
-Absolute imports highly depend on a path, and all API becomes public. We now
+Absolute imports are highly dependent on a path, and all API becomes public. We now
 provide a public API from the package directly.
 
 Deprecated:

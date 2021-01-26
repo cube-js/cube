@@ -4,7 +4,6 @@ import moment from 'moment';
 import bodyParser from 'body-parser';
 
 import type {
-  Request as ExpressRequest,
   Response, NextFunction,
   Application as ExpressApplication,
   RequestHandler,
@@ -150,15 +149,6 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
   return row;
 }));
 
-const coerceForSqlQuery = (query, context: RequestContext) => ({
-  ...query,
-  timeDimensions: query.timeDimensions || [],
-  contextSymbols: {
-    securityContext: context.securityContext && context.securityContext.u || {}
-  },
-  requestId: context.requestId
-});
-
 export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
@@ -197,6 +187,9 @@ export class ApiGateway {
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
+  // Flag to show deprecation for u, only once
+  protected checkAuthDeprecationShown: boolean = false;
+
   public constructor(
     protected readonly apiSecret: string,
     protected readonly compilerApi: any,
@@ -204,8 +197,6 @@ export class ApiGateway {
     protected readonly logger: any,
     options: ApiGatewayOptions,
   ) {
-    options = options || {};
-
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
     this.standalone = options.standalone;
@@ -390,7 +381,7 @@ export class ApiGateway {
 
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
-          coerceForSqlQuery(normalizedQuery, context),
+          this.coerceForSqlQuery(normalizedQuery, context),
           { includeDebugInfo: process.env.NODE_ENV !== 'production' }
         ))
       );
@@ -410,6 +401,44 @@ export class ApiGateway {
     }
   }
 
+  protected coerceForSqlQuery(query, context: RequestContext) {
+    let securityContext = {};
+
+    if (context.securityContext) {
+      if (context.securityContext.u) {
+        if (!this.checkAuthDeprecationShown) {
+          this.logger('JWT U Property Deprecation', {
+            warning: (
+              'Storing security context in the u property within the payload is now deprecated, please migrate: ' +
+              'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#authinfo'
+            )
+          });
+
+          this.checkAuthDeprecationShown = true;
+        }
+
+        const userContext = context.securityContext.u;
+        delete context.securityContext.u;
+
+        securityContext = {
+          ...context.securityContext,
+          ...userContext,
+        };
+      } else {
+        securityContext = context.securityContext;
+      }
+    }
+
+    return {
+      ...query,
+      timeDimensions: query.timeDimensions || [],
+      contextSymbols: {
+        securityContext,
+      },
+      requestId: context.requestId
+    };
+  }
+
   protected async dryRun({ query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
@@ -418,7 +447,7 @@ export class ApiGateway {
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
-          coerceForSqlQuery(normalizedQuery, context),
+          this.coerceForSqlQuery(normalizedQuery, context),
           { includeDebugInfo: process.env.NODE_ENV !== 'production' }
         ))
       );
@@ -456,7 +485,9 @@ export class ApiGateway {
         ].concat(normalizedQueries.map(
           async (normalizedQuery, index) => {
             const loadRequestSQLStarted = new Date();
-            const sqlQuery = await this.getCompilerApi(context).getSql(coerceForSqlQuery(normalizedQuery, context));
+            const sqlQuery = await this.getCompilerApi(context).getSql(
+              this.coerceForSqlQuery(normalizedQuery, context)
+            );
 
             this.log({
               type: 'Load Request SQL',
@@ -693,7 +724,7 @@ export class ApiGateway {
   }
 
   protected wrapCheckAuthMiddleware(fn: CheckAuthMiddlewareFn): CheckAuthMiddlewareFn {
-    this.logger('check_auth_middleware_deprecation', {
+    this.logger('CheckAuthMiddleware Middleware Deprecation', {
       warning: (
         'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: ' +
         'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
@@ -726,9 +757,9 @@ export class ApiGateway {
         req.authInfo = req.securityContext;
       } else if (req.authInfo) {
         if (!warningShowed) {
-          this.logger('auth_info_deprecation', {
+          this.logger('AuthInfo Deprecation', {
             warning: (
-              'Recently authInfo was renamed to securityContext, please migrate: ' +
+              'authInfo was renamed to securityContext, please migrate: ' +
               'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
             )
           });
