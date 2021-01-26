@@ -490,6 +490,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                     let custom_type_name = custom.to_string().to_lowercase();
                     match custom_type_name.as_str() {
                         "mediumint" => ColumnType::Int,
+                        "bytes" => ColumnType::Bytes,
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
@@ -1010,12 +1011,14 @@ mod tests {
             service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             service
-                .exec_query("CREATE TABLE foo.values (int_value mediumint)")
+                .exec_query("CREATE TABLE foo.values (int_value mediumint, b1 bytes, b2 varbinary)")
                 .await
                 .unwrap();
 
             service
-                .exec_query("INSERT INTO foo.values (int_value) VALUES (-153)")
+                .exec_query(
+                    "INSERT INTO foo.values (int_value, b1, b2) VALUES (-153, X'0a', X'0b')",
+                )
                 .await
                 .unwrap();
         })
