@@ -61,7 +61,7 @@ impl ImportFormat {
                                         .find(|c| c.get_name() == &next_column)
                                         .cloned()
                                         .ok_or(CubeError::user(format!(
-                                            "Column {} not found during import in {:?}",
+                                            "Column '{}' is not found during import in {:?}",
                                             next_column, columns
                                         )))?,
                                 );
@@ -74,33 +74,37 @@ impl ImportFormat {
                         for column in header_mapping
                             .as_ref()
                             .ok_or(CubeError::user(
-                                "Header required for CSV import".to_string(),
+                                "Header is required for CSV import".to_string(),
                             ))?
                             .iter()
                         {
                             let value = parser.next_value()?;
 
-                            row.push(match column.get_column_type() {
-                                ColumnType::String => TableValue::String(value),
-                                ColumnType::Int => value
-                                    .parse()
-                                    .map(|v| TableValue::Int(v))
-                                    .unwrap_or(TableValue::Null),
-                                ColumnType::Decimal { .. } => {
-                                    BigDecimal::from_str_radix(value.as_str(), 10)
-                                        .map(|d| TableValue::Decimal(d.to_string()))
-                                        .unwrap_or(TableValue::Null)
-                                }
-                                ColumnType::Bytes => unimplemented!(),
-                                ColumnType::HyperLogLog(_) => unimplemented!(),
-                                ColumnType::Timestamp => timestamp_from_string(value.as_str())?,
-                                ColumnType::Float => {
-                                    TableValue::Float(value.parse::<f64>()?.to_string())
-                                }
-                                ColumnType::Boolean => {
-                                    TableValue::Boolean(value.to_lowercase() == "true")
-                                }
-                            });
+                            if &value == "" {
+                                row.push(TableValue::Null);
+                            } else {
+                                row.push(match column.get_column_type() {
+                                    ColumnType::String => TableValue::String(value),
+                                    ColumnType::Int => value
+                                        .parse()
+                                        .map(|v| TableValue::Int(v))
+                                        .unwrap_or(TableValue::Null),
+                                    ColumnType::Decimal { .. } => {
+                                        BigDecimal::from_str_radix(value.as_str(), 10)
+                                            .map(|d| TableValue::Decimal(d.to_string()))
+                                            .unwrap_or(TableValue::Null)
+                                    }
+                                    ColumnType::Bytes => unimplemented!(),
+                                    ColumnType::HyperLogLog(_) => unimplemented!(),
+                                    ColumnType::Timestamp => timestamp_from_string(value.as_str())?,
+                                    ColumnType::Float => {
+                                        TableValue::Float(value.parse::<f64>()?.to_string())
+                                    }
+                                    ColumnType::Boolean => {
+                                        TableValue::Boolean(value.to_lowercase() == "true")
+                                    }
+                                });
+                            }
 
                             parser.advance()?;
                         }

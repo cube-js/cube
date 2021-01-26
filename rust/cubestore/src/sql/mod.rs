@@ -2078,6 +2078,7 @@ mod tests {
                 file.write_all("id,city,t,arr\n".as_bytes()).unwrap();
                 file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\n".as_bytes()).unwrap();
                 file.write_all("2,New York,2021-01-24 19:12:23 UTC,\"[\"\"\"\"]\"\n".as_bytes()).unwrap();
+                file.write_all("3,New York,2021-01-25 19:12:23 UTC,\n".as_bytes()).unwrap();
 
                 dir
             };
@@ -2089,10 +2090,10 @@ mod tests {
             assert!(error.contains("has data"));
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
 
-            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]'").await.unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
         }).await;
     }
 
