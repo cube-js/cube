@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{env, fs};
 use tokio::sync::broadcast;
-use tokio::time::Duration;
+use tokio::time::{timeout_at, Duration, Instant};
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -349,7 +349,11 @@ impl Config {
             let services = self.configure().await;
             services.start_processing_loops().await.unwrap();
 
-            test_fn(services.clone()).await;
+            // Should be long enough even for CI.
+            let timeout = Duration::from_secs(600);
+            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                panic!("Test timed out after {} seconds", timeout.as_secs());
+            }
 
             services.stop_processing_loops().await.unwrap();
         }
