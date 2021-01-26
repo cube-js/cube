@@ -28,7 +28,7 @@ const menuOrder = [
   'Data Schema',
   'Cube.js Frontend',
   'Deployment',
-  'Cube.js CLI',
+  'Developer Tools',
   'Examples & Tutorials',
 ];
 
