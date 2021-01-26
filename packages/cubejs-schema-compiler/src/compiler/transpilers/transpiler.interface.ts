@@ -1,27 +1,22 @@
-import {
-  ImportDeclaration,
-  ExportNamedDeclaration,
-  ExportDefaultDeclaration,
-  CallExpression,
-  VariableDeclaration,
-  Expression,
-} from '@babel/types';
+import t from '@babel/types';
+import { ErrorReporter } from '../ErrorReporter';
 
 // @todo Replace with Real type when https://github.com/babel/babel/pull/12488 PR will be merged
 export interface NodePath<T> {
   node: T,
   get(name: string): any,
-  replaceWith(node: VariableDeclaration | Expression): void;
-  replaceWithMultiple(node: VariableDeclaration[] | Expression): void;
+  replaceWith(node: t.VariableDeclaration | t.Expression): void;
+  replaceWithMultiple(node: t.VariableDeclaration[] | t.Expression): void;
 }
 
 export interface TraverseObject {
-  ImportDeclaration?: (path: NodePath<ImportDeclaration>) => void,
-  ExportNamedDeclaration?: (path: NodePath<ExportNamedDeclaration>) => void,
-  ExportDefaultDeclaration?: (path: NodePath<ExportDefaultDeclaration>) => void,
-  CallExpression?: (path: NodePath<CallExpression>) => void,
+  ImportDeclaration?: (path: NodePath<t.ImportDeclaration>) => void,
+  ExportNamedDeclaration?: (path: NodePath<t.ExportNamedDeclaration>) => void,
+  ExportDefaultDeclaration?: (path: NodePath<t.ExportDefaultDeclaration>) => void,
+  CallExpression?: (path: NodePath<t.CallExpression>) => void,
+  Identifier?: (path: NodePath<t.Identifier>) => void,
 }
 
 export interface TranspilerInterface {
-  traverseObject(): TraverseObject;
+  traverseObject(reporter: ErrorReporter): TraverseObject;
 }

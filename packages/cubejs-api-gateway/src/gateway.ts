@@ -24,6 +24,7 @@ import {
   QueryTransformerFn,
   RequestContext,
   RequestLoggerMiddlewareFn,
+  Request,
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
 
@@ -149,19 +150,14 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
   return row;
 }));
 
-const coerceForSqlQuery = (query, context) => ({
+const coerceForSqlQuery = (query, context: RequestContext) => ({
   ...query,
   timeDimensions: query.timeDimensions || [],
   contextSymbols: {
-    userContext: context.authInfo && context.authInfo.u || {}
+    securityContext: context.securityContext && context.securityContext.u || {}
   },
   requestId: context.requestId
 });
-
-interface Request extends ExpressRequest {
-  context?: RequestContext,
-  authInfo?: any,
-}
 
 export interface ApiGatewayOptions {
   standalone: boolean;
@@ -219,8 +215,10 @@ export class ApiGateway {
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
-    this.checkAuthFn = options.checkAuth || this.defaultCheckAuth.bind(this);
-    this.checkAuthMiddleware = options.checkAuthMiddleware || this.checkAuth.bind(this);
+    this.checkAuthFn = options.checkAuth ? this.wrapCheckAuth(options.checkAuth) : this.defaultCheckAuth.bind(this);
+    this.checkAuthMiddleware = options.checkAuthMiddleware
+      ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
+      : this.checkAuth.bind(this);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger.bind(this);
   }
 
@@ -619,11 +617,13 @@ export class ApiGateway {
     return this.adapterApi;
   }
 
-  public async contextByReq(req, authInfo, requestId) {
+  public async contextByReq(req: Request, securityContext, requestId: string) {
     const extensions = await Promise.resolve(typeof this.extendContext === 'function' ? this.extendContext(req) : {});
 
     return {
-      authInfo,
+      securityContext,
+      // Deprecated, but let's allow it for now.
+      authInfo: securityContext,
       requestId,
       ...extensions
     };
@@ -692,11 +692,60 @@ export class ApiGateway {
     }
   }
 
+  protected wrapCheckAuthMiddleware(fn: CheckAuthMiddlewareFn): CheckAuthMiddlewareFn {
+    this.logger('check_auth_middleware_deprecation', {
+      warning: (
+        'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: ' +
+        'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
+      )
+    });
+
+    return (req, res, next) => {
+      fn(req, res, (e) => {
+        // We renamed authInfo to securityContext, but users can continue to use both ways
+        if (req.securityContext && !req.authInfo) {
+          req.authInfo = req.securityContext;
+        } else if (req.authInfo) {
+          req.securityContext = req.authInfo;
+        }
+
+        next(e);
+      });
+    };
+  }
+
+  protected wrapCheckAuth(fn: (req: Request, auth?: string) => void) {
+    // We dont need to span all logs with deprecation message
+    let warningShowed = false;
+
+    return (req: Request, auth?: string) => {
+      fn(req, auth);
+
+      // We renamed authInfo to securityContext, but users can continue to use both ways
+      if (req.securityContext && !req.authInfo) {
+        req.authInfo = req.securityContext;
+      } else if (req.authInfo) {
+        if (!warningShowed) {
+          this.logger('auth_info_deprecation', {
+            warning: (
+              'Recently authInfo was renamed to securityContext, please migrate: ' +
+              'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
+            )
+          });
+
+          warningShowed = true;
+        }
+
+        req.securityContext = req.authInfo;
+      }
+    };
+  }
+
   protected async defaultCheckAuth(req: Request, auth?: string) {
     if (auth) {
       const secret = this.apiSecret;
       try {
-        req.authInfo = jwt.verify(auth, secret);
+        req.securityContext = jwt.verify(auth, secret);
       } catch (e) {
         if (this.enforceSecurityChecks) {
           throw new UserError('Invalid token');
@@ -749,7 +798,7 @@ export class ApiGateway {
   }
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    req.context = await this.contextByReq(req, req.authInfo, getRequestIdFromRequest(req));
+    req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
     if (next) {
       next();
     }
@@ -807,7 +856,7 @@ export class ApiGateway {
     this.logger(type, {
       ...restParams,
       ...(!context ? undefined : {
-        authInfo: context.authInfo,
+        securityContext: context.securityContext,
         requestId: context.requestId
       })
     });

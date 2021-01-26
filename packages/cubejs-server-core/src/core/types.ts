@@ -31,8 +31,16 @@ export interface OrchestratorOptions {
 }
 
 export interface RequestContext {
+  // @deprecated Renamed to securityContext, please use securityContext.
   authInfo: any;
+  securityContext: any;
   requestId: string;
+}
+
+export type UserBackgroundContext = {
+  // @deprecated Renamed to securityContext, please use securityContext.
+  authInfo?: any;
+  securityContext: any;
 }
 
 export interface DriverContext extends RequestContext {
@@ -106,7 +114,7 @@ export interface CreateOptions {
   extendContext?: (req: ExpressRequest) => any;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];
-  scheduledRefreshContexts?: () => Promise<object[]>;
+  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
   compilerCacheSize?: number;
   maxCompilerCacheKeepAlive?: number;

@@ -1225,7 +1225,7 @@ describe('SQL Generation', function test() {
     });
   });
 
-  it('user context', async () => {
+  it('security context', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -1235,7 +1235,7 @@ describe('SQL Generation', function test() {
       timeDimensions: [],
       timezone: 'America/Los_Angeles',
       contextSymbols: {
-        userContext: { source: 'some' }
+        securityContext: { source: 'some' }
       }
     });
 
@@ -1249,7 +1249,7 @@ describe('SQL Generation', function test() {
     });
   });
 
-  it('user context array', async () => {
+  it('security context array', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -1259,7 +1259,7 @@ describe('SQL Generation', function test() {
       timeDimensions: [],
       timezone: 'America/Los_Angeles',
       contextSymbols: {
-        userContext: {
+        securityContext: {
           sourceArray: ['some', 'google']
         }
       }

@@ -132,7 +132,10 @@ export class BaseQuery {
   }
 
   initFromOptions() {
-    this.contextSymbols = Object.assign({ userContext: {} }, this.options.contextSymbols || {});
+    this.contextSymbols = {
+      securityContext: {},
+      ...this.options.contextSymbols,
+    };
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({

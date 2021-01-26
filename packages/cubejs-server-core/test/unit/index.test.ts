@@ -10,6 +10,10 @@ class CubejsServerCoreOpen extends CubejsServerCore {
   public detectScheduledRefreshTimer(scheduledRefreshTimer?:string | number | boolean) {
     return super.detectScheduledRefreshTimer(scheduledRefreshTimer);
   }
+
+  public getRefreshScheduler() {
+    return super.getRefreshScheduler();
+  }
 }
 
 describe('index.test', () => {
@@ -177,7 +181,7 @@ describe('index.test', () => {
   expectRefreshTimerOption(undefined, false, true);
 
   test('scheduledRefreshContexts option', async () => {
-    const cubejsServerCore = new CubejsServerCore({
+    const cubejsServerCore = new CubejsServerCoreOpen({
       dbType: 'mysql',
       apiSecret: 'secret',
       // 250ms
@@ -185,24 +189,28 @@ describe('index.test', () => {
       scheduledRefreshConcurrency: 2,
       scheduledRefreshContexts: async () => [
         {
-          authInfo: {
+          securityContext: {
             appid: 'test1',
             u: {
               prop1: 'value1'
             }
           }
         },
-        {
+        // securityContext is required in typings, but can be empty in user-space
+        <any>{
+          // Renamed to securityContext, let's test that it migrate automatically
           authInfo: {
             appid: 'test2',
             u: {
               prop2: 'value2'
             }
-          }
+          },
         },
+        // Null is a default placeholder
+        null
       ],
     });
-    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCoreOpen);
 
     const timeoutKiller = withTimeout(
       () => {
@@ -211,24 +219,38 @@ describe('index.test', () => {
       2 * 1000,
     );
 
-    const runScheduledRefreshMock = jest.spyOn(cubejsServerCore, 'runScheduledRefresh')
-      .mockImplementation(async (ctx, query) => {
+    const refreshSchedulerMock = {
+      runScheduledRefresh: jest.fn(async () => {
         await timeoutKiller.cancel();
 
         return {
           finished: true,
         };
-      });
+      })
+    };
+
+    jest.spyOn(cubejsServerCore, 'getRefreshScheduler').mockImplementation(() => <any>refreshSchedulerMock);
 
     await timeoutKiller;
 
-    expect(runScheduledRefreshMock.mock.calls.length).toEqual(2);
-    expect(runScheduledRefreshMock.mock.calls[0]).toEqual([
-      { authInfo: { appid: 'test1', u: { prop1: 'value1' } } },
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls.length).toEqual(3);
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls[0]).toEqual([
+      {
+        authInfo: { appid: 'test1', u: { prop1: 'value1' } },
+        securityContext: { appid: 'test1', u: { prop1: 'value1' } },
+      },
       { concurrency: 2 },
     ]);
-    expect(runScheduledRefreshMock.mock.calls[1]).toEqual([
-      { authInfo: { appid: 'test2', u: { prop2: 'value2' } } },
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls[1]).toEqual([
+      {
+        authInfo: { appid: 'test2', u: { prop2: 'value2' } },
+        securityContext: { appid: 'test2', u: { prop2: 'value2' } },
+      },
+      { concurrency: 2 },
+    ]);
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls[2]).toEqual([
+      // RefreshScheduler will populate it
+      null,
       { concurrency: 2 },
     ]);
 
