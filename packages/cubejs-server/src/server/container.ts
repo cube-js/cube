@@ -275,37 +275,43 @@ export class ServerContainer {
 
   public async start() {
     const makeInstance = async () => {
+      const userConfig = await this.lookupConfiguration();
+
       const configuration = {
-        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : 2,
-        ...await this.lookupConfiguration(),
+        // By default graceful shutdown is disabled, but this value is needed for reboot
+        gracefulShutdown: getEnv('gracefulShutdown') || (process.env.NODE_ENV === 'production' ? 30 : 2),
+        ...userConfig,
       };
 
       const server = await this.runServerInstance(configuration);
 
       return {
         configuration,
+        gracefulEnabled: !!(getEnv('gracefulShutdown') || userConfig.gracefulShutdown),
         server
       };
     };
 
     let instance = await makeInstance();
 
-    // eslint-disable-next-line no-restricted-syntax
-    for (const bindSignal of ['SIGTERM', 'SIGINT']) {
-      // eslint-disable-next-line no-loop-func
-      process.on(bindSignal, async (signal) => {
-        console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
+    if (instance.gracefulEnabled) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const bindSignal of ['SIGTERM', 'SIGINT']) {
+        // eslint-disable-next-line no-loop-func
+        process.on(bindSignal, async (signal) => {
+          console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
 
-        process.exit(
-          await instance.server.shutdown(signal, true)
-        );
-      });
+          process.exit(
+            await instance.server.shutdown(signal, true)
+          );
+        });
+      }
     }
 
     let restartHandler: Promise<0|1>|null = null;
 
     process.addListener('SIGUSR1', async (signal) => {
-      console.log(`Received ${signal} signal, reloading`);
+      console.log(`Received ${signal} signal, reloading in ${instance.configuration.gracefulShutdown}s`);
 
       if (restartHandler) {
         console.log(`Unable to restart server while it's already restarting`);
