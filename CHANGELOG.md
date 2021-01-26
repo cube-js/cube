@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.30](https://github.com/cube-js/cube.js/compare/v0.25.29...v0.25.30) (2021-01-26)
+
+
+### Bug Fixes
+
+* **cubestore:** add custom type 'bytes', a synonym for 'varbinary' ([#1890](https://github.com/cube-js/cube.js/issues/1890)) ([4efc291](https://github.com/cube-js/cube.js/commit/4efc2914a0f9f0c960bf9af00a56c5562ac02bd4))
+* **shared:** 1st interval unexpected call on onDuplicatedStateResolved ([6265503](https://github.com/cube-js/cube.js/commit/62655036d337e2ca491d0bda4f7f1b98a6811c4c))
+
+
+### Features
+
+* **cubestore:** allow to import base64-encoded bytes in CSV ([#1891](https://github.com/cube-js/cube.js/issues/1891)) ([2f43afa](https://github.com/cube-js/cube.js/commit/2f43afaa3776fb70526196734b1f3e97b942770e))
+
+
+
+
+
 ## [0.25.29](https://github.com/cube-js/cube.js/compare/v0.25.28...v0.25.29) (2021-01-26)
 
 
