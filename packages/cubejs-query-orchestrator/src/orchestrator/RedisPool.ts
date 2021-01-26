@@ -18,7 +18,6 @@ export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
-  idleTimeout?: number;
   createClient?: CreateRedisClientFn;
   destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
 }
@@ -39,16 +38,14 @@ export class RedisPool {
   public constructor(options: RedisPoolOptions = {}) {
     const defaultMin = envIntWithDefault('CUBEJS_REDIS_POOL_MIN', 2);
     const defaultMax = envIntWithDefault('CUBEJS_REDIS_POOL_MAX', 1000);
-    const defaultIdleTimeout = envIntWithDefault('CUBEJS_REDIS_POOL_IDLE_TIMEOUT_SECONDS', 5);
     const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : defaultMin;
     const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : defaultMax;
-    const idleTimeout = (typeof options.idleTimeout !== 'undefined') ? options.idleTimeout : defaultIdleTimeout;
 
     const opts: PoolOptions = {
       min,
       max,
       acquireTimeoutMillis: 5000,
-      idleTimeoutMillis: idleTimeout * 1000,
+      idleTimeoutMillis: 5000,
       evictionRunIntervalMillis: 5000
     };
     
