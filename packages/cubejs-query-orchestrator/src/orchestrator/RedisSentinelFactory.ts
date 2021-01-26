@@ -6,7 +6,7 @@ function debugLog(msg) {
   }
 }
 
-function createIORedisClient(url: string, opts: RedisOptions): PromiseLike<redis> {
+async function createIORedisClient(url: string, opts: RedisOptions) {
   const [host, portStr] = (process.env.REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
   const port = portStr ? Number(portStr) : 6379;
 
@@ -65,7 +65,7 @@ Pipeline.prototype.execAsync = function execAsync() {
     .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
 };
 
-async function addAsyncMethods(client: redis): redis {
+async function addAsyncMethods(client: redis) {
   [
     'brpop',
     'del',
