@@ -1,8 +1,8 @@
 ---
-title: Command Reference
+title: Cube.js CLI Command Reference
 permalink: /reference
-category: Cube.js CLI
-menuOrder: 2
+category: Developer Tools
+menuOrder: 3
 ---
 
 ## create
