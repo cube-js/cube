@@ -3,6 +3,7 @@
     <query-builder :cubejs-api="cubejsApi" :query="query" style="width: 100%">
       <template
         #builder="{
+          validatedQuery,
           measures,
           setMeasures,
           availableMeasures,
@@ -12,14 +13,20 @@
           timeDimensions,
           setTimeDimensions,
           availableTimeDimensions,
-          availableFilters,
           filters,
           setFilters,
-          pivotConfig
+          pivotConfig,
+          limit,
+          setLimit,
+          orderMembers,
+          order,
+          setOrder,
+          updateOrder,
         }"
       >
         <v-container fluid class="pa-4 pa-md-8 pt-6 background-white">
-          <div>DEBUG: {{ pivotConfig }}</div>
+          <div>DEBUG:{{ order }}</div>
+          <div>DEBUG: {{ validatedQuery }}</div>
           <div class="wrap">
             <v-btn
               color="primary"
@@ -33,7 +40,9 @@
               >remove member</v-btn
             >
 
-            <v-btn color="primary" depressed elevation="2" raised v-on:click="print">Click Me!</v-btn>
+            <v-btn color="primary" depressed elevation="2" raised v-on:click="setOrder({ 'Orders.count': 'desc' })"
+              >Click Me!</v-btn
+            >
 
             <v-row>
               <v-col cols="12" md="2">
@@ -120,7 +129,7 @@
               </v-col>
             </v-row>
 
-            <v-row align="center" >
+            <v-row align="center">
               <v-col cols="2" md="2">
                 <v-select label="Chart Type" outlined hide-details v-model="type" :items="['line', 'table']" />
               </v-col>
@@ -129,8 +138,9 @@
                 Settings:
                 <PivotConfig :pivotConfig="pivotConfig" />
 
-                <v-btn>Order</v-btn>
-                <v-btn>Limit</v-btn>
+                <Order :orderMembers="orderMembers" @orderChange="updateOrder.set" @reorder="updateOrder.reorder" />
+
+                <Limit :limit="Number(limit)" @update="setLimit" />
               </v-col>
             </v-row>
 
@@ -144,7 +154,7 @@
         </v-container>
       </template>
 
-      <template v-slot="{ resultSet }" v-if="false">
+      <template v-slot="{ resultSet }">
         <div class="wrap pa-4 pa-md-8" v-if="resultSet">
           <div class="border-light pa-4 pa-md-12">
             <line-chart legend="bottom" v-if="type === 'line'" :data="series(resultSet)"></line-chart>
@@ -162,10 +172,12 @@ import { QueryBuilder, GRANULARITIES } from '@cubejs-client/vue';
 import FilterComponent from './FilterComponent.vue';
 import Table from './Table';
 import PivotConfig from '@/components/dialogs/PivotConfig';
+import Order from '@/components/dialogs/Order';
+import Limit from '@/components/dialogs/Limit';
 
 const API_URL = 'https://ecom.cubecloudapp.dev';
 const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjA3NDQwMTQ0LCJleHAiOjE2MTAwMzIxNDR9.Za52BRvDvtgzqgy44QC5C35Li2RZ1RZAGy2mDdIWY70';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjExMjIyMjY4LCJleHAiOjE2MTM4MTQyNjh9.g7_sjO6qjQwblwHuVNnKfpjvwv9TBxyjZzWKtmRAlVI';
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`,
 });
@@ -178,10 +190,12 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
 // });
 
 export default {
-  name: 'HelloWorld',
+  name: 'Explore',
 
   components: {
     PivotConfig,
+    Order,
+    Limit,
     QueryBuilder,
     FilterComponent,
     Table,
@@ -190,21 +204,20 @@ export default {
     let query = {};
 
     query = {
-      measures: ['Orders.count', 'Orders.number'],
+      measures: ['Orders.count'],
       dimensions: ['Orders.status'],
       timeDimensions: [
         {
           dimension: 'Orders.createdAt',
           granularity: 'month',
-          dateRange: 'this quarter'
+          dateRange: 'this quarter',
         },
       ],
       filters: [],
+      order: {
+        'Orders.status': 'desc',
+      },
     };
-
-    console.log('qqq',query)
-
-    // query = {};
 
     return {
       selectedGranularity: {
@@ -225,15 +238,17 @@ export default {
       ],
       type: 'line',
       GRANULARITIES,
-      pivotConfigDialog: false
+      // pivotConfigDialog: false,
+      // orderDialog: false,
     };
   },
   methods: {
-    print() {
-      console.log('clicked!');
+    print(value) {
+      console.log('printer: ', value);
     },
     series(resultSet) {
       const seriesNames = resultSet.seriesNames();
+
       const pivot = resultSet.chartPivot();
       const series = [];
       seriesNames.forEach((e) => {

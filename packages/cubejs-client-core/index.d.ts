@@ -978,11 +978,28 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function flattenFilters(filters: Filter[]): TFlatFilter[];
-  
+
   type TGranularityMap = {
     name: TimeDimensionGranularity | undefined;
     title: string;
-  }
-  
-  const GRANULARITIES: TGranularityMap[]
+  };
+
+  /**
+   * @hidden
+   */
+  type TOrderMember = {
+    id: string;
+    order: QueryOrder;
+    title: string;
+  };
+
+  /**
+   * @hidden
+   */
+  export function getOrderMembersFromOrder(
+    orderMembers: any,
+    order: TQueryOrderObject | TQueryOrderArray
+  ): TOrderMember[];
+
+  const GRANULARITIES: TGranularityMap[];
 }

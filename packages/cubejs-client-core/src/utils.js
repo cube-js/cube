@@ -1,3 +1,5 @@
+import { fromPairs, indexBy, toPairs, prop, mergeDeepLeft } from 'ramda';
+
 export const DEFAULT_GRANULARITY = 'day';
 
 export const GRANULARITIES = [
@@ -67,7 +69,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
           ? [
               {
                 dimension: defaultTimeDimension,
-                granularity: currentGranularity || granularity
+                granularity: currentGranularity || granularity,
               },
             ]
           : [],
@@ -206,6 +208,29 @@ export function movePivotItem(pivotConfig, sourceIndex, destinationIndex, source
   return nextPivotConfig;
 }
 
+export function checkPivotItemMove(pivotConfig, { sourceAxis, destinationAxis, sourceIndex }) {
+  let maxIndexOnAxis = pivotConfig[destinationAxis].length - 1;
+
+  if (sourceAxis === destinationAxis) {
+    maxIndexOnAxis--;
+  }
+
+  // if (event.draggedContext.element === 'measures') {
+  //   if (event.draggedContext.futureIndex <= maxIndexOnAxis) {
+  //     return false;
+  //   }
+  // } else {
+  //   const { length } = this.pivotConfig[destinationAxis];
+  //   if (this.pivotConfig[destinationAxis][length - 1] === 'measures') {
+  //     if (event.draggedContext.futureIndex > maxIndexOnAxis) {
+  //       return false;
+  //     }
+  //   }
+  // }
+
+  return true;
+}
+
 export function moveItemInArray(list, sourceIndex, destinationIndex) {
   const result = [...list];
   const [removed] = result.splice(sourceIndex, 1);
@@ -222,4 +247,27 @@ export function flattenFilters(filters = []) {
 
     return [...memo, filter];
   }, []);
+}
+
+export function getOrderMembersFromOrder(orderMembers, order) {
+  const ids = new Set();
+  const indexedOrderMembers = indexBy(prop('id'), orderMembers);
+  const nextOrderMembers = [];
+
+  Object.entries(order).forEach(([memberId, currentOrder]) => {
+    if (currentOrder !== 'none') {
+      ids.add(memberId);
+      nextOrderMembers.push({
+        ...indexedOrderMembers[memberId],
+        order: currentOrder,
+      });
+    }
+  });
+  orderMembers.forEach((member) => {
+    if (!ids.has(member.id)) {
+      nextOrderMembers.push(member);
+    }
+  });
+  
+  return nextOrderMembers;
 }

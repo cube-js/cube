@@ -64,19 +64,19 @@
     </v-app-bar>
 
     <v-main>
-      <HelloWorld />
+      <Explore />
     </v-main>
   </v-app>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld';
+import Explore from './components/Explore';
 
 export default {
   name: 'App',
 
   components: {
-    HelloWorld,
+    Explore,
   },
 };
 </script>

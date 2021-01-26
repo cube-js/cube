@@ -59,18 +59,19 @@ export default {
     }
 
     if ((!loading && resultSet && !error) || onlyDefault) {
-      const slotProps = {
+      let slotProps = {
         resultSet,
         sqlQuery,
         query: this.builderProps.query || this.query,
       };
 
       if (onlyDefault) {
-        Object.assign(slotProps, {
+        slotProps = {
           loading,
           error,
           ...this.builderProps,
-        });
+          ...slotProps
+        };
       }
 
       slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
@@ -137,8 +138,6 @@ export default {
     query: {
       deep: true,
       handler(query, prevQuery) {
-        console.log('has Changed!', d(query), d(prevQuery));
-
         if (isQueryPresent(query) && !equals(query, prevQuery)) {
           this.load();
         }

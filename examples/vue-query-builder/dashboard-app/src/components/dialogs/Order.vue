@@ -1,0 +1,67 @@
+<template>
+  <v-dialog v-model="dialog" max-width="400">
+    <template v-slot:activator="{ on, attrs }">
+      <v-btn v-bind="attrs" v-on="on"> Order </v-btn>
+    </template>
+
+    <v-card>
+      <v-card-title>Order</v-card-title>
+      <v-card-text class="container">
+        <draggable id="y" class="list-group" group="pivot" :list="orderMembers">
+          <div v-for="member in orderMembers" :key="member.id" class="order-member">
+            <div class="order-member-name">
+              <v-icon small>mdi-arrow-all</v-icon>
+
+              <span>{{ member.title }}</span>
+            </div>
+
+            <v-btn-toggle borderless :value="member.order" @change="(value) => $emit('orderChange', member.id, value)">
+              <v-btn small value="asc"> ASC </v-btn>
+              <v-btn small value="desc"> DESC </v-btn>
+              <v-btn small value="none"> NONE </v-btn>
+            </v-btn-toggle>
+          </div>
+        </draggable>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+</template>
+
+<script>
+import draggable from 'vuedraggable';
+
+export default {
+  name: 'Order',
+  components: {
+    draggable,
+  },
+  props: {
+    orderMembers: {
+      type: Array,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      dialog: false,
+    };
+  },
+};
+</script>
+
+<style scoped>
+.order-member {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin: 16px 0;
+}
+
+.order-member-name {
+  cursor: grab;
+}
+
+.order-member-name > i {
+  margin-right: 8px;
+}
+</style>

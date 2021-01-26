@@ -231,5 +231,6 @@ export {
   moveItemInArray,
   defaultOrder,
   flattenFilters,
+  getOrderMembersFromOrder,
   GRANULARITIES
 } from './utils';
