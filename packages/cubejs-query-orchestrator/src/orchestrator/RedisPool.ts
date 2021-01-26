@@ -52,6 +52,8 @@ export class RedisPool {
       evictionRunIntervalMillis: 5000
     };
     
+    console.info(JSON.stringify(opts));
+
     const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
 
     if (max > 0) {
