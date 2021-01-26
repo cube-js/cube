@@ -93,27 +93,45 @@ export function createCancelableInterval<T>(
   fn: (token: CancelToken) => Promise<T>,
   options: {
     interval: number,
-    onDuplicatedExecution?: () => any,
+    onDuplicatedStateResolved?: (intervalId: number, elapsedTime: number) => any,
+    onDuplicatedExecution?: (intervalId: number) => any,
   },
 ): CancelableInterval {
   let execution: CancelablePromise<T>|null = null;
+  let startTime: number|null = null;
+  let intervalId: number = 0;
+  let duplicatedExecutionTracked: boolean = true;
 
   const timeout = setInterval(
     async () => {
       if (execution) {
         if (options.onDuplicatedExecution) {
-          options.onDuplicatedExecution();
+          duplicatedExecutionTracked = true;
+          options.onDuplicatedExecution(intervalId);
         }
 
         return;
       }
 
       try {
+        intervalId++;
+
+        if (intervalId >= Number.MAX_SAFE_INTEGER) {
+          intervalId = 0;
+        }
+
+        startTime = Date.now();
         execution = createCancelablePromise(fn);
 
         await execution;
       } finally {
         execution = null;
+
+        if (duplicatedExecutionTracked && options.onDuplicatedStateResolved) {
+          options.onDuplicatedStateResolved(intervalId, Date.now() - <number>startTime);
+        }
+
+        duplicatedExecutionTracked = false;
       }
     },
     options.interval,
