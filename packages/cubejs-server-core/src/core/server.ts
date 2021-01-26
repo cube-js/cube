@@ -27,6 +27,7 @@ import type {
   RequestContext,
   DriverContext,
   SchemaFileRepository,
+  UserBackgroundContext,
 } from './types';
 
 import { FileRepository } from './FileRepository';
@@ -567,12 +568,49 @@ export class CubejsServerCore {
     }));
   }
 
+  protected getRefreshScheduler() {
+    return new RefreshScheduler(this);
+  }
+
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public async runScheduledRefresh(context, queryingOptions?: any) {
-    const scheduler = new RefreshScheduler(this);
-    return scheduler.runScheduledRefresh(context, queryingOptions);
+  public async runScheduledRefresh(context: UserBackgroundContext|null, queryingOptions?: any) {
+    return this.getRefreshScheduler().runScheduledRefresh(this.migrateBackgroundContext(context), queryingOptions);
+  }
+
+  protected warningBackgroundContextShow: boolean = false;
+
+  protected migrateBackgroundContext(ctx: UserBackgroundContext | null): RequestContext|null {
+    let result: any = null;
+
+    // We renamed authInfo to securityContext, but users can continue to use both ways
+    if (ctx) {
+      if (ctx.securityContext && !ctx.authInfo) {
+        result = {
+          ...ctx,
+          authInfo: ctx.securityContext,
+        };
+      } else if (ctx.authInfo) {
+        result = {
+          ...ctx,
+          securityContext: ctx.authInfo,
+        };
+
+        if (this.warningBackgroundContextShow) {
+          this.logger('auth_info_deprecation', {
+            warning: (
+              'Recently authInfo was renamed to securityContext, please migrate: ' +
+              'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
+            )
+          });
+
+          this.warningBackgroundContextShow = false;
+        }
+      }
+    }
+
+    return result;
   }
 
   public async getDriver(ctx: DriverContext) {

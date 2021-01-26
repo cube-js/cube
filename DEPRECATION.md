@@ -171,11 +171,7 @@ const { BaseQuery } = require('@cubejs-backend/schema-compiler');
 
 > 
 
-Motivation:
-
-1. The `checkAuthMiddleware` was tightly bound to Express, [which was deprecated](#embedding-cubejs-within-express).
-2. HTTP is not only the transport for Cube.js, We support WebSocket server, which can be a default way in the feature. In this case
-   we want our authentication API to be not transport-specific.
+The `checkAuthMiddleware` was tightly bound to Express, [which has been deprecated](#embedding-cubejs-within-express). Since Cube.js supports HTTP **and** WebSockets as transports, we want our authentication API to not rely on transport-specific details.
 
 We now recommend using [`checkAuth`][ref-checkauth] as a transport-agnostic method of
 authentication. This means the same authentication logic can be reused for both

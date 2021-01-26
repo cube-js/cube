@@ -1,6 +1,12 @@
 import { CubeValidator } from './CubeValidator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
-import { CubeCheckDuplicatePropTranspiler, CubePropContextTranspiler, ImportExportTranspiler, TranspilerInterface } from './transpilers';
+import {
+  CubeCheckDuplicatePropTranspiler,
+  CubePropContextTranspiler,
+  ImportExportTranspiler,
+  TranspilerInterface,
+  ValidationTranspiler,
+} from './transpilers';
 import { Funnels, RefreshKeys, Reflection } from '../extensions';
 import { CubeSymbols } from './CubeSymbols';
 import { CubeDictionary } from './CubeDictionary';
@@ -24,6 +30,7 @@ export const prepareCompiler = (repo, options) => {
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
 
   const transpilers: TranspilerInterface[] = [
+    new ValidationTranspiler(),
     new ImportExportTranspiler(),
     new CubePropContextTranspiler(cubeSymbols, cubeDictionary),
   ];

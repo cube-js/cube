@@ -73,6 +73,7 @@ export class DevServer {
       const driver = await this.cubejsServer.getDriver({
         dataSource: req.body.dataSource || 'default',
         authInfo: null,
+        securityContext: null,
         requestId: getRequestIdFromRequest(req),
       });
 
@@ -108,6 +109,7 @@ export class DevServer {
       const driver = await this.cubejsServer.getDriver({
         dataSource: req.body.dataSource || 'default',
         authInfo: null,
+        securityContext: null,
         requestId: getRequestIdFromRequest(req),
       });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
@@ -291,6 +293,7 @@ export class DevServer {
     app.get('/playground/test-connection', catchErrors(async (req, res) => {
       const orchestratorApi = this.cubejsServer.getOrchestratorApi({
         dataSource: req.query.dataSource || 'default',
+        securityContext: null,
         authInfo: null,
         requestId: getRequestIdFromRequest(req),
       });

@@ -3,6 +3,7 @@ import R from 'ramda';
 import { TranspilerInterface, TraverseObject } from './transpiler.interface';
 import type { CubeSymbols } from '../CubeSymbols';
 import type { CubeDictionary } from '../CubeDictionary';
+import { ErrorReporter } from '../ErrorReporter';
 
 export class CubePropContextTranspiler implements TranspilerInterface {
   public constructor(
