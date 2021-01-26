@@ -41,19 +41,10 @@ impl CompactionServiceImpl {
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
-        let mut chunks = self
+        let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?;
-        chunks.sort_by_key(|c| c.get_row().get_row_count());
-        let mut size = 0;
-        let chunks = chunks
-            .into_iter()
-            .take_while(|c| {
-                size += c.get_row().get_row_count();
-                size <= self.config.compaction_chunks_total_size_threshold()
-            })
-            .collect::<Vec<_>>();
         let (partition, index) = self
             .meta_store
             .get_partition_for_compaction(partition_id)
@@ -240,24 +231,15 @@ mod tests {
             .await
             .unwrap();
         metastore.chunk_uploaded(2).await.unwrap();
-        metastore
-            .create_chunk(partition.get_id(), 20)
-            .await
-            .unwrap();
-        metastore.chunk_uploaded(3).await.unwrap();
 
-        chunk_store.expect_get_chunk().returning(move |i| {
+        chunk_store.expect_get_chunk().times(2).returning(move |i| {
             Ok(DataFrame::new(
                 cols.clone(),
                 (0..{
                     if i.get_id() == 1 {
                         10
-                    } else if i.get_id() == 2 {
-                        16
-                    } else if i.get_id() == 3 {
-                        20
                     } else {
-                        unimplemented!()
+                        16
                     }
                 })
                     .map(|i| Row::new(vec![TableValue::String(format!("foo{}", i))]))
@@ -270,10 +252,6 @@ mod tests {
             .times(1)
             .returning(|| 20);
 
-        config
-            .expect_compaction_chunks_total_size_threshold()
-            .returning(|| 30);
-
         let compaction_service = CompactionServiceImpl::new(
             metastore.clone(),
             Arc::new(chunk_store),
@@ -282,36 +260,21 @@ mod tests {
         );
         compaction_service.compact(1).await.unwrap();
         let partition_1 = metastore.get_partition(2).await.unwrap();
+        assert_eq!(partition_1.get_row().get_min_val(), &None);
+        assert_eq!(partition_1.get_row().main_table_row_count(), 14);
+        assert_eq!(
+            partition_1.get_row().get_max_val(),
+            // 0, 0, 1, 1, 10, 11, 12, 13, 14, 15, 2, 2, 3, 3
+            &Some(Row::new(vec![TableValue::String("foo4".to_string())]))
+        );
         let partition_2 = metastore.get_partition(3).await.unwrap();
-        let mut result = vec![
-            (
-                partition_1.get_row().main_table_row_count(),
-                partition_1.get_row().get_min_val().as_ref().cloned(),
-                partition_1.get_row().get_max_val().as_ref().cloned(),
-            ),
-            (
-                partition_2.get_row().main_table_row_count(),
-                partition_2.get_row().get_min_val().as_ref().cloned(),
-                partition_2.get_row().get_max_val().as_ref().cloned(),
-            ),
-        ];
-        result.sort_by_key(|(s, _, _)| *s);
-        let mut expected = vec![
-            (
-                12,
-                //  4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9
-                Some(Row::new(vec![TableValue::String("foo4".to_string())])),
-                None,
-            ),
-            (
-                14,
-                None,
-                // 0, 0, 1, 1, 10, 11, 12, 13, 14, 15, 2, 2, 3, 3
-                Some(Row::new(vec![TableValue::String("foo4".to_string())])),
-            ),
-        ];
-        expected.sort_by_key(|(s, _, _)| *s);
-        assert_eq!(result, expected);
+        assert_eq!(partition_2.get_row().main_table_row_count(), 12);
+        assert_eq!(
+            partition_2.get_row().get_min_val(),
+            //  4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9
+            &Some(Row::new(vec![TableValue::String("foo4".to_string())]))
+        );
+        assert_eq!(partition_2.get_row().get_max_val(), &None);
         RocksMetaStore::cleanup_test_metastore("compaction");
     }
 }
