@@ -77,7 +77,7 @@ export class SubscriptionServer {
 
       const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
       const requestId = `${baseRequestId}-span-${uuid()}`;
-      context = await this.apiGateway.contextByReq(message, authContext.authInfo, requestId);
+      context = await this.apiGateway.contextByReq(message, authContext.securityContext, requestId);
 
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
