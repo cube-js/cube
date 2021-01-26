@@ -8,7 +8,7 @@ import isDocker from 'is-docker';
 import { ApiGateway } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
-  createCancelableInterval,
+  createCancelableInterval, formatDuration,
   getAnonymousId,
   getEnv,
   internalExceptions,
@@ -244,8 +244,11 @@ export class CubejsServerCore {
         },
         {
           interval: scheduledRefreshTimer,
-          onDuplicatedExecution: () => this.logger('Refresh Scheduler Interval Error', {
-            error: `Previous interval was not finished with ${scheduledRefreshTimer} interval`
+          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
+            error: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
+          }),
+          onDuplicatedStateResolved: (intervalId, elapsed) => this.logger('Refresh Scheduler Long Execution', {
+            warning: `Interval #${intervalId} finished after ${formatDuration(elapsed)}`
           })
         }
       );

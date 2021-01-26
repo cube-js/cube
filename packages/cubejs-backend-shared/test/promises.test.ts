@@ -67,91 +67,120 @@ test('createCancelablePromise(defer async + with)', async () => {
   expect(finished).toBe(true);
 });
 
-test('createCancelableInterval(handle too fast execution)', async () => {
-  let started = 0;
-  let finished = 0;
-  let onDuplicatedExecution = 0;
+describe('createCancelableInterval', () => {
+  test('handle too fast execution', async () => {
+    let started = 0;
+    let finished = 0;
+    let onDuplicatedExecution = 0;
+    let onDuplicatedStateResolved = 0;
 
-  const interval = createCancelableInterval(async (token) => {
-    started++;
+    const interval = createCancelableInterval(async (token) => {
+      started++;
 
-    await pausePromise(25);
+      await pausePromise(100);
 
-    finished++;
-  }, {
-    interval: 10,
-    onDuplicatedExecution: () => {
-      onDuplicatedExecution++;
-    },
+      finished++;
+    }, {
+      interval: 50,
+      onDuplicatedExecution: (intervalId) => {
+        expect(Number.isInteger(intervalId)).toBeTruthy();
+
+        onDuplicatedExecution++;
+      },
+      onDuplicatedStateResolved: (intervalId, elapsed) => {
+        expect(Number.isInteger(intervalId)).toBeTruthy();
+        expect(elapsed).toBeGreaterThanOrEqual(50 - 5);
+
+        onDuplicatedStateResolved++;
+      }
+    });
+
+    /**
+     * Interval is 50, when execution is 100
+     * Let's wait 5 intervals, which will do 2 executions
+     */
+    await pausePromise(50 * 5 + 25);
+    await interval.cancel(true);
+
+    expect(started).toBeGreaterThanOrEqual(2);
+    expect(finished).toEqual(started);
+
+    expect(onDuplicatedExecution).toBeGreaterThanOrEqual(2);
+    expect(onDuplicatedStateResolved).toBeGreaterThanOrEqual(2);
   });
 
-  await pausePromise(25 * 2 + 5);
-  await interval.cancel(true);
+  test('simple interval', async () => {
+    let started = 0;
+    let finished = 0;
+    let onDuplicatedExecution = 0;
+    let onDuplicatedStateResolved = 0;
+    let canceled = false;
 
-  expect(started).toEqual(2);
-  expect(finished).toEqual(2);
-  expect(onDuplicatedExecution).toBeLessThanOrEqual(3);
-});
+    const interval = createCancelableInterval(async (token) => {
+      started++;
 
-test('createCancelableInterval(simple interval)', async () => {
-  let started = 0;
-  let finished = 0;
-  let canceled = false;
+      await pausePromise(25);
 
-  const interval = createCancelableInterval(async (token) => {
-    started++;
+      if (token.isCanceled()) {
+        // console.log('canceling');
 
-    await pausePromise(25);
+        canceled = true;
 
-    if (token.isCanceled()) {
-      // console.log('canceling');
+        return;
+      }
 
-      canceled = true;
+      await pausePromise(25);
 
-      return;
-    }
+      finished++;
+    }, {
+      interval: 100,
+      onDuplicatedExecution: () => {
+        onDuplicatedExecution++;
+      },
+      onDuplicatedStateResolved: () => {
+        onDuplicatedStateResolved++;
+      }
+    });
 
-    await pausePromise(25);
+    await pausePromise(100 + 25 + 25 + 10);
 
-    finished++;
-  }, {
-    interval: 100,
+    expect(started).toEqual(1);
+    expect(finished).toEqual(1);
+
+    await pausePromise(50);
+
+    await interval.cancel(true);
+
+    expect(canceled).toEqual(true);
+    expect(started).toEqual(2);
+    expect(finished).toEqual(1);
+
+    // Interval 100ms, when execution takes ~50ms
+    expect(onDuplicatedExecution).toEqual(0);
+    expect(onDuplicatedStateResolved).toEqual(0);
   });
 
-  await pausePromise(100 + 25 + 25 + 10);
+  test('cancel should wait latest execution', async () => {
+    let started = 0;
+    let finished = 0;
 
-  expect(started).toEqual(1);
-  expect(finished).toEqual(1);
+    const interval = createCancelableInterval(async (token) => {
+      started++;
 
-  await pausePromise(50);
+      await pausePromise(250);
 
-  await interval.cancel(true);
+      finished++;
+    }, {
+      interval: 100,
+    });
 
-  expect(canceled).toEqual(true);
-  expect(started).toEqual(2);
-  expect(finished).toEqual(1);
-});
+    await pausePromise(100);
 
-test('createCancelableInterval(cancel should wait latest execution)', async () => {
-  let started = 0;
-  let finished = 0;
+    await interval.cancel();
 
-  const interval = createCancelableInterval(async (token) => {
-    started++;
-
-    await pausePromise(250);
-
-    finished++;
-  }, {
-    interval: 100,
+    expect(started).toEqual(1);
+    expect(finished).toEqual(1);
   });
-
-  await pausePromise(100);
-
-  await interval.cancel();
-
-  expect(started).toEqual(1);
-  expect(finished).toEqual(1);
 });
 
 test('withTimeoutRace(ok)', async () => {

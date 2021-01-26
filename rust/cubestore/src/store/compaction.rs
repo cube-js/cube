@@ -50,8 +50,13 @@ impl CompactionService for CompactionServiceImpl {
         let chunks = chunks
             .into_iter()
             .take_while(|c| {
-                size += c.get_row().get_row_count();
-                size <= self.config.compaction_chunks_total_size_threshold()
+                if size == 0 {
+                    size += c.get_row().get_row_count();
+                    true
+                } else {
+                    size += c.get_row().get_row_count();
+                    size <= self.config.compaction_chunks_total_size_threshold()
+                }
             })
             .collect::<Vec<_>>();
         let (partition, index) = self

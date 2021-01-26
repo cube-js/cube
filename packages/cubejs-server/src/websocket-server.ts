@@ -66,8 +66,8 @@ export class WebSocketServer {
       },
       {
         interval: processSubscriptionsInterval,
-        onDuplicatedExecution: () => this.serverCore.logger('WebSocket Server Interval Error', {
-          error: `Previous interval was not finished with ${processSubscriptionsInterval} interval`
+        onDuplicatedExecution: (intervalId) => this.serverCore.logger('WebSocket Server Interval Error', {
+          error: `Previous interval #${intervalId} was not finished with ${processSubscriptionsInterval} interval`
         }),
       }
     );

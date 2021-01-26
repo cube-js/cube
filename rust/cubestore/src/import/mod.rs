@@ -1,4 +1,5 @@
 use crate::config::ConfigObj;
+use crate::metastore::is_valid_hll;
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::sql::timestamp_from_string;
 use crate::store::{DataFrame, WALDataStore};
@@ -106,8 +107,15 @@ impl ImportFormat {
                                                 .map(|d| TableValue::Decimal(d.to_string()))
                                                 .unwrap_or(TableValue::Null)
                                         }
-                                        ColumnType::Bytes => unimplemented!(),
-                                        ColumnType::HyperLogLog(_) => unimplemented!(),
+                                        ColumnType::Bytes => {
+                                            TableValue::Bytes(base64::decode(value)?)
+                                        }
+                                        ColumnType::HyperLogLog(f) => {
+                                            let data = base64::decode(value)?;
+                                            is_valid_hll(&data, *f)?;
+
+                                            TableValue::Bytes(data)
+                                        }
                                         ColumnType::Timestamp => {
                                             timestamp_from_string(value.as_str())?
                                         }

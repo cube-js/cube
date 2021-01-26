@@ -37,6 +37,8 @@ use arrow::datatypes::{DataType, Field};
 use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::{fmt, mem};
+use cubehll::HllSketch;
+use cubezetasketch::HyperLogLogPlusPlus;
 use futures::future::join_all;
 use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
@@ -280,6 +282,19 @@ impl DataFrameValue<String> for Option<Row> {
 pub enum HllFlavour {
     Airlift,    // Compatible with Presto, Athena, etc.
     ZetaSketch, // Compatible with BigQuery.
+}
+
+pub fn is_valid_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
+    // TODO: do no memory allocations for better performance, this is run on hot path.
+    match f {
+        HllFlavour::Airlift => {
+            HllSketch::read(data)?;
+        }
+        HllFlavour::ZetaSketch => {
+            HyperLogLogPlusPlus::read(data)?;
+        }
+    }
+    return Ok(());
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
