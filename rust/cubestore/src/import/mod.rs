@@ -15,6 +15,7 @@ use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
+use itertools::Itertools;
 
 impl ImportFormat {
     async fn row_stream(
@@ -44,10 +45,10 @@ impl ImportFormat {
             ImportFormat::CSV => {
                 let lines = BufReader::new(file).lines();
                 let mut header_mapping = None;
+                let mut mapping_insert_indices = Vec::with_capacity(columns.len());
                 let rows =
                     LinesStream::new(lines).map(move |line| -> Result<Option<Row>, CubeError> {
                         let str = line?;
-                        let mut row = Vec::with_capacity(columns.len());
 
                         let mut parser = CsvLineParser::new(str.as_str());
 
@@ -55,35 +56,46 @@ impl ImportFormat {
                             let mut mapping = Vec::new();
                             for _ in 0..columns.len() {
                                 let next_column = parser.next_value()?;
-                                mapping.push(
-                                    columns
-                                        .iter()
-                                        .find(|c| c.get_name() == &next_column)
-                                        .cloned()
-                                        .ok_or(CubeError::user(format!(
-                                            "Column '{}' is not found during import in {:?}",
-                                            next_column, columns
-                                        )))?,
-                                );
+                                let (i, to_insert) = columns
+                                    .iter()
+                                    .find_position(|c| c.get_name() == &next_column)
+                                    .map(|(i, c)| (i, c.clone()))
+                                    .ok_or(CubeError::user(format!(
+                                        "Column '{}' is not found during import in {:?}",
+                                        next_column, columns
+                                    )))?;
+                                // This is tricky indices structure: it remembers indices of inserts
+                                // with regards to moving element indices due to these inserts.
+                                // It saves some column resorting trips.
+                                let insert_pos = mapping.iter().find_position(|(col_index, _)| *col_index > i)
+                                    .map(|(insert_pos, _)| insert_pos)
+                                    .unwrap_or_else(|| mapping.len());
+                                mapping_insert_indices.push(insert_pos);
+                                mapping.push((i, to_insert));
                                 parser.advance()?;
                             }
                             header_mapping = Some(mapping);
                             return Ok(None);
                         }
 
-                        for column in header_mapping
+
+                        let resolved_mapping = header_mapping
                             .as_ref()
                             .ok_or(CubeError::user(
                                 "Header is required for CSV import".to_string(),
-                            ))?
-                            .iter()
+                            ))?;
+
+                        let mut row = Vec::with_capacity(columns.len());
+
+                        for (i, (_, column)) in resolved_mapping
+                            .iter().enumerate()
                         {
                             let value = parser.next_value()?;
 
                             if &value == "" {
-                                row.push(TableValue::Null);
+                                row.insert(mapping_insert_indices[i], TableValue::Null);
                             } else {
-                                row.push(match column.get_column_type() {
+                                row.insert(mapping_insert_indices[i], match column.get_column_type() {
                                     ColumnType::String => TableValue::String(value),
                                     ColumnType::Int => value
                                         .parse()
@@ -132,12 +144,13 @@ impl<'a> CsvLineParser<'a> {
     fn next_value(&mut self) -> Result<String, CubeError> {
         Ok(if self.remaining.chars().nth(0) == Some('"') {
             let mut closing_index = None;
-            let mut i = 0;
+            let mut i = 1;
             while i < self.remaining.len() {
                 if i < self.remaining.len() - 1 && &self.remaining[i..(i + 2)] == "\"\"" {
                     i += 1;
                 } else if &self.remaining[i..(i + 1)] == "\"" {
                     closing_index = Some(i);
+                    break;
                 }
                 i += 1;
             }
@@ -146,7 +159,7 @@ impl<'a> CsvLineParser<'a> {
                 self.line
             )))?;
             let res: String = self.remaining[1..closing_index].replace("\"\"", "\"");
-            self.remaining = self.remaining[closing_index..].as_ref();
+            self.remaining = self.remaining[(closing_index+1)..].as_ref();
             res
         } else {
             let next_comma = self.remaining.find(",").unwrap_or(self.remaining.len());

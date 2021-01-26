@@ -2075,10 +2075,10 @@ mod tests {
 
                 let mut file = File::create(dir.clone()).unwrap();
 
-                file.write_all("id,city,t,arr\n".as_bytes()).unwrap();
-                file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\n".as_bytes()).unwrap();
-                file.write_all("2,New York,2021-01-24 19:12:23 UTC,\"[\"\"\"\"]\"\n".as_bytes()).unwrap();
-                file.write_all("3,New York,2021-01-25 19:12:23 UTC,\n".as_bytes()).unwrap();
+                file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
+                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
+                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).unwrap();
 
                 dir
             };
