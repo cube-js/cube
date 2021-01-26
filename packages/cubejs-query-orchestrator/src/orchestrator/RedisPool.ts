@@ -18,7 +18,6 @@ export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
-  idleTimeout?: number;
   createClient?: CreateRedisClientFn;
   destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
 }
@@ -33,32 +32,30 @@ export class RedisPool {
   protected readonly pool: Pool<AsyncRedisClient>|null = null;
 
   protected readonly create: CreateRedisClientFn|null = null;
-  
+
   protected poolErrors: number = 0;
 
   public constructor(options: RedisPoolOptions = {}) {
     const defaultMin = envIntWithDefault('CUBEJS_REDIS_POOL_MIN', 2);
     const defaultMax = envIntWithDefault('CUBEJS_REDIS_POOL_MAX', 1000);
-    const defaultIdleTimeout = envIntWithDefault('CUBEJS_REDIS_POOL_IDLE_TIMEOUT_SECONDS', 5);
     const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : defaultMin;
     const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : defaultMax;
-    const idleTimeout = (typeof options.idleTimeout !== 'undefined') ? options.idleTimeout : defaultIdleTimeout;
 
     const opts: PoolOptions = {
       min,
       max,
       acquireTimeoutMillis: 5000,
-      idleTimeoutMillis: idleTimeout * 1000,
+      idleTimeoutMillis: 5000,
       evictionRunIntervalMillis: 5000
     };
-    
+
     const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
 
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.end(true));
 
       this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
-      
+
       this.pool.on('factoryCreateError', (error) => {
         this.poolErrors++;
         // prevent the infinite loop when pool creation fails too many times

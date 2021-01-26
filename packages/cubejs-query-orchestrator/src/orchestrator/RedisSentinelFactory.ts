@@ -11,9 +11,7 @@ function createIORedisClient(url: string, opts: RedisOptions): PromiseLike<redis
   const port = portStr ? Number(portStr) : 6379;
 
   const options: RedisOptions = {
-    ...opts,
-    enableReadyCheck: true,
-    lazyConnect: true
+    ...opts
   };
 
   if (process.env.REDIS_SENTINEL) {
@@ -59,7 +57,7 @@ function createIORedisClient(url: string, opts: RedisOptions): PromiseLike<redis
     console.warn('Redis connection is being reconnected, attempt no: ', times);
   });
 
-  return client.connect().then(() => client);
+  return client;
 }
 
 Pipeline.prototype.execAsync = function execAsync() {
@@ -67,35 +65,33 @@ Pipeline.prototype.execAsync = function execAsync() {
     .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
 };
 
-function addAsyncMethods(client: redis): PromiseLike<redis> {
-  return client
-    .then((toAugment) => {
-      [
-        'brpop',
-        'del',
-        'get',
-        'hget',
-        'rpop',
-        'set',
-        'zadd',
-        'zrange',
-        'zrangebyscore',
-        'keys',
-        'watch',
-        'unwatch',
-        'incr',
-        'decr',
-        'lpush',
-      ].forEach(
-        k => {
-          toAugment[`${k}Async`] = toAugment[k];
-        }
-      );
+async function addAsyncMethods(client: redis): redis {
+  [
+    'brpop',
+    'del',
+    'get',
+    'hget',
+    'rpop',
+    'set',
+    'zadd',
+    'zrange',
+    'zrangebyscore',
+    'keys',
+    'watch',
+    'unwatch',
+    'incr',
+    'decr',
+    'lpush',
+  ].forEach(
+    k => {
+      client[`${k}Async`] = client[k];
+    }
+  );
 
-      return toAugment;
-    });
+  return client;
 }
 
 export function createRedisSentinelClient(url: string, opts: RedisOptions): PromiseLike<redis> {
-  return addAsyncMethods(createIORedisClient(url, opts));
+  return createIORedisClient(url, opts)
+    .then(addAsyncMethods);
 }
