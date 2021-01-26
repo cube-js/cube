@@ -47,15 +47,17 @@ It acts as an ORM for your database and it is flexible enough to model
 everything from simple counts to cohort retention and funnel analysis.
 [Read more about Cube.js Schema][link-cubejs-schema].
 
-You can generate schema files using the Playground. To do so, you can
+You can generate schema files using [Developer Playground][link-dev-playground]. To do so, you can
 start the dev server from project directory like this:
 
 ```bash
 $ npm run dev
 ```
 
-Then go to `http://localhost:4000` and use the Playground to generate
+Then go to `http://localhost:4000` and use Developer Playground to generate
 schema files.
+
+[link-dev-playground]: /dev-tools/dev-playground
 
 ### Manually creating Data Schema files
 

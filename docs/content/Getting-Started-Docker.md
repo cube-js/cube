@@ -82,16 +82,18 @@ Check if the container is running:
 $ docker ps
 ```
 
-## 4. Open Playground
+## 4. Open Developer Playground
 
-Head to [http://localhost:4000](http://localhost:4000) to open the Playground.
+Head to [http://localhost:4000](http://localhost:4000) to open [Developer Playground][link-dev-playground].
 
-You can generate Data Schema files using the Playground. Once schema files are
+You can generate Data Schema files using Developer Playground. Once schema files are
 generated you can execute queries on the Build tab in the Playground.
+
+[link-dev-playground]: /dev-tools/dev-playground
 
 ## Next Steps
 
-Generating Data Schema files in the Playground is a good first step to start modelling your data. You can [learn more about Cube.js Data Schema][link-cubejs-schema] for complex data
+Generating Data Schema files in Developer Playground is a good first step to start modelling your data. You can [learn more about Cube.js Data Schema][link-cubejs-schema] for complex data
 modelling techniques.
 
 Learn how to [query Cube.js with REST API][link-rest-api] or [use Javascript client library and

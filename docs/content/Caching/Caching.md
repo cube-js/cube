@@ -199,7 +199,7 @@ For these situations, the cache can effectively be disabled by setting the [`ref
 ## Inspecting Queries
 To inspect whether the query hits in-memory cache, pre-aggregation, or the underlying data source, you can use the Playground or [Cube Cloud][link-cube-cloud].
 
-The Playground can be used to inspect a single query. To do that, click the "cache" button after executing the query. It will show you the information about the `refreshKey` for the query and whether the query uses any pre-aggregations. To inspect multiple queries or list existing pre-aggregations, you can use Cube Cloud.
+[Developer Playground][link-dev-playground] can be used to inspect a single query. To do that, click the "cache" button after executing the query. It will show you the information about the `refreshKey` for the query and whether the query uses any pre-aggregations. To inspect multiple queries or list existing pre-aggregations, you can use Cube Cloud.
 
 [[info | ]]
 | [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have an account yet, you can [sign up to the waitlist here](https://cube.dev/cloud).
@@ -207,3 +207,5 @@ The Playground can be used to inspect a single query. To do that, click the "cac
 To inspect queries in the Cube Cloud, navigate to the "History" page. You can filter queries by multiple parameters on this page, including whether they hit the cache, pre-aggregations, or raw data. Additionally, you can click on the query to see its details, such as time spent in the database, the database queue's size at the point of query execution, generated SQL, query timeline, and more. It will also show you the optimal pre-aggregations that could be used for this query.
 
 To see existing pre-aggregations, navigate to the "Pre-Aggregations" page in the Cube Cloud. The table shows all the pre-aggregations, the last refresh timestamp, and the time spent to build the pre-aggregation. You can also inspect every pre-aggregation's details: the list of queries it serves and all its versions.
+
+[link-dev-playground]: /dev-tools/dev-playground
