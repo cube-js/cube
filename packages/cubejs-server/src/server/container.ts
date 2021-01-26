@@ -275,21 +275,29 @@ export class ServerContainer {
 
   public async start() {
     const makeInstance = async () => {
-      const configuration = await this.lookupConfiguration();
-      return this.runServerInstance({
+      const configuration = {
         gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : 2,
-        ...configuration,
-      });
+        ...await this.lookupConfiguration(),
+      };
+
+      const server = await this.runServerInstance(configuration);
+
+      return {
+        configuration,
+        server
+      };
     };
 
-    let server = await makeInstance();
+    let instance = await makeInstance();
 
     // eslint-disable-next-line no-restricted-syntax
     for (const bindSignal of ['SIGTERM', 'SIGINT']) {
       // eslint-disable-next-line no-loop-func
       process.on(bindSignal, async (signal) => {
+        console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
+
         process.exit(
-          await server.shutdown(signal, true)
+          await instance.server.shutdown(signal, true)
         );
       });
     }
@@ -306,14 +314,14 @@ export class ServerContainer {
       }
 
       try {
-        restartHandler = server.shutdown(signal, true);
+        restartHandler = instance.server.shutdown(signal, true);
 
         await restartHandler;
       } finally {
         restartHandler = null;
       }
 
-      server = await makeInstance();
+      instance = await makeInstance();
     });
   }
 }

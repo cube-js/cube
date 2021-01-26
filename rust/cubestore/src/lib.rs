@@ -14,6 +14,7 @@ use crate::remotefs::queue::RemoteFsOpResult;
 use arrow::error::ArrowError;
 use core::fmt;
 use cubehll::HllError;
+use cubezetasketch::ZetaError;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
@@ -319,6 +320,12 @@ impl From<hex::FromHexError> for CubeError {
 
 impl From<HllError> for CubeError {
     fn from(v: HllError) -> Self {
+        return CubeError::from_error(v);
+    }
+}
+
+impl From<ZetaError> for CubeError {
+    fn from(v: ZetaError) -> Self {
         return CubeError::from_error(v);
     }
 }

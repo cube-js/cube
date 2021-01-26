@@ -1,0 +1,182 @@
+/*
+ * Copyright 2019 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// This file contains messages for representing the internal state of
+// an aggregation algorithm, common properties of all aggregation
+// algorithms and common per-result element properties. Algorithms
+// specific properties should be added as extensions to different
+// proto files in the same directory.
+//
+// Adding a new algorithm requires the following steps:
+//   1. Add a new value with a descriptive name to the AggregatorType enum.
+//   2. Add an extension with the same tag as the enum value to
+//      AggregatorStateProto to hold the serialized state of the new
+//      algorithm.
+//   3. [optional] Add an extension with the same tag as the enum
+//      value to AggregatorValueStatsProto to hold meta data for each
+//      element in the result set.
+//   4. [optional] Add an extension with the same tag as the enum value to
+//      AggregatorStatsProto to hold additional run-time statistics for
+//      the aggregator.
+//
+// Each algorithm will have its own extension, rather than a single
+// range for all extensions since it's easy to make a mistake.
+//
+// Messages defined in this file may be stored on disk, so the
+// aggregation library should be able to parse all historic versions
+// of the serialized data and it should be able to merge data with
+// different serialization formats.
+
+syntax = "proto2";
+
+package zetasketch;
+
+import "google/protobuf/descriptor.proto";
+
+option cc_enable_arenas = true;
+option java_package = "com.google.protos.zetasketch";
+
+// Enumeration of all supported aggregation algorithms. Values should
+// start from 100.
+enum AggregatorType {
+  // Sum all values added to the aggregator.
+  SUM = 100;
+
+  reserved 0, 101 to 111, 113 to 140;
+
+  // Computes a cardinality estimation using the HyperLogLog++ algorithm.
+  HYPERLOGLOG_PLUS_UNIQUE = 112;
+}
+
+// Never instantiated, just for scoping an enum and associated options.
+message DefaultOpsType {
+  // Each value corresponds to a C++ type T and its corresponding
+  // DefaultOps<T> instantiation. A ValueOps implementation returning
+  // something other than UNKNOWN for a given value is promising that the value
+  // of the type corresponding to the value, and that the Ops implementation
+  // performs identical operations as DefaultOps<T> for that type.
+  enum Id {
+    UNKNOWN = 0;
+
+    // int8, DefaultOps<int8>
+    // SerializeToString writes the single 2s-complement byte.
+    INT8 = 1 [(unsigned_counterpart) = UINT8];
+
+    // int16, DefaultOps<int16>
+    // SerializeToString writes the two little-endian 2s-complement bytes.
+    INT16 = 2 [(unsigned_counterpart) = UINT16];
+
+    // int32, DefaultOps<int32>
+    // SerializeToString uses varint encoding of the 2s complement in 32 bits -
+    // i.e. the result for negative integers is 5 bytes long, not 10.
+    INT32 = 3 [(unsigned_counterpart) = UINT32];
+
+    // int64, DefaultOps<int64>
+    // SerializeToString uses varint encoding of the 2s complement.
+    INT64 = 4 [(unsigned_counterpart) = UINT64];
+
+    // uint8, DefaultOps<uint8>
+    // SerializeToString writes the single byte.
+    UINT8 = 5;
+
+    // uint16, DefaultOps<uint16>
+    // SerializeToString writes the two little-endian bytes.
+    UINT16 = 6;
+
+    // uint32, DefaultOps<uint32>
+    // SerializeToString uses varint encoding.
+    UINT32 = 7;
+
+    // uint64, DefaultOps<uint64>
+    // SerializeToString uses varint encoding.
+    UINT64 = 8;
+
+    // float, DefaultOps<float>
+    // SerializeToString encodes the 4 little endian IEEE754 bytes.
+    FLOAT = 9;
+
+    // double, DefaultOps<double>
+    // SerializeToString encodes the 8 little endian IEEE754 bytes.
+    DOUBLE = 10;
+
+    // string, DefaultOps<string>
+    // SerializeToString just copies the bytes.
+    BYTES_OR_UTF8_STRING = 11;
+
+    reserved 12;
+    reserved "UTF16_STRING";
+  }
+
+  extend google.protobuf.EnumValueOptions {
+    // Meant to be used on Id values, which represent types. Specifies the
+    // unsigned counterpart to the type.
+    optional Id unsigned_counterpart = 132643189;
+  }
+}
+
+// This message contains common "public" properties of an aggregation
+// algorithm. Add additional fields here only if they make sense for
+// all algorithms.
+message AggregatorStatsProto {
+  // Total number of values added to this aggregator.
+  required int64 num_values = 1;
+
+  extensions 108 to 111, 113 to 140;
+
+  extensions 112 to 112;  // reserved for HYPERLOGLOG_PLUS_UNIQUE.
+}
+
+// Serialized state of an aggregator. Add additional fields here only
+// if they make sense for all algorithms and if it doesn't make sense to
+// expose them to the users of the library, e.g. encoding version.
+message AggregatorStateProto {
+
+  // The type of the aggregator.
+  required AggregatorType type = 1;
+
+  required int64 num_values = 2;
+
+  // Version of the encoded internal state. On a per-aggregator basis, set this
+  // field to indicate that the format of the aggregator encoding has changed
+  // such that the library has to decide how to decode. Do NOT change the
+  // default value, as this affects all aggregators.
+  optional int32 encoding_version = 3 [default = 1];
+
+  // Specifies the value type for the aggregation.
+  //
+  // If the value type is one supported by the DefaultOps<T> template, and that
+  // set of operations (or a compatible implementation) was used, then this will
+  // be a value of the DefaultOpsType.Id enum.
+  //
+  // Otherwise, this is a globally unique number corresponding to the value and
+  // Ops implementation (e.g. the CL number in which the implementation is
+  // defined). Values for custom types should be greater than 1000. Implementors
+  // should consider registering a name for their custom type in
+  // custom-value-type.proto, to facilitate easier discovery and better error
+  // messages when conflicting types are merged.
+  optional int32 value_type = 4;
+
+  // An AggregatorStateProto message object will have exactly one
+  // extension field set (tag == stats.type), which holds the
+  // algorithm-specific state for the aggregator.
+
+  extensions 100 to 111, 113 to 140;
+
+  extensions 112 to 112;  // reserved for HYPERLOGLOGPLUS_UNIQUE.
+}
+
+// Additional metadata for each element in the result iterator.
+message AggregatorValueStatsProto {}

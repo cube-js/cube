@@ -1,3 +1,4 @@
+use crate::config::ConfigObj;
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::sql::timestamp_from_string;
 use crate::store::{DataFrame, WALDataStore};
@@ -8,6 +9,7 @@ use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
 use core::mem;
 use futures::{Stream, StreamExt};
+use itertools::Itertools;
 use mockall::automock;
 use std::env;
 use std::pin::Pin;
@@ -44,10 +46,10 @@ impl ImportFormat {
             ImportFormat::CSV => {
                 let lines = BufReader::new(file).lines();
                 let mut header_mapping = None;
+                let mut mapping_insert_indices = Vec::with_capacity(columns.len());
                 let rows =
                     LinesStream::new(lines).map(move |line| -> Result<Option<Row>, CubeError> {
                         let str = line?;
-                        let mut row = Vec::with_capacity(columns.len());
 
                         let mut parser = CsvLineParser::new(str.as_str());
 
@@ -55,50 +57,69 @@ impl ImportFormat {
                             let mut mapping = Vec::new();
                             for _ in 0..columns.len() {
                                 let next_column = parser.next_value()?;
-                                mapping.push(
-                                    columns
-                                        .iter()
-                                        .find(|c| c.get_name() == next_column)
-                                        .cloned()
-                                        .ok_or(CubeError::user(format!(
-                                            "Column {} not found during import in {:?}",
-                                            next_column, columns
-                                        )))?,
-                                );
+                                let (i, to_insert) = columns
+                                    .iter()
+                                    .find_position(|c| c.get_name() == &next_column)
+                                    .map(|(i, c)| (i, c.clone()))
+                                    .ok_or(CubeError::user(format!(
+                                        "Column '{}' is not found during import in {:?}",
+                                        next_column, columns
+                                    )))?;
+                                // This is tricky indices structure: it remembers indices of inserts
+                                // with regards to moving element indices due to these inserts.
+                                // It saves some column resorting trips.
+                                let insert_pos = mapping
+                                    .iter()
+                                    .find_position(|(col_index, _)| *col_index > i)
+                                    .map(|(insert_pos, _)| insert_pos)
+                                    .unwrap_or_else(|| mapping.len());
+                                mapping_insert_indices.push(insert_pos);
+                                mapping.push((i, to_insert));
                                 parser.advance()?;
                             }
                             header_mapping = Some(mapping);
                             return Ok(None);
                         }
 
-                        for column in header_mapping
-                            .as_ref()
-                            .ok_or(CubeError::user(
-                                "Header required for CSV import".to_string(),
-                            ))?
-                            .iter()
-                        {
+                        let resolved_mapping = header_mapping.as_ref().ok_or(CubeError::user(
+                            "Header is required for CSV import".to_string(),
+                        ))?;
+
+                        let mut row = Vec::with_capacity(columns.len());
+
+                        for (i, (_, column)) in resolved_mapping.iter().enumerate() {
                             let value = parser.next_value()?;
 
-                            row.push(match column.get_column_type() {
-                                ColumnType::String => TableValue::String(value.to_string()),
-                                ColumnType::Int => value
-                                    .parse()
-                                    .map(|v| TableValue::Int(v))
-                                    .unwrap_or(TableValue::Null),
-                                ColumnType::Decimal { .. } => BigDecimal::from_str_radix(value, 10)
-                                    .map(|d| TableValue::Decimal(d.to_string()))
-                                    .unwrap_or(TableValue::Null),
-                                ColumnType::Bytes => unimplemented!(),
-                                ColumnType::HyperLogLog => unimplemented!(),
-                                ColumnType::Timestamp => timestamp_from_string(value)?,
-                                ColumnType::Float => {
-                                    TableValue::Float(value.parse::<f64>()?.to_string())
-                                }
-                                ColumnType::Boolean => {
-                                    TableValue::Boolean(value.to_lowercase() == "true")
-                                }
-                            });
+                            if &value == "" {
+                                row.insert(mapping_insert_indices[i], TableValue::Null);
+                            } else {
+                                row.insert(
+                                    mapping_insert_indices[i],
+                                    match column.get_column_type() {
+                                        ColumnType::String => TableValue::String(value),
+                                        ColumnType::Int => value
+                                            .parse()
+                                            .map(|v| TableValue::Int(v))
+                                            .unwrap_or(TableValue::Null),
+                                        ColumnType::Decimal { .. } => {
+                                            BigDecimal::from_str_radix(value.as_str(), 10)
+                                                .map(|d| TableValue::Decimal(d.to_string()))
+                                                .unwrap_or(TableValue::Null)
+                                        }
+                                        ColumnType::Bytes => unimplemented!(),
+                                        ColumnType::HyperLogLog(_) => unimplemented!(),
+                                        ColumnType::Timestamp => {
+                                            timestamp_from_string(value.as_str())?
+                                        }
+                                        ColumnType::Float => {
+                                            TableValue::Float(value.parse::<f64>()?.to_string())
+                                        }
+                                        ColumnType::Boolean => {
+                                            TableValue::Boolean(value.to_lowercase() == "true")
+                                        }
+                                    },
+                                );
+                            }
 
                             parser.advance()?;
                         }
@@ -123,18 +144,29 @@ impl<'a> CsvLineParser<'a> {
         }
     }
 
-    fn next_value(&mut self) -> Result<&str, CubeError> {
+    fn next_value(&mut self) -> Result<String, CubeError> {
         Ok(if self.remaining.chars().nth(0) == Some('"') {
-            let closing_index = self.remaining.find("\"").ok_or(CubeError::user(format!(
+            let mut closing_index = None;
+            let mut i = 1;
+            while i < self.remaining.len() {
+                if i < self.remaining.len() - 1 && &self.remaining[i..(i + 2)] == "\"\"" {
+                    i += 1;
+                } else if &self.remaining[i..(i + 1)] == "\"" {
+                    closing_index = Some(i);
+                    break;
+                }
+                i += 1;
+            }
+            let closing_index = closing_index.ok_or(CubeError::user(format!(
                 "Malformed CSV string: {}",
                 self.line
             )))?;
-            let res: &str = self.remaining[1..closing_index].as_ref();
-            self.remaining = self.remaining[closing_index..].as_ref();
+            let res: String = self.remaining[1..closing_index].replace("\"\"", "\"");
+            self.remaining = self.remaining[(closing_index + 1)..].as_ref();
             res
         } else {
             let next_comma = self.remaining.find(",").unwrap_or(self.remaining.len());
-            let res: &str = self.remaining[0..next_comma].as_ref();
+            let res: String = self.remaining[0..next_comma].to_string();
             self.remaining = self.remaining[next_comma..].as_ref();
             res
         })
@@ -157,16 +189,19 @@ pub trait ImportService: Send + Sync {
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
     wal_store: Arc<dyn WALDataStore>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
         wal_store: Arc<dyn WALDataStore>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
             wal_store,
+            config_obj,
         })
     }
 }
@@ -202,7 +237,7 @@ impl ImportService for ImportServiceImpl {
         while let Some(row) = row_stream.next().await {
             if let Some(row) = row? {
                 rows.push(row);
-                if rows.len() >= 500000 {
+                if rows.len() >= self.config_obj.wal_split_threshold() as usize {
                     let mut to_add = Vec::new();
                     mem::swap(&mut rows, &mut to_add);
                     self.wal_store

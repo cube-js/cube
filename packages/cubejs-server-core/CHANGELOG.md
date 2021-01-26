@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.28](https://github.com/cube-js/cube.js/compare/v0.25.27...v0.25.28) (2021-01-25)
+
+
+### Bug Fixes
+
+* dependency version resolution ([f314ec5](https://github.com/cube-js/cube.js/commit/f314ec54d15c4c01b9eca602f5587d0896bdca23))
+
+
+
+
+
 ## [0.25.26](https://github.com/cube-js/cube.js/compare/v0.25.25...v0.25.26) (2021-01-25)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

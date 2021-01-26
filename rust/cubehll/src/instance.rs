@@ -568,6 +568,7 @@ impl DenseHll {
         }
     }
 
+    #[allow(dead_code)]
     fn insert_hash(&mut self, hash: u64) {
         let index = compute_index(hash, self.index_bit_len);
         let value = compute_value(hash, self.index_bit_len);
@@ -794,6 +795,7 @@ impl DenseHll {
         return (of_buckets, of_values);
     }
 
+    #[allow(dead_code)]
     pub fn verify(&self) {
         let mut zero_deltas = 0;
         for i in 0..number_of_buckets(self.index_bit_len) {
@@ -860,6 +862,7 @@ fn index_bit_length(n: u32) -> u8 {
     return n.trailing_zeros() as u8;
 }
 
+#[allow(dead_code)]
 fn compute_index(hash: u64, index_bit_len: u8) -> u32 {
     return (hash >> (64 - index_bit_len)) as u32;
 }
@@ -868,6 +871,7 @@ fn compute_value(hash: u64, index_bit_len: u8) -> u8 {
     return number_of_leading_zeros(hash, index_bit_len) + 1;
 }
 
+#[allow(dead_code)]
 fn number_of_leading_zeros(hash: u64, index_bit_len: u8) -> u8 {
     // place a 1 in the LSB to preserve the original number of leading zeros if the hash happens to be 0.
     let value = (hash << index_bit_len) | (1 << (index_bit_len - 1));

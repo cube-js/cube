@@ -18,6 +18,7 @@ sqlparser = "0.7.0"
 serde_derive = "1.0.115"
 serde = "1.0.115"
 cubehll = { path = "../cubehll" }
+cubezetasketch = { path = "../cubezetasketch" }
 parquet = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-01-02', version = "3.0.0-SNAPSHOT" }
 arrow = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-01-02', version = "3.0.0-SNAPSHOT" }
 arrow-flight = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-01-02', version = "3.0.0-SNAPSHOT" }

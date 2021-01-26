@@ -7,7 +7,8 @@ use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
 use crate::metastore::{
-    table::Table, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable, RowKey, Schema, TableId,
+    table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable, RowKey, Schema,
+    TableId,
 };
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
@@ -490,7 +491,8 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                     match custom_type_name.as_str() {
                         "mediumint" => ColumnType::Int,
                         "varbinary" => ColumnType::Bytes,
-                        "hyperloglog" => ColumnType::HyperLogLog,
+                        "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
+                        "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
@@ -543,11 +545,16 @@ fn decode_byte(s: &str) -> Option<u8> {
     return Some(v0 * 16 + v1);
 }
 
-fn parse_hyper_log_log(v: &Value) -> Result<Vec<u8>, CubeError> {
+fn parse_hyper_log_log(v: &Value, f: HllFlavour) -> Result<Vec<u8>, CubeError> {
     let bytes = parse_binary_string(v)?;
     // TODO: check without memory allocations. this is run on hot path.
-    if let Err(e) = cubehll::HllSketch::read(&bytes) {
-        return Err(e.into());
+    match f {
+        HllFlavour::Airlift => {
+            cubehll::HllSketch::read(&bytes)?;
+        }
+        HllFlavour::ZetaSketch => {
+            cubezetasketch::HyperLogLogPlusPlus::read(&bytes)?;
+        }
     }
     return Ok(bytes);
 }
@@ -633,10 +640,10 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
                 };
                 return Ok(TableValue::Bytes(val?));
             }
-            ColumnType::HyperLogLog => {
+            &ColumnType::HyperLogLog(f) => {
                 let val;
                 if let Expr::Value(v) = cell {
-                    val = parse_hyper_log_log(v)
+                    val = parse_hyper_log_log(v, f)
                 } else {
                     return Err(CubeError::user("Corrupted data in query.".to_string()));
                 };
@@ -2068,21 +2075,25 @@ mod tests {
 
                 let mut file = File::create(dir.clone()).unwrap();
 
-                file.write_all("id,city,t\n".as_bytes()).unwrap();
-                file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC\n".as_bytes()).unwrap();
-                file.write_all("2,New York,2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
+                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
+                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).unwrap();
 
                 dir
             };
 
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text, t timestamp) INDEX persons_city (`city`, `id`) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
+            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
             let res = service.exec_query("CREATE INDEX by_city ON Foo.Persons (city)").await;
             let error = format!("{:?}", res);
             assert!(error.contains("has data"));
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
         }).await;
     }
 
@@ -2148,8 +2159,7 @@ mod tests {
                 .exec_query("SELECT id, cardinality(hll) as cnt from hll.sketches WHERE id < 3 ORDER BY 1")
                 .await
                 .unwrap();
-            assert_eq!(
-                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
+            assert_eq!(to_rows(&result),
                 vec![vec![TableValue::Int(1), TableValue::Int(2)],
                      vec![TableValue::Int(2), TableValue::Int(655)]]);
             // Check merge and cardinality.
@@ -2157,20 +2167,45 @@ mod tests {
                 .exec_query("SELECT cardinality(merge(hll)) from hll.sketches WHERE id < 3")
                 .await
                 .unwrap();
-            assert_eq!(
-                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
-                vec![vec![TableValue::Int(657)]]);
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(657)]]);
 
             // Now merge all 4 HLLs, results should stay the same.
             let result = service
                 .exec_query("SELECT cardinality(merge(hll)) from hll.sketches")
                 .await
                 .unwrap();
-            assert_eq!(
-                result.get_rows().iter().map(|r| r.values().clone()).collect_vec(),
-                vec![vec![TableValue::Int(657)]]);
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(657)]]);
 
             // TODO: add format checks on insert and test invalid inputs.
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn hyperloglog_empty_inputs() {
+        Config::run_test("hyperloglog_empty_inputs", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE hll.sketches (id int, hll varbinary)")
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query("SELECT cardinality(merge(hll)) from hll.sketches")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(0)]]);
+
+            let result = service
+                .exec_query("SELECT merge(hll) from hll.sketches")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&result), vec![vec![TableValue::Bytes(vec![])]]);
         })
         .await;
     }
@@ -2264,6 +2299,14 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(20)]));
         }).await;
+    }
+
+    fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
+        return d
+            .get_rows()
+            .iter()
+            .map(|r| r.values().clone())
+            .collect_vec();
     }
 }
 

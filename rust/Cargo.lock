@@ -1066,6 +1066,7 @@ dependencies = [
  "cloud-storage",
  "csv",
  "cubehll",
+ "cubezetasketch",
  "datafusion",
  "deadqueue",
  "enum_primitive",
@@ -1100,6 +1101,14 @@ dependencies = [
  "tokio-util 0.6.2",
  "uuid",
  "warp",
+]
+
+[[package]]
+name = "cubezetasketch"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.10.0",
+ "protobuf",
 ]
 
 [[package]]
@@ -3047,6 +3056,12 @@ dependencies = [
  "bytes 0.5.6",
  "prost",
 ]
+
+[[package]]
+name = "protobuf"
+version = "2.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86473d5f16580f10b131a0bf0afb68f8e029d1835d33a00f37281b05694e5312"
 
 [[package]]
 name = "quick-error"
