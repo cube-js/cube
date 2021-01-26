@@ -58,7 +58,7 @@ impl ImportFormat {
                                 mapping.push(
                                     columns
                                         .iter()
-                                        .find(|c| c.get_name() == next_column)
+                                        .find(|c| c.get_name() == &next_column)
                                         .cloned()
                                         .ok_or(CubeError::user(format!(
                                             "Column {} not found during import in {:?}",
@@ -81,17 +81,19 @@ impl ImportFormat {
                             let value = parser.next_value()?;
 
                             row.push(match column.get_column_type() {
-                                ColumnType::String => TableValue::String(value.to_string()),
+                                ColumnType::String => TableValue::String(value),
                                 ColumnType::Int => value
                                     .parse()
                                     .map(|v| TableValue::Int(v))
                                     .unwrap_or(TableValue::Null),
-                                ColumnType::Decimal { .. } => BigDecimal::from_str_radix(value, 10)
-                                    .map(|d| TableValue::Decimal(d.to_string()))
-                                    .unwrap_or(TableValue::Null),
+                                ColumnType::Decimal { .. } => {
+                                    BigDecimal::from_str_radix(value.as_str(), 10)
+                                        .map(|d| TableValue::Decimal(d.to_string()))
+                                        .unwrap_or(TableValue::Null)
+                                }
                                 ColumnType::Bytes => unimplemented!(),
                                 ColumnType::HyperLogLog(_) => unimplemented!(),
-                                ColumnType::Timestamp => timestamp_from_string(value)?,
+                                ColumnType::Timestamp => timestamp_from_string(value.as_str())?,
                                 ColumnType::Float => {
                                     TableValue::Float(value.parse::<f64>()?.to_string())
                                 }
@@ -123,18 +125,28 @@ impl<'a> CsvLineParser<'a> {
         }
     }
 
-    fn next_value(&mut self) -> Result<&str, CubeError> {
+    fn next_value(&mut self) -> Result<String, CubeError> {
         Ok(if self.remaining.chars().nth(0) == Some('"') {
-            let closing_index = self.remaining.find("\"").ok_or(CubeError::user(format!(
+            let mut closing_index = None;
+            let mut i = 0;
+            while i < self.remaining.len() {
+                if i < self.remaining.len() - 1 && &self.remaining[i..(i + 2)] == "\"\"" {
+                    i += 1;
+                } else if &self.remaining[i..(i + 1)] == "\"" {
+                    closing_index = Some(i);
+                }
+                i += 1;
+            }
+            let closing_index = closing_index.ok_or(CubeError::user(format!(
                 "Malformed CSV string: {}",
                 self.line
             )))?;
-            let res: &str = self.remaining[1..closing_index].as_ref();
+            let res: String = self.remaining[1..closing_index].replace("\"\"", "\"");
             self.remaining = self.remaining[closing_index..].as_ref();
             res
         } else {
             let next_comma = self.remaining.find(",").unwrap_or(self.remaining.len());
-            let res: &str = self.remaining[0..next_comma].as_ref();
+            let res: String = self.remaining[0..next_comma].to_string();
             self.remaining = self.remaining[next_comma..].as_ref();
             res
         })

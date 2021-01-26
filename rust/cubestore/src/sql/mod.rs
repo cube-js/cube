@@ -2075,21 +2075,24 @@ mod tests {
 
                 let mut file = File::create(dir.clone()).unwrap();
 
-                file.write_all("id,city,t\n".as_bytes()).unwrap();
-                file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC\n".as_bytes()).unwrap();
-                file.write_all("2,New York,2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("id,city,t,arr\n".as_bytes()).unwrap();
+                file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\n".as_bytes()).unwrap();
+                file.write_all("2,New York,2021-01-24 19:12:23 UTC,\"[\"\"\"\"]\"\n".as_bytes()).unwrap();
 
                 dir
             };
 
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text, t timestamp) INDEX persons_city (`city`, `id`) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
+            let _ = service.exec_query(&format!("CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION '{}'", path.as_os_str().to_string_lossy())).await.unwrap();
             let res = service.exec_query("CREATE INDEX by_city ON Foo.Persons (city)").await;
             let error = format!("{:?}", res);
             assert!(error.contains("has data"));
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]'").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
         }).await;
     }
 
