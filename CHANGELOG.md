@@ -3,6 +3,42 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.30](https://github.com/cube-js/cube.js/compare/v0.25.29...v0.25.30) (2021-01-26)
+
+
+### Bug Fixes
+
+* **cubestore:** add custom type 'bytes', a synonym for 'varbinary' ([#1890](https://github.com/cube-js/cube.js/issues/1890)) ([4efc291](https://github.com/cube-js/cube.js/commit/4efc2914a0f9f0c960bf9af00a56c5562ac02bd4))
+* **shared:** 1st interval unexpected call on onDuplicatedStateResolved ([6265503](https://github.com/cube-js/cube.js/commit/62655036d337e2ca491d0bda4f7f1b98a6811c4c))
+
+
+### Features
+
+* **cubestore:** allow to import base64-encoded bytes in CSV ([#1891](https://github.com/cube-js/cube.js/issues/1891)) ([2f43afa](https://github.com/cube-js/cube.js/commit/2f43afaa3776fb70526196734b1f3e97b942770e))
+
+
+
+
+
+## [0.25.29](https://github.com/cube-js/cube.js/compare/v0.25.28...v0.25.29) (2021-01-26)
+
+
+### Bug Fixes
+
+* **cubestore:** CSV import escape sequence ([a3e118e](https://github.com/cube-js/cube.js/commit/a3e118e7be072d0763a2f0aa1044350e0a4ddd90))
+* **cubestore:** More CSV import escaping cases ([9419128](https://github.com/cube-js/cube.js/commit/9419128d2653405c51d60c8b79c4d07971b54e0f))
+* **cubestore:** Support NULL values in CSV import ([529e5ac](https://github.com/cube-js/cube.js/commit/529e5ac9f3d31fb8b7962c9dced6a5d8dd94c26a))
+
+
+### Features
+
+* **cubestore:** CUBESTORE_WAL_SPLIT_THRESHOLD env variable ([0d7e550](https://github.com/cube-js/cube.js/commit/0d7e550d825c129f5b21a6963182faebaa882132))
+* Improve logs for RefreshScheduler and too long execution ([d0f1f1b](https://github.com/cube-js/cube.js/commit/d0f1f1bbc32473452c763d22ff8ee728c74f6462))
+
+
+
+
+
 ## [0.25.28](https://github.com/cube-js/cube.js/compare/v0.25.27...v0.25.28) (2021-01-25)
 
 

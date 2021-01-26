@@ -7,8 +7,8 @@ use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
 use crate::metastore::{
-    table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable, RowKey, Schema,
-    TableId,
+    is_valid_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable,
+    RowKey, Schema, TableId,
 };
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
@@ -490,6 +490,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                     let custom_type_name = custom.to_string().to_lowercase();
                     match custom_type_name.as_str() {
                         "mediumint" => ColumnType::Int,
+                        "bytes" => ColumnType::Bytes,
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
@@ -547,15 +548,8 @@ fn decode_byte(s: &str) -> Option<u8> {
 
 fn parse_hyper_log_log(v: &Value, f: HllFlavour) -> Result<Vec<u8>, CubeError> {
     let bytes = parse_binary_string(v)?;
-    // TODO: check without memory allocations. this is run on hot path.
-    match f {
-        HllFlavour::Airlift => {
-            cubehll::HllSketch::read(&bytes)?;
-        }
-        HllFlavour::ZetaSketch => {
-            cubezetasketch::HyperLogLogPlusPlus::read(&bytes)?;
-        }
-    }
+    is_valid_hll(&bytes, f)?;
+
     return Ok(bytes);
 }
 
@@ -1017,12 +1011,14 @@ mod tests {
             service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             service
-                .exec_query("CREATE TABLE foo.values (int_value mediumint)")
+                .exec_query("CREATE TABLE foo.values (int_value mediumint, b1 bytes, b2 varbinary)")
                 .await
                 .unwrap();
 
             service
-                .exec_query("INSERT INTO foo.values (int_value) VALUES (-153)")
+                .exec_query(
+                    "INSERT INTO foo.values (int_value, b1, b2) VALUES (-153, X'0a', X'0b')",
+                )
                 .await
                 .unwrap();
         })

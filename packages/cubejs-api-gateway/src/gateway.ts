@@ -497,7 +497,7 @@ export class ApiGateway {
         };
 
         slowQuery = slowQuery || Boolean(response.slowQuery);
-        
+
         return {
           query: normalizedQuery,
           data: transformData(
@@ -826,7 +826,7 @@ export class ApiGateway {
 
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
-    
+
     if (this.standalone) {
       const orchestratorApi = await this.adapterApi({});
 
@@ -836,7 +836,7 @@ export class ApiGateway {
         await orchestratorApi.testConnection();
       } catch (e) {
         this.log({
-          type: 'Internal Server Error',
+          type: 'Internal Server Error on readiness probe',
           error: e.stack || e.toString(),
         });
 
@@ -847,7 +847,7 @@ export class ApiGateway {
         await orchestratorApi.testOrchestratorConnections();
       } catch (e) {
         this.log({
-          type: 'Internal Server Error',
+          type: 'Internal Server Error on readiness probe',
           error: e.stack || e.toString(),
         });
 
@@ -865,7 +865,7 @@ export class ApiGateway {
       await this.dataSourceStorage.testConnections();
     } catch (e) {
       this.log({
-        type: 'Internal Server Error',
+        type: 'Internal Server Error on liveness probe',
         error: e.stack || e.toString(),
       });
 
@@ -877,7 +877,7 @@ export class ApiGateway {
       await this.dataSourceStorage.testOrchestratorConnections();
     } catch (e) {
       this.log({
-        type: 'Internal Server Error',
+        type: 'Internal Server Error on liveness probe',
         error: e.stack || e.toString(),
       });
 
