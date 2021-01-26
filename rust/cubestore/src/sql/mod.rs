@@ -2222,6 +2222,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hyperloglog_empty_group_by() {
+        Config::run_test("hyperloglog_empty_group_by", async move |services| {
+            let service = services.sql_service;
+
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE hll.sketches (id int, key int, hll varbinary)")
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query("SELECT key, cardinality(merge(hll)) from hll.sketches group by key")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&result), Vec::<Vec<TableValue>>::new());
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn hyperloglog_inserts() {
         Config::run_test("hyperloglog_inserts", async move |services| {
             let service = services.sql_service;
