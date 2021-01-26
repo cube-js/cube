@@ -97,16 +97,16 @@ describe('createCancelableInterval', () => {
 
     /**
      * Interval is 50, when execution is 100
-     * Let's wait 4 intervals, which will do 2 executions
+     * Let's wait 5 intervals, which will do 2 executions
      */
-    await pausePromise(100 * 2 + 25);
+    await pausePromise(50 * 5 + 25);
     await interval.cancel(true);
 
     expect(started).toBeGreaterThanOrEqual(2);
     expect(finished).toEqual(started);
 
-    expect(onDuplicatedExecution).toBeGreaterThanOrEqual(started);
-    expect(onDuplicatedStateResolved).toEqual(onDuplicatedExecution);
+    expect(onDuplicatedExecution).toBeGreaterThanOrEqual(2);
+    expect(onDuplicatedStateResolved).toBeGreaterThanOrEqual(2);
   });
 
   test('simple interval', async () => {
