@@ -431,7 +431,11 @@ impl Config {
         .await
         .unwrap();
         meta_store.add_listener(event_sender).await;
-        let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), self.config_obj.wal_split_threshold() as usize);
+        let wal_store = WALStore::new(
+            meta_store.clone(),
+            remote_fs.clone(),
+            self.config_obj.wal_split_threshold() as usize,
+        );
         let chunk_store = ChunkStore::new(
             meta_store.clone(),
             remote_fs.clone(),
@@ -444,7 +448,11 @@ impl Config {
             remote_fs.clone(),
             self.config_obj.clone(),
         );
-        let import_service = ImportServiceImpl::new(meta_store.clone(), wal_store.clone(), self.config_obj.clone());
+        let import_service = ImportServiceImpl::new(
+            meta_store.clone(),
+            wal_store.clone(),
+            self.config_obj.clone(),
+        );
         let query_planner = QueryPlannerImpl::new(meta_store.clone());
         let query_executor = Arc::new(QueryExecutorImpl);
         let cluster = ClusterImpl::new(

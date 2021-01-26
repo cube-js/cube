@@ -1,3 +1,4 @@
+use crate::config::ConfigObj;
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::sql::timestamp_from_string;
 use crate::store::{DataFrame, WALDataStore};
@@ -16,7 +17,6 @@ use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
-use crate::config::ConfigObj;
 
 impl ImportFormat {
     async fn row_stream(
