@@ -18,11 +18,16 @@ export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
+  idleTimeout?: number;
   createClient?: CreateRedisClientFn;
   destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
 }
 
 const MAX_ALLOWED_POOL_ERRORS = 100;
+
+function envIntWithDefault(envVariable, defaultValue) {
+  return process.env[envVariable] ? parseInt(process.env[envVariable], 10) : defaultValue;
+}
 
 export class RedisPool {
   protected readonly pool: Pool<AsyncRedisClient>|null = null;
@@ -32,16 +37,18 @@ export class RedisPool {
   protected poolErrors: number = 0;
 
   public constructor(options: RedisPoolOptions = {}) {
-    const defaultMin = process.env.CUBEJS_REDIS_POOL_MIN ? parseInt(process.env.CUBEJS_REDIS_POOL_MIN, 10) : 2;
-    const defaultMax = process.env.CUBEJS_REDIS_POOL_MAX ? parseInt(process.env.CUBEJS_REDIS_POOL_MAX, 10) : 1000;
+    const defaultMin = envIntWithDefault('CUBEJS_REDIS_POOL_MIN', 2);
+    const defaultMax = envIntWithDefault('CUBEJS_REDIS_POOL_MAX', 1000);
+    const defaultIdleTimeout = envIntWithDefault('CUBEJS_REDIS_POOL_IDLE_TIMEOUT_SECONDS', 5);
     const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : defaultMin;
     const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : defaultMax;
+    const idleTimeout = (typeof options.idleTimeout !== 'undefined') ? options.idleTimeout : defaultIdleTimeout;
 
     const opts: PoolOptions = {
       min,
       max,
       acquireTimeoutMillis: 5000,
-      idleTimeoutMillis: 5000,
+      idleTimeoutMillis: idleTimeout * 1000,
       evictionRunIntervalMillis: 5000
     };
     
