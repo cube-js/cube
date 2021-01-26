@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import type { CommanderStatic } from 'commander';
 import { isDockerImage, requireFromPackage } from '@cubejs-backend/shared';
 
-import { displayError, event } from '../utils';
+import { displayError, displayWarning, event } from '../utils';
 
 export const defaultExpiry = '30 days';
 
@@ -12,7 +12,9 @@ const parsePayload = (payloadArray: string[] = []) => {
 
   payloadArray.forEach((entry = '') => {
     const [key, value] = entry.split('=');
-    if (key && value) result[key] = value;
+    if (key && value) {
+      result[key] = value;
+    }
   });
 
   return result;
@@ -48,8 +50,21 @@ export const token = async (options: TokenOptions) => {
 
   const payload = {
     ...parsePayload(options.payload),
-    u: parsePayload(options.userContext),
   };
+
+  const userContext = parsePayload(options.userContext);
+  if (userContext) {
+    displayWarning(`Option --user-context was deprecated and payload will be stored inside root instead of u`);
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const key of Object.keys(userContext)) {
+      if (key in payload) {
+        displayWarning(`Key ${key} already exists inside payload and will be overritten by user-context`);
+      }
+
+      payload[key] = userContext[key];
+    }
+  }
 
   console.log('Generating Cube.js JWT token');
   console.log('');

@@ -54,6 +54,6 @@ describe('Transpilers', async () => {
 
     await compiler.compile();
 
-    warnings[0].should.startWith('Warning: USER_CONTEXT was deprecated in flavour of SECURITY_CONTEXT. in main.js');
+    warnings[0].should.startWith('Warning: USER_CONTEXT was deprecated in favor of SECURITY_CONTEXT. in main.js');
   });
 });

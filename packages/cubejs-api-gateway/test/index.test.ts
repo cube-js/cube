@@ -4,7 +4,7 @@ import request from 'supertest';
 
 import { ApiGateway } from '../src';
 
-const compilerApi = jest.fn().mockImplementation(() => ({
+export const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
     return {
       sql: ['SELECT * FROM test', []],
@@ -40,7 +40,7 @@ const compilerApi = jest.fn().mockImplementation(() => ({
   },
 }));
 
-class DataSourceStorageMock {
+export class DataSourceStorageMock {
   public $testConnectionsDone: boolean = false;
 
   public $testOrchestratorConnectionsDone: boolean = false;
@@ -58,7 +58,7 @@ class DataSourceStorageMock {
   }
 }
 
-class AdapterApiMock {
+export class AdapterApiMock {
   public $testConnectionsDone: boolean = false;
 
   public $testOrchestratorConnectionsDone: boolean = false;
@@ -80,7 +80,7 @@ class AdapterApiMock {
       data: [{ foo__bar: 42 }]
     };
   }
-  
+
   public addDataSeenSource() {
     return undefined;
   }
