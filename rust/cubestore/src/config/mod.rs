@@ -207,7 +207,7 @@ impl Config {
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
                 partition_split_threshold: 1000000,
                 compaction_chunks_count_threshold: 4,
-                compaction_chunks_total_size_threshold: 500000,
+                compaction_chunks_total_size_threshold: 262144 * 2,
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
