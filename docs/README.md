@@ -26,6 +26,19 @@ source .env.production
 yarn build --prefix-paths
 ```
 
+## Formatting
+
+Run the following to format a Markdown file:
+
+```bash
+yarn prettier content/<NAME_OF_FILE> --write
+```
+
+If the file includes any alerts (`[[info | Note]]`), then wrap the alert with
+`<!-- prettier-ignore-start -->` and `<!-- prettier-ignore-end -->` to prevent
+Prettier from messing with them.
+
+
 ## Indexing
 
 The search functionality is powered by [DocSearch by Algolia][link-docsearch].
