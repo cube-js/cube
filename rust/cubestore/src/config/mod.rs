@@ -274,7 +274,7 @@ impl Config {
                 job_runners_count: env::var("CUBESTORE_JOB_RUNNERS")
                     .ok()
                     .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4)
+                    .unwrap_or(4),
             }),
         }
     }
