@@ -19,14 +19,13 @@
           limit,
           setLimit,
           orderMembers,
-          order,
           setOrder,
           updateOrder,
+          isQueryPresent,
         }"
       >
         <v-container fluid class="pa-4 pa-md-8 pt-6 background-white">
-          <div>DEBUG:{{ order }}</div>
-          <div>DEBUG: {{ validatedQuery }}</div>
+          <div>DEBUG isQueryPresent: {{ isQueryPresent }}</div>
           <div class="wrap">
             <v-btn
               color="primary"
@@ -51,9 +50,10 @@
                   label="Measures"
                   outlined
                   hide-details
+                  clearable
                   :value="measures.map((i) => i.name)"
-                  @change="setMeasures"
                   :items="availableMeasures.map((i) => i.name)"
+                  @change="setMeasures"
                 />
               </v-col>
 
@@ -63,6 +63,7 @@
                   label="Dimensions"
                   outlined
                   hide-details
+                  clearable
                   :value="dimensions.map((i) => i.name)"
                   :items="availableDimensions.map((i) => i.name)"
                   @change="setDimensions"
@@ -76,14 +77,15 @@
                   hide-details
                   :value="timeDimensions[0] && timeDimensions[0].dimension.name"
                   :items="availableTimeDimensions.map((i) => i.name)"
+                  clearable
                   @change="
-                    setTimeDimensions([
-                      {
-                        dimension: $event,
-                        granularity: timeDimensions[0].granularity,
-                        dateRange: timeDimensions[0].dateRange,
-                      },
-                    ])
+                    (value) =>
+                      handleTimeChange({
+                        value,
+                        availableTimeDimensions,
+                        timeDimensions,
+                        setTimeDimensions,
+                      })
                   "
                 />
               </v-col>
@@ -93,15 +95,7 @@
                   label="Granularity"
                   outlined
                   hide-details
-                  @change="
-                    setTimeDimensions([
-                      {
-                        dimension: timeDimensions[0].dimension.name,
-                        granularity: $event,
-                        dateRange: timeDimensions[0].dateRange,
-                      },
-                    ])
-                  "
+                  clearable
                   item-text="title"
                   item-value="name"
                   :value="timeDimensions[0] && timeDimensions[0].granularity"
@@ -114,6 +108,7 @@
                   label="Date Range"
                   outlined
                   hide-details
+                  clearable
                   :value="timeDimensions[0] && timeDimensions[0].dateRange"
                   :items="dateRangeItems"
                   @change="
@@ -131,7 +126,7 @@
 
             <v-row align="center">
               <v-col cols="2" md="2">
-                <v-select label="Chart Type" outlined hide-details v-model="type" :items="['line', 'table']" />
+                <v-select label="Chart Type" outlined hide-details v-model="type" :items="chartTypes" />
               </v-col>
 
               <v-col cols="10" class="settings-button-group">
@@ -154,11 +149,28 @@
         </v-container>
       </template>
 
-      <template v-slot="{ resultSet }">
-        <div class="wrap pa-4 pa-md-8" v-if="resultSet">
+      <template v-slot="{ resultSet, isQueryPresent }">
+        <div v-if="!isQueryPresent">
+          <v-alert color="blue" text>Choose a measure or dimension to get started</v-alert>
+        </div>
+
+        <div class="wrap pa-4 pa-md-8" v-if="resultSet && isQueryPresent">
           <div class="border-light pa-4 pa-md-12">
             <line-chart legend="bottom" v-if="type === 'line'" :data="series(resultSet)"></line-chart>
+
+            <area-chart legend="bottom" v-if="type === 'area'" :data="series(resultSet)"></area-chart>
+
+            <pie-chart v-if="type === 'pie'" :data="pairs(resultSet)"></pie-chart>
+
+            <column-chart v-if="type === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
+
             <Table v-if="type === 'table'" :data="resultSet"></Table>
+
+            <div v-if="type === 'number'">
+              <div v-for="item in resultSet.series()" :key="item.key">
+                {{ item.series[0].value }}
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -205,7 +217,7 @@ export default {
 
     query = {
       measures: ['Orders.count'],
-      dimensions: ['Orders.status'],
+      // dimensions: ['Orders.status'],
       timeDimensions: [
         {
           dimension: 'Orders.createdAt',
@@ -213,10 +225,10 @@ export default {
           dateRange: 'this quarter',
         },
       ],
-      filters: [],
-      order: {
-        'Orders.status': 'desc',
-      },
+      // filters: [],
+      // order: {
+      //   'Orders.status': 'desc',
+      // },
     };
 
     return {
@@ -236,26 +248,48 @@ export default {
         'Last 30 days',
         'Last year',
       ],
+      chartTypes: ['line', 'area', 'bar', 'pie', 'table', 'number'],
       type: 'line',
       GRANULARITIES,
-      // pivotConfigDialog: false,
-      // orderDialog: false,
     };
   },
   methods: {
-    print(value) {
-      console.log('printer: ', value);
+    handleTimeChange({ value, timeDimensions, availableTimeDimensions, setTimeDimensions }) {
+      const [selectedTd = {}] = timeDimensions;
+      const td = availableTimeDimensions.find(({ name }) => name === value);
+      
+      if (!td) {
+        setTimeDimensions([]);
+        return;
+      }
+
+      setTimeDimensions([
+        {
+          dimension: td.name,
+          granularity: selectedTd.granularity || 'day',
+          dateRange: selectedTd.dateRange,
+        },
+      ]);
     },
     series(resultSet) {
       const seriesNames = resultSet.seriesNames();
-
       const pivot = resultSet.chartPivot();
       const series = [];
+
       seriesNames.forEach((e) => {
         const data = pivot.map((p) => [p.x, p[e.key]]);
         series.push({ name: e.key, data });
       });
       return series;
+    },
+    pairs(resultSet) {
+      return resultSet.series()[0].series.map((item) => [item.x, item.value]);
+    },
+    seriesPairs(resultSet) {
+      return resultSet.series().map((seriesItem) => ({
+        name: seriesItem.title,
+        data: seriesItem.series.map((item) => [item.x, item.value]),
+      }));
     },
   },
 };

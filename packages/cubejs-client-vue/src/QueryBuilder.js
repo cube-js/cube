@@ -172,9 +172,9 @@ export default {
   },
   computed: {
     isQueryPresent() {
-      const { query } = this;
+      const { validatedQuery } = this;
 
-      return isQueryPresent(query);
+      return isQueryPresent(validatedQuery);
     },
     validatedQuery() {
       let validatedQuery = {};
@@ -534,7 +534,7 @@ export default {
       deep: true,
       handler(orderMembers) {
         const nextOrder = orderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean);
-        if (!equals(Object.entries(this.order), nextOrder)) {
+        if (!equals(Object.entries(this.order || {}), nextOrder)) {
           this.order = fromPairs(nextOrder);
         }
       },

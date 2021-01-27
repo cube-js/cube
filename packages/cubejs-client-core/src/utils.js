@@ -61,17 +61,17 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
         (newQuery.measures || []).length === 1 &&
         oldQuery.measures[0] !== newQuery.measures[0])
     ) {
-      const currentGranularity = (newQuery.timeDimensions || [])[0].granularity;
+      const [td] = (newQuery.timeDimensions || []);
       const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
       newQuery = {
         ...newQuery,
         timeDimensions: defaultTimeDimension
           ? [
-              {
-                dimension: defaultTimeDimension,
-                granularity: currentGranularity || granularity,
-              },
-            ]
+            {
+              dimension: defaultTimeDimension,
+              granularity: td && td.granularity || granularity,
+            },
+          ]
           : [],
       };
 
@@ -180,8 +180,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
 
 export function isQueryPresent(query) {
   return (Array.isArray(query) ? query : [query]).every(
-    (q) =>
-      (q.measures && q.measures.length) ||
+    (q) => (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );

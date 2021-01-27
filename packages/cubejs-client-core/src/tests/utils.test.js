@@ -86,8 +86,6 @@ describe('order', () => {
       'Orders.count': 'desc',
     });
 
-    console.log(' --> ', JSON.stringify( orderMembersToOrder(current, prev, 'array')))
     expect(orderMembersToOrder(current, prev, 'array')).toStrictEqual([['Orders.count', 'desc']]);
-    
   });
 });
