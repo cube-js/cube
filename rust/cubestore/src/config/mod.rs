@@ -113,6 +113,8 @@ pub trait ConfigObj: Send + Sync {
     fn download_concurrency(&self) -> u64;
 
     fn upload_concurrency(&self) -> u64;
+
+    fn data_dir(&self) -> &PathBuf;
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +186,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn upload_concurrency(&self) -> u64 {
         self.upload_concurrency
+    }
+
+    fn data_dir(&self) -> &PathBuf {
+        &self.data_dir
     }
 }
 

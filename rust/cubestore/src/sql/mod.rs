@@ -2094,6 +2094,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_table_with_url() {
+        Config::run_test("create_table_with_url", async move |services| {
+            let service = services.sql_service;
+
+            let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
+
+            service.exec_query("CREATE SCHEMA IF NOT EXISTS foo").await.unwrap();
+            service.exec_query(&format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url)).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) from foo.bikes").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(813)])]);
+        }).await;
+    }
+
+    #[tokio::test]
     async fn bytes() {
         Config::run_test("bytes", async move |services| {
             let service = services.sql_service;

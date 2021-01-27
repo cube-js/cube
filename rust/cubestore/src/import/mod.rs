@@ -12,12 +12,13 @@ use core::mem;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
-use std::env;
+use std::{fs};
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
+use std::path::PathBuf;
 
 impl ImportFormat {
     async fn row_stream(
@@ -25,9 +26,10 @@ impl ImportFormat {
         location: String,
         columns: Vec<Column>,
         table_id: u64,
+        temp_files: &mut TempFiles,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
         let file = if location.starts_with("http") {
-            let tmp_file = env::temp_dir().join(format!("{}", table_id));
+            let tmp_file = temp_files.new_file(table_id);
             let mut file = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -214,6 +216,34 @@ impl ImportServiceImpl {
     }
 }
 
+pub struct TempFiles {
+    temp_path: PathBuf,
+    files: Vec<PathBuf>
+}
+
+impl TempFiles {
+    pub fn new(temp_path: PathBuf) -> Self {
+        Self {
+            temp_path,
+            files: Vec::new()
+        }
+    }
+
+    pub fn new_file(&mut self, table_id: u64) -> PathBuf {
+        let path = self.temp_path.join(format!("{}.csv", table_id));
+        self.files.push(path.clone());
+        path
+    }
+}
+
+impl Drop for TempFiles {
+    fn drop(&mut self) {
+        for f in self.files.iter() {
+            let _ = fs::remove_file(f);
+        }
+    }
+}
+
 #[async_trait]
 impl ImportService for ImportServiceImpl {
     async fn import_table(&self, table_id: u64) -> Result<(), CubeError> {
@@ -234,11 +264,15 @@ impl ImportService for ImportServiceImpl {
                 "Trying to import table without location: {:?}",
                 table
             )))?;
+        let temp_dir = self.config_obj.data_dir().join("tmp");
+        tokio::fs::create_dir_all(temp_dir.clone()).await?;
+        let mut temp_files = TempFiles::new(temp_dir);
         let mut row_stream = format
             .row_stream(
                 location.to_string(),
                 table.get_row().get_columns().clone(),
                 table_id,
+                &mut temp_files,
             )
             .await?;
         let mut rows = Vec::new();
@@ -257,6 +291,8 @@ impl ImportService for ImportServiceImpl {
                 }
             }
         }
+
+        mem::drop(temp_files);
 
         self.wal_store
             .add_wal(
