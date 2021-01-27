@@ -46,6 +46,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.0",
+    "@cubejs-backend/server": "^0.26.10",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
