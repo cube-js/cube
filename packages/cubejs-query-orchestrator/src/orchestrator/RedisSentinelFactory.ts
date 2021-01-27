@@ -11,7 +11,9 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
   const port = portStr ? Number(portStr) : 6379;
 
   const options: RedisOptions = {
-    ...opts
+    ...opts,
+    enableReadyCheck: true,
+    lazyConnect: true
   };
 
   if (process.env.REDIS_SENTINEL) {
@@ -57,7 +59,7 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     console.warn('Redis connection is being reconnected, attempt no: ', times);
   });
 
-  return client;
+  return client.connect().then(() => client);
 }
 
 Pipeline.prototype.execAsync = function execAsync() {
