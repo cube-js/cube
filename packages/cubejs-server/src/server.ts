@@ -4,6 +4,7 @@ import CubeCore, {
   CreateOptions as CoreCreateOptions,
   CubejsServerCore,
   DatabaseType,
+  DriverContext,
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
 import express from 'express';
@@ -12,6 +13,7 @@ import http from 'http';
 import util from 'util';
 import bodyParser from 'body-parser';
 import cors, { CorsOptions } from 'cors';
+import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
 import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
@@ -162,8 +164,14 @@ export class CubejsServer {
     return this.core.testConnections();
   }
 
+  // @internal
   public runScheduledRefresh(context: any, queryingOptions: any) {
     return this.core.runScheduledRefresh(context, queryingOptions);
+  }
+
+  // @internal
+  public async getDriver(ctx: DriverContext): Promise<BaseDriver> {
+    return this.core.getDriver(ctx);
   }
 
   public async close() {
