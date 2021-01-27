@@ -40,9 +40,9 @@ mode does the following:
 
 ## Configuring CORS
 
-The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API requests.
-By default, the middleware allows requests from any origin (`*`). To change the allowed
-domain, you can do the following:
+The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API
+requests. By default, the middleware allows requests from any origin (`*`). To
+change the allowed domain, you can do the following:
 
 ```javascript
 module.exports = {
@@ -54,7 +54,8 @@ module.exports = {
 };
 ```
 
-Please consult the Configuration Reference [for more options][link-config-cors-opts].
+Please consult the Configuration Reference [for more
+options][link-config-cors-opts].
 
 [link-config-cors-opts]: /config#options-reference-http
 
