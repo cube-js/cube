@@ -1,5 +1,5 @@
 ---
-title: Cube.js CLI Command Reference
+title: CLI Command Reference
 permalink: /reference
 category: Developer Tools
 menuOrder: 2
