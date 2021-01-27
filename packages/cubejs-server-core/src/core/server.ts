@@ -25,6 +25,7 @@ import type {
   OrchestratorOptionsFn,
   PreAggregationsSchemaFn,
   RequestContext,
+  DriverContext,
   SchemaFileRepository,
 } from './types';
 
@@ -473,7 +474,7 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
-  public getOrchestratorApi(context: RequestContext): OrchestratorApi {
+  public getOrchestratorApi(context: DriverContext): OrchestratorApi {
     const orchestratorId = this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
@@ -549,9 +550,9 @@ export class CubejsServerCore {
     return scheduler.runScheduledRefresh(context, queryingOptions);
   }
 
-  public async getDriver() {
+  public async getDriver(ctx: DriverContext) {
     if (!this.driver) {
-      const driver = this.options.driverFactory(<any>{});
+      const driver = this.options.driverFactory(ctx);
       await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }
