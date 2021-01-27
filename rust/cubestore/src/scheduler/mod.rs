@@ -3,7 +3,7 @@ use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::{MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::remotefs::RemoteFs;
-use crate::store::ChunkStore;
+use crate::store::{ChunkStore, WALStore};
 use crate::CubeError;
 use log::error;
 use std::sync::Arc;
@@ -120,11 +120,13 @@ impl SchedulerImpl {
                 self.schedule_table_import(row_id).await?;
             }
         }
-        // if let MetaStoreEvent::Delete(TableId::WALs, row_id) = event {
-        //     self.remote_fs
-        //         .delete_file(WALStore::wal_remote_path(row_id).as_str())
-        //         .await?
-        // }
+        if let MetaStoreEvent::Delete(TableId::WALs, row_id) = event {
+            let file = self
+                .remote_fs
+                .local_file(WALStore::wal_remote_path(row_id).as_str())
+                .await?;
+            tokio::fs::remove_file(file).await?;
+        }
         if let MetaStoreEvent::Delete(TableId::Chunks, row_id) = event {
             self.remote_fs
                 .delete_file(ChunkStore::chunk_remote_path(row_id).as_str())
