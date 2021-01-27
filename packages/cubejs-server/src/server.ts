@@ -165,6 +165,11 @@ export class CubejsServer {
   }
 
   // @internal
+  public handleScheduledRefreshInterval() {
+    return this.core.handleScheduledRefreshInterval();
+  }
+
+  // @internal
   public runScheduledRefresh(context: any, queryingOptions: any) {
     return this.core.runScheduledRefresh(context, queryingOptions);
   }

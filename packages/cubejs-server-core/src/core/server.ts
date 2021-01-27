@@ -225,24 +225,7 @@ export class CubejsServerCore {
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
-        async () => {
-          const contexts = await options.scheduledRefreshContexts();
-          if (contexts.length < 1) {
-            this.logger('Refresh Scheduler Error', {
-              error: 'At least one context should be returned by scheduledRefreshContexts'
-            });
-          }
-
-          await Promise.all(contexts.map(async context => {
-            const queryingOptions: any = { concurrency: options.scheduledRefreshConcurrency };
-
-            if (options.scheduledRefreshTimeZones) {
-              queryingOptions.timezones = options.scheduledRefreshTimeZones;
-            }
-
-            await this.runScheduledRefresh(context, queryingOptions);
-          }));
-        },
+        this.handleScheduledRefreshInterval,
         {
           interval: scheduledRefreshTimer,
           onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
@@ -545,6 +528,31 @@ export class CubejsServerCore {
     });
   }
 
+  /**
+   * @internal Please dont use this method directly, use refreshTimer
+   */
+  public async handleScheduledRefreshInterval() {
+    const contexts = await this.options.scheduledRefreshContexts();
+    if (contexts.length < 1) {
+      this.logger('Refresh Scheduler Error', {
+        error: 'At least one context should be returned by scheduledRefreshContexts'
+      });
+    }
+
+    return Promise.all(contexts.map(async context => {
+      const queryingOptions: any = { concurrency: this.options.scheduledRefreshConcurrency };
+
+      if (this.options.scheduledRefreshTimeZones) {
+        queryingOptions.timezones = this.options.scheduledRefreshTimeZones;
+      }
+
+      await this.runScheduledRefresh(context, queryingOptions);
+    }));
+  }
+
+  /**
+   * @internal Please dont use this method directly, use refreshTimer
+   */
   public async runScheduledRefresh(context, queryingOptions?: any) {
     const scheduler = new RefreshScheduler(this);
     return scheduler.runScheduledRefresh(context, queryingOptions);
