@@ -453,7 +453,7 @@ impl ClusterImpl {
             )));
         }
         if !self.is_select_worker() {
-            for _ in 0..4 {
+            for _ in 0..self.config_obj.job_runners_count() {
                 // TODO number of job event loops
                 let job_runner = JobRunner {
                     meta_store: self.meta_store.clone(),

@@ -1,10 +1,10 @@
 /* eslint-disable global-require */
-// Playground version: 0.19.31
 import type { ChildProcess } from 'child_process';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
 import crypto from 'crypto';
+import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
 import type { Application as ExpressApplication } from 'express';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
@@ -70,7 +70,12 @@ export class DevServer {
 
     app.get('/playground/db-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server DB Schema Load');
-      const driver = await this.cubejsServer.getDriver();
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        requestId: getRequestIdFromRequest(req),
+      });
+
       const tablesSchema = await driver.tablesSchema();
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
@@ -100,7 +105,11 @@ export class DevServer {
         throw new Error('You have to select at least one table');
       }
 
-      const driver = await this.cubejsServer.getDriver();
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        requestId: getRequestIdFromRequest(req),
+      });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
       const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
@@ -279,10 +288,11 @@ export class DevServer {
       }
     }));
 
-    app.get('/playground/test-connection', catchErrors(async (_, res) => {
+    app.get('/playground/test-connection', catchErrors(async (req, res) => {
       const orchestratorApi = this.cubejsServer.getOrchestratorApi({
+        dataSource: req.query.dataSource || 'default',
         authInfo: null,
-        requestId: ''
+        requestId: getRequestIdFromRequest(req),
       });
 
       try {

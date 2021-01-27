@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
-import uuid from 'uuid/v4';
 import bodyParser from 'body-parser';
 
 import type {
@@ -12,7 +11,7 @@ import type {
   ErrorRequestHandler
 } from 'express';
 
-import { requestParser } from './requestParser';
+import { getRequestIdFromRequest, requestParser } from './requestParser';
 import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
@@ -630,10 +629,6 @@ export class ApiGateway {
     };
   }
 
-  protected requestIdByReq(req) {
-    return req.headers['x-request-id'] || req.headers.traceparent || uuid();
-  }
-
   protected handleErrorMiddleware: ErrorRequestHandler = async (e, req, res, next) => {
     this.handleError({
       e,
@@ -754,7 +749,7 @@ export class ApiGateway {
   }
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    req.context = await this.contextByReq(req, req.authInfo, this.requestIdByReq(req));
+    req.context = await this.contextByReq(req, req.authInfo, getRequestIdFromRequest(req));
     if (next) {
       next();
     }

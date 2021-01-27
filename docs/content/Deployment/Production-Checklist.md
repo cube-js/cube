@@ -17,8 +17,10 @@ lead to security vulnerabilities. You can read more on the differences between
 
 [link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
 
+<!-- prettier-ignore-start -->
 [[info | Note]]
 | Development mode is disabled by default.
+<!-- prettier-ignore-end -->
 
 ```bash
 # Set this to false or leave unset to disable development mode
@@ -31,59 +33,71 @@ Cube.js requires [Redis](https://redis.io/), an in-memory data structure store,
 to run in production.
 
 It uses Redis for query caching and queue. Set the `REDIS_URL` environment
-variable to allow Cube.js to connect to Redis. If your Redis instance also has
-a password, please set it via the `REDIS_PASSWORD` environment variable. Set
-the `REDIS_TLS` environment variable to `true` if you want to enable
-SSL-secured connections. Ensure your Redis cluster allows at least 15
-concurrent connections.
+variable to allow Cube.js to connect to Redis. If your Redis instance also has a
+password, please set it via the `REDIS_PASSWORD` environment variable. Set the
+`REDIS_TLS` environment variable to `true` if you want to enable SSL-secured
+connections. Ensure your Redis cluster allows at least 15 concurrent
+connections.
 
+<!-- prettier-ignore-start -->
 [[warning | Note]]
 | Cube.js server instances used by same tenant environments should have same
 | Redis instances. Otherwise they will have different query queues which can
 | lead to incorrect pre-aggregation states and intermittent data access errors.
+<!-- prettier-ignore-end -->
 
 ### Redis Pool
 
 If `REDIS_URL` is provided Cube.js, will create a Redis connection pool with a
-minimum of 2 and maximum of 1000 concurrent connections, by default.
-The `CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables
-can be used to tweak pool size limits. To disable connection pooling, and
-instead create connections on-demand, you can set `CUBEJS_REDIS_POOL_MAX` to 0.
+minimum of 2 and maximum of 1000 concurrent connections, by default. The
+`CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be
+used to tweak pool size limits. To disable connection pooling, and instead
+create connections on-demand, you can set `CUBEJS_REDIS_POOL_MAX` to 0.
 
 If your maximum concurrent connections limit is too low, you may see
-`TimeoutError: ResourceRequest timed out` errors. As a rule of a thumb, you
-need to have `Queue Size * Number of tenants` concurrent connections to ensure
-the best performance possible. If you use clustered deployments, please make
-sure you have enough connections for all Cube.js server instances. A lower
-number of connections still can work, however Redis becomes a performance
-bottleneck in this case.
+`TimeoutError: ResourceRequest timed out` errors. As a rule of a thumb, you need
+to have `Queue Size * Number of tenants` concurrent connections to ensure the
+best performance possible. If you use clustered deployments, please make sure
+you have enough connections for all Cube.js server instances. A lower number of
+connections still can work, however Redis becomes a performance bottleneck in
+this case.
 
 ### Running without Redis
 
 If you want to run Cube.js in production without Redis, you can use
 `CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.
 
+<!-- prettier-ignore-start -->
 [[warning | Note]]
 | Serverless and clustered deployments can't be run without Redis as it is used
 | to manage the query queue.
+<!-- prettier-ignore-end -->
 
 ## Set up Pre-aggregations Storage
 
-If you are using [external pre-aggregations][link-pre-aggregations], you need
-to set up and configure external pre-aggregations storage.
+If you are using [external pre-aggregations][link-pre-aggregations], you need to
+set up and configure external pre-aggregations storage.
 
 [link-pre-aggregations]: /pre-aggregations#external-pre-aggregations
 
-Currently, we recommend using MySQL for external pre-aggregations storage.
-There is some additional MySQL configuration required to optimize for
-pre-aggregation ingestion and serving. The final configuration may vary
-depending on the specific use case.
+By default, Cube.js will use `prod_pre_aggregations` as the schema name for
+storing pre-aggregations. This behavior can be modified by the
+`CUBEJS_PRE_AGGREGATIONS_SCHEMA` environent variable; see the [Environment
+Variables][ref-env-vars-general] page for more details.
+
+[ref-env-vars-general]: /reference/environment-variables#general
+
+Currently, we recommend using MySQL for external pre-aggregations storage. There
+is some additional MySQL configuration required to optimize for pre-aggregation
+ingestion and serving. The final configuration may vary depending on the
+specific use case.
 
 ## Set up Refresh Worker
 
-To refresh in-memory cache and [scheduled pre-aggregations][link-scheduled-refresh] in the background, we
-recommend running a separate Cube.js refresh worker instance. This allows your main Cube.js instance
-to continue to serve requests with high availability.
+To refresh in-memory cache and [scheduled
+pre-aggregations][link-scheduled-refresh] in the background, we recommend
+running a separate Cube.js refresh worker instance. This allows your main
+Cube.js instance to continue to serve requests with high availability.
 
 [link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
 
@@ -92,7 +106,10 @@ to continue to serve requests with high availability.
 CUBEJS_SCHEDULED_REFRESH_TIMER=true
 ```
 
-For Serverless deployments, use the [Run Scheduled Refresh endpoint of the REST API](rest-api#api-reference-v-1-run-scheduled-refresh) instead of a refresh worker.
+For Serverless deployments, use the [Run Scheduled Refresh endpoint of the REST
+API][ref-api-scheduled-refresh] instead of a refresh worker.
+
+[ref-api-scheduled-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
 
 ## Enable HTTPS
 

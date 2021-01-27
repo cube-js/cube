@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{env, fs};
 use tokio::sync::broadcast;
-use tokio::time::Duration;
+use tokio::time::{timeout_at, Duration, Instant};
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -98,6 +98,8 @@ pub trait ConfigObj: Send + Sync {
 
     fn select_worker_pool_size(&self) -> usize;
 
+    fn job_runners_count(&self) -> usize;
+
     fn bind_port(&self) -> u16;
 
     fn bind_address(&self) -> &str;
@@ -113,6 +115,8 @@ pub trait ConfigObj: Send + Sync {
     fn download_concurrency(&self) -> u64;
 
     fn upload_concurrency(&self) -> u64;
+
+    fn data_dir(&self) -> &PathBuf;
 }
 
 #[derive(Debug, Clone)]
@@ -124,6 +128,7 @@ pub struct ConfigObjImpl {
     pub data_dir: PathBuf,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
+    pub job_runners_count: usize,
     pub bind_port: u16,
     pub bind_address: String,
     pub query_timeout: u64,
@@ -152,6 +157,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn select_worker_pool_size(&self) -> usize {
         self.select_worker_pool_size
+    }
+
+    fn job_runners_count(&self) -> usize {
+        self.job_runners_count
     }
 
     fn bind_port(&self) -> u16 {
@@ -185,6 +194,10 @@ impl ConfigObj for ConfigObjImpl {
     fn upload_concurrency(&self) -> u64 {
         self.upload_concurrency
     }
+
+    fn data_dir(&self) -> &PathBuf {
+        &self.data_dir
+    }
 }
 
 lazy_static! {
@@ -205,9 +218,9 @@ impl Config {
                     .ok()
                     .map(|v| PathBuf::from(v))
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
-                partition_split_threshold: 1000000,
+                partition_split_threshold: 262144 * 2,
                 compaction_chunks_count_threshold: 4,
-                compaction_chunks_total_size_threshold: 262144 * 2,
+                compaction_chunks_total_size_threshold: 262144,
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -257,7 +270,11 @@ impl Config {
                 wal_split_threshold: env::var("CUBESTORE_WAL_SPLIT_THRESHOLD")
                     .ok()
                     .map(|v| v.parse::<u64>().unwrap())
-                    .unwrap_or(262144),
+                    .unwrap_or(131072),
+                job_runners_count: env::var("CUBESTORE_JOB_RUNNERS")
+                    .ok()
+                    .map(|v| v.parse::<usize>().unwrap())
+                    .unwrap_or(4),
             }),
         }
     }
@@ -277,6 +294,7 @@ impl Config {
                         .join(format!("{}-upstream", name)),
                 },
                 select_worker_pool_size: 0,
+                job_runners_count: 4,
                 bind_port: 3306,
                 bind_address: "0.0.0.0".to_string(),
                 query_timeout: 15,
@@ -349,7 +367,11 @@ impl Config {
             let services = self.configure().await;
             services.start_processing_loops().await.unwrap();
 
-            test_fn(services.clone()).await;
+            // Should be long enough even for CI.
+            let timeout = Duration::from_secs(600);
+            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                panic!("Test timed out after {} seconds", timeout.as_secs());
+            }
 
             services.stop_processing_loops().await.unwrap();
         }
