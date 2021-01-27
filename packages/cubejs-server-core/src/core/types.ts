@@ -106,7 +106,7 @@ export interface CreateOptions {
   extendContext?: (req: ExpressRequest) => any;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];
-  scheduledRefreshContexts?: () => Promise<any>;
+  scheduledRefreshContexts?: () => Promise<object[]>;
   scheduledRefreshConcurrency?: number;
   compilerCacheSize?: number;
   maxCompilerCacheKeepAlive?: number;

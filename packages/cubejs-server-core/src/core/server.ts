@@ -531,7 +531,7 @@ export class CubejsServerCore {
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public async handleScheduledRefreshInterval() {
+  public handleScheduledRefreshInterval = async () => {
     const contexts = await this.options.scheduledRefreshContexts();
     if (contexts.length < 1) {
       this.logger('Refresh Scheduler Error', {
