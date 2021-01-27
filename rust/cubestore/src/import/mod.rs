@@ -12,13 +12,13 @@ use core::mem;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
-use std::{fs};
+use std::fs;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
-use std::path::PathBuf;
 
 impl ImportFormat {
     async fn row_stream(
@@ -218,14 +218,14 @@ impl ImportServiceImpl {
 
 pub struct TempFiles {
     temp_path: PathBuf,
-    files: Vec<PathBuf>
+    files: Vec<PathBuf>,
 }
 
 impl TempFiles {
     pub fn new(temp_path: PathBuf) -> Self {
         Self {
             temp_path,
-            files: Vec::new()
+            files: Vec::new(),
         }
     }
 
