@@ -1,13 +1,15 @@
 import Redis, { Redis as redis, RedisOptions, Pipeline } from 'ioredis';
 
+import config from '../config';
+
 function debugLog(msg) {
-  if (process.env.FLAG_ENABLE_REDIS_SENTINEL_DEBUG) {
+  if (config.FLAG_ENABLE_REDIS_SENTINEL_DEBUG) {
     console.debug(msg);
   }
 }
 
 async function createIORedisClient(url: string, opts: RedisOptions) {
-  const [host, portStr] = (process.env.REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
+  const [host, portStr] = (config.REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
   const port = portStr ? Number(portStr) : 6379;
 
   const options: RedisOptions = {
@@ -16,7 +18,7 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     lazyConnect: true
   };
 
-  if (process.env.REDIS_SENTINEL) {
+  if (config.REDIS_SENTINEL) {
     options.sentinels = [{ host, port }];
     options.name = 'mymaster';
     options.enableOfflineQueue = false;
@@ -25,12 +27,12 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     options.port = port;
   }
 
-  if (process.env.REDIS_TLS === 'true') {
+  if (config.REDIS_TLS) {
     options.tls = {};
   }
 
-  if (process.env.REDIS_PASSWORD) {
-    options.password = process.env.REDIS_PASSWORD;
+  if (config.REDIS_PASSWORD) {
+    options.password = config.REDIS_PASSWORD;
   }
 
   const client = new Redis(options);

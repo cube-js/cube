@@ -5,6 +5,8 @@ import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactoryByDataSource } from './DriverFactory';
 
+import config from '../config';
+
 interface QueryOrchestratorOptions {
   cacheAndQueueDriver?: 'redis' | 'memory';
   externalDriverFactory?: any;
@@ -33,9 +35,9 @@ export class QueryOrchestrator {
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;
 
-    const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
-      process.env.NODE_ENV === 'production' || process.env.REDIS_URL ||
-        (process.env.FLAG_ENABLE_REDIS_SENTINEL && process.env.REDIS_SENTINEL) ? 'redis' : 'memory'
+    const cacheAndQueueDriver = options.cacheAndQueueDriver || config.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
+      config.NODE_ENV === 'production' || config.REDIS_URL ||
+        (config.FLAG_ENABLE_REDIS_SENTINEL && config.REDIS_SENTINEL) ? 'redis' : 'memory'
     );
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {

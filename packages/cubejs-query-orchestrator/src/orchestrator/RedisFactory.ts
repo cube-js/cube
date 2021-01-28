@@ -1,6 +1,7 @@
 import redis, { ClientOpts, RedisClient } from 'redis';
 import { promisify } from 'util';
 import AsyncRedisClient from './AsyncRedisClient';
+import config from '../config';
 
 function decorateRedisClient(client: RedisClient): AsyncRedisClient {
   [
@@ -39,12 +40,12 @@ export function createRedisClient(url: string, opts: ClientOpts = {}) {
     url,
   };
 
-  if (process.env.REDIS_TLS === 'true') {
+  if (config.REDIS_TLS) {
     options.tls = {};
   }
 
-  if (process.env.REDIS_PASSWORD) {
-    options.password = process.env.REDIS_PASSWORD;
+  if (config.REDIS_PASSWORD) {
+    options.password = config.REDIS_PASSWORD;
   }
 
   return Promise.resolve(decorateRedisClient(

@@ -4,9 +4,10 @@ import AsyncRedisClient from './AsyncRedisClient';
 import RedisClientOptions from './RedisClientOptions';
 import { createRedisClient as createNodeRedisClient } from './RedisFactory';
 import { createRedisSentinelClient } from './RedisSentinelFactory';
+import config from '../config';
 
 function createRedisClient(url: string, opts: RedisClientOptions = {}) {
-  if (process.env.FLAG_ENABLE_REDIS_SENTINEL) {
+  if (config.FLAG_ENABLE_REDIS_SENTINEL) {
     return createRedisSentinelClient(url, opts);
   }
 
@@ -26,10 +27,6 @@ export interface RedisPoolOptions {
 
 const MAX_ALLOWED_POOL_ERRORS = 100;
 
-function envIntWithDefault(envVariable, defaultValue) {
-  return process.env[envVariable] ? parseInt(process.env[envVariable], 10) : defaultValue;
-}
-
 export class RedisPool {
   protected readonly pool: Pool<AsyncRedisClient>|null = null;
 
@@ -38,14 +35,10 @@ export class RedisPool {
   protected poolErrors: number = 0;
 
   public constructor(options: RedisPoolOptions = {}) {
-    const defaultMin = envIntWithDefault('CUBEJS_REDIS_POOL_MIN', 2);
-    const defaultMax = envIntWithDefault('CUBEJS_REDIS_POOL_MAX', 1000);
-    const defaultIdleTimeoutSeconds = envIntWithDefault('CUBEJS_REDIS_IDLE_TIMEOUT_SECONDS', 5);
-    const defaultSoftIdleTimeoutSeconds = envIntWithDefault('CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS', -1);
-    const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : defaultMin;
-    const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : defaultMax;
-    const idleTimeoutSeconds = (typeof options.idleTimeoutSeconds !== 'undefined') ? options.idleTimeoutSeconds : defaultIdleTimeoutSeconds;
-    const softIdleTimeoutSeconds = (typeof options.softIdleTimeoutSeconds !== 'undefined') ? options.softIdleTimeoutSeconds : defaultSoftIdleTimeoutSeconds;
+    const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : config.CUBEJS_REDIS_POOL_MIN;
+    const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : config.CUBEJS_REDIS_POOL_MAX;
+    const idleTimeoutSeconds = (typeof options.idleTimeoutSeconds !== 'undefined') ? options.idleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
+    const softIdleTimeoutSeconds = (typeof options.softIdleTimeoutSeconds !== 'undefined') ? options.softIdleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
 
     const opts: PoolOptions = {
       min,
@@ -56,7 +49,7 @@ export class RedisPool {
       evictionRunIntervalMillis: Math.min(idleTimeoutSeconds, softIdleTimeoutSeconds) * 1000
     };
 
-    const create = options.createClient || (async () => createRedisClient(process.env.REDIS_URL));
+    const create = options.createClient || (async () => createRedisClient(config.REDIS_URL));
 
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.end(true));

@@ -3,6 +3,7 @@ import fs from 'fs';
 import { isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
 
 import { cancelCombinator } from './utils';
+import config from '../config';
 
 const sortByKeys = (unordered) => {
   const ordered = {};
@@ -73,8 +74,8 @@ export class BaseDriver {
     ];
 
     if (
-      process.env.CUBEJS_DB_SSL === 'true' ||
-      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
+      config.CUBEJS_DB_SSL ||
+      config.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
       sslOptions.find(o => !!process.env[o.value])
     ) {
       ssl = sslOptions.reduce(
@@ -112,10 +113,7 @@ export class BaseDriver {
         {}
       );
 
-      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
-        ssl.rejectUnauthorized =
-          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
-      }
+      ssl.rejectUnauthorized = config.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
     }
 
     return ssl;

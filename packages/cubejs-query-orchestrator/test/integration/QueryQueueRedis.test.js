@@ -1,11 +1,13 @@
 const QueryQueueTest = require('../unit/QueryQueue.test');
 const { RedisPool } = require('../../src/orchestrator/RedisPool');
 
-[false, true].forEach((sentinelFlag) => {
-  process.env.FLAG_ENABLE_REDIS_SENTINEL = sentinelFlag;
+const config = require('../../config');
 
-  QueryQueueTest(`RedisPool, sentinel ${process.env.FLAG_ENABLE_REDIS_SENTINEL ? 'enabled' : 'disabled'}`,
+[false, true].forEach((sentinelFlag) => {
+  config.FLAG_ENABLE_REDIS_SENTINEL = sentinelFlag;
+
+  QueryQueueTest(`RedisPool, sentinel ${config.FLAG_ENABLE_REDIS_SENTINEL ? 'enabled' : 'disabled'}`,
     { cacheAndQueueDriver: 'redis', redisPool: new RedisPool() });
-  QueryQueueTest(`RedisNoPool, sentinel ${process.env.FLAG_ENABLE_REDIS_SENTINEL ? 'enabled' : 'disabled'}`,
+  QueryQueueTest(`RedisNoPool, sentinel ${config.FLAG_ENABLE_REDIS_SENTINEL ? 'enabled' : 'disabled'}`,
     { cacheAndQueueDriver: 'redis', redisPool: new RedisPool({ poolMin: 0, poolMax: 0 }) });
 });
