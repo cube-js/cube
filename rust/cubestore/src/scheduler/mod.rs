@@ -133,8 +133,11 @@ impl SchedulerImpl {
                 .await?
         }
         if let MetaStoreEvent::DeletePartition(partition) = &event {
-            if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
-                self.remote_fs.delete_file(file_name.as_str()).await?;
+            // remove file only if partition is active otherwise it should be removed when it's deactivated
+            if partition.get_row().is_active() {
+                if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
+                    self.remote_fs.delete_file(file_name.as_str()).await?;
+                }
             }
         }
         if let MetaStoreEvent::Update(TableId::Partitions, row_id) = event {
