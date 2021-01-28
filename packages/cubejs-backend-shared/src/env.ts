@@ -52,11 +52,11 @@ function asPortOrSocket(input: string, envName: string): number|string {
 }
 
 function asBoolOrTime(input: string, envName: string): number|boolean {
-  if (input === 'true') {
+  if (input.toLowerCase() === 'true') {
     return true;
   }
 
-  if (input === 'false') {
+  if (input.toLowerCase() === 'false') {
     return false;
   }
 

@@ -45,6 +45,12 @@ describe('getEnv', () => {
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'false';
     expect(getEnv('refreshTimer')).toBe(false);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'True';
+    expect(getEnv('refreshTimer')).toBe(true);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'False';
+    expect(getEnv('refreshTimer')).toBe(false);
   });
 
   test('refreshTimer(exception)', () => {
