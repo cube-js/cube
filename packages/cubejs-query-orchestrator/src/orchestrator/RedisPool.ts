@@ -37,8 +37,10 @@ export class RedisPool {
   public constructor(options: RedisPoolOptions = {}) {
     const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : config.CUBEJS_REDIS_POOL_MIN;
     const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : config.CUBEJS_REDIS_POOL_MAX;
-    const idleTimeoutSeconds = (typeof options.idleTimeoutSeconds !== 'undefined') ? options.idleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
-    const softIdleTimeoutSeconds = (typeof options.softIdleTimeoutSeconds !== 'undefined') ? options.softIdleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
+    const idleTimeoutSeconds = (typeof options.idleTimeoutSeconds !== 'undefined') ?
+      options.idleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
+    const softIdleTimeoutSeconds = (typeof options.softIdleTimeoutSeconds !== 'undefined') ?
+      options.softIdleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
 
     const opts: PoolOptions = {
       min,
@@ -52,7 +54,7 @@ export class RedisPool {
     const create = options.createClient || (async () => createRedisClient(config.REDIS_URL));
 
     if (max > 0) {
-      const destroy = options.destroyClient || (async (client) => client.end(true));
+      const destroy = options.destroyClient || (async (client) => client.quitAsync());
 
       this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
 
