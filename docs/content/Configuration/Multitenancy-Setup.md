@@ -286,3 +286,18 @@ module.exports = new AWSHandlers({
     })
 });
 ```
+
+## Scheduled Refresh
+
+If you need scheduled refreshes in a multi-tenant deployment, ensure you have
+configured [`scheduledRefreshContexts`][ref-config-refresh-context] correctly.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| Leaving [`scheduledRefreshContexts`][ref-config-refresh-context]
+| unconfigured will lead to issues where the security context will be
+| `undefined`. This is because there is no way for Cube.js to know how to
+| generate a context without the required input.
+<!-- prettier-ignore-end -->
+
+[ref-config-refresh-context]: config#options-reference-scheduled-refresh-contexts

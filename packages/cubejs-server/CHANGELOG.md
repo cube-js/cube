@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.31](https://github.com/cube-js/cube.js/compare/v0.25.30...v0.25.31) (2021-01-28)
+
+
+### Features
+
+* Disable graceful shutdown by default ([#1903](https://github.com/cube-js/cube.js/issues/1903)) ([19e2f54](https://github.com/cube-js/cube.js/commit/19e2f5491ba8f8b3aa76762382da98400fb71a1b))
+
+
+
+
+
 ## [0.25.30](https://github.com/cube-js/cube.js/compare/v0.25.29...v0.25.30) (2021-01-26)
 
 **Note:** Version bump only for package @cubejs-backend/server

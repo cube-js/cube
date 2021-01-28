@@ -213,18 +213,25 @@ export class ServerContainer {
     }
   }
 
-  public async runServerInstance(configuration: CreateOptions) {
+  public async runServerInstance(configuration: CreateOptions, embedded: boolean = false) {
+    if (embedded) {
+      process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'false';
+      configuration.scheduledRefreshTimer = false;
+    }
+
     const server = new CubejsServer(configuration);
 
-    try {
-      const { version, port } = await server.listen();
+    if (!embedded) {
+      try {
+        const { version, port } = await server.listen();
 
-      console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-    } catch (e) {
-      console.error('Fatal error during server start: ');
-      console.error(e.stack || e);
+        console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+      } catch (e) {
+        console.error('Fatal error during server start: ');
+        console.error(e.stack || e);
 
-      process.exit(1);
+        process.exit(1);
+      }
     }
 
     return server;
@@ -273,7 +280,10 @@ export class ServerContainer {
     );
   }
 
-  public async start() {
+  /**
+   * @param embedded Cube.js will start without https/ws/graceful shutdown + without timers
+   */
+  public async start(embedded: boolean = false) {
     const makeInstance = async () => {
       const userConfig = await this.lookupConfiguration();
 
@@ -283,7 +293,7 @@ export class ServerContainer {
         ...userConfig,
       };
 
-      const server = await this.runServerInstance(configuration);
+      const server = await this.runServerInstance(configuration, embedded);
 
       return {
         configuration,
@@ -294,40 +304,42 @@ export class ServerContainer {
 
     let instance = await makeInstance();
 
-    if (instance.gracefulEnabled) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const bindSignal of ['SIGTERM', 'SIGINT']) {
-        // eslint-disable-next-line no-loop-func
-        process.on(bindSignal, async (signal) => {
-          console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
+    if (!embedded) {
+      if (instance.gracefulEnabled) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const bindSignal of ['SIGTERM', 'SIGINT']) {
+          // eslint-disable-next-line no-loop-func
+          process.on(bindSignal, async (signal) => {
+            console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
 
-          process.exit(
-            await instance.server.shutdown(signal, true)
-          );
-        });
+            process.exit(
+              await instance.server.shutdown(signal, true)
+            );
+          });
+        }
       }
+
+      let restartHandler: Promise<0|1>|null = null;
+
+      process.addListener('SIGUSR1', async (signal) => {
+        console.log(`Received ${signal} signal, reloading in ${instance.configuration.gracefulShutdown}s`);
+
+        if (restartHandler) {
+          console.log(`Unable to restart server while it's already restarting`);
+
+          return;
+        }
+
+        try {
+          restartHandler = instance.server.shutdown(signal, true);
+
+          await restartHandler;
+        } finally {
+          restartHandler = null;
+        }
+
+        instance = await makeInstance();
+      });
     }
-
-    let restartHandler: Promise<0|1>|null = null;
-
-    process.addListener('SIGUSR1', async (signal) => {
-      console.log(`Received ${signal} signal, reloading in ${instance.configuration.gracefulShutdown}s`);
-
-      if (restartHandler) {
-        console.log(`Unable to restart server while it's already restarting`);
-
-        return;
-      }
-
-      try {
-        restartHandler = instance.server.shutdown(signal, true);
-
-        await restartHandler;
-      } finally {
-        restartHandler = null;
-      }
-
-      instance = await makeInstance();
-    });
   }
 }

@@ -1,7 +1,7 @@
 ---
-title: Using the Cube.js CLI
+title: CLI
 permalink: /using-the-cubejs-cli
-category: Cube.js CLI
+category: Developer Tools
 menuOrder: 1
 ---
 

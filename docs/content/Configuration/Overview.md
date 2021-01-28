@@ -30,18 +30,19 @@ mode does the following:
 - Enables background refresh for in-memory cache and [scheduled
   pre-aggregations][link-scheduled-refresh]
 - Allows another log level to be set (`trace`)
-- Enables the Playground on `http://localhost:4000`
+- Enables [Developer Playground][link-dev-playground] on `http://localhost:4000`
 - Uses `memory` instead of `redis` as the default cache/queue engine
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors
 
 [link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
+[link-dev-playground]: /dev-tools/dev-playground
 
 ## Configuring CORS
 
-The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API requests.
-By default, the middleware allows requests from any origin (`*`). To change the allowed
-domain, you can do the following:
+The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API
+requests. By default, the middleware allows requests from any origin (`*`). To
+change the allowed domain, you can do the following:
 
 ```javascript
 module.exports = {
@@ -53,7 +54,8 @@ module.exports = {
 };
 ```
 
-Please consult the Configuration Reference [for more options][link-config-cors-opts].
+Please consult the Configuration Reference [for more
+options][link-config-cors-opts].
 
 [link-config-cors-opts]: /config#options-reference-http
 

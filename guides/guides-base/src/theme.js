@@ -40,7 +40,7 @@ export const sharedStyles = {
       font-size: 26px;
     }
 
-    p {
+    p, li {
       line-height: 28px;
     }
 
@@ -72,7 +72,7 @@ export const sharedStyles = {
     }
 
 
-   p > code[class*="language-"] {
+    p > code[class*="language-"], li > code[class*="language-"] {
       padding: 3px 6px;
       line-height: 16px;
       font-size: 13px;

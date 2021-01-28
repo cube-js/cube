@@ -42,7 +42,9 @@ You can provide the following configuration options to Cube.js.
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
   extendContext: (req: ExpressRequest) => any,
-  scheduledRefreshTimer: Boolean | Number,
+  scheduledRefreshTimer: String[],
+  scheduledRefreshTimeZones: string[],
+  scheduledRefreshContexts: () => Promise<object[]>,
   compilerCacheSize: Number,
   maxCompilerCacheKeepAlive: Number,
   updateCompilerCacheKeepAlive: Boolean,
@@ -213,17 +215,21 @@ module.exports = {
 
 ### contextToOrchestratorId
 
-`contextToOrchestratorId` is a function to determine a caching key for Query Orchestrator instance.
-Query Orchestrator instance holds database connections, execution queues, pre-aggregation table caches.
-By default, returns the same value as `contextToAppId`.
+`contextToOrchestratorId` is a function to determine a caching key for Query
+Orchestrator instance. Query Orchestrator instance holds database connections,
+execution queues, pre-aggregation table caches. By default, returns the same
+value as `contextToAppId`.
 
-Override it only in case multiple tenants should share the same execution queue and database connections while having different schemas instead of default Query Orchestrator per tenant strategy. 
+Override it only in case multiple tenants should share the same execution queue
+and database connections while having different schemas instead of default Query
+Orchestrator per tenant strategy.
 
 Called on each request.
 
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}_${authInfo.user_id}`,
+  contextToAppId: ({ authInfo }) =>
+    `CUBEJS_APP_${authInfo.tenantId}_${authInfo.user_id}`,
   contextToOrchestratorId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`,
 };
 ```
@@ -356,28 +362,80 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
-Pass `true` to enable scheduled refresh timer. Can be also set using
-`CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
+Cube.js enables background refresh by default. You can specify an interval as number in seconds or as a string format e.g. `30s`, `1m`.
+Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 
 ```javascript
 module.exports = {
-  scheduledRefreshTimer: true,
+  scheduledRefreshTimer: 60,
 };
 ```
 
-Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date)
+Learn more about [scheduled refreshes here](caching#keeping-cache-up-to-date).
 
-You can pass comma separated list of timezones to refresh in
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable. For example:
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
+instance. For serverless deployments, [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead.
 
+You may also need to configure [`scheduledRefreshTimeZones`](#options-reference-scheduled-refresh-time-zones) and [`scheduledRefreshContexts`](#options-reference-scheduled-refresh-contexts).
+### scheduledRefreshTimeZones
+
+All time-based calculations performed within Cube.js are timezone-aware. Using this property you can specify multiple timezones in
+[TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format e.g. `America/Los_Angeles`. The default value is `UTC`.
+
+```javascript
+module.exports = {
+  // You can define one or multiple timezones based on your requirements
+  scheduledRefreshTimer: [
+    'America/Vancouver',
+    'America/Toronto'
+  ],
+};
 ```
+
+This configuration option can be also set using the `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
+You can set a comma-separated list of timezones to refresh in `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. For example:
+
+```bash
 CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 ```
 
-Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
-instance. For serverless deployments
-[REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used
-instead of timer.
+### scheduledRefreshContexts
+
+If you are using `securityContext` inside `contextToAppId` or
+`contextToOrchestratorId`, you must also set up  `scheduledRefreshContexts`.
+This allows Cube.js to generate the necessary security contexts prior to
+running the scheduled refreshes.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| Leaving `scheduledRefreshContexts` unconfigured will lead to issues where the
+| security context will be `undefined`. This is because there is no way for
+| Cube.js to know how to generate a context without the required input.
+<!-- prettier-ignore-end -->
+
+```javascript
+module.exports = {
+  // scheduledRefreshContexts should return array of objects, which can declare authInfo
+  scheduledRefreshContexts: async () => [
+    {
+      authInfo: {
+        myappid: "demoappid",
+        u: {
+          bucket: "demo"
+        }
+      }
+    },
+    {
+      authInfo: {
+        myappid: "demoappid2",
+        u: {
+          bucket: "demo2"
+        }
+      }
+    }
+  ],
+};
+```
 
 ### extendContext
 
@@ -434,9 +492,12 @@ with options [from here][link-express-cors-opts].
 
 ### orchestratorOptions
 
-You can pass this object to set advanced options for Cube.js Query Orchestrator.
+<!-- prettier-ignore-start -->
+[[warning | ]]
+| We **strongly** recommend leaving these options set to the defaults. Changing these values can result in application instability and/or downtime.
+<!-- prettier-ignore-end -->
 
-_Please note that this is advanced configuration._
+You can pass this object to set advanced options for Cube.js Query Orchestrator.
 
 | Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                                      | Default Value           |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
@@ -475,13 +536,13 @@ module.exports = {
 
 Timeout and interval options' values are in seconds.
 
-| Option              | Description                                                                                                  | Default Value |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
+| Option              | Description                                                                                                                                    | Default Value |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. | `2`           |
-| continueWaitTimeout | Long polling interval                                                                                        | `5`           |
-| executionTimeout    | Total timeout of single query                                                                                | `600`         |
-| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                   | `120`         |
-| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled. | `30`          |
+| continueWaitTimeout | Long polling interval                                                                                                                          | `5`           |
+| executionTimeout    | Total timeout of single query                                                                                                                  | `600`         |
+| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                     | `120`         |
+| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                   | `30`          |
 
 ## RequestContext
 
