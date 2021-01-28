@@ -42,7 +42,9 @@ You can provide the following configuration options to Cube.js.
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
   extendContext: (req: ExpressRequest) => any,
-  scheduledRefreshTimer: Boolean | Number,
+  scheduledRefreshTimer: String[],
+  scheduledRefreshTimeZones: string[],
+  scheduledRefreshContexts: () => Promise<object[]>,
   compilerCacheSize: Number,
   maxCompilerCacheKeepAlive: Number,
   updateCompilerCacheKeepAlive: Boolean,
@@ -360,12 +362,63 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
-Pass `true` to enable scheduled refresh timer. Can be also set using
-`CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
+Cube.js enables background refresh by default, you can specify an interval as number in seconds or string format, e.g.: `30s`, `1m`. 
+Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 
 ```javascript
 module.exports = {
-  scheduledRefreshTimer: true,
+  scheduledRefreshTimer: 60,
+};
+```
+
+### scheduledRefreshTimeZones
+
+All time based calculations performed within Cube.js are timezone-aware. Using this property you can specify timezones in 
+[TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.: `America/Los_Angeles`. The default value is `UTC`.
+
+Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable.
+
+```javascript
+module.exports = {
+  // You can define one or multiple timezones based on your requirements
+  scheduledRefreshTimer: [
+    'America/Vancouver',
+    'America/Toronto'
+  ],
+};
+```
+
+### scheduledRefreshContexts
+
+If you are using `authInfo` inside `contextToAppId` or `contextToOrchestratorId` without `scheduledRefreshContexts`, 
+you will get `undefined`, because it's impossible to automatically generate context for it.
+
+To help Cube.js know about contexts, you should declare `scheduledRefreshContexts` to explain, what contexts
+are needed to be executed.
+
+You can declare contexts:
+
+```javascript
+module.exports = {
+  // scheduledRefreshContexts should return array of objects, which can declare authInfo
+  scheduledRefreshContexts: async () => [
+    {
+      authInfo: {
+        myappid: "demoappid",
+        u: {
+          bucket: "demo"
+        }
+      }
+    },
+    {
+      authInfo: {
+        myappid: "demoappid2",
+        u: {
+          bucket: "demo2"
+        }
+      }
+    }
+  ],
 };
 ```
 
