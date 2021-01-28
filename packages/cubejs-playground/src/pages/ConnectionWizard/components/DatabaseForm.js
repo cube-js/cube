@@ -1,5 +1,5 @@
 import { Button, Form, Input, Space } from 'antd';
-// import { Base64Upload } from '@cubejs-enterprise/uikit';
+import Base64Upload from './Base64Upload';
 
 export default function DatabaseForm({
   db,
@@ -28,25 +28,20 @@ export default function DatabaseForm({
     >
       {db.settings.map((param) =>
         param.type === 'base64upload' ? (
-          <div>Base64Upload</div>
+            <Base64Upload
+              onInput={({ raw, encoded }) => {
+                if (param.uploadTarget) {
+                  form.setFieldsValue({ [param.uploadTarget]: encoded });
+                }
+                if (param.extractField) {
+                  form.setFieldsValue({
+                    [param.extractField.formField]:
+                      raw[param.extractField.jsonField],
+                  });
+                }
+              }}
+            />
         ) : (
-          // <Base64Upload
-          //   key={param.env}
-          //   width="100%"
-          //   margin="2x bottom"
-          //   accept="application/json, .json"
-          //   onInput={({ raw, encoded }) => {
-          //     if (param.uploadTarget) {
-          //       form.setFieldsValue({ [param.uploadTarget]: encoded });
-          //     }
-          //     if (param.extractField) {
-          //       form.setFieldsValue({
-          //         [param.extractField.formField]:
-          //           raw[param.extractField.jsonField],
-          //       });
-          //     }
-          //   }}
-          // />
           <Form.Item
             key={param.env}
             label={param.title || param.env}
