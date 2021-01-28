@@ -373,7 +373,7 @@ module.exports = {
 
 ### scheduledRefreshTimeZones
 
-All time based calculations performed within Cube.js are timezone-aware. Using this property you can specify timezones in 
+All time-based calculations performed within Cube.js are timezone-aware. Using this property you can specify multiple timezones in 
 [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format e.g. `America/Los_Angeles`. The default value is `UTC`.
 
 Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable.
