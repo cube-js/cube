@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.31](https://github.com/cube-js/cube.js/compare/v0.25.30...v0.25.31) (2021-01-28)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** propagate time dimension to the drill down query ([#1911](https://github.com/cube-js/cube.js/issues/1911)) ([59701da](https://github.com/cube-js/cube.js/commit/59701dad6f6cb6d78954d18b309716a9d51aa6b7))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 **Note:** Version bump only for package @cubejs-client/core

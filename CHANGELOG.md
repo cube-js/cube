@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.31](https://github.com/cube-js/cube.js/compare/v0.25.30...v0.25.31) (2021-01-28)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** propagate time dimension to the drill down query ([#1911](https://github.com/cube-js/cube.js/issues/1911)) ([59701da](https://github.com/cube-js/cube.js/commit/59701dad6f6cb6d78954d18b309716a9d51aa6b7))
+* **cubestore:** Adjust default memory usage ([04c4bc8](https://github.com/cube-js/cube.js/commit/04c4bc850a801e5833641a4904144bb5e9f36ff8))
+* **cubestore:** Bring back WAL removal ([1b2bd40](https://github.com/cube-js/cube.js/commit/1b2bd40131314afbb4e024867666615b199c80d3))
+* **cubestore:** Drop temporary files on CSV import ([ab0affb](https://github.com/cube-js/cube.js/commit/ab0affb6ceed719444b3e0df6f8f56439d5b36a7))
+* **cubestore:** Error processing event DeletePartition: No such object ([0208234](https://github.com/cube-js/cube.js/commit/0208234ee1f5f76efb7c7d2db6eee448af2f097d))
+* **cubestore:** index out of bounds: the len is 0 but the index is 18446744073709551615 ([21bb226](https://github.com/cube-js/cube.js/commit/21bb226f911236353ed8625a674fe1fe1f1b7f51))
+* **cubestore:** Limit memory usage on compaction -- zero compaction threshold case ([#1895](https://github.com/cube-js/cube.js/issues/1895)) ([fb516f5](https://github.com/cube-js/cube.js/commit/fb516f5f04790f51a8e37f24eb875e00704b1954))
+* **cubestore:** Support single partition compactions ([c5eac36](https://github.com/cube-js/cube.js/commit/c5eac3655be86cfdf5d9035a5c98d72025521459))
+
+
+### Features
+
+* Ability to specify dataSource from request ([e8fe83a](https://github.com/cube-js/cube.js/commit/e8fe83abacfd2a47ad440fa2d52f3bf78d7a8c72))
+* Disable graceful shutdown by default ([#1903](https://github.com/cube-js/cube.js/issues/1903)) ([19e2f54](https://github.com/cube-js/cube.js/commit/19e2f5491ba8f8b3aa76762382da98400fb71a1b))
+
+
+
+
+
 ## [0.25.30](https://github.com/cube-js/cube.js/compare/v0.25.29...v0.25.30) (2021-01-26)
 
 
