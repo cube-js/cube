@@ -11,7 +11,7 @@ configuration options in the `cube.js` file.
 
 Example of setting a custom logger in the `cube.js` file.
 
-```js
+```javascript
 module.exports = {
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
@@ -23,82 +23,82 @@ module.exports = {
 
 You can provide the following configuration options to Cube.js.
 
-```javascript
-{
-  dbType: String | (context: RequestContext) => String,
-  externalDbType: String | (context: RequestContext) => String,
-  schemaPath: String,
-  basePath: String,
-  webSocketsBasePath: String,
-  logger: (msg: String, params: Object) => any,
-  driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>,
-  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>,
-  contextToAppId: (context: RequestContext) => String,
-  contextToOrchestratorId: (context: RequestContext) => String,
-  repositoryFactory: (context: RequestContext) => SchemaFileRepository,
-  checkAuth: (req: ExpressRequest, authorization: String) => any,
-  queryTransformer: (query: Object, context: RequestContext) => Object,
-  preAggregationsSchema: String | (context: RequestContext) => String,
-  schemaVersion: (context: RequestContext) => String,
-  extendContext: (req: ExpressRequest) => any,
-  scheduledRefreshTimer: String[],
+```typescript
+interface CubejsConfiguration {
+  dbType: string | ((context: RequestContext) => string);
+  externalDbType: string | ((context: RequestContext) => string);
+  schemaPath: string;
+  basePath: string;
+  webSocketsBasePath: string;
+  logger: (msg: string, params: object) => any;
+  driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>;
+  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
+  contextToAppId: (context: RequestContext) => string;
+  contextToOrchestratorId: (context: RequestContext) => string;
+  repositoryFactory: (context: RequestContext) => SchemaFileRepository;
+  checkAuth: (req: ExpressRequest, authorization: string) => any;
+  queryTransformer: (query: object, context: RequestContext) => object;
+  preAggregationsSchema: string | (context: RequestContext) => string;
+  schemaVersion: (context: RequestContext) => string;
+  extendContext: (req: ExpressRequest) => any;
+  scheduledRefreshTimer: boolean | number;
   scheduledRefreshTimeZones: string[],
   scheduledRefreshContexts: () => Promise<object[]>,
-  compilerCacheSize: Number,
-  maxCompilerCacheKeepAlive: Number,
-  updateCompilerCacheKeepAlive: Boolean,
-  telemetry: Boolean,
-  allowUngroupedWithoutPrimaryKey: Boolean,
+  compilerCacheSize: number;
+  maxCompilerCacheKeepAlive: number;
+  updateCompilerCacheKeepAlive: boolean;
+  telemetry: boolean;
+  allowUngroupedWithoutPrimaryKey: boolean;
   http: {
     cors: {
-      methods: String | String[],
-      origin: String,
-      allowedHeaders: String | String[],
-      exposedHeaders: String | String[],
-      credentials: Boolean,
-      maxAge: Number,
-      preflightContinue: Boolean,
-      optionsSuccessStatus: Number,
+      methods: string | string[];
+      origin: string;
+      allowedHeaders: string | string[];
+      exposedHeaders: string | string[];
+      credentials: boolean;
+      maxAge: number;
+      preflightContinue: boolean;
+      optionsSuccessStatus: number;
     },
   },
   orchestratorOptions: {
-    redisPrefix: String,
+    redisPrefix: string;
     queryCacheOptions: {
-      refreshKeyRenewalThreshold: number,
-      backgroundRenew: Boolean,
-      queueOptions: QueueOptions
+      refreshKeyRenewalThreshold: number;
+      backgroundRenew: boolean;
+      queueOptions: QueueOptions;
     }
     preAggregationsOptions: {
-      queueOptions: QueueOptions
+      queueOptions: QueueOptions;
     }
   },
-  allowJsDuplicatePropsInSchema: Boolean
+  allowJsDuplicatePropsInSchema: boolean;
 }
 
-QueueOptions {
-  concurrency: number
-  continueWaitTimeout: number,
-  executionTimeout: number,
-  orphanedTimeout: number,
-  heartBeatInterval: number
+interface QueueOptions {
+  concurrency: number;
+  continueWaitTimeout: number;
+  executionTimeout: number;
+  orphanedTimeout: number;
+  heartBeatInterval: number;
 }
 
-RequestContext {
-  securityContext: Object,
-  requestId: String
+interface RequestContext {
+  securityContext: object;
+  requestId: string;
 }
 
-DriverContext extends RequestContext {
-  dataSource: String
+interface DriverContext extends RequestContext {
+  dataSource: string;
 }
 
-SchemaFileRepository {
-  dataSchemaFiles(): Promise<FileContent[]>
+interface SchemaFileRepository {
+  dataSchemaFiles(): Promise<FileContent[]>;
 }
 
-FileContent {
-  fileName: String,
-  content: String
+interface FileContent {
+  fileName: string;
+  content: string;
 }
 ```
 
