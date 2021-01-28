@@ -27,7 +27,6 @@ pub struct RowParquetWriter {
     parquet_writer: SerializedFileWriter<File>,
     buffer: Vec<Row>,
     row_group_size: usize,
-    sort_key_size: u64,
 }
 
 enum ColumnAccessor {
@@ -556,7 +555,7 @@ impl RowParquetWriter {
         table: &'a Index,
         file: &'a str,
         row_group_size: usize,
-        sort_key_size: u64,
+        _sort_key_size: u64,
     ) -> Result<RowParquetWriter, CubeError> {
         let file = File::create(file)?;
 
@@ -584,7 +583,6 @@ impl RowParquetWriter {
             parquet_writer,
             row_group_size,
             buffer: Vec::with_capacity(row_group_size as usize),
-            sort_key_size,
         })
     }
 
@@ -613,6 +611,8 @@ impl RowParquetWriter {
                 match col_writer {
                     ColumnWriter::Int64ColumnWriter(ref mut typed) => {
                         let column = &self.columns[column_index];
+                        let mut min = None;
+                        let mut max = None;
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
                                 &self.buffer[row_batch_index * batch_size + row_index].values
@@ -647,21 +647,20 @@ impl RowParquetWriter {
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
+                            .map(|res_val| {
+                                if res_val.is_err() {
+                                    return res_val;
+                                }
+                                let v = res_val.unwrap();
+                                if min.is_none() || v < min.unwrap() {
+                                    min = Some(v)
+                                }
+                                if max.is_none() || max.unwrap() < v {
+                                    max = Some(v)
+                                }
+                                return Ok(v);
+                            })
                             .collect::<Result<Vec<i64>, _>>()?;
-                        let min = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[0].clone())
-                        } else {
-                            None
-                        };
-                        let max = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[column_values.len() - 1].clone())
-                        } else {
-                            None
-                        };
                         let def_levels = self.get_def_levels(
                             batch_size,
                             row_batch_index,
@@ -681,6 +680,8 @@ impl RowParquetWriter {
                     }
                     ColumnWriter::DoubleColumnWriter(ref mut typed) => {
                         let column = &self.columns[column_index];
+                        let mut min = None;
+                        let mut max = None;
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
                                 &self.buffer[row_batch_index * batch_size + row_index].values
@@ -699,21 +700,20 @@ impl RowParquetWriter {
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
+                            .map(|res_val| {
+                                if res_val.is_err() {
+                                    return res_val;
+                                }
+                                let v = res_val.unwrap();
+                                if min.is_none() || v < min.unwrap() {
+                                    min = Some(v)
+                                }
+                                if max.is_none() || max.unwrap() < v {
+                                    max = Some(v)
+                                }
+                                return Ok(v);
+                            })
                             .collect::<Result<Vec<f64>, _>>()?;
-                        let min = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[0].clone())
-                        } else {
-                            None
-                        };
-                        let max = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[column_values.len() - 1].clone())
-                        } else {
-                            None
-                        };
                         let def_levels = self.get_def_levels(
                             batch_size,
                             row_batch_index,
@@ -732,6 +732,31 @@ impl RowParquetWriter {
                         )?;
                     }
                     ColumnWriter::ByteArrayColumnWriter(ref mut typed) => {
+                        // Both vars store indicies into the `column_values`.
+                        let mut min: Option<String> = None;
+                        let mut max: Option<String> = None;
+                        let mut use_min_max = true;
+                        let mut update_stats = |v: &TableValue| {
+                            if !use_min_max {
+                                return;
+                            }
+                            let s;
+                            if let TableValue::String(ss) = v {
+                                s = ss;
+                            } else {
+                                use_min_max = false;
+                                min = None;
+                                max = None;
+                                return;
+                            }
+                            // TODO: do not clone(), only sort strings.
+                            if min.is_none() || s < min.as_ref().unwrap() {
+                                min = Some(s.clone())
+                            }
+                            if max.is_none() || max.as_ref().unwrap() < s {
+                                max = Some(s.clone())
+                            }
+                        };
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
                                 &self.buffer[row_batch_index * batch_size + row_index].values
@@ -739,30 +764,17 @@ impl RowParquetWriter {
                                     != &TableValue::Null
                             })
                             .map(|row_index| {
+                                let v = &self.buffer[row_batch_index * batch_size + row_index]
+                                    .values[column_index];
+                                update_stats(v);
                                 // TODO types
-                                match &self.buffer[row_batch_index * batch_size + row_index].values
-                                    [column_index]
-                                {
+                                match v {
                                     TableValue::String(str) => ByteArray::from(str.as_str()),
                                     TableValue::Bytes(bytes) => ByteArray::from(bytes.clone()),
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
                             .collect::<Vec<ByteArray>>();
-                        let min = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[0].clone())
-                        } else {
-                            None
-                        };
-                        let max = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[column_values.len() - 1].clone())
-                        } else {
-                            None
-                        };
                         let def_levels = self.get_def_levels(
                             batch_size,
                             row_batch_index,
@@ -770,17 +782,20 @@ impl RowParquetWriter {
                             rows_in_group,
                             column_values.len(),
                         );
+                        assert!(use_min_max || min.is_none() && max.is_none());
                         typed.write_batch_with_statistics(
                             &column_values,
                             def_levels.as_ref().map(|b| b.as_slice()),
                             None,
-                            &min,
-                            &max,
+                            &min.map(|s| ByteArray::from(s.into_bytes())),
+                            &max.map(|s| ByteArray::from(s.into_bytes())),
                             None,
                             None,
                         )?;
                     }
                     ColumnWriter::BoolColumnWriter(ref mut typed) => {
+                        let mut min = None;
+                        let mut max = None;
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
                                 &self.buffer[row_batch_index * batch_size + row_index].values
@@ -796,21 +811,17 @@ impl RowParquetWriter {
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
+                            .map(|res_val| {
+                                let v = res_val;
+                                if min.is_none() || v < min.unwrap() {
+                                    min = Some(v)
+                                }
+                                if max.is_none() || max.unwrap() < v {
+                                    max = Some(v)
+                                }
+                                return res_val;
+                            })
                             .collect::<Vec<bool>>();
-                        let min = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[0].clone())
-                        } else {
-                            None
-                        };
-                        let max = if self.sort_key_size >= column_index as u64
-                            && column_values.len() > 0
-                        {
-                            Some(column_values[column_values.len() - 1].clone())
-                        } else {
-                            None
-                        };
                         let def_levels = self.get_def_levels(
                             batch_size,
                             row_batch_index,
