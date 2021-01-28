@@ -168,9 +168,13 @@ impl CompactionService for CompactionServiceImpl {
                             }
                             EitherOrBoth::Left((c, (min, _))) => {
                                 if i == 0 && filtered_partitions.len() == 1 {
-                                    assert_eq!(partition.get_row().get_min_val().is_none(), true);
-                                    assert_eq!(partition.get_row().get_max_val().is_none(), true);
-                                    Ok((*c, (None, None)))
+                                    Ok((
+                                        *c,
+                                        (
+                                            partition.get_row().get_min_val().clone(),
+                                            partition.get_row().get_max_val().clone(),
+                                        ),
+                                    ))
                                 } else if i == filtered_partitions.len() - 1 {
                                     Ok(((
                                         *c,
@@ -261,6 +265,8 @@ mod tests {
                         16
                     } else if i.get_id() == 3 {
                         20
+                    } else if i.get_id() == 4 {
+                        2
                     } else {
                         unimplemented!()
                     }
@@ -270,10 +276,7 @@ mod tests {
             ))
         });
 
-        config
-            .expect_partition_split_threshold()
-            .times(1)
-            .returning(|| 20);
+        config.expect_partition_split_threshold().returning(|| 20);
 
         config
             .expect_compaction_chunks_total_size_threshold()
@@ -317,6 +320,32 @@ mod tests {
         ];
         expected.sort_by_key(|(s, _, _)| *s);
         assert_eq!(result, expected);
+
+        let next_partition_id = vec![partition_1, partition_2]
+            .iter()
+            .find(|p| p.get_row().main_table_row_count() == 14)
+            .unwrap()
+            .get_id();
+        metastore.create_chunk(next_partition_id, 2).await.unwrap();
+        metastore.chunk_uploaded(4).await.unwrap();
+
+        compaction_service.compact(next_partition_id).await.unwrap();
+
+        let partition = metastore.get_partition(4).await.unwrap();
+
+        assert_eq!(
+            (
+                partition.get_row().main_table_row_count(),
+                partition.get_row().get_min_val().as_ref().cloned(),
+                partition.get_row().get_max_val().as_ref().cloned(),
+            ),
+            (
+                16,
+                None,
+                Some(Row::new(vec![TableValue::String("foo4".to_string())])),
+            ),
+        );
+
         RocksMetaStore::cleanup_test_metastore("compaction");
     }
 }
