@@ -51,10 +51,12 @@ $ npm run dev
 
 To check if the API works, please navigate to [http://localhost:4000](http://localhost:4000/) in your browser. You'll see Cube.js Developer Playground, a powerful tool which greatly simplifies data exploration and query building.
 
+![](/images/playground.png)
+
 The last thing left to make the API work is to define the [data schema](https://cube.dev/docs/getting-started-cubejs-schema): it describes what kind of data we have in our dataset and what should be available at our application.
 
 Let’s go to the [data schema page](http://localhost:4000/#/schema) and check all tables from our database. Then, please click on the plus icon and press the “generate schema” button. Voila! 🎉
 
 Now you can spot a number of new `*.js` files in the `schema` folder.
 
-Now our API is set up, and we're ready to create map data visualizations with Mapbox!
+So, our API is set up, and we're ready to create map data visualizations with Mapbox!

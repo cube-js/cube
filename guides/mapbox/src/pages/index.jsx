@@ -8,7 +8,7 @@ import featureOneImg from './feature-1.svg';
 import featureTwoImg from './feature-2.svg';
 import featureThreeImg from './feature-3.svg';
 
-import hero from './hero.png';
+import hero from './demo.gif';
 
 class Index extends React.Component {
   render() {
@@ -25,9 +25,7 @@ class Index extends React.Component {
           startUrl={partsEdges[0].node.fields.slug}
           socialButtons={<Social align="flex-start" siteTitle={config.siteTitle} siteUrl={config.siteUrl} />}
           media={
-            <video muted autoPlay playsInline loop preload="auto" poster={hero}>
-              <source type="video/mp4" src="video/preview.mp4" />
-            </video>
+            <img src={hero} />
           }
           withFrame
         />

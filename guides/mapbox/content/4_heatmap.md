@@ -104,6 +104,8 @@ You can find more information about expressions in [Mapbox docs](https://docs.ma
 
 Here's the heatmap we've built:
 
+![](/images/heatmap.gif)
+
 ## Useful links
 
 - [Heatmap layer example at Mapbox documentation](https://docs.mapbox.com/help/tutorials/make-a-heatmap-with-mapbox-gl-js/)

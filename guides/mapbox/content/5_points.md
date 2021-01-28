@@ -131,3 +131,4 @@ filter: [
 
 Here's the visualization we've built:
 
+![](/images/points.gif)

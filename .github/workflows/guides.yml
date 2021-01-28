@@ -7,8 +7,7 @@ on:
       - '.github/actions/deploy-guide.sh'
       - 'guides/**'
     branches:
-      - '**'
-#      - master
+      - master
 
 jobs:
 

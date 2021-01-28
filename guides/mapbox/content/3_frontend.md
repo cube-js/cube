@@ -32,10 +32,10 @@ import * as React from 'react';
 import { useState } from 'react';
 import MapGL from 'react-map-gl';
 
-const MAPBOX_TOKEN = 'MAPBOX_TOKEN';  
+const MAPBOX_TOKEN = 'MAPBOX_TOKEN';
 
 function App() {
-  const [viewport, setViewport] = useState({
+  const [ viewport, setViewport ] = useState({
     latitude: 34,
     longitude: 5,
     zoom: 1.5,
@@ -43,14 +43,14 @@ function App() {
 
   return (
     <MapGL
-        {...viewport}
-        onViewportChange={(viewport) => {
-          setViewport(viewport)
-        }}
-        width='100%'
-        height='100%'
-        mapboxApiAccessToken={MAPBOX_TOKEN}
-      />
+      {...viewport}
+      onViewportChange={(viewport) => {
+        setViewport(viewport)
+      }}
+      width='100%'
+      height='100%'
+      mapboxApiAccessToken={MAPBOX_TOKEN}
+    />
   );
 }
 ```
