@@ -77,7 +77,7 @@ const Header: React.FC<Props> = (props) => (
             className={styles.headerButton}
           >
             <Icon style={{ fontSize: '22px' }} type="github" />
-            Github
+            GitHub
           </Button>
         </div>
       </Col>
