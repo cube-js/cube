@@ -390,13 +390,17 @@ module.exports = {
 
 ### scheduledRefreshContexts
 
-If you are using `authInfo` inside `contextToAppId` or `contextToOrchestratorId` without `scheduledRefreshContexts`, 
-you will get `undefined`, because it's impossible to automatically generate context for it.
+If you are using `securityContext` inside `contextToAppId` or
+`contextToOrchestratorId`, you must also set up  `scheduledRefreshContexts`.
+This allows Cube.js to generate the necessary security contexts prior to
+running the scheduled refreshes.
 
-To help Cube.js know about contexts, you should declare `scheduledRefreshContexts` to explain, what contexts
-are needed to be executed.
-
-You can declare contexts:
+<!-- prettier-ignore-start -->
+[[warning |]]
+| Leaving `scheduledRefreshContexts` unconfigured will lead to issues where the
+| security context will be `undefined`. This is because there is no way for
+| Cube.js to know how to generate a context without the required input.
+<!-- prettier-ignore-end -->
 
 ```javascript
 module.exports = {
