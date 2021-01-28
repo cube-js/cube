@@ -10,7 +10,8 @@ permalink: /getting-started-docker
 [link-config]: /config
 [link-env-vars]: /reference/environment-variables
 
-This guide will help you get Cube.js running as a Docker container using Docker Compose.
+This guide will help you get Cube.js running as a Docker container using Docker
+Compose.
 
 ## 1. Create a Docker Compose file
 
@@ -35,11 +36,15 @@ services:
 
 ## 2. Configure Cube.js
 
-There are two ways you can set configuration options for Cube.js; via a [configuration file][link-config], commonly known as the `cube.js` file, and [environment variables][link-env-vars].
+There are two ways you can set configuration options for Cube.js; via a
+[configuration file][link-config], commonly known as the `cube.js` file, and
+[environment variables][link-env-vars].
 
-We'll configure the database connection via environment variables. You can learn more about setting credentials for different databases in the [Connecting to the Database guide][link-connecting-to-the-database].
+We'll configure the database connection via environment variables. You can learn
+more about setting credentials for different databases in the [Connecting to the
+Database guide][link-connecting-to-the-database].
 
-The example below is for a Postgres instance running locally. 
+The example below is for a Postgres instance running locally.
 
 ```bash
 # Create an .env file with the following content
@@ -64,10 +69,10 @@ CUBEJS_API_SECRET=SECRET
 
 ### Network config for Linux Users
 
-For Linux, add the following line to your `docker-compose.yml` 
+For Linux, add the following line to your `docker-compose.yml`
 
 ```yaml
-network_mode: "host"
+network_mode: 'host'
 ```
 
 ## 3. Run Cube.js
@@ -82,30 +87,33 @@ Check if the container is running:
 $ docker ps
 ```
 
-## 4. Open Playground
+## 4. Open Developer Playground
 
-Head to [http://localhost:4000](http://localhost:4000) to open the Playground.
+Head to [http://localhost:4000](http://localhost:4000) to open [Developer
+Playground][link-dev-playground].
 
-You can generate Data Schema files using the Playground. Once schema files are
-generated you can execute queries on the Build tab in the Playground.
+You can generate Data Schema files using Developer Playground. Once schema files
+are generated you can execute queries on the Build tab in the Playground.
+
+[link-dev-playground]: /dev-tools/dev-playground
 
 ## Next Steps
 
-Generating Data Schema files in the Playground is a good first step to start modelling your data. You can [learn more about Cube.js Data Schema][link-cubejs-schema] for complex data
-modelling techniques.
+Generating Data Schema files in Developer Playground is a good first step to
+start modelling your data. You can [learn more about Cube.js Data
+Schema][link-cubejs-schema] for complex data modelling techniques.
 
-Learn how to [query Cube.js with REST API][link-rest-api] or [use Javascript client library and
-integrations with frontend frameworks][link-frontend-introduction].
+Learn how to [query Cube.js with REST API][link-rest-api] or [use Javascript
+client library and integrations with frontend
+frameworks][link-frontend-introduction].
 
 ### Configuration with cube.js file
 
-When using the `cube.js` file for configuration, you need to add it
-to the `volumes` definition in your `docker-compose.yml`:
+When using the `cube.js` file for configuration, you need to add it to the
+`volumes` definition in your `docker-compose.yml`:
 
 ```yaml
-  volumes:
-    - ./schema:/cube/conf/schema
-    - ./cube.js:/cube/conf/cube.js
+volumes:
+  - ./schema:/cube/conf/schema
+  - ./cube.js:/cube/conf/cube.js
 ```
-
-

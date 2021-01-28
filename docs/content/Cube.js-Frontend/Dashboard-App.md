@@ -5,7 +5,7 @@ category: Cube.js Frontend
 menuOrder: 6
 ---
 
-You can generate a Dashboard App in the Cube.js developer playground. The
+You can generate a Dashboard App in the [Developer Playground][link-dev-playground]. The
 Dashboard App wires multiple frontend components together into single
 app. It setups all the structure and configuration to work with Cube.js Backend, while giving you full control to customize it however you want.
 
@@ -16,6 +16,8 @@ is easy to embed into an existing architecture or deploy to any static website h
 _Currently Dashboard App is generated based on [React](https://reactjs.org/) JS library and [Ant Design](https://ant.design/) UI framework. If you'd like to see more options with
  different JS and CSS frameworks please [open a Github issue](https://github.com/cube-js/cube.js/issues/new) or [ping us in
  Slack.](https://slack.cube.dev)_
+
+[link-dev-playground]: /dev-tools/dev-playground
 
 ## Overview
 
