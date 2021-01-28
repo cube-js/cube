@@ -7,8 +7,8 @@
     "dev": "node index.js"
   },
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.19.56",
-    "@cubejs-backend/sqlite-driver": "^0.19.56",
+    "@cubejs-backend/server-core": "^0.25.31",
+    "@cubejs-backend/sqlite-driver": "^0.25.30",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
