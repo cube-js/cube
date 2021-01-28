@@ -600,13 +600,13 @@ impl RowParquetWriter {
 
     fn write_buffer(&mut self) -> Result<(), CubeError> {
         let batch_size = self.row_group_size;
-        let row_group_count = self.buffer.len() / self.row_group_size;
-        for row_batch_index in 0..max(row_group_count, 1) {
+        let row_group_count = div_ceil(self.buffer.len(), self.row_group_size);
+        for row_batch_index in 0..row_group_count {
             let mut row_group_writer = self.parquet_writer.next_row_group()?;
 
             let mut column_index = 0;
 
-            let rows_in_group = min(self.row_group_size, self.buffer.len());
+            let rows_in_group = min(batch_size, self.buffer.len() - row_batch_index * batch_size);
 
             while let Some(mut col_writer) = row_group_writer.next_column()? {
                 // TODO types
@@ -838,7 +838,11 @@ impl RowParquetWriter {
             self.parquet_writer.close_row_group(row_group_writer)?;
         }
 
-        let target_size = self.buffer.len() - row_group_count * self.row_group_size;
+        let target_size = if row_group_count * self.row_group_size > self.buffer.len() {
+            0
+        } else {
+            self.buffer.len() - row_group_count * self.row_group_size
+        };
         for i in (0..target_size).rev() {
             self.buffer.swap_remove(i);
         }
@@ -934,7 +938,7 @@ mod tests {
                 1,
             )
             .unwrap(),
-            row_group_size: 7,
+            row_group_size: 10,
         };
         let file_name = "foo.parquet";
 
