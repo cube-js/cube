@@ -42,7 +42,9 @@ You can provide the following configuration options to Cube.js.
   preAggregationsSchema: String | (context: RequestContext) => String,
   schemaVersion: (context: RequestContext) => String,
   extendContext: (req: ExpressRequest) => any,
-  scheduledRefreshTimer: Boolean | Number,
+  scheduledRefreshTimer: String[],
+  scheduledRefreshTimeZones: string[],
+  scheduledRefreshContexts: () => Promise<object[]>,
   compilerCacheSize: Number,
   maxCompilerCacheKeepAlive: Number,
   updateCompilerCacheKeepAlive: Boolean,
@@ -360,12 +362,67 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
-Pass `true` to enable scheduled refresh timer. Can be also set using
-`CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
+Cube.js enables background refresh by default. You can specify an interval as number in seconds or as a string format e.g. `30s`, `1m`.
+Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 
 ```javascript
 module.exports = {
-  scheduledRefreshTimer: true,
+  scheduledRefreshTimer: 60,
+};
+```
+
+### scheduledRefreshTimeZones
+
+All time-based calculations performed within Cube.js are timezone-aware. Using this property you can specify multiple timezones in 
+[TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format e.g. `America/Los_Angeles`. The default value is `UTC`.
+
+This configuration option can be also set using the `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
+
+```javascript
+module.exports = {
+  // You can define one or multiple timezones based on your requirements
+  scheduledRefreshTimer: [
+    'America/Vancouver',
+    'America/Toronto'
+  ],
+};
+```
+
+### scheduledRefreshContexts
+
+If you are using `securityContext` inside `contextToAppId` or
+`contextToOrchestratorId`, you must also set up  `scheduledRefreshContexts`.
+This allows Cube.js to generate the necessary security contexts prior to
+running the scheduled refreshes.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| Leaving `scheduledRefreshContexts` unconfigured will lead to issues where the
+| security context will be `undefined`. This is because there is no way for
+| Cube.js to know how to generate a context without the required input.
+<!-- prettier-ignore-end -->
+
+```javascript
+module.exports = {
+  // scheduledRefreshContexts should return array of objects, which can declare authInfo
+  scheduledRefreshContexts: async () => [
+    {
+      authInfo: {
+        myappid: "demoappid",
+        u: {
+          bucket: "demo"
+        }
+      }
+    },
+    {
+      authInfo: {
+        myappid: "demoappid2",
+        u: {
+          bucket: "demo2"
+        }
+      }
+    }
+  ],
 };
 ```
 
