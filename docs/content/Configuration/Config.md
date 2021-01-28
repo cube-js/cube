@@ -371,12 +371,16 @@ module.exports = {
 };
 ```
 
+Learn more about [scheduled refreshes here](caching#keeping-cache-up-to-date).
+
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
+instance. For serverless deployments, [REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used instead.
+
+You may also need to configure [`scheduledRefreshTimeZones`](#options-reference-scheduled-refresh-time-zones) and [`scheduledRefreshContexts`](#options-reference-scheduled-refresh-contexts).
 ### scheduledRefreshTimeZones
 
-All time-based calculations performed within Cube.js are timezone-aware. Using this property you can specify multiple timezones in 
+All time-based calculations performed within Cube.js are timezone-aware. Using this property you can specify multiple timezones in
 [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format e.g. `America/Los_Angeles`. The default value is `UTC`.
-
-This configuration option can be also set using the `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
 
 ```javascript
 module.exports = {
@@ -386,6 +390,13 @@ module.exports = {
     'America/Toronto'
   ],
 };
+```
+
+This configuration option can be also set using the `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
+You can set a comma-separated list of timezones to refresh in `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. For example:
+
+```bash
+CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 ```
 
 ### scheduledRefreshContexts
@@ -425,20 +436,6 @@ module.exports = {
   ],
 };
 ```
-
-Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date)
-
-You can pass comma separated list of timezones to refresh in
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable. For example:
-
-```
-CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
-```
-
-Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
-instance. For serverless deployments
-[REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used
-instead of timer.
 
 ### extendContext
 
