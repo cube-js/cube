@@ -45,9 +45,11 @@ $ cubejs create demo-app -d athena -t serverless
 
 ## server
 
-[[warning | Note]] | To define configuration you should use `cube.js`
-configuration file. See
-[available options](https://cube.dev/docs/@cubejs-backend-server-core#options-reference).
+<!-- prettier-ignore-start -->
+[[warning | Note]]
+| To define configuration you should use `cube.js` configuration file. See
+| [available options](/@cubejs-backend-server-core#options-reference).
+<!-- prettier-ignore-end -->
 
 The `server` command starts Cube.js in production mode.
 
@@ -59,7 +61,7 @@ $ cubejs server
 
 With debug information:
 
-```sh
+```bash
 $ cubejs server --debug
 ```
 

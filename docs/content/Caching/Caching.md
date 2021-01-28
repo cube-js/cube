@@ -48,7 +48,7 @@ start using pre-aggregations, Cube.js should have write access to the
 
 Pre-aggregations are defined in the data schema. Below is an example of `rollup`
 pre-aggregation. You can learn about defining pre-aggregations in
-[schema reference.](pre-aggregations)
+[schema reference.](/pre-aggregations)
 
 ```javascript
 cube(`Orders`, {
@@ -68,7 +68,7 @@ cube(`Orders`, {
 ### Refresh Strategy
 
 Refresh strategy can be customized by setting the
-[refreshKey](pre-aggregations#refresh-key) property for the pre-aggregation.
+[refreshKey](/pre-aggregations#refresh-key) property for the pre-aggregation.
 
 The default value of `refreshKey` is `every: '1 hour'`. It can be redefined
 either by providing SQL:
@@ -118,7 +118,7 @@ You can refresh pre-aggregations in the background by setting
 
 In development mode, Cube.js enables background refresh by default and will
 refresh all pre-aggregations marked with the
-[`scheduledRefresh`](pre-aggregations#scheduled-refresh) parameter.
+[`scheduledRefresh`](/pre-aggregations#scheduled-refresh) parameter.
 
 Please consult the [Production Checklist][link-production-checklist-refresh] for
 best practices on running background refresh in production environments.
@@ -165,7 +165,7 @@ query, but if there is a difference, the query needs to be re-run and its result
 cached.
 
 To aid with this, Cube.js defines a `refreshKey` for each cube.
-[Refresh keys](cube#parameters-refresh-key) are evaluated by Cube.js to assess
+[Refresh keys](/cube#parameters-refresh-key) are evaluated by Cube.js to assess
 if the data needs to be refreshed.
 
 ```js
@@ -231,7 +231,7 @@ For situations like real-time analytics or responding to live user changes to
 underlying data, the `refreshKey` query cache can prevent fresh data from
 showing up immediately. For these situations, the cache can effectively be
 disabled by setting the [`refreshKey.every`](cube#parameters-refresh-key)
-parameter to something very low, like `1 second`. ``
+parameter to something very low, like `1 second`.
 
 ## Inspecting Queries
 
@@ -245,9 +245,13 @@ show you the information about the `refreshKey` for the query and whether the
 query uses any pre-aggregations. To inspect multiple queries or list existing
 pre-aggregations, you can use Cube Cloud.
 
-[[info |]] | [Cube Cloud][link-cube-cloud] currently is in early access. If you
-don't have an account yet, you can
-[sign up to the waitlist here](https://cube.dev/cloud).
+<!-- prettier-ignore-start -->
+[[info |]]
+| [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
+| an account yet, you can [sign up to the waitlist here][link-cube-cloud].
+<!-- prettier-ignore-end -->
+
+[link-cube-cloud]: https://cube.dev/cloud
 
 To inspect queries in the Cube Cloud, navigate to the "History" page. You can
 filter queries by multiple parameters on this page, including whether they hit
