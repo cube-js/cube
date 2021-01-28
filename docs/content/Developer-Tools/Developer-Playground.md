@@ -16,6 +16,6 @@ in [development mode][link-dev-mode]
 Here's an example of building a query and plotting the results in Developer
 Playground:
 
-![](./playground.gif)
+![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Developer-Tools/playground.gif)
 
 [link-dev-mode]: /configuration/overview
