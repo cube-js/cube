@@ -95,7 +95,14 @@ async function addAsyncMethods(client: redis) {
   return client;
 }
 
+async function replaceEnd(client: redis) {
+  client.end = () => client.disconnect();
+
+  return client;
+}
+
 export function createRedisSentinelClient(url: string, opts: RedisOptions): PromiseLike<redis> {
   return createIORedisClient(url, opts)
-    .then(addAsyncMethods);
+    .then(addAsyncMethods)
+    .then(replaceEnd);
 }

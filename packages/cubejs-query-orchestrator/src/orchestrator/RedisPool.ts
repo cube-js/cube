@@ -54,7 +54,7 @@ export class RedisPool {
     const create = options.createClient || (async () => createRedisClient(config.REDIS_URL));
 
     if (max > 0) {
-      const destroy = options.destroyClient || (async (client) => client.quitAsync());
+      const destroy = options.destroyClient || (async (client) => client.end());
 
       this.pool = genericPool.createPool<AsyncRedisClient>({ create, destroy }, opts);
 

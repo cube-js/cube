@@ -51,8 +51,8 @@ const QueryQueueTest = (name, options) => {
       delayCount = 0;
       const result = await Promise.all([
         queue.executeInQueue('delay', '11', { delay: 600, result: '1' }, 1),
-        queue.executeInQueue('delay', '13', { delay: 100, result: '2' }, 0),
-        queue.executeInQueue('delay', '15', { delay: 100, result: '3' }, 10)
+        queue.executeInQueue('delay', '12', { delay: 100, result: '2' }, 0),
+        queue.executeInQueue('delay', '13', { delay: 100, result: '3' }, 10)
       ]);
       expect(parseInt(result.find(f => f[0] === '3'), 10) % 10).toBeLessThan(2);
     });
@@ -103,9 +103,9 @@ const QueryQueueTest = (name, options) => {
       const results = [];
       await Promise.all([
         queue.executeInQueue('delay', '31', { delay: 400, result: '4' }, -10).then(r => results.push(r)),
-        queue.executeInQueue('delay', '33', { delay: 100, result: '3' }, -9).then(r => results.push(r)),
-        queue.executeInQueue('delay', '35', { delay: 100, result: '2' }, -8).then(r => results.push(r)),
-        queue.executeInQueue('delay', '37', { delay: 100, result: '1' }, -7).then(r => results.push(r))
+        queue.executeInQueue('delay', '32', { delay: 100, result: '3' }, -9).then(r => results.push(r)),
+        queue.executeInQueue('delay', '33', { delay: 100, result: '2' }, -8).then(r => results.push(r)),
+        queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => results.push(r))
       ]);
 
       results.splice(0, 1);
