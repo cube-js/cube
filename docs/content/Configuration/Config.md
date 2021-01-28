@@ -362,7 +362,7 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
-Cube.js enables background refresh by default, you can specify an interval as number in seconds or string format, e.g.: `30s`, `1m`. 
+Cube.js enables background refresh by default. You can specify an interval as number in seconds or as a string format e.g. `30s`, `1m`.
 Can be also set using `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 
 ```javascript
