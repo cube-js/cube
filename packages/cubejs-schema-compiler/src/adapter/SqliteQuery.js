@@ -34,7 +34,7 @@ export class SqliteQuery extends BaseQuery {
 
   floorSql(numeric) {
     // SQLite doesnt support FLOOR
-    return `CAST(${numeric} as int) - (${numeric} < CAST(${numeric} as int))`;
+    return `(CAST((${numeric}) as int) - ((${numeric}) < CAST((${numeric}) as int)))`;
   }
 
   timeStampCast(value) {
