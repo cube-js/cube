@@ -2013,17 +2013,17 @@ mod tests {
                 .exec_query(
                     "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
                 FROM foo.timestamps `timestamp` \
-                WHERE `t` >= convert_tz(to_timestamp('2020-01-02T08:00:00.000Z'), '+08:00') GROUP BY 1",
+                WHERE `t` >= convert_tz(to_timestamp('2020-01-02T08:00:00.000Z'), '-08:00') GROUP BY 1",
                 )
                 .await
                 .unwrap();
 
             assert_eq!(
-                result.get_rows()[0],
-                Row::new(vec![
+                result.get_rows(),
+                &vec![Row::new(vec![
                     TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
                     TableValue::Int(3)
-                ])
+                ])]
             );
         })
             .await;
