@@ -265,6 +265,9 @@ export default {
   },
 
   methods: {
+    getQuery() {
+      return this.validatedQuery;
+    },
     copyQueryFromProps(query) {
       const {
         measures = [],

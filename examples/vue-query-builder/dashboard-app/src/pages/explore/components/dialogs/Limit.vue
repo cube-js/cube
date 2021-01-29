@@ -1,12 +1,12 @@
 <template>
   <v-dialog v-model="dialog" max-width="480">
-    <template v-slot:activator="{ on, attrs }">
-      <v-btn v-bind="attrs" v-on="on"> Limit </v-btn>
+    <template #activator="{ on, attrs }">
+      <v-btn v-bind="attrs" v-on="on" :disabled="disabled"> Limit </v-btn>
     </template>
 
     <v-card>
       <v-card-title>Limit</v-card-title>
-      <v-card-text class="container">
+      <v-card-text>
         <v-text-field
           type="number"
           label="Limit"
@@ -32,6 +32,10 @@ export default {
       type: Number,
       required: true,
     },
+    disabled: {
+      type: Boolean,
+      default: false
+    },
   },
   data() {
     return {
@@ -40,27 +44,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-.container {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-}
-
-.axis-name {
-  font-weight: bold;
-  text-align: center;
-}
-
-.list-group {
-  height: 100%;
-}
-
-.list-group-item {
-  cursor: grab;
-}
-
-.divider {
-  margin: 0 12px;
-}
-</style>

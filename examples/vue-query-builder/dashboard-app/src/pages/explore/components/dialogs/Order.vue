@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="dialog" max-width="400">
-    <template v-slot:activator="{ on, attrs }">
-      <v-btn v-bind="attrs" v-on="on"> Order </v-btn>
+    <template #activator="{ on, attrs }">
+      <v-btn v-bind="attrs" v-on="on" :disabled="disabled"> Order </v-btn>
     </template>
 
     <v-card>
@@ -39,6 +39,10 @@ export default {
     orderMembers: {
       type: Array,
       required: true,
+    },
+    disabled: {
+      type: Boolean,
+      default: false
     },
   },
   data() {

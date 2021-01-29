@@ -10,7 +10,14 @@
           transition="scale-transition"
         />
       </div>
+
+        <v-tabs align-with-title>
+          <v-tab to="/explore">Explore</v-tab>
+          <v-tab to="/dashboard">Dashboard</v-tab>
+        </v-tabs>
+
       <v-spacer></v-spacer>
+
       <v-hover v-slot:default="{ hover }">
         <a
           class="custom-btn mr-4"
@@ -64,20 +71,16 @@
     </v-app-bar>
 
     <v-main>
-      <Explore />
+      <router-view></router-view>
     </v-main>
   </v-app>
 </template>
 
 <script>
-import Explore from './components/Explore';
-
 export default {
   name: 'App',
 
-  components: {
-    Explore,
-  },
+  components: {},
 };
 </script>
 

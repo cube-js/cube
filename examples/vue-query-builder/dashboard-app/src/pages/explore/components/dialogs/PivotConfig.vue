@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="dialog" max-width="480">
-    <template v-slot:activator="{ on, attrs }">
-      <v-btn v-bind="attrs" v-on="on" :disabled="!pivotConfig"> Pivot </v-btn>
+    <template #activator="{ on, attrs }">
+      <v-btn v-bind="attrs" v-on="on" :disabled="!pivotConfig || disabled"> Pivot </v-btn>
     </template>
 
     <v-card>
@@ -40,33 +40,6 @@
 <script>
 import draggable from 'vuedraggable';
 
-const items = new Map();
-
-function onMoveEnd(axis, data, callback) {
-  const { added, removed } = data;
-  const id = added?.element || removed?.element;
-  const from = removed !== undefined ? removed : null;
-  const to = added !== undefined ? added : null;
-  const isSourceEvent = Boolean(from);
-
-  const item = items.get(id) || {};
-  const nextItem = {
-    sourceAxis: isSourceEvent ? axis : item.sourceAxis,
-    destinationAxis: !isSourceEvent ? axis : item.destinationAxis,
-    sourceIndex: item.sourceIndex != null ? item.sourceIndex : from?.oldIndex,
-    destinationIndex: item.destinationIndex != null ? item.destinationIndex : to?.newIndex,
-  };
-  items.set(id, nextItem);
-
-  if (nextItem.sourceAxis && nextItem.destinationAxis) {
-    callback({
-      element: id,
-      ...nextItem,
-    });
-    items.delete(id);
-  }
-}
-
 export default {
   name: 'PivotConfig',
   components: {
@@ -77,10 +50,10 @@ export default {
       type: Object,
       required: true,
     },
-    // onMove: {
-    //   type: Function,
-    //   required: true,
-    // },
+    disabled: {
+      type: Boolean,
+      default: false
+    }
   },
   data() {
     return {

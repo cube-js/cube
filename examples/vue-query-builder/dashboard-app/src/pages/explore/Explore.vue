@@ -131,11 +131,16 @@
 
               <v-col cols="10" class="settings-button-group">
                 Settings:
-                <PivotConfig :pivotConfig="pivotConfig" />
+                <PivotConfig :pivotConfig="pivotConfig" :disabled="!isQueryPresent" />
 
-                <Order :orderMembers="orderMembers" @orderChange="updateOrder.set" @reorder="updateOrder.reorder" />
+                <Order
+                  :orderMembers="orderMembers"
+                  :disabled="!isQueryPresent"
+                  @orderChange="updateOrder.set"
+                  @reorder="updateOrder.reorder"
+                />
 
-                <Limit :limit="Number(limit)" @update="setLimit" />
+                <Limit :limit="Number(limit)" :disabled="!isQueryPresent" @update="setLimit" />
               </v-col>
             </v-row>
 
@@ -149,12 +154,16 @@
         </v-container>
       </template>
 
-      <template v-slot="{ resultSet, isQueryPresent }">
+      <template v-slot="{ resultSet, isQueryPresent, validatedQuery }">
         <div v-if="!isQueryPresent">
           <v-alert color="blue" text>Choose a measure or dimension to get started</v-alert>
         </div>
 
         <div class="wrap pa-4 pa-md-8" v-if="resultSet && isQueryPresent">
+          <div class="d-flex justify-end mb-8">
+            <AddToDashboard @onSave="(name) => createDashboardItem({ name, query: validatedQuery })"></AddToDashboard>
+          </div>
+
           <div class="border-light pa-4 pa-md-12">
             <line-chart legend="bottom" v-if="type === 'line'" :data="series(resultSet)"></line-chart>
 
@@ -181,11 +190,14 @@
 <script>
 import cubejs from '@cubejs-client/core';
 import { QueryBuilder, GRANULARITIES } from '@cubejs-client/vue';
-import FilterComponent from './FilterComponent.vue';
-import Table from './Table';
-import PivotConfig from '@/components/dialogs/PivotConfig';
-import Order from '@/components/dialogs/Order';
-import Limit from '@/components/dialogs/Limit';
+import gql from 'graphql-tag';
+
+import Table from './components/Table';
+import FilterComponent from './components/FilterComponent.vue';
+import PivotConfig from './components/dialogs/PivotConfig';
+import Order from './components/dialogs/Order';
+import Limit from './components/dialogs/Limit';
+import AddToDashboard from './components/dialogs/AddToDashboard';
 
 const API_URL = 'https://ecom.cubecloudapp.dev';
 const CUBEJS_TOKEN =
@@ -211,6 +223,7 @@ export default {
     QueryBuilder,
     FilterComponent,
     Table,
+    AddToDashboard,
   },
   data() {
     let query = {};
@@ -254,10 +267,34 @@ export default {
     };
   },
   methods: {
+    async createDashboardItem({ name, query }) {
+      const response = await this.$apollo.mutate({
+        mutation: gql`
+          mutation($input: DashboardItemInput) {
+            createDashboardItem(input: $input) {
+              id
+              name
+            }
+          }
+        `,
+        variables: {
+          input: {
+            layout: '',
+            vizState: JSON.stringify({
+              query,
+            }),
+            name,
+          },
+        },
+      });
+      
+      console.log({ name, query });
+      console.log('>', response);
+    },
     handleTimeChange({ value, timeDimensions, availableTimeDimensions, setTimeDimensions }) {
       const [selectedTd = {}] = timeDimensions;
       const td = availableTimeDimensions.find(({ name }) => name === value);
-      
+
       if (!td) {
         setTimeDimensions([]);
         return;
