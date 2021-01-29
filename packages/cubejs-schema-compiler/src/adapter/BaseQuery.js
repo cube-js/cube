@@ -1855,9 +1855,11 @@ export class BaseQuery {
     // Mon, 01 Jan 2018 00:00:00 GMT
     const startDate = 1514764800000;
     const opt = {
+      utc: true,
       currentDate: new Date(startDate)
     };
     let utcOffset = 0;
+
     if (refreshKey.timezone) {
       utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
     }
@@ -1886,6 +1888,7 @@ export class BaseQuery {
     ) {
       throw new UserError(`Your cron string ('${every}') is correct, but we support only equal time intervals.`);
     }
+
     return {
       utcOffset,
       interval: delta,
