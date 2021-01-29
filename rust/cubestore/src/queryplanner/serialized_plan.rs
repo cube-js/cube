@@ -350,6 +350,11 @@ pub enum SerializedExpr {
         fun: CubeAggregateUDFKind,
         args: Vec<SerializedExpr>,
     },
+    InList {
+        expr: Box<SerializedExpr>,
+        list: Vec<SerializedExpr>,
+        negated: bool,
+    },
     Wildcard,
 }
 
@@ -427,6 +432,11 @@ impl SerializedExpr {
                 low: Box::new(low.expr()),
                 high: Box::new(high.expr()),
             },
+            SerializedExpr::InList { expr, list, negated } => Expr::InList {
+                expr: Box::new(expr.expr()),
+                list: list.iter().map(|e| e.expr()).collect(),
+                negated: *negated,
+            }
         }
     }
 }
@@ -948,6 +958,11 @@ impl SerializedPlan {
                 low: Box::new(Self::serialized_expr(&low)),
                 high: Box::new(Self::serialized_expr(&high)),
             },
+            Expr::InList { expr, list, negated } => SerializedExpr::InList {
+                expr: Box::new(Self::serialized_expr(&expr)),
+                list: list.iter().map(|e| Self::serialized_expr(&e)).collect(),
+                negated: *negated
+            }
         }
     }
 }
