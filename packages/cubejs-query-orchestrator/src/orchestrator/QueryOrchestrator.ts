@@ -117,16 +117,15 @@ export class QueryOrchestrator {
       undefined,
       await preAggregationsQueryStageState(preAggregation.dataSource)
     );
+    
     if (!preAggregationStage) {
       return undefined;
     }
-    const stageMessage =
-      `Building pre-aggregation ${pendingPreAggregationIndex + 1}/${queryBody.preAggregations.length}`;
-    if (preAggregationStage.stage.indexOf('queue') !== -1) {
-      return { ...preAggregationStage, stage: `${stageMessage}: ${preAggregationStage.stage}` };
-    } else {
-      return { ...preAggregationStage, stage: stageMessage };
-    }
+    
+    return {
+      ...preAggregationStage,
+      stage: 'Building pre-aggregation...'
+    };
   }
 
   public resultFromCacheIfExists(queryBody: any) {
