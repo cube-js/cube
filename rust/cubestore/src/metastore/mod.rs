@@ -1873,14 +1873,14 @@ impl RocksMetaStore {
         batch_pipe: &mut BatchPipe,
         rocks_index: &IndexRocksTable,
         rocks_partition: &PartitionRocksTable,
-        index_cols: &Vec<Column>,
+        table_cols: &Vec<Column>,
         table_id: &IdRow<Table>,
         index_def: IndexDef,
     ) -> Result<IdRow<Index>, CubeError> {
         if let Some(not_found) = index_def
             .columns
             .iter()
-            .find(|dc| index_cols.iter().all(|c| c.name.as_str() != dc.as_str()))
+            .find(|dc| table_cols.iter().all(|c| c.name.as_str() != dc.as_str()))
         {
             return Err(CubeError::user(format!(
                 "Column {} in index {} not found in table {}",
@@ -1889,24 +1889,35 @@ impl RocksMetaStore {
                 table_id.get_row().get_table_name()
             )));
         }
-        let (mut sorted, mut unsorted) =
-            index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
-                index_def
-                    .columns
-                    .iter()
-                    .find(|dc| c.name.as_str() == dc.as_str())
-                    .is_some()
-            });
-        let sorted_key_size = sorted.len() as u64;
-        sorted.append(&mut unsorted);
+
+        // First put the columns from the sort key.
+        let mut taken = vec![false; table_cols.len()];
+        let mut index_columns = Vec::with_capacity(table_cols.len());
+        for c in index_def.columns {
+            let i = table_cols.iter().position(|tc| tc.name == c).unwrap();
+            if taken[i] {
+                continue; // ignore duplicate columns inside the index.
+            }
+
+            taken[i] = true;
+            index_columns.push(table_cols[i].clone().replace_index(index_columns.len()));
+        }
+
+        let sorted_key_size = index_columns.len() as u64;
+        // Put the rest of the columns.
+        for i in 0..table_cols.len() {
+            if taken[i] {
+                continue;
+            }
+
+            index_columns.push(table_cols[i].clone().replace_index(index_columns.len()));
+        }
+        assert_eq!(index_columns.len(), table_cols.len());
+
         let index = Index::try_new(
             index_def.name,
             table_id.get_id(),
-            sorted
-                .into_iter()
-                .enumerate()
-                .map(|(i, c)| c.replace_index(i))
-                .collect::<Vec<_>>(),
+            index_columns,
             sorted_key_size,
         )?;
         let index_id = rocks_index.insert(index, batch_pipe)?;
