@@ -48,7 +48,7 @@ jobs:
             MAJOR=${MINOR%.*}
             TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
           elif [ "${{ github.event_name }}" = "push" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:build-${GITHUB_RUN_NUMBER}"
+            TAGS="$TAGS,${DOCKER_IMAGE}:build-1${GITHUB_RUN_NUMBER}"
           fi
           echo ::set-output name=version::${VERSION}
           echo ::set-output name=tags::${TAGS}
