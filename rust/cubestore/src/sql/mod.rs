@@ -1564,6 +1564,23 @@ mod tests {
                 &expected
             );
 
+            let result = service.exec_query(
+                "SELECT city, name, sum(amount) FROM foo.orders o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
+                WHERE customer_id = 'b' AND product_id IN ('2')
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
+            ).await.unwrap();
+
+            let expected = vec![
+                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)]),
+            ];
+
+            assert_eq!(
+                result.get_rows(),
+                &expected
+            );
+
         }).await;
     }
 
