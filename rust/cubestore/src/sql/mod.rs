@@ -1988,6 +1988,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn convert_tz() {
+        Config::run_test("convert_tz", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+                .await
+                .unwrap();
+
+            service
+                .exec_query(
+                    "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)",
+                )
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query(
+                    "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `t` >= convert_tz(to_timestamp('2020-01-02T08:00:00.000Z'), '+08:00') GROUP BY 1",
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])
+            );
+        })
+            .await;
+    }
+
+    #[tokio::test]
     async fn create_schema_if_not_exists() {
         Config::run_test("create_schema_if_not_exists", async move |services| {
             let service = services.sql_service;

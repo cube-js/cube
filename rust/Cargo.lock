@@ -132,7 +132,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#05de73e2f1adcd8f18353167dcdab26a84e93408"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#0a8b9d031943a9805d86e8eb800ad6b8c8203b26"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#05de73e2f1adcd8f18353167dcdab26a84e93408"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#0a8b9d031943a9805d86e8eb800ad6b8c8203b26"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -162,7 +162,7 @@ dependencies = [
  "proc-macro2",
  "prost",
  "prost-derive",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tonic",
  "tonic-build",
 ]
@@ -746,7 +746,7 @@ dependencies = [
  "reqwest 0.11.0",
  "serde",
  "serde_json",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -1076,7 +1076,7 @@ dependencies = [
  "simple_logger",
  "smallvec",
  "sqlparser",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-stream",
  "tokio-util 0.6.2",
  "uuid",
@@ -1094,7 +1094,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#05de73e2f1adcd8f18353167dcdab26a84e93408"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#0a8b9d031943a9805d86e8eb800ad6b8c8203b26"
 dependencies = [
  "ahash 0.6.3",
  "arrow",
@@ -1117,7 +1117,7 @@ dependencies = [
  "serde_derive",
  "sha2 0.9.2",
  "sqlparser",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -1370,9 +1370,9 @@ dependencies = [
 
 [[package]]
 name = "flate2"
-version = "1.0.19"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7411863d55df97a419aa64cb4d2f167103ea9d767e2c54a1868b7ac3f6b47129"
+checksum = "cd3aec53de10fe96d7d8c565eb17f2c687bb5518a2ec453b5b1252964526abe0"
 dependencies = [
  "cfg-if 1.0.0",
  "crc32fast",
@@ -1704,7 +1704,7 @@ dependencies = [
  "http",
  "indexmap",
  "slab",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-util 0.6.2",
  "tracing",
  "tracing-futures",
@@ -1882,7 +1882,7 @@ dependencies = [
  "itoa",
  "pin-project 1.0.4",
  "socket2",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tower-service",
  "tracing",
  "want",
@@ -1898,7 +1898,7 @@ dependencies = [
  "hyper 0.14.2",
  "log",
  "rustls",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-rustls",
  "webpki",
 ]
@@ -1925,7 +1925,7 @@ dependencies = [
  "bytes 1.0.1",
  "hyper 0.14.2",
  "native-tls",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-native-tls",
 ]
 
@@ -2376,7 +2376,7 @@ dependencies = [
  "mysql_common",
  "nom",
  "time 0.2.7",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -2766,7 +2766,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#05de73e2f1adcd8f18353167dcdab26a84e93408"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#0a8b9d031943a9805d86e8eb800ad6b8c8203b26"
 dependencies = [
  "arrow",
  "base64 0.12.3",
@@ -3404,7 +3404,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded 0.7.0",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-native-tls",
  "tokio-rustls",
  "url",
@@ -4062,9 +4062,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8efab2086f17abcddb8f756117665c958feee6b2e39974c2f1600592ab3a4195"
+checksum = "6714d663090b6b0acb0fa85841c6d66233d150cdb2602c8f9b8abb03370beb3f"
 dependencies = [
  "autocfg 1.0.1",
  "bytes 1.0.1",
@@ -4109,7 +4109,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7d995660bd2b7f8c1568414c1126076c13fbb725c40112dc0120b78eb9b717b"
 dependencies = [
  "native-tls",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -4119,7 +4119,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc6844de72e57df1980054b38be3a9f4702aba4858be64dd700181a8a6d0e1b6"
 dependencies = [
  "rustls",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "webpki",
 ]
 
@@ -4131,7 +4131,7 @@ checksum = "76066865172052eb8796c686f0b441a93df8b08d40a950b062ffb9a426f00edd"
 dependencies = [
  "futures-core",
  "pin-project-lite 0.2.4",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -4184,7 +4184,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite 0.2.4",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-stream",
 ]
 
@@ -4217,7 +4217,7 @@ dependencies = [
  "pin-project 1.0.4",
  "prost",
  "prost-derive",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-stream",
  "tokio-util 0.6.2",
  "tower",
@@ -4250,7 +4250,7 @@ dependencies = [
  "pin-project 1.0.4",
  "rand 0.8.3",
  "slab",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-stream",
  "tower-layer",
  "tower-service",
