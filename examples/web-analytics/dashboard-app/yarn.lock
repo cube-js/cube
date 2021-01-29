@@ -1060,10 +1060,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.19.56":
-  version "0.19.56"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.56.tgz#4248fb05f7ef8c4623bc853829cce7859f2cc18a"
-  integrity sha512-8EFDgBrLt+ZD4MKNBafM5uyQ1mnL2Q2anzECLUu/FTG8hk1BWjujZ9Knwsm8DY2kLV5KQbyOFK+6JaLkjrTB7A==
+"@cubejs-client/core@^0.25.31":
+  version "0.25.31"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.25.31.tgz#a0e5d7284695572bdc4a2a46c8a78c1865607def"
+  integrity sha512-HcSizs/SgJClcY7bGtXoI2UE2cc80XrzL0W5juiEZLbY3o8CEL9JjmpvFgkHlWMZOhYCgT8IS9CPMMc0cZgXWw==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1074,12 +1074,13 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.19.56":
-  version "0.19.56"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.19.56.tgz#9c2dc24e6d6b68a9a41d1bbacb3a501061714cc1"
-  integrity sha512-orFjjfEMZN623ejoEfxyP6YSZicpi0t6mSx2Dj3Nj7A2Us1X3Vp6UED3X5Q4opy/XteCXcZu+skCo5dla9S7Lg==
+"@cubejs-client/react@^0.25.31":
+  version "0.25.31"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.25.31.tgz#b6159222aff8309cd2bf28f377227c24b0b63069"
+  integrity sha512-IbAY5i5glyomW1DtCmZmDHamA+29jddIMfp2XGDHP8EymELe0uT0YRUjzPbq/FJEQP4AN6H7FYB6RD/AuyGiqA==
   dependencies:
     "@babel/runtime" "^7.1.2"
+    "@cubejs-client/core" "^0.25.31"
     core-js "^3.6.5"
     ramda "^0.27.0"
 
@@ -3494,12 +3495,11 @@ create-react-class@^15.5.3:
     object-assign "^4.1.1"
 
 cross-fetch@^3.0.2:
-  version "3.0.4"
-  resolved "https://registry.yarnpkg.com/cross-fetch/-/cross-fetch-3.0.4.tgz#7bef7020207e684a7638ef5f2f698e24d9eb283c"
-  integrity sha512-MSHgpjQqgbT/94D4CyADeNoYh52zMkCX4pcJvPP5WqPsLFMKjr2TCMg381ox5qI0ii2dPwaLx/00477knXqXVw==
+  version "3.0.6"
+  resolved "https://registry.yarnpkg.com/cross-fetch/-/cross-fetch-3.0.6.tgz#3a4040bc8941e653e0e9cf17f29ebcd177d3365c"
+  integrity sha512-KBPUbqgFjzWlVcURG+Svp9TlhA5uliYtiNx/0r8nv0pdypeQCRJ9IaSIc3q/x3q8t3F75cHuwxVql1HFGHCNJQ==
   dependencies:
-    node-fetch "2.6.0"
-    whatwg-fetch "3.0.0"
+    node-fetch "2.6.1"
 
 cross-spawn@6.0.5, cross-spawn@^6.0.0, cross-spawn@^6.0.5:
   version "6.0.5"
@@ -7496,10 +7496,15 @@ moment-range@^4.0.1:
   dependencies:
     es6-symbol "^3.1.0"
 
-moment@2.x, moment@^2.22.2, moment@^2.24.0:
+moment@2.x, moment@^2.24.0:
   version "2.24.0"
   resolved "https://registry.yarnpkg.com/moment/-/moment-2.24.0.tgz#0d055d53f5052aa653c9f6eb68bb5d12bf5c2b5b"
   integrity sha512-bV7f+6l2QigeBBZSM/6yTNq4P2fNpSWj/0e7jQcy87A8e7o2nAfP/34/2ky5Vw4B9S446EtIhodAzkFCcR4dQg==
+
+moment@^2.22.2:
+  version "2.29.1"
+  resolved "https://registry.yarnpkg.com/moment/-/moment-2.29.1.tgz#b2be769fa31940be9eeea6469c075e35006fa3d3"
+  integrity sha512-kHmoybcPV8Sqy59DwNDY3Jefr64lK/by/da0ViFcuA4DH0vQg5Q6Ze5VimxkfQNSC+Mls/Kx53s7TjP1RhFEDQ==
 
 move-concurrently@^1.0.1:
   version "1.0.1"
@@ -7619,10 +7624,10 @@ no-case@^2.2.0:
   dependencies:
     lower-case "^1.1.1"
 
-node-fetch@2.6.0:
-  version "2.6.0"
-  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.0.tgz#e633456386d4aa55863f676a7ab0daa8fdecb0fd"
-  integrity sha512-8dG4H5ujfvFiqDmVu9fQ5bOHUC15JMjMY/Zumv26oOvvVJjM67KF8koCWIabKQ1GJIa9r2mMZscBq/TbdOcmNA==
+node-fetch@2.6.1:
+  version "2.6.1"
+  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.1.tgz#045bd323631f76ed2e2b55573394416b639a0052"
+  integrity sha512-V4aYg89jEoVRxRb2fJdAg8FHvI7cEyYdVAh94HH0UIK8oJxUfkjlDQN9RbMx+bEjP7+ggMiFRprSti032Oipxw==
 
 node-fetch@^1.0.1:
   version "1.7.3"
@@ -12012,7 +12017,7 @@ whatwg-encoding@^1.0.1, whatwg-encoding@^1.0.3, whatwg-encoding@^1.0.5:
   dependencies:
     iconv-lite "0.4.24"
 
-whatwg-fetch@3.0.0, whatwg-fetch@>=0.10.0, whatwg-fetch@^3.0.0:
+whatwg-fetch@>=0.10.0, whatwg-fetch@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/whatwg-fetch/-/whatwg-fetch-3.0.0.tgz#fc804e458cc460009b1a2b966bc8817d2578aefb"
   integrity sha512-9GSJUgz1D4MfyKU7KRqwOjXCXTqWdFNvEr7eUBYchQiVc744mqK/MzXPNR2WsPkmkOa4ywfg8C2n8h+13Bey1Q==
