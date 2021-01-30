@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.33](https://github.com/cube-js/cube.js/compare/v0.25.32...v0.25.33) (2021-01-30)
+
+
+### Features
+
+* Warning on unconfigured scheduledRefreshContexts in multitenancy mode, fix [#1904](https://github.com/cube-js/cube.js/issues/1904) ([cf1984b](https://github.com/cube-js/cube.js/commit/cf1984b754d804383a72733d895bbb3a42544f2a))
+
+
+
+
+
 ## [0.25.32](https://github.com/cube-js/cube.js/compare/v0.25.31...v0.25.32) (2021-01-29)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
