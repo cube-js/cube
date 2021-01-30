@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.33](https://github.com/cube-js/cube.js/compare/v0.25.32...v0.25.33) (2021-01-30)
+
+
+### Bug Fixes
+
+* **cubestore:** min/max statistics on parquet writes ([#1925](https://github.com/cube-js/cube.js/issues/1925)) ([c7b5bbf](https://github.com/cube-js/cube.js/commit/c7b5bbf5add13eeb67e63dc76d0fe30304f54ab0))
+* Use local dates for pre-aggregations to avoid timezone shift discrepancies on DST timezones for timezone unaware databases like MySQL ([#1941](https://github.com/cube-js/cube.js/issues/1941)) ([f138e6f](https://github.com/cube-js/cube.js/commit/f138e6fa3d97492c34527d0f04917e78c374eb57))
+* **cubestore:** Correct `convert_tz` implementation ([f06d91e](https://github.com/cube-js/cube.js/commit/f06d91ed43d3b9d2a9398c03e30f2a86d70b64f6))
+* **cubestore:** Correct `convert_tz` implementation: correct sign ([999e00a](https://github.com/cube-js/cube.js/commit/999e00a96e61b9420adcd04e94b329b93a8a03bb))
+* **schema-compiler:** Wrong dayOffset in refreshKey for not UTC computers ([#1938](https://github.com/cube-js/cube.js/issues/1938)) ([5fe3431](https://github.com/cube-js/cube.js/commit/5fe3431a8f7320555fc3dba101c72547a0f41dac))
+
+
+### Features
+
+* Warning on unconfigured scheduledRefreshContexts in multitenancy mode, fix [#1904](https://github.com/cube-js/cube.js/issues/1904) ([cf1984b](https://github.com/cube-js/cube.js/commit/cf1984b754d804383a72733d895bbb3a42544f2a))
+
+
+
+
+
+## [0.25.32](https://github.com/cube-js/cube.js/compare/v0.25.31...v0.25.32) (2021-01-29)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** base64 file upload ([#1915](https://github.com/cube-js/cube.js/issues/1915)) ([8ba70fd](https://github.com/cube-js/cube.js/commit/8ba70fdd1d3aa8907cb3dd4e0f4bce34ac4e6e70))
+* **cubestore:** Revert back naive in list OR implementation ([99e9ca2](https://github.com/cube-js/cube.js/commit/99e9ca293555911497a9d8d45d05255e845b47c8))
+* **shared:** Value True is not valid for CUBEJS_SCHEDULED_REFRESH_TIMER ([99a5759](https://github.com/cube-js/cube.js/commit/99a5759e619824666b48c589a5c98c82c1817025))
+
+
+### Features
+
+* **cubestore:** Rebase to datafusion 2021-01-27 version ([#1930](https://github.com/cube-js/cube.js/issues/1930)) ([309ce8e](https://github.com/cube-js/cube.js/commit/309ce8edee0cc49f1e4dc0536f0ef593ceaa428f))
+
+
+
+
+
 ## [0.25.31](https://github.com/cube-js/cube.js/compare/v0.25.30...v0.25.31) (2021-01-28)
 
 

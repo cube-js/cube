@@ -69,9 +69,10 @@ type RequireOne<T, K extends keyof T> = {
 export type ServerCoreInitializedOptions = RequireOne<
   CreateOptions,
   // This fields are required, because we add default values in constructor
-  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'dashboardAppPath' | 'dashboardAppPort' |
+  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'logger' | 'dashboardAppPath' | 'dashboardAppPort' |
   'driverFactory' | 'dialectFactory' |
-  'externalDriverFactory' | 'externalDialectFactory'
+  'externalDriverFactory' | 'externalDialectFactory' |
+  'scheduledRefreshContexts'
 >;
 
 function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
@@ -130,98 +131,56 @@ export class CubejsServerCore {
   public coreServerVersion: string|null = null;
 
   public constructor(opts: CreateOptions = {}) {
-    optionsValidate(opts);
-
-    const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
-    const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
-    const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
-
-    const options: ServerCoreInitializedOptions = {
-      dbType,
-      externalDbType,
-      devServer,
-      driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
-      dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
-        CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
-      externalDriverFactory: externalDbType && (
-        () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
-          host: process.env.CUBEJS_EXT_DB_HOST,
-          database: process.env.CUBEJS_EXT_DB_NAME,
-          port: process.env.CUBEJS_EXT_DB_PORT,
-          user: process.env.CUBEJS_EXT_DB_USER,
-          password: process.env.CUBEJS_EXT_DB_PASS,
-        })
-      ),
-      externalDialectFactory: () => typeof externalDbType === 'string' &&
-        CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
-        CubejsServerCore.lookupDriverClass(externalDbType).dialectClass(),
-      apiSecret: process.env.CUBEJS_API_SECRET,
-      telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
-      scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
-        process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
-      scheduledRefreshContexts: async () => [null],
-      basePath: '/cubejs-api',
-      dashboardAppPath: 'dashboard-app',
-      dashboardAppPort: 3000,
-      scheduledRefreshConcurrency: parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
-      preAggregationsSchema: getEnv('preAggregationsSchema') || (
-        devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
-      ),
-      schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
-      ...opts,
-    };
-    this.options = options;
+    this.options = this.handleConfiguration(opts);
 
     if (
       !this.options.devServer || (this.options.devServer && this.configFileExists())
     ) {
       if (
-        !options.driverFactory ||
-        !options.apiSecret ||
-        !options.dbType
+        !this.options.driverFactory ||
+        !this.options.apiSecret ||
+        !this.options.dbType
       ) {
         throw new Error('driverFactory, apiSecret, dbType are required options');
       }
     }
 
-    this.logger = options.logger || (
-      process.env.NODE_ENV !== 'production'
-        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
-    );
+    this.logger = this.options.logger;
+    this.repository = new FileRepository(this.options.schemaPath);
+    this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
-    this.repository = new FileRepository(options.schemaPath);
-    this.repositoryFactory = options.repositoryFactory || (() => this.repository);
-
-    this.contextToDbType = wrapToFnIfNeeded(options.dbType);
-    this.contextToExternalDbType = wrapToFnIfNeeded(options.externalDbType);
-    this.preAggregationsSchema = wrapToFnIfNeeded(options.preAggregationsSchema);
-    this.orchestratorOptions = wrapToFnIfNeeded(options.orchestratorOptions);
+    this.contextToDbType = wrapToFnIfNeeded(this.options.dbType);
+    this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
+    this.preAggregationsSchema = wrapToFnIfNeeded(this.options.preAggregationsSchema);
+    this.orchestratorOptions = wrapToFnIfNeeded(this.options.orchestratorOptions);
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
-      max: options.compilerCacheSize || 250,
-      maxAge: options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+      max: this.options.compilerCacheSize || 250,
+      maxAge: this.options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: this.options.updateCompilerCacheKeepAlive
     });
 
     if (this.options.contextToAppId) {
-      this.contextToAppId = options.contextToAppId;
+      this.contextToAppId = this.options.contextToAppId;
       this.standalone = false;
     }
 
-    if (options.contextToDataSourceId) {
+    if (this.options.contextToDataSourceId) {
       throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
     }
 
-    this.contextToOrchestratorId = options.contextToOrchestratorId || this.contextToAppId;
+    this.contextToOrchestratorId = this.options.contextToOrchestratorId || this.contextToAppId;
 
     // proactively free up old cache values occasionally
-    if (options.maxCompilerCacheKeepAlive) {
-      this.maxCompilerCacheKeep = setInterval(() => this.compilerCache.prune(), options.maxCompilerCacheKeepAlive);
+    if (this.options.maxCompilerCacheKeepAlive) {
+      this.maxCompilerCacheKeep = setInterval(
+        () => this.compilerCache.prune(),
+        this.options.maxCompilerCacheKeepAlive
+      );
     }
 
     const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
-      options.scheduledRefreshTimer || getEnv('refreshTimer') || getEnv('scheduledRefresh')
+      this.options.scheduledRefreshTimer || getEnv('refreshTimer') || getEnv('scheduledRefresh')
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
@@ -239,7 +198,7 @@ export class CubejsServerCore {
     }
 
     this.event = async (name, props) => {
-      if (!options.telemetry) {
+      if (!this.options.telemetry) {
         return;
       }
 
@@ -324,6 +283,64 @@ export class CubejsServerCore {
 
       this.event('Server Start');
     }
+  }
+
+  protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
+    optionsValidate(opts);
+
+    const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
+    const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
+
+    const options: ServerCoreInitializedOptions = {
+      dbType,
+      externalDbType,
+      devServer,
+      driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
+      dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
+      externalDriverFactory: externalDbType && (
+        () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
+          host: process.env.CUBEJS_EXT_DB_HOST,
+          database: process.env.CUBEJS_EXT_DB_NAME,
+          port: process.env.CUBEJS_EXT_DB_PORT,
+          user: process.env.CUBEJS_EXT_DB_USER,
+          password: process.env.CUBEJS_EXT_DB_PASS,
+        })
+      ),
+      externalDialectFactory: () => typeof externalDbType === 'string' &&
+        CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(externalDbType).dialectClass(),
+      apiSecret: process.env.CUBEJS_API_SECRET,
+      telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
+      scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
+        process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
+      scheduledRefreshContexts: async () => [null],
+      basePath: '/cubejs-api',
+      dashboardAppPath: 'dashboard-app',
+      dashboardAppPort: 3000,
+      scheduledRefreshConcurrency: parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
+      preAggregationsSchema: getEnv('preAggregationsSchema') || (
+        devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
+      ),
+      schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
+      logger: opts.logger || process.env.NODE_ENV !== 'production'
+        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
+        : prodLogger(process.env.CUBEJS_LOG_LEVEL),
+      ...opts,
+    };
+
+    if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
+      options.logger('Multitenancy Without ScheduledRefreshContexts', {
+        warning: (
+          'You are using multitenancy without configuring scheduledRefreshContexts, which can lead to issues where the ' +
+          'security context will be undefined while Cube.js will do background refreshing: ' +
+          'https://cube.dev/docs/config#options-reference-scheduled-refresh-contexts'
+        ),
+      });
+    }
+
+    return options;
   }
 
   public configFileExists(): boolean {

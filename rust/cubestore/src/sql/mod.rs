@@ -1564,6 +1564,23 @@ mod tests {
                 &expected
             );
 
+            let result = service.exec_query(
+                "SELECT city, name, sum(amount) FROM foo.orders o \
+                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
+                LEFT JOIN foo.products p ON orders_product_id = product_id \
+                WHERE customer_id = 'b' AND product_id IN ('2')
+                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
+            ).await.unwrap();
+
+            let expected = vec![
+                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)]),
+            ];
+
+            assert_eq!(
+                result.get_rows(),
+                &expected
+            );
+
         }).await;
     }
 
@@ -1971,6 +1988,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn convert_tz() {
+        Config::run_test("convert_tz", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+                .await
+                .unwrap();
+
+            service
+                .exec_query(
+                    "INSERT INTO foo.timestamps (t, amount) VALUES \
+                ('2020-01-01T00:00:00.000Z', 1), \
+                ('2020-01-01T00:01:00.000Z', 2), \
+                ('2020-01-02T00:10:00.000Z', 3)",
+                )
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query(
+                    "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
+                FROM foo.timestamps `timestamp` \
+                WHERE `t` >= convert_tz(to_timestamp('2020-01-02T08:00:00.000Z'), '-08:00') GROUP BY 1",
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows(),
+                &vec![Row::new(vec![
+                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                    TableValue::Int(3)
+                ])]
+            );
+        })
+            .await;
+    }
+
+    #[tokio::test]
     async fn create_schema_if_not_exists() {
         Config::run_test("create_schema_if_not_exists", async move |services| {
             let service = services.sql_service;
@@ -2319,15 +2378,18 @@ mod tests {
             let p_4 = partitions.iter().find(|r| r.get_id() == 8).unwrap();
             let new_partitions = vec![p_1, p_2, p_3, p_4];
             println!("{:?}", new_partitions);
-            let intervals_set = new_partitions.into_iter()
+            let mut intervals_set = new_partitions.into_iter()
                 .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
                 .collect::<Vec<_>>();
-            assert_eq!(intervals_set, vec![
+            intervals_set.sort_by(|(min_a, _), (min_b, _)| min_a.as_ref().map(|a| a.sort_key(1)).cmp(&min_b.as_ref().map(|a| a.sort_key(1))));
+            let mut expected = vec![
                 (None, Some(Row::new(vec![TableValue::Int(2)]))),
                 (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
                 (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
                 (Some(Row::new(vec![TableValue::Int(27)])), None),
-            ].into_iter().collect::<Vec<_>>());
+            ].into_iter().collect::<Vec<_>>();
+            expected.sort_by(|(min_a, _), (min_b, _)| min_a.as_ref().map(|a| a.sort_key(1)).cmp(&min_b.as_ref().map(|a| a.sort_key(1))));
+            assert_eq!(intervals_set, expected);
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
 

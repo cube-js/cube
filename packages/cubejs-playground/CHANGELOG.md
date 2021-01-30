@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.25.32](https://github.com/cube-js/cube.js/compare/v0.25.31...v0.25.32) (2021-01-29)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** base64 file upload ([#1915](https://github.com/cube-js/cube.js/issues/1915)) ([8ba70fd](https://github.com/cube-js/cube.js/commit/8ba70fdd1d3aa8907cb3dd4e0f4bce34ac4e6e70))
+
+
+
+
+
 ## [0.25.31](https://github.com/cube-js/cube.js/compare/v0.25.30...v0.25.31) (2021-01-28)
 
 **Note:** Version bump only for package @cubejs-client/playground

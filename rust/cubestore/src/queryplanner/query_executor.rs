@@ -440,6 +440,7 @@ impl CubeTable {
                 let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path(
                     &local_path,
                     mapped_projection.clone(),
+                    None, // TODO
                     batch_size,
                     1,
                 )?);
@@ -456,6 +457,7 @@ impl CubeTable {
                 let node = Arc::new(ParquetExec::try_from_path(
                     local_path,
                     mapped_projection.clone(),
+                    None, // TODO
                     batch_size,
                     1,
                 )?);
