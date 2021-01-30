@@ -659,8 +659,8 @@ export class PreAggregations {
         .concat(this.query.filters).concat(this.query.timeDimensions.map(dimension => dimension.dateRange && ({
           filterToWhere: () => this.query.timeRangeFilter(
             this.query.dimensionSql(dimension),
-            this.query.timeStampInClientTz(dimension.dateFromParam()),
-            this.query.timeStampInClientTz(dimension.dateToParam())
+            dimension.localDateTimeFromParam(),
+            dimension.localDateTimeToParam()
           )
         }))).filter(f => !!f);
 
