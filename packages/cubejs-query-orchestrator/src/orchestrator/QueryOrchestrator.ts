@@ -37,7 +37,7 @@ export class QueryOrchestrator {
 
     const cacheAndQueueDriver = options.cacheAndQueueDriver || config.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
       config.NODE_ENV === 'production' || config.REDIS_URL ||
-        (config.FLAG_ENABLE_REDIS_SENTINEL && config.REDIS_SENTINEL) ? 'redis' : 'memory'
+        (config.CUBEJS_REDIS_USE_IOREDIS && config.CUBEJS_REDIS_SENTINEL) ? 'redis' : 'memory'
     );
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {

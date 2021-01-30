@@ -3,13 +3,13 @@ import Redis, { Redis as redis, RedisOptions, Pipeline } from 'ioredis';
 import config from '../config';
 
 function debugLog(msg) {
-  if (config.FLAG_ENABLE_REDIS_SENTINEL_DEBUG) {
+  if (config.CUBEJS_REDIS_USE_IOREDIS_DEBUG) {
     console.debug(msg);
   }
 }
 
 async function createIORedisClient(url: string, opts: RedisOptions) {
-  const [host, portStr] = (config.REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
+  const [host, portStr] = (config.CUBEJS_REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
   const port = portStr ? Number(portStr) : 6379;
 
   const options: RedisOptions = {
@@ -18,7 +18,7 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     lazyConnect: true
   };
 
-  if (config.REDIS_SENTINEL) {
+  if (config.CUBEJS_REDIS_SENTINEL) {
     options.sentinels = [{ host, port }];
     options.name = 'mymaster';
     options.enableOfflineQueue = false;
@@ -27,7 +27,7 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     options.port = port;
   }
 
-  if (config.REDIS_TLS) {
+  if (config.CUBEJS_REDIS_TLS) {
     options.tls = {};
   }
 

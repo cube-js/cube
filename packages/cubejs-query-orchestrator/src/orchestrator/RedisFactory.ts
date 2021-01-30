@@ -40,7 +40,7 @@ export function createRedisClient(url: string, opts: ClientOpts = {}) {
     url,
   };
 
-  if (config.REDIS_TLS) {
+  if (config.CUBEJS_REDIS_TLS) {
     options.tls = {};
   }
 

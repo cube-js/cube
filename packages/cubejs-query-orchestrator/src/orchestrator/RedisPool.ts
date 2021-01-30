@@ -7,7 +7,7 @@ import { createRedisSentinelClient } from './RedisSentinelFactory';
 import config from '../config';
 
 function createRedisClient(url: string, opts: RedisClientOptions = {}) {
-  if (config.FLAG_ENABLE_REDIS_SENTINEL) {
+  if (config.CUBEJS_REDIS_USE_IOREDIS) {
     return createRedisSentinelClient(url, opts);
   }
 
