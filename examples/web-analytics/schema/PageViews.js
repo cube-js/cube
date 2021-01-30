@@ -89,7 +89,7 @@ cube(`PageViews`, {
       ],
       granularity: `hour`,
       refreshKey: {
-        every: `4 hour`,
+        every: `1 day`,
         incremental: true,
         updateWindow: `1 day`
       },
