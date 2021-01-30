@@ -53,10 +53,6 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     debugLog('Redis connection ended');
   });
 
-  client.on('error', (e) => {
-    console.error('Redis connection failed: ', e);
-  });
-
   client.on('reconnecting', (times) => {
     console.warn('Redis connection is being reconnected, attempt no: ', times);
   });
