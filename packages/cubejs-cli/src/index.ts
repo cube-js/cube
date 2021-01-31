@@ -8,7 +8,7 @@ const semver = currentNodeVersion.split('.');
 const major = parseInt(<string> semver[0], 10);
 const minor = parseInt(<string> semver[1], 10);
 
-if (major < 10 || major === 10 && minor < 8) {
+if (major < 10 || (major === 10 && minor < 8)) {
   console.error(
     chalk.red(
       `You are running Node.js ${currentNodeVersion}.\n` +
@@ -17,6 +17,15 @@ if (major < 10 || major === 10 && minor < 8) {
     )
   );
   process.exit(1);
+}
+
+if (major === 10) {
+  process.emitWarning(
+    chalk.red(
+      `You are running Node.js ${currentNodeVersion}.\n` +
+      'Support for Node.js 10 will be removed soon. Please upgrade to Node.js 12 or higher.'
+    )
+  );
 }
 
 require('./cli');
