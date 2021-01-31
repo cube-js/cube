@@ -113,7 +113,7 @@ export class BaseDriver {
         {}
       );
 
-      ssl.rejectUnauthorized = config.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
+      ssl.rejectUnauthorized = config.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED;
     }
 
     return ssl;

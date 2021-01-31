@@ -27,7 +27,7 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     options.port = port;
   }
 
-  if (config.CUBEJS_REDIS_TLS) {
+  if (config.REDIS_TLS) {
     options.tls = {};
   }
 
