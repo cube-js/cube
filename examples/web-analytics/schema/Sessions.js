@@ -1,7 +1,7 @@
 cube(`Sessions`, {
 //  sqlAlias: `ss`,
   refreshKey: {
-    every: `4 hour`
+    every: `1 day`
   },
 
   sql: `
@@ -224,7 +224,7 @@ cube(`Sessions`, {
       timeDimensionReference: sessionStart,
       granularity: `hour`,
       refreshKey: {
-        every: `4 hour`,
+        every: `1 day`,
         incremental: true,
         updateWindow: `1 day`
       },
