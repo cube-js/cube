@@ -373,7 +373,7 @@ All time-based calculations performed within Cube.js are timezone-aware. Using t
 ```javascript
 module.exports = {
   // You can define one or multiple timezones based on your requirements
-  scheduledRefreshTimer: [
+  scheduledRefreshTimeZones: [
     'America/Vancouver',
     'America/Toronto'
   ],
