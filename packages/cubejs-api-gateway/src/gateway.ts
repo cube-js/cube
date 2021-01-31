@@ -759,7 +759,7 @@ export class ApiGateway {
         if (!warningShowed) {
           this.logger('AuthInfo Deprecation', {
             warning: (
-              'Recently authInfo was renamed to securityContext, please migrate: ' +
+              'authInfo was renamed to securityContext, please migrate: ' +
               'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
             )
           });

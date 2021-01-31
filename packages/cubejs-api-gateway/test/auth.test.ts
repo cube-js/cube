@@ -139,7 +139,7 @@ describe('test authorization', () => {
     expect(loggerMock.mock.calls[0]).toEqual([
       'AuthInfo Deprecation',
       {
-        warning: 'Recently authInfo was renamed to securityContext, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware',
+        warning: 'authInfo was renamed to securityContext, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware',
       }
     ]);
 
