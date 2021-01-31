@@ -34,6 +34,10 @@ options][link-config].
 | `REDIS_TLS`                          | If `true`, then the connection to the Redis server is protected by TLS authentication. Defaults to `false`                                                                                         | `true`, `false`                                           |
 | `CUBEJS_REDIS_POOL_MAX`              | The maximum number of connections to keep active in the Redis connection pool. Must be higher than `CUBEJS_REDIS_POOL_MIN`. Defaults to `1000`                                                     | A valid number of connections.                            |
 | `CUBEJS_REDIS_POOL_MIN`              | The minimum number of connections to keep active in the Redis connection pool. Must be lower than `CUBEJS_REDIS_POOL_MAX`. Defaults to `2`                                                         | A valid number of connections                             |
+| `CUBEJS_REDIS_IDLE_TIMEOUT_SECONDS`  | The minimum amount of time that an object may sit idle in the pool before it is eligible for eviction due to idle time. Defaults to `5` seconds                                                         | Number of seconds                             |
+| `CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS` | Amount of time in seconds an object may sit idle in the pool before it is eligible for eviction. Default to `-1` (nothing gets evicted)                                                         | Number of seconds                             |
+| `CUBEJS_REDIS_USE_IOREDIS`           | Makes the redis connection use ioredis instead of redis npm package. This flag must be true in order for connections to Redis Sentinel to work. Defaults to `false`                                                         | `true`, `false`                             |
+| `CUBEJS_REDIS_SENTINEL`              | The host URL for a Redis Sentinel server                                                         | A valid Redis host. May include port                             |
 
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 

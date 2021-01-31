@@ -39,6 +39,12 @@ password, please set it via the `REDIS_PASSWORD` environment variable. Set the
 connections. Ensure your Redis cluster allows at least 15 concurrent
 connections.
 
+### Redis Sentinel
+
+Redis Sentinel support via ioredis was recently added. In order to activate this
+feature, set the `CUBEJS_REDIS_USE_IOREDIS` environment variable to `true` and
+then set `CUBEJS_REDIS_SENTINEL` to allow Cube.js to connect to Redis Sentinel.
+
 <!-- prettier-ignore-start -->
 [[warning | Note]]
 | Cube.js server instances used by same tenant environments should have same
