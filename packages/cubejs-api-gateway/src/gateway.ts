@@ -336,7 +336,7 @@ export class ApiGateway {
     }
   }
 
-  protected async getNormalizedQueries(query, context): Promise<any> {
+  protected async getNormalizedQueries(query, context: RequestContext): Promise<any> {
     query = this.parseQueryParam(query);
     let queryType = QUERY_TYPE.REGULAR_QUERY;
 
@@ -745,12 +745,12 @@ export class ApiGateway {
     };
   }
 
-  protected wrapCheckAuth(fn: (req: Request, auth?: string) => void) {
+  protected wrapCheckAuth(fn: CheckAuthFn): CheckAuthFn {
     // We dont need to span all logs with deprecation message
     let warningShowed = false;
 
-    return (req: Request, auth?: string) => {
-      fn(req, auth);
+    return async (req, auth) => {
+      await fn(req, auth);
 
       // We renamed authInfo to securityContext, but users can continue to use both ways
       if (req.securityContext && !req.authInfo) {

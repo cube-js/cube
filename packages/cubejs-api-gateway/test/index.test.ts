@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-shadow */
 import express from 'express';
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 
-import { ApiGateway } from '../src';
+import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
 
 export const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
@@ -114,6 +115,7 @@ async function requestBothGetAndPost(app, { url, query, body }, assert) {
 function createApiGateway(
   adapterApi: any = new AdapterApiMock(),
   dataSourceStorage: any = new DataSourceStorageMock(),
+  options: Partial<ApiGatewayOptions> = {}
 ) {
   process.env.NODE_ENV = 'production';
 
@@ -122,6 +124,7 @@ function createApiGateway(
     dataSourceStorage,
     basePath: '/cubejs-api',
     refreshScheduler: {},
+    ...options,
   });
 
   process.env.NODE_ENV = 'unknown';
@@ -187,6 +190,91 @@ describe('API Gateway', () => {
     expect(res.body && res.body.error).toStrictEqual(
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
     );
+  });
+
+  test('query transform with checkAuth', async () => {
+    const queryTransformer = jest.fn(async (query: Query, context) => {
+      expect(context.securityContext).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      expect(context.authInfo).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      return query;
+    });
+
+    const { app } = createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            req.authInfo = jwt.verify(authorization, 'secret');
+          }
+        },
+        queryTransformer
+      }
+    );
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
+      )
+      // console.log(generateAuthToken({ uid: 5, }));
+      .set('Authorization', 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(200);
+
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+
+    expect(queryTransformer.mock.calls.length).toEqual(1);
+  });
+
+  test('query transform with checkAuth (return securityContext as string)', async () => {
+    const queryTransformer = jest.fn(async (query: Query, context) => {
+      expect(context.securityContext).toEqual(
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g'
+      );
+
+      expect(context.authInfo).toEqual(
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g'
+      );
+
+      return query;
+    });
+
+    const { app } = createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, 'secret');
+            req.authInfo = authorization;
+          }
+        },
+        queryTransformer
+      }
+    );
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
+      )
+      // console.log(generateAuthToken({ uid: 5, }));
+      .set('Authorization', 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(200);
+
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+
+    expect(queryTransformer.mock.calls.length).toEqual(1);
   });
 
   test('null filter values', async () => {
