@@ -39,6 +39,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.0",
+    "@cubejs-backend/shared": "^0.26.0",
     "@types/express": "^4.17.9",
     "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^26.0.20",
