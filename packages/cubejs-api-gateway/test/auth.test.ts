@@ -105,7 +105,7 @@ describe('test authorization', () => {
       res.status(200).end();
     });
 
-    const { apiGateway, app } = createApiGateway(handlerMock, loggerMock, {});
+    const { app } = createApiGateway(handlerMock, loggerMock, {});
 
     await request(app)
       .get('/test-auth-fake')
@@ -115,14 +115,6 @@ describe('test authorization', () => {
 
     expect(loggerMock.mock.calls.length).toEqual(0);
     expect(handlerMock.mock.calls.length).toEqual(1);
-
-    const args: any = handlerMock.mock.calls[0];
-
-    expect(apiGateway.coerceForSqlQuery({ timeDimensions: [] }, args[0]).contextSymbols.securityContext).toEqual({
-      exp: 2475858836,
-      iat: 1611858836,
-      uid: 5,
-    });
   });
 
   test('custom checkAuth with async flow', async () => {
@@ -217,6 +209,50 @@ describe('test authorization', () => {
     expect(handlerMock.mock.calls[0][0].context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
   });
 
+  test('custom checkAuth with securityContext (not object)', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const EXPECTED_SECURITY_CONTEXT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g';
+
+    const handlerMock = jest.fn((req, res) => {
+      expect(req.context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
+      expect(req.context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
+
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      checkAuth: (req: Request, auth?: string) => {
+        if (auth) {
+          // It must be object, but some users are using string for securityContext
+          req.securityContext = auth;
+        }
+      }
+    });
+
+    await request(app)
+      .get('/test-auth-fake')
+      // console.log(generateAuthToken({ uid: 5, }));
+      .set('Authorization', 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(200);
+
+    expect(loggerMock.mock.calls.length).toEqual(1);
+    expect(loggerMock.mock.calls[0]).toEqual([
+      'Security Context Should Be Object',
+      {
+        warning: 'Value of securityContext (previously authInfo) expected to be object, actual: string',
+      }
+    ]);
+
+    expect(handlerMock.mock.calls.length).toEqual(1);
+
+    expect(handlerMock.mock.calls[0][0].context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
+    // authInfo was deprecated, but should exists as computability
+    expect(handlerMock.mock.calls[0][0].context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
+  });
+
   test('custom checkAuthMiddleware with deprecated authInfo', async () => {
     const loggerMock = jest.fn(() => {
       //
@@ -258,11 +294,113 @@ describe('test authorization', () => {
         warning: 'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware',
       }
     ]);
-
     expect(handlerMock.mock.calls.length).toEqual(1);
 
     expect(handlerMock.mock.calls[0][0].context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
     // authInfo was deprecated, but should exists as computability
     expect(handlerMock.mock.calls[0][0].context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
+  });
+
+  test('custom checkAuthMiddleware with securityInfo (not object)', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const EXPECTED_SECURITY_CONTEXT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g';
+
+    const handlerMock = jest.fn((req, res) => {
+      expect(req.context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
+      expect(req.context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
+
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      checkAuthMiddleware: (req: Request, res, next) => {
+        if (req.headers.authorization) {
+          // It must be object, but some users are using string for securityContext
+          req.authInfo = req.headers.authorization;
+        }
+
+        if (next) {
+          next();
+        }
+      }
+    });
+
+    await request(app)
+      .get('/test-auth-fake')
+      // console.log(generateAuthToken({ uid: 5, }));
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(200);
+
+    expect(loggerMock.mock.calls.length).toEqual(2);
+    expect(loggerMock.mock.calls[0]).toEqual([
+      'CheckAuthMiddleware Middleware Deprecation',
+      {
+        warning: 'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware',
+      }
+    ]);
+    expect(loggerMock.mock.calls[1]).toEqual([
+      'Security Context Should Be Object',
+      {
+        warning: 'Value of securityContext (previously authInfo) expected to be object, actual: string',
+      }
+    ]);
+
+    expect(handlerMock.mock.calls.length).toEqual(1);
+    expect(handlerMock.mock.calls[0][0].context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
+    // authInfo was deprecated, but should exists as computability
+    expect(handlerMock.mock.calls[0][0].context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
+  });
+
+  test('coerceForSqlQuery multiple', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const handlerMock = jest.fn();
+
+    const { apiGateway } = createApiGateway(handlerMock, loggerMock, {});
+
+    // handle null
+    expect(
+      apiGateway.coerceForSqlQuery(
+        { timeDimensions: [] },
+        { securityContext: null, requestId: 'XXX' }
+      ).contextSymbols.securityContext
+    ).toEqual({});
+    // no warnings, done on checkAuth/checkAuthMiddleware level
+    expect(loggerMock.mock.calls.length).toEqual(0);
+
+    // handle string
+    expect(
+      apiGateway.coerceForSqlQuery(
+        { timeDimensions: [] },
+        { securityContext: 'AAABBBCCC', requestId: 'XXX' }
+      ).contextSymbols.securityContext
+    ).toEqual({});
+    // no warnings, done on checkAuth/checkAuthMiddleware level
+    expect(loggerMock.mock.calls.length).toEqual(0);
+
+    // (move u to root)
+    expect(
+      apiGateway.coerceForSqlQuery(
+        { timeDimensions: [] },
+        { securityContext: { exp: 2475858836, iat: 1611858836, u: { uid: 5 } }, requestId: 'XXX' }
+      ).contextSymbols.securityContext
+    ).toEqual({
+      exp: 2475858836,
+      iat: 1611858836,
+      uid: 5,
+    });
+
+    expect(loggerMock.mock.calls.length).toEqual(1);
+    expect(loggerMock.mock.calls[0]).toEqual([
+      'JWT U Property Deprecation',
+      {
+        warning: 'Storing security context in the u property within the payload is now deprecated, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#authinfo',
+      }
+    ]);
   });
 });
