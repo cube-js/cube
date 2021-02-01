@@ -71,22 +71,9 @@
               </v-col>
 
               <v-col cols="12" md="2">
-                <v-select
-                  label="Time Dimensions"
-                  outlined
-                  hide-details
-                  :value="timeDimensions[0] && timeDimensions[0].dimension.name"
-                  :items="availableTimeDimensions.map((i) => i.name)"
-                  clearable
-                  @change="
-                    (value) =>
-                      handleTimeChange({
-                        value,
-                        availableTimeDimensions,
-                        timeDimensions,
-                        setTimeDimensions,
-                      })
-                  "
+                <TimeDimensionSelect :availableTimeDimensions="availableTimeDimensions"
+                                     :timeDimensions="timeDimensions"
+                                     @change="setTimeDimensions"
                 />
               </v-col>
 
@@ -104,22 +91,8 @@
               </v-col>
 
               <v-col cols="12" md="2">
-                <v-select
-                  label="Date Range"
-                  outlined
-                  hide-details
-                  clearable
-                  :value="timeDimensions[0] && timeDimensions[0].dateRange"
-                  :items="dateRangeItems"
-                  @change="
-                    setTimeDimensions([
-                      {
-                        dimension: timeDimensions[0].dimension.name,
-                        granularity: timeDimensions[0].granularity,
-                        dateRange: $event,
-                      },
-                    ])
-                  "
+                <DateRangeSelect :timeDimensions="timeDimensions"
+                                 @change="setTimeDimensions"
                 />
               </v-col>
             </v-row>
@@ -198,6 +171,8 @@ import PivotConfig from './components/dialogs/PivotConfig';
 import Order from './components/dialogs/Order';
 import Limit from './components/dialogs/Limit';
 import AddToDashboard from './components/dialogs/AddToDashboard';
+import TimeDimensionSelect from './components/TimeDimensionSelect';
+import DateRangeSelect from './components/DateRangeSelect'
 
 const API_URL = 'https://ecom.cubecloudapp.dev';
 const CUBEJS_TOKEN =
@@ -224,6 +199,8 @@ export default {
     FilterComponent,
     Table,
     AddToDashboard,
+    TimeDimensionSelect,
+    DateRangeSelect
   },
   data() {
     let query = {};
@@ -251,16 +228,6 @@ export default {
       },
       cubejsApi,
       query,
-      dateRangeItems: [
-        'Today',
-        'Yesterday',
-        'This week',
-        'This month',
-        'This quarter',
-        'This year',
-        'Last 30 days',
-        'Last year',
-      ],
       chartTypes: ['line', 'area', 'bar', 'pie', 'table', 'number'],
       type: 'line',
       GRANULARITIES,
@@ -287,26 +254,9 @@ export default {
           },
         },
       });
-      
+
       console.log({ name, query });
       console.log('>', response);
-    },
-    handleTimeChange({ value, timeDimensions, availableTimeDimensions, setTimeDimensions }) {
-      const [selectedTd = {}] = timeDimensions;
-      const td = availableTimeDimensions.find(({ name }) => name === value);
-
-      if (!td) {
-        setTimeDimensions([]);
-        return;
-      }
-
-      setTimeDimensions([
-        {
-          dimension: td.name,
-          granularity: selectedTd.granularity || 'day',
-          dateRange: selectedTd.dateRange,
-        },
-      ]);
     },
     series(resultSet) {
       const seriesNames = resultSet.seriesNames();
