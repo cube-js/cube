@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
+import { getRealType } from '@cubejs-backend/shared';
 
 import type {
   Response, NextFunction,
@@ -404,7 +405,7 @@ export class ApiGateway {
   protected coerceForSqlQuery(query, context: RequestContext) {
     let securityContext = {};
 
-    if (context.securityContext) {
+    if (typeof context.securityContext === 'object' && context.securityContext !== null) {
       if (context.securityContext.u) {
         if (!this.checkAuthDeprecationShown) {
           this.logger('JWT U Property Deprecation', {
@@ -731,6 +732,9 @@ export class ApiGateway {
       )
     });
 
+    // securityContext should be object
+    let showWarningAboutNotObject = false;
+
     return (req, res, next) => {
       fn(req, res, (e) => {
         // We renamed authInfo to securityContext, but users can continue to use both ways
@@ -738,6 +742,16 @@ export class ApiGateway {
           req.authInfo = req.securityContext;
         } else if (req.authInfo) {
           req.securityContext = req.authInfo;
+        }
+
+        if ((typeof req.securityContext !== 'object' || req.securityContext === null) && !showWarningAboutNotObject) {
+          this.logger('Security Context Should Be Object', {
+            warning: (
+              `Value of securityContext (previously authInfo) expected to be object, actual: ${getRealType(req.securityContext)}`
+            )
+          });
+
+          showWarningAboutNotObject = true;
         }
 
         next(e);
@@ -748,6 +762,8 @@ export class ApiGateway {
   protected wrapCheckAuth(fn: CheckAuthFn): CheckAuthFn {
     // We dont need to span all logs with deprecation message
     let warningShowed = false;
+    // securityContext should be object
+    let showWarningAboutNotObject = false;
 
     return async (req, auth) => {
       await fn(req, auth);
@@ -768,6 +784,16 @@ export class ApiGateway {
         }
 
         req.securityContext = req.authInfo;
+      }
+
+      if ((typeof req.securityContext !== 'object' || req.securityContext === null) && !showWarningAboutNotObject) {
+        this.logger('Security Context Should Be Object', {
+          warning: (
+            `Value of securityContext (previously authInfo) expected to be object, actual: ${getRealType(req.securityContext)}`
+          )
+        });
+
+        showWarningAboutNotObject = true;
       }
     };
   }
