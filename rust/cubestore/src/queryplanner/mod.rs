@@ -17,7 +17,7 @@ use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
 use core::fmt;
-use datafusion::datasource::datasource::Statistics;
+use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
 use datafusion::physical_plan::memory::MemoryExec;
@@ -369,5 +369,12 @@ impl TableProvider for CubeTableLogical {
             total_byte_size: None,
             column_statistics: None,
         }
+    }
+
+    fn supports_filter_pushdown(
+        &self,
+        _filter: &Expr,
+    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
+        return Ok(TableProviderFilterPushDown::Inexact);
     }
 }
