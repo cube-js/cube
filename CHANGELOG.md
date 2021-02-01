@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.2](https://github.com/cube-js/cube.js/compare/v0.26.1...v0.26.2) (2021-02-01)
+
+
+### Bug Fixes
+
+* **cubestore:** sort data in column order from the index ([#1956](https://github.com/cube-js/cube.js/issues/1956)) ([342491e](https://github.com/cube-js/cube.js/commit/342491e720c1d1c6239005edcb8423777aaafb83))
+* Cannot create proxy with a non-object as target or handler ([790a3ba](https://github.com/cube-js/cube.js/commit/790a3ba8887ca00b4ec9ed3e31c7ff4875ae26c5))
+
+
+### Features
+
+* **cubestore:** filter rowgroups when reading parquet files ([#1957](https://github.com/cube-js/cube.js/issues/1957)) ([4df454c](https://github.com/cube-js/cube.js/commit/4df454c69542d72cc7846b69259d03c69d1a80c8))
+
+
+
+
+
 ## [0.26.1](https://github.com/cube-js/cube.js/compare/v0.26.0...v0.26.1) (2021-02-01)
 
 
