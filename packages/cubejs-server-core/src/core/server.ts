@@ -181,7 +181,7 @@ export class CubejsServerCore {
     }
 
     const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
-       getEnv('refreshTimer') || getEnv('scheduledRefresh') || this.options.scheduledRefreshTimer
+      getEnv('refreshTimer') || getEnv('scheduledRefresh') || this.options.scheduledRefreshTimer
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
