@@ -181,7 +181,7 @@ export class CubejsServerCore {
     }
 
     const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
-      this.options.scheduledRefreshTimer || getEnv('refreshTimer') || getEnv('scheduledRefresh')
+       getEnv('refreshTimer') || getEnv('scheduledRefresh') || this.options.scheduledRefreshTimer
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
@@ -360,7 +360,7 @@ export class CubejsServerCore {
       scheduledRefreshTimer = scheduledRefreshTimer.toLowerCase() === 'true';
     }
 
-    if (scheduledRefreshTimer == null) {
+    if (scheduledRefreshTimer === null) {
       scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
     }
 
