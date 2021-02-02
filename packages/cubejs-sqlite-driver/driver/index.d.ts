@@ -4,7 +4,7 @@ declare module "@cubejs-backend/sqlite-driver" {
     database: string;
   }
 
-  export default class SqliteDriver extends BaseDriver{
+  export default class SqliteDriver extends BaseDriver {
     constructor(options?: SqliteOptions);
     release(): Promise<void>
   }
