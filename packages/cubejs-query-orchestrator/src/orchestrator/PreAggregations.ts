@@ -11,6 +11,9 @@ import { CacheDriverInterface } from './cache-driver.interface';
 import { BaseDriver } from '../driver';
 import { QueryQueue } from './QueryQueue';
 
+// @ts-ignore
+const wait = (delay = 2000) => new Promise((resolve) => setTimeout(() => resolve(), delay));
+
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
 }
@@ -112,7 +115,7 @@ class PreAggregationLoadCache {
 
   private dataSource: string;
 
-  constructor(redisPrefix, clientFactory: DriverFactory, queryCache, preAggregations, options: {
+  public constructor(redisPrefix, clientFactory: DriverFactory, queryCache, preAggregations, options: {
     requestId?: string,
     dataSource: string
   }) {
@@ -265,7 +268,7 @@ class PreAggregationLoader {
 
   private externalRefresh: boolean;
 
-  constructor(
+  public constructor(
     redisPrefix,
     clientFactory: DriverFactory,
     logger,
@@ -275,9 +278,8 @@ class PreAggregationLoader {
     preAggregation,
     preAggregationsTablesToTempTables,
     loadCache,
-    options
+    options: any = {}
   ) {
-    options = options || {};
     this.redisPrefix = redisPrefix;
     this.driverFactory = clientFactory;
     this.logger = logger;
@@ -305,7 +307,7 @@ class PreAggregationLoader {
     }
   }
 
-  async loadPreAggregation() {
+  public async loadPreAggregation() {
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
     if (notLoadedKey && !this.waitForRenew) {
@@ -359,7 +361,10 @@ class PreAggregationLoader {
     }
   }
 
-  async loadPreAggregationWithKeys() {
+  protected async loadPreAggregationWithKeys() {
+    // console.log('loadPreAggregationWithKeys...', Date.now());
+    // await wait(6000);
+    
     const invalidationKeys = await this.getInvalidationKeyValues();
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = this.structureVersion();
@@ -509,7 +514,17 @@ class PreAggregationLoader {
       });
   }
 
-  executeInQueue(invalidationKeys, priority, newVersionEntry) {
+  protected async executeInQueue(invalidationKeys, priority, newVersionEntry) {
+    // console.log('executeInQueue...');
+    // await wait(10000);
+    // console.log('executeInQueue: [done]');
+    // console.log('poi--->', {
+    //   preAggregation: this.preAggregation,
+    //   preAggregationsTablesToTempTables: this.preAggregationsTablesToTempTables,
+    //   newVersionEntry,
+    //   requestId: this.requestId,
+    //   invalidationKeys
+    // });
     return this.preAggregations.getQueue(this.preAggregation.dataSource).executeInQueue(
       'query',
       this.preAggregationQueryKey(invalidationKeys),
@@ -785,7 +800,7 @@ export class PreAggregations {
 
   private queue: { [dataSource: string]: QueryQueue } = {};
 
-  constructor(redisPrefix, clientFactory: DriverFactoryByDataSource, logger, queryCache, options) {
+  public constructor(redisPrefix, clientFactory: DriverFactoryByDataSource, logger, queryCache, options) {
     this.options = options || {};
     this.redisPrefix = redisPrefix;
     this.driverFactory = clientFactory;
@@ -850,8 +865,7 @@ export class PreAggregations {
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
   }
 
-  getQueue(dataSource: string) {
-    dataSource = dataSource || 'default';
+  public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`, () => this.driverFactory(dataSource), (client, q) => {
         const {
