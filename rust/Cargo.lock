@@ -1070,6 +1070,7 @@ dependencies = [
  "reqwest 0.11.0",
  "rocksdb",
  "rust-s3",
+ "scopeguard",
  "serde",
  "serde_derive",
  "serde_json",

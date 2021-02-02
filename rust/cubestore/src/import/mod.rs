@@ -3,6 +3,7 @@ use crate::metastore::is_valid_hll;
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::sql::timestamp_from_string;
 use crate::store::{DataFrame, WALDataStore};
+use crate::sys::malloc::trim_allocs;
 use crate::table::{Row, TableValue};
 use crate::CubeError;
 use async_std::io::SeekFrom;
@@ -12,6 +13,7 @@ use core::mem;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
+use scopeguard::defer;
 use std::fs;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -275,6 +277,9 @@ impl ImportService for ImportServiceImpl {
                 &mut temp_files,
             )
             .await?;
+
+        defer!(trim_allocs());
+
         let mut rows = Vec::new();
         while let Some(row) = row_stream.next().await {
             if let Some(row) = row? {
