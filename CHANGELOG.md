@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.4](https://github.com/cube-js/cube.js/compare/v0.26.3...v0.26.4) (2021-02-02)
+
+
+### Bug Fixes
+
+* coerceForSqlQuery - dont mutate securityContext, fix [#1974](https://github.com/cube-js/cube.js/issues/1974) ([95e0536](https://github.com/cube-js/cube.js/commit/95e05364712b9539b564f948dccb44b7367abe26))
+
+
+
+
+
 ## [0.26.3](https://github.com/cube-js/cube.js/compare/v0.26.2...v0.26.3) (2021-02-02)
 
 
