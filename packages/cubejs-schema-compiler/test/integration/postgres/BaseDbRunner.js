@@ -59,7 +59,7 @@ export class BaseDbRunner {
     }
 
     if (this.connection) {
-      console.log(`[Connection] Closing`);
+      console.log('[Connection] Closing');
 
       if (this.connection.close) {
         try {
@@ -71,7 +71,7 @@ export class BaseDbRunner {
 
       this.connection = null;
 
-      console.log(`[Connection] Closed`);
+      console.log('[Connection] Closed');
     }
 
     if (this.container) {

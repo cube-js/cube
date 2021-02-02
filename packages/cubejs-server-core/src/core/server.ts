@@ -349,7 +349,7 @@ export class CubejsServerCore {
     return (fs.existsSync('./.env') || fs.existsSync('./cube.js'));
   }
 
-  protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number|false {
+  protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number | false {
     if (scheduledRefreshTimer && (typeof scheduledRefreshTimer === 'number')) {
       return parseInt(<any>scheduledRefreshTimer, 10) * 1000;
     }

@@ -1,5 +1,4 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { Duration, TemporalUnit } from 'node-duration';
 import { GenericContainer, Wait } from 'testcontainers';
 import sql from 'mssql';
 
