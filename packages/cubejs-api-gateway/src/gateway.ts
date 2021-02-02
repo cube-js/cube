@@ -25,6 +25,7 @@ import {
   RequestContext,
   RequestLoggerMiddlewareFn,
   Request,
+  ExtendedRequestContext,
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
 
@@ -648,8 +649,8 @@ export class ApiGateway {
     return this.adapterApi;
   }
 
-  public async contextByReq(req: Request, securityContext, requestId: string) {
-    const extensions = await Promise.resolve(typeof this.extendContext === 'function' ? this.extendContext(req) : {});
+  public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+    const extensions = typeof this.extendContext === 'function' ? await this.extendContext(req) : {};
 
     return {
       securityContext,

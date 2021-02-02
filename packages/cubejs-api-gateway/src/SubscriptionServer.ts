@@ -3,6 +3,7 @@ import uuid from 'uuid/v4';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
+import { ExtendedRequestContext } from './interfaces';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
@@ -29,7 +30,7 @@ export class SubscriptionServer {
 
   public async processMessage(connectionId: string, message, isSubscription) {
     let authContext: any = {};
-    let context: any = {};
+    let context: Partial<ExtendedRequestContext> = {};
 
     try {
       if (typeof message === 'string') {

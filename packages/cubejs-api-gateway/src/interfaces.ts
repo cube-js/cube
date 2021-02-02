@@ -65,8 +65,11 @@ export interface RequestContext {
   requestId: string;
 }
 
+export type RequestExtension = Record<string, any>;
+export type ExtendedRequestContext = RequestContext & RequestExtension;
+
 export interface Request extends ExpressRequest {
-  context?: RequestContext,
+  context?: ExtendedRequestContext,
   // It's deprecated
   authInfo?: any,
   // New one, replace authInfo
@@ -84,4 +87,4 @@ export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressRespon
 // @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
 export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void>|void;
 
-export type ExtendContextFn = (req: ExpressRequest) => any;
+export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension>|RequestExtension;
