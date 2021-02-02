@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.3](https://github.com/cube-js/cube.js/compare/v0.26.2...v0.26.3) (2021-02-02)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** table presentation ([09c953d](https://github.com/cube-js/cube.js/commit/09c953d54b0aebdf9174f00750652fde3787fc50))
+
+
+
+
+
 ## [0.26.2](https://github.com/cube-js/cube.js/compare/v0.26.1...v0.26.2) (2021-02-01)
 
 
