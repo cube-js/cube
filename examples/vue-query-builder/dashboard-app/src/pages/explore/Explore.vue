@@ -127,7 +127,7 @@
         </v-container>
       </template>
 
-      <template v-slot="{ resultSet, isQueryPresent, validatedQuery }">
+      <template #default="{ resultSet, isQueryPresent, validatedQuery }">
         <div v-if="!isQueryPresent">
           <v-alert color="blue" text>Choose a measure or dimension to get started</v-alert>
         </div>
