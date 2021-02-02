@@ -408,17 +408,13 @@ module.exports = {
     {
       authInfo: {
         myappid: "demoappid",
-        u: {
-          bucket: "demo"
-        }
+        bucket: "demo"
       }
     },
     {
       authInfo: {
         myappid: "demoappid2",
-        u: {
-          bucket: "demo2"
-        }
+        bucket: "demo2"
       }
     }
   ],
