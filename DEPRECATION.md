@@ -222,17 +222,37 @@ cube(`visitors`, {
 
 The `authInfo` parameter to `checkAuth` no longer wraps the decoded JWT under
 the `u` property. It has also been renamed to
-[`securityContext`][ref-security-context].
+[`securityContext`][ref-security-context]. Additionally, the security context
+claims are now populated from the root payload instead of the `u` property.
 
-[ref-security-context]: /security#security-context
+Old shape of `authInfo`:
+```json
+{
+  "sub": "1234567890",
+  "u": {
+    "user_id": 131
+  }
+}
+```
+
+New shape of `authInfo`:
+```json
+{
+  "sub": "1234567890",
+  "user_id": 131
+}
+```
+
+
+[ref-security-context]: https://cube.dev/docs/security#security-context
 
 Deprecated:
 
 ```js
 const server = new CubejsServer({
   checkAuth: async (req, auth) => {
-    // this one!
-    req.authInfo = jwt.verify(auth, pem);
+    // Notice how we're using the `u` property in `jwt.verify()` and assigning the result to `req.authInfo``
+    req.authInfo = jwt.verify({ u: auth }, pem);
   },
   contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
   preAggregationsSchema: ({ authInfo }) =>
@@ -245,12 +265,12 @@ You should use:
 ```js
 const server = new CubejsServer({
   checkAuth: async (req, auth) => {
-    // this one!
+    // We're now using directly assiging the result of `jet.verify()` to the `securityContext` property
     req.securityContext = jwt.verify(auth, pem);
   },
-  // this one
+  // And here we're now using the `securityContext` parameter`
   contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
-  // this one
+  // And the same here
   preAggregationsSchema: ({ securityContext }) =>
     `pre_aggregations_${securityContext.userId}`,
 });
