@@ -1,3 +1,4 @@
+import { BaseDriver } from "@cubejs-backend/query-orchestrator";
 import { BigQueryOptions } from "@google-cloud/bigquery";
 
 declare module "@cubejs-backend/bigquery-driver" {
@@ -7,7 +8,7 @@ declare module "@cubejs-backend/bigquery-driver" {
     pollMaxInterval?: number,
   }
 
-  export default class BigQueryDriver {
+  export default class BigQueryDriver extends BaseDriver {
     constructor(options?: BigQueryDriverOptions);
   }
 }
