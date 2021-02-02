@@ -1,5 +1,4 @@
-import { Request as ExpressRequest } from 'express';
-import { CheckAuthFn, CheckAuthMiddlewareFn, QueryTransformerFn } from '@cubejs-backend/api-gateway';
+import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn } from '@cubejs-backend/api-gateway';
 import { RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 
 export interface QueueOptions {
@@ -111,7 +110,7 @@ export interface CreateOptions {
   queryTransformer?: QueryTransformerFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string;
-  extendContext?: (req: ExpressRequest) => any;
+  extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
