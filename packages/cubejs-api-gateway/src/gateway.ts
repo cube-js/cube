@@ -402,8 +402,8 @@ export class ApiGateway {
     }
   }
 
-  protected coerceForSqlQuery(query, context: RequestContext) {
-    let securityContext = {};
+  protected coerceForSqlQuery(query, context: Readonly<RequestContext>) {
+    let securityContext: any = {};
 
     if (typeof context.securityContext === 'object' && context.securityContext !== null) {
       if (context.securityContext.u) {
@@ -418,13 +418,12 @@ export class ApiGateway {
           this.checkAuthDeprecationShown = true;
         }
 
-        const userContext = context.securityContext.u;
-        delete context.securityContext.u;
-
         securityContext = {
           ...context.securityContext,
-          ...userContext,
+          ...context.securityContext.u,
         };
+
+        delete securityContext.u;
       } else {
         securityContext = context.securityContext;
       }
