@@ -2,12 +2,6 @@ import Redis, { Redis as redis, RedisOptions, Pipeline } from 'ioredis';
 
 import config from '../config';
 
-function debugLog(msg) {
-  if (config.CUBEJS_REDIS_USE_IOREDIS_DEBUG) {
-    console.debug(msg);
-  }
-}
-
 async function createIORedisClient(url: string, opts: RedisOptions) {
   const [host, portStr] = (config.CUBEJS_REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
   const port = portStr ? Number(portStr) : 6379;
@@ -36,26 +30,6 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
   }
 
   const client = new Redis(options);
-
-  client.on('connect', () => {
-    debugLog('Redis connection established');
-  });
-
-  client.on('ready', () => {
-    debugLog('Redis ready');
-  });
-
-  client.on('close', () => {
-    debugLog('Redis connection closed');
-  });
-
-  client.on('end', () => {
-    debugLog('Redis connection ended');
-  });
-
-  client.on('reconnecting', (times) => {
-    console.warn('Redis connection is being reconnected, attempt no: ', times);
-  });
 
   return client.connect().then(() => client);
 }
