@@ -32,7 +32,13 @@ describe('getEnv', () => {
   });
 
   test('refreshTimer', () => {
-    expect(getEnv('refreshTimer')).toBe(undefined);
+    process.env.NODE_ENV = 'production';
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    expect(getEnv('refreshTimer')).toBe(false);
+
+    process.env.NODE_ENV = 'development';
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    expect(getEnv('refreshTimer')).toBe(true);
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '60';
     expect(getEnv('refreshTimer')).toBe(60);

@@ -7,7 +7,7 @@ import { DatabaseType } from '../../src/core/types';
 process.env.CUBEJS_API_SECRET = 'api-secret';
 
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public detectScheduledRefreshTimer(scheduledRefreshTimer?:string | number | boolean) {
+  public detectScheduledRefreshTimer(scheduledRefreshTimer: number|boolean) {
     return super.detectScheduledRefreshTimer(scheduledRefreshTimer);
   }
 
@@ -167,18 +167,17 @@ describe('index.test', () => {
       expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
       expect(cubejsServerCore.detectScheduledRefreshTimer(input)).toBe(output);
 
+      await cubejsServerCore.beforeShutdown();
       await cubejsServerCore.shutdown();
       delete process.env.NODE_ENV;
     });
   };
 
+  expectRefreshTimerOption(0, false);
+  expectRefreshTimerOption(1, 1000);
   expectRefreshTimerOption(10, 10000);
-  expectRefreshTimerOption('9', 9000);
   expectRefreshTimerOption(true, 30000);
   expectRefreshTimerOption(false, false);
-  expectRefreshTimerOption('false', false);
-  expectRefreshTimerOption(undefined, 30000);
-  expectRefreshTimerOption(undefined, false, true);
 
   test('scheduledRefreshContexts option', async () => {
     const cubejsServerCore = new CubejsServerCoreOpen({
@@ -254,6 +253,7 @@ describe('index.test', () => {
       { concurrency: 2 },
     ]);
 
+    await cubejsServerCore.beforeShutdown();
     await cubejsServerCore.shutdown();
   });
 });
