@@ -9,6 +9,8 @@ use async_trait::async_trait;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
 use std::sync::Arc;
+use scopeguard::defer;
+use crate::sys::malloc::trim_allocs;
 
 #[async_trait]
 pub trait CompactionService: Send + Sync {
@@ -41,6 +43,7 @@ impl CompactionServiceImpl {
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
+        defer!(trim_allocs());
         let mut chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)

@@ -16,7 +16,7 @@ pub fn trim_allocs() {
 }
 
 #[cfg(not(target_os = "linux"))]
-pub fn trim_memory() {}
+pub fn trim_allocs() {}
 
 #[cfg(target_os = "linux")] // we assume glibc is linked on linux.
 extern "C" {
