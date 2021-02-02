@@ -63,20 +63,17 @@
 </template>
 
 <script>
-  import cubejs from "@cubejs-client/core";
-
-  const API_URL = "https://ecom.cubecloudapp.dev";
-  const CUBEJS_TOKEN =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjExMjIyMjY4LCJleHAiOjE2MTM4MTQyNjh9.g7_sjO6qjQwblwHuVNnKfpjvwv9TBxyjZzWKtmRAlVI";
-  const cubejsApi = cubejs(CUBEJS_TOKEN, {
-    apiUrl: `${API_URL}/cubejs-api/v1`
-  });
   import gql from "graphql-tag";
   import { QueryRenderer } from "@cubejs-client/vue";
 
   export default {
     name: "Dashboard",
-
+    props: {
+      cubejsApi: {
+        type: Object,
+        required: true
+      }
+    },
     apollo: {
       dashboardItems: {
         query: gql`
@@ -100,14 +97,12 @@
     },
     data() {
       return {
-        cubejsApi,
         snackbar: false,
         text: ''
       };
     },
     methods: {
       series(resultSet) {
-        console.log(resultSet);
         const seriesNames = resultSet.seriesNames();
         const pivot = resultSet.chartPivot();
         const series = [];

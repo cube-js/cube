@@ -161,7 +161,6 @@
 </template>
 
 <script>
-import cubejs from '@cubejs-client/core';
 import { QueryBuilder, GRANULARITIES } from '@cubejs-client/vue';
 import gql from 'graphql-tag';
 
@@ -174,13 +173,6 @@ import AddToDashboard from './components/dialogs/AddToDashboard';
 import TimeDimensionSelect from './components/TimeDimensionSelect';
 import DateRangeSelect from './components/DateRangeSelect'
 
-const API_URL = 'https://ecom.cubecloudapp.dev';
-const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjExMjIyMjY4LCJleHAiOjE2MTM4MTQyNjh9.g7_sjO6qjQwblwHuVNnKfpjvwv9TBxyjZzWKtmRAlVI';
-const cubejsApi = cubejs(CUBEJS_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
-});
-
 // const API_URL = 'http://localhost:4000';
 // const CUBEJS_TOKEN =
 //   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjA3NDQwMTQ0LCJleHAiOjE2MTAwMzIxNDR9.Za52BRvDvtgzqgy44QC5C35Li2RZ1RZAGy2mDdIWY70';
@@ -190,7 +182,12 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
 
 export default {
   name: 'Explore',
-
+  props: {
+    cubejsApi: {
+      type: Object,
+      required: true
+    }
+  },
   components: {
     PivotConfig,
     Order,
@@ -226,7 +223,6 @@ export default {
         name: 'day',
         title: 'DAyyyy',
       },
-      cubejsApi,
       query,
       chartTypes: ['line', 'area', 'bar', 'pie', 'table', 'number'],
       type: 'line',

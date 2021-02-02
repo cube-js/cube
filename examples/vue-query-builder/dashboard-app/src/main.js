@@ -16,10 +16,18 @@ const apolloProvider = new VueApollo({
   defaultClient: apolloClient
 });
 
+import cubejs from '@cubejs-client/core';
+const API_URL = 'https://ecom.cubecloudapp.dev';
+const CUBEJS_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjExMjIyMjY4LCJleHAiOjE2MTM4MTQyNjh9.g7_sjO6qjQwblwHuVNnKfpjvwv9TBxyjZzWKtmRAlVI';
+const cubejsApi = cubejs(CUBEJS_TOKEN, {
+  apiUrl: `${API_URL}/cubejs-api/v1`,
+});
+
 const router = new VueRouter({
   routes: [
-    { path: '/explore', component: Explore },
-    { path: '/dashboard', component: Dashboard },
+    { path: '/explore', component: Explore, props: { cubejsApi } },
+    { path: '/dashboard', component: Dashboard, props: { cubejsApi } },
   ]
 })
 
