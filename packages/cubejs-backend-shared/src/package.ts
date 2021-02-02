@@ -25,12 +25,12 @@ export type PackageManifest = {
   version: string,
   dependencies: Record<string, string>,
   devDependencies: Record<string, string>
-}
+};
 
 type RequireBaseOptions = {
   basePath?: string,
   relative?: boolean,
-}
+};
 
 type RequireOptions = RequireBaseOptions & { silent?: true };
 

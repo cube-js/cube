@@ -83,6 +83,11 @@ module.exports = {
         '@typescript-eslint/explicit-member-accessibility': 'warn',
         'no-shadow': 'off',
         '@typescript-eslint/no-shadow': ['error', { ignoreTypeValueShadow: true }],
+        //
+        'no-duplicate-imports': 'off',
+        '@typescript-eslint/no-duplicate-imports': 'error',
+        semi: 'off',
+        '@typescript-eslint/semi': 'error',
       },
     },
   ],

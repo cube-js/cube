@@ -79,10 +79,10 @@ export interface Request extends ExpressRequest {
 export type QueryTransformerFn = (query: Query, context: RequestContext) => Promise<Query>;
 
 // @deprecated
-export type CheckAuthMiddlewareFn = (req: Request, res: ExpressResponse, next: ExpressNextFunction) => void
+export type CheckAuthMiddlewareFn = (req: Request, res: ExpressResponse, next: ExpressNextFunction) => void;
 
 // @deprecated
-export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void
+export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void;
 
 // @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
 export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void>|void;

@@ -670,7 +670,7 @@ export class ApiGateway {
     });
 
     next(e);
-  }
+  };
 
   public handleError({
     e, context, query, res, requestStarted
@@ -852,14 +852,14 @@ export class ApiGateway {
         res.status(500).json({ error: e.toString() });
       }
     }
-  }
+  };
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
     if (next) {
       next();
     }
-  }
+  };
 
   protected requestLogger: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     const details = requestParser(req, res);
@@ -869,7 +869,7 @@ export class ApiGateway {
     if (next) {
       next();
     }
-  }
+  };
 
   protected compareDateRangeTransformer(query) {
     let queryCompareDateRange;
@@ -957,7 +957,7 @@ export class ApiGateway {
     }
 
     return this.healthResponse(res, health);
-  }
+  };
 
   protected liveness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
@@ -986,5 +986,5 @@ export class ApiGateway {
     }
 
     return this.healthResponse(res, health);
-  }
+  };
 }

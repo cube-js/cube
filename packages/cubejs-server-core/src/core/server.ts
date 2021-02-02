@@ -65,7 +65,7 @@ type RequireOne<T, K extends keyof T> = {
   [X in Exclude<keyof T, K>]?: T[X]
 } & {
   [P in K]-?: T[P]
-}
+};
 
 export type ServerCoreInitializedOptions = RequireOne<
   CreateOptions,
@@ -556,7 +556,7 @@ export class CubejsServerCore {
 
       await this.runScheduledRefresh(context, queryingOptions);
     }));
-  }
+  };
 
   protected getRefreshScheduler() {
     return new RefreshScheduler(this);
@@ -697,7 +697,7 @@ export class CubejsServerCore {
     await this.causeErrorPromise;
 
     process.exit(1);
-  }
+  };
 
   public async shutdown() {
     if (this.devServer) {
