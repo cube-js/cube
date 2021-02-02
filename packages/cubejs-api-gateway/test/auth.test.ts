@@ -383,17 +383,37 @@ describe('test authorization', () => {
     // no warnings, done on checkAuth/checkAuthMiddleware level
     expect(loggerMock.mock.calls.length).toEqual(0);
 
+    /**
+     * Original securityContext should not be changed by coerceForSqlQuery, because SubscriptionServer store it once
+     * for all queries
+     */
+    const securityContext = { exp: 2475858836, iat: 1611858836, u: { uid: 5 } };
+
     // (move u to root)
     expect(
       apiGateway.coerceForSqlQuery(
         { timeDimensions: [] },
-        { securityContext: { exp: 2475858836, iat: 1611858836, u: { uid: 5 } }, requestId: 'XXX' }
+        { securityContext, requestId: 'XXX' }
       ).contextSymbols.securityContext
     ).toEqual({
       exp: 2475858836,
       iat: 1611858836,
       uid: 5,
     });
+
+    // (move u to root)
+    expect(
+      apiGateway.coerceForSqlQuery(
+        { timeDimensions: [] },
+        { securityContext, requestId: 'XXX' }
+      ).contextSymbols.securityContext
+    ).toEqual({
+      exp: 2475858836,
+      iat: 1611858836,
+      uid: 5,
+    });
+
+    expect(securityContext).toEqual({ exp: 2475858836, iat: 1611858836, u: { uid: 5 } });
 
     expect(loggerMock.mock.calls.length).toEqual(1);
     expect(loggerMock.mock.calls[0]).toEqual([
