@@ -28,7 +28,7 @@ class App extends Component {
   state = {
     fatalError: null,
     context: null,
-    slowQuery: false
+    slowQuery: false,
   };
 
   async componentDidMount() {
@@ -36,7 +36,15 @@ class App extends Component {
 
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
-      onQueryLoad: (resultSet) => {
+      onQueryLoad: (data) => {
+        let resultSet;
+
+        if (data?.resultSet) {
+          resultSet = data.resultSet;
+        } else {
+          resultSet = data;
+        }
+        
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
 
