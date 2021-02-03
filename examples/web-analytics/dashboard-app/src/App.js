@@ -18,6 +18,7 @@ const CUBEJS_TOKEN =
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`
 });
+
 const useStyles = makeStyles(theme => ({
   root: {
     display: 'flex'
@@ -31,6 +32,7 @@ const useStyles = makeStyles(theme => ({
 
 const AppLayout = ({ children }) => {
   const classes = useStyles();
+
   return (
     <div className={classes.root}>
       <Header />
