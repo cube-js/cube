@@ -117,7 +117,7 @@ This way in fact every tenant starts to see it's own data however all the resour
 ```javascript
 module.exports = {
   queryTransformer: (query, { securityContext }) => {
-    const user = securityContext.u;
+    const user = securityContext;
     if (user.id) {
       query.filters.push({
         member: 'Users.id',

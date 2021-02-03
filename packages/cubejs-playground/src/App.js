@@ -37,7 +37,17 @@ class App extends Component {
 
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
-      onQueryLoad: ({ resultSet, progress }) => {
+      onQueryLoad: (data) => {
+        let resultSet;
+        let progress;
+
+        if (data?.resultSet !== undefined) {
+          resultSet = data.resultSet;
+          progress = data.progress;
+        } else {
+          resultSet = data;
+        }
+        
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
 

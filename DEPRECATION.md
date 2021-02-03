@@ -33,20 +33,20 @@ features:
   migrate to alternatives. In such cases, a warning may be printed, and users
   should not rely on this feature.
 
-| Status     | Feature                                                                                                            | Deprecated | Remove       |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ | ---------- | ------------ |
-| Deprecated | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0      |
-| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                            | v0.23.8    | June 2021    |
-| Deprecated | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | v0.26.0      |
-| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                               | v0.24.0    | June 2021    |
-| Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator) | v0.24.2    | v0.28.0      |
-| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                  | v0.25.0    | v0.25.0      |
-| Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)               | v0.25.4    | v0.30.0      |
-| Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)       | v0.25.21   | v0.32.0      |
-| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                      | v0.26.0    |              |
-| Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    |              |
-| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |              |
-| Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |              |
+| Status     | Feature                                                                                                            | Deprecated | Remove    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ | ---------- | --------- |
+| Deprecated | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0   |
+| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                            | v0.23.8    | June 2021 |
+| Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | v0.26.0   |
+| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                               | v0.24.0    | June 2021 |
+| Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator) | v0.24.2    | v0.28.0   |
+| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                  | v0.25.0    | v0.25.0   |
+| Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)               | v0.25.4    | v0.30.0   |
+| Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)       | v0.25.21   | v0.32.0   |
+| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                      | v0.26.0    |           |
+| Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    |           |
+| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |           |
+| Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |           |
 
 ### Node.js 8
 
@@ -69,7 +69,7 @@ replaced by `heartBeatInterval`.
 
 ### `CUBEJS_ENABLE_TLS`
 
-**Deprecated in Release: v0.23.11**
+**Removed in Release: v0.26.0**
 
 We no longer recommend setting TLS options via Cube.js. Developers should set up
 TLS on a load balancer or reverse proxy instead. [Read more
@@ -98,8 +98,8 @@ microservices, if necessary).
 
 **Deprecated in Release: v0.24.2**
 
-Absolute imports are highly dependent on a path, and all API becomes public. We now
-provide a public API from the package directly.
+Absolute imports are highly dependent on a path, and all API becomes public. We
+now provide a public API from the package directly.
 
 Deprecated:
 
@@ -131,8 +131,8 @@ removing the `contextToDataSourceId` property completely.
 
 **Deprecated in Release: v0.25.4**
 
-Absolute imports are highly dependent on a path, and all API becomes public. We now
-provide a public API from the package directly.
+Absolute imports are highly dependent on a path, and all API becomes public. We
+now provide a public API from the package directly.
 
 Deprecated:
 
@@ -150,8 +150,8 @@ const { CubejsServerCore } = require('@cubejs-backend/server-core');
 
 **Deprecated in Release: v0.25.21**
 
-Absolute imports are highly dependent on a path, and all API becomes public. We now
-provide a public API from the package directly.
+Absolute imports are highly dependent on a path, and all API becomes public. We
+now provide a public API from the package directly.
 
 Deprecated:
 
@@ -169,15 +169,16 @@ const { BaseQuery } = require('@cubejs-backend/schema-compiler');
 
 **Deprecated in Release: v0.26.0**
 
-> 
+The `checkAuthMiddleware` option was tightly bound to Express,
+[which has been deprecated](#embedding-cubejs-within-express). Since Cube.js
+supports HTTP **and** WebSockets as transports, we want our authentication API
+to not rely on transport-specific details. We now recommend using
+[`checkAuth`][ref-checkauth] as a transport-agnostic method of authentication.
+This means the same authentication logic can be reused for both HTTP and
+Websockets transports.
 
-The `checkAuthMiddleware` was tightly bound to Express, [which has been deprecated](#embedding-cubejs-within-express). Since Cube.js supports HTTP **and** WebSockets as transports, we want our authentication API to not rely on transport-specific details.
-
-We now recommend using [`checkAuth`][ref-checkauth] as a transport-agnostic method of
-authentication. This means the same authentication logic can be reused for both
-HTTP and Websockets transports. 
-
-If you are using custom authorization, please take a (look at the documentation)[link-custom-auth]
+If you are using custom authorization, please take a [look at the
+documentation][link-custom-auth]
 
 [link-custom-auth]: https://cube.dev/docs/security#custom-authentication
 [ref-checkauth]: https://cube.dev/docs/config#options-reference-check-auth
@@ -195,16 +196,13 @@ no more updates. Please upgrade to Node.js 12 or higher.
 
 **Deprecated in Release: v0.26.0**
 
-There are three names for effectively the same concept, and we wanted to take
-the opportunity to simplify this.
-
 `USER_CONTEXT` has been renamed to `SECURITY_CONTEXT`.
 
 Deprecated:
 
 ```js
 cube(`visitors`, {
-  sql: `select * from visitors WHERE ${USER_CONTEXT.source.filter('source')}`
+  sql: `select * from visitors WHERE ${USER_CONTEXT.source.filter('source')}`,
 });
 ```
 
@@ -212,7 +210,9 @@ You should use:
 
 ```js
 cube(`visitors`, {
-  sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter('source')}`
+  sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter(
+    'source'
+  )}`,
 });
 ```
 
@@ -224,7 +224,7 @@ The `authInfo` parameter to `checkAuth` no longer wraps the decoded JWT under
 the `u` property. It has also been renamed to
 [`securityContext`][ref-security-context].
 
-[ref-security-context]: /
+[ref-security-context]: /security#security-context
 
 Deprecated:
 
@@ -235,13 +235,12 @@ const server = new CubejsServer({
     req.authInfo = jwt.verify(auth, pem);
   },
   contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`,
+  preAggregationsSchema: ({ authInfo }) =>
+    `pre_aggregations_${authInfo.userId}`,
 });
 ```
 
 You should use:
-
->> Attention: `authInfo` renamed across all configuration. Check all functions for `authInfo` and rename it to `securityContext`.
 
 ```js
 const server = new CubejsServer({
@@ -252,6 +251,7 @@ const server = new CubejsServer({
   // this one
   contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
   // this one
-  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) =>
+    `pre_aggregations_${securityContext.userId}`,
 });
 ```

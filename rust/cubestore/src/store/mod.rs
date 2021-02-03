@@ -22,11 +22,13 @@ use std::{
     sync::Arc,
 };
 
+use crate::sys::malloc::trim_allocs;
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use log::trace;
 use mockall::automock;
+use scopeguard::defer;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct DataFrame {
@@ -300,6 +302,8 @@ impl ChunkStore {
 #[async_trait]
 impl ChunkDataStore for ChunkStore {
     async fn partition(&self, wal_id: u64) -> Result<(), CubeError> {
+        defer!(trim_allocs());
+
         let wal = self.meta_store.get_wal(wal_id).await?;
         let table_id = wal.get_row().table_id();
         let data = self.wal_store.get_wal(wal_id).await?;
@@ -328,6 +332,8 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError> {
+        defer!(trim_allocs());
+
         let partition = self.meta_store.get_partition(partition_id).await?;
         if partition.get_row().is_active() {
             return Err(CubeError::internal(format!(

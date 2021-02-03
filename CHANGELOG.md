@@ -3,6 +3,62 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.5](https://github.com/cube-js/cube.js/compare/v0.26.4...v0.26.5) (2021-02-03)
+
+
+### Bug Fixes
+
+* **cubestore:** Return physical memory to the system after compaction ([cdfec78](https://github.com/cube-js/cube.js/commit/cdfec78a43d7a2c3a25c2ee1842147c8060e3fb4))
+* **cubestore:** return physical memory to the system at rest ([#1981](https://github.com/cube-js/cube.js/issues/1981)) ([7249a7d](https://github.com/cube-js/cube.js/commit/7249a7d0a96eaea3bb142f56f816690bec908618))
+
+
+### Features
+
+* **cubestore:** Multiple location load support ([#1982](https://github.com/cube-js/cube.js/issues/1982)) ([2b509ec](https://github.com/cube-js/cube.js/commit/2b509ec3c50be0688d613d2cda1ac3f53e80e093))
+
+
+
+
+
+## [0.26.4](https://github.com/cube-js/cube.js/compare/v0.26.3...v0.26.4) (2021-02-02)
+
+
+### Bug Fixes
+
+* coerceForSqlQuery - dont mutate securityContext, fix [#1974](https://github.com/cube-js/cube.js/issues/1974) ([95e0536](https://github.com/cube-js/cube.js/commit/95e05364712b9539b564f948dccb44b7367abe26))
+
+
+
+
+
+## [0.26.3](https://github.com/cube-js/cube.js/compare/v0.26.2...v0.26.3) (2021-02-02)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** table presentation ([09c953d](https://github.com/cube-js/cube.js/commit/09c953d54b0aebdf9174f00750652fde3787fc50))
+
+
+
+
+
+## [0.26.2](https://github.com/cube-js/cube.js/compare/v0.26.1...v0.26.2) (2021-02-01)
+
+
+### Bug Fixes
+
+* **cubestore:** sort data in column order from the index ([#1956](https://github.com/cube-js/cube.js/issues/1956)) ([342491e](https://github.com/cube-js/cube.js/commit/342491e720c1d1c6239005edcb8423777aaafb83))
+* Cannot create proxy with a non-object as target or handler ([790a3ba](https://github.com/cube-js/cube.js/commit/790a3ba8887ca00b4ec9ed3e31c7ff4875ae26c5))
+
+
+### Features
+
+* **cubestore:** filter rowgroups when reading parquet files ([#1957](https://github.com/cube-js/cube.js/issues/1957)) ([4df454c](https://github.com/cube-js/cube.js/commit/4df454c69542d72cc7846b69259d03c69d1a80c8))
+
+
+
+
+
 ## [0.26.1](https://github.com/cube-js/cube.js/compare/v0.26.0...v0.26.1) (2021-02-01)
 
 

@@ -2,12 +2,14 @@ use crate::config::ConfigObj;
 use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
+use crate::sys::malloc::trim_allocs;
 use crate::table::parquet::ParquetTableStore;
 use crate::table::TableStore;
 use crate::CubeError;
 use async_trait::async_trait;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
+use scopeguard::defer;
 use std::sync::Arc;
 
 #[async_trait]
@@ -41,6 +43,7 @@ impl CompactionServiceImpl {
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
+        defer!(trim_allocs());
         let mut chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)

@@ -39,6 +39,7 @@ pub mod remotefs;
 pub mod scheduler;
 pub mod sql;
 pub mod store;
+pub mod sys;
 pub mod table;
 pub mod telemetry;
 pub mod util;
