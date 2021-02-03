@@ -743,6 +743,8 @@ mod tests {
     use std::time::Duration;
     use std::{env, fs};
     use uuid::Uuid;
+    use async_compression::tokio::write::GzipEncoder;
+    use tokio::io::{BufWriter, AsyncWriteExt};
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -2134,7 +2136,7 @@ mod tests {
                 let dir = env::temp_dir();
 
                 let path_1 = dir.clone().join("foo-1.csv");
-                let path_2 = dir.clone().join("foo-2.csv");
+                let path_2 = dir.clone().join("foo-2.csv.gz");
                 let mut file = File::create(path_1.clone()).unwrap();
 
                 file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
@@ -2142,12 +2144,14 @@ mod tests {
                 file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
                 file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).unwrap();
 
-                let mut file = File::create(path_2.clone()).unwrap();
+                let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
 
-                file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
-                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
-                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
-                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
+                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).await.unwrap();
+                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+
+                file.shutdown().await.unwrap();
 
                 vec![path_1, path_2]
             };

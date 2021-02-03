@@ -163,16 +163,20 @@ class BigQueryDriver extends BaseDriver {
 
   async downloadTable(table, options) {
     if (options && options.csvImport && this.bucket) {
-      const destination = this.bucket.file(`${table}.csv`);
+      const destination = this.bucket.file(`${table}-*.csv.gz`);
       const [schema, tableName] = table.split('.');
       const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
-      const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV' });
+      const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
       await this.waitForJobResult(job, { table }, false);
-      const [url] = await destination.getSignedUrl({
-        action: 'read',
-        expires: new Date(new Date().getTime() + 60 * 60 * 1000)
-      });
-      return { csvFile: url };
+      const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
+      const urls = await Promise.all(files.map(async file => {
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+        });
+        return url;
+      }));
+      return { csvFile: urls };
     }
     return super.downloadTable(table, options);
   }

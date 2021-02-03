@@ -21,6 +21,8 @@ use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
+use async_compression::tokio::bufread::{GzipDecoder};
+use tokio::io;
 
 impl ImportFormat {
     async fn row_stream(
@@ -45,15 +47,24 @@ impl ImportFormat {
             file.seek(SeekFrom::Start(0)).await?;
             file
         } else {
-            File::open(location).await?
+            File::open(location.clone()).await?
         };
         match self {
             ImportFormat::CSV => {
-                let lines = BufReader::new(file).lines();
+                let lines_stream: Pin<Box<dyn Stream<Item = io::Result<String>> + Send>> = if location.contains(".csv.gz") {
+                    let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
+                    let lines = reader.lines();
+                    Box::pin(LinesStream::new(lines))
+                } else {
+                    let reader = BufReader::new(file);
+                    let lines = reader.lines();
+                    Box::pin(LinesStream::new(lines))
+                };
+
                 let mut header_mapping = None;
                 let mut mapping_insert_indices = Vec::with_capacity(columns.len());
                 let rows =
-                    LinesStream::new(lines).map(move |line| -> Result<Option<Row>, CubeError> {
+                    lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                         let str = line?;
 
                         let mut parser = CsvLineParser::new(str.as_str());
