@@ -3,6 +3,7 @@ import uuid from 'uuid/v4';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
+import { ExtendedRequestContext } from './interfaces';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
@@ -29,7 +30,7 @@ export class SubscriptionServer {
 
   public async processMessage(connectionId: string, message, isSubscription) {
     let authContext: any = {};
-    let context: any = {};
+    let context: Partial<ExtendedRequestContext> = {};
 
     try {
       if (typeof message === 'string') {
@@ -77,7 +78,7 @@ export class SubscriptionServer {
 
       const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
       const requestId = `${baseRequestId}-span-${uuid()}`;
-      context = await this.apiGateway.contextByReq(message, authContext.authInfo, requestId);
+      context = await this.apiGateway.contextByReq(message, authContext.securityContext, requestId);
 
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))

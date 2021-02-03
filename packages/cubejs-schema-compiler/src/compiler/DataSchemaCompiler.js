@@ -8,45 +8,9 @@ import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 
 import { UserError } from './UserError';
-import { CompileError } from './CompileError';
+import { ErrorReporter } from './ErrorReporter';
 
 const moduleFileCache = {};
-
-class ErrorReporter {
-  constructor(parent, context) {
-    this.errors = [];
-    this.parent = parent;
-    this.context = context || [];
-  }
-
-  error(e, fileName, lineNumber, position) {
-    const message = `${this.context.length ? `${this.context.join(' -> ')}: ` : ''}${e instanceof UserError ? e.message : (e.stack || e)}`;
-    if (this.rootReporter().errors.find(m => (m.message || m) === message)) {
-      return;
-    }
-    if (fileName) {
-      this.rootReporter().errors.push({
-        message, fileName, lineNumber, position
-      });
-    } else {
-      this.rootReporter().errors.push(message);
-    }
-  }
-
-  rootReporter() {
-    return this.parent ? this.parent.rootReporter() : this;
-  }
-
-  inContext(context) {
-    return new ErrorReporter(this, this.context.concat(context));
-  }
-
-  throwIfAny() {
-    if (this.rootReporter().errors.length > 0) {
-      throw new CompileError(this.rootReporter().errors);
-    }
-  }
-}
 
 export class DataSchemaCompiler {
   constructor(repository, options) {
@@ -65,6 +29,7 @@ export class DataSchemaCompiler {
     this.allowNodeRequire = options.allowNodeRequire;
     this.compileContext = options.compileContext;
     this.compilerCache = options.compilerCache;
+    this.errorReport = options.errorReport;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -87,7 +52,7 @@ export class DataSchemaCompiler {
       this.compilePromise = this.repository.dataSchemaFiles().then((files) => {
         const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
 
-        const errorsReport = new ErrorReporter();
+        const errorsReport = new ErrorReporter(null, [], this.errorReport);
         this.errorsReport = errorsReport;
         // TODO: required in order to get pre transpile compilation work
         const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
@@ -121,7 +86,13 @@ export class DataSchemaCompiler {
           plugins: ['objectRestSpread']
         },
       );
-      this.transpilers.forEach((t) => babelTraverse(ast, t.traverseObject()));
+
+      this.transpilers.forEach((t) => {
+        errorsReport.inFile(file);
+        babelTraverse(ast, t.traverseObject(errorsReport));
+        errorsReport.exitFile();
+      });
+
       const content = babelGenerator(ast, {}, file.content).code;
       return Object.assign({}, file, { content });
     } catch (e) {
@@ -158,6 +129,7 @@ export class DataSchemaCompiler {
     const dashboardTemplates = [];
     const compiledFiles = {};
     const asyncModules = [];
+
     toCompile
       .forEach((file) => {
         this.compileFile(

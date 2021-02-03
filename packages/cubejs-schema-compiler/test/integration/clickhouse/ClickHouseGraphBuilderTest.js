@@ -1144,7 +1144,7 @@ describe('ClickHouse JoinGraph', function test() {
     });
   }));
 
-  it('user context', () => compiler.compile().then(() => {
+  it('security context', () => compiler.compile().then(() => {
     const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
@@ -1152,7 +1152,7 @@ describe('ClickHouse JoinGraph', function test() {
       timeDimensions: [],
       timezone: 'America/Los_Angeles',
       contextSymbols: {
-        userContext: { source: 'some' }
+        securityContext: { source: 'some' }
       }
     });
 
@@ -1166,7 +1166,7 @@ describe('ClickHouse JoinGraph', function test() {
     });
   }));
 
-  it('user context array', () => compiler.compile().then(() => {
+  it('security context array', () => compiler.compile().then(() => {
     const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
@@ -1174,7 +1174,7 @@ describe('ClickHouse JoinGraph', function test() {
       timeDimensions: [],
       timezone: 'America/Los_Angeles',
       contextSymbols: {
-        userContext: {
+        securityContext: {
           sourceArray: ['some', 'google']
         }
       }

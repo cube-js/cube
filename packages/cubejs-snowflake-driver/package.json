@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.25.32",
+  "version": "0.26.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-snowflake-driver"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "main": "driver/SnowflakeDriver.js",
   "scripts": {
@@ -17,7 +17,7 @@
     "lint:fix": "linter --fix driver/*"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.25.32",
+    "@cubejs-backend/query-orchestrator": "^0.26.2",
     "date-fns-timezone": "^0.1.4",
     "snowflake-sdk": "^1.1.15"
   },
@@ -29,6 +29,6 @@
     "extends": "../cubejs-linter"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.25.0"
+    "@cubejs-backend/linter": "^0.26.0"
   }
 }

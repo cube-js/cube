@@ -61,19 +61,30 @@ export interface NormalizedQuery extends Query {
 }
 
 export interface RequestContext {
-  authInfo: any;
+  securityContext: any;
   requestId: string;
+}
+
+export type RequestExtension = Record<string, any>;
+export type ExtendedRequestContext = RequestContext & RequestExtension;
+
+export interface Request extends ExpressRequest {
+  context?: ExtendedRequestContext,
+  // It's deprecated
+  authInfo?: any,
+  // New one, replace authInfo
+  securityContext?: any,
 }
 
 export type QueryTransformerFn = (query: Query, context: RequestContext) => Promise<Query>;
 
 // @deprecated
-export type CheckAuthMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void
+export type CheckAuthMiddlewareFn = (req: Request, res: ExpressResponse, next: ExpressNextFunction) => void
 
 // @deprecated
 export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void
 
 // @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
-export type CheckAuthFn = (ctx: any, authorization?: string) => any;
+export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void>|void;
 
-export type ExtendContextFn = (req: ExpressRequest) => any;
+export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension>|RequestExtension;

@@ -1,5 +1,4 @@
-import { Request as ExpressRequest } from 'express';
-import { CheckAuthFn, CheckAuthMiddlewareFn, QueryTransformerFn } from '@cubejs-backend/api-gateway';
+import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn } from '@cubejs-backend/api-gateway';
 import { RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 
 export interface QueueOptions {
@@ -31,8 +30,16 @@ export interface OrchestratorOptions {
 }
 
 export interface RequestContext {
+  // @deprecated Renamed to securityContext, please use securityContext.
   authInfo: any;
+  securityContext: any;
   requestId: string;
+}
+
+export type UserBackgroundContext = {
+  // @deprecated Renamed to securityContext, please use securityContext.
+  authInfo?: any;
+  securityContext: any;
 }
 
 export interface DriverContext extends RequestContext {
@@ -103,10 +110,10 @@ export interface CreateOptions {
   queryTransformer?: QueryTransformerFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string;
-  extendContext?: (req: ExpressRequest) => any;
+  extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];
-  scheduledRefreshContexts?: () => Promise<object[]>;
+  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
   compilerCacheSize?: number;
   maxCompilerCacheKeepAlive?: number;

@@ -37,12 +37,15 @@ const decimalFormatter = item => numeral(item).format("0,0.00");
 const percentFormatter = item => numeral(item/100.0).format('0.00%');
 const timeNumberFormatter = item => numeral(item).format('00:00:00');
 const dateFormatter = item => moment(item).format("MMM DD");
+
 const resolveFormatter = (type) => {
   if (type === "string") {
     return (item) => item
   } else if (type === "number") {
     return numberFormatter;
   }
+
+  throw new Error(`Unsupported type for resolveFormatter: "${type}"`);
 }
 
 
@@ -54,7 +57,21 @@ const xAxisFormatter = (item) => {
   }
 }
 
-const getType = (resultSet, key) => (resultSet.loadResponse.annotation.measures[key] || resultSet.loadResponse.annotation.dimensions[key]).type
+const getType = (resultSet, key) => {
+  let annotation = resultSet.annotation();
+
+  if (annotation.measures[key]) {
+    return annotation.measures[key].type;
+  }
+
+  if (annotation.dimensions[key]) {
+    return annotation.dimensions[key].type;
+  }
+
+  throw new Error(
+    `Unable to resolve type from resultSet with key: "${key}"`
+  );
+}
 
 const CartesianChart = ({ resultSet, legend, children, ChartComponent, height }) => (
   <ResponsiveContainer width="100%" height={height || 250}>
@@ -165,7 +182,7 @@ const TypeToChartComponent = {
   ),
   number: ({ resultSet, height }) => {
     const measureKey = resultSet.seriesNames()[0].key; // Ensure number can only render single measure
-    const format = resultSet.loadResponse.annotation.measures[measureKey].format;
+    const format = resultSet.annotation().measures[measureKey].format;
     const value = resultSet.totalRow()[measureKey];
     let formattedValue;
     if (format === 'percent') {
@@ -199,7 +216,11 @@ const TypeToChartComponent = {
             <TableRow key={index}>
               {resultSet.tableColumns().map(c => {
                 const type = getType(resultSet, c.key);
-                return (<TableCell align={getType(resultSet, c.key) === 'number' ? 'right' : 'left'} key={c.key}>{resolveFormatter(type)(row[c.key])}</TableCell>)
+                return (
+                  <TableCell align={getType(resultSet, c.key) === 'number' ? 'right' : 'left'} key={c.key}>
+                    {resolveFormatter(type)(row[c.key])}
+                  </TableCell>
+                )
               })}
             </TableRow>
           ))}

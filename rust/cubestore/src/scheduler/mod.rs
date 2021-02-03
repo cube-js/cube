@@ -116,7 +116,7 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::Insert(TableId::Tables, row_id) = event {
             let table = self.meta_store.get_table_by_id(row_id).await?;
-            if table.get_row().location().is_some() {
+            if table.get_row().locations().is_some() {
                 self.schedule_table_import(row_id).await?;
             }
         }

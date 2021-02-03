@@ -1,3 +1,4 @@
+import { BaseDriver } from "@cubejs-backend/query-orchestrator";
 import { ClientConfiguration } from "aws-sdk/clients/athena";
 
 declare module "@cubejs-backend/athena-driver" {
@@ -7,7 +8,7 @@ declare module "@cubejs-backend/athena-driver" {
     pollMaxInterval?: number,
   }
 
-  export default class AthenaDriver {
+  export default class AthenaDriver extends BaseDriver {
     constructor(options?: AthenaDriverOptions);
   }
 }

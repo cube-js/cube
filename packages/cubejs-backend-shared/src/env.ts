@@ -72,7 +72,6 @@ const variables = {
     .default('false')
     .asBoolStrict(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
-  tlsPort: () => asPortOrSocket(process.env.TLS_PORT || '4433', 'TLS_PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
     .asBoolStrict(),

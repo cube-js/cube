@@ -1,11 +1,13 @@
 import * as t from '@babel/types';
 import { TranspilerInterface, TraverseObject } from './transpiler.interface';
+import { ErrorReporter } from '../ErrorReporter';
 
 export class ImportExportTranspiler implements TranspilerInterface {
-  public traverseObject(): TraverseObject {
+  public traverseObject(reporter: ErrorReporter): TraverseObject {
     return {
       ImportDeclaration(path) {
         const specifiers = path.get('specifiers');
+        // eslint-disable-next-line array-callback-return,consistent-return
         const declarations = specifiers.map(specifier => {
           if (specifier.node.type === 'ImportSpecifier') {
             return t.variableDeclarator(
@@ -21,13 +23,17 @@ export class ImportExportTranspiler implements TranspilerInterface {
               t.callExpression(t.identifier('require'), [path.get('source').node])
             );
           } else {
-            throw new Error(`'${specifier.node.type}' import not supported`);
+            reporter.syntaxError({
+              message: `'${specifier.node.type}' import not supported`,
+              loc: specifier.node.loc,
+            });
           }
         });
         path.replaceWith(t.variableDeclaration('const', declarations));
       },
       ExportNamedDeclaration(path) {
         const specifiers = path.get('specifiers');
+        // eslint-disable-next-line array-callback-return,consistent-return
         const declarations = specifiers.map(specifier => {
           if (specifier.node.type === 'ExportSpecifier') {
             return t.objectProperty(
@@ -35,7 +41,10 @@ export class ImportExportTranspiler implements TranspilerInterface {
               specifier.get('local').node
             );
           } else {
-            throw new Error(`'${specifier.node.type}' export not supported`);
+            reporter.syntaxError({
+              message: `'${specifier.node.type}' export not supported`,
+              loc: specifier.node.loc,
+            });
           }
         });
         const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(declarations)]);

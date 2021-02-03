@@ -1,3 +1,5 @@
+import { BaseDriver } from "@cubejs-backend/query-orchestrator";
+
 interface ConnectionConfig {
   /**
    * The hostname of the database you are connecting to. (Default: localhost)
@@ -21,7 +23,7 @@ interface ConnectionConfig {
 }
 
 declare module "@cubejs-backend/cubestore-driver" {
-  export default class CubeStoreDriver {
+  export default class CubeStoreDriver extends BaseDriver {
     constructor(options?: ConnectionConfig);
   }
 }

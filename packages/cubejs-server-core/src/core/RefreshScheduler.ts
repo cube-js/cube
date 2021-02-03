@@ -3,6 +3,7 @@ import uuid from 'uuid/v4';
 
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
+import { RequestContext } from './types';
 
 export class RefreshScheduler {
   public constructor(
@@ -89,14 +90,22 @@ export class RefreshScheduler {
     }
   }
 
-  public async runScheduledRefresh(context, queryingOptions) {
+  public async runScheduledRefresh(ctx: RequestContext | null, queryingOptions) {
     queryingOptions = { timezones: [queryingOptions.timezone || 'UTC'], ...queryingOptions };
     const { throwErrors, ...restOptions } = queryingOptions;
-    context = { requestId: `scheduler-${context && context.requestId || uuid()}`, ...context };
+
+    const context: RequestContext = {
+      authInfo: null,
+      securityContext: null,
+      ...ctx,
+      requestId: `scheduler-${ctx && ctx.requestId || uuid()}`,
+    };
+
     this.serverCore.logger('Refresh Scheduler Run', {
-      authInfo: context.authInfo,
+      securityContext: context.securityContext,
       requestId: context.requestId
     });
+
     try {
       const compilerApi = this.serverCore.getCompilerApi(context);
       await Promise.all([
@@ -110,7 +119,7 @@ export class RefreshScheduler {
       if (e.error !== 'Continue wait') {
         this.serverCore.logger('Refresh Scheduler Error', {
           error: e.error || e.stack || e.toString(),
-          authInfo: context.authInfo,
+          securityContext: context.securityContext,
           requestId: context.requestId
         });
       }

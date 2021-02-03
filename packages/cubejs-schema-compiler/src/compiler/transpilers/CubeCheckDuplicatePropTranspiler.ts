@@ -1,20 +1,18 @@
-import { TranspilerInterface, TraverseObject } from './transpiler.interface';
+/* eslint-disable no-restricted-syntax */
+import t from '@babel/types';
 
-const TYPE = {
-  OBJECT_EXPRESSION: 'ObjectExpression',
-  STRING_LITERAL: 'StringLiteral',
-  IDENTIFIER: 'Identifier'
-};
+import { TranspilerInterface, TraverseObject } from './transpiler.interface';
+import { ErrorReporter } from '../ErrorReporter';
 
 export class CubeCheckDuplicatePropTranspiler implements TranspilerInterface {
-  public traverseObject(): TraverseObject {
+  public traverseObject(reporter: ErrorReporter): TraverseObject {
     return {
       CallExpression: path => {
         // @ts-ignore @todo Unsafely?
         if (path.node.callee.name === 'cube') {
           path.node.arguments.forEach(arg => {
-            if (arg && arg.type === TYPE.OBJECT_EXPRESSION) {
-              this.checkExpression(arg);
+            if (arg && arg.type === 'ObjectExpression') {
+              this.checkExpression(arg, reporter);
             }
           });
         }
@@ -22,39 +20,41 @@ export class CubeCheckDuplicatePropTranspiler implements TranspilerInterface {
     };
   }
 
-  protected compileExpression(expr) {
-    if (expr.type === TYPE.IDENTIFIER) {
+  protected compileExpression(expr: t.Expression) {
+    if (expr.type === 'Identifier') {
       return expr.name;
     }
 
-    if (expr.type === TYPE.STRING_LITERAL && expr.value) {
+    if (expr.type === 'StringLiteral' && expr.value) {
       return expr.value;
     }
 
     return null;
   }
 
-  protected checkExpression(astObjectExpression) {
+  protected checkExpression(astObjectExpression: t.ObjectExpression, reporter: ErrorReporter) {
     const unique = new Set();
 
-    astObjectExpression.properties.forEach(prop => {
-      const { value, key, loc } = prop || {};
-      if (value && key) {
-        if (value.type === TYPE.OBJECT_EXPRESSION) {
-          this.checkExpression(value);
-        }
-
-        const keyName = this.compileExpression(key);
-        if (keyName) {
-          if (unique.has(keyName)) {
-            const error: any = new SyntaxError(`Duplicate property parsing ${keyName}`);
-            error.loc = loc.start;
-            throw error;
+    for (const prop of astObjectExpression.properties) {
+      if (prop.type === 'ObjectProperty') {
+        if (prop.value && prop.key) {
+          if (prop.value.type === 'ObjectExpression') {
+            this.checkExpression(prop.value, reporter);
           }
 
-          unique.add(keyName);
+          const keyName = this.compileExpression(prop.key);
+          if (keyName) {
+            if (unique.has(keyName)) {
+              reporter.syntaxError({
+                message: `Duplicate property parsing ${keyName}`,
+                loc: prop.key.loc,
+              });
+            }
+
+            unique.add(keyName);
+          }
         }
       }
-    });
+    }
   }
 }

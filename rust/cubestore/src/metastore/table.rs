@@ -21,7 +21,10 @@ pub struct Table {
     table_name: String,
     schema_id: u64,
     columns: Vec<Column>,
+    // TODO remove once we figure out how to drop fields without failing deserialization
     location: Option<String>,
+    #[serde(default)]
+    locations: Option<Vec<String>>,
     import_format: Option<ImportFormat>,
     #[serde(default)]
     has_data: bool
@@ -47,14 +50,15 @@ impl Table {
         table_name: String,
         schema_id: u64,
         columns: Vec<Column>,
-        location: Option<String>,
+        locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
     ) -> Table {
         Table {
             table_name,
             schema_id,
             columns,
-            location,
+            location: None,
+            locations,
             import_format,
             has_data: false,
         }
@@ -71,8 +75,11 @@ impl Table {
         &self.import_format
     }
 
-    pub fn location(&self) -> &Option<String> {
-        &self.location
+    pub fn locations(&self) -> Option<Vec<&String>> {
+        self.location
+            .as_ref()
+            .map(|l| vec![l])
+            .or_else(|| self.locations.as_ref().map(|l| l.iter().collect()))
     }
 
     pub fn get_table_name(&self) -> &String {
@@ -89,6 +96,7 @@ impl Table {
             schema_id: self.schema_id,
             columns: self.columns.clone(),
             location: self.location.clone(),
+            locations: self.locations.clone(),
             import_format: self.import_format.clone(),
             has_data,
         }

@@ -132,7 +132,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#e45703e2d906af19a006a1d8af4d24c044456380"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#d7968e901b774c238fbdc0550a152fa8e98c46fc"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#e45703e2d906af19a006a1d8af4d24c044456380"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#d7968e901b774c238fbdc0550a152fa8e98c46fc"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -176,6 +176,19 @@ dependencies = [
  "concurrent-queue",
  "event-listener",
  "futures-core",
+]
+
+[[package]]
+name = "async-compression"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b72c1f1154e234325b50864a349b9c8e56939e266a4c307c0f159812df2f9537"
+dependencies = [
+ "flate2",
+ "futures-core",
+ "memchr",
+ "pin-project-lite 0.2.4",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -1033,6 +1046,7 @@ dependencies = [
  "actix-rt",
  "arrow",
  "arrow-flight",
+ "async-compression",
  "async-std 0.99.12",
  "async-trait",
  "aws-creds",
@@ -1070,6 +1084,7 @@ dependencies = [
  "reqwest 0.11.0",
  "rocksdb",
  "rust-s3",
+ "scopeguard",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1094,7 +1109,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#e45703e2d906af19a006a1d8af4d24c044456380"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#d7968e901b774c238fbdc0550a152fa8e98c46fc"
 dependencies = [
  "ahash 0.6.3",
  "arrow",
@@ -2766,7 +2781,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#e45703e2d906af19a006a1d8af4d24c044456380"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#d7968e901b774c238fbdc0550a152fa8e98c46fc"
 dependencies = [
  "arrow",
  "base64 0.12.3",

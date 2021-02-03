@@ -10,7 +10,7 @@ import { withRouter } from 'react-router';
 import Header from './components/Header';
 import { event, setAnonymousId } from './events';
 import GlobalStyles from './components/GlobalStyles';
-import { AppContext } from './hooks/slow-query';
+import { AppContext } from './hooks';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
@@ -28,7 +28,8 @@ class App extends Component {
   state = {
     fatalError: null,
     context: null,
-    slowQuery: false
+    slowQuery: false,
+    isPreAggregationBuildInProgress: false,
   };
 
   async componentDidMount() {
@@ -36,13 +37,28 @@ class App extends Component {
 
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
-      onQueryLoad: (resultSet) => {
+      onQueryLoad: (data) => {
+        let resultSet;
+        
+        if (data?.resultSet !== undefined) {
+          resultSet = data.resultSet;
+        } else {
+          resultSet = data;
+        }
+        
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
 
           this.setState({ slowQuery: Boolean(loadResponse.slowQuery) });
         }
       },
+      onQueryProgress: (progress) => {
+        this.setState({
+          isPreAggregationBuildInProgress: Boolean(progress?.stage?.stage.includes(
+            'pre-aggregation'
+          )),
+        });
+      }
     };
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
@@ -95,7 +111,8 @@ class App extends Component {
   }
 
   render() {
-    const { context, fatalError, slowQuery } = this.state || {};
+    const { context, fatalError, slowQuery, isPreAggregationBuildInProgress } =
+      this.state || {};
     const { location, children } = this.props;
 
     if (context == null) {
@@ -106,6 +123,7 @@ class App extends Component {
       <AppContext.Provider
         value={{
           slowQuery,
+          isPreAggregationBuildInProgress,
         }}
       >
         <Layout style={{ height: '100%' }}>
