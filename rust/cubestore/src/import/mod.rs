@@ -258,53 +258,54 @@ impl ImportService for ImportServiceImpl {
                 "Trying to import table without import format: {:?}",
                 table
             )))?;
-        let location = table
+        let locations = table
             .get_row()
-            .location()
-            .as_ref()
+            .locations()
             .ok_or(CubeError::internal(format!(
                 "Trying to import table without location: {:?}",
                 table
             )))?;
         let temp_dir = self.config_obj.data_dir().join("tmp");
         tokio::fs::create_dir_all(temp_dir.clone()).await?;
-        let mut temp_files = TempFiles::new(temp_dir);
-        let mut row_stream = format
-            .row_stream(
-                location.to_string(),
-                table.get_row().get_columns().clone(),
-                table_id,
-                &mut temp_files,
-            )
-            .await?;
+        for location in locations.into_iter() {
+            let mut temp_files = TempFiles::new(temp_dir.clone());
+            let mut row_stream = format
+                .row_stream(
+                    location.to_string(),
+                    table.get_row().get_columns().clone(),
+                    table_id,
+                    &mut temp_files,
+                )
+                .await?;
 
-        defer!(trim_allocs());
+            defer!(trim_allocs());
 
-        let mut rows = Vec::new();
-        while let Some(row) = row_stream.next().await {
-            if let Some(row) = row? {
-                rows.push(row);
-                if rows.len() >= self.config_obj.wal_split_threshold() as usize {
-                    let mut to_add = Vec::new();
-                    mem::swap(&mut rows, &mut to_add);
-                    self.wal_store
-                        .add_wal(
-                            table.clone(),
-                            DataFrame::new(table.get_row().get_columns().clone(), to_add),
-                        )
-                        .await?;
+            let mut rows = Vec::new();
+            while let Some(row) = row_stream.next().await {
+                if let Some(row) = row? {
+                    rows.push(row);
+                    if rows.len() >= self.config_obj.wal_split_threshold() as usize {
+                        let mut to_add = Vec::new();
+                        mem::swap(&mut rows, &mut to_add);
+                        self.wal_store
+                            .add_wal(
+                                table.clone(),
+                                DataFrame::new(table.get_row().get_columns().clone(), to_add),
+                            )
+                            .await?;
+                    }
                 }
             }
+
+            mem::drop(temp_files);
+
+            self.wal_store
+                .add_wal(
+                    table.clone(),
+                    DataFrame::new(table.get_row().get_columns().clone(), rows),
+                )
+                .await?;
         }
-
-        mem::drop(temp_files);
-
-        self.wal_store
-            .add_wal(
-                table.clone(),
-                DataFrame::new(table.get_row().get_columns().clone(), rows),
-            )
-            .await?;
 
         Ok(())
     }
