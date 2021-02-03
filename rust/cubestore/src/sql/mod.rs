@@ -732,6 +732,7 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use crate::store::WALStore;
+    use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
     use rand::distributions::Alphanumeric;
@@ -742,9 +743,8 @@ mod tests {
     use std::path::PathBuf;
     use std::time::Duration;
     use std::{env, fs};
+    use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
-    use async_compression::tokio::write::GzipEncoder;
-    use tokio::io::{BufWriter, AsyncWriteExt};
 
     #[tokio::test]
     async fn create_schema_test() {

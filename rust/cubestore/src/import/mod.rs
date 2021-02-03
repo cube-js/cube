@@ -6,6 +6,7 @@ use crate::store::{DataFrame, WALDataStore};
 use crate::sys::malloc::trim_allocs;
 use crate::table::{Row, TableValue};
 use crate::CubeError;
+use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
@@ -19,10 +20,9 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
+use tokio::io;
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
-use async_compression::tokio::bufread::{GzipDecoder};
-use tokio::io;
 
 impl ImportFormat {
     async fn row_stream(
@@ -51,103 +51,99 @@ impl ImportFormat {
         };
         match self {
             ImportFormat::CSV => {
-                let lines_stream: Pin<Box<dyn Stream<Item = io::Result<String>> + Send>> = if location.contains(".csv.gz") {
-                    let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
-                    let lines = reader.lines();
-                    Box::pin(LinesStream::new(lines))
-                } else {
-                    let reader = BufReader::new(file);
-                    let lines = reader.lines();
-                    Box::pin(LinesStream::new(lines))
-                };
+                let lines_stream: Pin<Box<dyn Stream<Item = io::Result<String>> + Send>> =
+                    if location.contains(".csv.gz") {
+                        let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
+                        let lines = reader.lines();
+                        Box::pin(LinesStream::new(lines))
+                    } else {
+                        let reader = BufReader::new(file);
+                        let lines = reader.lines();
+                        Box::pin(LinesStream::new(lines))
+                    };
 
                 let mut header_mapping = None;
                 let mut mapping_insert_indices = Vec::with_capacity(columns.len());
-                let rows =
-                    lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
-                        let str = line?;
+                let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
+                    let str = line?;
 
-                        let mut parser = CsvLineParser::new(str.as_str());
+                    let mut parser = CsvLineParser::new(str.as_str());
 
-                        if header_mapping.is_none() {
-                            let mut mapping = Vec::new();
-                            for _ in 0..columns.len() {
-                                let next_column = parser.next_value()?;
-                                let (i, to_insert) = columns
-                                    .iter()
-                                    .find_position(|c| c.get_name() == &next_column)
-                                    .map(|(i, c)| (i, c.clone()))
-                                    .ok_or(CubeError::user(format!(
-                                        "Column '{}' is not found during import in {:?}",
-                                        next_column, columns
-                                    )))?;
-                                // This is tricky indices structure: it remembers indices of inserts
-                                // with regards to moving element indices due to these inserts.
-                                // It saves some column resorting trips.
-                                let insert_pos = mapping
-                                    .iter()
-                                    .find_position(|(col_index, _)| *col_index > i)
-                                    .map(|(insert_pos, _)| insert_pos)
-                                    .unwrap_or_else(|| mapping.len());
-                                mapping_insert_indices.push(insert_pos);
-                                mapping.push((i, to_insert));
-                                parser.advance()?;
-                            }
-                            header_mapping = Some(mapping);
-                            return Ok(None);
-                        }
-
-                        let resolved_mapping = header_mapping.as_ref().ok_or(CubeError::user(
-                            "Header is required for CSV import".to_string(),
-                        ))?;
-
-                        let mut row = Vec::with_capacity(columns.len());
-
-                        for (i, (_, column)) in resolved_mapping.iter().enumerate() {
-                            let value = parser.next_value()?;
-
-                            if &value == "" {
-                                row.insert(mapping_insert_indices[i], TableValue::Null);
-                            } else {
-                                row.insert(
-                                    mapping_insert_indices[i],
-                                    match column.get_column_type() {
-                                        ColumnType::String => TableValue::String(value),
-                                        ColumnType::Int => value
-                                            .parse()
-                                            .map(|v| TableValue::Int(v))
-                                            .unwrap_or(TableValue::Null),
-                                        ColumnType::Decimal { .. } => {
-                                            BigDecimal::from_str_radix(value.as_str(), 10)
-                                                .map(|d| TableValue::Decimal(d.to_string()))
-                                                .unwrap_or(TableValue::Null)
-                                        }
-                                        ColumnType::Bytes => {
-                                            TableValue::Bytes(base64::decode(value)?)
-                                        }
-                                        ColumnType::HyperLogLog(f) => {
-                                            let data = base64::decode(value)?;
-                                            is_valid_hll(&data, *f)?;
-
-                                            TableValue::Bytes(data)
-                                        }
-                                        ColumnType::Timestamp => {
-                                            timestamp_from_string(value.as_str())?
-                                        }
-                                        ColumnType::Float => {
-                                            TableValue::Float(value.parse::<f64>()?.to_string())
-                                        }
-                                        ColumnType::Boolean => {
-                                            TableValue::Boolean(value.to_lowercase() == "true")
-                                        }
-                                    },
-                                );
-                            }
-
+                    if header_mapping.is_none() {
+                        let mut mapping = Vec::new();
+                        for _ in 0..columns.len() {
+                            let next_column = parser.next_value()?;
+                            let (i, to_insert) = columns
+                                .iter()
+                                .find_position(|c| c.get_name() == &next_column)
+                                .map(|(i, c)| (i, c.clone()))
+                                .ok_or(CubeError::user(format!(
+                                    "Column '{}' is not found during import in {:?}",
+                                    next_column, columns
+                                )))?;
+                            // This is tricky indices structure: it remembers indices of inserts
+                            // with regards to moving element indices due to these inserts.
+                            // It saves some column resorting trips.
+                            let insert_pos = mapping
+                                .iter()
+                                .find_position(|(col_index, _)| *col_index > i)
+                                .map(|(insert_pos, _)| insert_pos)
+                                .unwrap_or_else(|| mapping.len());
+                            mapping_insert_indices.push(insert_pos);
+                            mapping.push((i, to_insert));
                             parser.advance()?;
                         }
-                        Ok(Some(Row::new(row)))
-                    });
+                        header_mapping = Some(mapping);
+                        return Ok(None);
+                    }
+
+                    let resolved_mapping = header_mapping.as_ref().ok_or(CubeError::user(
+                        "Header is required for CSV import".to_string(),
+                    ))?;
+
+                    let mut row = Vec::with_capacity(columns.len());
+
+                    for (i, (_, column)) in resolved_mapping.iter().enumerate() {
+                        let value = parser.next_value()?;
+
+                        if &value == "" {
+                            row.insert(mapping_insert_indices[i], TableValue::Null);
+                        } else {
+                            row.insert(
+                                mapping_insert_indices[i],
+                                match column.get_column_type() {
+                                    ColumnType::String => TableValue::String(value),
+                                    ColumnType::Int => value
+                                        .parse()
+                                        .map(|v| TableValue::Int(v))
+                                        .unwrap_or(TableValue::Null),
+                                    ColumnType::Decimal { .. } => {
+                                        BigDecimal::from_str_radix(value.as_str(), 10)
+                                            .map(|d| TableValue::Decimal(d.to_string()))
+                                            .unwrap_or(TableValue::Null)
+                                    }
+                                    ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+                                    ColumnType::HyperLogLog(f) => {
+                                        let data = base64::decode(value)?;
+                                        is_valid_hll(&data, *f)?;
+
+                                        TableValue::Bytes(data)
+                                    }
+                                    ColumnType::Timestamp => timestamp_from_string(value.as_str())?,
+                                    ColumnType::Float => {
+                                        TableValue::Float(value.parse::<f64>()?.to_string())
+                                    }
+                                    ColumnType::Boolean => {
+                                        TableValue::Boolean(value.to_lowercase() == "true")
+                                    }
+                                },
+                            );
+                        }
+
+                        parser.advance()?;
+                    }
+                    Ok(Some(Row::new(row)))
+                });
                 Ok(rows.boxed())
             }
         }
