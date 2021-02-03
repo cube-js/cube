@@ -2,10 +2,6 @@
 import pt from 'promise-timeout';
 import { QueryOrchestrator, ContinueWaitError } from '@cubejs-backend/query-orchestrator';
 
-let counter = 0;
-// @ts-ignore
-const wait = (delay = 2000) => new Promise((resolve) => setTimeout(() => resolve(), delay));
-
 export class OrchestratorApi {
   private seenDataSources: { [dataSource: string]: boolean } = {};
   
@@ -25,19 +21,6 @@ export class OrchestratorApi {
   public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
-    
-    // console.log({ counter });
-    
-    // if (counter % 2 === 0) {
-    //   counter++;
-    //   throw {
-    //     error: 'Continue wait',
-    //     stage: `Building pre-aggregation ${counter}`
-    //   };
-    // } else {
-    //   counter++;
-    //   await wait(1000);
-    // }
     
     try {
       this.logger('Query started', {
