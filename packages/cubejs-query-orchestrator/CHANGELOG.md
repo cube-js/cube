@@ -971,7 +971,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ### Features
 
-* `CUBEJS_REDIS_TLS=true` env variable support ([55858cf](https://github.com/statsbotco/cubejs-client/commit/55858cf))
+* `REDIS_TLS=true` env variable support ([55858cf](https://github.com/statsbotco/cubejs-client/commit/55858cf))
 
 
 
