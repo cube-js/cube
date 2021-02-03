@@ -1,6 +1,7 @@
 import { useState, useRef, useLayoutEffect } from 'react';
 import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
 
 import { playgroundAction } from './events';
@@ -10,10 +11,11 @@ import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
-import { Card, SectionHeader, SectionRow } from './components';
+import { Card, SectionHeader, SectionRow, Button } from './components';
 import styled from 'styled-components';
 import ChartContainer from './ChartContainer';
 import { dispatchChartEvent } from './utils';
+import { useSecurityContext } from './hooks';
 
 const Section = styled.div`
   display: flex;
@@ -87,14 +89,15 @@ export default function PlaygroundQueryBuilder({
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
-  
+  const { isModalOpen, setIsModalOpen } = useSecurityContext();
+
   useLayoutEffect(() => {
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
       onChartRendererReady() {
         setChartRendererReady(true);
-      }
-    }
+      },
+    };
   }, []);
 
   const { response } = useDryRun(query, {
@@ -141,6 +144,18 @@ export default function PlaygroundQueryBuilder({
       }) => {
         return (
           <>
+            <Row style={{ margin: 12 }}>
+              <Col span={24}>
+                <Button
+                  icon={<LockOutlined />}
+                  size="small"
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  Edit Security Context
+                </Button>
+              </Col>
+            </Row>
+
             <Row
               justify="space-around"
               align="top"

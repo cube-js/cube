@@ -1,6 +1,5 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
 import { Component } from 'react';
-import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
 import './index.less';
 import './index.css';
@@ -145,14 +144,5 @@ class App extends Component {
     );
   }
 }
-
-App.propTypes = {
-  location: PropTypes.object.isRequired,
-  children: PropTypes.array,
-};
-
-App.defaultProps = {
-  children: [],
-};
 
 export default withRouter(App);
