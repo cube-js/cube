@@ -1,11 +1,10 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactoryByDataSource } from './DriverFactory';
-
-import config from '../config';
 
 interface QueryOrchestratorOptions {
   cacheAndQueueDriver?: 'redis' | 'memory';
@@ -35,9 +34,9 @@ export class QueryOrchestrator {
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;
 
-    const cacheAndQueueDriver = options.cacheAndQueueDriver || config.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
-      config.NODE_ENV === 'production' || config.REDIS_URL ||
-        (config.CUBEJS_REDIS_USE_IOREDIS && config.CUBEJS_REDIS_SENTINEL) ? 'redis' : 'memory'
+    const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
+      getEnv('nodeEnv') === 'production' || getEnv('redisUrl') ||
+      (getEnv('redisUseIORedis') && getEnv('redisSentinel')) ? 'redis' : 'memory'
     );
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {

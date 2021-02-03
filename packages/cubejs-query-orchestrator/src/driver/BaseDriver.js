@@ -1,9 +1,8 @@
 import { reduce } from 'ramda';
 import fs from 'fs';
-import { isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
+import { getEnv, isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
 
 import { cancelCombinator } from './utils';
-import config from '../config';
 
 const sortByKeys = (unordered) => {
   const ordered = {};
@@ -74,8 +73,8 @@ export class BaseDriver {
     ];
 
     if (
-      config.CUBEJS_DB_SSL ||
-      config.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
+      getEnv('dbSsl') ||
+      getEnv('dbSslRejectUnauthorized') ||
       sslOptions.find(o => !!process.env[o.value])
     ) {
       ssl = sslOptions.reduce(
@@ -113,7 +112,7 @@ export class BaseDriver {
         {}
       );
 
-      ssl.rejectUnauthorized = config.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED;
+      ssl.rejectUnauthorized = getEnv('dbSslRejectUnauthorized');
     }
 
     return ssl;

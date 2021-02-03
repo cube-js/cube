@@ -1,7 +1,7 @@
 import redis, { ClientOpts, RedisClient } from 'redis';
+import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import AsyncRedisClient from './AsyncRedisClient';
-import config from '../config';
 
 function decorateRedisClient(client: RedisClient): AsyncRedisClient {
   [
@@ -40,12 +40,12 @@ export function createRedisClient(url: string, opts: ClientOpts = {}) {
     url,
   };
 
-  if (config.REDIS_TLS) {
+  if (getEnv('redisTls')) {
     options.tls = {};
   }
 
-  if (config.REDIS_PASSWORD) {
-    options.password = config.REDIS_PASSWORD;
+  if (getEnv('redisPassword')) {
+    options.password = getEnv('redisPassword');
   }
 
   return Promise.resolve(decorateRedisClient(

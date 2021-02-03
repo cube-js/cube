@@ -1,9 +1,8 @@
 import Redis, { Redis as redis, RedisOptions, Pipeline } from 'ioredis';
-
-import config from '../config';
+import { getEnv } from '@cubejs-backend/shared';
 
 async function createIORedisClient(url: string, opts: RedisOptions) {
-  const [host, portStr] = (config.CUBEJS_REDIS_SENTINEL || url || 'localhost').replace('redis://', '').split(':');
+  const [host, portStr] = (getEnv('redisSentinel') || url || 'localhost').replace('redis://', '').split(':');
   const port = portStr ? Number(portStr) : 6379;
 
   const options: RedisOptions = {
@@ -12,7 +11,7 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     lazyConnect: true
   };
 
-  if (config.CUBEJS_REDIS_SENTINEL) {
+  if (getEnv('redisSentinel')) {
     options.sentinels = [{ host, port }];
     options.name = 'mymaster';
     options.enableOfflineQueue = false;
@@ -21,12 +20,12 @@ async function createIORedisClient(url: string, opts: RedisOptions) {
     options.port = port;
   }
 
-  if (config.REDIS_TLS) {
+  if (getEnv('redisTls')) {
     options.tls = {};
   }
 
-  if (config.REDIS_PASSWORD) {
-    options.password = config.REDIS_PASSWORD;
+  if (getEnv('redisPassword')) {
+    options.password = getEnv('redisPassword');
   }
 
   const client = new Redis(options);

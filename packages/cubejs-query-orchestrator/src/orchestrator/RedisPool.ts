@@ -1,13 +1,13 @@
 /* eslint-disable global-require */
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
+import { getEnv } from '@cubejs-backend/shared';
 import AsyncRedisClient from './AsyncRedisClient';
 import RedisClientOptions from './RedisClientOptions';
 import { createRedisClient as createNodeRedisClient } from './RedisFactory';
 import { createRedisSentinelClient } from './RedisSentinelFactory';
-import config from '../config';
 
 function createRedisClient(url: string, opts: RedisClientOptions = {}) {
-  if (config.CUBEJS_REDIS_USE_IOREDIS) {
+  if (getEnv('redisUseIORedis')) {
     return createRedisSentinelClient(url, opts);
   }
 
@@ -35,23 +35,18 @@ export class RedisPool {
   protected poolErrors: number = 0;
 
   public constructor(options: RedisPoolOptions = {}) {
-    const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : config.CUBEJS_REDIS_POOL_MIN;
-    const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : config.CUBEJS_REDIS_POOL_MAX;
-    const idleTimeoutSeconds = (typeof options.idleTimeoutSeconds !== 'undefined') ?
-      options.idleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
-    const softIdleTimeoutSeconds = (typeof options.softIdleTimeoutSeconds !== 'undefined') ?
-      options.softIdleTimeoutSeconds : config.CUBEJS_REDIS_SOFT_IDLE_TIMEOUT_SECONDS;
+    const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : getEnv('redisPoolMin');
+    const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : getEnv('redisPoolMax');
 
     const opts: PoolOptions = {
       min,
       max,
       acquireTimeoutMillis: 5000,
-      idleTimeoutMillis: idleTimeoutSeconds * 1000,
-      softIdleTimeoutMillis: softIdleTimeoutSeconds * 1000,
-      evictionRunIntervalMillis: Math.min(idleTimeoutSeconds, softIdleTimeoutSeconds) * 1000
+      idleTimeoutMillis: 5000,
+      evictionRunIntervalMillis: 5000
     };
 
-    const create = options.createClient || (async () => createRedisClient(config.REDIS_URL));
+    const create = options.createClient || (async () => createRedisClient(getEnv('redisUrl')));
 
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.end());
