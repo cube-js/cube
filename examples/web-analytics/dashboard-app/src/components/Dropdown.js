@@ -20,7 +20,7 @@ export default function Dropdown({ value, options }) {
   };
 
   return (
-    <div>
+    <>
       <Button
         color="inherit"
         aria-haspopup="true"
@@ -48,6 +48,6 @@ export default function Dropdown({ value, options }) {
           </MenuItem>
         ))}
       </Menu>
-    </div>
+    </>
   );
 }

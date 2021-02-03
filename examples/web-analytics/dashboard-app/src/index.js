@@ -19,17 +19,17 @@ import CustomReportsBuilderPage from "./pages/CustomReportsBuilderPage";
 ReactDOM.render(
   <Router>
     <App>
-      <Route key="index" exact path="/"
+      <Route exact path="/"
         render={() => <ReportPage report={AudiencePage} />} />
-      <Route key="index" exact path="/behavior"
+      <Route exact path="/behavior"
         render={() => <ReportPage report={BehaviorPage} />} />
-      <Route key="index" exact path="/acquisition"
+      <Route exact path="/acquisition"
         render={() => <ReportPage report={AcquisitionPage} />} />
-      <Route key="index" exact path="/custom-reports-overview"
+      <Route exact path="/custom-reports-overview"
         component={CustomReportsOverviewPage} />
-      <Route key="index" exact path="/custom-reports-builder/:id?"
+      <Route exact path="/custom-reports-builder/:id?"
         component={CustomReportsBuilderPage} />
-      <Route key="index" exact path="/custom-reports/:id"
+      <Route exact path="/custom-reports/:id"
         render={() => <ReportPage report={CustomReportPage} />} />
     </App>
   </Router>,
