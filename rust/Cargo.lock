@@ -179,6 +179,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-compression"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b72c1f1154e234325b50864a349b9c8e56939e266a4c307c0f159812df2f9537"
+dependencies = [
+ "flate2",
+ "futures-core",
+ "memchr",
+ "pin-project-lite 0.2.4",
+ "tokio 1.1.1",
+]
+
+[[package]]
 name = "async-executor"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1033,6 +1046,7 @@ dependencies = [
  "actix-rt",
  "arrow",
  "arrow-flight",
+ "async-compression",
  "async-std 0.99.12",
  "async-trait",
  "aws-creds",

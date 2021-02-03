@@ -229,6 +229,14 @@ impl DataFrameValue<String> for Option<String> {
     }
 }
 
+impl DataFrameValue<String> for Option<Vec<String>> {
+    fn value(v: &Self) -> String {
+        v.as_ref()
+            .map(|s| format!("{:?}", s))
+            .unwrap_or("NULL".to_string())
+    }
+}
+
 impl DataFrameValue<String> for Option<DateTime<Utc>> {
     fn value(v: &Self) -> String {
         v.as_ref()
@@ -645,7 +653,7 @@ pub trait MetaStore: Send + Sync {
         schema_name: String,
         table_name: String,
         columns: Vec<Column>,
-        location: Option<String>,
+        locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
     ) -> Result<IdRow<Table>, CubeError>;
@@ -2119,7 +2127,7 @@ impl MetaStore for RocksMetaStore {
         schema_name: String,
         table_name: String,
         columns: Vec<Column>,
-        location: Option<String>,
+        locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
     ) -> Result<IdRow<Table>, CubeError> {
@@ -2136,7 +2144,7 @@ impl MetaStore for RocksMetaStore {
                 table_name,
                 schema_id.get_id(),
                 columns,
-                location,
+                locations,
                 import_format,
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
