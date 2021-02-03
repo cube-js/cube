@@ -3,9 +3,11 @@ import { Alert, Spin, Typography } from 'antd';
 import styled from 'styled-components';
 
 import { dispatchChartEvent } from '../../utils';
-import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
-import useSlowQuery from '../../hooks/slow-query';
-import useIsPreAggregationBuildInProgress from '../../hooks/is-pre-aggregation-build-in-progress';
+import {
+  useDeepCompareMemoize,
+  useSlowQuery,
+  useIsPreAggregationBuildInProgress,
+} from '../../hooks';
 
 const { Text } = Typography;
 
