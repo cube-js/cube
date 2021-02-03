@@ -76,7 +76,9 @@ impl Table {
     }
 
     pub fn locations(&self) -> Option<Vec<&String>> {
-        self.location.as_ref().map(|l| vec![l])
+        self.location
+            .as_ref()
+            .map(|l| vec![l])
             .or_else(|| self.locations.as_ref().map(|l| l.iter().collect()))
     }
 
