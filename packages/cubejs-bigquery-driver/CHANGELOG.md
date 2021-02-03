@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.5](https://github.com/cube-js/cube.js/compare/v0.26.4...v0.26.5) (2021-02-03)
+
+
+### Features
+
+* **cubestore:** Multiple location load support ([#1982](https://github.com/cube-js/cube.js/issues/1982)) ([2b509ec](https://github.com/cube-js/cube.js/commit/2b509ec3c50be0688d613d2cda1ac3f53e80e093))
+
+
+
+
+
 ## [0.26.2](https://github.com/cube-js/cube.js/compare/v0.26.1...v0.26.2) (2021-02-01)
 
 **Note:** Version bump only for package @cubejs-backend/bigquery-driver
