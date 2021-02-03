@@ -21,7 +21,7 @@ export class OrchestratorApi {
   public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
-
+    
     try {
       this.logger('Query started', {
         query: queryForLog,
@@ -68,7 +68,10 @@ export class OrchestratorApi {
           };
         }
 
-        throw { error: 'Continue wait', stage: !query.scheduledRefresh ? await this.orchestrator.queryStage(query) : null };
+        throw {
+          error: 'Continue wait',
+          stage: !query.scheduledRefresh ? await this.orchestrator.queryStage(query) : null
+        };
       }
 
       this.logger('Error querying db', {

@@ -1,9 +1,33 @@
 import { useEffect } from 'react';
-import { Alert, Spin } from 'antd';
+import { Alert, Spin, Typography } from 'antd';
+import styled from 'styled-components';
 
 import { dispatchChartEvent } from '../../utils';
-import useDeepCompareMemoize from '../../hooks/deep-compare-memoize';
-import useSlowQuery from '../../hooks/slow-query';
+import {
+  useDeepCompareMemoize,
+  useSlowQuery,
+  useIsPreAggregationBuildInProgress,
+} from '../../hooks';
+
+const { Text } = Typography;
+
+const ChartContainer = styled.div`
+  visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
+
+  & > iframe {
+    width: 100%;
+    min-height: 400px;
+    border: none;
+  }
+`;
+
+const RequestMessage = styled.div`
+  display: flex;
+  width: 100%;
+  min-height: 400px;
+  align-items: center;
+  justify-content: center;
+`;
 
 export default function ChartRenderer({
   iframeRef,
@@ -16,6 +40,7 @@ export default function ChartRenderer({
   onChartRendererReadyChange,
 }) {
   const slowQuery = useSlowQuery();
+  const isPreAggregationBuildInProgress = useIsPreAggregationBuildInProgress();
 
   useEffect(() => {
     return () => {
@@ -46,19 +71,25 @@ export default function ChartRenderer({
         />
       ) : null}
 
-      {!isChartRendererReady ? <Spin /> : null}
+      {isPreAggregationBuildInProgress ? (
+        <RequestMessage>
+          <Text strong style={{ fontSize: 18 }}>
+            Building pre-aggregations...
+          </Text>
+        </RequestMessage>
+      ) : !isChartRendererReady ? (
+        <Spin />
+      ) : null}
 
-      <iframe
-        ref={iframeRef}
-        style={{
-          width: '100%',
-          minHeight: 400,
-          border: 'none',
-          visibility: isChartRendererReady ? 'visible' : 'hidden',
-        }}
-        title="Chart renderer"
-        src={`/chart-renderers/${framework}/index.html`}
-      />
+      <ChartContainer
+        hidden={!isChartRendererReady || isPreAggregationBuildInProgress}
+      >
+        <iframe
+          ref={iframeRef}
+          title="Chart renderer"
+          src={`/chart-renderers/${framework}/index.html`}
+        />
+      </ChartContainer>
     </>
   );
 }
