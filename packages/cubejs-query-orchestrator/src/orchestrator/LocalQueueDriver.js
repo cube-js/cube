@@ -1,9 +1,6 @@
 const R = require('ramda');
 const { BaseQueueDriver } = require('./BaseQueueDriver');
 
-// @ts-ignore
-const wait = (delay = 2000) => new Promise((resolve) => setTimeout(() => resolve(), delay));
-
 export class LocalQueueDriverConnection {
   constructor(driver, options) {
     this.redisQueuePrefix = options.redisQueuePrefix;
@@ -40,23 +37,11 @@ export class LocalQueueDriverConnection {
       return null;
     }
     const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
-    
-    // console.log('--> getResultBlocking', resultListKey);
-    // await wait(5000);
 
     const res = await Promise.race([
       this.getResultPromise(resultListKey),
       timeoutPromise(this.continueWaitTimeout * 1000),
     ]);
-    
-    // const res = await Promise.race([
-    //   new Promise((resolve) => {
-    //     this.getResultPromise(resultListKey).then((actualRes) => {
-    //       setTimeout(() => resolve(actualRes), 5000);
-    //     });
-    //   }),
-    //   timeoutPromise(this.continueWaitTimeout * 1000),
-    // ]);
 
     if (res) {
       delete this.resultPromises[resultListKey];

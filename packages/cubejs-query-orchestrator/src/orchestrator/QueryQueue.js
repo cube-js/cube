@@ -5,11 +5,6 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 
-let done = false;
-let counter = {};
-// @ts-ignore
-const wait = (delay = 2000) => new Promise((resolve) => setTimeout(() => resolve(), delay));
-
 export class QueryQueue {
   constructor(redisQueuePrefix, options) {
     this.redisQueuePrefix = redisQueuePrefix;
@@ -39,17 +34,6 @@ export class QueryQueue {
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
     options = options || {};
     const redisClient = await this.queueDriver.createConnection();
-    
-    // console.log('executeInQueue...', query);
-    // // await wait(5000);
-    // // console.log('executeInQueue: [done]');
-    
-    // if (!done && query.preAggregation?.tableName) {
-    //   console.log('START WAITING TO CREATE PRE-AGGREGATION');
-    //   await wait(7000);
-    //   done = true;
-    // }
-    
     try {
       if (priority == null) {
         priority = 0;
@@ -99,7 +83,6 @@ export class QueryQueue {
       }
 
       result = await redisClient.getResultBlocking(queryKey);
-      
       if (!result) {
         throw new ContinueWaitError();
       }

@@ -26,18 +26,18 @@ export class OrchestratorApi {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
     
-    console.log({ counter });
+    // console.log({ counter });
     
-    if (counter % 2 === 0) {
-      counter++;
-      throw {
-        error: 'Continue wait',
-        stage: `Building pre-aggregation ${counter}`
-      };
-    } else {
-      counter++;
-      await wait(1000);
-    }
+    // if (counter % 2 === 0) {
+    //   counter++;
+    //   throw {
+    //     error: 'Continue wait',
+    //     stage: `Building pre-aggregation ${counter}`
+    //   };
+    // } else {
+    //   counter++;
+    //   await wait(1000);
+    // }
     
     try {
       this.logger('Query started', {

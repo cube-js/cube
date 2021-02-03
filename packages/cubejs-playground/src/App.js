@@ -39,11 +39,9 @@ class App extends Component {
       ...window['__cubejsPlayground'],
       onQueryLoad: (data) => {
         let resultSet;
-        let progress;
-
+        
         if (data?.resultSet !== undefined) {
           resultSet = data.resultSet;
-          progress = data.progress;
         } else {
           resultSet = data;
         }
@@ -53,13 +51,14 @@ class App extends Component {
 
           this.setState({ slowQuery: Boolean(loadResponse.slowQuery) });
         }
-
+      },
+      onQueryProgress: (progress) => {
         this.setState({
-          isPreAggregationBuildInProgress: Boolean(progress?.stage?.includes(
+          isPreAggregationBuildInProgress: Boolean(progress?.stage?.stage.includes(
             'pre-aggregation'
           )),
         });
-      },
+      }
     };
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
