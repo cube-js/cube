@@ -218,9 +218,9 @@ impl Config {
                     .ok()
                     .map(|v| PathBuf::from(v))
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
-                partition_split_threshold: 262144 * 2,
+                partition_split_threshold: 524288 * 2,
                 compaction_chunks_count_threshold: 4,
-                compaction_chunks_total_size_threshold: 262144,
+                compaction_chunks_total_size_threshold: 524288,
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -270,7 +270,7 @@ impl Config {
                 wal_split_threshold: env::var("CUBESTORE_WAL_SPLIT_THRESHOLD")
                     .ok()
                     .map(|v| v.parse::<u64>().unwrap())
-                    .unwrap_or(131072),
+                    .unwrap_or(524288 / 2),
                 job_runners_count: env::var("CUBESTORE_JOB_RUNNERS")
                     .ok()
                     .map(|v| v.parse::<usize>().unwrap())
