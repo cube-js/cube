@@ -1,0 +1,18 @@
+{
+  "name": "web-analytics",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-server"
+  },
+  "dependencies": {
+    "express-session": "^1.17.0",
+    "passport": "^0.4.1",
+    "passport-google-oauth20": "^2.0.0"
+  },
+  "devDependencies": {
+    "@cubejs-backend/athena-driver": "^0.25.30",
+    "@cubejs-backend/cubestore-driver": "^0.25.30",
+    "@cubejs-backend/server": "^0.25.30"
+  }
+}
