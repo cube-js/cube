@@ -41,11 +41,13 @@ connections.
 
 ### Redis Sentinel
 
-Redis Sentinel support via ioredis was recently added. In order to activate
-this feature, set the `CUBEJS_REDIS_USE_IOREDIS` environment variable to
-`true` and then set `CUBEJS_REDIS_SENTINEL` to to the address and port
-(`host:port`) to allow Cube.js to connect to Redis Sentinel. `REDIS_URL` environment
-variable should not be set in this case.
+Redis Sentinel support via the [`ioredis`][gh-ioredis] npm package was recently
+added. In order to activate this feature, set the `CUBEJS_REDIS_USE_IOREDIS`
+environment variable to `true` and then set `CUBEJS_REDIS_SENTINEL` to to the
+address and port (`host:port`) to allow Cube.js to connect to the Redis
+Sentinel. `REDIS_URL` environment variable should not be set in this case.
+Ioredis is usable with redis as well and the choice of type is done by setting
+either `CUBEJS_REDIS_SENTINEL ` or `REDIS_URL`;
 
 <!-- prettier-ignore-start -->
 [[warning | Note]]
