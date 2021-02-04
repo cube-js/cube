@@ -37,6 +37,8 @@ options][link-config].
 | `CUBEJS_REDIS_USE_IOREDIS`           | Use [`ioredis`][gh-ioredis] instead of[ `redis`][gh-node-redis]. This flag must be true in order for connections to Redis Sentinel to work as well as connections directly to Redis. Defaults to `false` | `true`, `false`                             		|
 | `CUBEJS_REDIS_SENTINEL`              | The host URL for a Redis Sentinel server                                                         | A valid Redis host. May include port                             |
 
+[gh-ioredis]: https://github.com/luin/ioredis
+[gh-node-redis]: https://github.com/NodeRedis/node-redis
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
 ## Database Connection
