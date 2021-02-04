@@ -84,12 +84,13 @@ export default function PlaygroundQueryBuilder({
   apiUrl,
   cubejsToken,
   setQuery,
+  dashboardSource
 }) {
   const ref = useRef(null);
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
-  const { isModalOpen, setIsModalOpen } = useSecurityContext();
+  const { setIsModalOpen } = useSecurityContext();
 
   useLayoutEffect(() => {
     window['__cubejsPlayground'] = {
@@ -165,7 +166,6 @@ export default function PlaygroundQueryBuilder({
               <Col span={24}>
                 <Card bordered={false} style={{ borderRadius: 0 }}>
                   <Row
-                    justify="stretch"
                     align="top"
                     gutter={0}
                     style={{ marginBottom: -12 }}
@@ -299,6 +299,7 @@ export default function PlaygroundQueryBuilder({
                     }}
                     chartLibraries={frameworkChartLibraries}
                     cubejsApi={cubejsApi}
+                    dashboardSource={dashboardSource}
                     render={({ framework }) => {
                       return (
                         <ChartRenderer

@@ -1206,10 +1206,10 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.3.1.tgz#fa0efcf813daa43f8a6aef3ddaa80f7e66f1278e"
   integrity sha512-jUJrjU62MUgHDSu5JfONfgRM2V7GfN5KknsygfIbxwRZXGeayIzxk4O9GiYgEAr9DG5HJThTF5+a5x3wtrOKzQ==
 
-"@cubejs-client/core@^0.25.0":
-  version "0.25.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.25.0.tgz#8b7fac7c333d72803b2dcac33d403702d9107f51"
-  integrity sha512-/Zu23svhCmWaYTCHjZbEvM4jrkFQrCe8JRYmg6GteP9fmmjH5QBnJ60qS8fyYP3c0VSWIkDNBp1e3/+DaR/s+Q==
+"@cubejs-client/core@^0.26.0":
+  version "0.26.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.26.0.tgz#212a0d83f9f179120ea431eeac7093b24ed2064b"
+  integrity sha512-Ft2cAmHMZoLUMgURzfIguc7neLvJX4eypFXgHq8na8khppLT/4K1pkKjLt7Jf2wkqT+/VQmt8cjzEaPN2AtKyA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1220,13 +1220,13 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.25.14":
-  version "0.25.14"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.25.14.tgz#16e4162293aba05f03eb6c30729f0aedbc32a28f"
-  integrity sha512-RZ5i7JV67SH7Bt5qDF3mYpPnZ0KCTKsoq1fKDbgeOqDvZNFJA1OYSBbnpzeaz2gyTIl2YxfoErsxrfGc/XWvGA==
+"@cubejs-client/react@^0.26.0":
+  version "0.26.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.26.0.tgz#154a7e6612166bd69ad240ce622bc96ce6565abf"
+  integrity sha512-l8MX17WN7JblA0ipGS9ipmnkMTB3BNmAKUoslmKp9Iri2xVjCZkJDbYiopKmBxsocIQK3KiV9oomL451WNEUxg==
   dependencies:
     "@babel/runtime" "^7.1.2"
-    "@cubejs-client/core" "^0.25.0"
+    "@cubejs-client/core" "^0.26.0"
     core-js "^3.6.5"
     ramda "^0.27.0"
 
@@ -7197,6 +7197,11 @@ jsprim@^1.2.2:
   dependencies:
     array-includes "^3.1.2"
     object.assign "^4.1.2"
+
+jwt-decode@^3.1.2:
+  version "3.1.2"
+  resolved "https://registry.yarnpkg.com/jwt-decode/-/jwt-decode-3.1.2.tgz#3fb319f3675a2df0c2895c8f5e9fa4b67b04ed59"
+  integrity sha512-UfpWE/VZn0iP50d8cz9NrZLM9lSWhcJ+0Gt/nm4by88UL+J1SiKN8/5dkjMmbEzwL2CAe+67GsegCbIKtbp75A==
 
 killable@^1.0.1:
   version "1.0.1"

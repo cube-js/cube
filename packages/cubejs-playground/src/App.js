@@ -1,15 +1,16 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
 import { Component } from 'react';
 import '@ant-design/compatible/assets/index.css';
-import './index.less';
-import './index.css';
 import { Layout, Alert, notification, Spin } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { withRouter } from 'react-router';
+
 import Header from './components/Header';
 import { event, setAnonymousId } from './events';
 import GlobalStyles from './components/GlobalStyles';
 import { AppContext } from './hooks';
+import './index.less';
+import './index.css';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {

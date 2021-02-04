@@ -1,70 +1,81 @@
-import { Component } from 'react';
 import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
+import { useEffect, useMemo, useState } from 'react';
+import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
 import DashboardSource from '../../DashboardSource';
+import { useSecurityContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 
-export default class ExplorePage extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {};
-    this.dashboardSource = new DashboardSource();
-  }
+export default function ExplorePage() {
+  const { push, location } = useHistory();
+  const { token, saveToken } = useSecurityContext();
 
-  async componentDidMount() {
-    const res = await fetch('/playground/context');
-    const result = await res.json();
+  const [apiUrl, setApiUrl] = useState(null);
+  const [playgroundContext, setPlaygroundContext] = useState(null);
 
-    const basePath = result.basePath || '/cubejs-api';
-    let apiUrl =
-      result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, '');
-    apiUrl = `${apiUrl}${basePath}/v1`;
+  const dashboardSource = useMemo(() => new DashboardSource(), []);
+  const cubejsApi = useMemo(() => {
+    if (!token || !apiUrl || token === 'undefined') {
+      return null;
+    }
 
-    this.setState({
-      cubejsToken: result.cubejsToken,
+    console.log('create new api instance', token);
+
+    return cubejs(token, {
       apiUrl,
     });
+  }, [apiUrl, token]);
 
-    window['__cubejsPlayground'] = {
-      ...window['__cubejsPlayground'],
-      apiUrl,
-      token: result.cubejsToken,
-    };
-  }
+  useEffect(() => {
+    (async () => {
+      const res = await fetch('/playground/context');
+      const result = await res.json();
 
-  cubejsApi() {
-    const { cubejsToken, apiUrl } = this.state;
-    if (!this.cubejsApiInstance && cubejsToken) {
-      this.cubejsApiInstance = cubejs(cubejsToken, {
+      setPlaygroundContext(result);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (playgroundContext) {
+      const basePath = playgroundContext.basePath || '/cubejs-api';
+      let apiUrl =
+        playgroundContext.apiUrl ||
+        window.location.href.split('#')[0].replace(/\/$/, '');
+      apiUrl = `${apiUrl}${basePath}/v1`;
+
+      setApiUrl(apiUrl);
+
+      if (!token || token === 'undefined') {
+        saveToken(playgroundContext.cubejsToken, false);
+      }
+
+      window['__cubejsPlayground'] = {
+        ...window['__cubejsPlayground'],
         apiUrl,
-      });
+        token,
+      };
     }
-    return this.cubejsApiInstance;
+  }, [token, playgroundContext, saveToken]);
+
+  if (!cubejsApi) {
+    return null;
   }
 
-  render() {
-    const { cubejsToken, apiUrl } = this.state;
-    const { location, history } = this.props;
-    const params = new URLSearchParams(location.search);
-    const query =
-      (params.get('query') && JSON.parse(params.get('query'))) || {};
+  const params = new URLSearchParams(location.search);
+  const query = (params.get('query') && JSON.parse(params.get('query'))) || {};
 
-    return (
-      (this.cubejsApi() && (
-        <CubeProvider cubejsApi={this.cubejsApi()}>
-          <PlaygroundQueryBuilder
-            query={query}
-            setQuery={(q) => history.push(`/build?query=${JSON.stringify(q)}`)}
-            cubejsApi={this.cubejsApi()}
-            apiUrl={apiUrl}
-            cubejsToken={cubejsToken}
-            dashboardSource={this.dashboardSource}
-          />
-        </CubeProvider>
-      )) ||
-      null
-    );
-  }
+  return (
+    <CubeProvider cubejsApi={cubejsApi}>
+      <PlaygroundQueryBuilder
+        query={query}
+        setQuery={(q) => push(`/build?query=${JSON.stringify(q)}`)}
+        cubejsApi={cubejsApi}
+        apiUrl={apiUrl}
+        cubejsToken={token}
+        dashboardSource={dashboardSource}
+      />
+    </CubeProvider>
+  );
 }

@@ -2,13 +2,17 @@ import ReactDOM from 'react-dom';
 import { Router, Route } from 'react-router-dom';
 import { createHashHistory } from 'history';
 
-import IndexPage from './IndexPage';
-import SchemaPage from './SchemaPage';
 import App from './App';
 import { page } from './events';
 import TemplateGalleryPage from './TemplateGallery/TemplateGalleryPage';
-import { ExplorePage, DashboardPage, ConnectionWizardPage } from './pages';
-import SecurityContext, { SecurityContextProvider } from './components/SecurityContext/SecurityContext'
+import {
+  ExplorePage,
+  DashboardPage,
+  ConnectionWizardPage,
+  SchemaPage,
+  IndexPage,
+} from './pages';
+import SecurityContextProvider from './components/SecurityContext/SecurityContextProvider';
 
 const history = createHashHistory();
 history.listen((location) => {

@@ -3,7 +3,6 @@ import { createContext } from 'react';
 export const AppContext = createContext({
   slowQuery: false,
   isPreAggregationBuildInProgress: false,
-  isSecurityContextModalOpen: false,
 });
 
 export { default as useSlowQuery } from './slow-query';
