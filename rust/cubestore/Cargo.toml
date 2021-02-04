@@ -63,3 +63,4 @@ futures-timer = "3.0.2"
 tokio-stream = { version = "0.1.2", features=["io-util"] }
 scopeguard = "1.1.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
+tempfile = "3.2.0"
