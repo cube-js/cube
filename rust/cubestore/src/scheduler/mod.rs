@@ -76,6 +76,16 @@ impl SchedulerImpl {
                 self.schedule_wal_to_process(row_id).await?;
             }
         }
+        if let MetaStoreEvent::Insert(TableId::Partitions, row_id)
+        | MetaStoreEvent::Update(TableId::Partitions, row_id) = event
+        {
+            let p = self.meta_store.get_partition(row_id).await?;
+            if p.get_row().is_active() {
+                if let Some(path) = p.get_row().get_full_name(p.get_id()) {
+                    self.schedule_partition_warmup(p.get_id(), path).await?;
+                }
+            }
+        }
         if let MetaStoreEvent::Insert(TableId::Chunks, row_id)
         | MetaStoreEvent::Update(TableId::Chunks, row_id) = event
         {
@@ -246,5 +256,17 @@ impl SchedulerImpl {
             self.cluster.notify_job_runner(wal_node_name).await?;
         }
         Ok(())
+    }
+
+    async fn schedule_partition_warmup(
+        &self,
+        partition_id: u64,
+        path: String,
+    ) -> Result<(), CubeError> {
+        let node_name = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
+        self.cluster.warmup_download(&node_name, path).await
     }
 }
