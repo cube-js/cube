@@ -36,7 +36,18 @@ export class DeployDirectory {
 
   protected filter(file: string) {
     const baseName = path.basename(file);
-    return baseName !== 'dashboard-app' && baseName !== 'node_modules' && baseName !== '.git' && baseName !== '.env';
+
+    // whitelist
+    if (['.gitignore'].includes(baseName)) {
+      return true;
+    }
+
+    // blacklist
+    if (['dashboard-app', 'node_modules'].includes(baseName)) {
+      return false;
+    }
+
+    return baseName.charAt(0) !== '.';
   }
 
   protected fileHash(file: string) {
