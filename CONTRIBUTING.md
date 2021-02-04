@@ -114,8 +114,8 @@ If driver class contains `static dialectClass()` method it'll be used to lookup 
 
 ### Publishing Driver npm Package
 
-Cube.js looks up `{dbType}-cubejs-driver` package among installed modules to fullfil driver dependency if there's no corresponding default driver for the specified database type.
-For example one can publish `foo-cubejs-driver` npm package to fullfil driver dependency for the `foo` database type.
+Cube.js looks up `cubejs-{dbType}-driver` package among installed modules to fullfil driver dependency if there's no corresponding default driver for the specified database type.
+For example one can publish `cubejs-foo-driver` npm package to fullfil driver dependency for the `foo` database type.
 
 ### Testing Schema Compiler
 
