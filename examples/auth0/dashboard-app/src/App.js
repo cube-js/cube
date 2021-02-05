@@ -5,7 +5,7 @@ import { makeStyles } from '@material-ui/core/styles';
 import { CubeProvider } from '@cubejs-client/react';
 import { useAuth0 } from "@auth0/auth0-react";
 import Header from './components/Header';
-import initCubejsApi from './init-cubejs-api';
+import { initCubejsApi } from './init-cubejs-api';
 import config from './auth_config';
 
 const useStyles = makeStyles((theme) => ({
