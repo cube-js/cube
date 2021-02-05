@@ -196,6 +196,8 @@ pub trait WALDataStore: Send + Sync {
 #[async_trait]
 pub trait ChunkDataStore: Send + Sync {
     async fn partition(&self, wal_id: u64) -> Result<(), CubeError>;
+    /// Returns ids of uploaded chunks. Uploaded chunks are **not** activated.
+    async fn partition_data(&self, table_id: u64, data: DataFrame) -> Result<Vec<u64>, CubeError>;
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn get_chunk(&self, chunk: IdRow<Chunk>) -> Result<DataFrame, CubeError>;
     async fn download_chunk(&self, chunk: IdRow<Chunk>) -> Result<String, CubeError>;
@@ -300,31 +302,20 @@ impl ChunkStore {
 
 #[async_trait]
 impl ChunkDataStore for ChunkStore {
-    async fn partition(&self, wal_id: u64) -> Result<(), CubeError> {
-        defer!(trim_allocs());
+    async fn partition_data(&self, table_id: u64, data: DataFrame) -> Result<Vec<u64>, CubeError> {
+        let indexes = self.meta_store.get_table_indexes(table_id).await?;
+        self.build_index_chunks(&indexes, data).await
+    }
 
+    async fn partition(&self, wal_id: u64) -> Result<(), CubeError> {
         let wal = self.meta_store.get_wal(wal_id).await?;
         let table_id = wal.get_row().table_id();
         let data = self.wal_store.get_wal(wal_id).await?;
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
-        let mut new_chunks = Vec::new();
-        for index in indexes.iter() {
-            new_chunks.append(
-                &mut self
-                    .partition_data_frame(
-                        index.get_id(),
-                        data.remap_columns(index.get_row().columns().clone())?,
-                    )
-                    .await?,
-            ); // TODO dataframe clone
-        }
 
+        let new_chunks = self.build_index_chunks(&indexes, data).await?;
         self.meta_store
-            .activate_wal(
-                wal_id,
-                new_chunks.into_iter().map(|c| c.get_id()).collect(),
-                indexes.len() as u64,
-            )
+            .activate_wal(wal_id, new_chunks, indexes.len() as u64)
             .await?;
 
         Ok(())
@@ -684,5 +675,28 @@ impl ChunkStore {
             .upload_file(&ChunkStore::chunk_file_name(chunk.clone()))
             .await?;
         Ok(chunk)
+    }
+
+    /// Returns a list of newly added chunks.
+    async fn build_index_chunks(
+        &self,
+        indexes: &[IdRow<Index>],
+        data: DataFrame,
+    ) -> Result<Vec<u64>, CubeError> {
+        defer!(trim_allocs());
+
+        let mut new_chunks = Vec::new();
+        for index in indexes.iter() {
+            new_chunks.append(
+                &mut self
+                    .partition_data_frame(
+                        index.get_id(),
+                        data.remap_columns(index.get_row().columns().clone())?,
+                    )
+                    .await?,
+            ); // TODO dataframe clone
+        }
+
+        Ok(new_chunks.iter().map(|c| c.get_id()).collect())
     }
 }
