@@ -1,5 +1,6 @@
 import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn } from '@cubejs-backend/api-gateway';
-import { RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
+import { BaseQuery } from '@cubejs-backend/schema-compiler';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -98,10 +99,10 @@ export interface CreateOptions {
   devServer?: boolean;
   apiSecret?: string;
   logger?: (msg: string, params: any) => void;
-  driverFactory?: (context: DriverContext) => any;
-  dialectFactory?: (context: DialectContext) => any;
-  externalDriverFactory?: (context: RequestContext) => any;
-  externalDialectFactory?: (context: RequestContext) => any;
+  driverFactory?: (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
+  dialectFactory?: (context: DialectContext) => BaseQuery;
+  externalDriverFactory?: (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
+  externalDialectFactory?: (context: RequestContext) => BaseQuery;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
