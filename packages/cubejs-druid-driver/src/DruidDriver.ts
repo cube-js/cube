@@ -46,10 +46,10 @@ export class DruidDriver extends BaseDriver {
   }
 
   public async testConnection() {
-    return true;
+    //
   }
 
-  public async query(query: string, values: unknown[] = []) {
+  public async query(query: string, values: unknown[] = []): Promise<Array<unknown>> {
     return this.client.query(query, this.normalizeQueryValues(values));
   }
 
@@ -65,7 +65,7 @@ export class DruidDriver extends BaseDriver {
     `;
   }
 
-  public async createSchemaIfNotExists(schemaName: string) {
+  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
     throw new Error('Unable to create schema, Druid does not support it');
   }
 

@@ -123,9 +123,8 @@ export class BaseDriver {
 
   /**
    * @abstract
-   * @return Promise<Array<unknown>>
    */
-  testConnection() {
+  async testConnection() {
     throw new Error('Not implemented');
   }
 
@@ -133,9 +132,9 @@ export class BaseDriver {
    * @abstract
    * @param {string} query
    * @param {Array<unknown>} values
-   * @return Promise<Array<unknown>>
+   * @return {Promise<Array<unknown>>}
    */
-  query(query, values) {
+  async query(query, values) {
     throw new Error('Not implemented');
   }
 
@@ -185,7 +184,11 @@ export class BaseDriver {
     return this.query(query).then(data => reduce(reduceCb, {}, data));
   }
 
-  createSchemaIfNotExists(schemaName) {
+  /**
+   * @param {string} schemaName
+   * @return {Promise<Array<unknown>>}
+   */
+  async createSchemaIfNotExists(schemaName) {
     return this.query(
       `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
       [schemaName]
