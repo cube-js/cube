@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
@@ -26,8 +26,11 @@ import {
   RequestLoggerMiddlewareFn,
   Request,
   ExtendedRequestContext,
+  JWTOptions,
+  SecurityContextExtractorFn,
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
+import { createJWKsFetcher } from './jwk';
 
 type ResponseResultFn = (message: object, extra?: { status: number }) => void;
 
@@ -160,6 +163,7 @@ export interface ApiGatewayOptions {
   checkAuth?: CheckAuthFn;
   // @deprecated Please use checkAuth
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
+  jwt?: JWTOptions;
   requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
   queryTransformer?: QueryTransformerFn;
   subscriptionStore?: any;
@@ -189,8 +193,7 @@ export class ApiGateway {
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
-  // Flag to show deprecation for u, only once
-  protected checkAuthDeprecationShown: boolean = false;
+  protected readonly securityContextExtractor: SecurityContextExtractorFn;
 
   public constructor(
     protected readonly apiSecret: string,
@@ -208,10 +211,13 @@ export class ApiGateway {
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
-    this.checkAuthFn = options.checkAuth ? this.wrapCheckAuth(options.checkAuth) : this.defaultCheckAuth.bind(this);
+    this.checkAuthFn = options.checkAuth
+      ? this.wrapCheckAuth(options.checkAuth)
+      : this.createDefaultCheckAuth(options.jwt);
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth.bind(this);
+    this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger.bind(this);
   }
 
@@ -403,38 +409,58 @@ export class ApiGateway {
     }
   }
 
-  protected coerceForSqlQuery(query, context: Readonly<RequestContext>) {
-    let securityContext: any = {};
-
-    if (typeof context.securityContext === 'object' && context.securityContext !== null) {
-      if (context.securityContext.u) {
-        if (!this.checkAuthDeprecationShown) {
-          this.logger('JWT U Property Deprecation', {
-            warning: (
-              'Storing security context in the u property within the payload is now deprecated, please migrate: ' +
-              'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#authinfo'
-            )
-          });
-
-          this.checkAuthDeprecationShown = true;
+  protected createSecurityContextExtractor(options?: JWTOptions): SecurityContextExtractorFn {
+    if (options?.claimsNamespace) {
+      return (ctx: Readonly<RequestContext>) => {
+        if (typeof ctx.securityContext === 'object' && ctx.securityContext !== null) {
+          if (<string>options.claimsNamespace in ctx.securityContext) {
+            return ctx.securityContext[<string>options.claimsNamespace];
+          }
         }
 
-        securityContext = {
-          ...context.securityContext,
-          ...context.securityContext.u,
-        };
-
-        delete securityContext.u;
-      } else {
-        securityContext = context.securityContext;
-      }
+        return {};
+      };
     }
 
+    let checkAuthDeprecationShown: boolean = false;
+
+    return (ctx: Readonly<RequestContext>) => {
+      let securityContext: any = {};
+
+      if (typeof ctx.securityContext === 'object' && ctx.securityContext !== null) {
+        if (ctx.securityContext.u) {
+          if (!checkAuthDeprecationShown) {
+            this.logger('JWT U Property Deprecation', {
+              warning: (
+                'Storing security context in the u property within the payload is now deprecated, please migrate: ' +
+                'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#authinfo'
+              )
+            });
+
+            checkAuthDeprecationShown = true;
+          }
+
+          securityContext = {
+            ...ctx.securityContext,
+            ...ctx.securityContext.u,
+          };
+
+          delete securityContext.u;
+        } else {
+          securityContext = ctx.securityContext;
+        }
+      }
+
+      return securityContext;
+    };
+  }
+
+  protected coerceForSqlQuery(query, context: Readonly<RequestContext>) {
     return {
       ...query,
       timeDimensions: query.timeDimensions || [],
       contextSymbols: {
-        securityContext,
+        securityContext: this.securityContextExtractor(context),
       },
       requestId: context.requestId
     };
@@ -732,7 +758,6 @@ export class ApiGateway {
       )
     });
 
-    // securityContext should be object
     let showWarningAboutNotObject = false;
 
     return (req, res, next) => {
@@ -798,25 +823,71 @@ export class ApiGateway {
     };
   }
 
-  protected async defaultCheckAuth(req: Request, auth?: string) {
-    if (auth) {
-      const secret = this.apiSecret;
-      try {
-        req.securityContext = jwt.verify(auth, secret);
-      } catch (e) {
-        if (this.enforceSecurityChecks) {
-          throw new UserError('Invalid token');
-        } else {
-          this.log({
-            type: 'Invalid Token',
-            token: auth,
-            error: e.stack || e.toString()
-          }, <any>req);
-        }
+  protected createDefaultCheckAuth(options?: JWTOptions): CheckAuthFn {
+    type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
+
+    const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
+      algorithms: <JWTAlgorithm[]|undefined>options?.algorithms,
+      issuer: options?.issuer,
+      audience: options?.audience,
+      subject: options?.subject,
+    });
+
+    let checkAuthFn: VerifyTokenFn = verifyToken;
+
+    if (options && options.jwkUrl) {
+      const jwks = createJWKsFetcher(options);
+
+      // Precache JWKs response to speedup first auth
+      if (options.jwkUrl && typeof options.jwkUrl === 'string') {
+        jwks.fetchOnly(options.jwkUrl);
       }
-    } else if (this.enforceSecurityChecks) {
-      throw new UserError('Authorization header isn\'t set');
+
+      checkAuthFn = async (auth) => {
+        const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
+        if (!decoded) {
+          throw new UserError('Unable to decode JWT key');
+        }
+
+        if (!decoded.header || !decoded.header.kid) {
+          throw new UserError('JWT without kid inside headers');
+        }
+
+        const jwk = await jwks.getJWKbyKid(
+          typeof options.jwkUrl === 'function' ? options.jwkUrl(decoded) : <string>options.jwkUrl,
+          decoded.header.kid
+        );
+        if (!jwk) {
+          throw new UserError(
+            `Unable to verify, JWK with kid: "${decoded.header.kid}" not found`,
+          );
+        }
+
+        return verifyToken(auth, jwk);
+      };
     }
+
+    const secret = options?.key || this.apiSecret;
+
+    return async (req, auth) => {
+      if (auth) {
+        try {
+          req.securityContext = await checkAuthFn(auth, secret);
+        } catch (e) {
+          if (this.enforceSecurityChecks) {
+            throw new UserError('Invalid token');
+          } else {
+            this.log({
+              type: e.message,
+              token: auth,
+              error: e.stack || e.toString()
+            }, <any>req);
+          }
+        }
+      } else if (this.enforceSecurityChecks) {
+        throw new UserError('Authorization header isn\'t set');
+      }
+    };
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {

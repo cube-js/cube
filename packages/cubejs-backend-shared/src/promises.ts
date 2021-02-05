@@ -1,3 +1,6 @@
+/* eslint-disable arrow-body-style */
+import crypto from 'crypto';
+
 export interface CancelablePromise<T> extends Promise<T> {
   cancel: (waitExecution?: boolean) => Promise<any>;
 }
@@ -232,3 +235,115 @@ export const retryWithTimeout = <T>(
     }),
     timeout
   );
+
+/**
+ * High order function that makes to debounce multi async calls to single call at one time
+ */
+export const asyncDebounce = <ReturnType, Arguments>(
+  fn: (...args: Arguments[]) => Promise<ReturnType>,
+) => {
+  const cache = new Map<string, Promise<ReturnType>>();
+
+  return async (...args: Arguments[]) => {
+    const key = crypto.createHash('md5')
+      .update(args.map((v) => JSON.stringify(v)).join(','))
+      .digest('hex');
+
+    if (cache.has(key)) {
+      return <Promise<ReturnType>>cache.get(key);
+    }
+
+    try {
+      const promise = fn(...args);
+
+      cache.set(key, promise);
+
+      return await promise;
+    } finally {
+      cache.delete(key);
+    }
+  };
+};
+
+export type MemoizeOptions<ReturnType, Arguments> = {
+  extractKey: (...args: Arguments[]) => string,
+  extractCacheLifetime: (result: ReturnType) => number,
+};
+
+type MemoizeBucket<T> = {
+  item: T,
+  lifetime: number,
+};
+
+export const asyncMemoize = <ReturnType, Arguments>(
+  fn: (...args: Arguments[]) => Promise<ReturnType>,
+  options: MemoizeOptions<ReturnType, Arguments>
+) => {
+  const cache = new Map<string, MemoizeBucket<ReturnType>>();
+
+  const debouncedFn = asyncDebounce(fn);
+  const debouncedFnForce = asyncDebounce(fn);
+
+  const call = async (...args: Arguments[]) => {
+    const key = options.extractKey(...args);
+
+    if (cache.has(key)) {
+      const bucket = <MemoizeBucket<ReturnType>>cache.get(key);
+      if (bucket.lifetime >= Date.now()) {
+        return bucket.item;
+      } else {
+        cache.delete(key);
+      }
+    }
+
+    const item = await debouncedFn(...args);
+    cache.set(key, {
+      lifetime: Date.now() + options.extractCacheLifetime(item),
+      item,
+    });
+
+    return item;
+  };
+
+  call.force = async (...args: Arguments[]) => {
+    const key = options.extractKey(...args);
+
+    const item = await debouncedFnForce(...args);
+    cache.set(key, {
+      lifetime: Date.now() + options.extractCacheLifetime(item),
+      item,
+    });
+
+    return item;
+  };
+
+  return call;
+};
+
+export type RetryOptions = {
+  times: number,
+};
+
+/**
+ * High order function that do retry when async function throw an exception
+ */
+export const asyncRetry = async <ReturnType>(
+  fn: () => Promise<ReturnType>,
+  options: RetryOptions
+) => {
+  if (options.times <= 0) {
+    throw new Error('Option times in asyncRetry, must be a positive integer');
+  }
+
+  let latestException: unknown = null;
+
+  for (let i = 0; i < options.times; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      latestException = e;
+    }
+  }
+
+  throw latestException;
+};

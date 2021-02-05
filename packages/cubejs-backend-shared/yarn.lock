@@ -279,10 +279,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/linter@^0.25.0":
-  version "0.25.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.25.0.tgz#fdb4e153ef066ddd33c924a2bffa3ad0d2fd2f2e"
-  integrity sha512-Bw0l4YDJSoXh9lqmaZ2FXjp8KPwzVtmvF2ZBtiFHxGlxKhMHdiY5ViNrJiCa7/+M8hlX+kyLeGH1zCV5LPAR1Q==
+"@cubejs-backend/linter@^0.26.0":
+  version "0.26.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.26.0.tgz#bdd9b262822c377f74a03ca236c2ad78a65acfa1"
+  integrity sha512-f9DNam1VeCu/g7wC0harScInk+kq1mzrMoIvD9m+2RKQ/iEEWXUKEYMCfLP0lZAB2Axjp1CtX+Bs96Uxo9a65g==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.8.2"
     "@typescript-eslint/parser" "^4.8.2"

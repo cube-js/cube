@@ -1,5 +1,5 @@
-const Joi = require('@hapi/joi');
-const DriverDependencies = require('./DriverDependencies');
+import Joi from '@hapi/joi';
+import DriverDependencies from './DriverDependencies';
 
 const schemaQueueOptions = Joi.object().keys({
   concurrency: Joi.number().min(1).integer(),
@@ -9,6 +9,18 @@ const schemaQueueOptions = Joi.object().keys({
   heartBeatInterval: Joi.number().min(0).integer(),
   sendProcessMessageFn: Joi.func(),
   sendCancelMessageFn: Joi.func(),
+});
+
+const jwtOptions = Joi.object().keys({
+  jwkRetry: Joi.number().min(1).max(5).integer(),
+  jwkUrl: Joi.alternatives().try(
+    Joi.string(),
+    Joi.func()
+  ),
+  algorithms: Joi.array().items(Joi.string()),
+  issuer: Joi.array().items(Joi.string()),
+  audience: Joi.string(),
+  subject: Joi.string(),
 });
 
 const dbTypes = Joi.alternatives().try(
@@ -36,6 +48,7 @@ const schemaOptions = Joi.object().keys({
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
   checkAuthMiddleware: Joi.func(),
+  jwt: jwtOptions,
   queryTransformer: Joi.func(),
   preAggregationsSchema: Joi.alternatives().try(
     Joi.string(),
@@ -74,7 +87,7 @@ const schemaOptions = Joi.object().keys({
   scheduledRefreshContexts: Joi.func()
 });
 
-module.exports = (options) => {
+export default (options: any) => {
   const { error } = Joi.validate(options, schemaOptions, {
     abortEarly: false,
     // http configuration from server is not a part of server-core, we dont needed to get an error

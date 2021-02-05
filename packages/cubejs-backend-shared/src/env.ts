@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
 
 export class InvalidConfiguration extends Error {
@@ -131,7 +132,21 @@ const variables = {
     .asString(),
   redisTls: () => get('REDIS_TLS')
     .default('false')
-    .asBoolStrict()
+    .asBoolStrict(),
+  jwkKey: () => get('CUBEJS_JWK_KEY')
+    .asUrlString(),
+  jwkUrl: () => get('CUBEJS_JWK_URL')
+    .asUrlString(),
+  jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
+    .asArray(','),
+  jwtAudience: () => get('CUBEJS_JWT_AUDIENCE')
+    .asString(),
+  jwtIssuer: () => get('CUBEJS_JWT_ISSUER')
+    .asArray(','),
+  jwtSubject: () => get('CUBEJS_JWT_SUBJECT')
+    .asString(),
+  jwtClaimsNamespace: () => get('CUBEJS_JWT_CLAIMS_NAMESPACE')
+    .asString(),
 };
 
 type Vars = typeof variables;
