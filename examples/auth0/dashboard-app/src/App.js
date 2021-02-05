@@ -6,6 +6,7 @@ import { CubeProvider } from '@cubejs-client/react';
 import { useAuth0 } from "@auth0/auth0-react";
 import Header from './components/Header';
 import initCubejsApi from './init-cubejs-api';
+import config from './auth_config';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -29,6 +30,7 @@ const App = ({ children }) => {
   // Get all necessary auth0 data
   const {
     isLoading,
+    error,
     isAuthenticated,
     loginWithRedirect,
     getAccessTokenSilently,
@@ -45,7 +47,10 @@ const App = ({ children }) => {
 
   // Get CubeJS instance with access_token and set to component state
   const initCubejs = useCallback(async () => {
-    const accessToken = await getAccessTokenSilently();
+    const accessToken = await getAccessTokenSilently({
+      audience: config.audience,
+      scope: config.scope
+    });
 
     setCubejsApi(initCubejsApi(accessToken));
   }, [getAccessTokenSilently]);
@@ -56,6 +61,10 @@ const App = ({ children }) => {
       initCubejs();
     }
   }, [cubejsApi, initCubejs, isAuthenticated, isLoading]);
+
+  if (error) {
+    return <span>{error.message}</span>;
+  }
 
   // show loading indicator while loading
   if (isLoading || !isAuthenticated || !cubejsApi) {

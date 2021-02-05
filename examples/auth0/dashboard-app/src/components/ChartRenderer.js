@@ -41,20 +41,6 @@ const CartesianChart = ({ resultSet, children, ChartComponent }) => (
 
 const colors = ["#FF6492", "#141446", "#7A77FF"];
 
-const stackedChartData = resultSet => {
-  const data = resultSet
-    .pivot()
-    .map(({ xValues, yValuesArray }) =>
-      yValuesArray.map(([yValues, m]) => ({
-        x: resultSet.axisValuesString(xValues, ", "),
-        color: resultSet.axisValuesString(yValues, ", "),
-        measure: m && Number.parseFloat(m)
-      }))
-    )
-    .reduce((a, b) => a.concat(b), []);
-  return data;
-};
-
 const TypeToChartComponent = {
   line: ({ resultSet }) => (
     <CartesianChart resultSet={resultSet} ChartComponent={LineChart}>

@@ -7,3 +7,6 @@ yarn-error.log
 
 # Cube.js repo
 cube.js/
+
+# Local Netlify folder
+.netlify

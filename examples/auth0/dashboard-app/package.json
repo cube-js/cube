@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@auth0/auth0-react": "^1.0.0",
-    "@cubejs-client/core": "^0.19.55",
-    "@cubejs-client/react": "^0.19.55",
+    "@auth0/auth0-react": "^1.2.0",
+    "@cubejs-client/core": "^0.26.0",
+    "@cubejs-client/react": "^0.26.0",
     "@material-ui/core": "^4.11.0",
     "@material-ui/icons": "^4.9.1",
     "@testing-library/jest-dom": "^4.2.4",
@@ -21,7 +21,7 @@
     "recharts": "^1.8.5"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "SKIP_PREFLIGHT_CHECK=true react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
