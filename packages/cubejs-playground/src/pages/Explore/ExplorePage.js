@@ -21,8 +21,6 @@ export default function ExplorePage() {
       return null;
     }
 
-    console.log('create new api instance', token);
-
     return cubejs(token, {
       apiUrl,
     });
@@ -71,7 +69,6 @@ export default function ExplorePage() {
       <PlaygroundQueryBuilder
         query={query}
         setQuery={(q) => push(`/build?query=${JSON.stringify(q)}`)}
-        cubejsApi={cubejsApi}
         apiUrl={apiUrl}
         cubejsToken={token}
         dashboardSource={dashboardSource}

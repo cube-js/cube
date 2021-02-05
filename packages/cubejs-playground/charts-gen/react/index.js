@@ -69,12 +69,6 @@ const packages = [
     {
       appPath: reactChartsPath,
       packagesPath,
-    },
-    {
-      credentials: {
-        apiUrl: 'http://localhost:4000/cubejs-api/v1',
-        cubejsToken: 'secret',
-      },
     }
   );
 

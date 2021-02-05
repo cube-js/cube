@@ -2,14 +2,13 @@ import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Table, Tabs } from 'antd';
 import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from 'sql-formatter';
-import PropTypes from 'prop-types';
+
 import PrismCode from '../PrismCode';
 
-const CachePane = ({ query, cubejsApi }) => (
+const CachePane = ({ query }) => (
   <QueryRenderer
     loadSql
     query={{ ...query, renewQuery: true }}
-    cubejsApi={cubejsApi}
     render={({ sqlQuery, resultSet: rs }) => (
       <Tabs
         defaultActiveKey="refreshKeys"
@@ -155,10 +154,5 @@ const CachePane = ({ query, cubejsApi }) => (
     )}
   />
 );
-
-CachePane.propTypes = {
-  query: PropTypes.object.isRequired,
-  cubejsApi: PropTypes.object.isRequired,
-};
 
 export default CachePane;

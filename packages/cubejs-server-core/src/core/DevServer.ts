@@ -340,10 +340,10 @@ export class DevServer {
     }));
     
     app.post('/playground/token', catchErrors(async (req, res) => {
-      const { claims = {} } = req.body;
-      const jwtOptions = typeof claims.exp != null ? {} : { expiresIn: '1d' };
+      const { payload = {} } = req.body;
+      const jwtOptions = typeof payload.exp != null ? {} : { expiresIn: '1d' };
       
-      const token = jwt.sign(claims, options.apiSecret, jwtOptions);
+      const token = jwt.sign(payload, options.apiSecret, jwtOptions);
       
       res.json({ token });
     }));

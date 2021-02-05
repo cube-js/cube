@@ -138,7 +138,6 @@ class ChartContainer extends Component {
       dashboardSource,
       hideActions,
       query,
-      cubejsApi,
       chartingLibrary,
       setChartLibrary,
       chartLibraries,
@@ -386,7 +385,6 @@ class ChartContainer extends Component {
           <QueryRenderer
             loadSql="only"
             query={query}
-            cubejsApi={cubejsApi}
             render={({ sqlQuery }) => {
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
@@ -397,7 +395,7 @@ class ChartContainer extends Component {
           />
         );
       } else if (showCode === 'cache') {
-        return <CachePane query={query} cubejsApi={cubejsApi} />;
+        return <CachePane query={query} />;
       }
       return render({ framework, error });
     };
@@ -483,7 +481,6 @@ ChartContainer.propTypes = {
   dashboardSource: PropTypes.object,
   hideActions: PropTypes.array,
   query: PropTypes.object,
-  cubejsApi: PropTypes.object,
   history: PropTypes.object.isRequired,
   chartingLibrary: PropTypes.string.isRequired,
   setChartLibrary: PropTypes.func.isRequired,
@@ -491,7 +488,6 @@ ChartContainer.propTypes = {
 
 ChartContainer.defaultProps = {
   query: {},
-  cubejsApi: null,
   hideActions: null,
   dashboardSource: null,
   codeSandboxSource: null,

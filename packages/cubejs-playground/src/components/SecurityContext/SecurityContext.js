@@ -14,11 +14,15 @@ const { Text, Link } = Typography;
 const FlexBox = styled.div`
   display: flex;
   gap: 8px;
+
+  input {
+    text-overflow: ${(props) => (props.editing ? 'unset' : 'ellipsis')};
+  }
 `;
 
 export default function SecurityContext() {
   const {
-    claims,
+    payload,
     token,
     isModalOpen,
     setIsModalOpen,
@@ -28,7 +32,7 @@ export default function SecurityContext() {
   const [tmpToken, setToken] = useState(token || '');
   const [editingToken, setEditingToken] = useState(!token);
   const [isJsonValid, setIsJsonValid] = useState(true);
-  const [tmpClaims, setClaims] = useState(claims);
+  const [tmpPayload, setPayload] = useState(payload);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -40,17 +44,17 @@ export default function SecurityContext() {
   useEffect(() => {
     setToken(token);
     setEditingToken(!token);
-    setClaims(claims);
-  }, [token, claims]);
+    setPayload(payload);
+  }, [token, payload]);
 
   function handleTokenSave() {
     setEditingToken(false);
     saveToken(tmpToken);
   }
 
-  function handleClaimsChange(event) {
+  function handlepayloadChange(event) {
     const { value } = event.target;
-    setClaims(value);
+    setPayload(value);
 
     try {
       JSON.parse(value);
@@ -60,7 +64,7 @@ export default function SecurityContext() {
     }
   }
 
-  async function handleClaimsSave() {
+  async function handlepayloadSave() {
     if (isJsonValid) {
       try {
         const response = await fetch('/playground/token', {
@@ -69,7 +73,7 @@ export default function SecurityContext() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            claims: JSON.parse(tmpClaims),
+            payload: JSON.parse(tmpPayload),
           }),
         });
         const { token } = await response.json();
@@ -85,23 +89,26 @@ export default function SecurityContext() {
       title="Security Context"
       visible={isModalOpen}
       footer={null}
+      bodyStyle={{
+        paddingTop: 16,
+      }}
       onCancel={() => setIsModalOpen(false)}
     >
       <Space direction="vertical" size={24} style={{ width: '100%' }}>
-        <Tabs defaultActiveKey="json">
+        <Tabs defaultActiveKey="json" style={{ minHeight: 200 }}>
           <TabPane tab="JSON" key="json">
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               <TextArea
-                value={tmpClaims}
+                value={tmpPayload}
                 rows={10}
                 style={{ width: '100%' }}
-                onChange={handleClaimsChange}
+                onChange={handlepayloadChange}
               />
 
               <Button
                 type="primary"
                 disabled={!isJsonValid}
-                onClick={handleClaimsSave}
+                onClick={handlepayloadSave}
               >
                 Save
               </Button>
@@ -114,7 +121,7 @@ export default function SecurityContext() {
                 Edit or copy the generated token from below
               </Text>
 
-              <FlexBox>
+              <FlexBox editing={editingToken}>
                 <Input
                   ref={inputRef}
                   prefix={<CubejsIcon />}

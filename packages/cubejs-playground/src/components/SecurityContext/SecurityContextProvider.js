@@ -4,7 +4,7 @@ import jwtDecode from 'jwt-decode';
 import SecurityContext from './SecurityContext';
 
 export const SecurityContextContext = createContext({
-  claims: null,
+  payload: null,
   token: null,
   isValid: false,
   isModalOpen: false,
@@ -12,7 +12,7 @@ export const SecurityContextContext = createContext({
 
 export default function SecurityContextProvider({ children }) {
   const [token, setToken] = useState(null);
-  const [claims, setClaims] = useState('');
+  const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
@@ -25,9 +25,10 @@ export default function SecurityContextProvider({ children }) {
   useEffect(() => {
     if (token) {
       try {
-        const claims = jwtDecode(token);
-        setClaims(JSON.stringify(claims, null, 2));
+        const payload = jwtDecode(token);
+        setPayload(JSON.stringify(payload, null, 2));
       } catch (error) {
+        setPayload('');
         console.error('Invalid JWT token');
       }
     }
@@ -41,7 +42,7 @@ export default function SecurityContextProvider({ children }) {
   return (
     <SecurityContextContext.Provider
       value={{
-        claims,
+        payload,
         token,
         isValid: false,
         isModalOpen,

@@ -84,11 +84,14 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
   };
 }
 
-export function dispatchChartEvent(document, detail) {
-  const myEvent = new CustomEvent('cubejs', {
+export function dispatchPlaygroundEvent(document, eventType, detail) {
+  const myEvent = new CustomEvent('__cubejsPlaygroundEvent', {
     bubbles: true,
     composed: true,
-    detail,
+    detail: {
+      ...detail,
+      eventType
+    },
   });
 
   document.dispatchEvent(myEvent);
