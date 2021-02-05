@@ -1,0 +1,20 @@
+{
+  "name": "auth0",
+  "version": "0.0.1",
+  "author": {
+    "name": "Krystian Fras",
+    "email": "krystian@fras.me"
+  },
+  "private": false,
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-server"
+  },
+  "devDependencies": {
+    "@cubejs-backend/postgres-driver": "^0.26.2",
+    "@cubejs-backend/server": "^0.26.2"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.836.0"
+  }
+}
