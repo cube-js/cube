@@ -9,6 +9,9 @@ use tokio::net::TcpStream;
 pub enum NetworkMessage {
     Select(SerializedPlan),
     SelectResult(Result<SerializedRecordBatchStream, CubeError>),
+
+    WarmupDownload(/*remote_path*/ String),
+    WarmupDownloadResult(Result<(), CubeError>),
 }
 
 impl NetworkMessage {

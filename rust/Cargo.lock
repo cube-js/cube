@@ -1091,6 +1091,7 @@ dependencies = [
  "simple_logger",
  "smallvec",
  "sqlparser",
+ "tempfile",
  "tokio 1.1.1",
  "tokio-stream",
  "tokio-util 0.6.2",
