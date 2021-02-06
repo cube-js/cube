@@ -532,8 +532,16 @@ describe('ScaffoldingSchema', () => {
     ]);
   });
 
-  it('should add dataSource if passed', () => {
-    const dataSource = 'testDataSource';
+  it('should add options if passed', () => {
+    const extraParams = {
+      dataSource: 'testDataSource',
+      preAggregations: {
+        main: {
+          type: `originalSql`
+        }
+      }
+    };
+
     const template = new ScaffoldingTemplate({
       public: {
         orders: [{
@@ -548,7 +556,7 @@ describe('ScaffoldingSchema', () => {
         }]
       }
     }, bigQueryDriver);
-    template.generateFilesByTableNames(['public.orders'], dataSource).should.be.deepEqual([
+    template.generateFilesByTableNames(['public.orders'], extraParams).should.be.deepEqual([
       {
         fileName: 'Orders.js',
         content: `cube(\`Orders\`, {
@@ -579,7 +587,13 @@ describe('ScaffoldingSchema', () => {
     }
   },
   
-  dataSource: \`testDataSource\`
+  dataSource: \`testDataSource\`,
+  
+  preAggregations: {
+    main: {
+      type: \`originalSql\`
+    }
+  }
 });
 `
       }
