@@ -3,6 +3,8 @@ import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import AsyncRedisClient from './AsyncRedisClient';
 
+export type RedisOptions = ClientOpts;
+
 function decorateRedisClient(client: RedisClient): AsyncRedisClient {
   [
     'brpop',
@@ -29,13 +31,13 @@ function decorateRedisClient(client: RedisClient): AsyncRedisClient {
   return <AsyncRedisClient>client;
 }
 
-export function createRedisClient(url: string, opts: ClientOpts = {}) {
-  redis.Multi.prototype.execAsync = function execAsync() {
-    return new Promise((resolve, reject) => this.exec((err, res) => (
-      err ? reject(err) : resolve(res)
-    )));
-  };
+redis.Multi.prototype.execAsync = function execAsync() {
+  return new Promise((resolve, reject) => this.exec((err, res) => (
+    err ? reject(err) : resolve(res)
+  )));
+};
 
+export async function createRedisClient(url: string, opts: ClientOpts = {}) {
   const options: ClientOpts = {
     url,
   };
@@ -48,10 +50,10 @@ export function createRedisClient(url: string, opts: ClientOpts = {}) {
     options.password = getEnv('redisPassword');
   }
 
-  return Promise.resolve(decorateRedisClient(
+  return decorateRedisClient(
     redis.createClient({
       ...options,
       ...opts,
     })
-  ));
+  );
 }

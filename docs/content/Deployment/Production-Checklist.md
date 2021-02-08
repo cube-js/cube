@@ -45,14 +45,10 @@ Redis provides functionality for high availability through
 [`Redis Sentinel`][redis-sentinel].
 
 For Redis Sentinel support, the npm package [`ioredis`][gh-ioredis] needs to be
-used instead of[ `redis`][gh-node-redis]. This is done by setting the
+used instead of[`redis`][gh-node-redis]. This is done by setting the
 `CUBEJS_REDIS_USE_IOREDIS` environment variable to `true`. Then set
-`CUBEJS_REDIS_SENTINEL` to the address and port (`host:port`) to allow Cube.js
-to connect to the Redis Sentinel. The `REDIS_URL` environment variable should
-not be set in this case.
-
-Ioredis is usable with redis as well and the choice of type is done by setting
-either `CUBEJS_REDIS_SENTINEL ` or `REDIS_URL`;
+`CUBEJS_REDIS_URL` to the `redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js
+to connect to the Redis Sentinel.
 
 [redis-sentinel]: https://redis.io/topics/sentinel
 [gh-ioredis]: https://github.com/luin/ioredis

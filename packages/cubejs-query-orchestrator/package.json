@@ -19,7 +19,7 @@
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
     "unit": "jest --runInBand --verbose dist/test/unit",
-    "integration": "npm run integration:redis",
+    "integration": "npm run integration:redis dist/test/integration",
     "integration:redis": "jest --runInBand --verbose dist/test/integration",
     "lint": "linter src/* test/* --ext .ts,.js",
     "lint:fix": "linter --fix src/* test/* --ext .ts,.js"

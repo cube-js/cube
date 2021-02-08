@@ -35,8 +35,9 @@ export class QueryOrchestrator {
     this.rollupOnlyMode = options.rollupOnlyMode;
 
     const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
-      getEnv('nodeEnv') === 'production' || getEnv('redisUrl') ||
-      (getEnv('redisUseIORedis') && getEnv('redisSentinel')) ? 'redis' : 'memory'
+      (getEnv('nodeEnv') === 'production' || getEnv('redisUrl') || getEnv('redisUseIORedis'))
+        ? 'redis'
+        : 'memory'
     );
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
@@ -103,7 +104,7 @@ export class QueryOrchestrator {
       }
       return preAggregationsQueryStageStateByDataSource[dataSource];
     };
-    
+
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
@@ -111,11 +112,11 @@ export class QueryOrchestrator {
             PreAggregations.preAggregationQueryCacheKey(p), 10, await preAggregationsQueryStageState(p.dataSource)
           ))
       )).findIndex(p => !!p);
-      
+
     if (pendingPreAggregationIndex === -1) {
       return this.queryCache.getQueue(queryBody.dataSource).getQueryStage(QueryCache.queryCacheKey(queryBody));
     }
-    
+
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
     const preAggregationStage = await this.preAggregations.getQueue(preAggregation.dataSource).getQueryStage(
       PreAggregations.preAggregationQueryCacheKey(preAggregation),

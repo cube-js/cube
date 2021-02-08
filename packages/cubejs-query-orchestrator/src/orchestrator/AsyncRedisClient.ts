@@ -16,6 +16,9 @@ interface AsyncRedisClient extends RedisClient {
   incrAsync: Commands<Promise<any>>['incr'],
   decrAsync: Commands<Promise<any>>['decr'],
   lpushAsync: Commands<Promise<any>>['lpush'],
+  // @todo Improve types
+  multi: () => any,
+  end: (flush?: boolean) => void,
 }
 
 export default AsyncRedisClient;
