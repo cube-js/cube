@@ -315,7 +315,7 @@ impl Config {
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
-                    .unwrap_or("localhost".to_string())
+                    .unwrap_or("localhost".to_string()),
             }),
         }
     }
@@ -347,7 +347,7 @@ impl Config {
                 download_concurrency: 8,
                 wal_split_threshold: 262144,
                 connection_timeout: 60,
-                server_name: "localhost".to_string()
+                server_name: "localhost".to_string(),
             }),
         }
     }
