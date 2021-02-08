@@ -116,7 +116,8 @@ export class RefreshScheduler {
         finished: true
       };
     } catch (e) {
-      if (e.error !== 'Continue wait') {
+      // e.error is from api-gateway, e.message is from query-orchestrator
+      if (e.error !== 'Continue wait' && e.message !== 'Continue wait') {
         this.serverCore.logger('Refresh Scheduler Error', {
           error: e.error || e.stack || e.toString(),
           securityContext: context.securityContext,
