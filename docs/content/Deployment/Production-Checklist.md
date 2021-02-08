@@ -47,7 +47,8 @@ Redis provides functionality for high availability through
 For Redis Sentinel support, the npm package [`ioredis`][gh-ioredis] needs to be
 used instead of[`redis`][gh-node-redis]. This is done by setting the
 `CUBEJS_REDIS_USE_IOREDIS` environment variable to `true`. Then set
-`CUBEJS_REDIS_URL` to the `redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js
+`CUBEJS_REDIS_URL` to the
+`redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js
 to connect to the Redis Sentinel.
 
 [redis-sentinel]: https://redis.io/topics/sentinel
@@ -159,3 +160,16 @@ server {
   }
 }
 ```
+
+## Set up health checks
+
+Cube.js provides [Kubernetes-API compatible][link-k8s-healthcheck-api] health
+check (or probe) endpoints that indicate the status of the deployment. Configure
+your monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
+[`/livez`][ref-api-livez] API endpoints so you can check on the Cube.js
+deployment's health and be alerted to any issues.
+
+[link-k8s-healthcheck-api]:
+  https://kubernetes.io/docs/reference/using-api/health-checks/
+[ref-api-readyz]: /rest-api#api-reference-readyz
+[ref-api-livez]: /rest-api#api-reference-livez
