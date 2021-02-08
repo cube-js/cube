@@ -15,7 +15,7 @@ To provide best real-time experience it's recommended to use Web Sockets transpo
 Web sockets on backend can be enabled using `CUBEJS_WEB_SOCKETS` environment variable:
 
 **.env:**
-```
+```dotenv
 CUBEJS_WEB_SOCKETS=true
 ```
 
@@ -71,7 +71,7 @@ import { useCubeQuery } from '@cubejs-client/react';
 
 const Chart = ({ query }) => {
   const { resultSet, error, isLoading } = useCubeQuery(query, { subscribe: true });
-  
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -79,11 +79,11 @@ const Chart = ({ query }) => {
   if (error) {
     return <pre>{error.toString()}</pre>;
   }
-  
+
   if (!resultSet) {
     return null;
   }
-  
+
   return <LineChart resultSet={resultSet}/>;
 };
 ```
