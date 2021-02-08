@@ -1,3 +1,4 @@
+use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::CubeError;
@@ -9,6 +10,15 @@ use tokio::net::TcpStream;
 pub enum NetworkMessage {
     Select(SerializedPlan),
     SelectResult(Result<SerializedRecordBatchStream, CubeError>),
+
+    WarmupDownload(/*remote_path*/ String),
+    WarmupDownloadResult(Result<(), CubeError>),
+
+    MetaStoreCall(MetaStoreRpcMethodCall),
+    MetaStoreCallResult(MetaStoreRpcMethodResult),
+
+    NotifyJobListeners,
+    NotifyJobListenersSuccess,
 }
 
 impl NetworkMessage {

@@ -598,13 +598,7 @@ impl ClusterSendExec {
             .map(|union| {
                 union
                     .iter()
-                    .flat_map(|index| {
-                        index
-                            .partitions()
-                            .iter()
-                            .map(|p| p.partition().clone())
-                            .collect::<Vec<_>>()
-                    })
+                    .flat_map(|index| index.partitions().iter().map(|p| p.partition().clone()))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -663,8 +657,14 @@ impl ExecutionPlan for ClusterSendExec {
         let record_batches = self
             .cluster
             .run_select(
-                self.cluster
-                    .node_name_by_partitions(&self.partitions[partition])
+                &self
+                    .cluster
+                    .node_name_by_partitions(
+                        &self.partitions[partition]
+                            .iter()
+                            .map(|p| p.get_id())
+                            .collect_vec(),
+                    )
                     .await?,
                 self.serialized_plan.with_partition_id_to_execute(
                     self.partitions[partition]

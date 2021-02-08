@@ -8,17 +8,19 @@ use regex::{NoExpand, Regex};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
+use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 #[derive(Debug)]
 pub struct GCSRemoteFs {
-    dir: RwLock<PathBuf>,
+    dir: PathBuf,
     bucket: String,
     sub_path: Option<String>,
+    delete_mut: Mutex<()>,
 }
 
 impl GCSRemoteFs {
@@ -28,9 +30,10 @@ impl GCSRemoteFs {
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
         Ok(Arc::new(Self {
-            dir: RwLock::new(dir),
+            dir,
             bucket: bucket_name.to_string(),
             sub_path,
+            delete_mut: Mutex::new(()),
         }))
     }
 }
@@ -40,7 +43,7 @@ impl RemoteFs for GCSRemoteFs {
     async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
-        let local_path = self.dir.read().await.as_path().join(remote_path);
+        let local_path = self.dir.as_path().join(remote_path);
         let file = File::open(local_path).await?;
         let size = file.metadata().await?.len();
         let stream = FramedRead::new(file, BytesCodec::new());
@@ -58,14 +61,15 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let local = self.dir.write().await.as_path().join(remote_path);
-        let path = local.to_str().unwrap().to_owned();
-        fs::create_dir_all(local.parent().unwrap()).await?;
-        if !local.exists() {
+        let local_file = self.dir.as_path().join(remote_path);
+        let local_dir = local_file.parent().unwrap();
+
+        fs::create_dir_all(local_dir).await?;
+        if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
-            let output_file = File::create(path.as_str()).await?;
-            let mut writer = BufWriter::new(output_file);
+            let (temp_file, temp_path) = NamedTempFile::new_in(local_dir)?.into_parts();
+            let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
             let mut stream = Object::download_streamed(
                 self.bucket.as_str(),
                 self.gcs_path(remote_path).as_str(),
@@ -80,6 +84,8 @@ impl RemoteFs for GCSRemoteFs {
             }
             writer.flush().await?;
 
+            temp_path.persist(&local_file)?;
+
             info!(
                 "Downloaded {} ({:?}) ({} bytes)",
                 remote_path,
@@ -87,7 +93,7 @@ impl RemoteFs for GCSRemoteFs {
                 c
             );
         }
-        Ok(path)
+        Ok(local_file.into_os_string().into_string().unwrap())
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
@@ -96,11 +102,11 @@ impl RemoteFs for GCSRemoteFs {
         Object::delete(self.bucket.as_str(), self.gcs_path(remote_path).as_str()).await?;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
 
-        let dir = self.dir.write().await;
-        let local = dir.as_path().join(remote_path);
+        let _guard = self.delete_mut.lock().await;
+        let local = self.dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
-            LocalDirRemoteFs::remove_empty_paths(dir.as_path().to_path_buf(), local.clone())
+            LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
                 .await?;
         }
 
@@ -140,11 +146,11 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn local_path(&self) -> String {
-        self.dir.read().await.to_str().unwrap().to_owned()
+        self.dir.to_str().unwrap().to_owned()
     }
 
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let buf = self.dir.read().await.join(remote_path);
+        let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }

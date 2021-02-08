@@ -11,14 +11,16 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
+use tempfile::NamedTempFile;
 use tokio::fs;
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct S3RemoteFs {
-    dir: RwLock<PathBuf>,
+    dir: PathBuf,
     bucket: Bucket,
     sub_path: Option<String>,
+    delete_mut: Mutex<()>,
 }
 
 impl S3RemoteFs {
@@ -37,9 +39,10 @@ impl S3RemoteFs {
         )?;
         let bucket = Bucket::new(&bucket_name, region.parse()?, credentials)?;
         Ok(Arc::new(Self {
-            dir: RwLock::new(dir),
+            dir,
             bucket,
             sub_path,
+            delete_mut: Mutex::new(()),
         }))
     }
 }
@@ -51,7 +54,7 @@ impl RemoteFs for S3RemoteFs {
         debug!("Uploading {}", remote_path);
         let path = self.s3_path(remote_path);
         let bucket = self.bucket.clone();
-        let local_path = self.dir.read().await.as_path().join(remote_path);
+        let local_path = self.dir.as_path().join(remote_path);
         let status_code = tokio::task::spawn_blocking(move || {
             bucket.put_object_stream_blocking(local_path, path)
         })
@@ -67,20 +70,27 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let local = self.dir.write().await.as_path().join(remote_path);
-        let local_path = local.to_str().unwrap().to_owned();
-        let local_to_move = local_path.clone();
-        fs::create_dir_all(local.parent().unwrap()).await?;
-        if !local.exists() {
+        let local_file = self.dir.as_path().join(remote_path);
+        let local_dir = local_file.parent().unwrap();
+
+        let local_file_str = local_file.to_str().unwrap().to_string(); // return value.
+
+        fs::create_dir_all(local_dir).await?;
+        if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(remote_path);
             let bucket = self.bucket.clone();
-            let status_code = tokio::task::spawn_blocking(move || {
-                let mut output_file = std::fs::File::create(local_to_move.as_str())?;
-                let res = bucket.get_object_stream_blocking(path.as_str(), &mut output_file);
-                output_file.flush()?;
-                res
+            let status_code = tokio::task::spawn_blocking(move || -> Result<u16, CubeError> {
+                let local_dir = local_file.parent().unwrap();
+                let (mut temp_file, temp_path) = NamedTempFile::new_in(local_dir)?.into_parts();
+
+                let res = bucket.get_object_stream_blocking(path.as_str(), &mut temp_file)?;
+                temp_file.flush()?;
+
+                temp_path.persist(local_file)?;
+
+                Ok(res)
             })
             .await??;
             info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
@@ -91,7 +101,7 @@ impl RemoteFs for S3RemoteFs {
                 )));
             }
         }
-        Ok(local_path)
+        Ok(local_file_str)
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
@@ -109,11 +119,11 @@ impl RemoteFs for S3RemoteFs {
             )));
         }
 
-        let dir = self.dir.write().await;
-        let local = dir.as_path().join(remote_path);
+        let _guard = self.delete_mut.lock().await;
+        let local = self.dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
-            LocalDirRemoteFs::remove_empty_paths(dir.as_path().to_path_buf(), local.clone())
+            LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
                 .await?;
         }
 
@@ -152,11 +162,11 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn local_path(&self) -> String {
-        self.dir.read().await.to_str().unwrap().to_owned()
+        self.dir.to_str().unwrap().to_owned()
     }
 
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let buf = self.dir.read().await.join(remote_path);
+        let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }

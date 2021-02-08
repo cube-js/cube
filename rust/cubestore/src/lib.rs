@@ -342,3 +342,9 @@ impl From<base64::DecodeError> for CubeError {
         return CubeError::from_error(v);
     }
 }
+
+impl From<tempfile::PathPersistError> for CubeError {
+    fn from(v: tempfile::PathPersistError) -> Self {
+        return CubeError::from_error(v);
+    }
+}

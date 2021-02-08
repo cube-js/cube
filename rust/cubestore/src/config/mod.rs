@@ -1,6 +1,6 @@
-use crate::cluster::ClusterImpl;
+use crate::cluster::{ClusterImpl, ClusterMetaStoreClient};
 use crate::import::ImportServiceImpl;
-use crate::metastore::RocksMetaStore;
+use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::QueryPlannerImpl;
 use crate::remotefs::gcs::GCSRemoteFs;
@@ -29,7 +29,8 @@ use tokio::time::{timeout_at, Duration, Instant};
 pub struct CubeServices {
     pub sql_service: Arc<dyn SqlService>,
     pub scheduler: Arc<SchedulerImpl>,
-    pub meta_store: Arc<RocksMetaStore>,
+    pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
+    pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
     pub remote_fs: Arc<QueueRemoteFs>,
 }
@@ -44,7 +45,9 @@ impl CubeServices {
         self.cluster.start_processing_loops().await;
         QueueRemoteFs::start_processing_loops(self.remote_fs.clone());
         if !self.cluster.is_select_worker() {
-            RocksMetaStore::run_upload_loop(self.meta_store.clone());
+            RocksMetaStore::run_upload_loop(self.rocks_meta_store.clone().unwrap());
+            let cluster = self.cluster.clone();
+            tokio::spawn(async move { ClusterImpl::listen_on_metastore_port(cluster).await });
             let scheduler = self.scheduler.clone();
             tokio::spawn(async move { scheduler.run_scheduler().await });
         } else {
@@ -58,7 +61,9 @@ impl CubeServices {
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
         self.cluster.stop_processing_loops().await?;
         self.remote_fs.stop_processing_loops()?;
-        self.meta_store.stop_processing_loops().await;
+        if let Some(rocks_meta) = &self.rocks_meta_store {
+            rocks_meta.stop_processing_loops().await;
+        }
         self.scheduler.stop_processing_loops()?;
         stop_track_event_loop().await;
         Ok(())
@@ -112,11 +117,19 @@ pub trait ConfigObj: Send + Sync {
 
     fn worker_bind_address(&self) -> &Option<String>;
 
+    fn metastore_bind_address(&self) -> &Option<String>;
+
+    fn metastore_remote_address(&self) -> &Option<String>;
+
     fn download_concurrency(&self) -> u64;
 
     fn upload_concurrency(&self) -> u64;
 
     fn data_dir(&self) -> &PathBuf;
+
+    fn connection_timeout(&self) -> u64;
+
+    fn server_name(&self) -> &String;
 }
 
 #[derive(Debug, Clone)]
@@ -134,8 +147,12 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
+    pub metastore_bind_address: Option<String>,
+    pub metastore_remote_address: Option<String>,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
+    pub connection_timeout: u64,
+    pub server_name: String,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -187,6 +204,14 @@ impl ConfigObj for ConfigObjImpl {
         &self.worker_bind_address
     }
 
+    fn metastore_bind_address(&self) -> &Option<String> {
+        &self.metastore_bind_address
+    }
+
+    fn metastore_remote_address(&self) -> &Option<String> {
+        &self.metastore_remote_address
+    }
+
     fn download_concurrency(&self) -> u64 {
         self.download_concurrency
     }
@@ -197,6 +222,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn data_dir(&self) -> &PathBuf {
         &self.data_dir
+    }
+
+    fn connection_timeout(&self) -> u64 {
+        self.connection_timeout
+    }
+
+    fn server_name(&self) -> &String {
+        &self.server_name
     }
 }
 
@@ -265,6 +298,10 @@ impl Config {
                 worker_bind_address: env::var("CUBESTORE_WORKER_PORT")
                     .ok()
                     .map(|v| format!("0.0.0.0:{}", v)),
+                metastore_bind_address: env::var("CUBESTORE_META_PORT")
+                    .ok()
+                    .map(|v| format!("0.0.0.0:{}", v)),
+                metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 wal_split_threshold: env::var("CUBESTORE_WAL_SPLIT_THRESHOLD")
@@ -275,6 +312,10 @@ impl Config {
                     .ok()
                     .map(|v| v.parse::<usize>().unwrap())
                     .unwrap_or(4),
+                connection_timeout: 60,
+                server_name: env::var("CUBESTORE_SERVER_NAME")
+                    .ok()
+                    .unwrap_or("localhost".to_string()),
             }),
         }
     }
@@ -300,9 +341,13 @@ impl Config {
                 query_timeout: 15,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
+                metastore_bind_address: None,
+                metastore_remote_address: None,
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 wal_split_threshold: 262144,
+                connection_timeout: 60,
+                server_name: "localhost".to_string(),
             }),
         }
     }
@@ -444,15 +489,26 @@ impl Config {
         let remote_fs = QueueRemoteFs::new(self.config_obj.clone(), original_remote_fs.clone());
         let (event_sender, event_receiver) = broadcast::channel(10000); // TODO config
 
-        let meta_store = RocksMetaStore::load_from_remote(
-            self.meta_store_path().to_str().unwrap(),
-            // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-            original_remote_fs,
-            self.config_obj.clone(),
-        )
-        .await
-        .unwrap();
-        meta_store.add_listener(event_sender).await;
+        let mut rocks_meta_store = None;
+        let meta_store: Arc<dyn MetaStore> =
+            if let Some(meta_store_remote) = self.config_obj.metastore_remote_address() {
+                let transport =
+                    ClusterMetaStoreClient::new(meta_store_remote.clone(), self.config_obj.clone());
+                Arc::new(MetaStoreRpcClient::new(transport))
+            } else {
+                let meta_store = RocksMetaStore::load_from_remote(
+                    self.meta_store_path().to_str().unwrap(),
+                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                    original_remote_fs,
+                    self.config_obj.clone(),
+                )
+                .await
+                .unwrap();
+                rocks_meta_store = Some(meta_store.clone());
+                meta_store.add_listener(event_sender).await;
+                meta_store
+            };
+
         let wal_store = WALStore::new(
             meta_store.clone(),
             remote_fs.clone(),
@@ -462,7 +518,7 @@ impl Config {
             meta_store.clone(),
             remote_fs.clone(),
             wal_store.clone(),
-            262144,
+            self.config_obj.wal_split_threshold() as usize,
         );
         let compaction_service = CompactionServiceImpl::new(
             meta_store.clone(),
@@ -478,7 +534,7 @@ impl Config {
         let query_planner = QueryPlannerImpl::new(meta_store.clone());
         let query_executor = Arc::new(QueryExecutorImpl);
         let cluster = ClusterImpl::new(
-            "localhost".to_string(),
+            self.config_obj.server_name().to_string(),
             vec!["localhost".to_string()],
             remote_fs.clone(),
             Duration::from_secs(30),
@@ -508,6 +564,7 @@ impl Config {
         CubeServices {
             sql_service,
             scheduler: Arc::new(scheduler),
+            rocks_meta_store,
             meta_store,
             cluster,
             remote_fs,

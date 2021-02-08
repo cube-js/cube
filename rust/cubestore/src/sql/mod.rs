@@ -1291,6 +1291,7 @@ mod tests {
                 Config::test("high_frequency_inserts_worker_1")
                     .update_config(|mut c| {
                         c.worker_bind_address = Some("127.0.0.1:4306".to_string());
+                        c.server_name = "127.0.0.1:4306".to_string();
                         c.store_provider = FileStoreProvider::S3 {
                             region: "us-west-2".to_string(),
                             bucket_name: "cube-store-ci-test".to_string(),
@@ -1353,12 +1354,13 @@ mod tests {
         Config::test("high_frequency_inserts_gcs")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
-                c.compaction_chunks_count_threshold = 100;
+                c.compaction_chunks_count_threshold = 0;
                 c.store_provider = FileStoreProvider::GCS {
                     bucket_name: "cube-store-ci-test".to_string(),
                     sub_path: Some("high_frequency_inserts_gcs".to_string()),
                 };
                 c.select_workers = vec!["127.0.0.1:4312".to_string()];
+                c.metastore_bind_address = Some("127.0.0.1:15312".to_string());
                 c
             })
             .start_test(async move |services| {
@@ -1367,10 +1369,12 @@ mod tests {
                 Config::test("high_frequency_inserts_gcs_worker_1")
                     .update_config(|mut c| {
                         c.worker_bind_address = Some("127.0.0.1:4312".to_string());
+                        c.server_name = "127.0.0.1:4312".to_string();
                         c.store_provider = FileStoreProvider::GCS {
                             bucket_name: "cube-store-ci-test".to_string(),
                             sub_path: Some("high_frequency_inserts_gcs".to_string()),
                         };
+                        c.metastore_remote_address = Some("127.0.0.1:15312".to_string());
                         c
                     })
                     .start_test_worker(async move |_| {
@@ -1709,62 +1713,70 @@ mod tests {
     #[tokio::test]
     async fn cluster() {
         Config::test("cluster_router").update_config(|mut config| {
-            config.select_workers = vec!["127.0.0.1:4306".to_string(), "127.0.0.1:4307".to_string()];
+            config.select_workers = vec!["127.0.0.1:14306".to_string(), "127.0.0.1:14307".to_string()];
+            config.metastore_bind_address = Some("127.0.0.1:15306".to_string());
+            config.compaction_chunks_count_threshold = 0;
             config
         }).start_test(async move |services| {
             let service = services.sql_service;
 
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.orders_1 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.orders_2 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-            service.exec_query("CREATE INDEX orders_by_product_1 ON foo.orders_1 (orders_product_id)").await.unwrap();
-            service.exec_query("CREATE INDEX orders_by_product_2 ON foo.orders_2 (orders_product_id)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders_2 (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
-            ).await.unwrap();
-
             Config::test("cluster_worker_1").update_config(|mut config| {
-                config.worker_bind_address = Some("127.0.0.1:4306".to_string());
+                config.worker_bind_address = Some("127.0.0.1:14306".to_string());
+                config.server_name = "127.0.0.1:14306".to_string();
+                config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                 config.store_provider = FileStoreProvider::Filesystem {
                     remote_dir: env::current_dir()
                         .unwrap()
                         .join("cluster_router-upstream".to_string()),
                 };
+                config.compaction_chunks_count_threshold = 0;
                 config
             }).start_test_worker(async move |_| {
                 Config::test("cluster_worker_2").update_config(|mut config| {
-                    config.worker_bind_address = Some("127.0.0.1:4307".to_string());
+                    config.worker_bind_address = Some("127.0.0.1:14307".to_string());
+                    config.server_name = "127.0.0.1:14307".to_string();
+                    config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                     config.store_provider = FileStoreProvider::Filesystem {
                         remote_dir: env::current_dir()
                             .unwrap()
                             .join("cluster_router-upstream".to_string()),
                     };
+                    config.compaction_chunks_count_threshold = 0;
                     config
                 }).start_test_worker(async move |_| {
+                    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                    service.exec_query("CREATE TABLE foo.orders_1 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+                    service.exec_query("CREATE TABLE foo.orders_2 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
+                    service.exec_query("CREATE INDEX orders_by_product_1 ON foo.orders_1 (orders_product_id)").await.unwrap();
+                    service.exec_query("CREATE INDEX orders_by_product_2 ON foo.orders_2 (orders_product_id)").await.unwrap();
+                    service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
+                    service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
+
+                    service.exec_query(
+                        "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
+                    ).await.unwrap();
+
+                    service.exec_query(
+                        "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
+                    ).await.unwrap();
+
+                    service.exec_query(
+                        "INSERT INTO foo.orders_2 (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
+                    ).await.unwrap();
+
+                    service.exec_query(
+                        "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
+                    ).await.unwrap();
+
+                    service.exec_query(
+                        "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
+                    ).await.unwrap();
+
+                    service.exec_query(
+                        "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
+                    ).await.unwrap();
+
                     let result = service.exec_query(
                         "SELECT city, name, sum(amount) FROM (SELECT * FROM foo.orders_1 UNION ALL SELECT * FROM foo.orders_2) o \
                 LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
