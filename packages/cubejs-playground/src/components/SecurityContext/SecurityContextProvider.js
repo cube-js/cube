@@ -10,7 +10,7 @@ export const SecurityContextContext = createContext({
   isModalOpen: false,
 });
 
-export default function SecurityContextProvider({ children }) {
+export default function SecurityContextProvider({ children, getToken }) {
   const [token, setToken] = useState(null);
   const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,9 +34,14 @@ export default function SecurityContextProvider({ children }) {
     }
   }, [token]);
 
-  const saveToken = useCallback((token, saveToLocalStorage = true) => {
-    saveToLocalStorage && localStorage.setItem('cubejsToken', token);
-    setToken(token);
+  const saveToken = useCallback((token) => {
+    if (token) {
+      localStorage.setItem('cubejsToken', token);
+    } else {
+      localStorage.removeItem('cubejsToken');
+      setPayload('');
+    }
+    setToken(token || null);
   }, []);
 
   return (
@@ -48,6 +53,7 @@ export default function SecurityContextProvider({ children }) {
         isModalOpen,
         setIsModalOpen,
         saveToken,
+        getToken
       }}
     >
       {children}

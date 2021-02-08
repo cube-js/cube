@@ -4,7 +4,7 @@ import { createHashHistory } from 'history';
 
 import App from './App';
 import { page } from './events';
-import TemplateGalleryPage from './TemplateGallery/TemplateGalleryPage';
+import { TemplateGalleryPage } from './pages';
 import {
   ExplorePage,
   DashboardPage,
@@ -19,6 +19,20 @@ history.listen((location) => {
   page(location);
 });
 
+async function getToken(payload) {
+  const response = await fetch('/playground/token', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      payload: JSON.parse(payload),
+    }),
+  });
+  const { token } = await response.json();
+  return token;
+}
+
 ReactDOM.render(
   <Router history={history}>
     <App>
@@ -28,7 +42,7 @@ ReactDOM.render(
         path="/build"
         component={(props) => {
           return (
-            <SecurityContextProvider>
+            <SecurityContextProvider getToken={getToken}>
               <ExplorePage {...props} />
             </SecurityContextProvider>
           );

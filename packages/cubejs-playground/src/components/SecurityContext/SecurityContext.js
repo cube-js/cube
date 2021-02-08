@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, Tabs, Input, Button, Space, Typography, Form } from 'antd';
 import { CheckOutlined, CopyOutlined, EditOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
-import { fetch } from 'whatwg-fetch';
 
 import { useSecurityContext } from '../../hooks';
 import CubejsIcon from '../../shared/icons/CubejsIcon';
@@ -28,10 +27,11 @@ export default function SecurityContext() {
     isModalOpen,
     setIsModalOpen,
     saveToken,
+    getToken
   } = useSecurityContext();
 
   const [form] = Form.useForm();
-  const [editingToken, setEditingToken] = useState(!token);
+  const [editingToken, setEditingToken] = useState(false);
   const [isJsonValid, setIsJsonValid] = useState(true);
   const [tmpPayload, setPayload] = useState(payload);
   const inputRef = useRef(null);
@@ -50,11 +50,11 @@ export default function SecurityContext() {
   }, [form, token, payload]);
 
   function handleTokenSave(values) {
-    setEditingToken(false);
     saveToken(values.token);
+    setEditingToken(false);
   }
 
-  function handlepayloadChange(event) {
+  function handlePayloadChange(event) {
     const { value } = event.target;
     setPayload(value);
 
@@ -66,20 +66,10 @@ export default function SecurityContext() {
     }
   }
 
-  async function handlepayloadSave() {
+  async function handlePayloadSave() {
     if (isJsonValid) {
       try {
-        const response = await fetch('/playground/token', {
-          method: 'post',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            payload: JSON.parse(tmpPayload),
-          }),
-        });
-        const { token } = await response.json();
-        saveToken(token);
+        saveToken(await getToken(tmpPayload));
       } catch (error) {
         console.error(error);
       }
@@ -113,13 +103,13 @@ export default function SecurityContext() {
                 value={tmpPayload}
                 rows={10}
                 style={{ width: '100%' }}
-                onChange={handlepayloadChange}
+                onChange={handlePayloadChange}
               />
 
               <Button
                 type="primary"
                 disabled={!isJsonValid}
-                onClick={handlepayloadSave}
+                onClick={handlePayloadSave}
               >
                 Save
               </Button>

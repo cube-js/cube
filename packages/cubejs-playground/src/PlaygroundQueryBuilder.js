@@ -1,5 +1,4 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
-import * as PropTypes from 'prop-types';
 import { Col, Row } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
@@ -338,10 +337,3 @@ export default function PlaygroundQueryBuilder({
     />
   );
 }
-
-PlaygroundQueryBuilder.propTypes = {
-  query: PropTypes.object,
-  setQuery: PropTypes.func,
-  apiUrl: PropTypes.string,
-  cubejsToken: PropTypes.string,
-};
