@@ -619,7 +619,7 @@ meta_store_table_impl!(IndexMetaStoreTable, Index, IndexRocksTable);
 meta_store_table_impl!(PartitionMetaStoreTable, Partition, PartitionRocksTable);
 meta_store_table_impl!(TableMetaStoreTable, Table, TableRocksTable);
 
-#[async_trait]
+#[cuberpc::service]
 pub trait MetaStore: Send + Sync {
     async fn wait_for_current_seq_to_sync(&self) -> Result<(), CubeError>;
     fn schemas_table(&self) -> SchemaMetaStoreTable;
@@ -683,6 +683,7 @@ pub trait MetaStore: Send + Sync {
         new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError>;
     async fn is_partition_used(&self, partition_id: u64) -> Result<bool, CubeError>;
+    async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
 
     fn index_table(&self) -> IndexMetaStoreTable;
     async fn create_index(
@@ -697,6 +698,7 @@ pub trait MetaStore: Send + Sync {
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError>;
 
     async fn get_active_partitions_and_chunks_by_index_id_for_select(
         &self,
@@ -2420,6 +2422,13 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            PartitionRocksTable::new(db_ref).delete(partition_id, batch_pipe)
+        })
+        .await
+    }
+
     fn index_table(&self) -> IndexMetaStoreTable {
         IndexMetaStoreTable {
             rocks_meta_store: self.clone(),
@@ -2507,6 +2516,13 @@ impl MetaStore for RocksMetaStore {
                 .into_iter()
                 .filter(|r| r.get_row().active)
                 .collect::<Vec<_>>())
+        })
+        .await
+    }
+
+    async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError> {
+        self.read_operation(move |db_ref| {
+            IndexRocksTable::new(db_ref).get_row_or_not_found(index_id)
         })
         .await
     }
@@ -3226,19 +3242,37 @@ mod tests {
                     .create_schema("foo1".to_string(), false)
                     .await
                     .unwrap();
-                services.meta_store.run_upload().await.unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
                 services
                     .meta_store
                     .create_schema("foo".to_string(), false)
                     .await
                     .unwrap();
-                services.meta_store.upload_check_point().await.unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .upload_check_point()
+                    .await
+                    .unwrap();
                 services
                     .meta_store
                     .create_schema("bar".to_string(), false)
                     .await
                     .unwrap();
-                services.meta_store.run_upload().await.unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
                 services.stop_processing_loops().await.unwrap();
             }
             Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
@@ -3282,19 +3316,37 @@ mod tests {
                     .create_schema("foo1".to_string(), false)
                     .await
                     .unwrap();
-                services.meta_store.run_upload().await.unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
                 services
                     .meta_store
                     .create_schema("foo".to_string(), false)
                     .await
                     .unwrap();
-                services.meta_store.upload_check_point().await.unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .upload_check_point()
+                    .await
+                    .unwrap();
                 services
                     .meta_store
                     .create_schema("bar".to_string(), false)
                     .await
                     .unwrap();
-                services.meta_store.run_upload().await.unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
                 services.stop_processing_loops().await.unwrap();
             }
             Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict

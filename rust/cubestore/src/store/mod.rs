@@ -9,8 +9,7 @@ extern crate bincode;
 use bincode::{deserialize_from, serialize_into};
 
 use crate::metastore::{
-    table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, MetaStoreTable, Partition,
-    WAL,
+    table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL,
 };
 use crate::remotefs::RemoteFs;
 use crate::table::{Row, TableStore, TableValue};
@@ -377,13 +376,11 @@ impl ChunkDataStore for ChunkStore {
         }
         let partition = self
             .meta_store
-            .partition_table()
-            .row_by_id_or_not_found(chunk.get_row().get_partition_id())
+            .get_partition(chunk.get_row().get_partition_id())
             .await?;
         let index = self
             .meta_store
-            .index_table()
-            .row_by_id_or_not_found(partition.get_row().get_index_id())
+            .get_index(partition.get_row().get_index_id())
             .await?;
         let remote_path = ChunkStore::chunk_file_name(chunk);
         self.remote_fs.download_file(&remote_path).await?;
@@ -407,12 +404,10 @@ impl ChunkDataStore for ChunkStore {
         }
         let partition = self
             .meta_store
-            .partition_table()
-            .row_by_id_or_not_found(chunk.get_row().get_partition_id())
+            .get_partition(chunk.get_row().get_partition_id())
             .await?;
         self.meta_store
-            .index_table()
-            .row_by_id_or_not_found(partition.get_row().get_index_id())
+            .get_index(partition.get_row().get_index_id())
             .await?;
         let remote_path = ChunkStore::chunk_file_name(chunk);
         self.remote_fs.download_file(&remote_path).await?;
@@ -615,11 +610,7 @@ impl ChunkStore {
         index_id: u64,
         data: DataFrame,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        let index = self
-            .meta_store
-            .index_table()
-            .row_by_id_or_not_found(index_id)
-            .await?;
+        let index = self.meta_store.get_index(index_id).await?;
         let partitions = self
             .meta_store
             .get_active_partitions_by_index_id(index_id)
