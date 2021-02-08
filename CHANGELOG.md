@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.6](https://github.com/cube-js/cube.js/compare/v0.26.5...v0.26.6) (2021-02-08)
+
+
+### Bug Fixes
+
+* **cubestore:** Increase default split thresholds as memory issues are fixed ([7771a86](https://github.com/cube-js/cube.js/commit/7771a869ae51d58a61dce2ffcbd3dd0f9dc8c483))
+* **server-core:** add support for async driverFactory ([312f90b](https://github.com/cube-js/cube.js/commit/312f90b0c6d92f053f1033ecf15efea1c10a4c0a))
+* **sqlite-driver:** Use workaround for FLOOR ([#1931](https://github.com/cube-js/cube.js/issues/1931)) ([fe64feb](https://github.com/cube-js/cube.js/commit/fe64febd1b970c4b8396d05a859f16b3d9e5a8a8))
+
+
+### Features
+
+* **@cubejs-client/playground:** Building pre-aggregations message ([#1984](https://github.com/cube-js/cube.js/issues/1984)) ([e1fff5d](https://github.com/cube-js/cube.js/commit/e1fff5de4584df1bd8ef518e2436e1dcb4962975))
+* Block from uploading files and folders (recur) starting from "." ([d549fc4](https://github.com/cube-js/cube.js/commit/d549fc4ab6eff19b3c5273cafb7427be1cbaca98))
+* Improve typings for extendContext ([8e9c3bc](https://github.com/cube-js/cube.js/commit/8e9c3bcafc3f9acbc8e1a53113202b4be19bb12c))
+* Partitions warmup ([#1993](https://github.com/cube-js/cube.js/issues/1993)) ([200dab1](https://github.com/cube-js/cube.js/commit/200dab193eee43649b0a3e9f5240bc4bf3576fcc))
+* **cubestore:** Distributed jobs implementation ([#2001](https://github.com/cube-js/cube.js/issues/2001)) ([064ca30](https://github.com/cube-js/cube.js/commit/064ca3056ac3c52f8514ac5fb21f23f6b6b43244))
+* **server-core:** Correct typings for driverFactory/dialectFactory ([51fb117](https://github.com/cube-js/cube.js/commit/51fb117883d2e04c3a8fce4494ac48e0938a0097))
+
+
+
+
+
 ## [0.26.5](https://github.com/cube-js/cube.js/compare/v0.26.4...v0.26.5) (2021-02-03)
 
 

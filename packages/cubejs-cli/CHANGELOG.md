@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.6](https://github.com/cube-js/cube.js/compare/v0.26.5...v0.26.6) (2021-02-08)
+
+
+### Features
+
+* Block from uploading files and folders (recur) starting from "." ([d549fc4](https://github.com/cube-js/cube.js/commit/d549fc4ab6eff19b3c5273cafb7427be1cbaca98))
+
+
+
+
+
 ## [0.26.2](https://github.com/cube-js/cube.js/compare/v0.26.1...v0.26.2) (2021-02-01)
 
 **Note:** Version bump only for package cubejs-cli
