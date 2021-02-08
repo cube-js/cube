@@ -6,6 +6,7 @@ import fs from 'fs-extra';
 import crypto from 'crypto';
 import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
 import type { Application as ExpressApplication } from 'express';
+import jwt from 'jsonwebtoken';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import AppContainer from '../dev/AppContainer';
@@ -29,7 +30,6 @@ export class DevServer {
   }
 
   public initDevEnv(app: ExpressApplication, options: ServerCoreInitializedOptions) {
-    const jwt = require('jsonwebtoken');
     const port = process.env.PORT || 4000; // TODO
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
 
@@ -337,6 +337,15 @@ export class DevServer {
       fs.writeFileSync('.env', variables.join('\n'));
 
       res.status(200).json('ok');
+    }));
+    
+    app.post('/playground/token', catchErrors(async (req, res) => {
+      const { payload = {} } = req.body;
+      const jwtOptions = typeof payload.exp != null ? {} : { expiresIn: '1d' };
+      
+      const token = jwt.sign(payload, options.apiSecret, jwtOptions);
+      
+      res.json({ token });
     }));
   }
 }

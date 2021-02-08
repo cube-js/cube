@@ -60,6 +60,7 @@
     "@types/express": "^4.17.9",
     "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^25.2.3",
+    "@types/jsonwebtoken": "^8.5.0",
     "@types/lru-cache": "^5.1.0",
     "@types/node": "^10.17.49",
     "@types/node-fetch": "^2.5.7",

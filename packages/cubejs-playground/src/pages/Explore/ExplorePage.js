@@ -1,76 +1,65 @@
-import { Component } from 'react';
-import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
-import PropTypes from 'prop-types';
 
 import DashboardSource from '../../DashboardSource';
+import { useCubejsApi, useSecurityContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 
-class ExplorePage extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {};
-    this.dashboardSource = new DashboardSource();
-  }
+export default function ExplorePage() {
+  const { push, location } = useHistory();
+  const { token } = useSecurityContext();
+  
+  const [apiUrl, setApiUrl] = useState(null);
+  const [playgroundContext, setPlaygroundContext] = useState(null);
 
-  async componentDidMount() {
-    const res = await fetch('/playground/context');
-    const result = await res.json();
+  const dashboardSource = useMemo(() => new DashboardSource(), []);
+  const cubejsApi = useCubejsApi(apiUrl, token || playgroundContext?.cubejsToken);
 
-    const basePath = result.basePath || '/cubejs-api';
-    let apiUrl = result.apiUrl || window.location.href.split('#')[0].replace(/\/$/, '');
-    apiUrl = `${apiUrl}${basePath}/v1`;
+  useEffect(() => {
+    (async () => {
+      const res = await fetch('/playground/context');
+      const result = await res.json();
 
-    this.setState({
-      cubejsToken: result.cubejsToken,
-      apiUrl
-    });
+      setPlaygroundContext(result);
+    })();
+  }, []);
 
-    window['__cubejsPlayground'] = {
-      ...window['__cubejsPlayground'],
-      apiUrl,
-      token: result.cubejsToken
-    };
-  }
+  useLayoutEffect(() => {
+    if (playgroundContext) {
+      const basePath = playgroundContext.basePath || '/cubejs-api';
+      let apiUrl =
+        playgroundContext.apiUrl ||
+        window.location.href.split('#')[0].replace(/\/$/, '');
+      apiUrl = `${apiUrl}${basePath}/v1`;
 
-  cubejsApi() {
-    const { cubejsToken, apiUrl } = this.state;
-    if (!this.cubejsApiInstance && cubejsToken) {
-      this.cubejsApiInstance = cubejs(cubejsToken, {
-        apiUrl
-      });
+      setApiUrl(apiUrl);
+
+      window['__cubejsPlayground'] = {
+        ...window['__cubejsPlayground'],
+        apiUrl,
+        token: token || playgroundContext.cubejsToken,
+      };
     }
-    return this.cubejsApiInstance;
+  }, [token, playgroundContext]);
+
+  if (!cubejsApi) {
+    return null;
   }
 
-  render() {
-    const { cubejsToken, apiUrl } = this.state;
-    const { location, history } = this.props;
-    const params = new URLSearchParams(location.search);
-    const query =
-      (params.get('query') && JSON.parse(params.get('query'))) || {};
-    return (
-      (this.cubejsApi() && (
-        <CubeProvider cubejsApi={this.cubejsApi()}>
-          <PlaygroundQueryBuilder
-            query={query}
-            setQuery={(q) => history.push(`/build?query=${JSON.stringify(q)}`)}
-            cubejsApi={this.cubejsApi()}
-            apiUrl={apiUrl}
-            cubejsToken={cubejsToken}
-            dashboardSource={this.dashboardSource}
-          />
-        </CubeProvider>
-      )) ||
-      null
-    );
-  }
+  const params = new URLSearchParams(location.search);
+  const query = (params.get('query') && JSON.parse(params.get('query'))) || {};
+
+  return (
+    <CubeProvider cubejsApi={cubejsApi}>
+      <PlaygroundQueryBuilder
+        query={query}
+        setQuery={(q) => push(`/build?query=${JSON.stringify(q)}`)}
+        apiUrl={apiUrl}
+        cubejsToken={token || playgroundContext.cubejsToken}
+        dashboardSource={dashboardSource}
+      />
+    </CubeProvider>
+  );
 }
-
-ExplorePage.propTypes = {
-  location: PropTypes.object.isRequired,
-  history: PropTypes.object.isRequired,
-};
-
-export default ExplorePage;

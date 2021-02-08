@@ -4,7 +4,7 @@ import CubeContext from '../CubeContext';
 import isQueryPresent from '../isQueryPresent';
 import useDeepCompareMemoize from './deep-compare-memoize';
 
-export default (query, options = {}) => {
+export default function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
   const [currentQuery, setCurrentQuery] = useState(null);
   const [isLoading, setLoading] = useState(false);
@@ -112,4 +112,4 @@ export default (query, options = {}) => {
     error,
     progress,
   };
-};
+}

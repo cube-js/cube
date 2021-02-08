@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Alert, Spin, Typography } from 'antd';
 import styled from 'styled-components';
 
-import { dispatchChartEvent } from '../../utils';
+import { dispatchPlaygroundEvent } from '../../utils';
 import {
   useDeepCompareMemoize,
   useSlowQuery,
@@ -51,7 +51,7 @@ export default function ChartRenderer({
 
   useEffect(() => {
     if (isChartRendererReady && iframeRef.current) {
-      dispatchChartEvent(iframeRef.current.contentDocument, {
+      dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
         pivotConfig,
         query,
         chartType,

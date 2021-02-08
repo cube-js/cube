@@ -3,7 +3,7 @@ import { fetch } from 'whatwg-fetch';
 import { Spin } from 'antd';
 import { Redirect } from 'react-router-dom';
 
-class IndexPage extends Component {
+export default class IndexPage extends Component {
   constructor(props) {
     super(props);
     this.state = {};
@@ -50,5 +50,3 @@ class IndexPage extends Component {
     );
   }
 }
-
-export default IndexPage;

@@ -1,6 +1,4 @@
 import { Component } from 'react';
-import * as PropTypes from 'prop-types';
-import cubejs from '@cubejs-client/core';
 import {
   Layout,
   Button,
@@ -8,11 +6,11 @@ import {
   Modal,
   Empty,
 } from 'antd';
-import PrismCode from './PrismCode';
-import { playgroundAction } from './events';
-import { Menu, Tabs, Tree, Alert } from './components';
 
-import fetch from './playgroundFetch';
+import PrismCode from '../../PrismCode';
+import { playgroundAction } from '../../events';
+import { Menu, Tabs, Tree, Alert } from '../../components';
+import fetch from '../../playgroundFetch';
 
 const { Content, Sider } = Layout;
 
@@ -34,7 +32,7 @@ const schemaToTreeData = (schemas) =>
     }),
   }));
 
-class SchemaPage extends Component {
+export default class SchemaPage extends Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -67,16 +65,6 @@ class SchemaPage extends Component {
 
   onSelect(selectedKeys) {
     this.setState({ selectedKeys });
-  }
-
-  cubejsApi() {
-    const { cubejsToken, apiUrl } = this.state;
-    if (!this.cubejsApiInstance && cubejsToken) {
-      this.cubejsApiInstance = cubejs(cubejsToken, {
-        apiUrl: `${apiUrl}/cubejs-api/v1`,
-      });
-    }
-    return this.cubejsApiInstance;
   }
 
   async loadDBSchema() {
@@ -277,9 +265,3 @@ class SchemaPage extends Component {
     );
   }
 }
-
-SchemaPage.propTypes = {
-  history: PropTypes.object.isRequired,
-};
-
-export default SchemaPage;

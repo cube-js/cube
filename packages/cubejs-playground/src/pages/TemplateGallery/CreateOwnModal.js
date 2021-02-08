@@ -3,8 +3,9 @@ import { Form } from '@ant-design/compatible';
 import '@ant-design/compatible/assets/index.css';
 import { Switch, Menu, Dropdown, Modal, Alert } from 'antd';
 import styled from 'styled-components';
-import { playgroundAction } from '../events';
-import Button from '../components/Button';
+
+import { playgroundAction } from '../../events';
+import Button from '../../components/Button';
 
 const StyledModal = styled(Modal)`
   && {

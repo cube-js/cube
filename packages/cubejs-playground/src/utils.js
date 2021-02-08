@@ -1,3 +1,5 @@
+import { notification } from 'antd';
+
 const bootstrapDefinition = {
   'angular-cli': {
     files: {
@@ -84,11 +86,14 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
   };
 }
 
-export function dispatchChartEvent(document, detail) {
-  const myEvent = new CustomEvent('cubejs', {
+export function dispatchPlaygroundEvent(document, eventType, detail) {
+  const myEvent = new CustomEvent('__cubejsPlaygroundEvent', {
     bubbles: true,
     composed: true,
-    detail,
+    detail: {
+      ...detail,
+      eventType,
+    },
   });
 
   document.dispatchEvent(myEvent);
@@ -99,6 +104,26 @@ export function fetchWithTimeout(url, options, timeout) {
     fetch(url, options),
     new Promise((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), timeout)
-    )
+    ),
   ]);
+}
+
+export async function copyToClipboard(value, message = 'Copied to clipboard') {
+  if (!navigator.clipboard) {
+    notification.error({
+      message: "Your browser doesn't support copy to clipboard",
+    });
+  }
+
+  try {
+    await navigator.clipboard.writeText(value);
+    notification.success({
+      message,
+    });
+  } catch (e) {
+    notification.error({
+      message: "Can't copy to clipboard",
+      description: e,
+    });
+  }
 }

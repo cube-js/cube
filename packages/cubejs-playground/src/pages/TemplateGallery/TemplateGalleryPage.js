@@ -4,12 +4,12 @@ import '@ant-design/compatible/assets/index.css';
 import { Col, Row, Spin, Typography } from 'antd';
 import { Redirect, withRouter } from 'react-router-dom';
 
-import DashboardSource from '../DashboardSource';
-import { frameworks } from '../ChartContainer';
-import { Button, Card } from '../components';
+import DashboardSource from '../../DashboardSource';
+import { frameworks } from '../../ChartContainer';
+import { Button, Card } from '../../components';
 import { ReactComponent as PlusSVG } from './plus.svg';
 import CreateOwnModal from './CreateOwnModal';
-import { frameworkChartLibraries } from '../PlaygroundQueryBuilder';
+import { frameworkChartLibraries } from '../../PlaygroundQueryBuilder';
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>

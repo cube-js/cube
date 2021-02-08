@@ -1,6 +1,6 @@
-import { useState, useRef, useLayoutEffect } from 'react';
-import * as PropTypes from 'prop-types';
+import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { Col, Row } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
 
 import { playgroundAction } from './events';
@@ -10,10 +10,11 @@ import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
-import { Card, SectionHeader, SectionRow } from './components';
+import { Card, SectionHeader, SectionRow, Button } from './components';
 import styled from 'styled-components';
 import ChartContainer from './ChartContainer';
-import { dispatchChartEvent } from './utils';
+import { dispatchPlaygroundEvent } from './utils';
+import { useSecurityContext } from './hooks';
 
 const Section = styled.div`
   display: flex;
@@ -78,24 +79,34 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
 
 export default function PlaygroundQueryBuilder({
   query = {},
-  cubejsApi,
   apiUrl,
   cubejsToken,
   setQuery,
+  dashboardSource,
 }) {
   const ref = useRef(null);
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
-  
+  const { token, setIsModalOpen } = useSecurityContext();
+
   useLayoutEffect(() => {
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
       onChartRendererReady() {
         setChartRendererReady(true);
-      }
-    }
+      },
+    };
   }, []);
+
+  useEffect(() => {
+    if (isChartRendererReady && ref.current) {
+      dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
+        token: cubejsToken,
+        apiUrl,
+      });
+    }
+  }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
 
   const { response } = useDryRun(query, {
     skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
@@ -113,7 +124,6 @@ export default function PlaygroundQueryBuilder({
     <QueryBuilder
       query={query}
       setQuery={setQuery}
-      cubejsApi={cubejsApi}
       wrapWithQueryRenderer={false}
       render={({
         error,
@@ -141,6 +151,21 @@ export default function PlaygroundQueryBuilder({
       }) => {
         return (
           <>
+            <Row style={{ margin: 12 }}>
+              <Col span={24}>
+                <Button.Group>
+                  <Button
+                    icon={<LockOutlined />}
+                    size="small"
+                    type={token ? 'primary' : 'default'}
+                    onClick={() => setIsModalOpen(true)}
+                  >
+                    {token ? 'Edit' : 'Add'} Security Context
+                  </Button>
+                </Button.Group>
+              </Col>
+            </Row>
+
             <Row
               justify="space-around"
               align="top"
@@ -149,12 +174,7 @@ export default function PlaygroundQueryBuilder({
             >
               <Col span={24}>
                 <Card bordered={false} style={{ borderRadius: 0 }}>
-                  <Row
-                    justify="stretch"
-                    align="top"
-                    gutter={0}
-                    style={{ marginBottom: -12 }}
-                  >
+                  <Row align="top" gutter={0} style={{ marginBottom: -12 }}>
                     <Section>
                       <SectionHeader>Measures</SectionHeader>
                       <MemberGroup
@@ -276,14 +296,18 @@ export default function PlaygroundQueryBuilder({
                     setFramework={setFramework}
                     setChartLibrary={(value) => {
                       if (ref.current) {
-                        dispatchChartEvent(ref.current.contentDocument, {
-                          chartingLibrary: value,
-                        });
+                        dispatchPlaygroundEvent(
+                          ref.current.contentDocument,
+                          'chart',
+                          {
+                            chartingLibrary: value,
+                          }
+                        );
                       }
                       setChartingLibrary(value);
                     }}
                     chartLibraries={frameworkChartLibraries}
-                    cubejsApi={cubejsApi}
+                    dashboardSource={dashboardSource}
                     render={({ framework }) => {
                       return (
                         <ChartRenderer
@@ -313,11 +337,3 @@ export default function PlaygroundQueryBuilder({
     />
   );
 }
-
-PlaygroundQueryBuilder.propTypes = {
-  query: PropTypes.object,
-  setQuery: PropTypes.func,
-  cubejsApi: PropTypes.object,
-  apiUrl: PropTypes.string,
-  cubejsToken: PropTypes.string,
-};

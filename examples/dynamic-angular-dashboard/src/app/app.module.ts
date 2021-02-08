@@ -1,5 +1,5 @@
-import { HttpClientModule } from '@angular/common/http';
-import { NgModule } from '@angular/core';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatGridListModule } from '@angular/material/grid-list';
@@ -48,6 +48,13 @@ const cubejsOptions = {
   },
 };
 
+export function cubejsClientFactory(http: HttpClient) {
+  return () =>
+    new Promise((resolve) => {
+      setTimeout(() => resolve({ token: '100500' }), 2000);
+    });
+}
+
 @NgModule({
   declarations: [
     AppComponent,
@@ -61,7 +68,7 @@ const cubejsOptions = {
     SettingsDialogComponent,
     AddToDashboardDialogComponent,
     FilterGroupComponent,
-    FilterComponent
+    FilterComponent,
   ],
   entryComponents: [SettingsDialogComponent, AddToDashboardDialogComponent],
   imports: [
@@ -87,7 +94,7 @@ const cubejsOptions = {
     MatListModule,
     AppRoutingModule,
     MatMenuModule,
-    GridsterModule
+    GridsterModule,
   ],
   providers: [
     QueryBuilderService,
@@ -95,6 +102,12 @@ const cubejsOptions = {
       provide: APOLLO_OPTIONS,
       useFactory: () => apolloClient,
       deps: [HttpLink],
+    },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: cubejsClientFactory,
+      deps: [HttpClient],
+      multi: true,
     },
   ],
   bootstrap: [AppComponent],
