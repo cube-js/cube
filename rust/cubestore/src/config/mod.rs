@@ -128,6 +128,8 @@ pub trait ConfigObj: Send + Sync {
     fn data_dir(&self) -> &PathBuf;
 
     fn connection_timeout(&self) -> u64;
+
+    fn server_name(&self) -> &String;
 }
 
 #[derive(Debug, Clone)]
@@ -150,6 +152,7 @@ pub struct ConfigObjImpl {
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
+    pub server_name: String,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -223,6 +226,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn connection_timeout(&self) -> u64 {
         self.connection_timeout
+    }
+
+    fn server_name(&self) -> &String {
+        &self.server_name
     }
 }
 
@@ -306,6 +313,9 @@ impl Config {
                     .map(|v| v.parse::<usize>().unwrap())
                     .unwrap_or(4),
                 connection_timeout: 60,
+                server_name: env::var("CUBESTORE_SERVER_NAME")
+                    .ok()
+                    .unwrap_or("localhost".to_string())
             }),
         }
     }
@@ -337,6 +347,7 @@ impl Config {
                 download_concurrency: 8,
                 wal_split_threshold: 262144,
                 connection_timeout: 60,
+                server_name: "localhost".to_string()
             }),
         }
     }
@@ -523,10 +534,7 @@ impl Config {
         let query_planner = QueryPlannerImpl::new(meta_store.clone());
         let query_executor = Arc::new(QueryExecutorImpl);
         let cluster = ClusterImpl::new(
-            self.config_obj
-                .worker_bind_address
-                .clone()
-                .unwrap_or("localhost".to_string()),
+            self.config_obj.server_name().to_string(),
             vec!["localhost".to_string()],
             remote_fs.clone(),
             Duration::from_secs(30),

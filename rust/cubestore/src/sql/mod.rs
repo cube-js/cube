@@ -1291,6 +1291,7 @@ mod tests {
                 Config::test("high_frequency_inserts_worker_1")
                     .update_config(|mut c| {
                         c.worker_bind_address = Some("127.0.0.1:4306".to_string());
+                        c.server_name = "127.0.0.1:4306".to_string();
                         c.store_provider = FileStoreProvider::S3 {
                             region: "us-west-2".to_string(),
                             bucket_name: "cube-store-ci-test".to_string(),
@@ -1368,6 +1369,7 @@ mod tests {
                 Config::test("high_frequency_inserts_gcs_worker_1")
                     .update_config(|mut c| {
                         c.worker_bind_address = Some("127.0.0.1:4312".to_string());
+                        c.server_name = "127.0.0.1:4312".to_string();
                         c.store_provider = FileStoreProvider::GCS {
                             bucket_name: "cube-store-ci-test".to_string(),
                             sub_path: Some("high_frequency_inserts_gcs".to_string()),
@@ -1720,6 +1722,7 @@ mod tests {
 
             Config::test("cluster_worker_1").update_config(|mut config| {
                 config.worker_bind_address = Some("127.0.0.1:14306".to_string());
+                config.server_name = "127.0.0.1:14306".to_string();
                 config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                 config.store_provider = FileStoreProvider::Filesystem {
                     remote_dir: env::current_dir()
@@ -1731,6 +1734,7 @@ mod tests {
             }).start_test_worker(async move |_| {
                 Config::test("cluster_worker_2").update_config(|mut config| {
                     config.worker_bind_address = Some("127.0.0.1:14307".to_string());
+                    config.server_name = "127.0.0.1:14307".to_string();
                     config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                     config.store_provider = FileStoreProvider::Filesystem {
                         remote_dir: env::current_dir()
