@@ -9,7 +9,7 @@ import {
   SyncOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { Dropdown, Menu, Modal, notification } from 'antd';
+import { Dropdown, Menu, Modal } from 'antd';
 import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
@@ -20,7 +20,7 @@ import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
-import { codeSandboxDefinition } from './utils';
+import { codeSandboxDefinition, copyToClipboard } from './utils';
 
 const frameworkToTemplate = {
   react: 'create-react-app',
@@ -80,9 +80,9 @@ class ChartContainer extends Component {
         return {
           ...state,
           chartRendererError: 'The chart renderer failed to load',
-        }
+        };
       }
-      
+
       const codesandboxFiles = __cubejsPlayground.getCodesandboxFiles(
         props.chartingLibrary,
         {
@@ -90,15 +90,18 @@ class ChartContainer extends Component {
           query: JSON.stringify(props.query, null, 2),
           pivotConfig: JSON.stringify(props.pivotConfig, null, 2),
           apiUrl: props.apiUrl,
-          cubejsToken: props.cubejsToken
+          cubejsToken: props.cubejsToken,
         }
       );
       let codeExample = '';
-      
+
       if (props.framework === 'react') {
         codeExample = codesandboxFiles['index.js'];
       } else if (props.framework === 'angular') {
-        codeExample = codesandboxFiles['src/app/query-renderer/query-renderer.component.ts'];
+        codeExample =
+          codesandboxFiles[
+            'src/app/query-renderer/query-renderer.component.ts'
+          ];
       }
 
       return {
@@ -116,7 +119,7 @@ class ChartContainer extends Component {
     super(props);
     this.state = {
       showCode: false,
-      chartRendererError: null
+      chartRendererError: null,
     };
   }
 
@@ -128,7 +131,7 @@ class ChartContainer extends Component {
       redirectToDashboard,
       showCode,
       addingToDashboard,
-      chartRendererError
+      chartRendererError,
     } = this.state;
     const {
       isChartRendererReady,
@@ -154,7 +157,7 @@ class ChartContainer extends Component {
     if (chartRendererError) {
       return <div>{chartRendererError}</div>;
     }
-    
+
     const parameters = isChartRendererReady
       ? getParameters(
           codeSandboxDefinition(
@@ -402,27 +405,6 @@ class ChartContainer extends Component {
 
     let title;
 
-    const copyCodeToClipboard = async () => {
-      if (!navigator.clipboard) {
-        notification.error({
-          message: "Your browser doesn't support copy to clipboard",
-        });
-      }
-      try {
-        await navigator.clipboard.writeText(
-          showCode === 'query' ? queryText : codeExample
-        );
-        notification.success({
-          message: 'Copied to clipboard',
-        });
-      } catch (e) {
-        notification.error({
-          message: "Can't copy to clipboard",
-          description: e,
-        });
-      }
-    };
-
     if (showCode === 'code') {
       title = (
         <SectionRow>
@@ -431,7 +413,7 @@ class ChartContainer extends Component {
             icon={<CopyOutlined />}
             size="small"
             onClick={() => {
-              copyCodeToClipboard();
+              copyToClipboard(codeExample);
               playgroundAction('Copy Code to Clipboard');
             }}
             type="primary"
@@ -448,7 +430,7 @@ class ChartContainer extends Component {
             icon={<CopyOutlined />}
             size="small"
             onClick={() => {
-              copyCodeToClipboard();
+              copyToClipboard(query);
               playgroundAction('Copy Query to Clipboard');
             }}
             type="primary"

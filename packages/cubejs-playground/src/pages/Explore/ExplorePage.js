@@ -1,6 +1,6 @@
 import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
@@ -35,7 +35,7 @@ export default function ExplorePage() {
     })();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (playgroundContext) {
       const basePath = playgroundContext.basePath || '/cubejs-api';
       let apiUrl =

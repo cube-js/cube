@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Tabs, Input, Button, Space, Typography } from 'antd';
+import { Modal, Tabs, Input, Button, Space, Typography, Form } from 'antd';
 import { CheckOutlined, CopyOutlined, EditOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
 import { fetch } from 'whatwg-fetch';
 
 import { useSecurityContext } from '../../hooks';
 import CubejsIcon from '../../shared/icons/CubejsIcon';
+import { copyToClipboard } from '../../utils';
 
 const { TabPane } = Tabs;
 const { TextArea } = Input;
@@ -29,7 +30,7 @@ export default function SecurityContext() {
     saveToken,
   } = useSecurityContext();
 
-  const [tmpToken, setToken] = useState(token || '');
+  const [form] = Form.useForm();
   const [editingToken, setEditingToken] = useState(!token);
   const [isJsonValid, setIsJsonValid] = useState(true);
   const [tmpPayload, setPayload] = useState(payload);
@@ -42,14 +43,15 @@ export default function SecurityContext() {
   }, [editingToken]);
 
   useEffect(() => {
-    setToken(token);
     setEditingToken(!token);
     setPayload(payload);
-  }, [token, payload]);
 
-  function handleTokenSave() {
+    form.resetFields();
+  }, [form, token, payload]);
+
+  function handleTokenSave(values) {
     setEditingToken(false);
-    saveToken(tmpToken);
+    saveToken(values.token);
   }
 
   function handlepayloadChange(event) {
@@ -95,7 +97,16 @@ export default function SecurityContext() {
       onCancel={() => setIsModalOpen(false)}
     >
       <Space direction="vertical" size={24} style={{ width: '100%' }}>
-        <Tabs defaultActiveKey="json" style={{ minHeight: 200 }}>
+        <Tabs
+          defaultActiveKey="json"
+          style={{ minHeight: 200 }}
+          onChange={(tabKey) => {
+            if (tabKey !== 'token' && editingToken) {
+              setEditingToken(false);
+              form.resetFields();
+            }
+          }}
+        >
           <TabPane tab="JSON" key="json">
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               <TextArea
@@ -121,45 +132,56 @@ export default function SecurityContext() {
                 Edit or copy the generated token from below
               </Text>
 
-              <FlexBox editing={editingToken}>
-                <Input
-                  ref={inputRef}
-                  prefix={<CubejsIcon />}
-                  value={tmpToken}
-                  disabled={!editingToken}
-                  style={{
-                    width: 'auto',
-                    flexGrow: 1,
-                  }}
-                  onChange={(event) => setToken(event.target.value)}
-                />
-
-                {!editingToken ? (
-                  <>
-                    <Button
-                      ghost
-                      type="primary"
-                      icon={<EditOutlined />}
-                      onClick={() => {
-                        setEditingToken(true);
-                      }}
+              <Form
+                form={form}
+                initialValues={{
+                  token,
+                }}
+                onFinish={handleTokenSave}
+              >
+                <FlexBox editing={editingToken}>
+                  <Form.Item
+                    name="token"
+                    style={{
+                      width: 'auto',
+                      flexGrow: 1,
+                    }}
+                  >
+                    <Input
+                      ref={inputRef}
+                      prefix={<CubejsIcon />}
+                      disabled={!editingToken}
                     />
+                  </Form.Item>
+
+                  {!editingToken ? (
+                    <>
+                      <Button
+                        ghost
+                        type="primary"
+                        icon={<EditOutlined />}
+                        onClick={() => {
+                          setEditingToken(true);
+                        }}
+                      />
+                      <Button
+                        type="primary"
+                        icon={<CopyOutlined />}
+                        disabled={!token}
+                        onClick={() => copyToClipboard(token)}
+                      >
+                        Copy
+                      </Button>
+                    </>
+                  ) : (
                     <Button
                       type="primary"
-                      icon={<CopyOutlined />}
-                      disabled={!token}
-                    >
-                      Copy
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    type="primary"
-                    icon={<CheckOutlined />}
-                    onClick={handleTokenSave}
-                  />
-                )}
-              </FlexBox>
+                      icon={<CheckOutlined />}
+                      htmlType="submit"
+                    />
+                  )}
+                </FlexBox>
+              </Form>
             </Space>
           </TabPane>
         </Tabs>

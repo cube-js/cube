@@ -11,7 +11,7 @@ export default function CubejsIcon() {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <g clip-path="url(#clip0)">
+          <g clipPath="url(#clip0)">
             <path
               d="M895.492 257.384L447.827 0V178.087L895.492 434.365V257.384Z"
               fill="#FF6492"

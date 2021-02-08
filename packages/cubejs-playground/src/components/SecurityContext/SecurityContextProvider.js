@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import jwtDecode from 'jwt-decode';
 
 import SecurityContext from './SecurityContext';
@@ -34,10 +34,10 @@ export default function SecurityContextProvider({ children }) {
     }
   }, [token]);
 
-  function saveToken(token, saveToLocalStorage = true) {
+  const saveToken = useCallback((token, saveToLocalStorage = true) => {
     saveToLocalStorage && localStorage.setItem('cubejsToken', token);
     setToken(token);
-  }
+  }, []);
 
   return (
     <SecurityContextContext.Provider
