@@ -730,6 +730,11 @@ pub trait MetaStore: Send + Sync {
         uploaded_ids: Vec<u64>,
         index_count: u64,
     ) -> Result<(), CubeError>;
+    async fn activate_chunks(
+        &self,
+        table_id: u64,
+        uploaded_chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError>;
     async fn is_chunk_used(&self, chunk_id: u64) -> Result<bool, CubeError>;
     async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
 
@@ -1979,6 +1984,21 @@ impl RocksMetaStore {
 
         Ok(chunks)
     }
+
+    // Must be run under write_operation(). Returns activated row count.
+    fn activate_chunks_impl(
+        db_ref: DbTableRef,
+        batch_pipe: &mut BatchPipe,
+        uploaded_chunk_ids: &[u64],
+    ) -> Result<u64, CubeError> {
+        let table = ChunkRocksTable::new(db_ref.clone());
+        let mut activated_row_count = 0;
+        for id in uploaded_chunk_ids {
+            activated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
+            table.update_with_fn(*id, |row| row.set_uploaded(true), batch_pipe)?;
+        }
+        return Ok(activated_row_count);
+    }
 }
 
 #[async_trait]
@@ -2656,16 +2676,12 @@ impl MetaStore for RocksMetaStore {
         );
         self.write_operation(move |db_ref, batch_pipe| {
             let wal_table = WALRocksTable::new(db_ref.clone());
-            let table = ChunkRocksTable::new(db_ref.clone());
-            let mut activated_row_count = 0;
 
             let deactivated_row_count = wal_table.get_row_or_not_found(wal_id_to_delete)?.get_row().get_row_count();
             wal_table.delete(wal_id_to_delete, batch_pipe)?;
 
-            for id in uploaded_ids.iter() {
-                activated_row_count += table.get_row_or_not_found(*id)?.get_row().get_row_count();
-                table.update_with_fn(*id, |row| row.set_uploaded(true), batch_pipe)?;
-            }
+            let activated_row_count = Self::activate_chunks_impl(db_ref, batch_pipe, &uploaded_ids)?;
+
             if activated_row_count != deactivated_row_count * index_count {
                 return Err(CubeError::internal(format!(
                     "Deactivated WAL row count ({}) doesn't match activated row count ({}) during swap of ({}) to ({}) chunks",
@@ -2678,6 +2694,28 @@ impl MetaStore for RocksMetaStore {
             Ok(())
         })
         .await
+    }
+
+    async fn activate_chunks(
+        &self,
+        table_id: u64,
+        uploaded_chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError> {
+        trace!(
+            "Activating chunks ({})",
+            uploaded_chunk_ids.iter().join(", ")
+        );
+        self.write_operation(move |db_ref, batch_pipe| {
+            TableRocksTable::new(db_ref.clone()).update_with_fn(
+                table_id,
+                |t| t.update_has_data(true),
+                batch_pipe,
+            )?;
+            Self::activate_chunks_impl(db_ref, batch_pipe, &uploaded_chunk_ids)?;
+            Ok(())
+        })
+        .await?;
+        Ok(())
     }
 
     async fn swap_chunks(

@@ -348,3 +348,9 @@ impl From<tempfile::PathPersistError> for CubeError {
         return CubeError::from_error(v);
     }
 }
+
+impl From<tokio::sync::AcquireError> for CubeError {
+    fn from(v: tokio::sync::AcquireError) -> Self {
+        return CubeError::from_error(v);
+    }
+}
