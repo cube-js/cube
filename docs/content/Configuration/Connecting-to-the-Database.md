@@ -99,8 +99,8 @@ CUBEJS_DB_SSL_CERT=/ssl/cert.pem
 CUBEJS_DB_SSL_KEY=/ssl/key.pem
 ```
 
-You can also provide the contents of a PEM file as a multi-line environment
-variable:
+You can also set the above environment variables to the contents of the PEM
+files; for example:
 
 ```dotenv
 CUBEJS_DB_SSL_CA="-----BEGIN CERTIFICATE-----
