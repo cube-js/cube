@@ -18,6 +18,7 @@ serde_derive = "1.0.115"
 serde = "1.0.115"
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
+cuberpc = { path = "../cuberpc" }
 parquet = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-01-27', version = "4.0.0-SNAPSHOT" }
 arrow = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-01-27', version = "4.0.0-SNAPSHOT" }
 arrow-flight = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-01-27', version = "4.0.0-SNAPSHOT" }
@@ -64,3 +65,4 @@ tokio-stream = { version = "0.1.2", features=["io-util"] }
 scopeguard = "1.1.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
 tempfile = "3.2.0"
+tarpc = { version = "0.24", features = ["tokio1"] }

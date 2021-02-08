@@ -191,7 +191,10 @@ impl SchedulerImpl {
     }
 
     async fn schedule_repartition(&self, partition_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.server_name().to_string(); // TODO find best node to run import
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
@@ -242,18 +245,21 @@ impl SchedulerImpl {
     }
 
     async fn schedule_partition_to_compact(&self, partition_id: u64) -> Result<(), CubeError> {
-        let wal_node_name = self.cluster.server_name().to_string(); // TODO move to WAL
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
                 RowKey::Table(TableId::Partitions, partition_id),
                 JobType::PartitionCompaction,
-                wal_node_name.clone(),
+                node.clone(),
             ))
             .await?;
         if job.is_some() {
             // TODO queue failover
-            self.cluster.notify_job_runner(wal_node_name).await?;
+            self.cluster.notify_job_runner(node).await?;
         }
         Ok(())
     }

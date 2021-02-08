@@ -3,6 +3,7 @@ members = [
     "cubestore",
     "cubehll",
     "cubezetasketch",
+    "cuberpc",
 ]
 
 [patch.crates-io]

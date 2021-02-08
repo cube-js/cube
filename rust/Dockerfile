@@ -18,6 +18,7 @@ COPY Cargo.toml .
 COPY Cargo.lock .
 COPY cubehll cubehll
 COPY cubezetasketch cubezetasketch
+COPY cuberpc cuberpc
 COPY cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs

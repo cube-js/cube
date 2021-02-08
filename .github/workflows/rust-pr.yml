@@ -68,7 +68,7 @@ jobs:
             ${{ runner.os }}-buildx-
       - name: Build only
         uses: docker/build-push-action@v2
-        timeout-minutes: 25
+        timeout-minutes: 60
         with:
           context: ./rust/
           file: ./rust/Dockerfile

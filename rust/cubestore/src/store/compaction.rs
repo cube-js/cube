@@ -1,5 +1,5 @@
 use crate::config::ConfigObj;
-use crate::metastore::{MetaStore, MetaStoreTable};
+use crate::metastore::MetaStore;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
@@ -130,7 +130,7 @@ impl CompactionService for CompactionServiceImpl {
                     filtered_partitions.push(p);
                 }
                 EitherOrBoth::Left(p) => {
-                    self.meta_store.partition_table().delete(p.get_id()).await?;
+                    self.meta_store.delete_partition(p.get_id()).await?;
                 }
                 EitherOrBoth::Right(_) => {
                     return Err(CubeError::internal(format!(

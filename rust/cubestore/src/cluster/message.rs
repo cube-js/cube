@@ -1,3 +1,4 @@
+use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::CubeError;
@@ -12,6 +13,12 @@ pub enum NetworkMessage {
 
     WarmupDownload(/*remote_path*/ String),
     WarmupDownloadResult(Result<(), CubeError>),
+
+    MetaStoreCall(MetaStoreRpcMethodCall),
+    MetaStoreCallResult(MetaStoreRpcMethodResult),
+
+    NotifyJobListeners,
+    NotifyJobListenersSuccess,
 }
 
 impl NetworkMessage {
