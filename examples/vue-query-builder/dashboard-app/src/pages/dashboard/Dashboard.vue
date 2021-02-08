@@ -4,7 +4,6 @@
       color="success"
       top
       v-model="snackbar"
-      :vertical="vertical"
     >
       {{ text }}
 
@@ -19,44 +18,65 @@
       </template>
     </v-snackbar>
     The Dashboard
-    <div class="px-12 my-4" v-for="item in dashboardItems" :key="item.id">
-      <query-renderer :cubejsApi="cubejsApi" :query="JSON.parse(item.vizState).query">
-        <template #default="{ resultSet }">
-          <v-card :loading="!resultSet" class="px-4 py-2">
-            <v-card-title>{{item.name}}</v-card-title>
-            <template v-if="resultSet">
-              <line-chart v-if="item.type === 'line'" legend="bottom" :data="series(resultSet)"></line-chart>
-              <area-chart v-else-if="item.type === 'area'" legend="bottom" :data="series(resultSet)"></area-chart>
-              <pie-chart v-else-if="item.type === 'pie'" :data="pairs(resultSet)"></pie-chart>
-              <column-chart v-else-if="item.type === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
-              <div v-else-if="item.type === 'number'">
-                <div v-for="item in resultSet.series()" :key="item.key">
-                  {{ item.series[0].value }}
-                </div>
-              </div>
-              <Table v-else :data="resultSet"></Table>
-            </template>
+    <grid-layout
+      :layout.sync="layout"
+      :col-num="12"
+      :row-height="430"
+      :is-draggable="true"
+      :is-resizable="true"
+      :is-mirrored="false"
+      :vertical-compact="true"
+      :margin="[10, 10]"
+      :use-css-transforms="true"
+      :preventCollision="false"
+      :responsive="true"
+    >
+        <grid-item
+                   v-for="(item, index) in dashboardItems"
+                   :key="item.id"
+                   :x="layout[index].x"
+                   :y="layout[index].y"
+                   :w="layout[index].w"
+                   :h="layout[index].h"
+                   :i="layout[index].i">
+          <query-renderer :cubejsApi="cubejsApi" :query="JSON.parse(item.vizState).query">
+            <template #default="{ resultSet }">
+              <v-card :loading="!resultSet" class="px-4 py-2">
+                <v-card-title>{{item.name}}</v-card-title>
+                <template v-if="resultSet">
+                  <line-chart v-if="item.type === 'line'" legend="bottom" :data="series(resultSet)"></line-chart>
+                  <area-chart v-else-if="item.type === 'area'" legend="bottom" :data="series(resultSet)"></area-chart>
+                  <pie-chart v-else-if="item.type === 'pie'" :data="pairs(resultSet)"></pie-chart>
+                  <column-chart v-else-if="item.type === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
+                  <div v-else-if="item.type === 'number'">
+                    <div v-for="item in resultSet.series()" :key="item.key">
+                      {{ item.series[0].value }}
+                    </div>
+                  </div>
+                  <Table v-else :data="resultSet"></Table>
+                </template>
 
-            <v-card-actions>
-              <v-btn
-                text
-                @click="deleteDashboardItem(item.id)"
-              >
-                Delete
-              </v-btn>
-            </v-card-actions>
+                <v-card-actions>
+                  <v-btn
+                    text
+                    @click="deleteDashboardItem(item.id)"
+                  >
+                    Delete
+                  </v-btn>
+                </v-card-actions>
 
-            <template slot="progress">
-              <v-progress-linear
-                color="deep-purple"
-                height="10"
-                indeterminate
-              ></v-progress-linear>
+                <template slot="progress">
+                  <v-progress-linear
+                    color="deep-purple"
+                    height="10"
+                    indeterminate
+                  ></v-progress-linear>
+                </template>
+              </v-card>
             </template>
-          </v-card>
-        </template>
-      </query-renderer>
-    </div>
+          </query-renderer>
+        </grid-item>
+    </grid-layout>
   </v-container>
 </template>
 
@@ -64,6 +84,7 @@
   import gql from "graphql-tag";
   import { QueryRenderer } from "@cubejs-client/vue";
   import Table from '../explore/components/Table';
+  import VueGridLayout from 'vue-grid-layout';
 
   export default {
     name: "Dashboard",
@@ -94,12 +115,19 @@
 
     components: {
       QueryRenderer,
-      Table
+      Table,
+      GridLayout: VueGridLayout.GridLayout,
+      GridItem: VueGridLayout.GridItem
     },
     data() {
       return {
         snackbar: false,
-        text: ''
+        text: '',
+        layout: [
+          {"x":0,"y":0,"w":6,"h":1,"i":"0"},
+          {"x":6,"y":0,"w":6,"h":1,"i":"1"},
+        ],
+        index: 0,
       };
     },
     methods: {
@@ -146,7 +174,23 @@
           this.text = '';
           this.snackbar = false;
         }, 2000);
-      }
+      },
+      addItem: function () {
+        // Add a new item. It must have a unique key!
+        this.layout.push({
+          x: (this.layout.length * 2) % (this.colNum || 12),
+          y: this.layout.length + (this.colNum || 12), // puts it at the bottom
+          w: 2,
+          h: 2,
+          i: this.index,
+        });
+        // Increment the counter to ensure key is always unique.
+        this.index++;
+      },
+      removeItem: function (val) {
+        const index = this.layout.map(item => item.i).indexOf(val);
+        this.layout.splice(index, 1);
+      },
     }
   };
 </script>
