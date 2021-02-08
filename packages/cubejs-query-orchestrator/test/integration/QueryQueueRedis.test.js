@@ -1,11 +1,31 @@
-const QueryQueueTest = require('../unit/QueryQueue.test');
-const { RedisPool } = require('../../src/orchestrator/RedisPool');
+import { getEnv } from '@cubejs-backend/shared';
+import QueryQueueTest from '../unit/QueryQueue.test';
+import { RedisPool } from '../../src/orchestrator/RedisPool';
 
-[false, true].forEach((sentinelFlag) => {
-  process.env.CUBEJS_REDIS_USE_IOREDIS = sentinelFlag;
+function doRedisTest(useIORedis) {
+  process.env.CUBEJS_REDIS_USE_IOREDIS = useIORedis;
 
-  QueryQueueTest(`RedisPool, sentinel ${process.env.CUBEJS_REDIS_USE_IOREDIS ? 'enabled' : 'disabled'}`,
-    { cacheAndQueueDriver: 'redis', redisPool: new RedisPool() });
-  QueryQueueTest(`RedisNoPool, sentinel ${process.env.CUBEJS_REDIS_USE_IOREDIS ? 'enabled' : 'disabled'}`,
-    { cacheAndQueueDriver: 'redis', redisPool: new RedisPool({ poolMin: 0, poolMax: 0 }) });
-});
+  const title = `RedisPool, Driver: ${useIORedis ? 'plain redis' : 'ioredis'}`;
+
+  QueryQueueTest(
+    title,
+    {
+      cacheAndQueueDriver: 'redis',
+      redisPool: new RedisPool()
+    }
+  );
+  QueryQueueTest(
+    `${title} without pool`,
+    {
+      cacheAndQueueDriver: 'redis',
+      redisPool: new RedisPool({ poolMin: 0, poolMax: 0 })
+    }
+  );
+}
+
+if (process.env.CUBEJS_REDIS_USE_IOREDIS !== undefined) {
+  doRedisTest(getEnv('redisUseIORedis'));
+} else {
+  doRedisTest(true);
+  doRedisTest(false);
+}

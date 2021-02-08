@@ -34,8 +34,7 @@ options][link-config].
 | `REDIS_TLS`                          | If `true`, then the connection to the Redis server is protected by TLS authentication. Defaults to `false`                                                                                         | `true`, `false`                                           |
 | `CUBEJS_REDIS_POOL_MAX`              | The maximum number of connections to keep active in the Redis connection pool. Must be higher than `CUBEJS_REDIS_POOL_MIN`. Defaults to `1000`                                                     | A valid number of connections.                            |
 | `CUBEJS_REDIS_POOL_MIN`              | The minimum number of connections to keep active in the Redis connection pool. Must be lower than `CUBEJS_REDIS_POOL_MAX`. Defaults to `2`                                                         | A valid number of connections                             |
-| `CUBEJS_REDIS_USE_IOREDIS`           | Use [`ioredis`][gh-ioredis] instead of[ `redis`][gh-node-redis]. Defaults to `false`                                                                                                               | `true`, `false`                                       		|
-| `CUBEJS_REDIS_SENTINEL`              | The host and port for a Redis Sentinel server, e.g my-sentinel-host:26379                                                                                                                          | A valid Redis Sentinel host and port                      |
+| `CUBEJS_REDIS_USE_IOREDIS`           | Use [`ioredis`][gh-ioredis] instead of[ `redis`][gh-node-redis]. Defaults to `false`                                                                                                               | `true`, `false`                                           |
 
 [gh-ioredis]: https://github.com/luin/ioredis
 [gh-node-redis]: https://github.com/NodeRedis/node-redis

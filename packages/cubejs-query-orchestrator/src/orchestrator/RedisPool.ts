@@ -2,16 +2,15 @@
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
 import { getEnv } from '@cubejs-backend/shared';
 import AsyncRedisClient from './AsyncRedisClient';
-import RedisClientOptions from './RedisClientOptions';
-import { createRedisClient as createNodeRedisClient } from './RedisFactory';
-import { createRedisSentinelClient } from './RedisSentinelFactory';
+import { createRedisClient as createNodeRedisClient, RedisOptions } from './RedisFactory';
+import { createIORedisClient, IORedisOptions } from './IORedisFactory';
 
-function createRedisClient(url: string, opts: RedisClientOptions = {}) {
+function createRedisClient(url: string, opts: RedisOptions | IORedisOptions = {}) {
   if (getEnv('redisUseIORedis')) {
-    return createRedisSentinelClient(url, opts);
+    return createIORedisClient(url, <IORedisOptions>opts);
   }
 
-  return createNodeRedisClient(url, opts);
+  return createNodeRedisClient(url, <RedisOptions>opts);
 }
 
 export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;

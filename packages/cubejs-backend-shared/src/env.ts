@@ -121,8 +121,6 @@ const variables = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
-  redisSentinel: () => get('CUBEJS_REDIS_SENTINEL')
-    .asString(),
   redisPassword: () => get('REDIS_PASSWORD')
     .asString(),
   redisTls: () => get('REDIS_TLS')
@@ -133,7 +131,13 @@ const variables = {
 type Vars = typeof variables;
 
 export function getEnv<T extends keyof Vars>(key: T): ReturnType<Vars[T]> {
-  return <any>variables[key]();
+  if (key in variables) {
+    return <any>variables[key]();
+  }
+
+  throw new Error(
+    `Unsupported env variable: "${key}"`,
+  );
 }
 
 export function isDockerImage(): boolean {
