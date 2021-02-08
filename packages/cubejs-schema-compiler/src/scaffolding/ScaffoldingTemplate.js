@@ -26,7 +26,7 @@ export class ScaffoldingTemplate {
     return !!name.match(/^[a-z0-9_]+$/);
   }
 
-  generateFilesByTableNames(tableNames, extraParams) {
+  generateFilesByTableNames(tableNames, extraParams = {}) {
     const schemaForTables = this.scaffoldingSchema.generateForTables(tableNames.map(n => this.resolveTableName(n)));
     return schemaForTables.map(tableSchema => ({
       // eslint-disable-next-line prefer-template
