@@ -134,7 +134,7 @@
 
         <div class="wrap pa-4 pa-md-8" v-if="resultSet && isQueryPresent">
           <div class="d-flex justify-end mb-8">
-            <AddToDashboard @onSave="(name) => createDashboardItem({ name, query: validatedQuery })"></AddToDashboard>
+            <AddToDashboard @onSave="(name) => createDashboardItem({ name, query: validatedQuery, type })"></AddToDashboard>
           </div>
 
           <div class="border-light pa-4 pa-md-12">
@@ -230,7 +230,7 @@ export default {
     };
   },
   methods: {
-    async createDashboardItem({ name, query }) {
+    async createDashboardItem({ name, query, type }) {
       const response = await this.$apollo.mutate({
         mutation: gql`
           mutation($input: DashboardItemInput) {
@@ -247,6 +247,7 @@ export default {
               query,
             }),
             name,
+            type,
           },
         },
       });

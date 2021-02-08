@@ -24,12 +24,14 @@ const typeDefs = `
     layout: String
     vizState: String
     name: String
+    type: String
   }
 
   input DashboardItemInput {
     layout: String
     vizState: String
     name: String
+    type: String
   }
 
   type Query {

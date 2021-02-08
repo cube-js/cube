@@ -6,6 +6,7 @@ export const GET_DASHBOARD_ITEMS = gql`
       layout
       vizState
       name
+      type
     }
   }
 `;
@@ -16,6 +17,7 @@ export const GET_DASHBOARD_ITEM = gql`
       layout
       vizState
       name
+      type
     }
   }
 `;

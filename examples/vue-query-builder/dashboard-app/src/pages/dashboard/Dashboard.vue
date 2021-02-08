@@ -25,19 +25,17 @@
           <v-card :loading="!resultSet" class="px-4 py-2">
             <v-card-title>{{item.name}}</v-card-title>
             <template v-if="resultSet">
-              <line-chart legend="bottom" :data="series(resultSet)"></line-chart>
-            </template>
-
-            <v-card-text>
-              <v-row
-                align="center"
-                class="mx-0"
-              >
-                <div class="grey--text">
-                  {{JSON.stringify(item)}}
+              <line-chart v-if="item.type === 'line'" legend="bottom" :data="series(resultSet)"></line-chart>
+              <area-chart v-else-if="item.type === 'area'" legend="bottom" :data="series(resultSet)"></area-chart>
+              <pie-chart v-else-if="item.type === 'pie'" :data="pairs(resultSet)"></pie-chart>
+              <column-chart v-else-if="item.type === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
+              <div v-else-if="item.type === 'number'">
+                <div v-for="item in resultSet.series()" :key="item.key">
+                  {{ item.series[0].value }}
                 </div>
-              </v-row>
-            </v-card-text>
+              </div>
+              <Table v-else :data="resultSet"></Table>
+            </template>
 
             <v-card-actions>
               <v-btn
@@ -65,6 +63,7 @@
 <script>
   import gql from "graphql-tag";
   import { QueryRenderer } from "@cubejs-client/vue";
+  import Table from '../explore/components/Table';
 
   export default {
     name: "Dashboard",
@@ -83,6 +82,7 @@
                   name
                   layout
                   vizState
+                  type
                 }
           }
         `,
@@ -93,7 +93,8 @@
     },
 
     components: {
-      QueryRenderer
+      QueryRenderer,
+      Table
     },
     data() {
       return {
