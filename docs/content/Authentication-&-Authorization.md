@@ -270,3 +270,90 @@ module.exports = {
   },
 };
 ```
+
+## Auth0
+
+<!-- prettier-ignore-start -->
+[[warning | Note]]
+| There is an [example/auth](https://github.com/cube-js/cube.js/tree/master/examples/auth0) inside Cube.js repository.
+<!-- prettier-ignore-end --
+
+1. Navigate to the [Auth0 dashboard](https://manage.auth0.com/).
+2. Click on the APIs menu option on the left sidebar and then click the Create API button.
+3. Fill the name, fill the Identifier (we recommend to use URL), select Signing Algorithm (We highly recommend to use `RS256`).
+
+1. Create App
+2. Fill Allowed Callback Urls, Allowed Web Origins, Allowed Origins (CORS)
+3. OAuth - Allowed APPs / APIs use identifier of your API
+
+Client data:
+
+```
+# Copy it from your settings
+REACT_APP_AUTH0_DOMAIN=ovr.auth0.com
+# Copy it from your Application
+REACT_APP_AUTH0_CLIENT_ID=yGpqi8J5RL3IOeNA2aCilDTHB9xhJM8W
+# Copy it from your API
+REACT_APP_AUTH0_AUDIENCE=http://localhost:4000/cubejs-api/v2
+```
+
+Configure your `.env` file:
+
+```
+# Identifier of your Custom API
+CUBEJS_JWT_AUDIENCE=http://localhost:4000/cubejs-api/v2
+# Your domain
+CUBEJS_JWT_ISSUER=https://ovr.auth0.com/
+# Supported algorithm of your Custom API
+CUBEJS_JWT_ALG=RS256
+# You can copy/past JWK url from your API settings.
+CUBEJS_JWK_URL=https://ovr.auth0.com/.well-known/jwks.json
+```
+
+### Custom Token Claims
+
+By default, there are no claims inside JWT's payload, but it's possible to do by creating custom rule.
+
+```js
+function addClaimToAccessToken(user, context, callback) {
+  // Auth requires that namespace should be an url, for example you can take an url of your audience.
+  var namespace = 'http://localhost:4000/';
+
+  context.accessToken[namespace] = {
+    email: user.email,
+    clientId: user.clientId,
+  };
+
+  return callback(null, user, context);
+}
+```
+
+Next you should define `claimsNamespace` inside auth options:
+
+```js
+auth: {
+  claimsNamespace: 'http://localhost:4000/'
+}
+```
+
+## Cognito
+
+<!-- prettier-ignore-start -->
+[[warning | Note]]
+| There is an [example/cognito](https://github.com/cube-js/cube.js/tree/master/examples/cognito) inside Cube.js repository.
+<!-- prettier-ignore-end --
+
+### Custom Token Claims
+
+By default, there are no claims inside `accessToken`'s token payload, but it's possible to be done by lamda on top of
+Pre-Token Generation trigger.
+
+```js
+
+```
+
+```js
+auth: {
+  claimsNamespace: 'http://localhost:4000/'
+}
+```
