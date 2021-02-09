@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.9](https://github.com/cube-js/cube.js/compare/v0.26.8...v0.26.9) (2021-02-09)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** closing tag ([b0777b3](https://github.com/cube-js/cube.js/commit/b0777b3cf07e563280dfe9a41e1c7628f21b6360))
+* **@cubejs-client/playground:** tab switch ([ddd93f3](https://github.com/cube-js/cube.js/commit/ddd93f31fbe8dd90854cca782f72193860b777ba))
+
+
+
+
+
 ## [0.26.8](https://github.com/cube-js/cube.js/compare/v0.26.7...v0.26.8) (2021-02-09)
 
 
