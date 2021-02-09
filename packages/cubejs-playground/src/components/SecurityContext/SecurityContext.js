@@ -101,7 +101,7 @@ export default function SecurityContext() {
             setActiveTabKey(tabKey);
           }}
         >
-          <TabPane tab="JSON" key="json"></TabPane>
+          <TabPane tab="JSON" key="json">
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               <TextArea
                 value={tmpPayload}
