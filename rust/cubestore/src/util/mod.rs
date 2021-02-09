@@ -1,3 +1,4 @@
+pub mod fast_timestamp;
 pub mod maybe_owned;
 
 use crate::CubeError;

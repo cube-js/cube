@@ -26,7 +26,7 @@ use crate::metastore::job::JobType;
 use crate::queryplanner::query_executor::QueryExecutor;
 use crate::sql::parser::CubeStoreParser;
 use crate::sys::malloc::trim_allocs;
-use chrono::{TimeZone, Utc};
+use crate::util::fast_timestamp::parse_timestamp_to_nanos;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use hex::FromHex;
@@ -679,13 +679,10 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
 }
 
 pub fn timestamp_from_string(v: &str) -> Result<TableValue, CubeError> {
-    let result = string_to_timestamp_nanos(v).or_else(|_| {
-        if let Ok(ts) = Utc.datetime_from_str(v, "%Y-%m-%d %H:%M:%S UTC") {
-            return Ok(ts.timestamp_nanos());
-        }
-        return Err(CubeError::user(format!("Can't parse timestamp: {}", v)));
-    });
-    Ok(TableValue::Timestamp(TimestampValue::new(result?)))
+    match parse_timestamp_to_nanos(v) {
+        Err(_) => Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
+        Ok(nanos) => Ok(TableValue::Timestamp(TimestampValue::new(nanos))),
+    }
 }
 
 fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
