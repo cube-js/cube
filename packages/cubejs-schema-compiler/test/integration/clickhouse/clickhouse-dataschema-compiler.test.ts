@@ -1,24 +1,22 @@
-/* globals it, describe, after */
-/* eslint-disable quote-props */
 import { CompileError } from '../../../src/compiler/CompileError';
-import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { prepareCompiler as originalPrepareCompiler } from '../../../src/compiler/PrepareCompiler';
-import { PostgresDBRunner } from './PostgresDBRunner';
+import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
 
-require('should');
+import { prepareCompiler as testPrepareCompiler } from '../../unit/PrepareCompiler';
+import { ClickHouseDbRunner } from './ClickHouseDbRunner';
+import { logSqlAndParams } from '../../unit/TestUtil';
 
-describe('DataSchemaCompiler', function test() {
-  this.timeout(200000);
+describe('ClickHouse DataSchemaCompiler', () => {
+  jest.setTimeout(200000);
 
-  const dbRunner = new PostgresDBRunner();
+  const dbRunner = new ClickHouseDbRunner();
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
   it('gutter', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -53,7 +51,7 @@ describe('DataSchemaCompiler', function test() {
   });
 
   it('error', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = testPrepareCompiler(`
     cube({}, {
       measures: {}
     })
@@ -63,13 +61,13 @@ describe('DataSchemaCompiler', function test() {
         compiler.throwIfAnyErrors();
         throw new Error();
       })
-      .catch((error) => {
-        error.should.be.instanceof(CompileError);
+      .catch((error: any) => {
+        expect(error).toBeInstanceOf(CompileError);
       });
   });
 
   it('duplicate member', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -98,123 +96,13 @@ describe('DataSchemaCompiler', function test() {
     return compiler.compile().then(() => {
       compiler.throwIfAnyErrors();
       throw new Error();
-    }).catch((error) => {
-      error.should.be.instanceof(CompileError);
-    });
-  });
-
-  describe('Test duplicate properties', () => {
-    const invalidSchema = `
-      cube('visitors', {
-        sql: 'select * from visitors',
-        measures: {
-          count: {
-            type: 'count',
-            sql: 'id'
-          },
-          count: {
-            type: 'count',
-            sql: 'id'
-          }
-        },
-        dimensions: {
-          date: {
-            type: 'string',
-            sql: 'date'
-          }
-        }
-      })
-    `;
-
-    const validSchema = `
-      cube('visitors', {
-        sql: 'select * from visitors',
-        measures: {
-          count: {
-            type: 'count',
-            sql: 'id'
-          }
-        },
-        dimensions: {
-          date: {
-            type: 'string',
-            sql: 'date'
-          }
-        }
-      })
-    `;
-
-    it('Should compile without error, allowJsDuplicatePropsInSchema = false, valid schema', () => {
-      const { compiler } = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
-      return compiler.compile().then(() => {
-        compiler.throwIfAnyErrors();
-      });
-    });
-
-    it('Should throw error, allowJsDuplicatePropsInSchema = false, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
-      return compiler.compile().then(() => {
-        compiler.throwIfAnyErrors();
-        throw new Error();
-      }).catch((error) => {
-        error.should.be.instanceof(CompileError);
-        error.message.should.be.match(/Duplicate property parsing count/);
-      });
-    });
-
-    it('Should compile without error, allowJsDuplicatePropsInSchema = true, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
-      return compiler.compile().then(() => {
-        compiler.throwIfAnyErrors();
-      });
-    });
-
-    describe('Test perfomance', () => {
-      const schema = `
-        cube('visitors', {
-          sql: 'select * from visitors',
-          measures: {
-            count: {
-              type: 'count',
-              sql: 'id'
-            },
-            duration: {
-              type: 'avg',
-              sql: 'duration'
-            },
-          },
-          dimensions: {
-            date: {
-              type: 'string',
-              sql: 'date'
-            },
-            browser: {
-              type: 'string',
-              sql: 'browser'
-            }
-          }
-        })
-      `;
-
-      it('Should compile 200 schemas in less than 2500ms * 10', async () => {
-        const repeats = 200;
-
-        const compilerWith = prepareCompiler(schema, { allowJsDuplicatePropsInSchema: false });
-        const start = new Date().getTime();
-        for (let i = 0; i < repeats; i++) {
-          delete compilerWith.compiler.compilePromise; // Reset compile result
-          await compilerWith.compiler.compile();
-        }
-        const end = new Date().getTime();
-        const time = end - start;
-
-        time.should.be.below(2500 * 10);
-      });
+    }).catch((error: any) => {
+      expect(error).toBeInstanceOf(CompileError);
     });
   });
 
   it('calculated metrics', () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -252,7 +140,7 @@ describe('DataSchemaCompiler', function test() {
     })
     `);
     const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visitors.visitor_count'],
         timeDimensions: [{
           dimension: 'visitors.created_at',
@@ -270,14 +158,15 @@ describe('DataSchemaCompiler', function test() {
         timezone: 'America/Los_Angeles'
       });
 
-      console.log(query.buildSqlAndParams());
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        res.should.be.deepEqual(
+      logSqlAndParams(query);
+
+      return dbRunner.testQuery(query.buildSqlAndParams()).then((res: any) => {
+        expect(res).toEqual(
           [
-            { 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__visitor_count': '1' },
-            { 'visitors__created_at_day': '2017-01-04T00:00:00.000Z', 'visitors__visitor_count': '1' },
-            { 'visitors__created_at_day': '2017-01-05T00:00:00.000Z', 'visitors__visitor_count': '1' },
-            { 'visitors__created_at_day': '2017-01-06T00:00:00.000Z', 'visitors__visitor_count': '2' }
+            { visitors__created_at_day: '2017-01-02T00:00:00.000', visitors__visitor_count: '1' },
+            { visitors__created_at_day: '2017-01-04T00:00:00.000', visitors__visitor_count: '1' },
+            { visitors__created_at_day: '2017-01-05T00:00:00.000', visitors__visitor_count: '1' },
+            { visitors__created_at_day: '2017-01-06T00:00:00.000', visitors__visitor_count: '2' }
           ]
         );
       });
@@ -286,8 +175,8 @@ describe('DataSchemaCompiler', function test() {
     return result;
   });
 
-  it('static dimension case', () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+  it('static dimension case', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -321,23 +210,95 @@ describe('DataSchemaCompiler', function test() {
       }
     })
     `);
+    await compiler.compile();
+
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.visitor_count'],
+      dimensions: ['visitors.status'],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors.status'
+      }]
+    });
+
+    logSqlAndParams(query);
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then((res: any) => {
+      expect(res).toEqual(
+        [
+          { visitors__status: 'Approved', visitors__visitor_count: '2' },
+          { visitors__status: 'Canceled', visitors__visitor_count: '4' }
+        ]
+      );
+    });
+  });
+
+  it('dynamic dimension case', () => {
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    cube('visitors', {
+      sql: \`
+      select * from visitors
+      \`,
+
+      measures: {
+        visitor_count: {
+          type: 'count',
+          sql: 'id'
+        }
+      },
+
+      dimensions: {
+        source: {
+          type: 'string',
+          sql: 'source'
+        },
+        latitude: {
+          type: 'string',
+          sql: 'latitude'
+        },
+        enabled_source: {
+          type: 'string',
+          case: {
+            when: [{
+              sql: \`\${CUBE}.status = 3\`,
+              label: 'three'
+            }, {
+              sql: \`\${CUBE}.status = 2\`,
+              label: {
+                sql: \`\${CUBE}.source\`
+              }
+            }],
+            else: {
+              label: {
+                sql: \`\${CUBE}.source\`
+              }
+            }
+          }
+        },
+        created_at: {
+          type: 'time',
+          sql: 'created_at'
+        }
+      }
+    })
+    `);
     const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visitors.visitor_count'],
-        dimensions: ['visitors.status'],
+        dimensions: ['visitors.enabled_source'],
         timezone: 'America/Los_Angeles',
         order: [{
-          id: 'visitors.status'
+          id: 'visitors.enabled_source'
         }]
       });
+      logSqlAndParams(query);
 
-      console.log(query.buildSqlAndParams());
-
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        res.should.be.deepEqual(
+      return dbRunner.testQuery(query.buildSqlAndParams()).then((res: any) => {
+        expect(res).toEqual(
           [
-            { 'visitors__status': 'Approved', 'visitors__visitor_count': '2' },
-            { 'visitors__status': 'Canceled', 'visitors__visitor_count': '4' }
+            { visitors__enabled_source: 'google', visitors__visitor_count: '1' },
+            { visitors__enabled_source: 'some', visitors__visitor_count: '2' },
+            { visitors__enabled_source: null, visitors__visitor_count: '3' },
           ]
         );
       });
@@ -346,50 +307,52 @@ describe('DataSchemaCompiler', function test() {
     return result;
   });
 
-  it('filtered dates', () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
-    cube('visitors', {
-      sql: \`
-      select * from visitors
-      \`,
+  {
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+      cube('visitors', {
+        sql: \`
+        select * from visitors
+        \`,
 
-      dimensions: {
-        source: {
-          type: 'string',
-          sql: 'source'
-        },
-        created_at: {
-          type: 'time',
-          sql: 'created_at'
-        },
-        updated_at: {
-          type: 'time',
-          sql: 'updated_at'
+        dimensions: {
+          source: {
+            type: 'string',
+            sql: 'source'
+          },
+          created_at: {
+            type: 'time',
+            sql: 'created_at'
+          },
+          updated_at: {
+            type: 'time',
+            sql: 'updated_at'
+          }
         }
-      }
-    })
-    `);
+      })
+      `);
     const responses = [
-      [{ 'visitors__created_at': '2017-01-03T00:00:00.000Z' }],
+      [{ visitors__created_at: '2017-01-02T16:00:00.000' }],
       [
-        { 'visitors__created_at': '2016-09-07T00:00:00.000Z' },
-        { 'visitors__created_at': '2017-01-05T00:00:00.000Z' },
-        { 'visitors__created_at': '2017-01-06T00:00:00.000Z' },
-        { 'visitors__created_at': '2017-01-07T00:00:00.000Z' }
+        { visitors__created_at: '2016-09-06T16:00:00.000' },
+        { visitors__created_at: '2017-01-04T16:00:00.000' },
+        { visitors__created_at: '2017-01-05T16:00:00.000' },
+        { visitors__created_at: '2017-01-06T16:00:00.000' }
       ],
-      [{ 'visitors__created_at': '2017-01-07T00:00:00.000Z' }],
+      [{ visitors__created_at: '2017-01-06T16:00:00.000' }],
       [
-        { 'visitors__created_at': '2016-09-07T00:00:00.000Z' },
-        { 'visitors__created_at': '2017-01-03T00:00:00.000Z' },
-        { 'visitors__created_at': '2017-01-05T00:00:00.000Z' },
-        { 'visitors__created_at': '2017-01-06T00:00:00.000Z' }
+        { visitors__created_at: '2016-09-06T16:00:00.000' },
+        { visitors__created_at: '2017-01-02T16:00:00.000' },
+        { visitors__created_at: '2017-01-04T16:00:00.000' },
+        { visitors__created_at: '2017-01-05T16:00:00.000' }
       ],
-      [{ 'visitors__created_at': '2017-01-07T00:00:00.000Z' }]
+      [{ visitors__created_at: '2017-01-06T16:00:00.000' }]
     ];
-    const result = compiler.compile().then(() => {
-      const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
-        const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
-        return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
+      const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
+      it(`filtered dates ${operator}`, async () => {
+        await compiler.compile();
+
+        const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
           measures: [],
           dimensions: ['visitors.created_at'],
           timeDimensions: [],
@@ -404,21 +367,17 @@ describe('DataSchemaCompiler', function test() {
           }],
           timezone: 'America/Los_Angeles'
         });
-      });
-
-      return Promise.all(queries.map(async (query, index) => {
-        console.log(query.buildSqlAndParams());
+        logSqlAndParams(query);
         const res = await dbRunner.testQuery(query.buildSqlAndParams());
 
-        res.should.be.deepEqual(responses[index]);
-      }));
+        expect(res).toEqual(responses[index]);
+      });
+      return true;
     });
-
-    return result;
-  });
+  }
 
   it('export import', () => {
-    const { compiler, cubeEvaluator, joinGraph } = originalPrepareCompiler({
+    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler({
       dataSchemaFiles: () => Promise.resolve([
         {
           fileName: 'main.js',
@@ -441,22 +400,22 @@ describe('DataSchemaCompiler', function test() {
           `
         }
       ])
-    }, { adapter: 'postgres' });
+    }, { adapter: dbRunner.adapter });
     return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['Main.count'],
         dimensions: [],
         timeDimensions: [],
         order: [],
         timezone: 'America/Los_Angeles'
       });
-      console.log(query.buildSqlAndParams());
-      query.buildSqlAndParams()[0].should.match(/bar/);
+      logSqlAndParams(query);
+      expect(query.buildSqlAndParams()[0]).toMatch(/bar/);
     });
   });
 
   it('contexts', () => {
-    const { compiler, contextEvaluator } = prepareCompiler(`
+    const { compiler, contextEvaluator } = testPrepareCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -482,14 +441,14 @@ describe('DataSchemaCompiler', function test() {
       });
     `);
     return compiler.compile().then(() => {
-      contextEvaluator.contextList.should.be.deepEqual(
+      expect(contextEvaluator.contextList).toEqual(
         ['Marketing']
       );
     });
   });
 
   it('dashboard templates', () => {
-    const { compiler, dashboardTemplateEvaluator } = prepareCompiler(`
+    const { compiler, dashboardTemplateEvaluator } = testPrepareCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -546,7 +505,7 @@ describe('DataSchemaCompiler', function test() {
       });
     `);
     return compiler.compile().then(() => {
-      JSON.parse(JSON.stringify(dashboardTemplateEvaluator.compiledTemplates)).should.be.deepEqual(
+      expect(JSON.parse(JSON.stringify(dashboardTemplateEvaluator.compiledTemplates))).toEqual(
         [{
           name: 'VisitorsMarketing',
           title: 'Marketing',

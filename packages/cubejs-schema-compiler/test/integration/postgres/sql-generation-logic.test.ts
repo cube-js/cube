@@ -1,18 +1,14 @@
-/* globals it, describe, after */
-/* eslint-disable quote-props */
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { PostgresDBRunner } from './PostgresDBRunner';
 
-require('should');
-
-describe('SQL Generation', function test() {
-  this.timeout(90000);
+describe('SQL Generation', () => {
+  jest.setTimeout(200000);
 
   const dbRunner = new PostgresDBRunner();
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
@@ -339,8 +335,8 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'visitor_checkins__google_sourced_checkins': '1' }]
+      expect(res).toEqual(
+        [{ visitor_checkins__google_sourced_checkins: '1' }]
       );
     });
   });
@@ -351,33 +347,33 @@ describe('SQL Generation', function test() {
     try {
       // eslint-disable-next-line no-new
       new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        'measures': [
+        measures: [
           'visitors.visitor_count'
         ],
-        'order': {
+        order: {
           'visitors.visitor_count': 'desc'
         },
-        'filters': [
+        filters: [
           {
             or: [
               {
-                'dimension': 'visitors.visitor_count',
-                'operator': 'gt',
-                'values': [
+                dimension: 'visitors.visitor_count',
+                operator: 'gt',
+                values: [
                   '1'
                 ]
               },
               {
-                'dimension': 'visitors.source',
-                'operator': 'equals',
-                'values': [
+                dimension: 'visitors.source',
+                operator: 'equals',
+                values: [
                   'google'
                 ]
               }
             ]
           },
         ],
-        'dimensions': [
+        dimensions: [
           'visitors.source'
         ]
       });
@@ -385,7 +381,7 @@ describe('SQL Generation', function test() {
       throw new Error();
     } catch (error) {
       // You cannot use dimension and measure in same condition
-      error.should.be.instanceof(UserError);
+      expect(error).toBeInstanceOf(UserError);
     }
   });
 
@@ -426,17 +422,17 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'cards__count': '1',
-          'visitors__source': 'google',
-          'visitors__visitor_count': '1',
-          'visitors__average_checkins': '2.0000000000000000'
+          cards__count: '1',
+          visitors__source: 'google',
+          visitors__visitor_count: '1',
+          visitors__average_checkins: '2.0000000000000000'
         }, {
-          'cards__count': '2',
-          'visitors__source': 'some',
-          'visitors__visitor_count': '1',
-          'visitors__average_checkins': '6.0000000000000000'
+          cards__count: '2',
+          visitors__source: 'some',
+          visitors__visitor_count: '1',
+          visitors__average_checkins: '6.0000000000000000'
         }]
       );
     });
@@ -497,17 +493,17 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'cards__count': '1',
-          'visitors__source': 'google',
-          'visitors__visitor_count': '1',
-          'visitors__average_checkins': '2.0000000000000000'
+          cards__count: '1',
+          visitors__source: 'google',
+          visitors__visitor_count: '1',
+          visitors__average_checkins: '2.0000000000000000'
         }, {
-          'cards__count': '2',
-          'visitors__source': 'some',
-          'visitors__visitor_count': '1',
-          'visitors__average_checkins': '6.0000000000000000'
+          cards__count: '2',
+          visitors__source: 'some',
+          visitors__visitor_count: '1',
+          visitors__average_checkins: '6.0000000000000000'
         }]
       );
     });
@@ -568,17 +564,17 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
           // "cards__count": "1",
-          'visitors__source': 'google',
-          'visitors__visitor_count': '1',
-          'visitors__average_checkins': '2.0000000000000000'
+          visitors__source: 'google',
+          visitors__visitor_count: '1',
+          visitors__average_checkins: '2.0000000000000000'
         }, {
           // "cards__count": "2",
-          'visitors__source': 'some',
-          'visitors__visitor_count': '1',
-          'visitors__average_checkins': '6.0000000000000000'
+          visitors__source: 'some',
+          visitors__visitor_count: '1',
+          visitors__average_checkins: '6.0000000000000000'
         }]
       );
     });
@@ -638,15 +634,15 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__source': 'google',
-          'visitor_checkins__cards_count': '1',
-          'visitors__visitor_count': '1',
+          visitors__source: 'google',
+          visitor_checkins__cards_count: '1',
+          visitors__visitor_count: '1',
         }, {
-          'visitors__source': 'some',
-          'visitors__visitor_count': '2',
-          'visitor_checkins__cards_count': '0'
+          visitors__source: 'some',
+          visitors__visitor_count: '2',
+          visitor_checkins__cards_count: '0'
         }]
       );
     });
@@ -705,13 +701,13 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__source': 'google',
-          'visitors__visitor_count': '1',
+          visitors__source: 'google',
+          visitors__visitor_count: '1',
         }, {
-          'visitors__source': 'some',
-          'visitors__visitor_count': '2',
+          visitors__source: 'some',
+          visitors__visitor_count: '2',
         }]
       );
     });
@@ -767,13 +763,13 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__source': 'google',
-          'visitors__visitor_count': '1',
+          visitors__source: 'google',
+          visitors__visitor_count: '1',
         }, {
-          'visitors__source': 'some',
-          'visitors__visitor_count': '2',
+          visitors__source: 'some',
+          visitors__visitor_count: '2',
         }]
       );
     });
@@ -823,7 +819,7 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual([{ 'visitors__source': 'some', 'visitors__visitor_count': '2' }]);
+      expect(res).toEqual([{ visitors__source: 'some', visitors__visitor_count: '2' }]);
     });
   });
 
@@ -865,11 +861,11 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
-          { 'visitors__source': null, 'visitors__visitor_count': '3' },
-          { 'visitors__source': 'google', 'visitors__visitor_count': '1' },
-          { 'visitors__source': 'some', 'visitors__visitor_count': '2' }
+          { visitors__source: null, visitors__visitor_count: '3' },
+          { visitors__source: 'google', visitors__visitor_count: '1' },
+          { visitors__source: 'some', visitors__visitor_count: '2' }
         ]
       );
     });
@@ -924,7 +920,7 @@ describe('SQL Generation', function test() {
 
       throw new Error();
     } catch (error) {
-      error.should.be.instanceof(UserError);
+      expect(error).toBeInstanceOf(UserError);
     }
   });
 

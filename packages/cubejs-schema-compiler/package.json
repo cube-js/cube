@@ -23,12 +23,12 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "nyc --reporter=lcov mocha --full-trace dist/test/unit",
-    "integration": "nyc --reporter=lcov mocha --full-trace dist/test/integration/*",
-    "integration:mssql": "nyc --reporter=lcov mocha --full-trace dist/test/integration/mssql",
-    "integration:mysql": "nyc --reporter=lcov mocha --full-trace dist/test/integration/mysql",
-    "integration:postgres": "nyc --reporter=lcov mocha --full-trace dist/test/integration/postgres",
-    "integration:clickhouse": "nyc --reporter=lcov mocha --full-trace dist/test/integration/clickhouse",
+    "unit": "TZ=UTC jest --coverage dist/test/unit",
+    "integration": "TZ=UTC jest dist/test/integration/*",
+    "integration:mssql": "TZ=UTC jest dist/test/integration/mssql",
+    "integration:mysql": "TZ=UTC jest dist/test/integration/mysql",
+    "integration:postgres": "TZ=UTC jest dist/test/integration/postgres",
+    "integration:clickhouse": "TZ=UTC jest dist/test/integration/clickhouse",
     "lint": "linter src/* test/* --ext .ts,.js",
     "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
   },
@@ -47,6 +47,7 @@
     "cron-parser": "^2.16.3",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
+    "jest": "^26.6.3",
     "lru-cache": "^5.1.1",
     "moment-range": "^4.0.1",
     "moment-timezone": "^0.5.28",
@@ -63,21 +64,18 @@
     "@types/babel__traverse": "^7.11.0",
     "@types/hapi__joi": "^17.1.0",
     "@types/inflection": "^1.5.28",
+    "@types/jest": "^26.0.20",
     "@types/lru-cache": "^5.1.0",
-    "@types/mocha": "^8.2.0",
     "@types/node": "^8.10.66",
     "@types/sqlstring": "^2.3.0",
     "@types/syntax-error": "^1.4.1",
     "@types/uuid": "^3.4.9",
     "istanbul": "^0.4.5",
-    "mocha": "^8.0.1",
     "mssql": "^6.1.0",
     "mysql": "^2.18.1",
-    "nyc": "^15.0.0",
     "pg-promise": "^10.5.2",
     "request": "^2.88.0",
     "request-promise": "^4.2.4",
-    "should": "^13.2.3",
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
     "testcontainers": "^2.4.0",
@@ -85,11 +83,19 @@
     "uuid": "^3.3.2"
   },
   "license": "Apache-2.0",
-  "nyc": {
-    "source-map": true,
-    "produce-source-map": true
-  },
   "eslintConfig": {
     "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverage": false,
+    "coverageDirectory": "coverage/",
+    "collectCoverageFrom": [
+      "dist/src/**/*.js",
+      "dist/src/**/*.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ]
   }
 }

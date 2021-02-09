@@ -1,5 +1,3 @@
-/* globals it, describe, after */
-/* eslint-disable quote-props */
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
@@ -7,14 +5,12 @@ import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { PostgresDBRunner } from './PostgresDBRunner';
 
-require('should');
-
-describe('SQL Generation', function test() {
-  this.timeout(90000);
+describe('SQL Generation', () => {
+  jest.setTimeout(200000);
 
   const dbRunner = new PostgresDBRunner();
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
@@ -349,35 +345,35 @@ describe('SQL Generation', function test() {
     console.log(queryAndParams);
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-            'visitors__visitor_revenue': '100',
-            'visitors__visitor_count': '1',
-            'visitor_checkins__visitor_checkins_count': '3',
-            'visitors__per_visitor_revenue': '100'
+            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors__visitor_revenue: '100',
+            visitors__visitor_count: '1',
+            visitor_checkins__visitor_checkins_count: '3',
+            visitors__per_visitor_revenue: '100'
           },
           {
-            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-            'visitors__visitor_revenue': '200',
-            'visitors__visitor_count': '1',
-            'visitor_checkins__visitor_checkins_count': '2',
-            'visitors__per_visitor_revenue': '200'
+            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors__visitor_revenue: '200',
+            visitors__visitor_count: '1',
+            visitor_checkins__visitor_checkins_count: '2',
+            visitors__per_visitor_revenue: '200'
           },
           {
-            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'visitors__visitor_revenue': null,
-            'visitors__visitor_count': '1',
-            'visitor_checkins__visitor_checkins_count': '1',
-            'visitors__per_visitor_revenue': null
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__visitor_revenue: null,
+            visitors__visitor_count: '1',
+            visitor_checkins__visitor_checkins_count: '1',
+            visitors__per_visitor_revenue: null
           },
           {
-            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-            'visitors__visitor_revenue': null,
-            'visitors__visitor_count': '2',
-            'visitor_checkins__visitor_checkins_count': '0',
-            'visitors__per_visitor_revenue': null
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            visitors__visitor_revenue: null,
+            visitors__visitor_count: '2',
+            visitor_checkins__visitor_checkins_count: '0',
+            visitors__per_visitor_revenue: null
           }
         ]
       );
@@ -392,7 +388,7 @@ describe('SQL Generation', function test() {
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
     console.log(JSON.stringify(res));
 
-    res.should.be.deepEqual(
+    expect(res).toEqual(
       expectedResult
     );
   }
@@ -411,10 +407,10 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles',
     order: []
   }, [{
-    'visitors__visitor_revenue': '300',
-    'visitors__visitor_count': '5',
-    'visitor_checkins__visitor_checkins_count': '6',
-    'visitors__per_visitor_revenue': '60'
+    visitors__visitor_revenue: '300',
+    visitors__visitor_count: '5',
+    visitor_checkins__visitor_checkins_count: '6',
+    visitors__per_visitor_revenue: '60'
   }]));
 
   it('running total', async () => {
@@ -440,37 +436,37 @@ describe('SQL Generation', function test() {
     // TODO ordering doesn't work for running total
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__created_at_day': '2017-01-01T00:00:00.000Z',
-          'visitors__revenue_running': null
+          visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+          visitors__revenue_running: null
         }, {
-          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-          'visitors__revenue_running': '100'
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__revenue_running: '100'
         }, {
-          'visitors__created_at_day': '2017-01-03T00:00:00.000Z',
-          'visitors__revenue_running': '100'
+          visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+          visitors__revenue_running: '100'
         }, {
-          'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-          'visitors__revenue_running': '300'
+          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+          visitors__revenue_running: '300'
         }, {
-          'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-          'visitors__revenue_running': '600'
+          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+          visitors__revenue_running: '600'
         }, {
-          'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-          'visitors__revenue_running': '1500'
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__revenue_running: '1500'
         }, {
-          'visitors__created_at_day': '2017-01-07T00:00:00.000Z',
-          'visitors__revenue_running': '1500'
+          visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+          visitors__revenue_running: '1500'
         }, {
-          'visitors__created_at_day': '2017-01-08T00:00:00.000Z',
-          'visitors__revenue_running': '1500'
+          visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+          visitors__revenue_running: '1500'
         }, {
-          'visitors__created_at_day': '2017-01-09T00:00:00.000Z',
-          'visitors__revenue_running': '1500'
+          visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+          visitors__revenue_running: '1500'
         }, {
-          'visitors__created_at_day': '2017-01-10T00:00:00.000Z',
-          'visitors__revenue_running': '1500'
+          visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+          visitors__revenue_running: '1500'
         }]
       );
     });
@@ -490,16 +486,16 @@ describe('SQL Generation', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { 'visitors__created_at_day': '2017-01-01T00:00:00.000Z', 'visitors__revenue_rolling': null },
-    { 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__revenue_rolling': null },
-    { 'visitors__created_at_day': '2017-01-03T00:00:00.000Z', 'visitors__revenue_rolling': '100' },
-    { 'visitors__created_at_day': '2017-01-04T00:00:00.000Z', 'visitors__revenue_rolling': '100' },
-    { 'visitors__created_at_day': '2017-01-05T00:00:00.000Z', 'visitors__revenue_rolling': '200' },
-    { 'visitors__created_at_day': '2017-01-06T00:00:00.000Z', 'visitors__revenue_rolling': '500' },
-    { 'visitors__created_at_day': '2017-01-07T00:00:00.000Z', 'visitors__revenue_rolling': '1200' },
-    { 'visitors__created_at_day': '2017-01-08T00:00:00.000Z', 'visitors__revenue_rolling': '900' },
-    { 'visitors__created_at_day': '2017-01-09T00:00:00.000Z', 'visitors__revenue_rolling': null },
-    { 'visitors__created_at_day': '2017-01-10T00:00:00.000Z', 'visitors__revenue_rolling': null }
+    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__revenue_rolling: '100' },
+    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__revenue_rolling: '100' },
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__revenue_rolling: '200' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__revenue_rolling: '500' },
+    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__revenue_rolling: '1200' },
+    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_rolling: '900' },
+    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling: null },
+    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
   ]));
 
   it('rolling multiplied', () => runQueryTest({
@@ -518,24 +514,24 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles'
   }, [
     {
-      'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-      'visitors__revenue_rolling': null,
-      'visitor_checkins__visitor_checkins_count': '3'
+      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      visitors__revenue_rolling: null,
+      visitor_checkins__visitor_checkins_count: '3'
     },
     {
-      'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-      'visitors__revenue_rolling': '100',
-      'visitor_checkins__visitor_checkins_count': '2'
+      visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+      visitors__revenue_rolling: '100',
+      visitor_checkins__visitor_checkins_count: '2'
     },
     {
-      'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-      'visitors__revenue_rolling': '200',
-      'visitor_checkins__visitor_checkins_count': '1'
+      visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors__revenue_rolling: '200',
+      visitor_checkins__visitor_checkins_count: '1'
     },
     {
-      'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-      'visitors__revenue_rolling': '500',
-      'visitor_checkins__visitor_checkins_count': '0'
+      visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors__revenue_rolling: '500',
+      visitor_checkins__visitor_checkins_count: '0'
     }
   ]));
 
@@ -553,7 +549,7 @@ describe('SQL Generation', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { 'visitors__created_at_week': '2017-01-09T00:00:00.000Z', 'visitors__revenue_rolling3day': '900' }
+    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling3day: '900' }
   ]));
 
   it('rolling count', () => runQueryTest({
@@ -570,16 +566,16 @@ describe('SQL Generation', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { 'visitors__created_at_day': '2017-01-01T00:00:00.000Z', 'visitors__count_rolling': null },
-    { 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__count_rolling': null },
-    { 'visitors__created_at_day': '2017-01-03T00:00:00.000Z', 'visitors__count_rolling': '1' },
-    { 'visitors__created_at_day': '2017-01-04T00:00:00.000Z', 'visitors__count_rolling': '1' },
-    { 'visitors__created_at_day': '2017-01-05T00:00:00.000Z', 'visitors__count_rolling': '1' },
-    { 'visitors__created_at_day': '2017-01-06T00:00:00.000Z', 'visitors__count_rolling': '2' },
-    { 'visitors__created_at_day': '2017-01-07T00:00:00.000Z', 'visitors__count_rolling': '3' },
-    { 'visitors__created_at_day': '2017-01-08T00:00:00.000Z', 'visitors__count_rolling': '2' },
-    { 'visitors__created_at_day': '2017-01-09T00:00:00.000Z', 'visitors__count_rolling': null },
-    { 'visitors__created_at_day': '2017-01-10T00:00:00.000Z', 'visitors__count_rolling': null }
+    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__count_rolling: null },
+    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__count_rolling: null },
+    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__count_rolling: '1' },
+    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__count_rolling: '1' },
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__count_rolling: '1' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__count_rolling: '2' },
+    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__count_rolling: '3' },
+    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__count_rolling: '2' },
+    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__count_rolling: null },
+    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
   ]));
 
   it('sql utils', () => runQueryTest({
@@ -596,10 +592,10 @@ describe('SQL Generation', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { 'visitors__created_at_sql_utils_day': '2017-01-02T00:00:00.000Z', 'visitors__visitor_count': '1' },
-    { 'visitors__created_at_sql_utils_day': '2017-01-04T00:00:00.000Z', 'visitors__visitor_count': '1' },
-    { 'visitors__created_at_sql_utils_day': '2017-01-05T00:00:00.000Z', 'visitors__visitor_count': '1' },
-    { 'visitors__created_at_sql_utils_day': '2017-01-06T00:00:00.000Z', 'visitors__visitor_count': '2' }
+    { visitors__created_at_sql_utils_day: '2017-01-02T00:00:00.000Z', visitors__visitor_count: '1' },
+    { visitors__created_at_sql_utils_day: '2017-01-04T00:00:00.000Z', visitors__visitor_count: '1' },
+    { visitors__created_at_sql_utils_day: '2017-01-05T00:00:00.000Z', visitors__visitor_count: '1' },
+    { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000Z', visitors__visitor_count: '2' }
   ]));
 
   it('running total total', () => runQueryTest({
@@ -616,7 +612,7 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles'
   }, [
     {
-      'visitors__revenue_running': '1500'
+      visitors__revenue_running: '1500'
     }
   ]));
 
@@ -634,16 +630,16 @@ describe('SQL Generation', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { 'visitors__created_at_day': '2017-01-01T00:00:00.000Z', 'visitors__running_revenue_per_count': null },
-    { 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__running_revenue_per_count': '100' },
-    { 'visitors__created_at_day': '2017-01-03T00:00:00.000Z', 'visitors__running_revenue_per_count': '100' },
-    { 'visitors__created_at_day': '2017-01-04T00:00:00.000Z', 'visitors__running_revenue_per_count': '150' },
-    { 'visitors__created_at_day': '2017-01-05T00:00:00.000Z', 'visitors__running_revenue_per_count': '200' },
-    { 'visitors__created_at_day': '2017-01-06T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' },
-    { 'visitors__created_at_day': '2017-01-07T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' },
-    { 'visitors__created_at_day': '2017-01-08T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' },
-    { 'visitors__created_at_day': '2017-01-09T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' },
-    { 'visitors__created_at_day': '2017-01-10T00:00:00.000Z', 'visitors__running_revenue_per_count': '300' }
+    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__running_revenue_per_count: null },
+    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
+    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
+    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__running_revenue_per_count: '150' },
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__running_revenue_per_count: '200' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
+    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
+    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
+    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
+    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__running_revenue_per_count: '300' }
   ]));
 
   it('hll rolling (BigQuery)', async () => {
@@ -666,8 +662,8 @@ describe('SQL Generation', function test() {
 
     console.log(query.buildSqlAndParams());
 
-    query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.MERGE/);
-    query.buildSqlAndParams()[0].should.match(/HLL_COUNT\.INIT/);
+    expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.MERGE/);
+    expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.INIT/);
   });
 
   it('offset (PrestoQuery), refs #988', async () => {
@@ -689,7 +685,7 @@ describe('SQL Generation', function test() {
 
     console.log(query.buildSqlAndParams());
 
-    query.buildSqlAndParams()[0].should.match(/OFFSET (\d) LIMIT (\d)/);
+    expect(query.buildSqlAndParams()[0]).toMatch(/OFFSET (\d) LIMIT (\d)/);
   });
 
   it('calculated join', async () => {
@@ -707,8 +703,8 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'visitor_checkins__revenue_per_checkin': '50' }]
+      expect(res).toEqual(
+        [{ visitor_checkins__revenue_per_checkin: '50' }]
       );
     });
   });
@@ -728,8 +724,8 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'visitor_checkins__google_sourced_checkins': '1' }]
+      expect(res).toEqual(
+        [{ visitor_checkins__google_sourced_checkins: '1' }]
       );
     });
   });
@@ -752,8 +748,8 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'visitor_checkins__google_sourced_checkins': '1' }]
+      expect(res).toEqual(
+        [{ visitor_checkins__google_sourced_checkins: '1' }]
       );
     });
   });
@@ -784,13 +780,13 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__source': 'some',
-          'visitors__visitor_count': '2'
+          visitors__source: 'some',
+          visitors__visitor_count: '2'
         }, {
-          'visitors__source': null,
-          'visitors__visitor_count': '3'
+          visitors__source: null,
+          visitors__visitor_count: '3'
         }]
       );
     });
@@ -820,11 +816,11 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__source': 'some'
+          visitors__source: 'some'
         }, {
-          'visitors__source': null
+          visitors__source: null
         }]
       );
     });
@@ -854,9 +850,9 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__source': 'some'
+          visitors__source: 'some'
         }]
       );
     });
@@ -890,9 +886,9 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__source': 'some'
+          visitors__source: 'some'
         }]
       );
     });
@@ -924,23 +920,23 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__checkins': '0',
-          'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-          'visitors__visitor_count': '2'
+          visitors__checkins: '0',
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__visitor_count: '2'
         }, {
-          'visitors__checkins': '1',
-          'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-          'visitors__visitor_count': '1'
+          visitors__checkins: '1',
+          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+          visitors__visitor_count: '1'
         }, {
-          'visitors__checkins': '2',
-          'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-          'visitors__visitor_count': '1'
+          visitors__checkins: '2',
+          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+          visitors__visitor_count: '1'
         }, {
-          'visitors__checkins': '3',
-          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-          'visitors__visitor_count': '1'
+          visitors__checkins: '3',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__visitor_count: '1'
         }]
       );
     });
@@ -972,23 +968,23 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitors__checkins_with_propagation': '0',
-          'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-          'visitors__visitor_count': '2'
+          visitors__checkins_with_propagation: '0',
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__visitor_count: '2'
         }, {
-          'visitors__checkins_with_propagation': '1',
-          'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-          'visitors__visitor_count': '1'
+          visitors__checkins_with_propagation: '1',
+          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+          visitors__visitor_count: '1'
         }, {
-          'visitors__checkins_with_propagation': '2',
-          'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-          'visitors__visitor_count': '1'
+          visitors__checkins_with_propagation: '2',
+          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+          visitors__visitor_count: '1'
         }, {
-          'visitors__checkins_with_propagation': '3',
-          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-          'visitors__visitor_count': '1'
+          visitors__checkins_with_propagation: '3',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__visitor_count: '1'
         }]
       );
     });
@@ -1021,8 +1017,8 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'visitors__created_at_day': '2017-01-02T00:00:00.000Z', 'visitors__average_checkins': '6.0000000000000000' }]
+      expect(res).toEqual(
+        [{ visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__average_checkins: '6.0000000000000000' }]
       );
     });
   });
@@ -1042,21 +1038,21 @@ describe('SQL Generation', function test() {
     }]
   }, [
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-02T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__min_visitor_checkin_date_day: '2017-01-02T00:00:00.000Z',
+      visitors__visitor_count: '1'
     },
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-04T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__min_visitor_checkin_date_day: '2017-01-04T00:00:00.000Z',
+      visitors__visitor_count: '1'
     },
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-05T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__min_visitor_checkin_date_day: '2017-01-05T00:00:00.000Z',
+      visitors__visitor_count: '1'
     }
   ]).then(() => {
     throw new Error();
   }).catch((error) => {
-    error.should.be.instanceof(UserError);
+    expect(error).toBeInstanceOf(UserError);
   }));
 
   it('min date subquery', () => runQueryTest({
@@ -1074,16 +1070,16 @@ describe('SQL Generation', function test() {
     }]
   }, [
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-02T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__min_visitor_checkin_date_day: '2017-01-02T00:00:00.000Z',
+      visitors__visitor_count: '1'
     },
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-04T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__min_visitor_checkin_date_day: '2017-01-04T00:00:00.000Z',
+      visitors__visitor_count: '1'
     },
     {
-      'visitors__min_visitor_checkin_date_day': '2017-01-05T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__min_visitor_checkin_date_day: '2017-01-05T00:00:00.000Z',
+      visitors__visitor_count: '1'
     }
   ]));
 
@@ -1101,7 +1097,7 @@ describe('SQL Generation', function test() {
       id: 'visitors.minVisitorCheckinDate1'
     }]
   }, []).catch((error) => {
-    error.should.be.instanceof(UserError);
+    expect(error).toBeInstanceOf(UserError);
   }));
 
   it('subquery dimension with join', () => runQueryTest({
@@ -1115,16 +1111,16 @@ describe('SQL Generation', function test() {
     }]
   }, [
     {
-      'visitor_checkins__cards_count': '0',
-      'visitors__visitor_revenue': '300'
+      visitor_checkins__cards_count: '0',
+      visitors__visitor_revenue: '300'
     },
     {
-      'visitor_checkins__cards_count': '1',
-      'visitors__visitor_revenue': '100'
+      visitor_checkins__cards_count: '1',
+      visitors__visitor_revenue: '100'
     },
     {
-      'visitor_checkins__cards_count': null,
-      'visitors__visitor_revenue': null
+      visitor_checkins__cards_count: null,
+      visitors__visitor_revenue: null
     }
   ]));
 
@@ -1159,7 +1155,7 @@ describe('SQL Generation', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription()[0];
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
@@ -1167,12 +1163,12 @@ describe('SQL Generation', function test() {
       query.buildSqlAndParams()
     ])).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitor_checkins__source': 'google',
-            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-            'visitors__per_visitor_revenue': '100'
+            visitor_checkins__source: 'google',
+            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors__per_visitor_revenue: '100'
           }
         ]
       );
@@ -1204,7 +1200,7 @@ describe('SQL Generation', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription()[0];
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
@@ -1215,11 +1211,11 @@ describe('SQL Generation', function test() {
       query.buildSqlAndParams()
     ])).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [{
-          'visitor_checkins__source': 'google',
-          'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-          'visitors__visitor_revenue': '100'
+          visitor_checkins__source: 'google',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__visitor_revenue: '100'
         }]
       );
     });
@@ -1243,8 +1239,8 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'visitor_checkins__revenue_per_checkin': '60' }]
+      expect(res).toEqual(
+        [{ visitor_checkins__revenue_per_checkin: '60' }]
       );
     });
   });
@@ -1269,8 +1265,8 @@ describe('SQL Generation', function test() {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
-        [{ 'visitor_checkins__revenue_per_checkin': '50' }]
+      expect(res).toEqual(
+        [{ visitor_checkins__revenue_per_checkin: '50' }]
       );
     });
   });
@@ -1285,7 +1281,7 @@ describe('SQL Generation', function test() {
       dimension: 'ReferenceVisitors.createdAt',
       dateRange: ['2017-01-01', '2017-01-30']
     }],
-  }, [{ 'reference_visitors__count': '1' }]));
+  }, [{ reference_visitors__count: '1' }]));
 
   it('Filtered count without primaryKey', () => runQueryTest({
     measures: [
@@ -1297,7 +1293,7 @@ describe('SQL Generation', function test() {
       dimension: 'ReferenceVisitors.createdAt',
       dateRange: ['2016-12-01', '2017-03-30']
     }],
-  }, [{ 'reference_visitors__google_sourced_count': '1' }]));
+  }, [{ reference_visitors__google_sourced_count: '1' }]));
 
   it('builds geo dimension', () => runQueryTest({
     dimensions: [
@@ -1306,11 +1302,11 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles',
     order: [{ id: 'visitors.location' }],
   }, [
-    { 'visitors__location': '120.120,10.60' },
-    { 'visitors__location': '120.120,40.60' },
-    { 'visitors__location': '120.120,58.10' },
-    { 'visitors__location': '120.120,58.60' },
-    { 'visitors__location': '120.120,70.60' }
+    { visitors__location: '120.120,10.60' },
+    { visitors__location: '120.120,40.60' },
+    { visitors__location: '120.120,58.10' },
+    { visitors__location: '120.120,58.60' },
+    { visitors__location: '120.120,70.60' }
   ]));
 
   it('applies measure_filter type filter', () => runQueryTest({
@@ -1324,8 +1320,8 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles',
     order: [{ id: 'visitors.location' }],
   }, [
-    { 'visitors__id': 1 },
-    { 'visitors__id': 2 }
+    { visitors__id: 1 },
+    { visitors__id: 2 }
   ]));
 
   it(
@@ -1346,7 +1342,7 @@ describe('SQL Generation', function test() {
         id: 'visitors.source'
       }]
     }, [
-      { 'visitors__source': 'some' }
+      { visitors__source: 'some' }
     ])
   );
 
@@ -1368,8 +1364,8 @@ describe('SQL Generation', function test() {
         id: 'visitors.source'
       }]
     }, [
-      { 'visitors__source': 'google' },
-      { 'visitors__source': null }
+      { visitors__source: 'google' },
+      { visitors__source: null }
     ])
   );
 
@@ -1391,8 +1387,8 @@ describe('SQL Generation', function test() {
         id: 'visitors.source'
       }]
     }, [
-      { 'visitors__source': 'google' },
-      { 'visitors__source': null },
+      { visitors__source: 'google' },
+      { visitors__source: null },
     ])
   );
 
@@ -1414,8 +1410,8 @@ describe('SQL Generation', function test() {
         id: 'visitors.source'
       }]
     }, [
-      { 'visitors__source': 'some' },
-      { 'visitors__source': null },
+      { visitors__source: 'some' },
+      { visitors__source: null },
     ])
   );
 
@@ -1434,12 +1430,12 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles'
   }, [
     {
-      'visitors__created_at_year': '2016-01-01T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__created_at_year: '2016-01-01T00:00:00.000Z',
+      visitors__visitor_count: '1'
     },
     {
-      'visitors__created_at_year': '2017-01-01T00:00:00.000Z',
-      'visitors__visitor_count': '5'
+      visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+      visitors__visitor_count: '5'
     }
   ]));
 
@@ -1457,20 +1453,20 @@ describe('SQL Generation', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [{
-    'visitors__created_at_minute': '2016-09-06T17:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_minute: '2016-09-06T17:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_minute': '2017-01-02T16:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_minute: '2017-01-02T16:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_minute': '2017-01-04T16:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_minute: '2017-01-04T16:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_minute': '2017-01-05T16:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_minute: '2017-01-05T16:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_minute': '2017-01-06T16:00:00.000Z',
-    'visitors__visitor_count': '2'
+    visitors__created_at_minute: '2017-01-06T16:00:00.000Z',
+    visitors__visitor_count: '2'
   }]));
 
   it('second granularity', () => runQueryTest({
@@ -1487,20 +1483,20 @@ describe('SQL Generation', function test() {
     }],
     timezone: 'America/Los_Angeles'
   }, [{
-    'visitors__created_at_second': '2016-09-06T17:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_second: '2016-09-06T17:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_second': '2017-01-02T16:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_second: '2017-01-02T16:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_second': '2017-01-04T16:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_second: '2017-01-04T16:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_second': '2017-01-05T16:00:00.000Z',
-    'visitors__visitor_count': '1'
+    visitors__created_at_second: '2017-01-05T16:00:00.000Z',
+    visitors__visitor_count: '1'
   }, {
-    'visitors__created_at_second': '2017-01-06T16:00:00.000Z',
-    'visitors__visitor_count': '2'
+    visitors__created_at_second: '2017-01-06T16:00:00.000Z',
+    visitors__visitor_count: '2'
   }]));
 
   it('time date ranges', () => runQueryTest({
@@ -1518,8 +1514,8 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles'
   }, [
     {
-      'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-      'visitors__visitor_count': '1'
+      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      visitors__visitor_count: '1'
     }
   ]));
 
@@ -1539,23 +1535,23 @@ describe('SQL Generation', function test() {
     timezone: 'America/Los_Angeles',
     ungrouped: true
   }, [{
-    'visitors__id': 6,
-    'visitors__created_at_day': '2016-09-06T00:00:00.000Z'
+    visitors__id: 6,
+    visitors__created_at_day: '2016-09-06T00:00:00.000Z'
   }, {
-    'visitors__id': 1,
-    'visitors__created_at_day': '2017-01-02T00:00:00.000Z'
+    visitors__id: 1,
+    visitors__created_at_day: '2017-01-02T00:00:00.000Z'
   }, {
-    'visitors__id': 2,
-    'visitors__created_at_day': '2017-01-04T00:00:00.000Z'
+    visitors__id: 2,
+    visitors__created_at_day: '2017-01-04T00:00:00.000Z'
   }, {
-    'visitors__id': 3,
-    'visitors__created_at_day': '2017-01-05T00:00:00.000Z'
+    visitors__id: 3,
+    visitors__created_at_day: '2017-01-05T00:00:00.000Z'
   }, {
-    'visitors__id': 4,
-    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+    visitors__id: 4,
+    visitors__created_at_day: '2017-01-06T00:00:00.000Z'
   }, {
-    'visitors__id': 5,
-    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+    visitors__id: 5,
+    visitors__created_at_day: '2017-01-06T00:00:00.000Z'
   }]));
 
   it('offset cache', () => runQueryTest({
@@ -1575,8 +1571,8 @@ describe('SQL Generation', function test() {
     ungrouped: true,
     offset: 5
   }, [{
-    'visitors__id': 5,
-    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+    visitors__id: 5,
+    visitors__created_at_day: '2017-01-06T00:00:00.000Z'
   }]));
 
   it('ungrouped without id', () => runQueryTest({
@@ -1594,17 +1590,17 @@ describe('SQL Generation', function test() {
     ungrouped: true,
     allowUngroupedWithoutPrimaryKey: true
   }, [{
-    'visitors__created_at_day': '2016-09-06T00:00:00.000Z'
+    visitors__created_at_day: '2016-09-06T00:00:00.000Z'
   }, {
-    'visitors__created_at_day': '2017-01-02T00:00:00.000Z'
+    visitors__created_at_day: '2017-01-02T00:00:00.000Z'
   }, {
-    'visitors__created_at_day': '2017-01-04T00:00:00.000Z'
+    visitors__created_at_day: '2017-01-04T00:00:00.000Z'
   }, {
-    'visitors__created_at_day': '2017-01-05T00:00:00.000Z'
+    visitors__created_at_day: '2017-01-05T00:00:00.000Z'
   }, {
-    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+    visitors__created_at_day: '2017-01-06T00:00:00.000Z'
   }, {
-    'visitors__created_at_day': '2017-01-06T00:00:00.000Z'
+    visitors__created_at_day: '2017-01-06T00:00:00.000Z'
   }]));
 
   it(
@@ -1617,7 +1613,7 @@ describe('SQL Generation', function test() {
       filters: [],
       order: []
     }, [
-      { 'cube_with_long_name__count': '3' }
+      { cube_with_long_name__count: '3' }
     ])
   );
 
@@ -1633,7 +1629,7 @@ describe('SQL Generation', function test() {
       order: []
     });
 
-    query.dataSource.should.be.deepEqual('oracle');
+    expect(query.dataSource).toEqual('oracle');
   });
 
   it(
@@ -1646,7 +1642,7 @@ describe('SQL Generation', function test() {
       filters: [],
       order: []
     }, [
-      { 'visitors__foo': '6' }
+      { visitors__foo: '6' }
     ])
   );
 
@@ -1674,7 +1670,7 @@ describe('SQL Generation', function test() {
       }],
       order: []
     }, [
-      { 'visitors__visitor_count': '6' }
+      { visitors__visitor_count: '6' }
     ])
   );
 
@@ -1715,6 +1711,7 @@ describe('SQL Generation', function test() {
 
   // eslint-disable-next-line
   for (const granularityTest of granularityCases) {
+    // eslint-disable-next-line no-loop-func
     it(`Should date with TZ, when pass timeDimensions with granularity by ${granularityTest.granularity}`, async () => {
       await compiler.compile();
 
@@ -1729,9 +1726,9 @@ describe('SQL Generation', function test() {
 
       const sqlBuild = query.buildSqlAndParams();
 
-      (sqlBuild[0].includes('America/Los_Angeles')).should.be.equal(true);
-      sqlBuild[1][0].should.be.equal(granularityTest.from);
-      sqlBuild[1][1].should.be.equal(granularityTest.to);
+      expect(sqlBuild[0].includes('America/Los_Angeles')).toEqual(true);
+      expect(sqlBuild[1][0]).toEqual(granularityTest.from);
+      expect(sqlBuild[1][1]).toEqual(granularityTest.to);
     });
   }
 });

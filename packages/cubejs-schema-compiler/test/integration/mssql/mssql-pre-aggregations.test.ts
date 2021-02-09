@@ -1,18 +1,14 @@
-/* globals describe,it,after */
-/* eslint-disable quote-props */
 import R from 'ramda';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { MSSqlDbRunner } from './MSSqlDbRunner';
 
-require('should');
-
-describe('MSSqlPreAggregations', function test() {
-  this.timeout(200000);
+describe('MSSqlPreAggregations', () => {
+  jest.setTimeout(200000);
 
   const dbRunner = new MSSqlDbRunner();
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
@@ -216,7 +212,7 @@ describe('MSSqlPreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     return dbRunner
@@ -226,7 +222,7 @@ describe('MSSqlPreAggregations', function test() {
           .map((q) => replaceTableName(q, preAggregationsDescription, 1))
       )
       .then((res) => {
-        res.should.be.deepEqual([
+        expect(res).toEqual([
           {
             visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
             visitors__count: 1,
@@ -271,9 +267,9 @@ describe('MSSqlPreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
-    preAggregationsDescription[0].loadSql[0].should.match(/visitors_ratio/);
+    expect(preAggregationsDescription[0].loadSql[0]).toMatch(/visitors_ratio/);
 
     return dbRunner
       .testQueries(
@@ -282,7 +278,7 @@ describe('MSSqlPreAggregations', function test() {
           .map((q) => replaceTableName(q, preAggregationsDescription, 10))
       )
       .then((res) => {
-        res.should.be.deepEqual([
+        expect(res).toEqual([
           {
             visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
             visitors__ratio: 0.333333333333,
@@ -329,7 +325,7 @@ describe('MSSqlPreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -340,7 +336,7 @@ describe('MSSqlPreAggregations', function test() {
       .testQueries(queries.concat([queryAndParams]).map((q) => replaceTableName(q, preAggregationsDescription, 142)))
       .then((res) => {
         console.log(JSON.stringify(res));
-        res.should.be.deepEqual([
+        expect(res).toEqual([
           {
             visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
             visitors__checkins_total: 1,

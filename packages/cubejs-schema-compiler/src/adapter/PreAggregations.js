@@ -9,6 +9,9 @@ export class PreAggregations {
     this.cubeLattices = {};
   }
 
+  /**
+   * @return {unknown[]}
+   */
   preAggregationsDescription() {
     return R.pipe(R.unnest, R.uniqBy(desc => desc.tableName))(
       [this.preAggregationsDescriptionLocal()].concat(

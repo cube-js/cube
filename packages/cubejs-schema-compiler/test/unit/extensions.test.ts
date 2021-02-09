@@ -1,9 +1,5 @@
-/* globals it,describe */
-/* eslint-disable quote-props */
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareCompiler } from './PrepareCompiler';
-
-require('should');
 
 describe('Extensions', () => {
   const {
@@ -79,9 +75,9 @@ describe('Extensions', () => {
 
       console.log(query.buildSqlAndParams()[0]);
 
-      query.buildSqlAndParams()[0].should.match(/application_installed_events/);
-      query.buildSqlAndParams()[0].should.match(/application_opened_events/);
-      query.buildSqlAndParams()[0].should.match(/user_training_finish_first_events/);
+      expect(query.buildSqlAndParams()[0]).toMatch(/application_installed_events/);
+      expect(query.buildSqlAndParams()[0]).toMatch(/application_opened_events/);
+      expect(query.buildSqlAndParams()[0]).toMatch(/user_training_finish_first_events/);
     });
 
     return result;

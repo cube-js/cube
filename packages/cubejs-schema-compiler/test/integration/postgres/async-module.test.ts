@@ -1,22 +1,18 @@
-/* eslint-disable quote-props */
-/* globals describe, it, after */
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 
 import { PostgresDBRunner } from './PostgresDBRunner';
 
-require('should');
-
-describe('AsyncModule', function test() {
-  this.timeout(20000);
+describe('AsyncModule', () => {
+  jest.setTimeout(200000);
 
   const dbRunner = new PostgresDBRunner();
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
-  it('gutter', () => {
+  it('gutter', async () => {
     const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
     const rp = require('request-promise');
     
@@ -54,24 +50,20 @@ describe('AsyncModule', function test() {
       })
     })
     `, { allowNodeRequire: true });
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: ['visitors.visitor_count'],
-        timezone: 'America/Los_Angeles'
-      });
+    await compiler.compile();
 
-      console.log(query.buildSqlAndParams());
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        res.should.be.deepEqual(
-          [
-            { 'visitors__visitor_count': '6' }
-          ]
-        );
-      });
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.visitor_count'],
+      timezone: 'America/Los_Angeles'
     });
+
+    console.log(query.buildSqlAndParams());
+    expect(await dbRunner.testQuery(query.buildSqlAndParams())).toEqual([
+      { visitors__visitor_count: '6' }
+    ]);
   });
 
-  it('import local node module', () => {
+  it('import local node module', async () => {
     const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
     import { foo } from '../../test/unit/TestHelperForImport.js';
     
@@ -103,20 +95,17 @@ describe('AsyncModule', function test() {
       }
     })
     `, { allowNodeRequire: true });
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: ['bar.visitor_count'],
-        timezone: 'America/Los_Angeles'
-      });
 
-      console.log(query.buildSqlAndParams());
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        res.should.be.deepEqual(
-          [
-            { 'bar__visitor_count': '6' }
-          ]
-        );
-      });
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['bar.visitor_count'],
+      timezone: 'America/Los_Angeles'
     });
+
+    console.log(query.buildSqlAndParams());
+    expect(await dbRunner.testQuery(query.buildSqlAndParams())).toEqual([
+      { bar__visitor_count: '6' }
+    ]);
   });
 });

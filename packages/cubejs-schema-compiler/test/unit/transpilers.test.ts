@@ -1,10 +1,6 @@
-/* globals it,describe */
-/* eslint-disable quote-props */
 import { prepareCompiler } from './PrepareCompiler';
 
-require('should');
-
-describe('Transpilers', async () => {
+describe('Transpilers', () => {
   it('CubeCheckDuplicatePropTranspiler', async () => {
     try {
       const { compiler } = prepareCompiler(`
@@ -28,12 +24,12 @@ describe('Transpilers', async () => {
 
       throw new Error('Compile should thrown an error');
     } catch (e) {
-      e.should.be.match(/Duplicate property parsing test1 in main.js/);
+      expect(e.message).toMatch(/Duplicate property parsing test1 in main.js/);
     }
   });
 
   it('ValidationTranspiler', async () => {
-    const warnings = [];
+    const warnings: string[] = [];
 
     const { compiler } = prepareCompiler(`
         cube(\`Test\`, {
@@ -54,6 +50,6 @@ describe('Transpilers', async () => {
 
     await compiler.compile();
 
-    warnings[0].should.startWith('Warning: USER_CONTEXT was deprecated in favor of SECURITY_CONTEXT. in main.js');
+    expect(warnings[0]).toMatch(/Warning: USER_CONTEXT was deprecated in favor of SECURITY_CONTEXT. in main.js/);
   });
 });

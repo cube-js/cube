@@ -1,9 +1,5 @@
-/* globals it, describe */
-/* eslint-disable quote-props */
 import { MongoBiQuery } from '../../src/adapter/MongoBiQuery';
 import { prepareCompiler } from './PrepareCompiler';
-
-require('should');
 
 describe('MongoBiQuery', () => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
@@ -45,6 +41,6 @@ describe('MongoBiQuery', () => {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    queryAndParams[0].should.match(/TIMESTAMPADD\(HOUR, -/);
+    expect(queryAndParams[0]).toMatch(/TIMESTAMPADD\(HOUR, -/);
   }));
 });

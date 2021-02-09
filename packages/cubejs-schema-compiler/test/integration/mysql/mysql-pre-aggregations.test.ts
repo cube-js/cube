@@ -1,18 +1,14 @@
-/* globals describe,it,after */
-/* eslint-disable quote-props */
 import R from 'ramda';
 import { MysqlQuery } from '../../../src/adapter/MysqlQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { MySqlDbRunner } from './MySqlDbRunner';
 
-require('should');
-
-describe('MySqlPreAggregations', function test() {
-  this.timeout(300000);
+describe('MySqlPreAggregations', () => {
+  jest.setTimeout(200000);
 
   const dbRunner = new MySqlDbRunner();
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
@@ -129,7 +125,7 @@ describe('MySqlPreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -140,12 +136,12 @@ describe('MySqlPreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-02 00:00:00',
-            'visitors__count': 1
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-02 00:00:00',
+            visitors__count: 1
           }
         ]
       );
@@ -174,7 +170,7 @@ describe('MySqlPreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -185,27 +181,27 @@ describe('MySqlPreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 42))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-02 00:00:00',
-            'visitors__count': 1
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-02 00:00:00',
+            visitors__count: 1
           },
           {
-            'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-04 00:00:00',
-            'visitors__count': 1
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-04 00:00:00',
+            visitors__count: 1
           },
           {
-            'visitors__source': 'google',
-            'visitors__created_at_day': '2017-01-05 00:00:00',
-            'visitors__count': 1
+            visitors__source: 'google',
+            visitors__created_at_day: '2017-01-05 00:00:00',
+            visitors__count: 1
           },
           {
-            'visitors__source': null,
-            'visitors__created_at_day': '2017-01-06 00:00:00',
-            'visitors__count': 2
+            visitors__source: null,
+            visitors__created_at_day: '2017-01-06 00:00:00',
+            visitors__count: 2
           }
         ]
       );
@@ -236,7 +232,7 @@ describe('MySqlPreAggregations', function test() {
     const partitionedPreAgg =
         preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitors');
 
-    const minMaxQueries = query.preAggregationStartEndQueries('visitors', partitionedPreAgg.preAggregation);
+    const minMaxQueries = query.preAggregationStartEndQueries('visitors', partitionedPreAgg?.preAggregation);
 
     console.log(minMaxQueries);
 
@@ -244,7 +240,7 @@ describe('MySqlPreAggregations', function test() {
 
     console.log(res);
 
-    res[0][Object.keys(res[0])[0]].should.be.deepEqual('2017-01-07 00:00:00');
+    expect(res[0][Object.keys(res[0])[0]]).toEqual('2017-01-07 00:00:00');
   }));
 
   it('segment', () => compiler.compile().then(() => {
@@ -268,7 +264,7 @@ describe('MySqlPreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -279,11 +275,11 @@ describe('MySqlPreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 142))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__created_at_day': '2017-01-06 00:00:00',
-            'visitors__count': 1
+            visitors__created_at_day: '2017-01-06 00:00:00',
+            visitors__count: 1
           }
         ]
       );
