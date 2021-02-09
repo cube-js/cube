@@ -203,6 +203,10 @@ impl RemoteFs for QueueRemoteFs {
         }
     }
 
+    async fn delete_local_copy(&self, remote_path: &str) -> Result<(), CubeError> {
+        self.remote_fs.delete_local_copy(remote_path).await
+    }
+
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
         self.remote_fs.list(remote_prefix).await
     }

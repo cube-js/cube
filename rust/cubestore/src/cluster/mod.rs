@@ -60,6 +60,7 @@ pub trait Cluster: Send + Sync {
     fn server_name(&self) -> &str;
 
     async fn warmup_download(&self, node_name: &str, remote_path: String) -> Result<(), CubeError>;
+    async fn warmup_cleanup(&self, node_name: &str, remote_path: String) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
 
@@ -179,6 +180,17 @@ impl Cluster for ClusterImpl {
         match response {
             NetworkMessage::WarmupDownloadResult(r) => r,
             _ => panic!("unexpected result for warmup download"),
+        }
+    }
+
+    async fn warmup_cleanup(&self, node_name: &str, remote_path: String) -> Result<(), CubeError> {
+        // We only wait for the result is to ensure our request is delivered.
+        let response = self
+            .send_or_process_locally(node_name, NetworkMessage::WarmupCleanup(remote_path))
+            .await?;
+        match response {
+            NetworkMessage::WarmupCleanupResult(r) => r,
+            _ => panic!("unexpected result for warmup cleanup"),
         }
     }
 
@@ -578,7 +590,13 @@ impl ClusterImpl {
                 let res = self.remote_fs.download_file(&remote_path).await;
                 NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
             }
-            NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
+            NetworkMessage::WarmupCleanup(remote_path) => {
+                let res = self.remote_fs.delete_local_copy(&remote_path).await;
+                NetworkMessage::WarmupCleanupResult(res.map(|_| ()))
+            }
+            NetworkMessage::SelectResult(_)
+            | NetworkMessage::WarmupDownloadResult(_)
+            | NetworkMessage::WarmupCleanupResult(_) => {
                 panic!("result sent to worker");
             }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
