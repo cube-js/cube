@@ -214,13 +214,13 @@ jobs:
       - name: Run Redis Integration with Redis Driver
         timeout-minutes: 10
         run: |
-          yarn lerna run --concurrency 1 integration:redis
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
         env:
           CUBEJS_REDIS_USE_IOREDIS: false
       - name: Run Redis Integration with IORedis Driver
         timeout-minutes: 10
         run: |
-          yarn lerna run --concurrency 1 integration:redis
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
         env:
           CUBEJS_REDIS_USE_IOREDIS: true
       - name: Setup Redis Cluster
@@ -235,7 +235,7 @@ jobs:
       - name: Run Redis Integration with Cluster
         timeout-minutes: 10
         run: |
-          yarn lerna run --concurrency 1 integration:redis
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
         env:
           CUBEJS_REDIS_USE_IOREDIS: true
           CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
@@ -298,42 +298,42 @@ jobs:
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 9.6
       - name: Run Postgres Integration with 10
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 10
       - name: Run Postgres Integration with 11
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 11
       - name: Run Postgres Integration with 12
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 12
       - name: Run MS SQL Integration with 2017-latest
         timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mssql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mssql
         env:
           TEST_MSSQL_VERSION: 2017-latest
       - name: Run MS SQL Integration with 2019-latest
         timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mssql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mssql
         env:
           TEST_MSSQL_VERSION: 2019-latest
 
@@ -393,35 +393,35 @@ jobs:
         timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mysql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.6
       - name: Run MySQL Integration with 5.7
         timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mysql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.7
       - name: Run Clickhouse Integration with 21.1.2
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 integration:clickhouse
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 21.1.2
       - name: Run Clickhouse Integration with 20.6
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 integration:clickhouse
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20.6
       - name: Run Clickhouse Integration with 19
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 integration:clickhouse
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 19
 
@@ -483,7 +483,7 @@ jobs:
           docker pull lewuathe/presto-coordinator:${TEST_PRESTO_VERSION}
           docker pull lewuathe/presto-worker:${TEST_PRESTO_VERSION}
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:presto
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:presto
         env:
           TEST_PGSQL_VERSION: 12.4
           TEST_PRESTO_VERSION: 341-SNAPSHOT
@@ -493,7 +493,7 @@ jobs:
           docker pull postgres:${TEST_POSTGRES_VERSION}
           docker pull zookeeper:${TEST_ZOOKEEPER_VERSION}
           docker pull apache/druid:${TEST_DRUID_VERSION}
-          yarn lerna run --concurrency 1 integration:druid
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:druid
         env:
           TEST_POSTGRES_VERSION: latest
           TEST_ZOOKEEPER_VERSION: 3.5
