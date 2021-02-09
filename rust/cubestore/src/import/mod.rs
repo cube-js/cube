@@ -5,6 +5,7 @@ use crate::sql::timestamp_from_string;
 use crate::store::{DataFrame, WALDataStore};
 use crate::sys::malloc::trim_allocs;
 use crate::table::{Row, TableValue};
+use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
@@ -72,7 +73,8 @@ impl ImportFormat {
                     if header_mapping.is_none() {
                         let mut mapping = Vec::new();
                         for _ in 0..columns.len() {
-                            let next_column = parser.next_value()?;
+                            let next_column_buf = parser.next_value()?;
+                            let next_column = next_column_buf.as_ref();
                             let (i, to_insert) = columns
                                 .iter()
                                 .find_position(|c| c.get_name() == &next_column)
@@ -104,21 +106,24 @@ impl ImportFormat {
                     let mut row = Vec::with_capacity(columns.len());
 
                     for (i, (_, column)) in resolved_mapping.iter().enumerate() {
-                        let value = parser.next_value()?;
+                        let value_buf = parser.next_value()?;
+                        let value = value_buf.as_ref();
 
-                        if &value == "" {
+                        if value == "" {
                             row.insert(mapping_insert_indices[i], TableValue::Null);
                         } else {
                             row.insert(
                                 mapping_insert_indices[i],
                                 match column.get_column_type() {
-                                    ColumnType::String => TableValue::String(value),
+                                    ColumnType::String => {
+                                        TableValue::String(value_buf.take_string())
+                                    }
                                     ColumnType::Int => value
                                         .parse()
                                         .map(|v| TableValue::Int(v))
                                         .unwrap_or(TableValue::Null),
                                     ColumnType::Decimal { .. } => {
-                                        BigDecimal::from_str_radix(value.as_str(), 10)
+                                        BigDecimal::from_str_radix(value, 10)
                                             .map(|d| TableValue::Decimal(d.to_string()))
                                             .unwrap_or(TableValue::Null)
                                     }
@@ -129,7 +134,7 @@ impl ImportFormat {
 
                                         TableValue::Bytes(data)
                                     }
-                                    ColumnType::Timestamp => timestamp_from_string(value.as_str())?,
+                                    ColumnType::Timestamp => timestamp_from_string(value)?,
                                     ColumnType::Float => {
                                         TableValue::Float(value.parse::<f64>()?.to_string())
                                     }
@@ -163,36 +168,51 @@ impl<'a> CsvLineParser<'a> {
         }
     }
 
-    fn next_value(&mut self) -> Result<String, CubeError> {
-        Ok(if self.remaining.chars().nth(0) == Some('"') {
-            let mut closing_index = None;
-            let mut i = 1;
-            while i < self.remaining.len() {
-                if i < self.remaining.len() - 1 && &self.remaining[i..(i + 2)] == "\"\"" {
+    fn next_value(&mut self) -> Result<MaybeOwnedStr, CubeError> {
+        Ok(
+            if let Some(b'"') = self.remaining.as_bytes().iter().nth(0) {
+                let mut closing_index = None;
+                let mut i = 1;
+                let mut seen_escapes = false;
+                while i < self.remaining.len() {
+                    if i < self.remaining.len() - 1 && &self.remaining[i..(i + 2)] == "\"\"" {
+                        i += 1;
+                        seen_escapes = true;
+                    } else if self.remaining.as_bytes()[i] == b'"' {
+                        closing_index = Some(i);
+                        break;
+                    }
                     i += 1;
-                } else if &self.remaining[i..(i + 1)] == "\"" {
-                    closing_index = Some(i);
-                    break;
                 }
-                i += 1;
-            }
-            let closing_index = closing_index.ok_or(CubeError::user(format!(
-                "Malformed CSV string: {}",
-                self.line
-            )))?;
-            let res: String = self.remaining[1..closing_index].replace("\"\"", "\"");
-            self.remaining = self.remaining[(closing_index + 1)..].as_ref();
-            res
-        } else {
-            let next_comma = self.remaining.find(",").unwrap_or(self.remaining.len());
-            let res: String = self.remaining[0..next_comma].to_string();
-            self.remaining = self.remaining[next_comma..].as_ref();
-            res
-        })
+                let closing_index = closing_index.ok_or(CubeError::user(format!(
+                    "Malformed CSV string: {}",
+                    self.line
+                )))?;
+                let res;
+                if seen_escapes {
+                    let unescaped = self.remaining[1..closing_index].replace("\"\"", "\"");
+                    res = MaybeOwnedStr::Owned(unescaped)
+                } else {
+                    res = MaybeOwnedStr::Borrowed(&self.remaining[1..closing_index])
+                }
+                self.remaining = self.remaining[(closing_index + 1)..].as_ref();
+                res
+            } else {
+                let next_comma = self
+                    .remaining
+                    .as_bytes()
+                    .iter()
+                    .position(|c| *c == b',')
+                    .unwrap_or(self.remaining.len());
+                let res = &self.remaining[0..next_comma];
+                self.remaining = self.remaining[next_comma..].as_ref();
+                MaybeOwnedStr::Borrowed(res)
+            },
+        )
     }
 
     fn advance(&mut self) -> Result<(), CubeError> {
-        if self.remaining.chars().nth(0) == Some(',') {
+        if let Some(b',') = self.remaining.as_bytes().iter().nth(0) {
             self.remaining = self.remaining[1..].as_ref()
         }
         Ok(())
