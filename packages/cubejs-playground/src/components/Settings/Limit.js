@@ -1,13 +1,13 @@
 import { InputNumber } from 'antd';
 
-export default function Limit({ limit = 10000, onUpdate }) {
+export default function Limit({ limit = 5000, onUpdate }) {
   return (
     <label>
       Limit{' '}
       <InputNumber
         prefix="Limit"
         value={limit}
-        step={1000}
+        step={500}
         onChange={(value) =>
           onUpdate({
             limit: value,
