@@ -36,7 +36,7 @@ const cubejsApi = cubejs(
 
 Name | Type | Description |
 ------ | ------ | ------ |
-apiToken | string &#124;  () => *Promise‹string›* | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
+apiToken | string &#124;  () => *Promise‹string›* | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
 options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 >  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
