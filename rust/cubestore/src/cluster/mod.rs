@@ -296,7 +296,7 @@ impl JobRunner {
             job.get_row().row_reference().clone(),
             job.get_row().job_type().clone(),
         ))?;
-        let res = timeout(Duration::from_secs(300), self.route_job(job.get_row())).await;
+        let res = timeout(Duration::from_secs(600), self.route_job(job.get_row())).await;
         mem::drop(rx);
         heart_beat_timer.await?;
         if let Err(timeout_err) = res {
