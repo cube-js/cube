@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.7](https://github.com/cube-js/cube.js/compare/v0.26.6...v0.26.7) (2021-02-09)
+
+
+### Features
+
+* **@cubejs-client/playground:** security context editing ([#1986](https://github.com/cube-js/cube.js/issues/1986)) ([90f2365](https://github.com/cube-js/cube.js/commit/90f2365eb21313fb5ea7a80583622e0ed742005c))
+
+
+
+
+
 ## [0.26.6](https://github.com/cube-js/cube.js/compare/v0.26.5...v0.26.6) (2021-02-08)
 
 

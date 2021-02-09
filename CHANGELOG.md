@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.7](https://github.com/cube-js/cube.js/compare/v0.26.6...v0.26.7) (2021-02-09)
+
+
+### Bug Fixes
+
+* **cubestore:** skip WAL, partition data directly during ingestion ([#2002](https://github.com/cube-js/cube.js/issues/2002)) ([5442fad](https://github.com/cube-js/cube.js/commit/5442fad9e804615de6271f555b6084e4c5e45c28))
+
+
+### Features
+
+* **@cubejs-client/playground:** security context editing ([#1986](https://github.com/cube-js/cube.js/issues/1986)) ([90f2365](https://github.com/cube-js/cube.js/commit/90f2365eb21313fb5ea7a80583622e0ed742005c))
+* Support for Redis Sentinel + IORedis driver. fix [#1769](https://github.com/cube-js/cube.js/issues/1769) ([a5e7972](https://github.com/cube-js/cube.js/commit/a5e7972485fa97faaf9965b9794b0cf48256f484))
+* Use REDIS_URL for IORedis options (with santinels) ([988bfe5](https://github.com/cube-js/cube.js/commit/988bfe5526be3506fe7b773d247ad89b3287fad4))
+
+
+
+
+
 ## [0.26.6](https://github.com/cube-js/cube.js/compare/v0.26.5...v0.26.6) (2021-02-08)
 
 
