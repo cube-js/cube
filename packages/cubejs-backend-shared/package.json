@@ -30,8 +30,7 @@
   },
   "dependencies": {
     "env-var": "^6.3.0",
-    "node-fetch": "^2.6.1",
-    "node-machine-id": "^1.1.12"
+    "node-fetch": "^2.6.1"
   },
   "publishConfig": {
     "access": "public"

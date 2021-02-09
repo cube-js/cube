@@ -53,7 +53,6 @@
     "cubejs-dotenv": "^8.3.0",
     "express": "^4.17.1",
     "jsonwebtoken": "^8.4.0",
-    "node-machine-id": "^1.1.10",
     "semver": "^7.3.2",
     "source-map-support": "^0.5.19",
     "ws": "^7.1.2"
