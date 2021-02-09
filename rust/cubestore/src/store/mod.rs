@@ -619,7 +619,8 @@ impl ChunkStore {
 
         let columns = data.get_columns().clone();
         let mut remaining_rows = data.into_rows();
-        remaining_rows.sort_by(|a, b| a.sort_key(sort_key_size).cmp(&b.sort_key(sort_key_size)));
+        remaining_rows
+            .sort_unstable_by(|a, b| a.sort_key(sort_key_size).cmp(&b.sort_key(sort_key_size)));
 
         let mut new_chunks = Vec::new();
 
