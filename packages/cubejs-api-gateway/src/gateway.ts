@@ -736,7 +736,7 @@ export class ApiGateway {
     let showWarningAboutNotObject = false;
 
     return (req, res, next) => {
-      fn(req, res, (e) => {
+      fn.bind(this)(req, res, (e) => {
         // We renamed authInfo to securityContext, but users can continue to use both ways
         if (req.securityContext && !req.authInfo) {
           req.authInfo = req.securityContext;
@@ -766,7 +766,7 @@ export class ApiGateway {
     let showWarningAboutNotObject = false;
 
     return async (req, auth) => {
-      await fn(req, auth);
+      await fn.bind(this)(req, auth);
 
       // We renamed authInfo to securityContext, but users can continue to use both ways
       if (req.securityContext && !req.authInfo) {
