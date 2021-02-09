@@ -95,10 +95,10 @@ export class MSSqlDbRunner extends BaseDbRunner {
       .withEnv('MSSQL_SA_PASSWORD', this.password())
       .withHealthCheck({
         test: `/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`,
-        interval: new Duration(2, TemporalUnit.SECONDS),
-        timeout: new Duration(3, TemporalUnit.SECONDS),
+        interval: 2 * 1000,
+        timeout: 3 * 1000,
         retries: 5,
-        startPeriod: new Duration(10, TemporalUnit.SECONDS),
+        startPeriod: 10 * 1000,
       })
       .withExposedPorts(this.port())
       .withWaitStrategy(Wait.forHealthCheck())

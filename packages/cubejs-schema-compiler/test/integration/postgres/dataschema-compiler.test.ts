@@ -2,16 +2,10 @@ import { CompileError } from '../../../src/compiler/CompileError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { prepareCompiler as originalPrepareCompiler } from '../../../src/compiler/PrepareCompiler';
-import { PostgresDBRunner } from './PostgresDBRunner';
+import { dbRunner } from './PostgresDBRunner';
 
 describe('DataSchemaCompiler', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new PostgresDBRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   it('gutter', async () => {
     const { compiler } = prepareCompiler(`
@@ -48,7 +42,7 @@ describe('DataSchemaCompiler', () => {
     return compiler.compile();
   });
 
-  it('error', () => {
+  it('error', async () => {
     const { compiler } = prepareCompiler(`
     cube({}, {
       measures: {}
