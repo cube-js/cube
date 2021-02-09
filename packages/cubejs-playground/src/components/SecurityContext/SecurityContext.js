@@ -31,6 +31,7 @@ export default function SecurityContext() {
   } = useSecurityContext();
 
   const [form] = Form.useForm();
+  const [activeTabKey, setActiveTabKey] = useState('json');
   const [editingToken, setEditingToken] = useState(false);
   const [isJsonValid, setIsJsonValid] = useState(true);
   const [tmpPayload, setPayload] = useState(payload);
@@ -74,6 +75,8 @@ export default function SecurityContext() {
         console.error(error);
       }
     }
+    
+    setActiveTabKey('token');
   }
 
   return (
@@ -88,20 +91,21 @@ export default function SecurityContext() {
     >
       <Space direction="vertical" size={24} style={{ width: '100%' }}>
         <Tabs
-          defaultActiveKey="json"
+          activeKey={activeTabKey}
           style={{ minHeight: 200 }}
           onChange={(tabKey) => {
             if (tabKey !== 'token' && editingToken) {
               setEditingToken(false);
               form.resetFields();
             }
+            setActiveTabKey(tabKey);
           }}
         >
-          <TabPane tab="JSON" key="json">
+          <TabPane tab="JSON" key="json"></TabPane>
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               <TextArea
                 value={tmpPayload}
-                rows={10}
+                rows={6}
                 style={{ width: '100%' }}
                 onChange={handlePayloadChange}
               />
