@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.8](https://github.com/cube-js/cube.js/compare/v0.26.7...v0.26.8) (2021-02-09)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** allow to store multiple tokens ([bf3f49a](https://github.com/cube-js/cube.js/commit/bf3f49ae2357e9a7eff5027cfa5573f8290a110b))
+* **@cubejs-client/playground:** angular chart renderer ([1132103](https://github.com/cube-js/cube.js/commit/1132103b8c1d9b2ad0f986518dbe48bc3ed4d377))
+* **cubestore:** Increase job timeout to 10 minutes ([a874f60](https://github.com/cube-js/cube.js/commit/a874f6035bf374432dcfc775374ad373aeb5c118))
+
+
+### Reverts
+
+* Revert "fix(cubestore): skip WAL, partition data directly during ingestion (#2002)" ([c9a6527](https://github.com/cube-js/cube.js/commit/c9a6527375f1223d69f3163d18343a5d52bc4f05)), closes [#2002](https://github.com/cube-js/cube.js/issues/2002)
+
+
+
+
+
 ## [0.26.7](https://github.com/cube-js/cube.js/compare/v0.26.6...v0.26.7) (2021-02-09)
 
 

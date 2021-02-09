@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.8](https://github.com/cube-js/cube.js/compare/v0.26.7...v0.26.8) (2021-02-09)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** allow to store multiple tokens ([bf3f49a](https://github.com/cube-js/cube.js/commit/bf3f49ae2357e9a7eff5027cfa5573f8290a110b))
+* **@cubejs-client/playground:** angular chart renderer ([1132103](https://github.com/cube-js/cube.js/commit/1132103b8c1d9b2ad0f986518dbe48bc3ed4d377))
+
+
+
+
+
 ## [0.26.7](https://github.com/cube-js/cube.js/compare/v0.26.6...v0.26.7) (2021-02-09)
 
 
