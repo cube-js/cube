@@ -2,16 +2,10 @@ import R from 'ramda';
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { PostgresDBRunner } from './PostgresDBRunner';
+import { dbRunner } from './PostgresDBRunner';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new PostgresDBRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
   cube(\`visitors\`, {

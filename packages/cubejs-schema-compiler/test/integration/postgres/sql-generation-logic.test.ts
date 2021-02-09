@@ -1,16 +1,10 @@
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { PostgresDBRunner } from './PostgresDBRunner';
+import { dbRunner } from './PostgresDBRunner';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new PostgresDBRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     const perVisitorRevenueMeasure = {

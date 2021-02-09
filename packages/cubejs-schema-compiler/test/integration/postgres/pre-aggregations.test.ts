@@ -2,16 +2,10 @@ import R from 'ramda';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { PostgresDBRunner } from './PostgresDBRunner';
-
-const dbRunner = new PostgresDBRunner();
+import { dbRunner } from './PostgresDBRunner';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     cube(\`visitors\`, {
@@ -1154,7 +1148,9 @@ describe('PreAggregations', () => {
     });
   }));
 
-  it('rollup join existing joins', () => compiler.compile().then(() => {
+  it('rollup join existing joins', async () => {
+    await compiler.compile();
+
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitor_checkins.count',
@@ -1192,7 +1188,7 @@ describe('PreAggregations', () => {
         ],
       );
     });
-  }));
+  });
 
   it('rollup join partitioned', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -1343,11 +1339,7 @@ describe('PreAggregations', () => {
 });
 
 describe('PreAggregations in time hierarchy', () => {
-  // this.timeout(200000);
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
+  jest.setTimeout(200000);
 
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     cube(\`visitors\`, {

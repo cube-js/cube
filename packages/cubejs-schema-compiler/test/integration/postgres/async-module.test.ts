@@ -1,16 +1,9 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
-
-import { PostgresDBRunner } from './PostgresDBRunner';
+import { dbRunner } from './PostgresDBRunner';
 
 describe('AsyncModule', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new PostgresDBRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   it('gutter', async () => {
     const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`

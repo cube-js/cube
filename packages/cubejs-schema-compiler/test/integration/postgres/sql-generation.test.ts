@@ -3,16 +3,10 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { PostgresDBRunner } from './PostgresDBRunner';
+import { dbRunner } from './PostgresDBRunner';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
-
-  const dbRunner = new PostgresDBRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
 
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
     const perVisitorRevenueMeasure = {
@@ -393,7 +387,7 @@ describe('SQL Generation', () => {
     );
   }
 
-  it('simple join total', () => runQueryTest({
+  it('simple join total', async () => runQueryTest({
     measures: [
       'visitors.visitor_revenue',
       'visitors.visitor_count',
@@ -472,7 +466,7 @@ describe('SQL Generation', () => {
     });
   });
 
-  it('rolling', () => runQueryTest({
+  it('rolling', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling'
     ],
@@ -498,7 +492,7 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
   ]));
 
-  it('rolling multiplied', () => runQueryTest({
+  it('rolling multiplied', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling',
       'visitor_checkins.visitor_checkins_count'
@@ -535,7 +529,7 @@ describe('SQL Generation', () => {
     }
   ]));
 
-  it('rolling month', () => runQueryTest({
+  it('rolling month', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling3day'
     ],
@@ -552,7 +546,7 @@ describe('SQL Generation', () => {
     { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling3day: '900' }
   ]));
 
-  it('rolling count', () => runQueryTest({
+  it('rolling count', async () => runQueryTest({
     measures: [
       'visitors.countRolling'
     ],
@@ -578,7 +572,7 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
   ]));
 
-  it('sql utils', () => runQueryTest({
+  it('sql utils', async () => runQueryTest({
     measures: [
       'visitors.visitor_count'
     ],
@@ -598,7 +592,7 @@ describe('SQL Generation', () => {
     { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000Z', visitors__visitor_count: '2' }
   ]));
 
-  it('running total total', () => runQueryTest({
+  it('running total total', async () => runQueryTest({
     measures: [
       'visitors.revenueRunning'
     ],
@@ -616,7 +610,7 @@ describe('SQL Generation', () => {
     }
   ]));
 
-  it('running total ratio', () => runQueryTest({
+  it('running total ratio', async () => runQueryTest({
     measures: [
       'visitors.runningRevenuePerCount'
     ],
