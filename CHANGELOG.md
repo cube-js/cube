@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.10](https://github.com/cube-js/cube.js/compare/v0.26.9...v0.26.10) (2021-02-09)
+
+
+### Bug Fixes
+
+* Using .end() without the flush parameter is deprecated and throws from v.3.0.0 ([7078f41](https://github.com/cube-js/cube.js/commit/7078f4146572a4eb447b9ed6f64e071b86e0aca2))
+* **cubestore:** Speed up CSV parsing ([#2032](https://github.com/cube-js/cube.js/issues/2032)) ([39e95f0](https://github.com/cube-js/cube.js/commit/39e95f0347e068012e5e7d60060168c271edab98))
+
+
+
+
+
 ## [0.26.9](https://github.com/cube-js/cube.js/compare/v0.26.8...v0.26.9) (2021-02-09)
 
 
