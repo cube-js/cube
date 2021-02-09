@@ -1,8 +1,4 @@
-/* eslint-disable quote-props */
-/* globals it,describe */
-import SqlParser from '../../src/parser/SqlParser';
-
-require('should');
+const SqlParser = require('../../src/parser/SqlParser');
 
 describe('SqlParser', () => {
   it('basic where', () => {
@@ -23,8 +19,8 @@ describe('SqlParser', () => {
           ':00:00'
         ) AS DATETIME
       )`);
-    sqlParser.isSimpleAsteriskQuery().should.be.deepEqual(true);
-    sqlParser.extractWhereConditions('x').should.be.deepEqual(`CAST(
+    expect(sqlParser.isSimpleAsteriskQuery()).toEqual(true);
+    expect(sqlParser.extractWhereConditions('x')).toEqual(`CAST(
         CONCAT(
           SUBSTRING($1$, 1, 13),
           ':00:00'
@@ -57,8 +53,8 @@ describe('SqlParser', () => {
         ) AS DATETIME
       ) AND 1 = 1`);
     sqlParser.throwErrorsIfAny();
-    sqlParser.isSimpleAsteriskQuery().should.be.deepEqual(true);
-    sqlParser.extractWhereConditions('x').should.be.deepEqual(`CAST(
+    expect(sqlParser.isSimpleAsteriskQuery()).toEqual(true);
+    expect(sqlParser.extractWhereConditions('x')).toEqual(`CAST(
         CONCAT(
           SUBSTRING($1$, 1, 13),
           ':00:00'
@@ -78,8 +74,8 @@ describe('SqlParser', () => {
     from
       some.ttt
     WHERE a is null`);
-    sqlParser.isSimpleAsteriskQuery().should.be.deepEqual(true);
-    sqlParser.extractWhereConditions('x').should.be.deepEqual('x.a is null');
+    expect(sqlParser.isSimpleAsteriskQuery()).toEqual(true);
+    expect(sqlParser.extractWhereConditions('x')).toEqual('x.a is null');
   });
 
   it('do not honor group by', () => {
@@ -89,7 +85,7 @@ describe('SqlParser', () => {
       some.ttt
     GROUP BY 1
      `);
-    sqlParser.isSimpleAsteriskQuery().should.be.deepEqual(false);
+    expect(sqlParser.isSimpleAsteriskQuery()).toEqual(false);
   });
 
   it('wrapped', () => {
@@ -98,7 +94,7 @@ describe('SqlParser', () => {
     from
       some.ttt WHERE 1 = 1)
      `);
-    sqlParser.isSimpleAsteriskQuery().should.be.deepEqual(true);
-    sqlParser.extractWhereConditions('x').should.be.deepEqual('1 = 1');
+    expect(sqlParser.isSimpleAsteriskQuery()).toEqual(true);
+    expect(sqlParser.extractWhereConditions('x')).toEqual('1 = 1');
   });
 });

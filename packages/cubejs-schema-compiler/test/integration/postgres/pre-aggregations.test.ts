@@ -1,19 +1,15 @@
-/* eslint-disable quote-props */
-/* globals it, describe, after */
 import R from 'ramda';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { PostgresDBRunner } from './PostgresDBRunner';
 
-require('should');
-
 const dbRunner = new PostgresDBRunner();
 
-describe('PreAggregations', function test() {
-  this.timeout(200000);
+describe('PreAggregations', () => {
+  jest.setTimeout(200000);
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
@@ -396,29 +392,29 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-            'visitors__count': '1'
+            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors__count: '1'
           },
           {
-            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-            'visitors__count': '1'
+            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors__count: '1'
           },
           {
-            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'visitors__count': '1'
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__count: '1'
           },
           {
-            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-            'visitors__count': '2'
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            visitors__count: '2'
           }
         ]
       );
@@ -444,30 +440,30 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
-    preAggregationsDescription[0].loadSql[0].should.match(/visitors_ratio/);
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/visitors_ratio/);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 10))).then(res => {
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-            'visitors__ratio': '0.33333333333333333333'
+            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors__ratio: '0.33333333333333333333'
           },
           {
-            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-            'visitors__ratio': '0.50000000000000000000'
+            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors__ratio: '0.50000000000000000000'
           },
           {
-            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'visitors__ratio': '1.00000000000000000000'
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__ratio: '1.00000000000000000000'
           },
           {
-            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-            'visitors__ratio': null
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            visitors__ratio: null
           }
         ]
       );
@@ -493,17 +489,17 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'google_visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'google_visitors__count': '1'
+            google_visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            google_visitors__count: '1'
           }
         ]
       );
@@ -532,20 +528,20 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/NOW\(\) </);
+    expect(preAggregationsDescription[0].invalidateKeyQueries[0][0]).toMatch(/NOW\(\) </);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => {
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'google_visitors__source': 'google',
-            'google_visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'google_visitors__checkins_total': '1'
+            google_visitors__source: 'google',
+            google_visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            google_visitors__checkins_total: '1'
           }
         ]
       );
@@ -574,21 +570,21 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/NOW\(\) </);
-    preAggregationsDescription[0].invalidateKeyQueries[0][1][0].should.be.deepEqual('2017-02-01T07:59:59Z');
+    expect(preAggregationsDescription[0].invalidateKeyQueries[0][0]).toMatch(/NOW\(\) </);
+    expect(preAggregationsDescription[0].invalidateKeyQueries[0][1][0]).toEqual('2017-02-01T07:59:59Z');
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 103))).then(res => {
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'every_hour_visitors__source': 'google',
-            'every_hour_visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'every_hour_visitors__checkins_total': '1'
+            every_hour_visitors__source: 'google',
+            every_hour_visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            every_hour_visitors__checkins_total: '1'
           }
         ]
       );
@@ -616,15 +612,15 @@ describe('PreAggregations', function test() {
     const partitionedPreAgg =
         preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitor_checkins');
 
-    const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg.preAggregation);
+    const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg?.preAggregation);
 
     console.log(minMaxQueries);
 
-    minMaxQueries[0][0].should.match(/NOW/);
+    expect(minMaxQueries[0][0]).toMatch(/NOW/);
 
     const res = await dbRunner.testQueries(minMaxQueries);
 
-    res.should.be.deepEqual(
+    expect(res).toEqual(
       [{ max: '2017-01-06T00:00:00.000Z' }]
     );
   }));
@@ -650,13 +646,13 @@ describe('PreAggregations', function test() {
     const partitionedPreAgg =
         preAggregations.find(p => p.preAggregationName === 'emptyPartitioned' && p.cube === 'visitor_checkins');
 
-    const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg.preAggregation);
+    const minMaxQueries = query.preAggregationStartEndQueries('visitor_checkins', partitionedPreAgg?.preAggregation);
 
     console.log(minMaxQueries);
 
     const res = await dbRunner.testQueries(minMaxQueries);
 
-    res.should.be.deepEqual(
+    expect(res).toEqual(
       [{ max: null }]
     );
   }));
@@ -683,15 +679,15 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    preAggregationsDescription[0].invalidateKeyQueries[0][0].should.match(/FLOOR/);
+    expect(preAggregationsDescription[0].invalidateKeyQueries[0][0]).toMatch(/FLOOR/);
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
     ]).map(q => replaceTableName(q, preAggregationsDescription, 102))).then(res => {
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
             visitors__source: 'some',
@@ -737,11 +733,11 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription()[0];
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
-    queryAndParams[0].should.match(/HLL_COUNT\.MERGE/);
-    preAggregationsDescription.loadSql[0].should.match(/HLL_COUNT\.INIT/);
+    expect(queryAndParams[0]).toMatch(/HLL_COUNT\.MERGE/);
+    expect(preAggregationsDescription.loadSql[0]).toMatch(/HLL_COUNT\.INIT/);
   }));
 
   it('sub query', () => compiler.compile().then(() => {
@@ -757,11 +753,11 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
-    preAggregationsDescription[1].loadSql[0].should.match(/vc_main/);
+    expect(preAggregationsDescription[1].loadSql[0]).toMatch(/vc_main/);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
@@ -769,12 +765,12 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 2))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
-          { 'visitors__checkins_count': '0', 'visitors__count': '3' },
-          { 'visitors__checkins_count': '1', 'visitors__count': '1' },
-          { 'visitors__checkins_count': '2', 'visitors__count': '1' },
-          { 'visitors__checkins_count': '3', 'visitors__count': '1' }
+          { visitors__checkins_count: '0', visitors__count: '3' },
+          { visitors__checkins_count: '1', visitors__count: '1' },
+          { visitors__checkins_count: '2', visitors__count: '1' },
+          { visitors__checkins_count: '3', visitors__count: '1' }
         ]
       );
     });
@@ -799,16 +795,16 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 
     const desc = preAggregationsDescription.find(e => e.tableName === 'visitors_multi_stage20170101');
-    desc.invalidateKeyQueries[0][1][0].should.be.equal('2017-01-02T07:59:59Z');
+    expect(desc.invalidateKeyQueries[0][1][0]).toEqual('2017-01-02T07:59:59Z');
 
     const vcMainDesc = preAggregationsDescription.find(e => e.tableName === 'vc_main');
-    vcMainDesc.invalidateKeyQueries.length.should.be.equal(1);
+    expect(vcMainDesc.invalidateKeyQueries.length).toEqual(1);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
@@ -816,11 +812,11 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 3))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__created_at_month': '2017-01-01T00:00:00.000Z',
-            'visitors__checkins_total': '6'
+            visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+            visitors__checkins_total: '6'
           }
         ]
       );
@@ -852,13 +848,13 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
     const partitionedTables = preAggregationsDescription
       .filter(({ tableName }) => tableName.indexOf('visitors_partitioned') === 0);
 
-    partitionedTables[0].refreshKeyRenewalThresholds[0].should.be.equal(86400);
-    partitionedTables[partitionedTables.length - 1].refreshKeyRenewalThresholds[0].should.be.equal(300);
+    expect(partitionedTables[0].refreshKeyRenewalThresholds[0]).toEqual(86400);
+    expect(partitionedTables[partitionedTables.length - 1].refreshKeyRenewalThresholds[0]).toEqual(300);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 
@@ -868,7 +864,7 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1042))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         []
       );
     });
@@ -896,7 +892,7 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -907,22 +903,22 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 42))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-02T00:00:00.000Z',
-            'visitors__checkins_total': '3'
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors__checkins_total: '3'
           },
           {
-            'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-04T00:00:00.000Z',
-            'visitors__checkins_total': '2'
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors__checkins_total: '2'
           },
           {
-            'visitors__source': 'google',
-            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'visitors__checkins_total': '1'
+            visitors__source: 'google',
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__checkins_total: '1'
           }
         ]
       );
@@ -951,7 +947,7 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -962,15 +958,15 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 12342))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__source': 'google',
-            'visitors__checkins_total': '1'
+            visitors__source: 'google',
+            visitors__checkins_total: '1'
           },
           {
-            'visitors__source': 'some',
-            'visitors__checkins_total': '5'
+            visitors__source: 'some',
+            visitors__checkins_total: '5'
           }
         ]
       );
@@ -999,7 +995,7 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -1010,17 +1006,17 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 242))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__source': 'some',
-            'visitors__created_at_hour': '2017-01-03T00:00:00.000Z',
-            'visitors__checkins_total': '3'
+            visitors__source: 'some',
+            visitors__created_at_hour: '2017-01-03T00:00:00.000Z',
+            visitors__checkins_total: '3'
           },
           {
-            'visitors__source': 'some',
-            'visitors__created_at_hour': '2017-01-05T00:00:00.000Z',
-            'visitors__checkins_total': '2'
+            visitors__source: 'some',
+            visitors__created_at_hour: '2017-01-05T00:00:00.000Z',
+            visitors__checkins_total: '2'
           }
         ]
       );
@@ -1049,9 +1045,9 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
-    preAggregationsDescription.length.should.be.equal(2);
+    expect(preAggregationsDescription.length).toEqual(2);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 
@@ -1061,17 +1057,17 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 342))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__source': 'some',
-            'visitors__created_at_hour': '2017-01-03T00:00:00.000Z',
-            'visitors__checkins_total': '3'
+            visitors__source: 'some',
+            visitors__created_at_hour: '2017-01-03T00:00:00.000Z',
+            visitors__checkins_total: '3'
           },
           {
-            'visitors__source': 'some',
-            'visitors__created_at_hour': '2017-01-05T00:00:00.000Z',
-            'visitors__checkins_total': '2'
+            visitors__source: 'some',
+            visitors__created_at_hour: '2017-01-05T00:00:00.000Z',
+            visitors__checkins_total: '2'
           }
         ]
       );
@@ -1099,7 +1095,7 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -1110,11 +1106,11 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 142))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__created_at_week': '2017-01-02T00:00:00.000Z',
-            'visitors__checkins_total': '1'
+            visitors__created_at_week: '2017-01-02T00:00:00.000Z',
+            visitors__checkins_total: '1'
           }
         ]
       );
@@ -1135,10 +1131,10 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    console.log(query.preAggregations.rollupMatchResultDescriptions());
+    console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 
@@ -1148,7 +1144,7 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 342)),
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           { visitors__source: 'google', vc__count: '1' },
           { visitors__source: 'some', vc__count: '5' },
@@ -1174,10 +1170,10 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    console.log(query.preAggregations.rollupMatchResultDescriptions());
+    console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 
@@ -1187,7 +1183,7 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 341)),
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           { visitors__source: 'google', cards__visitor_id: 3, vc__count: '1' },
           { visitors__source: 'some', cards__visitor_id: 1, vc__count: '3' },
@@ -1218,10 +1214,10 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    console.log(query.preAggregations.rollupMatchResultDescriptions());
+    console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 
@@ -1231,7 +1227,7 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 442)),
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
             visitors__source: 'some',
@@ -1259,7 +1255,7 @@ describe('PreAggregations', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -1270,11 +1266,11 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 43))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
-          { 'visitors__source': 'some', 'visitors__checkins_total': '5' },
-          { 'visitors__source': 'google', 'visitors__checkins_total': '1' },
-          { 'visitors__source': null, 'visitors__checkins_total': '0' }
+          { visitors__source: 'some', visitors__checkins_total: '5' },
+          { visitors__source: 'google', visitors__checkins_total: '1' },
+          { visitors__source: null, visitors__checkins_total: '0' }
         ]
       );
     });
@@ -1304,7 +1300,7 @@ describe('PreAggregations', function test() {
         }],
       });
       queryAndParams = query.buildSqlAndParams();
-      preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+      preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     }
 
     console.log(queryAndParams);
@@ -1318,27 +1314,27 @@ describe('PreAggregations', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1142))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__source': null,
-            'visitors__created_at_day': '2016-09-07T00:00:00.000Z',
-            'visitors__checkins_total': '0'
+            visitors__source: null,
+            visitors__created_at_day: '2016-09-07T00:00:00.000Z',
+            visitors__checkins_total: '0'
           },
           {
-            'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-03T00:00:00.000Z',
-            'visitors__checkins_total': '3'
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+            visitors__checkins_total: '3'
           },
           {
-            'visitors__source': 'some',
-            'visitors__created_at_day': '2017-01-05T00:00:00.000Z',
-            'visitors__checkins_total': '2'
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__checkins_total: '2'
           },
           {
-            'visitors__source': 'google',
-            'visitors__created_at_day': '2017-01-06T00:00:00.000Z',
-            'visitors__checkins_total': '1'
+            visitors__source: 'google',
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            visitors__checkins_total: '1'
           }
         ]
       );
@@ -1346,10 +1342,10 @@ describe('PreAggregations', function test() {
   }));
 });
 
-describe('PreAggregations in time hierarchy', function test() {
-  this.timeout(200000);
+describe('PreAggregations in time hierarchy', () => {
+  // this.timeout(200000);
 
-  after(async () => {
+  afterAll(async () => {
     await dbRunner.tearDown();
   });
 
@@ -1423,10 +1419,10 @@ describe('PreAggregations in time hierarchy', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
 
-    query.preAggregations.preAggregationForQuery.preAggregation.granularity.should.be.equal('month');
+    expect((<any>query).preAggregations.preAggregationForQuery.preAggregation.granularity).toEqual('month');
 
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -1437,11 +1433,11 @@ describe('PreAggregations in time hierarchy', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__count': '5',
-            'visitors__created_at_year': '2017-01-01T00:00:00.000Z'
+            visitors__count: '5',
+            visitors__created_at_year: '2017-01-01T00:00:00.000Z'
           },
         ]
       );
@@ -1465,15 +1461,15 @@ describe('PreAggregations in time hierarchy', function test() {
       filters: [
         {
           or: [{
-            'dimension': 'visitors.count',
-            'operator': 'equals',
-            'values': [
+            dimension: 'visitors.count',
+            operator: 'equals',
+            values: [
               '5'
             ]
           }, {
-            'dimension': 'visitors.count',
-            'operator': 'equals',
-            'values': [
+            dimension: 'visitors.count',
+            operator: 'equals',
+            values: [
               '2'
             ]
           },
@@ -1483,10 +1479,10 @@ describe('PreAggregations in time hierarchy', function test() {
 
     const queryAndParams = query.buildSqlAndParams();
 
-    query.preAggregations.preAggregationForQuery.preAggregation.granularity.should.be.equal('day');
+    expect((<any>query).preAggregations.preAggregationForQuery.preAggregation.granularity).toEqual('day');
 
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
@@ -1497,11 +1493,11 @@ describe('PreAggregations in time hierarchy', function test() {
       queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1))
     ).then(res => {
       console.log(JSON.stringify(res));
-      res.should.be.deepEqual(
+      expect(res).toEqual(
         [
           {
-            'visitors__count': '5',
-            'visitors__created_at_week': '2017-01-02T00:00:00.000Z'
+            visitors__count: '5',
+            visitors__created_at_week: '2017-01-02T00:00:00.000Z'
           },
         ]
       );

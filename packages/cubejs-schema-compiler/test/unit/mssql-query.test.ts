@@ -1,9 +1,5 @@
-/* globals it, describe */
-/* eslint-disable quote-props */
 import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 import { prepareCompiler } from './PrepareCompiler';
-
-require('should');
 
 describe('MssqlQuery', () => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
@@ -63,6 +59,6 @@ describe('MssqlQuery', () => {
       const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
       const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
 
-      finalGroupBy.should.equal('GROUP BY "visitors.createdAt_series"."date_from"');
+      expect(finalGroupBy).toEqual('GROUP BY "visitors.createdAt_series"."date_from"');
     }));
 });
