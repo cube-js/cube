@@ -1,5 +1,4 @@
 use crate::cluster::{ClusterImpl, ClusterMetaStoreClient};
-use crate::import::limits::ConcurrencyLimits;
 use crate::import::ImportServiceImpl;
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
@@ -154,7 +153,6 @@ pub struct ConfigObjImpl {
     pub download_concurrency: u64,
     pub connection_timeout: u64,
     pub server_name: String,
-    pub max_ingestion_data_frames: usize,
 }
 
 impl ConfigObj for ConfigObjImpl {
@@ -306,10 +304,6 @@ impl Config {
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 upload_concurrency: 4,
                 download_concurrency: 8,
-                max_ingestion_data_frames: env::var("CUBESTORE_MAX_DATA_FRAMES")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4),
                 wal_split_threshold: env::var("CUBESTORE_WAL_SPLIT_THRESHOLD")
                     .ok()
                     .map(|v| v.parse::<u64>().unwrap())
@@ -351,7 +345,6 @@ impl Config {
                 metastore_remote_address: None,
                 upload_concurrency: 4,
                 download_concurrency: 8,
-                max_ingestion_data_frames: 4,
                 wal_split_threshold: 262144,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
@@ -533,12 +526,10 @@ impl Config {
             remote_fs.clone(),
             self.config_obj.clone(),
         );
-        let concurrency_limits = ConcurrencyLimits::new(self.config_obj.max_ingestion_data_frames);
         let import_service = ImportServiceImpl::new(
             meta_store.clone(),
-            chunk_store.clone(),
+            wal_store.clone(),
             self.config_obj.clone(),
-            concurrency_limits.clone(),
         );
         let query_planner = QueryPlannerImpl::new(meta_store.clone());
         let query_executor = Arc::new(QueryExecutorImpl);
@@ -557,12 +548,10 @@ impl Config {
 
         let sql_service = SqlServiceImpl::new(
             meta_store.clone(),
-            chunk_store.clone(),
-            concurrency_limits,
+            wal_store.clone(),
             query_planner.clone(),
             query_executor.clone(),
             cluster.clone(),
-            self.config_obj.wal_split_threshold as usize,
         );
         let scheduler = SchedulerImpl::new(
             meta_store.clone(),

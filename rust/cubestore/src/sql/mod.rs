@@ -14,7 +14,7 @@ use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use crate::{
     metastore::{Column, ColumnType, MetaStore},
-    store::DataFrame,
+    store::{DataFrame, WALDataStore},
 };
 use std::sync::Arc;
 
@@ -22,12 +22,9 @@ use crate::queryplanner::{QueryPlan, QueryPlanner};
 
 use crate::cluster::{Cluster, JobEvent};
 
-use crate::import::limits::ConcurrencyLimits;
-use crate::import::Ingestion;
 use crate::metastore::job::JobType;
 use crate::queryplanner::query_executor::QueryExecutor;
 use crate::sql::parser::CubeStoreParser;
-use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
 use chrono::{TimeZone, Utc};
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
@@ -43,32 +40,26 @@ pub trait SqlService: Send + Sync {
 
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
-    chunk_store: Arc<dyn ChunkDataStore>,
-    limits: ConcurrencyLimits,
+    wal_store: Arc<dyn WALDataStore>,
     query_planner: Arc<dyn QueryPlanner>,
     query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
-    rows_per_chunk: usize,
 }
 
 impl SqlServiceImpl {
     pub fn new(
         db: Arc<dyn MetaStore>,
-        chunk_store: Arc<dyn ChunkDataStore>,
-        limits: ConcurrencyLimits,
+        wal_store: Arc<dyn WALDataStore>,
         query_planner: Arc<dyn QueryPlanner>,
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
-        rows_per_chunk: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
-            chunk_store,
-            limits,
+            wal_store,
             query_planner,
             query_executor,
             cluster,
-            rows_per_chunk,
         })
     }
 
@@ -132,6 +123,26 @@ impl SqlServiceImpl {
                 .await?;
             if let JobEvent::Error(_, _, e) = import_res {
                 return Err(CubeError::user(format!("Create table failed: {}", e)));
+            }
+            let wal_listener = self.cluster.job_result_listener();
+            let wals = self.db.get_wals_for_table(table.get_id()).await?;
+            let events = wal_listener
+                .wait_for_job_results(
+                    wals.into_iter()
+                        .map(|wal| {
+                            (
+                                RowKey::Table(TableId::WALs, wal.get_id()),
+                                JobType::WalPartitioning,
+                            )
+                        })
+                        .collect(),
+                )
+                .await?;
+
+            for v in events {
+                if let JobEvent::Error(_, _, e) = v {
+                    return Err(CubeError::user(format!("Create table failed: {}", e)));
+                }
             }
 
             Ok(table)
@@ -198,17 +209,36 @@ impl SqlServiceImpl {
             real_col.push(c);
         }
 
-        let mut ingestion = Ingestion::new(
-            self.db.clone(),
-            self.chunk_store.clone(),
-            self.limits.clone(),
-            table.clone(),
-        );
-        for rows_chunk in data.chunks(self.rows_per_chunk) {
-            let rows = parse_chunk(rows_chunk, &real_col)?;
-            ingestion.queue_data_frame(rows).await?;
+        let chunk_len = self.wal_store.get_wal_chunk_size();
+
+        let mut wal_ids = Vec::new();
+
+        let listener = self.cluster.job_result_listener();
+        for rows_chunk in data.chunks(chunk_len) {
+            let data_frame = parse_chunk(rows_chunk, &real_col)?;
+            wal_ids.push(
+                self.wal_store
+                    .add_wal(table.clone(), data_frame)
+                    .await?
+                    .get_id(),
+            );
         }
-        ingestion.wait_completion().await?;
+
+        let res = listener
+            .wait_for_job_results(
+                wal_ids
+                    .into_iter()
+                    .map(|id| (RowKey::Table(TableId::WALs, id), JobType::WalPartitioning))
+                    .collect(),
+            )
+            .await?;
+
+        for v in res {
+            if let JobEvent::Error(_, _, e) = v {
+                return Err(CubeError::user(format!("Insert job failed: {}", e)));
+            }
+        }
+
         Ok(data.len() as u64)
     }
 }
@@ -490,7 +520,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
     Ok(rolupdb_columns)
 }
 
-fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<Row>, CubeError> {
+fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<DataFrame, CubeError> {
     let mut res: Vec<Row> = Vec::new();
     for r in chunk {
         let mut row = vec![TableValue::Int(0); column.len()];
@@ -499,7 +529,10 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<Row>, C
         }
         res.push(Row::new(row));
     }
-    Ok(res)
+    Ok(DataFrame::new(
+        column.iter().map(|c| (*c).clone()).collect::<Vec<Column>>(),
+        res,
+    ))
 }
 
 fn decode_byte(s: &str) -> Option<u8> {
@@ -698,7 +731,7 @@ mod tests {
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-    use crate::store::{ChunkStore, WALStore};
+    use crate::store::WALStore;
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
@@ -729,23 +762,13 @@ mod tests {
                 PathBuf::from(remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
-            let rows_per_chunk = 10;
-            let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
-            let store = ChunkStore::new(
-                meta_store.clone(),
-                remote_fs.clone(),
-                wal_store,
-                rows_per_chunk,
-            );
-            let limits = ConcurrencyLimits::new(4);
+            let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let service = SqlServiceImpl::new(
                 meta_store,
                 store,
-                limits,
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
-                rows_per_chunk,
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -776,23 +799,13 @@ mod tests {
                 PathBuf::from(remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
-            let rows_per_chunk = 10;
-            let store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
-            let chunk_store = ChunkStore::new(
-                meta_store.clone(),
-                remote_fs.clone(),
-                store.clone(),
-                rows_per_chunk,
-            );
-            let limits = ConcurrencyLimits::new(4);
+            let store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
             let service = SqlServiceImpl::new(
                 meta_store,
-                chunk_store,
-                limits,
+                store,
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
-                rows_per_chunk,
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(

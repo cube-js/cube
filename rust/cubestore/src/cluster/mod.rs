@@ -815,14 +815,6 @@ mod tests {
 
     #[async_trait]
     impl ChunkDataStore for MockChunkStore {
-        async fn partition_data(
-            &self,
-            _table_id: u64,
-            _data: DataFrame,
-        ) -> Result<Vec<u64>, CubeError> {
-            unimplemented!()
-        }
-
         async fn partition(&self, _wal_id: u64) -> Result<(), CubeError> {
             unimplemented!()
         }

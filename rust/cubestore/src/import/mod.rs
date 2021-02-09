@@ -1,12 +1,8 @@
-pub mod limits;
-
 use crate::config::ConfigObj;
-use crate::import::limits::ConcurrencyLimits;
-use crate::metastore::table::Table;
-use crate::metastore::{is_valid_hll, IdRow};
+use crate::metastore::is_valid_hll;
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::sql::timestamp_from_string;
-use crate::store::{ChunkDataStore, DataFrame};
+use crate::store::{DataFrame, WALDataStore};
 use crate::sys::malloc::trim_allocs;
 use crate::table::{Row, TableValue};
 use crate::CubeError;
@@ -26,7 +22,6 @@ use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
 use tokio::io;
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
-use tokio::task::JoinHandle;
 use tokio_stream::wrappers::LinesStream;
 
 impl ImportFormat {
@@ -212,23 +207,20 @@ pub trait ImportService: Send + Sync {
 
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
-    chunk_store: Arc<dyn ChunkDataStore>,
+    wal_store: Arc<dyn WALDataStore>,
     config_obj: Arc<dyn ConfigObj>,
-    limits: ConcurrencyLimits,
 }
 
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
-        chunk_store: Arc<dyn ChunkDataStore>,
+        wal_store: Arc<dyn WALDataStore>,
         config_obj: Arc<dyn ConfigObj>,
-        limits: ConcurrencyLimits,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
-            chunk_store,
+            wal_store,
             config_obj,
-            limits,
         })
     }
 }
@@ -295,12 +287,6 @@ impl ImportService for ImportServiceImpl {
 
             defer!(trim_allocs());
 
-            let mut ingestion = Ingestion::new(
-                self.meta_store.clone(),
-                self.chunk_store.clone(),
-                self.limits.clone(),
-                table.clone(),
-            );
             let mut rows = Vec::new();
             while let Some(row) = row_stream.next().await {
                 if let Some(row) = row? {
@@ -308,69 +294,24 @@ impl ImportService for ImportServiceImpl {
                     if rows.len() >= self.config_obj.wal_split_threshold() as usize {
                         let mut to_add = Vec::new();
                         mem::swap(&mut rows, &mut to_add);
-                        ingestion.queue_data_frame(to_add).await?;
+                        self.wal_store
+                            .add_wal(
+                                table.clone(),
+                                DataFrame::new(table.get_row().get_columns().clone(), to_add),
+                            )
+                            .await?;
                     }
                 }
             }
 
             mem::drop(temp_files);
 
-            ingestion.queue_data_frame(rows).await?;
-            ingestion.wait_completion().await?;
-        }
-
-        Ok(())
-    }
-}
-
-/// Handles row-based data ingestion, e.g. on CSV import and SQL insert.
-pub struct Ingestion {
-    meta_store: Arc<dyn MetaStore>,
-    chunk_store: Arc<dyn ChunkDataStore>,
-    limits: ConcurrencyLimits,
-    table: IdRow<Table>,
-
-    partition_jobs: Vec<JoinHandle<Result<(), CubeError>>>,
-}
-
-impl Ingestion {
-    pub fn new(
-        meta_store: Arc<dyn MetaStore>,
-        chunk_store: Arc<dyn ChunkDataStore>,
-        limits: ConcurrencyLimits,
-        table: IdRow<Table>,
-    ) -> Ingestion {
-        Ingestion {
-            meta_store,
-            chunk_store,
-            limits,
-            table,
-            partition_jobs: Vec::new(),
-        }
-    }
-
-    pub async fn queue_data_frame(&mut self, rows: Vec<Row>) -> Result<(), CubeError> {
-        let active_data_frame = self.limits.acquire_data_frame().await?;
-
-        let meta_store = self.meta_store.clone();
-        let chunk_store = self.chunk_store.clone();
-        let columns = self.table.get_row().get_columns().clone().clone();
-        let table_id = self.table.get_id();
-        self.partition_jobs.push(tokio::spawn(async move {
-            let new_chunks = chunk_store
-                .partition_data(table_id, DataFrame::new(columns, rows))
+            self.wal_store
+                .add_wal(
+                    table.clone(),
+                    DataFrame::new(table.get_row().get_columns().clone(), rows),
+                )
                 .await?;
-            std::mem::drop(active_data_frame);
-            meta_store.activate_chunks(table_id, new_chunks).await?;
-            Ok(())
-        }));
-
-        Ok(())
-    }
-
-    pub async fn wait_completion(self) -> Result<(), CubeError> {
-        for j in self.partition_jobs {
-            j.await??;
         }
 
         Ok(())
