@@ -1,5 +1,5 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
-import { Col, Row } from 'antd';
+import { Col, Row, Divider } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
 
@@ -151,20 +151,30 @@ export default function PlaygroundQueryBuilder({
       }) => {
         return (
           <>
-            <Row style={{ margin: 12 }}>
+            <Row>
               <Col span={24}>
-                <Button.Group>
-                  <Button
-                    icon={<LockOutlined />}
-                    size="small"
-                    type={token ? 'primary' : 'default'}
-                    onClick={() => setIsModalOpen(true)}
-                  >
-                    {token ? 'Edit' : 'Add'} Security Context
-                  </Button>
-                </Button.Group>
+                <Card
+                  bordered={false}
+                  style={{
+                    borderRadius: 0,
+                    borderBottom: 1,
+                  }}
+                >
+                  <Button.Group>
+                    <Button
+                      icon={<LockOutlined />}
+                      size="small"
+                      type={token ? 'primary' : 'default'}
+                      onClick={() => setIsModalOpen(true)}
+                    >
+                      {token ? 'Edit' : 'Add'} Security Context
+                    </Button>
+                  </Button.Group>
+                </Card>
               </Col>
             </Row>
+
+            <Divider style={{ margin: 0 }} />
 
             <Row
               justify="space-around"

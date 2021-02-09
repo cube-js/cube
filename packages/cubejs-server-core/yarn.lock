@@ -846,12 +846,12 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/api-gateway@^0.26.4":
-  version "0.26.4"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.26.4.tgz#3ac0cf8d86ffcb80596078070bafe2a0a1621fad"
-  integrity sha512-0zeH97eX7EKetdTKztV0LsxBYLy4VUFCM5ErfNTOVY1RgE8/yArcFBlwxzqZglutW2o52UmxmRW74oX47SWX2g==
+"@cubejs-backend/api-gateway@^0.26.7":
+  version "0.26.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/api-gateway/-/api-gateway-0.26.7.tgz#97861ee3d6932d279bebec28487b7e3721709ddf"
+  integrity sha512-mMivTTN9f4KSAGETToErWeI9tXYi0OmnS7qFEEOfHSeov2ckIIlnNre8Hb7cpP13fLTsE4FjjMUR4yjicdCXAQ==
   dependencies:
-    "@cubejs-backend/shared" "^0.26.2"
+    "@cubejs-backend/shared" "^0.26.7"
     "@hapi/joi" "^15.1.1"
     body-parser "^1.19.0"
     chrono-node "1.4.4"
@@ -874,20 +874,21 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/query-orchestrator@^0.26.2":
-  version "0.26.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.26.2.tgz#c4654b69ae7a2233d65b28d968259f98ff609b91"
-  integrity sha512-vS27yqLBy4Ze6bu4KIARKVZHwM8hz+hMk2e9x+f0Ofqs5Zv12egOBOXDpplvUxRawqc+13zkOivEtH8RNarN4w==
+"@cubejs-backend/query-orchestrator@^0.26.7":
+  version "0.26.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.26.7.tgz#2f237a9655bfe61936a3fec08f98a79c17875e60"
+  integrity sha512-WmYr1Ee+tgNqEArt/aCmzMmXSKpz1WJD4qoK0AUV7VG5pqWNJTmOQSdLYMEg41g746keG3D47DS6r6Ujrj5qPQ==
   dependencies:
-    "@cubejs-backend/shared" "^0.26.2"
+    "@cubejs-backend/shared" "^0.26.7"
     generic-pool "^3.7.1"
+    ioredis "^4.19.4"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.26.0":
-  version "0.26.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.26.0.tgz#269b6478578533d5603635930e19469db9be2c58"
-  integrity sha512-VKHcM6B2l18JOJtz+RUKPYEcxyGyaacoUTPk+pfRsEdeM7AEkcCk1NG0NPTqk+0b4zUcdC/qMBt4Cvs4L+oetA==
+"@cubejs-backend/schema-compiler@^0.26.6":
+  version "0.26.6"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.26.6.tgz#537ba6b04e594fe76dc1916800e1dff4aa67d23d"
+  integrity sha512-Z7mYcksCM0grq0mbq5llV8iSeYe3wWVRlnyokoD19QhNWa1MTgdg7j5Ka57IHlCpt3aLRSAHevw33WzP/OPPPA==
   dependencies:
     "@babel/code-frame" "^7.12.11"
     "@babel/core" "^7.12.10"
@@ -910,10 +911,10 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/shared@^0.26.2":
-  version "0.26.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.2.tgz#6b5ca90383d278cacb2e8862d06189ee3aa7fad1"
-  integrity sha512-ppWNJhJJlnwlrczf8HrMmw6cCn06w8LfWvo3ThcU8a+fYWchk1OWgOhAREiccZafr3oKGC2fzA8UhniYdxHnlw==
+"@cubejs-backend/shared@^0.26.7":
+  version "0.26.7"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.7.tgz#3e60bad859b0b59c9386059db89d9084dfb7c289"
+  integrity sha512-yoWNLvp7OdHmsvaFkf/tnk5nYp0Uy7bLtkNLw9IcvzDp2Y6lj/JeFz40XcKVu5YuNl4Vlg2W/e+u8SsASPtpfw==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"
@@ -2051,6 +2052,11 @@ cliui@^6.0.0:
     strip-ansi "^6.0.0"
     wrap-ansi "^6.2.0"
 
+cluster-key-slot@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/cluster-key-slot/-/cluster-key-slot-1.1.0.tgz#30474b2a981fb12172695833052bc0d01336d10d"
+  integrity sha512-2Nii8p3RwAPiFwsnZvukotvow2rIHM+yQ6ZcBXGHdniadkYGZYiGmkHJIbZPIV9nfv7m/U1IPMVVcAhoWFeklw==
+
 co@^4.6.0:
   version "4.6.0"
   resolved "https://registry.yarnpkg.com/co/-/co-4.6.0.tgz#6ea6bdf3d853ae54ccb8e47bfa0bf3f9031fb184"
@@ -2369,7 +2375,7 @@ delayed-stream@~1.0.0:
   resolved "https://registry.yarnpkg.com/delayed-stream/-/delayed-stream-1.0.0.tgz#df3ae199acadfb7d440aaae0b29e2272b24ec619"
   integrity sha1-3zrhmayt+31ECqrgsp4icrJOxhk=
 
-denque@^1.4.1:
+denque@^1.1.0, denque@^1.4.1:
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/denque/-/denque-1.5.0.tgz#773de0686ff2d8ec2ff92914316a47b73b1c73de"
   integrity sha512-CYiCSgIF1p6EUByQPlGkKnP1M9g0ZV3qMIrqMqZqdwazygIA/YP2vrbcyl1h/WppKJTdl1F85cXIle+394iDAQ==
@@ -3390,6 +3396,22 @@ inherits@2.0.3:
   resolved "https://registry.yarnpkg.com/inherits/-/inherits-2.0.3.tgz#633c2c83e3da42a502f52466022480f4208261de"
   integrity sha1-Yzwsg+PaQqUC9SRmAiSA9CCCYd4=
 
+ioredis@^4.19.4:
+  version "4.22.0"
+  resolved "https://registry.yarnpkg.com/ioredis/-/ioredis-4.22.0.tgz#a2e18a29300ffb759670d7ed7023fcf6592031a2"
+  integrity sha512-mtC+jNFMPRxReWx0HodDbcwj34Gj5pK/P4+aE6Nh0pdqgtZKvxUh4z2lVtLjqnRIvMhKaBnIgMYFR8qH/xtttA==
+  dependencies:
+    cluster-key-slot "^1.1.0"
+    debug "^4.1.1"
+    denque "^1.1.0"
+    lodash.defaults "^4.2.0"
+    lodash.flatten "^4.4.0"
+    p-map "^2.1.0"
+    redis-commands "1.7.0"
+    redis-errors "^1.2.0"
+    redis-parser "^3.0.0"
+    standard-as-callback "^2.0.1"
+
 ip-regex@^2.1.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/ip-regex/-/ip-regex-2.1.0.tgz#fa78bf5d2e6913c911ce9f819ee5146bb6d844e9"
@@ -4272,6 +4294,16 @@ locate-path@^5.0.0:
   dependencies:
     p-locate "^4.1.0"
 
+lodash.defaults@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/lodash.defaults/-/lodash.defaults-4.2.0.tgz#d09178716ffea4dde9e5fb7b37f6f0802274580c"
+  integrity sha1-0JF4cW/+pN3p5ft7N/bwgCJ0WAw=
+
+lodash.flatten@^4.4.0:
+  version "4.4.0"
+  resolved "https://registry.yarnpkg.com/lodash.flatten/-/lodash.flatten-4.4.0.tgz#f31c22225a9632d2bbf8e4addbef240aa765a61f"
+  integrity sha1-8xwiIlqWMtK7+OSt2+8kCqdlph8=
+
 lodash.includes@^4.3.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/lodash.includes/-/lodash.includes-4.3.0.tgz#60bb98a87cb923c68ca1e51325483314849f553f"
@@ -4774,6 +4806,11 @@ p-locate@^4.1.0:
   dependencies:
     p-limit "^2.2.0"
 
+p-map@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/p-map/-/p-map-2.1.0.tgz#310928feef9c9ecc65b68b17693018a665cea175"
+  integrity sha512-y3b8Kpd8OAN444hxfBbFfj1FY/RjtTd8tzYwhUqNYXx0fXx2iX4maP4Qr6qhIKbQXI02wTLAda4fYUbDagTUFw==
+
 p-try@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/p-try/-/p-try-1.0.0.tgz#cbc79cdbaf8fd4228e13f621f2b1a237c1b207b3"
@@ -5087,6 +5124,11 @@ realpath-native@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/realpath-native/-/realpath-native-2.0.0.tgz#7377ac429b6e1fd599dc38d08ed942d0d7beb866"
   integrity sha512-v1SEYUOXXdbBZK8ZuNgO4TBjamPsiSgcFr0aP+tEKpQZK8vooEUqV6nm6Cv502mX4NF2EfsnVqtNAHG+/6Ur1Q==
+
+redis-commands@1.7.0:
+  version "1.7.0"
+  resolved "https://registry.yarnpkg.com/redis-commands/-/redis-commands-1.7.0.tgz#15a6fea2d58281e27b1cd1acfb4b293e278c3a89"
+  integrity sha512-nJWqw3bTFy21hX/CPKHth6sfhZbdiHP6bTawSgQBlKOVRG7EZkfHbbHwQJnrE4vsQf0CMNE+3gJ4Fmm16vdVlQ==
 
 redis-commands@^1.5.0:
   version "1.6.0"
@@ -5623,6 +5665,11 @@ stack-utils@^1.0.1:
   integrity sha512-IPDJfugEGbfizBwBZRZ3xpccMdRyP5lqsBWXGQWimVjua/ccLCeMOAVjlc1R7LxFjo5sEDhyNIXd8mo/AiDS9w==
   dependencies:
     escape-string-regexp "^2.0.0"
+
+standard-as-callback@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/standard-as-callback/-/standard-as-callback-2.0.1.tgz#ed8bb25648e15831759b6023bdb87e6b60b38126"
+  integrity sha512-NQOxSeB8gOI5WjSaxjBgog2QFw55FV8TkS6Y07BiB3VJ8xNTvUYm0wl0s8ObgQ5NhdpnNfigMIKjgPESzgr4tg==
 
 static-extend@^0.1.1:
   version "0.1.2"
