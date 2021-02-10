@@ -77,7 +77,8 @@ const generate = async (options) => {
     }
   );
   const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
-  const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
+  const { tables, dataSource } = options;
+  const files = scaffoldingTemplate.generateFilesByTableNames(tables, { dataSource });
   await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 
   await event({
