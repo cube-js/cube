@@ -278,10 +278,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/linter@^0.26.0":
-  version "0.26.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.26.0.tgz#bdd9b262822c377f74a03ca236c2ad78a65acfa1"
-  integrity sha512-f9DNam1VeCu/g7wC0harScInk+kq1mzrMoIvD9m+2RKQ/iEEWXUKEYMCfLP0lZAB2Axjp1CtX+Bs96Uxo9a65g==
+"@cubejs-backend/linter@^0.26.11":
+  version "0.26.11"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.26.11.tgz#6ebce54b92789047d5bdc72ad5af1d066a861824"
+  integrity sha512-m0Pzlsg+OkD5FyFf9HiF+fVcXtDxhLjiXndgecDxb4yoVLLfGq6R5gJvkZLZZQBDEeMkWvetcGSH+QzpcZFH4g==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.8.2"
     "@typescript-eslint/parser" "^4.8.2"
@@ -290,14 +290,13 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/shared@^0.26.2":
-  version "0.26.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.2.tgz#6b5ca90383d278cacb2e8862d06189ee3aa7fad1"
-  integrity sha512-ppWNJhJJlnwlrczf8HrMmw6cCn06w8LfWvo3ThcU8a+fYWchk1OWgOhAREiccZafr3oKGC2fzA8UhniYdxHnlw==
+"@cubejs-backend/shared@^0.26.11":
+  version "0.26.11"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.11.tgz#2bf5e8115976d88a9ab0bec31fd2602ebbc6cf92"
+  integrity sha512-/cKWRfK+WICGqTSIM98ytEO9V/Kum/OmUgj2FXpRlMHVOeh5rmlEznlkF6INGggYprTF9nOFiPdLqMCaEin59Q==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"
-    node-machine-id "^1.1.12"
 
 "@eslint/eslintrc@^0.3.0":
   version "0.3.0"
@@ -633,10 +632,10 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-14.14.25.tgz#15967a7b577ff81383f9b888aa6705d43fbbae93"
   integrity sha512-EPpXLOVqDvisVxtlbvzfyqSsFeQxltFbluZNRndIb8tr9KiBnYNLzrc1N3pyKUCww2RNrfHDViqDWWE1LCJQtQ==
 
-"@types/node@^8.10.66":
-  version "8.10.66"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.10.66.tgz#dd035d409df322acc83dff62a602f12a5783bbb3"
-  integrity sha512-tktOkFUA4kXx2hhhrB8bIFb5TbwzS4uOhKEmwiD+NoiL0qtP2OQ9mFldbgD4dV1djrlBYP6eBuQZiWjuHUpqFw==
+"@types/node@^10.17.51":
+  version "10.17.51"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-10.17.51.tgz#639538575befbcf3d3861f95c41de8e47124d674"
+  integrity sha512-KANw+MkL626tq90l++hGelbl67irOJzGhUJk6a1Bt8QHOeh9tztJx+L0AqttraWKinmZn7Qi5lJZJzx45Gq0dg==
 
 "@types/normalize-package-data@^2.4.0":
   version "2.4.0"
@@ -3233,11 +3232,6 @@ node-int64@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/node-int64/-/node-int64-0.4.0.tgz#87a9065cdb355d3182d8f94ce11188b825c68a3b"
   integrity sha1-h6kGXNs1XTGC2PlM4RGIuCXGijs=
-
-node-machine-id@^1.1.12:
-  version "1.1.12"
-  resolved "https://registry.yarnpkg.com/node-machine-id/-/node-machine-id-1.1.12.tgz#37904eee1e59b320bb9c5d6c0a59f3b469cb6267"
-  integrity sha512-QNABxbrPa3qEIfrE6GOJ7BYIuignnJw7iQ2YPbc3Nla1HzRJjXzZOiikfF8m7eAMfichLt3M4VgLOetqgDmgGQ==
 
 node-modules-regexp@^1.0.0:
   version "1.0.0"
