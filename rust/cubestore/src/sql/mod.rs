@@ -1,4 +1,4 @@
-mod parser;
+pub(crate) mod parser;
 
 use log::trace;
 

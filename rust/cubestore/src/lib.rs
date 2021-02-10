@@ -3,6 +3,7 @@
 #![feature(backtrace)]
 #![feature(async_closure)]
 #![feature(drain_filter)]
+#![feature(box_patterns)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);

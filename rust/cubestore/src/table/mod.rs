@@ -96,21 +96,27 @@ impl<'a> PartialOrd for RowSortKey<'a> {
             return None;
         }
         for i in 0..self.sort_key_size {
-            if self.row.values[i] != other.row.values[i] {
-                return match (&self.row.values[i], &other.row.values[i]) {
-                    (TableValue::Null, _) => Some(Ordering::Less),
-                    (_, TableValue::Null) => Some(Ordering::Greater),
-                    (TableValue::String(a), TableValue::String(b)) => a.partial_cmp(b),
-                    (TableValue::Int(a), TableValue::Int(b)) => a.partial_cmp(b),
-                    (TableValue::Decimal(a), TableValue::Decimal(b)) => a.partial_cmp(b),
-                    (TableValue::Bytes(a), TableValue::Bytes(b)) => a.partial_cmp(b),
-                    (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.partial_cmp(b),
-                    (TableValue::Boolean(a), TableValue::Boolean(b)) => a.partial_cmp(b),
-                    (a, b) => panic!("Can't compare {:?} to {:?}", a, b),
-                };
+            let ord = cmp_same_types(&self.row.values[i], &other.row.values[i]);
+            if ord != Ordering::Equal {
+                return Some(ord);
             }
         }
         Some(Ordering::Equal)
+    }
+}
+
+pub fn cmp_same_types(l: &TableValue, r: &TableValue) -> Ordering {
+    match (l, r) {
+        (TableValue::Null, TableValue::Null) => Ordering::Equal,
+        (TableValue::Null, _) => Ordering::Less,
+        (_, TableValue::Null) => Ordering::Greater,
+        (TableValue::String(a), TableValue::String(b)) => a.cmp(b),
+        (TableValue::Int(a), TableValue::Int(b)) => a.cmp(b),
+        (TableValue::Decimal(a), TableValue::Decimal(b)) => a.cmp(b),
+        (TableValue::Bytes(a), TableValue::Bytes(b)) => a.cmp(b),
+        (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.cmp(b),
+        (TableValue::Boolean(a), TableValue::Boolean(b)) => a.cmp(b),
+        (a, b) => panic!("Can't compare {:?} to {:?}", a, b),
     }
 }
 
