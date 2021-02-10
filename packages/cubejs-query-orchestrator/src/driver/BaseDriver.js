@@ -41,8 +41,20 @@ const DbTypeValueMatcher = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
   date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
   bigint: (v) => Number.isInteger(v) && (v > DB_INT_MAX || v < DB_INT_MIN),
-  int: (v) => Number.isInteger(v) || v.toString().match(/^\d+$/),
-  decimal: (v) => v instanceof Number || v.toString().match(/^\d+(\.\d+)?$/),
+  int: (v) => {
+    if (Number.isInteger(v)) {
+      return true;
+    }
+
+    return v.toString().match(/^[-]?\d+$/);
+  },
+  decimal: (v) => {
+    if (v instanceof Number) {
+      return true;
+    }
+
+    return v.toString().match(/^[-]?\d+(\.\d+)?$/);
+  },
   boolean: (v) => v === false || v === true || v.toString().toLowerCase() === 'true' || v.toString().toLowerCase() === 'false',
   string: (v) => v.length < 256,
   text: () => true
