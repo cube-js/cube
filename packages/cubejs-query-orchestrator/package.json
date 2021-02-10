@@ -18,7 +18,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --verbose dist/test/unit",
+    "unit": "jest --runInBand --coverage --verbose dist/test/unit",
     "integration": "npm run integration:redis dist/test/integration",
     "integration:redis": "jest --runInBand --verbose dist/test/integration",
     "lint": "linter src/* test/* --ext .ts,.js",
@@ -51,5 +51,16 @@
   "license": "Apache-2.0",
   "eslintConfig": {
     "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "collectCoverage": false,
+    "coverageDirectory": "coverage/",
+    "collectCoverageFrom": [
+      "dist/src/**/*.js",
+      "dist/src/**/*.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ]
   }
 }
