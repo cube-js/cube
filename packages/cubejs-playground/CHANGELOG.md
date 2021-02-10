@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** react code gen ([22b077e](https://github.com/cube-js/cube.js/commit/22b077eab5b1a486ab1ea93a50fc897c76c26b55))
+
+
+
+
+
 ## [0.26.10](https://github.com/cube-js/cube.js/compare/v0.26.9...v0.26.10) (2021-02-09)
 
 **Note:** Version bump only for package @cubejs-client/playground

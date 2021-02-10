@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** react code gen ([22b077e](https://github.com/cube-js/cube.js/commit/22b077eab5b1a486ab1ea93a50fc897c76c26b55))
+* **cubestore:** cleanup warmup downloads on partition removal ([#2025](https://github.com/cube-js/cube.js/issues/2025)) ([3e77143](https://github.com/cube-js/cube.js/commit/3e771432138f05fb08f48e860479340107d634b5))
+* CUBEJS_SCHEDULED_REFRESH_TIMER, fix [#1972](https://github.com/cube-js/cube.js/issues/1972) ([#1975](https://github.com/cube-js/cube.js/issues/1975)) ([dac7e52](https://github.com/cube-js/cube.js/commit/dac7e52ee0d3a118c9d69c9d030e58a3c048cca1))
+* hostname: command not found. fix [#1998](https://github.com/cube-js/cube.js/issues/1998) ([#2027](https://github.com/cube-js/cube.js/issues/2027)) ([8d03cee](https://github.com/cube-js/cube.js/commit/8d03ceec27b2ac3dd057fce4dfc21ff97c6f12a2))
+
+
+### Features
+
+* **cli:** generate - allow to specify -d (dataSource) ([51c6a1c](https://github.com/cube-js/cube.js/commit/51c6a1c45483f259dcd719f9177936bb9dbcee8f))
+
+
+
+
+
 ## [0.26.10](https://github.com/cube-js/cube.js/compare/v0.26.9...v0.26.10) (2021-02-09)
 
 

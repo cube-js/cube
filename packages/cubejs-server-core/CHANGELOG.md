@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
+
+
+### Bug Fixes
+
+* CUBEJS_SCHEDULED_REFRESH_TIMER, fix [#1972](https://github.com/cube-js/cube.js/issues/1972) ([#1975](https://github.com/cube-js/cube.js/issues/1975)) ([dac7e52](https://github.com/cube-js/cube.js/commit/dac7e52ee0d3a118c9d69c9d030e58a3c048cca1))
+
+
+### Features
+
+* **cli:** generate - allow to specify -d (dataSource) ([51c6a1c](https://github.com/cube-js/cube.js/commit/51c6a1c45483f259dcd719f9177936bb9dbcee8f))
+
+
+
+
+
 ## [0.26.10](https://github.com/cube-js/cube.js/compare/v0.26.9...v0.26.10) (2021-02-09)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
