@@ -54,7 +54,7 @@ export const token = async (options: TokenOptions) => {
 
   const userContext = parsePayload(options.userContext);
   if (userContext) {
-    displayWarning(`Option --user-context was deprecated and payload will be stored inside root instead of u`);
+    displayWarning('Option --user-context was deprecated and payload will be stored inside root instead of u');
 
     // eslint-disable-next-line no-restricted-syntax
     for (const key of Object.keys(userContext)) {

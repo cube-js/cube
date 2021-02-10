@@ -91,7 +91,7 @@ const tablesToVersionEntries = (schema, tables: any[]): VersionEntry[] => R.sort
 type PreAggregationLoadCacheOptions = {
   requestId?: string,
   dataSource: string
-}
+};
 
 class PreAggregationLoadCache {
   private redisPrefix: string;
@@ -774,7 +774,7 @@ type PreAggregationsOptions = {
   queueOptions?: object | ((dataSource: String) => object);
   redisPool?: any;
   cacheAndQueueDriver?: 'redis' | 'memory'
-}
+};
 
 export class PreAggregations {
   public options: PreAggregationsOptions;

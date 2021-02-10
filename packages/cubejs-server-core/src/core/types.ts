@@ -41,7 +41,7 @@ export type UserBackgroundContext = {
   // @deprecated Renamed to securityContext, please use securityContext.
   authInfo?: any;
   securityContext: any;
-}
+};
 
 export interface DriverContext extends RequestContext {
   dataSource: string;

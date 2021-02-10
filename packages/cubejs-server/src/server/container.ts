@@ -325,7 +325,7 @@ export class ServerContainer {
         console.log(`Received ${signal} signal, reloading in ${instance.configuration.gracefulShutdown}s`);
 
         if (restartHandler) {
-          console.log(`Unable to restart server while it's already restarting`);
+          console.log('Unable to restart server while it\'s already restarting');
 
           return;
         }

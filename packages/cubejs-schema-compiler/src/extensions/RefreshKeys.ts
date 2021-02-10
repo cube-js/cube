@@ -12,5 +12,5 @@ export class RefreshKeys extends AbstractExtension {
       ),
       label: scalarValue
     }])}`
-  })
+  });
 }

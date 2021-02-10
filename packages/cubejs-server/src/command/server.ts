@@ -9,7 +9,7 @@ export class Server extends Command {
       default: false,
       description: 'Print useful debug information'
     })
-  }
+  };
 
   public static args = [];
 

@@ -38,5 +38,5 @@ export class TypescriptCompiler {
       console.log('Unable to compile configuration file.');
       process.exit(1);
     }
-  }
+  };
 }

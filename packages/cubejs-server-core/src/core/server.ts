@@ -65,7 +65,7 @@ type RequireOne<T, K extends keyof T> = {
   [X in Exclude<keyof T, K>]?: T[X]
 } & {
   [P in K]-?: T[P]
-}
+};
 
 export type ServerCoreInitializedOptions = RequireOne<
   CreateOptions,
@@ -181,7 +181,7 @@ export class CubejsServerCore {
     }
 
     const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
-      this.options.scheduledRefreshTimer || getEnv('refreshTimer') || getEnv('scheduledRefresh')
+      this.options.scheduledRefreshTimer,
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
@@ -328,6 +328,7 @@ export class CubejsServerCore {
       logger: opts.logger || process.env.NODE_ENV !== 'production'
         ? devLogger(process.env.CUBEJS_LOG_LEVEL)
         : prodLogger(process.env.CUBEJS_LOG_LEVEL),
+      scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
       ...opts,
     };
 
@@ -348,27 +349,16 @@ export class CubejsServerCore {
     return (fs.existsSync('./.env') || fs.existsSync('./cube.js'));
   }
 
-  protected detectScheduledRefreshTimer(scheduledRefreshTimer?: string | number | boolean): number|null {
-    if (scheduledRefreshTimer && (
-      typeof scheduledRefreshTimer === 'number' ||
-      typeof scheduledRefreshTimer === 'string' && scheduledRefreshTimer.match(/^\d+$/)
-    )) {
-      scheduledRefreshTimer = parseInt(<any>scheduledRefreshTimer, 10) * 1000;
+  protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number | false {
+    if (scheduledRefreshTimer && (typeof scheduledRefreshTimer === 'number')) {
+      return parseInt(<any>scheduledRefreshTimer, 10) * 1000;
     }
 
-    if (scheduledRefreshTimer && typeof scheduledRefreshTimer === 'string') {
-      scheduledRefreshTimer = scheduledRefreshTimer.toLowerCase() === 'true';
+    if (scheduledRefreshTimer) {
+      return 30000;
     }
 
-    if (scheduledRefreshTimer == null) {
-      scheduledRefreshTimer = process.env.NODE_ENV !== 'production';
-    }
-
-    if (typeof scheduledRefreshTimer === 'boolean' && scheduledRefreshTimer) {
-      scheduledRefreshTimer = 30000;
-    }
-
-    return <any>scheduledRefreshTimer;
+    return false;
   }
 
   protected initAgent() {
@@ -566,7 +556,7 @@ export class CubejsServerCore {
 
       await this.runScheduledRefresh(context, queryingOptions);
     }));
-  }
+  };
 
   protected getRefreshScheduler() {
     return new RefreshScheduler(this);
@@ -707,7 +697,7 @@ export class CubejsServerCore {
     await this.causeErrorPromise;
 
     process.exit(1);
-  }
+  };
 
   public async shutdown() {
     if (this.devServer) {

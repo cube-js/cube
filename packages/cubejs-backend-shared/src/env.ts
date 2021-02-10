@@ -56,7 +56,7 @@ function asBoolOrTime(input: string, envName: string): number|boolean {
     return true;
   }
 
-  if (input.toLowerCase() === 'false') {
+  if (input.toLowerCase() === 'false' || input === '0') {
     return false;
   }
 
@@ -78,12 +78,18 @@ const variables = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
-  refreshTimer: () => process.env.CUBEJS_SCHEDULED_REFRESH_TIMER
-    && asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER'),
-  gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
-    .asIntPositive(),
+  refreshTimer: () => {
+    if (process.env.CUBEJS_SCHEDULED_REFRESH_TIMER) {
+      return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
+    }
+
+    // Refresh timer is true by default for development
+    return process.env.NODE_ENV !== 'production';
+  },
   scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
     .asBool(),
+  gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
+    .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
   // It's only excepted for CI, nothing else.

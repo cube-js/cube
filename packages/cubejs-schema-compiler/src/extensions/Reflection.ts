@@ -16,5 +16,5 @@ export class Reflection extends AbstractExtension {
     }
 
     return new DynamicReference(references, fn);
-  }
+  };
 }
