@@ -545,14 +545,14 @@ describe('ScaffoldingSchema', () => {
     const template = new ScaffoldingTemplate({
       public: {
         orders: [{
-          'name': 'id',
-          'type': 'integer',
-          'attributes': []
+          name: 'id',
+          type: 'integer',
+          attributes: []
         }, {
-          'name': 'some.dimension.inside',
-          'nestedName': ['some', 'dimension', 'inside'],
-          'type': 'string',
-          'attributes': []
+          name: 'some.dimension.inside',
+          nestedName: ['some', 'dimension', 'inside'],
+          type: 'string',
+          attributes: []
         }]
       }
     }, bigQueryDriver);
