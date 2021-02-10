@@ -15,7 +15,7 @@
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "test": "npm run unit",
-    "unit": "jest dist/test",
+    "unit": "jest --coverage dist/test",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
@@ -55,5 +55,17 @@
   "license": "Apache-2.0",
   "eslintConfig": {
     "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverage": false,
+    "coverageDirectory": "coverage/",
+    "collectCoverageFrom": [
+      "dist/src/**/*.js",
+      "dist/src/**/*.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ]
   }
 }
