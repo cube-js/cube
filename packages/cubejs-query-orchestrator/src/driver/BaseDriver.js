@@ -33,6 +33,9 @@ const DbTypeToGenericType = {
   'double precision': 'decimal'
 };
 
+const DB_BIG_INT_MAX = BigInt('9223372036854775807');
+const DB_BIG_INT_MIN = BigInt('-9223372036854775808');
+
 const DB_INT_MAX = 2147483647;
 const DB_INT_MIN = -2147483648;
 
@@ -40,13 +43,31 @@ const DB_INT_MIN = -2147483648;
 const DbTypeValueMatcher = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
   date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
-  bigint: (v) => Number.isInteger(v) && (v > DB_INT_MAX || v < DB_INT_MIN),
   int: (v) => {
     if (Number.isInteger(v)) {
-      return true;
+      return (v <= DB_INT_MAX && v >= DB_INT_MIN);
     }
 
-    return v.toString().match(/^[-]?\d+$/);
+    if (v.toString().match(/^[-]?\d+$/)) {
+      const value = BigInt(v.toString());
+
+      return value <= DB_INT_MAX && value >= DB_INT_MIN;
+    }
+
+    return false;
+  },
+  bigint: (v) => {
+    if (Number.isInteger(v)) {
+      return (v <= DB_BIG_INT_MAX && v >= DB_BIG_INT_MIN);
+    }
+
+    if (v.toString().match(/^[-]?\d+$/)) {
+      const value = BigInt(v.toString());
+
+      return value <= DB_BIG_INT_MAX && value >= DB_BIG_INT_MIN;
+    }
+
+    return false;
   },
   decimal: (v) => {
     if (v instanceof Number) {
