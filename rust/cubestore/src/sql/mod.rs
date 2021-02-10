@@ -680,7 +680,8 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
 
 pub fn timestamp_from_string(v: &str) -> Result<TableValue, CubeError> {
     let result = string_to_timestamp_nanos(v).or_else(|_| {
-        if let Ok(ts) = Utc.datetime_from_str(v, "%Y-%m-%d %H:%M:%S UTC") {
+        // TODO this parsed as nanoseconds instead of milliseconds
+        if let Ok(ts) = Utc.datetime_from_str(v, "%Y-%m-%d %H:%M:%S%.3f UTC") {
             return Ok(ts.timestamp_nanos());
         }
         return Err(CubeError::user(format!("Can't parse timestamp: {}", v)));
@@ -2153,7 +2154,7 @@ mod tests {
 
                 file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
                 file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
-                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).unwrap();
+                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n".as_bytes()).unwrap();
                 file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).unwrap();
 
                 let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
