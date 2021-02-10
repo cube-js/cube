@@ -556,7 +556,7 @@ describe('ScaffoldingSchema', () => {
         }]
       }
     }, bigQueryDriver);
-    template.generateFilesByTableNames(['public.orders'], extraParams).should.be.deepEqual([
+    expect(template.generateFilesByTableNames(['public.orders'], extraParams)).toEqual([
       {
         fileName: 'Orders.js',
         content: `cube(\`Orders\`, {
