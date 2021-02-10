@@ -5,3 +5,4 @@ export * from './errors';
 export * from './promises';
 export * from './convert';
 export * from './helpers';
+export * from './machine-id';

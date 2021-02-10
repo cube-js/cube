@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import fetch from 'node-fetch';
-import { machineIdSync } from 'node-machine-id';
+import { machineIdSync } from './machine-id';
 import { internalExceptions } from './errors';
 
 export type BaseEvent = {
@@ -75,7 +75,7 @@ export async function track(opts: BaseEvent) {
   if (process.env.CI) {
     return Promise.resolve();
   }
-  
+
   trackEvents.push({
     ...opts,
     id: crypto.randomBytes(16).toString('hex'),
