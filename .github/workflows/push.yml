@@ -41,6 +41,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          # pulls all commits (needed for codecov)
+          fetch-depth: 2
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
@@ -74,6 +77,11 @@ jobs:
         run: yarn tsc
       - name: Lerna test
         run: yarn lerna run --concurrency 1 unit
+      - uses: codecov/codecov-action@v1
+        if: (matrix.node-version == '15.x')
+        with:
+          files: ./packages/*/coverage/clover.xml
+          verbose: true # optional (default = false)
 
   lint:
     runs-on: ubuntu-latest

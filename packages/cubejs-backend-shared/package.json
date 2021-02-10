@@ -10,7 +10,7 @@
     "watch": "tsc -w",
     "lint": "linter src/* --ext .ts",
     "lint:fix": "linter --fix src/* --ext .ts",
-    "unit": "jest dist"
+    "unit": "jest --coverage dist/test"
   },
   "files": [
     "README.md",
@@ -40,6 +40,15 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "collectCoverage": false,
+    "coverageDirectory": "coverage/",
+    "collectCoverageFrom": [
+      "dist/src/**/*.js",
+      "dist/src/**/*.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ]
   }
 }
