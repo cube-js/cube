@@ -250,6 +250,7 @@ export default function PlaygroundQueryBuilder({
                         availableMembers={availableDimensions.concat(
                           availableMeasures
                         )}
+                        missingMembers={missingMembers}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(
                           updateFilters,

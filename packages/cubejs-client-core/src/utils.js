@@ -220,6 +220,10 @@ export function getQueryMembers(query = {}) {
   
   keys.forEach((key) => (query[key] || []).forEach((member) => members.add(member)));
   (query.timeDimensions || []).forEach((td) => members.add(td.dimension));
+  // todo: support for boolean filters
+  if (Array.isArray(query.filters)) {
+    query.filters.forEach((filter) => members.add(filter.dimension || filter.member));
+  }
   
   return [...members];
 }
