@@ -330,12 +330,12 @@ export class QueryCache {
       ));
   }
 
-  public loadRefreshKeysFromQuery(query: Query) {
-    return this.loadRefreshKeys(this.cacheKeyQueriesFrom(query), this.getExpireSecs(query), {
+  public async loadRefreshKeysFromQuery(query: Query) {
+    return Promise.all(this.loadRefreshKeys(this.cacheKeyQueriesFrom(query), this.getExpireSecs(query), {
       requestId: query.requestId,
       dataSource: query.dataSource,
       refreshKeyRenewalThresholds: this.getRefreshKeyRenewalThresholds(query)
-    });
+    }));
   }
 
   public loadRefreshKeys(
