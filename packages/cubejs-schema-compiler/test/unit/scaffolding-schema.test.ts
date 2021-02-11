@@ -533,7 +533,7 @@ describe('ScaffoldingSchema', () => {
   });
 
   it('should add options if passed', () => {
-    const extraParams = {
+    const schemaContext = {
       dataSource: 'testDataSource',
       preAggregations: {
         main: {
@@ -556,7 +556,7 @@ describe('ScaffoldingSchema', () => {
         }]
       }
     }, bigQueryDriver);
-    expect(template.generateFilesByTableNames(['public.orders'], extraParams)).toEqual([
+    expect(template.generateFilesByTableNames(['public.orders'], schemaContext)).toEqual([
       {
         fileName: 'Orders.js',
         content: `cube(\`Orders\`, {
