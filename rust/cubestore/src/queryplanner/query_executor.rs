@@ -151,7 +151,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 execution_time.elapsed()?,
                 plan_to_move
             );
-            debug!(
+            info!(
                 "Slow Partition Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &worker_plan
