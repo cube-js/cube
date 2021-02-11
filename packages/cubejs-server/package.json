@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.11",
+  "version": "0.26.12",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
@@ -39,7 +39,7 @@
     "jest:shapshot": "jest --updateSnapshot test"
   },
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.26.11",
+    "@cubejs-backend/server-core": "^0.26.12",
     "@cubejs-backend/shared": "^0.26.11",
     "@oclif/color": "^0.1.2",
     "@oclif/command": "^1.8.0",
@@ -59,7 +59,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.11",
-    "@cubejs-backend/query-orchestrator": "^0.26.11",
+    "@cubejs-backend/query-orchestrator": "^0.26.12",
     "@oclif/dev-cli": "^1.23.1",
     "@types/body-parser": "^1.19.0",
     "@types/cors": "^2.8.8",

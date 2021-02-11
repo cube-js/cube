@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.12](https://github.com/cube-js/cube.js/compare/v0.26.11...v0.26.12) (2021-02-11)
+
+
+### Bug Fixes
+
+* **cubestore:** ms timestamp format for BigQuery support ([bf70716](https://github.com/cube-js/cube.js/commit/bf70716c9844417c6b9162a309bc8bf8f32a4036))
+* **query-orchestrator:** detect negative int/decimal as strings ([#2051](https://github.com/cube-js/cube.js/issues/2051)) ([2b8b549](https://github.com/cube-js/cube.js/commit/2b8b549b022e357d85b9f4549a4ff61c9d39fbeb))
+* **snowflake-driver:** Reorder snowflake execute statement to check for error before attempting to access rows.length ([#2053](https://github.com/cube-js/cube.js/issues/2053)) ([783f003](https://github.com/cube-js/cube.js/commit/783f0033754843364c809df4539529c73c3e49ff))
+* UnhandledPromiseRejectionWarning: Error: Continue wait. fix [#1873](https://github.com/cube-js/cube.js/issues/1873) ([7f113f6](https://github.com/cube-js/cube.js/commit/7f113f61bef5b197cf26a3948a80d052a9cda79d))
+
+
+
+
+
 ## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.12](https://github.com/cube-js/cube.js/compare/v0.26.11...v0.26.12) (2021-02-11)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Reorder snowflake execute statement to check for error before attempting to access rows.length ([#2053](https://github.com/cube-js/cube.js/issues/2053)) ([783f003](https://github.com/cube-js/cube.js/commit/783f0033754843364c809df4539529c73c3e49ff))
+
+
+
+
+
 ## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver
