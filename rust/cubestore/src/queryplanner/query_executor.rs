@@ -36,7 +36,7 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, RecordBatchStream};
 use itertools::Itertools;
-use log::{debug, error, trace, warn, info};
+use log::{debug, error, info, trace, warn};
 use mockall::automock;
 use num::BigInt;
 use regex::Regex;
