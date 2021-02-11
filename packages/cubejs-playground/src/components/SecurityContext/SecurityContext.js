@@ -90,7 +90,10 @@ export default function SecurityContext() {
       bodyStyle={{
         paddingTop: 16,
       }}
-      onCancel={() => setIsModalOpen(false)}
+      onCancel={() => {
+        setIsModalOpen(false);
+        setEditingToken(false);
+      }}
     >
       <Space direction="vertical" size={24} style={{ width: '100%' }}>
         <Tabs
