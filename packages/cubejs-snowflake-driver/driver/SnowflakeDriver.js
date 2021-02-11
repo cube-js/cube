@@ -101,6 +101,11 @@ class SnowflakeDriver extends BaseDriver {
       binds: values,
       fetchAsString: ['Number'],
       complete: (err, stmt, rows) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
         if (rehydrate && rows.length) {
           const hydrationMap = {};
           const columns = stmt.getColumns();
@@ -127,11 +132,7 @@ class SnowflakeDriver extends BaseDriver {
           }
         }
 
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows);
-        }
+        resolve(rows);
       }
     }));
   }
