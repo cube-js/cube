@@ -57,7 +57,7 @@ const generate = async (options) => {
   const server = await container.runServerInstance(configuration, true);
 
   const driver = await server.getDriver({
-    dataSource: options.datasource,
+    dataSource: options.dataSource,
     authInfo: null,
     securityContext: null,
     requestId: 'CLI REQUEST'
@@ -95,7 +95,7 @@ export function configureGenerateCommand(program: CommanderStatic) {
   program
     .command('generate')
     .option('-t, --tables <tables>', 'Comma delimited list of tables to generate schema from', list)
-    .option('-d, --datasource <datasource>', '', 'default')
+    .option('-d, --dataSource <dataSource>', '', 'default')
     .description('Generate Cube.js schema from DB tables schema')
     .action(
       (options) => generate(options)
