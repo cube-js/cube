@@ -1,9 +1,9 @@
 import styled from 'styled-components';
-import * as PropTypes from 'prop-types';
 import { CloseOutlined } from '@ant-design/icons';
+
 import { Button } from '../components';
 
-const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
+const UnstyledRemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group {...props}>
     {children}
     <Button ghost onClick={onRemoveClick} className="remove-btn">
@@ -12,46 +12,54 @@ const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   </Button.Group>
 );
 
-RemoveButtonGroup.propTypes = {
-  onRemoveClick: PropTypes.func.isRequired,
-  children: PropTypes.object.isRequired,
-};
-
-const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
-  && {
-    border: 1px solid var(--primary-color);
-    color: var(--primary-color);
-    border-radius: calc(var(--border-radius-base) + 1px);
+function color(props) {
+  const colorMap = {
+    primary: 'primary',
+    danger: 'pink'
+  };
   
+  if (props.color == null) {
+    return 'primary';
+  }
+  
+  return colorMap[props.color];
+}
+
+const RemoveButtonGroup = styled(UnstyledRemoveButtonGroup)`
+  && {
+    border: 1px solid var(--${color}-color);
+    color: var(--${color}-color);
+    border-radius: calc(var(--border-radius-base) + 1px);
+
     .ant-btn {
-      background-color: var(--primary-9);
-      color: var(--primary-color);
+      background-color: var(--${color}-9);
+      color: var(--${color}-color);
       border: none;
-      
+
       span {
-        color: var(--primary-color);
+        color: var(--${color}-color);
       }
-      
+
       &:hover {
-        background-color: var(--primary-8);
+        background-color: var(--${color}-8);
         border: none;
         box-shadow: none;
       }
-      
+
       & + .ant-btn {
         margin-left: 0;
       }
     }
 
     .remove-btn {
-      background-color: white !important;    
-      color: var(--primary-color);
+      background-color: white !important;
+      color: var(--${color}-color);
       padding: 8px;
-      
+
       &:hover {
-        background-color: var(--remove-btn-hover-bg) !important;
+        background-color: var(--${color}-8) !important;
       }
-      
+
       .anticon {
         height: 14px;
         display: block;
@@ -61,4 +69,4 @@ const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
   }
 `;
 
-export default styledRemoveButtonGroup;
+export default RemoveButtonGroup;

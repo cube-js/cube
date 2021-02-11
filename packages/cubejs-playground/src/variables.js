@@ -33,6 +33,9 @@ module.exports = {
   'remove-btn-bg': color('purple', .1),
   'remove-btn-hover-bg': color('purple', .2),
   'primary-color': color('purple'),
+  
+  'pink-8': color('pink', .2),
+  'pink-9': color('pink', .1),
 
   'heading-color': color('dark', .65),
   'link-color': color('purple'),
