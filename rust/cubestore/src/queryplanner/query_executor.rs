@@ -1,6 +1,7 @@
 use crate::cluster::Cluster;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
+use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -424,8 +425,32 @@ impl CubeTable {
                 .map(|i| i.unwrap())
                 .collect::<Vec<_>>()
         });
+        let projected_schema = if let Some(p) = &mapped_projection {
+            Arc::new(Schema::new(
+                self.schema
+                    .fields()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone()))
+                    .collect(),
+            ))
+        } else {
+            self.schema.clone()
+        };
 
         let predicate = combine_filters(filters);
+        let partition_filter_schema = Schema::new(
+            projected_schema
+                .fields()
+                .iter()
+                .take(index.get_row().sort_key_size() as usize)
+                .map(|x| x.clone())
+                .collect(),
+        );
+        let partition_filter = PartitionFilter::extract(&partition_filter_schema, filters);
+        let mut pruned_partitions = 0;
+        let mut candidate_partitions = 0;
+        trace!("Extracted partition filter is {:?}", partition_filter);
         for partition_snapshot in partition_snapshots {
             if !self
                 .worker_partition_ids
@@ -433,7 +458,17 @@ impl CubeTable {
             {
                 continue;
             }
+            candidate_partitions += 1;
             let partition = partition_snapshot.partition();
+            if let (Some(min_row), Some(max_row)) = (
+                partition.get_row().get_min_val(),
+                partition.get_row().get_max_val(),
+            ) {
+                if !partition_filter.can_match(min_row.values(), max_row.values()) {
+                    pruned_partitions += 1;
+                    continue;
+                }
+            }
 
             if let Some(remote_path) = partition.get_row().get_full_name(partition.get_id()) {
                 let local_path = self
@@ -468,22 +503,15 @@ impl CubeTable {
             }
         }
 
+        trace!(
+            "Pruned {} of {} partitions",
+            pruned_partitions,
+            candidate_partitions
+        );
+
         if partition_execs.len() == 0 {
             partition_execs.push(Arc::new(EmptyExec::new(false, self.schema.clone())));
         }
-
-        let projected_schema = if let Some(p) = mapped_projection {
-            Arc::new(Schema::new(
-                self.schema
-                    .fields()
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone()))
-                    .collect(),
-            ))
-        } else {
-            self.schema.clone()
-        };
 
         let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.join_on()
         {
