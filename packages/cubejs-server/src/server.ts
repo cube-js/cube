@@ -1,4 +1,4 @@
-import dotenv from 'cubejs-dotenv';
+import dotenv from '@cubejs-backend/dotenv';
 
 import CubeCore, {
   CreateOptions as CoreCreateOptions,
@@ -23,6 +23,7 @@ const { version } = require('../package.json');
 
 dotenv.config({
   override: true,
+  multiline: 'line-breaks',
 });
 
 export type InitAppFn = (app: express.Application) => void | Promise<void>;

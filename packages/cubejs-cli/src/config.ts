@@ -4,7 +4,7 @@ import rp, { RequestPromiseOptions } from 'request-promise';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import os from 'os';
-import dotenv from 'dotenv';
+import dotenv from '@cubejs-backend/dotenv';
 import { isFilePath } from '@cubejs-backend/shared';
 import { displayWarning } from './utils';
 
@@ -44,7 +44,7 @@ export class Config {
 
   public async envFile(envFile: string) {
     if (await fs.pathExists(envFile)) {
-      const env = dotenv.config({ path: envFile }).parsed;
+      const env = dotenv.config({ path: envFile, multiline: 'line-breaks' }).parsed;
       if (env) {
         if ('CUBEJS_DEV_MODE' in env) {
           delete env.CUBEJS_DEV_MODE;

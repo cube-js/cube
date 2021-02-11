@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
-import dotenv from 'cubejs-dotenv';
+import dotenv from '@cubejs-backend/dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import {
   getEnv,
@@ -240,6 +240,7 @@ export class ServerContainer {
   public async lookupConfiguration(): Promise<CreateOptions> {
     dotenv.config({
       override: true,
+      multiline: 'line-breaks'
     });
 
     const devMode = getEnv('devMode');
