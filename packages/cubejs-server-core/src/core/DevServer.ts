@@ -106,8 +106,10 @@ export class DevServer {
         throw new Error('You have to select at least one table');
       }
 
+      const dataSource = req.body.dataSource || 'default';
+
       const driver = await this.cubejsServer.getDriver({
-        dataSource: req.body.dataSource || 'default',
+        dataSource,
         authInfo: null,
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
@@ -116,7 +118,7 @@ export class DevServer {
 
       const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
       const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver);
-      const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables);
+      const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
       const schemaPath = options.schemaPath || 'schema';
 

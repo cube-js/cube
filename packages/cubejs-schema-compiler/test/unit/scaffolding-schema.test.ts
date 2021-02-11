@@ -531,4 +531,72 @@ describe('ScaffoldingSchema', () => {
       }
     ]);
   });
+
+  it('should add options if passed', () => {
+    const schemaContext = {
+      dataSource: 'testDataSource',
+      preAggregations: {
+        main: {
+          type: `originalSql`
+        }
+      }
+    };
+
+    const template = new ScaffoldingTemplate({
+      public: {
+        orders: [{
+          name: 'id',
+          type: 'integer',
+          attributes: []
+        }, {
+          name: 'some.dimension.inside',
+          nestedName: ['some', 'dimension', 'inside'],
+          type: 'string',
+          attributes: []
+        }]
+      }
+    }, bigQueryDriver);
+    expect(template.generateFilesByTableNames(['public.orders'], schemaContext)).toEqual([
+      {
+        fileName: 'Orders.js',
+        content: `cube(\`Orders\`, {
+  sql: \`SELECT * FROM public.orders\`,
+  
+  joins: {
+    
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`,
+      drillMembers: [id, someDimensionInside]
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    someDimensionInside: {
+      sql: \`\${CUBE}.some.dimension.inside\`,
+      type: \`string\`,
+      title: \`Some.dimension.inside\`
+    }
+  },
+  
+  dataSource: \`testDataSource\`,
+  
+  preAggregations: {
+    main: {
+      type: \`originalSql\`
+    }
+  }
+});
+`
+      }
+    ]);
+  });
 });

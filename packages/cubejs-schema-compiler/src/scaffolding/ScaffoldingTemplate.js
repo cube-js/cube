@@ -26,12 +26,12 @@ export class ScaffoldingTemplate {
     return !!name.match(/^[a-z0-9_]+$/);
   }
 
-  generateFilesByTableNames(tableNames) {
+  generateFilesByTableNames(tableNames, schemaContext = {}) {
     const schemaForTables = this.scaffoldingSchema.generateForTables(tableNames.map(n => this.resolveTableName(n)));
     return schemaForTables.map(tableSchema => ({
       // eslint-disable-next-line prefer-template
       fileName: tableSchema.cube + '.js',
-      content: this.renderFile(this.schemaDescriptorForTable(tableSchema))
+      content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext))
     }));
   }
 
@@ -66,7 +66,7 @@ export class ScaffoldingTemplate {
     }
   }
 
-  schemaDescriptorForTable(tableSchema) {
+  schemaDescriptorForTable(tableSchema, schemaContext = {}) {
     return {
       cube: tableSchema.cube,
       sql: `SELECT * FROM ${this.escapeName(tableSchema.schema)}.${this.escapeName(tableSchema.table)}`, // TODO escape
@@ -95,7 +95,8 @@ export class ScaffoldingTemplate {
           title: this.memberTitle(m),
           primaryKey: m.isPrimaryKey ? true : undefined
         }
-      })).reduce((a, b) => ({ ...a, ...b }), {})
+      })).reduce((a, b) => ({ ...a, ...b }), {}),
+      ...schemaContext
     };
   }
 
