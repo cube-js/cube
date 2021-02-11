@@ -37,14 +37,28 @@ in the database.
 <!-- prettier-ignore-start -->
 [[warning | ]]
 | Some databases have trouble with long table names. You can work around this
-| by specifiying the [`sqlAlias`][ref-sqlalias] attribute on the cube.
+| by specifying the [`sqlAlias`][ref-sqlalias] property on the cube and on
+| the pre-aggregation definition.
 <!-- prettier-ignore-end -->
 
-Pre-aggregations names should:
+Pre-aggregation names should:
 
 - Be unique within a cube
 - Start with a lowercase letter
 - Consist of numbers, letters and `_`
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  preAggregations: {
+    main: {
+      sqlAlias: `original`,
+      type: `originalSql`,
+    },
+  },
+});
+```
 
 Pre-aggregations must include all dimensions, measures, and filters you will
 query with.
