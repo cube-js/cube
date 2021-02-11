@@ -341,7 +341,7 @@ impl JobRunner {
             ))?;
         } else {
             let deleted_job = self.meta_store.delete_job(job_id).await?;
-            debug!(
+            info!(
                 "Running job completed ({:?}): {:?}",
                 start.elapsed()?,
                 deleted_job
