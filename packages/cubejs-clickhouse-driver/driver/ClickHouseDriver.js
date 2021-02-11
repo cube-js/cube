@@ -12,7 +12,7 @@ class ClickHouseDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
       protocol: process.env.CUBEJS_DB_SSL ? 'https:' : 'http:',
-      readonly: config && config.readOnly,
+      readonly: Boolean(process.env.CUBEJS_DB_CLICKHOUSE_READONLY),
       queryOptions: {
         database: process.env.CUBEJS_DB_NAME || config && config.database || 'default'
       },
