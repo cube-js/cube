@@ -111,7 +111,7 @@ export default function PlaygroundQueryBuilder({
   const { response } = useDryRun(query, {
     skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
   });
-
+  
   let parsedDateRange;
   if (response) {
     const { timeDimensions = [] } = response.pivotQuery || {};
@@ -148,6 +148,7 @@ export default function PlaygroundQueryBuilder({
         updateOrder,
         pivotConfig,
         updatePivotConfig,
+        missingMembers
       }) => {
         return (
           <>
@@ -190,6 +191,7 @@ export default function PlaygroundQueryBuilder({
                       <MemberGroup
                         members={measures}
                         availableMembers={availableMeasures}
+                        missingMembers={missingMembers}
                         addMemberName="Measure"
                         updateMethods={playgroundActionUpdateMethods(
                           updateMeasures,
@@ -197,11 +199,13 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
+                    
                     <Section>
                       <SectionHeader>Dimensions</SectionHeader>
                       <MemberGroup
                         members={dimensions}
                         availableMembers={availableDimensions}
+                        missingMembers={missingMembers}
                         addMemberName="Dimension"
                         updateMethods={playgroundActionUpdateMethods(
                           updateDimensions,
@@ -209,11 +213,13 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
+                    
                     <Section>
                       <SectionHeader>Segment</SectionHeader>
                       <MemberGroup
                         members={segments}
                         availableMembers={availableSegments}
+                        missingMembers={missingMembers}
                         addMemberName="Segment"
                         updateMethods={playgroundActionUpdateMethods(
                           updateSegments,
@@ -221,11 +227,13 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
+                    
                     <Section>
                       <SectionHeader>Time</SectionHeader>
                       <TimeGroup
                         members={timeDimensions}
                         availableMembers={availableTimeDimensions}
+                        missingMembers={missingMembers}
                         addMemberName="Time"
                         updateMethods={playgroundActionUpdateMethods(
                           updateTimeDimensions,
@@ -242,6 +250,7 @@ export default function PlaygroundQueryBuilder({
                         availableMembers={availableDimensions.concat(
                           availableMeasures
                         )}
+                        missingMembers={missingMembers}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(
                           updateFilters,
@@ -328,6 +337,7 @@ export default function PlaygroundQueryBuilder({
                           query={query}
                           pivotConfig={pivotConfig}
                           iframeRef={ref}
+                          queryHasMissingMembers={missingMembers.length > 0}
                           onChartRendererReadyChange={setChartRendererReady}
                         />
                       );

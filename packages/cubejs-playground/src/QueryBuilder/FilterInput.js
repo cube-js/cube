@@ -8,8 +8,9 @@ const FilterInputs = {
       key="input"
       style={{ width: 300 }}
       mode="tags"
-      onChange={onChange}
       value={values}
+      maxTagCount="responsive"
+      onChange={onChange}
     />
   ),
   number: ({ values, onChange }) => (

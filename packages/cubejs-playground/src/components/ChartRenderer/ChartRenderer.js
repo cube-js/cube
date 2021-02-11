@@ -37,6 +37,7 @@ export default function ChartRenderer({
   chartType,
   query,
   pivotConfig,
+  queryHasMissingMembers,
   onChartRendererReadyChange,
 }) {
   const slowQuery = useSlowQuery();
@@ -50,7 +51,7 @@ export default function ChartRenderer({
   }, []);
 
   useEffect(() => {
-    if (isChartRendererReady && iframeRef.current) {
+    if (isChartRendererReady && iframeRef.current && !queryHasMissingMembers) {
       dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
         pivotConfig,
         query,
@@ -59,7 +60,7 @@ export default function ChartRenderer({
       });
     }
     // eslint-disable-next-line
-  }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType]));
+  }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType, queryHasMissingMembers]));
 
   return (
     <>
@@ -77,7 +78,7 @@ export default function ChartRenderer({
             Building pre-aggregations...
           </Text>
         </RequestMessage>
-      ) : !isChartRendererReady ? (
+      ) : !isChartRendererReady || queryHasMissingMembers ? (
         <Spin />
       ) : null}
 

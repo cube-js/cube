@@ -968,4 +968,9 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function flattenFilters(filters: Filter[]): TFlatFilter[];
+  
+  /**
+   * @hidden
+   */
+  export function getQueryMembers(query: Query): string[];
 }

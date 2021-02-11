@@ -1,7 +1,8 @@
 import * as PropTypes from 'prop-types';
 import { Menu as AntdMenu } from 'antd';
-import ButtonDropdown from './ButtonDropdown';
 import styled from 'styled-components';
+
+import ButtonDropdown from './ButtonDropdown';
 
 const Menu = styled(AntdMenu)`
   max-height: 320px;

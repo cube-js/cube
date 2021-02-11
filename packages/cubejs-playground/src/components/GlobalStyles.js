@@ -204,6 +204,10 @@ const GlobalStyles = createGlobalStyle`
   .token.entity {
     cursor: help;
   }
+  
+  .missing-member-tooltip {
+    max-width: none;
+  }
 `;
 
 export default GlobalStyles;
