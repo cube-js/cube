@@ -102,7 +102,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 execution_time.elapsed()?,
                 plan_to_move
             );
-            debug!(
+            info!(
                 "Slow Query Physical Plan ({:?}): {:#?}",
                 execution_time.elapsed()?,
                 &split_plan
