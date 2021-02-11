@@ -36,14 +36,14 @@ combinations of these configuration options.
 
 In cases where your Cube.js schema is spread across multiple different databases
 you may consider using the [`dataSource` cube property][ref-cube-datasource]
-instead of multitenancy. Multitenancy designed for cases where you need to serve
-different datasets for multiple users or tenants which aren't related to each
-other. On the other hand, multiple data sources can be used for a scenario where
-users need to access the same data but from different databases. Multitenancy and
+instead of multitenancy. Multitenancy is designed for cases where you need to
+serve different datasets for multiple users, or tenants which aren't related to
+each other.
+
+On the other hand, multiple data sources can be used for scenarios where users
+need to access the same data but from different databases. The multitenancy and
 multiple data sources features aren't mutually exclusive and can be used
 together.
-
-Typical multiple data sources configuration looks like:
 
 <!-- prettier-ignore-start -->
 [[warning | Note]]
@@ -51,6 +51,37 @@ Typical multiple data sources configuration looks like:
 | resolve target query data source for now. This behavior **will** be changed
 | in future releases.
 <!-- prettier-ignore-end -->
+
+A simple configuration with two data sources might look like:
+
+**cube.js:**
+
+```javascript
+module.exports = {
+  driverFactory: ({ dataSource } = {}) => {
+    if (dataSource === 'db1') {
+      return new PostgresDriver({
+        database: DB1_NAME,
+        host: DB1_HOST,
+        user: DB1_USER,
+        password: DB1_PASS,
+        port: DB1_PORT,
+      });
+    } else {
+      return new PostgresDriver({
+        database: DB2_NAME,
+        host: DB2_HOST,
+        user: DB2_USER,
+        password: DB2_PASS,
+        port: DB2_PORT,
+      });
+    }
+  },
+};
+```
+
+A more advanced example with additional configuration of
+[`dbType`][ref-config-dbtype] could look like:
 
 **cube.js:**
 
@@ -93,8 +124,8 @@ module.exports = {
 As a rule of thumb, [`SECURITY_CONTEXT`][ref-cube-security-ctx] should be used
 in scenarios when you want to define row-level security within the same database
 for different users of such database. For example, to separate access of two
-e-commerce administrators who work on different product categories within the same
-e-commerce store.
+e-commerce administrators who work on different product categories within the
+same e-commerce store.
 
 ```javascript
 cube(`Products`, {
@@ -104,10 +135,10 @@ cube(`Products`, {
 });
 ```
 
-On the other hand, Multitenant [`COMPILE_CONTEXT`][ref-cube-security-ctx] should be
-used when users in fact access different databases. For example, if you provide
-SaaS ecommerce hosting and each of your customers have a separate database, then
-each ecommerce store should be modelled as a separate tenant.
+On the other hand, Multitenant [`COMPILE_CONTEXT`][ref-cube-security-ctx] should
+be used when users in fact access different databases. For example, if you
+provide SaaS ecommerce hosting and each of your customers have a separate
+database, then each ecommerce store should be modelled as a separate tenant.
 
 ```javascript
 const {
