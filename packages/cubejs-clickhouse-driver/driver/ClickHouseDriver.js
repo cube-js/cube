@@ -12,6 +12,7 @@ class ClickHouseDriver extends BaseDriver {
       port: process.env.CUBEJS_DB_PORT,
       auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
       protocol: process.env.CUBEJS_DB_SSL ? 'https:' : 'http:',
+      readonly: config && config.readOnly,
       queryOptions: {
         database: process.env.CUBEJS_DB_NAME || config && config.database || 'default'
       },
@@ -21,7 +22,14 @@ class ClickHouseDriver extends BaseDriver {
       create: async () => new ClickHouse({
         ...this.config,
         queryOptions: {
-          join_use_nulls: 1,
+          //
+          //
+          // If ClickHouse user's permissions are restricted with "readonly = 1",
+          // change settings queries are not allowed. Thus, "join_use_nulls" setting
+          // can not be changed
+          //
+          //
+          ...(this.config.readonly ? {} : { join_use_nulls: 1 }),
           session_id: uuid(),
           ...this.config.queryOptions,
         }
@@ -78,7 +86,17 @@ class ClickHouseDriver extends BaseDriver {
 
     return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
       dataObjects: true,
-      queryOptions: { query_id: queryId, join_use_nulls: 1 }
+      queryOptions: {
+        query_id: queryId,
+        //
+        //
+        // If ClickHouse user's permissions are restricted with "readonly = 1",
+        // change settings queries are not allowed. Thus, "join_use_nulls" setting
+        // can not be changed
+        //
+        //
+        ...(this.config.readonly ? {} : { join_use_nulls: 1 }),
+      }
     }).then(res => this.normaliseResponse(res)));
   }
 

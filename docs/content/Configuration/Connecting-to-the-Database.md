@@ -218,6 +218,14 @@ You can connect to an SSL-enabled ClickHouse database by setting `CUBEJS_DB_SSL`
 `true`. All other SSL-related environment variables can be left unset. See
 [Enabling SSL][link-enabling-ssl] for more details.
 
+You can connect to a ClickHouse database when your user's permissions are
+[restricted][link-clickhouse-readonly] to read-only, by setting the `readOnly`
+driver option to `true`. Please refer to [Multitenancy Guide][link-multitenancy]
+to learn more.
+
+[link-enabling-ssl]: #enabling-ssl
+[link-clickhouse-readonly]: https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
+
 [link-enabling-ssl]: #enabling-ssl
 
 ### Connecting to Multiple Databases
