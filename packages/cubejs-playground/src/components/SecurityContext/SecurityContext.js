@@ -4,7 +4,6 @@ import { CheckOutlined, CopyOutlined, EditOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
 
 import { useSecurityContext } from '../../hooks';
-import CubejsIcon from '../../shared/icons/CubejsIcon';
 import { copyToClipboard } from '../../utils';
 
 const { TabPane } = Tabs;
@@ -27,11 +26,10 @@ export default function SecurityContext() {
     isModalOpen,
     setIsModalOpen,
     saveToken,
-    getToken
+    getToken,
   } = useSecurityContext();
 
   const [form] = Form.useForm();
-  const [activeTabKey, setActiveTabKey] = useState('json');
   const [editingToken, setEditingToken] = useState(false);
   const [isJsonValid, setIsJsonValid] = useState(true);
   const [tmpPayload, setPayload] = useState(payload);
@@ -47,12 +45,15 @@ export default function SecurityContext() {
     setEditingToken(!token);
     setPayload(payload);
 
-    form.resetFields();
+    form.setFieldsValue({
+      token,
+    });
   }, [form, token, payload]);
 
   function handleTokenSave(values) {
     saveToken(values.token);
     setEditingToken(false);
+    setIsModalOpen(false);
   }
 
   function handlePayloadChange(event) {
@@ -74,9 +75,11 @@ export default function SecurityContext() {
       } catch (error) {
         console.error(error);
       }
+    } else if (!tmpPayload) {
+      saveToken(null);
     }
-    
-    setActiveTabKey('token');
+
+    setIsModalOpen(false);
   }
 
   return (
@@ -87,18 +90,20 @@ export default function SecurityContext() {
       bodyStyle={{
         paddingTop: 16,
       }}
-      onCancel={() => setIsModalOpen(false)}
+      onCancel={() => {
+        setIsModalOpen(false);
+        setEditingToken(false);
+      }}
     >
       <Space direction="vertical" size={24} style={{ width: '100%' }}>
         <Tabs
-          activeKey={activeTabKey}
+          defaultActiveKey="json"
           style={{ minHeight: 200 }}
           onChange={(tabKey) => {
-            if (tabKey !== 'token' && editingToken) {
+            if (tabKey !== 'token' && editingToken && token) {
               setEditingToken(false);
               form.resetFields();
             }
-            setActiveTabKey(tabKey);
           }}
         >
           <TabPane tab="JSON" key="json">
@@ -112,7 +117,7 @@ export default function SecurityContext() {
 
               <Button
                 type="primary"
-                disabled={!isJsonValid}
+                disabled={tmpPayload && !isJsonValid}
                 onClick={handlePayloadSave}
               >
                 Save
@@ -141,11 +146,7 @@ export default function SecurityContext() {
                       flexGrow: 1,
                     }}
                   >
-                    <Input
-                      ref={inputRef}
-                      prefix={<CubejsIcon />}
-                      disabled={!editingToken}
-                    />
+                    <Input ref={inputRef} disabled={!editingToken} />
                   </Form.Item>
 
                   {!editingToken ? (
