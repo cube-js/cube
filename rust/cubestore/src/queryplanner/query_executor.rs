@@ -43,7 +43,7 @@ use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Formatter;
+use std::fmt::{Formatter, Debug};
 use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -561,11 +561,19 @@ impl CubeTable {
     }
 }
 
-#[derive(Debug)]
 pub struct CubeTableExec {
     schema: DFSchemaRef,
     index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
+}
+
+impl Debug for CubeTableExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CubeTableExec")
+            .field("index", self.index_snapshot.index())
+            .field("partition_execs", &self.partition_execs)
+            .finish()
+    }
 }
 
 #[async_trait]
