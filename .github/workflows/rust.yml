@@ -98,7 +98,8 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             artifact_name: rust/target/x86_64-unknown-linux-musl/release/miniserve
-            cross: true
+            # Maybe will be enabled later
+            cross: false
             strip: true
           #- os: windows-latest
           #  target: x86_64-pc-windows-msvc
