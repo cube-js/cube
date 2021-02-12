@@ -183,3 +183,36 @@ jobs:
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
+
+  cubestore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      matrix:
+        target:
+          # procspawn is using libc::kill(pid as i32, libc::SIGKILL) which is not supported in windows
+          # - x86_64-pc-windows-gnu
+          - x86_64-apple-darwin
+          - x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      # https://github.com/actions-rs/cargo/issues/6
+      #- uses: actions-rs/cargo@v1
+      - uses: marcopolo/cargo@master
+        with:
+          use-cross: true
+          command: build
+          working-directory: rust
+          args: --release --target=${{ matrix.target }}
+      - name: Upload Binary to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: rust/target/${{ matrix.target }}/release/cubestored
+          asset_name: cubestored-${{ matrix.target }}
+          tag: ${{ github.ref }}
