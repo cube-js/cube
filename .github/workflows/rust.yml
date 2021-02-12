@@ -13,7 +13,22 @@ on:
       - 'rust/**'
 
 jobs:
+  pre_job:
+    # continue-on-error: true # Uncomment once integration is finished
+    runs-on: ubuntu-latest
+    # Map a step output to a job output
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+
   debian:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     name: Debian Rust ${{ matrix.rust }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -55,10 +70,13 @@ jobs:
           args: --manifest-path rust/Cargo.toml -j 1
 
   docker-image-latest:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     name: Build only :latest image
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: github.ref != 'refs/heads/master'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -85,6 +103,9 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
 
   cross:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

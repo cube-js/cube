@@ -29,7 +29,22 @@ on:
       - 'docs/**'
 
 jobs:
+  pre_job:
+    # continue-on-error: true # Uncomment once integration is finished
+    runs-on: ubuntu-latest
+    # Map a step output to a job output
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+
   unit:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -85,6 +100,9 @@ jobs:
           verbose: true # optional (default = false)
 
   lint:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -124,6 +142,9 @@ jobs:
         run: yarn lerna run --concurrency 1 lint
 
   build:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -167,6 +188,9 @@ jobs:
         run: yarn lerna run --concurrency 1 build
 
   integration-redis:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -250,6 +274,9 @@ jobs:
           CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
 
   integration-wrk-1:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -347,6 +374,9 @@ jobs:
           TEST_MSSQL_VERSION: 2019-latest
 
   integration-wrk-2:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -435,6 +465,9 @@ jobs:
           TEST_CLICKHOUSE_VERSION: 19
 
   integration-wrk-3:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -510,7 +543,9 @@ jobs:
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
-    needs: integration-wrk-1
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
@@ -569,6 +604,8 @@ jobs:
           push: false
 
   docker-image-dev:
+    needs: docker-image-latest-set-tag
+
     name: Build only :dev image
     runs-on: ubuntu-latest
     timeout-minutes: 60
