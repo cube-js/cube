@@ -170,6 +170,12 @@ impl RemoteFs for QueueRemoteFs {
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
+        // We might be lucky and the file has already been downloaded.
+        if let Ok(local_path) = self.local_file(remote_path).await {
+            if tokio::fs::metadata(&local_path).await.is_ok() {
+                return Ok(local_path);
+            }
+        }
         let mut receiver = self.result_sender.subscribe();
         {
             let mut downloading = self.downloading.write().await;
