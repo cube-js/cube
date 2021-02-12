@@ -43,7 +43,7 @@ use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Formatter, Debug};
+use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
