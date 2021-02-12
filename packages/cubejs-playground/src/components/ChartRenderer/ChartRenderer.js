@@ -1,13 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, Spin, Typography } from 'antd';
 import styled from 'styled-components';
 
 import { dispatchPlaygroundEvent } from '../../utils';
-import {
-  useDeepCompareMemoize,
-  useSlowQuery,
-  useIsPreAggregationBuildInProgress,
-} from '../../hooks';
+import { useDeepCompareMemoize } from '../../hooks';
 
 const { Text } = Typography;
 
@@ -40,8 +36,8 @@ export default function ChartRenderer({
   queryHasMissingMembers,
   onChartRendererReadyChange,
 }) {
-  const slowQuery = useSlowQuery();
-  const isPreAggregationBuildInProgress = useIsPreAggregationBuildInProgress();
+  const [slowQuery, setSlowQuery] = useState(false);
+  const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -61,6 +57,35 @@ export default function ChartRenderer({
     }
     // eslint-disable-next-line
   }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType, queryHasMissingMembers]));
+
+  useLayoutEffect(() => {
+    window['__cubejsPlayground'] = {
+      ...window['__cubejsPlayground'],
+      onQueryLoad: (data) => {
+        let resultSet;
+
+        if (data?.resultSet !== undefined) {
+          resultSet = data.resultSet;
+        } else {
+          resultSet = data;
+        }
+
+        if (resultSet) {
+          const { loadResponse } = resultSet.serialize();
+
+          setSlowQuery(Boolean(loadResponse.slowQuery));
+        }
+      },
+      onQueryProgress: (progress) => {
+        setBuildInProgress(
+          Boolean(progress?.stage?.stage.includes('pre-aggregation'))
+        );
+      },
+      onChartRendererReady() {
+        onChartRendererReadyChange(true);
+      },
+    };
+  }, [onChartRendererReadyChange]);
 
   return (
     <>

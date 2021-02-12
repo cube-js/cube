@@ -90,15 +90,6 @@ export default function PlaygroundQueryBuilder({
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
 
-  useLayoutEffect(() => {
-    window['__cubejsPlayground'] = {
-      ...window['__cubejsPlayground'],
-      onChartRendererReady() {
-        setChartRendererReady(true);
-      },
-    };
-  }, []);
-
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
       dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
