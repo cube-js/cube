@@ -118,10 +118,13 @@ jobs:
         with:
           toolchain: stable
           target: ${{ matrix.target }}
+      - run: rust/cross/scripts/${{ matrix.os }}-install.sh
+        shell: bash
       # https://github.com/actions-rs/cargo/issues/6
       #- uses: actions-rs/cargo@v1
       - uses: marcopolo/cargo@master
         with:
+          working-directory: rust
           command: build
           args: --release --locked --target=${{ matrix.target }}
           use-cross: ${{ matrix.cross }}
