@@ -184,7 +184,7 @@ jobs:
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
-  cross:
+  cubestore:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
