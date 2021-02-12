@@ -174,8 +174,11 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly-2020-10-25
           target: ${{ matrix.target }}
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
       - run: rust/cross/scripts/${{ matrix.os }}-install.sh
         shell: bash
       # https://github.com/actions-rs/cargo/issues/6
