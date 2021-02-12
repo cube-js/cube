@@ -83,7 +83,8 @@ jobs:
     strategy:
       matrix:
         target:
-          - x86_64-pc-windows-gnu
+          # procspawn is using libc::kill(pid as i32, libc::SIGKILL) which is not supported in windows
+          # - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
           - x86_64-unknown-linux-musl
     steps:
@@ -93,8 +94,11 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - uses: actions-rs/cargo@v1
+      # https://github.com/actions-rs/cargo/issues/6
+      #- uses: actions-rs/cargo@v1
+      - uses: marcopolo/cargo@master
         with:
           use-cross: true
           command: build
+          working-directory: rust
           args: --release --target=${{ matrix.target }}
