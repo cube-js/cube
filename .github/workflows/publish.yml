@@ -183,3 +183,65 @@ jobs:
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
+
+  cubestore:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        target:
+          #- x86_64-unknown-linux-musl
+          # procspawn is using libc::kill(pid as i32, libc::SIGKILL) which is not supported in windows
+          # - x86_64-pc-windows-gnu
+          - x86_64-apple-darwin
+        include:
+          #- os: ubuntu-latest
+          #  target: x86_64-unknown-linux-musl
+          #  artifact_name: rust/target/x86_64-unknown-linux-musl/release/miniserve
+          #  # Maybe will be enabled later
+          #  cross: false
+          #  strip: true
+          #- os: windows-latest
+          #  target: x86_64-pc-windows-msvc
+          #  artifact_name: rust/target/x86_64-pc-windows-msvc/release/cubestored.exe
+          #  cross: false
+          #  strip: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: rust/target/x86_64-apple-darwin/release/cubestored
+            cross: false
+            strip: true
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2020-10-25
+          target: ${{ matrix.target }}
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - run: rust/cross/scripts/${{ matrix.os }}-install.sh
+        shell: bash
+      # https://github.com/actions-rs/cargo/issues/6
+      #- uses: actions-rs/cargo@v1
+      - uses: marcopolo/cargo@master
+        with:
+          working-directory: rust
+          command: build
+          args: --release --locked --target=${{ matrix.target }}
+          use-cross: ${{ matrix.cross }}
+      - name: Compress binaries
+        uses: svenstaro/upx-action@v2
+        with:
+          file: ${{ matrix.artifact_name }}
+          args: --lzma
+          strip: ${{ matrix.strip }}
+      - name: Upload Binary to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.artifact_name }}
+          asset_name: cubestored-${{ matrix.target }}
+          tag: ${{ github.ref }}

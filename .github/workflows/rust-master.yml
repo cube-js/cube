@@ -8,6 +8,51 @@ on:
       - master
 
 jobs:
+  debian:
+    name: Debian Rust ${{ matrix.rust }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [nightly-2020-10-25]
+    env:
+      RUST: ${{ matrix.rust }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - name: Run cargo fmt cubestore
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path rust/cubestore/Cargo.toml -- --check
+      - name: Run cargo fmt cubehll
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path rust/cubehll/Cargo.toml -- --check
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --manifest-path rust/Cargo.toml -j 4
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        env:
+          CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
+          CUBESTORE_AWS_SECRET_ACCESS_KEY: ${{ secrets.CUBESTORE_AWS_SECRET_ACCESS_KEY }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+        with:
+          command: test
+          args: --manifest-path rust/Cargo.toml -j 1
+
   cubestore-docker-image-dev:
     name: Release Cube Store :dev image
     runs-on: ubuntu-latest
@@ -95,3 +140,58 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: cubejs/cubestore
           readme-filepath: ./rust/README.md
+
+  cross:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        target:
+          #- x86_64-unknown-linux-musl
+          # procspawn is using libc::kill(pid as i32, libc::SIGKILL) which is not supported in windows
+          # - x86_64-pc-windows-gnu
+          - x86_64-apple-darwin
+        include:
+          #- os: ubuntu-latest
+          #  target: x86_64-unknown-linux-musl
+          #  artifact_name: rust/target/x86_64-unknown-linux-musl/release/miniserve
+          #  # Maybe will be enabled later
+          #  cross: false
+          #  strip: true
+          #- os: windows-latest
+          #  target: x86_64-pc-windows-msvc
+          #  artifact_name: rust/target/x86_64-pc-windows-msvc/release/cubestored.exe
+          #  cross: false
+          #  strip: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: rust/target/x86_64-apple-darwin/release/cubestored
+            cross: false
+            strip: true
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2020-10-25
+          target: ${{ matrix.target }}
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - run: rust/cross/scripts/${{ matrix.os }}-install.sh
+        shell: bash
+      # https://github.com/actions-rs/cargo/issues/6
+      #- uses: actions-rs/cargo@v1
+      - uses: marcopolo/cargo@master
+        with:
+          working-directory: rust
+          command: build
+          args: --release --locked --target=${{ matrix.target }}
+          use-cross: ${{ matrix.cross }}
+      - name: Compress binaries
+        uses: svenstaro/upx-action@v2
+        with:
+          file: ${{ matrix.artifact_name }}
+          args: --lzma
+          strip: ${{ matrix.strip }}
