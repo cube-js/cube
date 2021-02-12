@@ -27,8 +27,6 @@ class App extends Component {
   state = {
     fatalError: null,
     context: null,
-    slowQuery: false,
-    isPreAggregationBuildInProgress: false,
   };
 
   async componentDidMount() {

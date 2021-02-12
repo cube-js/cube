@@ -118,6 +118,7 @@ export default function PlaygroundQueryBuilder({
       wrapWithQueryRenderer={false}
       render={({
         error,
+        metaError,
         isQueryPresent,
         chartType,
         updateChartType,
@@ -319,6 +320,10 @@ export default function PlaygroundQueryBuilder({
                     chartLibraries={frameworkChartLibraries}
                     dashboardSource={dashboardSource}
                     render={({ framework }) => {
+                      if (metaError) {
+                        return <pre>{metaError.stack?.toString() || metaError.toString()}</pre>;
+                      }
+                      
                       return (
                         <ChartRenderer
                           isChartRendererReady={isChartRendererReady}
