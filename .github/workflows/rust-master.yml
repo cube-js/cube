@@ -142,24 +142,49 @@ jobs:
           readme-filepath: ./rust/README.md
 
   cross:
-    runs-on: ubuntu-latest
-    timeout-minutes: 240
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       matrix:
         target:
+          - x86_64-unknown-linux-musl
           # procspawn is using libc::kill(pid as i32, libc::SIGKILL) which is not supported in windows
           # - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
-          - x86_64-unknown-linux-musl
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: rust/target/x86_64-unknown-linux-musl/release/miniserve
+            cross: true
+            strip: true
+          #- os: windows-latest
+          #  target: x86_64-pc-windows-msvc
+          #  artifact_name: rust/target/x86_64-pc-windows-msvc/release/cubestored.exe
+          #  cross: false
+          #  strip: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: rust/target/x86_64-apple-darwin/release/cubestored
+            cross: false
+            strip: true
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
-      - uses: docker-practice/actions-setup-docker@master
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
       # https://github.com/actions-rs/cargo/issues/6
       #- uses: actions-rs/cargo@v1
       - uses: marcopolo/cargo@master
         with:
-          use-cross: true
           command: build
-          working-directory: rust
-          args: --release --target=${{ matrix.target }}
+          args: --release --locked --target=${{ matrix.target }}
+          use-cross: ${{ matrix.cross }}
+      - name: Compress binaries
+        uses: svenstaro/upx-action@v2
+        with:
+          file: ${{ matrix.artifact_name }}
+          args: --lzma
+          strip: ${{ matrix.strip }}
