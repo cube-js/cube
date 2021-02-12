@@ -109,8 +109,14 @@ export default class QueryBuilder extends React.Component {
     const { query, pivotConfig } = this.state;
     let dryRunResponse;
     let missingMembers = [];
-
-    const meta = await this.cubejsApi().meta();
+    let meta;
+    let metaError = null;
+    
+    try {
+      meta = await this.cubejsApi().meta();
+    } catch (error) {
+      metaError = error;
+    }
 
     if (this.isQueryPresent()) {
       missingMembers = this.getMissingMembers(query, meta);
@@ -122,6 +128,7 @@ export default class QueryBuilder extends React.Component {
 
     this.setState({
       meta,
+      metaError,
       orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
       pivotConfig: ResultSet.getNormalizedPivotConfig(dryRunResponse?.pivotQuery || {}, pivotConfig),
       missingMembers,
@@ -198,7 +205,16 @@ export default class QueryBuilder extends React.Component {
       },
     });
 
-    const { meta, query, orderMembers = [], chartType, pivotConfig, validatedQuery, missingMembers } = this.state;
+    const {
+      meta,
+      metaError,
+      query,
+      orderMembers = [],
+      chartType,
+      pivotConfig,
+      validatedQuery,
+      missingMembers
+    } = this.state;
 
     const flatFilters = uniqBy(
       prop('member'),
@@ -217,6 +233,7 @@ export default class QueryBuilder extends React.Component {
 
     return {
       meta,
+      metaError,
       query,
       validatedQuery,
       isQueryPresent: this.isQueryPresent(),
