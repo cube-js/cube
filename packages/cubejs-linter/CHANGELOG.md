@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.13](https://github.com/cube-js/cube.js/compare/v0.26.12...v0.26.13) (2021-02-12)
+
+
+### Features
+
+* type detection - check overflows for int/bigint ([393948a](https://github.com/cube-js/cube.js/commit/393948ae5fabf1c4b46ce4ea2b2dc22e8f012ee1))
+
+
+
+
+
 ## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
 
 

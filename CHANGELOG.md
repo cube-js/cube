@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.13](https://github.com/cube-js/cube.js/compare/v0.26.12...v0.26.13) (2021-02-12)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** security token impovements ([#2069](https://github.com/cube-js/cube.js/issues/2069)) ([94c1431](https://github.com/cube-js/cube.js/commit/94c14316efbea2cd53df247c82ed36efd6a81adb))
+* **@cubejs-client/playground:** context refactor, piechart fix ([#2076](https://github.com/cube-js/cube.js/issues/2076)) ([cef9251](https://github.com/cube-js/cube.js/commit/cef9251908cc259671c314694ac36ef01558d151))
+* **@cubejs-client/playground:** Meta error handling ([#2077](https://github.com/cube-js/cube.js/issues/2077)) ([1e6d591](https://github.com/cube-js/cube.js/commit/1e6d591f2857311f0f885ec7d275d110f93bc08a))
+
+
+### Features
+
+* **@cubejs-client/playground:** handle missing members ([#2067](https://github.com/cube-js/cube.js/issues/2067)) ([348b245](https://github.com/cube-js/cube.js/commit/348b245f4086095fbe1515d7821d631047f0008c))
+* **cubestore:** prune partitions based on sort order at query time ([#2068](https://github.com/cube-js/cube.js/issues/2068)) ([84b6c9b](https://github.com/cube-js/cube.js/commit/84b6c9be887582f17ebc988fc1c58284d33fa483))
+* **schema-compiler:** Generate parser by antlr4ts ([d8e68c7](https://github.com/cube-js/cube.js/commit/d8e68c77f4649ddc056322f2848c769e5311c6b1))
+* **schema-compiler:** Wrap new generated parser. fix [#1798](https://github.com/cube-js/cube.js/issues/1798) ([c5fde21](https://github.com/cube-js/cube.js/commit/c5fde21cb4bbcd675a4eeb735cd0c48d7a3ade6d))
+* Support for extra params in generating schema for tables. ([#1990](https://github.com/cube-js/cube.js/issues/1990)) ([a9b3df2](https://github.com/cube-js/cube.js/commit/a9b3df222f8eaca86724ed2e1c24c348b38f718c))
+* type detection - check overflows for int/bigint ([393948a](https://github.com/cube-js/cube.js/commit/393948ae5fabf1c4b46ce4ea2b2dc22e8f012ee1))
+
+
+
+
+
 ## [0.26.12](https://github.com/cube-js/cube.js/compare/v0.26.11...v0.26.12) (2021-02-11)
 
 

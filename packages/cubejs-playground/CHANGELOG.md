@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.13](https://github.com/cube-js/cube.js/compare/v0.26.12...v0.26.13) (2021-02-12)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** security token impovements ([#2069](https://github.com/cube-js/cube.js/issues/2069)) ([94c1431](https://github.com/cube-js/cube.js/commit/94c14316efbea2cd53df247c82ed36efd6a81adb))
+* **@cubejs-client/playground:** context refactor, piechart fix ([#2076](https://github.com/cube-js/cube.js/issues/2076)) ([cef9251](https://github.com/cube-js/cube.js/commit/cef9251908cc259671c314694ac36ef01558d151))
+* **@cubejs-client/playground:** Meta error handling ([#2077](https://github.com/cube-js/cube.js/issues/2077)) ([1e6d591](https://github.com/cube-js/cube.js/commit/1e6d591f2857311f0f885ec7d275d110f93bc08a))
+
+
+### Features
+
+* **@cubejs-client/playground:** handle missing members ([#2067](https://github.com/cube-js/cube.js/issues/2067)) ([348b245](https://github.com/cube-js/cube.js/commit/348b245f4086095fbe1515d7821d631047f0008c))
+
+
+
+
+
 ## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
 
 
