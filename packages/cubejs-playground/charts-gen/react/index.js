@@ -41,7 +41,9 @@ const packages = [
 
   const distPath = `${rootPath}/charts-dist/react`;
   const reactChartsPath = `${distPath}/react-charts`;
-  
+
+  let dependencies = [['chart.js', '2.9.4']];
+
   chartingLibraryTemplates.forEach(async (key) => {
     const dashboardAppPath = `${distPath}/${key}`;
     const dt = new DependencTree(manifest, [
@@ -49,7 +51,7 @@ const packages = [
       'react-charting-library',
       'antd-tables',
     ]);
-  
+
     const appContainer = new AppContainer(
       dt.getRootNode(),
       {
@@ -58,24 +60,23 @@ const packages = [
       },
       {}
     );
-  
+
     await appContainer.applyTemplates();
+    dependencies = dependencies.concat(
+      Object.entries(appContainer.sourceContainer.importDependencies)
+    );
   });
-  
+
   const dt = new DependencTree(manifest, packages);
-  
-  const appContainer = new AppContainer(
-    dt.getRootNode(),
-    {
-      appPath: reactChartsPath,
-      packagesPath,
-    }
-  );
+
+  const appContainer = new AppContainer(dt.getRootNode(), {
+    appPath: reactChartsPath,
+    packagesPath,
+  });
 
   await appContainer.applyTemplates();
 
   let code = '';
-  let dependencies = ['chart.js'];
   const imports = [];
   const libNames = [];
 
@@ -92,15 +93,6 @@ const packages = [
 
         const codeChunksContent = generateCodeChunks(
           chartRendererContent.content
-        );
-
-        dependencies = dependencies.concat(
-          fileContents
-            .map(({ content, fileName }) => {
-              const ts = new TargetSource(fileName, content);
-              return ts.getImportDependencies();
-            })
-            .reduce((a, b) => [...a, ...b])
         );
 
         await executeCommand('mv', [
@@ -142,7 +134,7 @@ const packages = [
 
   appContainer.sourceContainer.addImportDependencies(
     dependencies
-      .map((d) => ({ [d]: 'latest' }))
+      .map(([d, v]) => ({ [d]: v }))
       .reduce((a, b) => ({ ...a, ...b }))
   );
   await appContainer.ensureDependencies();

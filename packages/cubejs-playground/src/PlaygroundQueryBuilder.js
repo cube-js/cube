@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Col, Row, Divider } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
@@ -89,15 +89,6 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
-
-  useLayoutEffect(() => {
-    window['__cubejsPlayground'] = {
-      ...window['__cubejsPlayground'],
-      onChartRendererReady() {
-        setChartRendererReady(true);
-      },
-    };
-  }, []);
 
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
