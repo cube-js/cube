@@ -804,7 +804,7 @@ mod tests {
     use crate::metastore::{table::Table, Chunk, IdRow, RocksMetaStore, WAL};
     use crate::queryplanner::query_executor::QueryExecutorImpl;
     use crate::remotefs::LocalDirRemoteFs;
-    use crate::store::{DataFrame, WALDataStore};
+    use crate::store::{ChunkUploadJob, DataFrame, WALDataStore};
     use async_trait::async_trait;
     use std::{env, fs};
 
@@ -834,6 +834,14 @@ mod tests {
     #[async_trait]
     impl ChunkDataStore for MockChunkStore {
         async fn partition(&self, _wal_id: u64) -> Result<(), CubeError> {
+            unimplemented!()
+        }
+
+        async fn partition_data(
+            &self,
+            _table_id: u64,
+            _data: DataFrame,
+        ) -> Result<Vec<ChunkUploadJob>, CubeError> {
             unimplemented!()
         }
 

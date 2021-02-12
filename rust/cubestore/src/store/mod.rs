@@ -25,9 +25,11 @@ use crate::sys::malloc::trim_allocs;
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
+use futures::future::join_all;
 use log::trace;
 use mockall::automock;
 use scopeguard::defer;
+use tokio::task::JoinHandle;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct DataFrame {
@@ -196,6 +198,12 @@ pub trait WALDataStore: Send + Sync {
 #[async_trait]
 pub trait ChunkDataStore: Send + Sync {
     async fn partition(&self, wal_id: u64) -> Result<(), CubeError>;
+    /// Returns ids of uploaded chunks. Uploaded chunks are **not** activated.
+    async fn partition_data(
+        &self,
+        table_id: u64,
+        data: DataFrame,
+    ) -> Result<Vec<ChunkUploadJob>, CubeError>;
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn get_chunk(&self, chunk: IdRow<Chunk>) -> Result<DataFrame, CubeError>;
     async fn download_chunk(&self, chunk: IdRow<Chunk>) -> Result<String, CubeError>;
@@ -300,31 +308,30 @@ impl ChunkStore {
 
 #[async_trait]
 impl ChunkDataStore for ChunkStore {
-    async fn partition(&self, wal_id: u64) -> Result<(), CubeError> {
-        defer!(trim_allocs());
+    async fn partition_data(
+        &self,
+        table_id: u64,
+        data: DataFrame,
+    ) -> Result<Vec<ChunkUploadJob>, CubeError> {
+        let indexes = self.meta_store.get_table_indexes(table_id).await?;
+        self.build_index_chunks(&indexes, data).await
+    }
 
+    async fn partition(&self, wal_id: u64) -> Result<(), CubeError> {
         let wal = self.meta_store.get_wal(wal_id).await?;
         let table_id = wal.get_row().table_id();
         let data = self.wal_store.get_wal(wal_id).await?;
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
-        let mut new_chunks = Vec::new();
-        for index in indexes.iter() {
-            new_chunks.append(
-                &mut self
-                    .partition_data_frame(
-                        index.get_id(),
-                        data.remap_columns(index.get_row().columns().clone())?,
-                    )
-                    .await?,
-            ); // TODO dataframe clone
-        }
+
+        let new_chunks: Result<Vec<u64>, CubeError> =
+            join_all(self.build_index_chunks(&indexes, data).await?)
+                .await
+                .into_iter()
+                .map(|c| Ok(c??.get_id()))
+                .collect();
 
         self.meta_store
-            .activate_wal(
-                wal_id,
-                new_chunks.into_iter().map(|c| c.get_id()).collect(),
-                indexes.len() as u64,
-            )
+            .activate_wal(wal_id, new_chunks?, indexes.len() as u64)
             .await?;
 
         Ok(())
@@ -357,11 +364,14 @@ impl ChunkDataStore for ChunkStore {
             )
         }
 
+        let new_chunk_ids: Result<Vec<u64>, CubeError> = join_all(new_chunks)
+            .await
+            .into_iter()
+            .map(|c| Ok(c??.get_id()))
+            .collect();
+
         self.meta_store
-            .swap_chunks(
-                old_chunks,
-                new_chunks.into_iter().map(|c| c.get_id()).collect(),
-            )
+            .swap_chunks(old_chunks, new_chunk_ids?)
             .await?;
 
         Ok(())
@@ -585,6 +595,9 @@ mod tests {
             let chunk = chunk_store
                 .add_chunk(index, partition, restored_wal)
                 .await
+                .unwrap()
+                .await
+                .unwrap()
                 .unwrap();
             meta_store
                 .swap_chunks(Vec::new(), vec![chunk.get_id()])
@@ -604,12 +617,14 @@ mod tests {
     }
 }
 
+pub type ChunkUploadJob = JoinHandle<Result<IdRow<Chunk>, CubeError>>;
+
 impl ChunkStore {
     async fn partition_data_frame(
         &self,
         index_id: u64,
         data: DataFrame,
-    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+    ) -> Result<Vec<JoinHandle<Result<IdRow<Chunk>, CubeError>>>, CubeError> {
         let index = self.meta_store.get_index(index_id).await?;
         let partitions = self
             .meta_store
@@ -657,12 +672,14 @@ impl ChunkStore {
         Ok(new_chunks)
     }
 
+    /// Processes data into parquet files in the current task and schedules an async file upload.
+    /// Join the returned handle to wait for the upload to finish.
     async fn add_chunk(
         &self,
         index: IdRow<Index>,
         partition: IdRow<Partition>,
         data: DataFrame,
-    ) -> Result<IdRow<Chunk>, CubeError> {
+    ) -> Result<ChunkUploadJob, CubeError> {
         let chunk = self
             .meta_store
             .create_chunk(partition.get_id(), data.len())
@@ -681,9 +698,35 @@ impl ChunkStore {
             Ok(())
         })
         .await??;
-        self.remote_fs
-            .upload_file(&ChunkStore::chunk_file_name(chunk.clone()))
-            .await?;
-        Ok(chunk)
+
+        let fs = self.remote_fs.clone();
+        Ok(tokio::spawn(async move {
+            fs.upload_file(&ChunkStore::chunk_file_name(chunk.clone()))
+                .await?;
+            Ok(chunk)
+        }))
+    }
+
+    /// Returns a list of newly added chunks.
+    async fn build_index_chunks(
+        &self,
+        indexes: &[IdRow<Index>],
+        data: DataFrame,
+    ) -> Result<Vec<ChunkUploadJob>, CubeError> {
+        defer!(trim_allocs());
+
+        let mut new_chunks = Vec::new();
+        for index in indexes.iter() {
+            new_chunks.append(
+                &mut self
+                    .partition_data_frame(
+                        index.get_id(),
+                        data.remap_columns(index.get_row().columns().clone())?,
+                    )
+                    .await?,
+            ); // TODO dataframe clone
+        }
+
+        Ok(new_chunks)
     }
 }
