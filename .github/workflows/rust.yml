@@ -84,13 +84,12 @@ jobs:
 
   cross:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 240
     strategy:
       matrix:
         target:
           - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
-          - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v2
