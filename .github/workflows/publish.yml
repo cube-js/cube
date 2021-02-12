@@ -186,7 +186,7 @@ jobs:
 
   cubestore:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 60
     strategy:
       matrix:
         target:
@@ -194,6 +194,7 @@ jobs:
           # - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
           - x86_64-unknown-linux-musl
+      fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
