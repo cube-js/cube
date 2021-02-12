@@ -1,10 +1,10 @@
 [target.x86_64-apple-darwin]
 image = "cubejs/rust-cross:x86_64-apple-darwin"
-xargo = false
+xargo = true
 
 [target.x86_64-pc-windows-gnu]
 image = "cubejs/rust-cross:x86_64-pc-windows-gnu"
-xargo = false
+xargo = true
 
 # [target.x86_64-unknown-linux-gnu]
 # image = "cubejs/rust-cross:x86_64-unknown-linux-gnu"
@@ -12,4 +12,4 @@ xargo = false
 
 [target.x86_64-unknown-linux-musl]
 image = "cubejs/rust-cross:x86_64-unknown-linux-musl"
-xargo = false
+xargo = true
