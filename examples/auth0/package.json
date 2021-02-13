@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/postgres-driver": "^0.26.2",
-    "@cubejs-backend/server": "^0.26.2"
+    "@cubejs-backend/server": "^0.26.2",
+    "cross-env": "^7.0.3"
   }
 }
