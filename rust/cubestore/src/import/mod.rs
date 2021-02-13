@@ -13,23 +13,24 @@ use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
+use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
 use core::mem;
+use core::slice::memchr;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
+use pin_project_lite::pin_project;
 use scopeguard::defer;
 use std::fs;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
-use tokio::io;
-use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufRead, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio::task::JoinHandle;
-use tokio_stream::wrappers::LinesStream;
 
 impl ImportFormat {
     async fn row_stream(
@@ -58,15 +59,13 @@ impl ImportFormat {
         };
         match self {
             ImportFormat::CSV => {
-                let lines_stream: Pin<Box<dyn Stream<Item = io::Result<String>> + Send>> =
+                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
                     if location.contains(".csv.gz") {
                         let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
-                        let lines = reader.lines();
-                        Box::pin(LinesStream::new(lines))
+                        Box::pin(CsvLineStream::new(reader))
                     } else {
                         let reader = BufReader::new(file);
-                        let lines = reader.lines();
-                        Box::pin(LinesStream::new(lines))
+                        Box::pin(CsvLineStream::new(reader))
                     };
 
                 let mut header_mapping = None;
@@ -222,6 +221,104 @@ impl<'a> CsvLineParser<'a> {
             self.remaining = self.remaining[1..].as_ref()
         }
         Ok(())
+    }
+}
+
+pin_project! {
+    struct CsvLineStream<R: AsyncBufRead> {
+        #[pin]
+        reader: R,
+        buf: Vec<u8>,
+        in_quotes: bool,
+    }
+}
+
+impl<R: AsyncBufRead> CsvLineStream<R> {
+    pub fn new(reader: R) -> Self {
+        Self {
+            reader,
+            buf: Vec::new(),
+            in_quotes: false,
+        }
+    }
+}
+
+impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
+    type Item = Result<String, CubeError>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut projected = self.project();
+        let mut reader = projected.reader;
+        loop {
+            let (done, used) = {
+                let available = match reader.as_mut().poll_fill_buf(cx) {
+                    Poll::Ready(available) => available,
+                    Poll::Pending => return Poll::Pending,
+                };
+                match available {
+                    Err(err) => {
+                        return Poll::Ready(Some(Err(CubeError::from_error(err))));
+                    }
+                    Ok(available) => {
+                        if *projected.in_quotes {
+                            let quote_pos = memchr::memchr(b'"', available);
+                            if let Some(i) = quote_pos {
+                                if !(i != 0 && available[i - 1] == b'\\'
+                                    || i == 0
+                                        && !projected.buf.is_empty()
+                                        && projected.buf[projected.buf.len() - 1] == b'\\')
+                                {
+                                    *projected.in_quotes = false;
+                                }
+                                projected.buf.extend_from_slice(&available[..=i]);
+                                (false, i + 1)
+                            } else {
+                                projected.buf.extend_from_slice(available);
+                                (false, available.len())
+                            }
+                        } else {
+                            let new_line_pos = memchr::memchr(b'\n', available);
+                            let quote_pos = memchr::memchr(b'"', available);
+                            let in_quotes = quote_pos.is_some()
+                                && (new_line_pos.is_some() && quote_pos < new_line_pos
+                                    || new_line_pos.is_none());
+                            if in_quotes {
+                                if let Some(i) = quote_pos {
+                                    projected.buf.extend_from_slice(&available[..=i]);
+                                    *projected.in_quotes = in_quotes;
+                                    (false, i + 1)
+                                } else {
+                                    unreachable!()
+                                }
+                            } else if let Some(i) = new_line_pos {
+                                projected.buf.extend_from_slice(&available[..=i]);
+                                (true, i + 1)
+                            } else {
+                                projected.buf.extend_from_slice(available);
+                                (false, available.len())
+                            }
+                        }
+                    }
+                }
+            };
+
+            reader.as_mut().consume(used);
+
+            if used == 0 {
+                return Poll::Ready(None);
+            } else if done {
+                if projected.buf.ends_with(&[b'\n']) {
+                    projected.buf.pop();
+
+                    if projected.buf.ends_with(&[b'\r']) {
+                        projected.buf.pop();
+                    }
+                }
+                let str = String::from_utf8(mem::replace(&mut projected.buf, Vec::new()));
+                let res = str.map_err(|e| CubeError::from_error(e));
+                return Poll::Ready(Some(res));
+            }
+        }
     }
 }
 

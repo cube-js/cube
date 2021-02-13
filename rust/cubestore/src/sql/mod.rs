@@ -2140,7 +2140,7 @@ mod tests {
                 let mut file = File::create(path_1.clone()).unwrap();
 
                 file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
-                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
+                file.write_all("1,San Francisco,\"[\"\"Foo\n\n\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
                 file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n".as_bytes()).unwrap();
                 file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).unwrap();
 
@@ -2171,7 +2171,7 @@ mod tests {
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
         }).await;
     }
 

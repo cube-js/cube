@@ -4,6 +4,7 @@
 #![feature(async_closure)]
 #![feature(drain_filter)]
 #![feature(box_patterns)]
+#![feature(slice_internals)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);

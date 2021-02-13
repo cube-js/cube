@@ -66,3 +66,4 @@ scopeguard = "1.1.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
 tempfile = "3.2.0"
 tarpc = { version = "0.24", features = ["tokio1"] }
+pin-project-lite = "0.2.4"
