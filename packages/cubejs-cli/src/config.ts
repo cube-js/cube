@@ -87,7 +87,7 @@ export class Config {
   public async deployAuth(url?: string) {
     const config = await this.loadConfig();
 
-    if(process.env.CUBE_CLOUD_DEPLOY_AUTH) {
+    if (process.env.CUBE_CLOUD_DEPLOY_AUTH) {
       return (await this.addAuthToken(process.env.CUBE_CLOUD_DEPLOY_AUTH, config)).auth;
     }
 
