@@ -177,17 +177,22 @@ impl<'a> CsvLineParser<'a> {
         Ok(
             if let Some(b'"') = self.remaining.as_bytes().iter().nth(0) {
                 let mut closing_index = None;
-                let mut i = 1;
                 let mut seen_escapes = false;
-                while i < self.remaining.len() {
-                    if i < self.remaining.len() - 1 && &self.remaining[i..(i + 2)] == "\"\"" {
-                        i += 1;
+                self.remaining = &self.remaining[1..];
+                let mut first_quote_index = None;
+                for (i, c) in self.remaining.char_indices() {
+                    if c == '"' && first_quote_index.is_some() {
                         seen_escapes = true;
-                    } else if self.remaining.as_bytes()[i] == b'"' {
-                        closing_index = Some(i);
+                        first_quote_index = None;
+                    } else if c == '"' {
+                        first_quote_index = Some(i);
+                    } else if first_quote_index.is_some() {
+                        closing_index = first_quote_index.take();
                         break;
                     }
-                    i += 1;
+                }
+                if first_quote_index.is_some() {
+                    closing_index = first_quote_index.take();
                 }
                 let closing_index = closing_index.ok_or(CubeError::user(format!(
                     "Malformed CSV string: {}",
@@ -195,10 +200,10 @@ impl<'a> CsvLineParser<'a> {
                 )))?;
                 let res;
                 if seen_escapes {
-                    let unescaped = self.remaining[1..closing_index].replace("\"\"", "\"");
+                    let unescaped = self.remaining[0..closing_index].replace("\"\"", "\"");
                     res = MaybeOwnedStr::Owned(unescaped)
                 } else {
-                    res = MaybeOwnedStr::Borrowed(&self.remaining[1..closing_index])
+                    res = MaybeOwnedStr::Borrowed(&self.remaining[0..closing_index])
                 }
                 self.remaining = self.remaining[(closing_index + 1)..].as_ref();
                 res
@@ -263,10 +268,10 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
                         if *projected.in_quotes {
                             let quote_pos = memchr::memchr(b'"', available);
                             if let Some(i) = quote_pos {
-                                if !(i != 0 && available[i - 1] == b'\\'
+                                if !(i != 0 && available[i - 1] == b'"'
                                     || i == 0
                                         && !projected.buf.is_empty()
-                                        && projected.buf[projected.buf.len() - 1] == b'\\')
+                                        && projected.buf[projected.buf.len() - 1] == b'"')
                                 {
                                     *projected.in_quotes = false;
                                 }
