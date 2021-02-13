@@ -444,6 +444,5 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: auth0
-          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/dashboard-app
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
