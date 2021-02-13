@@ -25,7 +25,7 @@ use futures::future::join_all;
 use futures::Future;
 use futures_timer::Delay;
 use itertools::Itertools;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use mockall::automock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -645,6 +645,10 @@ impl ClusterImpl {
                     .into_iter(),
             )
             .collect::<HashMap<_, _>>();
+        let warmup = start.elapsed()?;
+        if warmup.as_millis() > 200 {
+            warn!("Warmup download for select ({:?})", warmup);
+        }
         let pool_option = self.select_process_pool.read().await.clone();
         let res = if let Some(pool) = pool_option {
             let serialized_plan_node = plan_node.clone();
