@@ -335,7 +335,7 @@ Logical operators have only one of the following properties:
         {
           member: 'visitors.source',
           operator: 'equals',
-          values: ['some']
+          values: ['other']
         },
         {
           member: 'visitor_checkins.cardsCount',
