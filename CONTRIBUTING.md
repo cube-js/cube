@@ -22,7 +22,7 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 
 ## Step-by-step guide to contributing
 
-1. Find [issues](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either `good first issue` and/or `help wanted` labels. 
+1. Find [issues](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either [`good first issue`](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22+) and/or [`help wanted`](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) labels.
 2. Follow the directions in the [Getting Started guide](https://cube.dev/docs/getting-started) to get Cube.js up and running (incl. the [Developer Playground](https://cube.dev/docs/dev-tools/dev-playground)). 
 3. Clone the [Cube.js repo](https://github.com/cube-js/cube.js).
 4. Submit your Pull Request. 
