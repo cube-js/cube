@@ -27,7 +27,7 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 3. Clone the [Cube.js repo](https://github.com/cube-js/cube.js).
 4. Submit your Pull Request. 
 5. Testing: Please include test(s) for your code contribution. See some of the test examples for [drivers](https://github.com/cube-js/cube.js/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube.js/tree/master/packages/cubejs-backend-shared/test). 
-6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the `/docs` folder. To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
+6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs` folder](https://github.com/cube-js/cube.js/tree/master/docs). To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
 7. Relevant team(s) will be pinged automatically for a review based on information in the `CODEOWNERS` file. 
 
 ## Development Workflow
