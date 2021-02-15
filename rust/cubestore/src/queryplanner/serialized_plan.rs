@@ -1,5 +1,6 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition};
+use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
@@ -8,7 +9,7 @@ use crate::queryplanner::udfs::{
 };
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, Field};
 use datafusion::logical_plan::{DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning};
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
@@ -537,6 +538,7 @@ impl SerializedPlan {
             LogicalPlan::TableScan {
                 table_name,
                 projection,
+                filters,
                 ..
             } => {
                 let name_split = table_name.split(".").collect::<Vec<_>>();
@@ -622,11 +624,33 @@ impl SerializedPlan {
                     .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
                     .await?;
 
-                let mut partition_snapshots = Vec::new();
+                let partition_filter = PartitionFilter::extract(
+                    &partition_filter_schema(&projection, &table, &index),
+                    filters,
+                );
+                log::trace!("Extracted partition filter is {:?}", partition_filter);
+                let candidate_partitions = partitions.len();
+                let mut pruned_partitions = 0;
 
+                let mut partition_snapshots = Vec::new();
                 for (partition, chunks) in partitions.into_iter() {
+                    if let (Some(ref min_row), Some(ref max_row)) = (
+                        partition.get_row().get_min_val(),
+                        partition.get_row().get_max_val(),
+                    ) {
+                        if !partition_filter.can_match(min_row.values(), max_row.values()) {
+                            pruned_partitions += 1;
+                            continue;
+                        }
+                    }
+
                     partition_snapshots.push(PartitionSnapshot { chunks, partition });
                 }
+                log::trace!(
+                    "Pruned {} of {} partitions",
+                    pruned_partitions,
+                    candidate_partitions
+                );
 
                 index_snapshots.push(IndexSnapshot {
                     index,
@@ -973,4 +997,39 @@ impl SerializedPlan {
             },
         }
     }
+}
+
+fn partition_filter_schema(
+    projection: &Option<Vec<usize>>,
+    table: &IdRow<Table>,
+    index: &IdRow<Index>,
+) -> arrow::datatypes::Schema {
+    let mapped_projection = projection.as_ref().map(|p| {
+        CubeTable::project_to_index_positions(&CubeTable::project_to_table(table, p), index)
+            .into_iter()
+            .map(|i| i.unwrap())
+            .collect::<Vec<_>>()
+    });
+
+    let sort_key_len = index.get_row().sort_key_size() as usize;
+
+    let index_cols = index.get_row().columns();
+    let schema_fields: Vec<Field>;
+    if let Some(p) = &mapped_projection {
+        schema_fields = index_cols
+            .iter()
+            .enumerate()
+            .filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone().into()))
+            .take(sort_key_len)
+            .collect();
+    } else {
+        schema_fields = index_cols
+            .iter()
+            .map(|c| c.clone().into())
+            .take(sort_key_len)
+            .collect()
+    };
+
+    assert!(schema_fields.len() <= sort_key_len);
+    arrow::datatypes::Schema::new(schema_fields)
 }
