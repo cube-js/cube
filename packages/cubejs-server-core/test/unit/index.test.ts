@@ -114,7 +114,16 @@ describe('index.test', () => {
         },
         rollupOnlyMode: false
       },
-      allowJsDuplicatePropsInSchema: true
+      allowJsDuplicatePropsInSchema: true,
+      jwk: {
+        claimsNamespace: 'http://localhost:4000',
+        jwkUrl: () => '',
+        jwkRetry: 5,
+        jwkDefaultExpire: 5 * 60,
+        algorithms: ['RS256'],
+        audience: 'http://localhost:4000/v1',
+        issuer: 'http://localhost:4000',
+      }
     };
 
     const cubejsServerCore = new CubejsServerCore(<any>options);
