@@ -3,15 +3,11 @@ name: Examples
 on:
   push:
     paths:
-      - '.github/workflows/examples.yml'
-      - '.github/actions/build-example.sh'
+      - '.github/workflows/examples-publish.yml'
+      - '.github/actions/deploy-example.sh'
       - 'examples/**'
-  # It's not possible to use it in PRs, because pheel/path-watcher-action@v1
-  #pull_request:
-  #  paths:
-  #    - '.github/workflows/examples.yml'
-  #    - '.github/actions/build-example.sh'
-  #    - 'examples/**'
+    branches:
+      - master
 
 jobs:
 
@@ -25,7 +21,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/angular-dashboard-with-material-ui/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/angular-dashboard-with-material-ui/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -33,7 +29,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: angular-dashboard-with-material-ui
           EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/dashboard-app
@@ -50,7 +46,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/compare-date-range/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/compare-date-range/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -58,7 +54,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: compare-date-range
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -74,7 +70,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/d3-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/d3-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -82,7 +78,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: d3-dashboard
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -98,7 +94,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/data-blending/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/data-blending/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -106,7 +102,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: data-blending
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -122,7 +118,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/drill-downs/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/drill-downs/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -130,7 +126,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: drill-downs
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -146,7 +142,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/ecom-backend/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/ecom-backend/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -154,7 +150,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: ecom-backend
           EXAMPLE_FRONTEND_SKIP: 1
@@ -171,7 +167,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/external-rollups/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/external-rollups/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -179,7 +175,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: external-rollups
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -195,7 +191,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/hacktoberfest/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/hacktoberfest/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -203,7 +199,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: hacktoberfest
           EXAMPLE_FRONTEND_SUBDIRECTORY: dashboard
@@ -220,7 +216,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/highcharts/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/highcharts/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -228,7 +224,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: highcharts
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -244,7 +240,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/mapbox/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/mapbox/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -252,7 +248,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: mapbox
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -268,7 +264,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/material-ui-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/material-ui-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -276,7 +272,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: material-ui-dashboard
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -292,7 +288,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/react-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -300,7 +296,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: react-dashboard
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -316,7 +312,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/react-data-table/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-data-table/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -324,7 +320,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: react-data-table
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -340,7 +336,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/react-muze/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-muze/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -348,7 +344,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: react-muze
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -364,7 +360,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/real-time-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/real-time-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -372,7 +368,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: real-time-dashboard
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -388,7 +384,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/vue-query-builder/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/vue-query-builder/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -396,7 +392,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: vue-query-builder
           EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist
@@ -413,7 +409,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/web-analytics/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/web-analytics/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -421,7 +417,7 @@ jobs:
           node-version: 14.x
 
       - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
+        run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: web-analytics
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
@@ -437,31 +433,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples.yml,.github/actions/build-example.sh,examples/auth0/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v1
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/build-example.sh
-        env:
-          EXAMPLE_SLUG: auth0
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-
-  cognito:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples.yml,.github/actions/deploy-example.sh,examples/cognito/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/auth0/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -471,6 +443,6 @@ jobs:
       - if: steps.modified.outputs.modified
         run: .github/actions/deploy-example.sh
         env:
-          EXAMPLE_SLUG: cognito
+          EXAMPLE_SLUG: auth0
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
