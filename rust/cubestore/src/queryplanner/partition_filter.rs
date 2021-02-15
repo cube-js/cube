@@ -97,6 +97,39 @@ impl Builder<'_> {
                 }
                 return r;
             }
+            Expr::InList {
+                expr: box Expr::Column(name, alias),
+                list,
+                negated: false,
+            } => {
+                // equivalent to <name> = <list_1> OR ... OR <name> = <list_n>.
+                let elems = list.iter().map(|v| {
+                    let mut r = r.clone();
+                    if let Some(cc) =
+                        self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, v)
+                    {
+                        self.apply_stat(&cc, &mut r);
+                        return r;
+                    }
+                    r
+                });
+                return self.handle_or(elems);
+            }
+            Expr::InList {
+                expr: box Expr::Column(name, alias),
+                list,
+                negated: true,
+            } => {
+                // equivalent to <name> != <list_1> AND ... AND <name> != <list_n>.
+                for v in list {
+                    if let Some(cc) =
+                        self.extract_column_compare(&name, alias.as_deref(), Operator::NotEq, v)
+                    {
+                        self.apply_stat(&cc, &mut r);
+                    }
+                }
+                return r;
+            }
             Expr::BinaryExpr {
                 left,
                 op: Operator::And,
@@ -106,32 +139,46 @@ impl Builder<'_> {
                 return self.extract_filter(right, r);
             }
             Expr::BinaryExpr {
-                left,
+                box left,
                 op: Operator::Or,
-                right,
+                box right,
             } => {
-                let mut res_left = self.extract_filter(left, r.clone());
-                if res_left.is_empty() {
-                    return Vec::new();
-                }
-                let mut res_right = self.extract_filter(right, r);
-                if res_right.is_empty() {
-                    return Vec::new();
-                }
-                if PartitionFilter::SIZE_LIMIT < res_left.len() + res_right.len() {
-                    assert!(res_left.len() <= PartitionFilter::SIZE_LIMIT);
-                    res_right.truncate(PartitionFilter::SIZE_LIMIT - res_left.len());
-                }
-                res_left.extend(res_right);
-                return res_left;
+                return self.handle_or(
+                    [left, right]
+                        .iter()
+                        .map(|e| self.extract_filter(e, r.clone())),
+                );
             }
             _ => r,
             // TODO: most important unsupported expressions are:
             //       - IsNull/IsNotNull
             //       - Not
             //       - Between
-            //       - InList
         }
+    }
+
+    /// <e_1> OR <e_2> OR ... OR <e_n>
+    fn handle_or<Iter: Iterator<Item = Vec<MinMaxCondition>>>(
+        &self,
+        rs: Iter,
+    ) -> Vec<MinMaxCondition> {
+        let mut res = None;
+        for mut r in rs {
+            if r.is_empty() {
+                return Vec::new();
+            }
+            if res.is_none() {
+                res = Some(r);
+                continue;
+            }
+            if PartitionFilter::SIZE_LIMIT < res.as_mut().unwrap().len() + r.len() {
+                assert!(r.len() <= PartitionFilter::SIZE_LIMIT);
+                r.truncate(PartitionFilter::SIZE_LIMIT - r.len());
+            }
+            res.as_mut().unwrap().extend(r);
+        }
+
+        res.unwrap_or_default()
     }
 
     fn extract_column_compare(
@@ -387,6 +434,43 @@ mod tests {
                 min: vec![None],
                 max: vec![Some(TableValue::Int(10))],
             }]
+        );
+
+        // `IN` and `NOT IN` expressions.
+        assert_eq!(
+            extract("a IN (10)").min_max,
+            vec![MinMaxCondition {
+                min: vec![Some(TableValue::Int(10))],
+                max: vec![Some(TableValue::Int(10))],
+            }]
+        );
+
+        // TODO: more efficient encoding of these cases.
+        assert_eq!(
+            extract("a IN (10, 11, 12)").min_max,
+            vec![
+                MinMaxCondition {
+                    min: vec![Some(TableValue::Int(10))],
+                    max: vec![Some(TableValue::Int(10))],
+                },
+                MinMaxCondition {
+                    min: vec![Some(TableValue::Int(11))],
+                    max: vec![Some(TableValue::Int(11))],
+                },
+                MinMaxCondition {
+                    min: vec![Some(TableValue::Int(12))],
+                    max: vec![Some(TableValue::Int(12))],
+                }
+            ]
+        );
+
+        assert_eq!(
+            extract("a NOT IN (NULL)").min_max,
+            vec![] // TODO: below is expected result, but the parser never produces negated `in list`.
+                   // vec![MinMaxCondition {
+                   //     min: vec![Some(TableValue::Int(i64::min_value()))],
+                   //     max: vec![None],
+                   // }]
         );
 
         // Parentheses do not change anything. Note that parentheses are removed by the parser.
