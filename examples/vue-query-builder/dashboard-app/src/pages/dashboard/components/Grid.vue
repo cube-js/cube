@@ -3,13 +3,12 @@
     v-if="layout.length"
     :layout="layout"
     :col-num="colNum"
-    :row-height="434"
+    :row-height="20"
     :vertical-compact="true"
     :use-css-transforms="true"
     @layout-updated="layoutUpdatedEvent"
   >
     <grid-item
-      class="scroll-y-transition scroll-y-overflow"
       v-for="item in layout"
       :key="item.i"
       :x="item.x"
@@ -18,7 +17,7 @@
       :h="item.h"
       :i="item.i"
     >
-      <query-renderer :cubejsApi="cubejsApi" :query="getQueryById(item.i)">
+      <query-renderer class="height-100" :cubejsApi="cubejsApi" :query="getQueryById(item.i)">
         <template #default="{ resultSet }">
           <v-card :loading="!resultSet" class="px-4 py-2" height="100%">
             <v-card-title>{{item.value.name}}</v-card-title>
@@ -112,7 +111,7 @@
               x: (this.dashboardItems.length * 2) % (this.colNum || 12),
               y: this.dashboardItems.length + (this.colNum || 12), // puts it at the bottom
               w: 6,
-              h: 1,
+              h: 20,
               i: item.id,
             }
           }
@@ -194,5 +193,11 @@
 <style>
   .scroll-y-overflow {
     overflow-y: scroll;
+  }
+  .height-100 {
+    height: 100%;
+    max-height: 100%;
+    min-height: 100%;
+    overflow-y: hidden;
   }
 </style>
