@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.14](https://github.com/cube-js/cube.js/compare/v0.26.13...v0.26.14) (2021-02-15)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** Deploy token from env and malformed error ([#2089](https://github.com/cube-js/cube.js/issues/2089)) ([4d97399](https://github.com/cube-js/cube.js/commit/4d97399fba97a4e9e24501eeff90ac7d28da35d3))
+* **cubestore:** do not wait in queue for already downloaded files ([#2085](https://github.com/cube-js/cube.js/issues/2085)) ([13f4319](https://github.com/cube-js/cube.js/commit/13f4319218b4c3f81b3863e8c055907c55a6165a))
+* **cubestore:** Multiline CSV parsing ([860cf39](https://github.com/cube-js/cube.js/commit/860cf39cfc7a7302efb79d8e850aa793be264b00))
+* **cubestore:** UTF CSV parsing ([de2c6c3](https://github.com/cube-js/cube.js/commit/de2c6c36a0572daaa41f954bcbdd5ca131d92489))
+
+
+### Features
+
+* Build Cube Store binary for MacOS ([#2075](https://github.com/cube-js/cube.js/issues/2075)) ([5ef3612](https://github.com/cube-js/cube.js/commit/5ef3612e7ea23c08ecada5423c27bd54a609ad75))
+
+
+
+
+
 ## [0.26.13](https://github.com/cube-js/cube.js/compare/v0.26.12...v0.26.13) (2021-02-12)
 
 

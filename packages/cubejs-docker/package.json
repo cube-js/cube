@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/docker",
-  "version": "0.26.13",
+  "version": "0.26.14",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -23,7 +23,7 @@
     "@cubejs-backend/server": "^0.26.13",
     "@cubejs-backend/snowflake-driver": "^0.26.13",
     "@cubejs-backend/sqlite-driver": "^0.26.13",
-    "cubejs-cli": "^0.26.13",
+    "cubejs-cli": "^0.26.14",
     "typescript": "~4.1.2"
   }
 }
