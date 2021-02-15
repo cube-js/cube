@@ -85,24 +85,12 @@ export class Config {
   }
 
   public async deployAuth(url?: string) {
+    const config = await this.loadConfig();
+
     if (process.env.CUBE_CLOUD_DEPLOY_AUTH) {
-      const payload = jwt.decode(process.env.CUBE_CLOUD_DEPLOY_AUTH);
-      if (!payload || typeof payload !== 'object' || !payload.url) {
-        throw new Error('Malformed token in CUBE_CLOUD_DEPLOY_AUTH');
-      }
-
-      if (url && payload.url !== url) {
-        throw new Error('CUBE_CLOUD_DEPLOY_AUTH token doesn\'t match url in .cubecloud');
-      }
-
-      return {
-        [payload.url]: {
-          auth: process.env.CUBE_CLOUD_DEPLOY_AUTH
-        }
-      };
+      return (await this.addAuthToken(process.env.CUBE_CLOUD_DEPLOY_AUTH, config)).auth;
     }
 
-    const config = await this.loadConfig();
     if (config.auth) {
       return config.auth;
     }
