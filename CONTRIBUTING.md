@@ -20,11 +20,21 @@ Please review the following sections before proposing code changes.
 
 By contributing to Cube Dev, Inc., You accept and agree to the terms and conditions in the [Developer Certificate of Origin](https://github.com/cube-js/cube.js/blob/master/DCO.md) for Your present and future Contributions submitted to Cube Dev, Inc. Your contribution includes any submissions to the [Cube.js repository](https://github.com/cube-js) when you click on such buttons as `Propose changes` or `Create pull request`. Except for the licenses granted herein, You reserve all right, title, and interest in and to Your Contributions.
 
-## Contribution Prerequisites
+## Step-by-step guide to contributing
 
-Cube.js works with Node.js 8+ and uses yarn as a package manager.
+1. Find [issues](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either [`good first issue`](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22+) and/or [`help wanted`](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) labels.
+2. Follow the directions in the [Getting Started guide](https://cube.dev/docs/getting-started) to get Cube.js up and running (incl. the [Developer Playground](https://cube.dev/docs/dev-tools/dev-playground)). 
+3. Clone the [Cube.js repo](https://github.com/cube-js/cube.js).
+4. Submit your Pull Request. 
+5. Testing: Please include test(s) for your code contribution. See some of the test examples for [drivers](https://github.com/cube-js/cube.js/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube.js/tree/master/packages/cubejs-backend-shared/test). 
+6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs` folder](https://github.com/cube-js/cube.js/tree/master/docs). To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
+7. Relevant team(s) will be pinged automatically for a review based on information in the `CODEOWNERS` file. 
 
 ## Development Workflow
+
+### Prerequisites
+
+Cube.js works with Node.js 10+ and uses Yarn as a package manager.
 
 ### Cube.js Docker
 
