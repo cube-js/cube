@@ -81,6 +81,10 @@ class ClickHouseDriver extends BaseDriver {
     return this.query("SELECT 1");
   }
 
+  readOnly() {
+    return !!this.config.readOnly || this.readOnlyMode;
+  }
+
   query(query, values) {
     const formattedQuery = sqlstring.format(query, values);
 
