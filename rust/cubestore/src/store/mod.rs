@@ -686,12 +686,13 @@ impl ChunkStore {
             .await?;
         trace!("New chunk allocated during partitioning: {:?}", chunk);
         let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
-        let local_file = self.remote_fs.local_file(&remote_path).await?;
+        let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
+        let local_file_copy = local_file.clone();
         tokio::task::spawn_blocking(move || -> Result<(), CubeError> {
             let parquet = ParquetTableStore::new(index.get_row().clone(), 16384); // TODO config
             parquet.merge_rows(
                 None,
-                vec![local_file],
+                vec![local_file_copy],
                 data.into_rows(),
                 index.get_row().sort_key_size(),
             )?;
@@ -701,8 +702,7 @@ impl ChunkStore {
 
         let fs = self.remote_fs.clone();
         Ok(tokio::spawn(async move {
-            fs.upload_file(&ChunkStore::chunk_file_name(chunk.clone()))
-                .await?;
+            fs.upload_file(&local_file, &remote_path).await?;
             Ok(chunk)
         }))
     }

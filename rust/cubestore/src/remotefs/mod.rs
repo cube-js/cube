@@ -9,7 +9,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
 use std::fmt::Debug;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use tokio::fs;
@@ -33,7 +33,17 @@ impl RemoteFile {
 
 #[async_trait]
 pub trait RemoteFs: Send + Sync + Debug {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError>;
+    /// Use this path to prepare files for upload. Writing into `local_path()` directly can result
+    /// in files being deleted by the background cleanup process, see `QueueRemoteFs::cleanup_loop`.
+    async fn temp_upload_path(&self, remote_path: &str) -> Result<String, CubeError> {
+        // Putting files into a subdirectory prevents cleanups from removing them.
+        self.local_file(&format!("uploads/{}", remote_path)).await
+    }
+
+    /// In addition to uploading this file to the remote filesystem, this function moves the file
+    /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
+    async fn upload_file(&self, temp_upload_path: &str, remote_path: &str)
+        -> Result<(), CubeError>;
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError>;
 
@@ -77,12 +87,20 @@ impl LocalDirRemoteFs {
 
 #[async_trait]
 impl RemoteFs for LocalDirRemoteFs {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
         debug!("Uploading {}", remote_path);
         let remote_dir = self.remote_dir.write().await;
         let dest = remote_dir.as_path().join(remote_path);
         fs::create_dir_all(dest.parent().unwrap()).await?;
-        fs::copy(self.dir.as_path().join(remote_path), dest.clone()).await?;
+        fs::copy(&temp_upload_path, dest.clone()).await?;
+        let local_path = self.dir.as_path().join(remote_path);
+        if Path::new(temp_upload_path) != local_path {
+            fs::rename(&temp_upload_path, local_path).await?;
+        }
         Ok(())
     }
 

@@ -8,7 +8,7 @@ use s3::creds::Credentials;
 use s3::Bucket;
 use std::env;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::NamedTempFile;
@@ -49,16 +49,24 @@ impl S3RemoteFs {
 
 #[async_trait]
 impl RemoteFs for S3RemoteFs {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let path = self.s3_path(remote_path);
         let bucket = self.bucket.clone();
-        let local_path = self.dir.as_path().join(remote_path);
+        let temp_upload_path_copy = temp_upload_path.to_string();
         let status_code = tokio::task::spawn_blocking(move || {
-            bucket.put_object_stream_blocking(local_path, path)
+            bucket.put_object_stream_blocking(temp_upload_path_copy, path)
         })
         .await??;
+        let local_path = self.dir.as_path().join(remote_path);
+        if Path::new(temp_upload_path) != local_path {
+            fs::rename(&temp_upload_path, local_path).await?;
+        }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 200 {
             return Err(CubeError::user(format!(
