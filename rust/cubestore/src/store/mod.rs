@@ -21,6 +21,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::config::injection::DIService;
 use crate::sys::malloc::trim_allocs;
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
@@ -164,12 +165,16 @@ pub struct WALStore {
     wal_chunk_size: usize,
 }
 
+crate::di_service!(WALStore, [WALDataStore]);
+
 pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     wal_store: Arc<dyn WALDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     chunk_size: usize,
 }
+
+crate::di_service!(ChunkStore, [ChunkDataStore]);
 
 fn save<T: Serialize>(path: String, data: T) -> Result<(), CubeError> {
     let file = File::create(path)?;
@@ -188,7 +193,7 @@ fn load<T: de::DeserializeOwned>(path: String) -> Result<T, CubeError> {
 }
 
 #[async_trait]
-pub trait WALDataStore: Send + Sync {
+pub trait WALDataStore: DIService + Send + Sync {
     async fn add_wal(&self, table: IdRow<Table>, data: DataFrame) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<DataFrame, CubeError>;
     fn get_wal_chunk_size(&self) -> usize;
@@ -196,7 +201,7 @@ pub trait WALDataStore: Send + Sync {
 
 #[automock]
 #[async_trait]
-pub trait ChunkDataStore: Send + Sync {
+pub trait ChunkDataStore: DIService + Send + Sync {
     async fn partition(&self, wal_id: u64) -> Result<(), CubeError>;
     /// Returns ids of uploaded chunks. Uploaded chunks are **not** activated.
     async fn partition_data(
@@ -209,6 +214,8 @@ pub trait ChunkDataStore: Send + Sync {
     async fn download_chunk(&self, chunk: IdRow<Chunk>) -> Result<String, CubeError>;
     async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError>;
 }
+
+crate::di_service!(MockChunkDataStore, [ChunkDataStore]);
 
 impl WALStore {
     pub fn new(

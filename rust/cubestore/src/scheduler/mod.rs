@@ -20,6 +20,8 @@ pub struct SchedulerImpl {
     config: Arc<dyn ConfigObj>,
 }
 
+crate::di_service!(SchedulerImpl, []);
+
 impl SchedulerImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,

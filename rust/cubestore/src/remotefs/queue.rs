@@ -1,4 +1,5 @@
 use crate::config::ConfigObj;
+use crate::di_service;
 use crate::remotefs::{RemoteFile, RemoteFs};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -30,7 +31,9 @@ pub struct QueueRemoteFs {
 
 impl Debug for QueueRemoteFs {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.remote_fs.fmt(f)
+        f.debug_struct("QueueRemoteFs")
+            .field("remote_fs", &self.remote_fs)
+            .finish()
     }
 }
 
@@ -50,6 +53,8 @@ pub enum RemoteFsOpResult {
     Delete(String, Result<(), CubeError>),
     Download(String, Result<String, CubeError>),
 }
+
+di_service!(QueueRemoteFs, [RemoteFs]);
 
 impl QueueRemoteFs {
     pub fn new(config: Arc<dyn ConfigObj>, remote_fs: Arc<dyn RemoteFs>) -> Arc<Self> {

@@ -2,6 +2,8 @@ pub mod gcs;
 pub mod queue;
 pub mod s3;
 
+use crate::config::injection::DIService;
+use crate::di_service;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -32,7 +34,7 @@ impl RemoteFile {
 }
 
 #[async_trait]
-pub trait RemoteFs: Send + Sync + Debug {
+pub trait RemoteFs: DIService + Send + Sync + Debug {
     /// Use this path to prepare files for upload. Writing into `local_path()` directly can result
     /// in files being deleted by the background cleanup process, see `QueueRemoteFs::cleanup_loop`.
     async fn temp_upload_path(&self, remote_path: &str) -> Result<String, CubeError> {
@@ -84,6 +86,8 @@ impl LocalDirRemoteFs {
         Ok(fs::remove_dir_all(&*self.dir).await?)
     }
 }
+
+di_service!(LocalDirRemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for LocalDirRemoteFs {

@@ -3,6 +3,7 @@ pub mod worker_pool;
 
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
+use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -46,7 +47,7 @@ use tokio::time::timeout;
 
 #[automock]
 #[async_trait]
-pub trait Cluster: Send + Sync {
+pub trait Cluster: DIService + Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
 
     async fn run_select(
@@ -66,6 +67,8 @@ pub trait Cluster: Send + Sync {
 
     async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError>;
 }
+
+crate::di_service!(MockCluster, [Cluster]);
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum JobEvent {
@@ -96,6 +99,8 @@ pub struct ClusterImpl {
     close_worker_socket_tx: watch::Sender<bool>,
     close_worker_socket_rx: RwLock<watch::Receiver<bool>>,
 }
+
+crate::di_service!(ClusterImpl, [Cluster]);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WorkerMessage {
@@ -816,6 +821,8 @@ mod tests {
 
     struct MockWalStore;
 
+    crate::di_service!(MockWalStore, [WALDataStore]);
+
     #[async_trait]
     impl WALDataStore for MockWalStore {
         async fn add_wal(
@@ -836,6 +843,8 @@ mod tests {
     }
 
     struct MockChunkStore;
+
+    crate::di_service!(MockChunkStore, [ChunkDataStore]);
 
     #[async_trait]
     impl ChunkDataStore for MockChunkStore {
@@ -869,6 +878,8 @@ mod tests {
     }
 
     struct MockCompaction;
+
+    crate::di_service!(MockCompaction, [CompactionService]);
 
     #[async_trait]
     impl CompactionService for MockCompaction {

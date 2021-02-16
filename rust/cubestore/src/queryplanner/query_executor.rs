@@ -1,4 +1,5 @@
 use crate::cluster::Cluster;
+use crate::config::injection::DIService;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
@@ -50,7 +51,7 @@ use std::time::SystemTime;
 
 #[automock]
 #[async_trait]
-pub trait QueryExecutor: Send + Sync {
+pub trait QueryExecutor: DIService + Send + Sync {
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
@@ -64,7 +65,11 @@ pub trait QueryExecutor: Send + Sync {
     ) -> Result<Vec<RecordBatch>, CubeError>;
 }
 
+crate::di_service!(MockQueryExecutor, [QueryExecutor]);
+
 pub struct QueryExecutorImpl;
+
+crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
