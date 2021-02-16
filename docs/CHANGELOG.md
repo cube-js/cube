@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.15](https://github.com/cube-js/cube.js/compare/v0.26.14...v0.26.15) (2021-02-16)
+
+
+### Features
+
+* **clickhouse-driver:** HTTPS and readOnly support ([3d60ead](https://github.com/cube-js/cube.js/commit/3d60ead920635eb85c76b51a5c301e2f1fb08cb6))
+
+
+
+
+
 ## [0.26.14](https://github.com/cube-js/cube.js/compare/v0.26.13...v0.26.14) (2021-02-15)
 
 **Note:** Version bump only for package @cubejs-docs/site
