@@ -1679,7 +1679,7 @@ impl RocksMetaStore {
             );
             let file_name = self.remote_fs.local_file(&log_name).await?;
             serializer.write_to_file(&file_name).await?;
-            self.remote_fs.upload_file(&log_name).await?;
+            self.remote_fs.upload_file(&file_name, &log_name).await?;
             let mut seq = self.last_upload_seq.write().await;
             *seq = max.unwrap();
             self.write_completed_notify.notify_waiters();
@@ -1738,8 +1738,14 @@ impl RocksMetaStore {
         }
         for v in join_all(
             files_to_upload
-                .iter()
-                .map(|f| remote_fs.upload_file(&f))
+                .into_iter()
+                .map(|f| {
+                    let remote_fs = remote_fs.clone();
+                    return async move {
+                        let local = remote_fs.local_file(&f).await?;
+                        remote_fs.upload_file(&local, &f).await
+                    };
+                })
                 .collect::<Vec<_>>(),
         )
         .await
@@ -1785,11 +1791,13 @@ impl RocksMetaStore {
         let current_metastore_file = remote_fs.local_file("metastore-current").await?;
 
         {
-            let mut file = File::create(current_metastore_file).await?;
+            let mut file = File::create(&current_metastore_file).await?;
             tokio::io::AsyncWriteExt::write_all(&mut file, remote_path.as_bytes()).await?;
         }
 
-        remote_fs.upload_file("metastore-current").await?;
+        remote_fs
+            .upload_file(&current_metastore_file, "metastore-current")
+            .await?;
 
         Ok(())
     }
