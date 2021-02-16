@@ -129,7 +129,7 @@ export class BaseDriver {
                 );
               }
 
-              const file = fs.readFileSync(value);
+              const file = fs.readFileSync(value, 'utf8');
               if (validate(file)) {
                 return {
                   ...agg,
