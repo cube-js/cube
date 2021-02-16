@@ -5,7 +5,7 @@ use cloud_storage::Object;
 use futures::StreamExt;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::NamedTempFile;
@@ -40,11 +40,14 @@ impl GCSRemoteFs {
 
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
-        let local_path = self.dir.as_path().join(remote_path);
-        let file = File::open(local_path).await?;
+        let file = File::open(temp_upload_path).await?;
         let size = file.metadata().await?.len();
         let stream = FramedRead::new(file, BytesCodec::new());
         let stream = stream.map(|r| r.map(|b| b.to_vec()));
@@ -56,6 +59,10 @@ impl RemoteFs for GCSRemoteFs {
             "application/octet-stream",
         )
         .await?;
+        let local_path = self.dir.as_path().join(remote_path);
+        if Path::new(temp_upload_path) != local_path {
+            fs::rename(&temp_upload_path, local_path).await?;
+        }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         Ok(())
     }

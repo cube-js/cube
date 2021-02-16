@@ -103,7 +103,7 @@ impl CompactionService for CompactionServiceImpl {
         let mut new_partition_local_files = Vec::new();
         for p in new_partitions.iter() {
             let new_remote_path = p.get_row().get_full_name(p.get_id()).unwrap();
-            new_partition_local_files.push(self.remote_fs.local_file(&new_remote_path).await?)
+            new_partition_local_files.push(self.remote_fs.temp_upload_path(&new_remote_path).await?)
         }
 
         let new_partition_file_names = new_partition_local_files.clone();
@@ -119,18 +119,23 @@ impl CompactionService for CompactionServiceImpl {
 
         let mut filtered_partitions = Vec::new();
 
-        for p in new_partitions
+        for (i, p) in new_partitions
             .into_iter()
             .zip_longest(count_and_min_max.iter())
+            .enumerate()
         {
             match p {
                 EitherOrBoth::Both(p, _) => {
                     let new_remote_path = p.get_row().get_full_name(p.get_id()).unwrap();
-                    self.remote_fs.upload_file(new_remote_path.as_str()).await?;
+                    self.remote_fs
+                        .upload_file(&new_partition_local_files[i], new_remote_path.as_str())
+                        .await?;
                     filtered_partitions.push(p);
                 }
                 EitherOrBoth::Left(p) => {
                     self.meta_store.delete_partition(p.get_id()).await?;
+                    // TODO: ensure all files get removed on errors.
+                    let _ = tokio::fs::remove_file(&new_partition_local_files[i]).await;
                 }
                 EitherOrBoth::Right(_) => {
                     return Err(CubeError::internal(format!(

@@ -8,8 +8,11 @@ use log::error;
 use smallvec::alloc::fmt::Formatter;
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::{broadcast, watch, RwLock};
+use tokio::task::spawn_blocking;
+use tokio::time::Duration;
 
 pub struct QueueRemoteFs {
     config: Arc<dyn ConfigObj>,
@@ -33,7 +36,10 @@ impl Debug for QueueRemoteFs {
 
 #[derive(Debug)]
 pub enum RemoteFsOp {
-    Upload(String),
+    Upload {
+        temp_upload_path: String,
+        remote_path: String,
+    },
     Delete(String),
     Download(String),
 }
@@ -111,6 +117,11 @@ impl QueueRemoteFs {
                 }
             });
         }
+
+        let to_move = queue_remote_fs.clone();
+        tokio::task::spawn(async move {
+            to_move.cleanup_loop().await;
+        });
     }
 
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
@@ -119,12 +130,17 @@ impl QueueRemoteFs {
 
     async fn upload_loop(&self, to_process: RemoteFsOp) -> Result<(), CubeError> {
         match to_process {
-            RemoteFsOp::Upload(file) => {
-                if !self.deleted.read().await.contains(file.as_str()) {
-                    self.result_sender.send(RemoteFsOpResult::Upload(
-                        file.to_string(),
-                        self.remote_fs.upload_file(file.as_str()).await,
-                    ))?;
+            RemoteFsOp::Upload {
+                temp_upload_path,
+                remote_path,
+            } => {
+                if !self.deleted.read().await.contains(remote_path.as_str()) {
+                    let res = self
+                        .remote_fs
+                        .upload_file(&temp_upload_path, &remote_path)
+                        .await;
+                    self.result_sender
+                        .send(RemoteFsOpResult::Upload(remote_path, res))?;
                 }
             }
             RemoteFsOp::Delete(file) => {
@@ -151,14 +167,118 @@ impl QueueRemoteFs {
         }
         Ok(())
     }
+
+    const CLEANUP_INTERVAL: Duration = Duration::from_secs(600);
+    /// Periodically cleans up the local directory from the files removed on the remote side.
+    /// This function currently removes only direct sibling files and does not touch subdirectories.
+    /// So e.g. we remove the `.parquet` files, but not directories like `metastore` or heartbeat.
+    ///
+    /// Uploads typically live in the `uploads` directory while being prepared and only get moved
+    /// to be direct siblings **after** appearing on the server.
+    async fn cleanup_loop(&self) -> () {
+        let local_dir = self.local_path().await;
+        let mut stopped_rx = self.stopped_rx.clone();
+        loop {
+            // Do the cleanup every now and then.
+            tokio::select! {
+                () = tokio::time::sleep(Self::CLEANUP_INTERVAL) => {},
+                res = stopped_rx.changed() => {
+                    if res.is_err() || *stopped_rx.borrow() {
+                        return;
+                    }
+                }
+            }
+
+            // Important to collect local files **before** remote to avoid invalid removals.
+            // We rely on RemoteFs implementations to upload the file to the server before they make
+            // it available on the local filesystem.
+            let local_dir_copy = local_dir.clone();
+            let res_local_files =
+                spawn_blocking(move || -> Result<HashSet<String>, std::io::Error> {
+                    let mut local_files = HashSet::new();
+                    for res_entry in Path::new(&local_dir_copy).read_dir()? {
+                        let entry = match res_entry {
+                            Err(_) => continue, // ignore errors, might come from concurrent fs ops.
+                            Ok(e) => e,
+                        };
+
+                        let ft = match entry.file_type() {
+                            Err(_) => continue,
+                            Ok(ft) => ft,
+                        };
+                        if !ft.is_file() {
+                            continue;
+                        }
+
+                        let file_name = match entry.file_name().into_string() {
+                            Err(_) => {
+                                log::error!("could not convert file name {:?}", entry.file_name());
+                                continue;
+                            }
+                            Ok(name) => name,
+                        };
+
+                        local_files.insert(file_name);
+                    }
+                    Ok(local_files)
+                })
+                .await
+                .unwrap();
+
+            let mut local_files = match res_local_files {
+                Err(e) => {
+                    log::error!("error while trying to list local files: {}", e);
+                    continue;
+                }
+                Ok(f) => f,
+            };
+
+            let res_remote_files = self.list("").await;
+            let remote_files = match res_remote_files {
+                Err(e) => {
+                    log::error!("could not get the list of remote files: {}", e);
+                    continue;
+                }
+                Ok(f) => f,
+            };
+
+            // Only keep the files we want to remove in `local_files`.
+            for f in remote_files {
+                local_files.remove(&f);
+            }
+
+            if !local_files.is_empty() {
+                log::debug!(
+                    "Cleaning up {} files that were removed remotely",
+                    local_files.len()
+                );
+                log::trace!("The files being removed are {:?}", local_files);
+            }
+
+            let local_dir_copy = local_dir.clone();
+            tokio::task::spawn_blocking(move || {
+                for f in local_files {
+                    let _ = std::fs::remove_file(Path::new(&local_dir_copy).join(f));
+                }
+            })
+            .await
+            .unwrap();
+        }
+    }
 }
 
 #[async_trait]
 impl RemoteFs for QueueRemoteFs {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn upload_file(
+        &self,
+        local_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
         let mut receiver = self.result_sender.subscribe();
-        self.upload_queue
-            .push(RemoteFsOp::Upload(remote_path.to_string()));
+        self.upload_queue.push(RemoteFsOp::Upload {
+            temp_upload_path: local_upload_path.to_string(),
+            remote_path: remote_path.to_string(),
+        });
         loop {
             let res = receiver.recv().await?;
             if let RemoteFsOpResult::Upload(file, result) = res {

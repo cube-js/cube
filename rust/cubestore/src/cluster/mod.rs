@@ -710,7 +710,9 @@ impl ClusterImpl {
             .trim_start_matches("/")
             .to_string();
 
-        self.remote_fs.upload_file(&to_upload).await?;
+        self.remote_fs
+            .upload_file(heart_beat_path.to_str().unwrap(), &to_upload)
+            .await?;
 
         let heart_beats = self
             .remote_fs
