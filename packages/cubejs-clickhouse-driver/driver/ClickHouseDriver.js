@@ -17,7 +17,7 @@ class ClickHouseDriver extends BaseDriver {
       },
       ...config
     };
-    this.readOnlyMode = Boolean(process.env.CUBEJS_DB_CLICKHOUSE_READONLY);
+    this.readOnlyMode = process.env.CUBEJS_DB_CLICKHOUSE_READONLY === 'true';
     this.pool = genericPool.createPool({
       create: async () => new ClickHouse({
         ...this.config,
