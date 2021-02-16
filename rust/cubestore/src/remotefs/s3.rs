@@ -1,3 +1,4 @@
+use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -46,6 +47,8 @@ impl S3RemoteFs {
         }))
     }
 }
+
+di_service!(S3RemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for S3RemoteFs {

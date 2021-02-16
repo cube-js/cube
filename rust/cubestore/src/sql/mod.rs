@@ -22,6 +22,7 @@ use crate::queryplanner::{QueryPlan, QueryPlanner};
 
 use crate::cluster::{Cluster, JobEvent};
 
+use crate::config::injection::DIService;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
@@ -37,25 +38,27 @@ use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 
 #[async_trait]
-pub trait SqlService: Send + Sync {
+pub trait SqlService: DIService + Send + Sync {
     async fn exec_query(&self, query: &str) -> Result<DataFrame, CubeError>;
 }
 
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
-    limits: ConcurrencyLimits,
+    limits: Arc<ConcurrencyLimits>,
     query_planner: Arc<dyn QueryPlanner>,
     query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
 }
 
+crate::di_service!(SqlServiceImpl, [SqlService]);
+
 impl SqlServiceImpl {
     pub fn new(
         db: Arc<dyn MetaStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
-        limits: ConcurrencyLimits,
+        limits: Arc<ConcurrencyLimits>,
         query_planner: Arc<dyn QueryPlanner>,
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
@@ -738,7 +741,7 @@ mod tests {
                 wal_store,
                 rows_per_chunk,
             );
-            let limits = ConcurrencyLimits::new(4);
+            let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
                 store,
@@ -785,7 +788,7 @@ mod tests {
                 store.clone(),
                 rows_per_chunk,
             );
-            let limits = ConcurrencyLimits::new(4);
+            let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
                 chunk_store,

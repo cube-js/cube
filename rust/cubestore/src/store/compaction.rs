@@ -1,3 +1,4 @@
+use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::MetaStore;
 use crate::remotefs::RemoteFs;
@@ -13,7 +14,7 @@ use scopeguard::defer;
 use std::sync::Arc;
 
 #[async_trait]
-pub trait CompactionService: Send + Sync {
+pub trait CompactionService: DIService + Send + Sync {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError>;
 }
 
@@ -23,6 +24,8 @@ pub struct CompactionServiceImpl {
     remote_fs: Arc<dyn RemoteFs>,
     config: Arc<dyn ConfigObj>,
 }
+
+crate::di_service!(CompactionServiceImpl, [CompactionService]);
 
 impl CompactionServiceImpl {
     pub fn new(

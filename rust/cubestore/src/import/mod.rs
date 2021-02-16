@@ -1,5 +1,6 @@
 pub mod limits;
 
+use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
@@ -329,23 +330,27 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
 
 #[automock]
 #[async_trait]
-pub trait ImportService: Send + Sync {
+pub trait ImportService: DIService + Send + Sync {
     async fn import_table(&self, table_id: u64) -> Result<(), CubeError>;
 }
+
+crate::di_service!(MockImportService, [ImportService]);
 
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
     config_obj: Arc<dyn ConfigObj>,
-    limits: ConcurrencyLimits,
+    limits: Arc<ConcurrencyLimits>,
 }
+
+crate::di_service!(ImportServiceImpl, [ImportService]);
 
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
         config_obj: Arc<dyn ConfigObj>,
-        limits: ConcurrencyLimits,
+        limits: Arc<ConcurrencyLimits>,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
@@ -450,7 +455,7 @@ impl ImportService for ImportServiceImpl {
 pub struct Ingestion {
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
-    limits: ConcurrencyLimits,
+    limits: Arc<ConcurrencyLimits>,
     table: IdRow<Table>,
 
     partition_jobs: Vec<JoinHandle<Result<(), CubeError>>>,
@@ -460,7 +465,7 @@ impl Ingestion {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
-        limits: ConcurrencyLimits,
+        limits: Arc<ConcurrencyLimits>,
         table: IdRow<Table>,
     ) -> Ingestion {
         Ingestion {

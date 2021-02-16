@@ -1,17 +1,20 @@
-use crate::cluster::{ClusterImpl, ClusterMetaStoreClient};
+pub mod injection;
+
+use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
+use crate::config::injection::{get_service, get_service_typed, DIService, Injector, InjectorRef};
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::ImportServiceImpl;
+use crate::import::{ImportService, ImportServiceImpl};
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
-use crate::queryplanner::QueryPlannerImpl;
+use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
-use crate::store::compaction::CompactionServiceImpl;
-use crate::store::{ChunkStore, WALStore};
+use crate::store::compaction::{CompactionService, CompactionServiceImpl};
+use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
 use log::debug;
@@ -90,10 +93,11 @@ pub enum FileStoreProvider {
 
 pub struct Config {
     config_obj: Arc<ConfigObjImpl>,
+    injector: Arc<Injector>,
 }
 
 #[automock]
-pub trait ConfigObj: Send + Sync {
+pub trait ConfigObj: DIService {
     fn partition_split_threshold(&self) -> u64;
 
     fn compaction_chunks_total_size_threshold(&self) -> u64;
@@ -131,6 +135,8 @@ pub trait ConfigObj: Send + Sync {
     fn connection_timeout(&self) -> u64;
 
     fn server_name(&self) -> &String;
+
+    fn max_ingestion_data_frames(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +162,9 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
 }
+
+crate::di_service!(ConfigObjImpl, [ConfigObj]);
+crate::di_service!(MockConfigObj, [ConfigObj]);
 
 impl ConfigObj for ConfigObjImpl {
     fn partition_split_threshold(&self) -> u64 {
@@ -233,6 +242,10 @@ impl ConfigObj for ConfigObjImpl {
     fn server_name(&self) -> &String {
         &self.server_name
     }
+
+    fn max_ingestion_data_frames(&self) -> usize {
+        self.max_ingestion_data_frames
+    }
 }
 
 lazy_static! {
@@ -248,6 +261,7 @@ lazy_static! {
 impl Config {
     pub fn default() -> Config {
         Config {
+            injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::var("CUBESTORE_DATA_DIR")
                     .ok()
@@ -328,6 +342,7 @@ impl Config {
 
     pub fn test(name: &str) -> Config {
         Config {
+            injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::current_dir()
                     .unwrap()
@@ -365,6 +380,7 @@ impl Config {
     ) -> Config {
         let new_config = self.config_obj.as_ref().clone();
         Self {
+            injector: self.injector.clone(),
             config_obj: Arc::new(update_config(new_config)),
         }
     }
@@ -406,7 +422,7 @@ impl Config {
         }
 
         let store_path = self.local_dir().clone();
-        let remote_fs = self.remote_fs().unwrap();
+        let remote_fs = self.remote_fs().await.unwrap();
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
             let remote_files = remote_fs.list("").await.unwrap();
@@ -464,121 +480,238 @@ impl Config {
         self.local_dir().join("metastore")
     }
 
-    fn remote_fs(&self) -> Result<Arc<dyn RemoteFs>, CubeError> {
-        Ok(match &self.config_obj.store_provider {
+    async fn configure_remote_fs(&self) {
+        let config_obj_to_register = self.config_obj.clone();
+        self.injector
+            .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
+            .await;
+
+        match &self.config_obj.store_provider {
             FileStoreProvider::Filesystem { remote_dir } => {
-                LocalDirRemoteFs::new(remote_dir.clone(), self.config_obj.data_dir.clone())
+                let remote_dir = remote_dir.clone();
+                let data_dir = self.config_obj.data_dir.clone();
+                self.injector
+                    .register("original_remote_fs", async move |_| {
+                        let arc: Arc<dyn DIService> = LocalDirRemoteFs::new(remote_dir, data_dir);
+                        arc
+                    })
+                    .await;
             }
             FileStoreProvider::S3 {
                 region,
                 bucket_name,
                 sub_path,
-            } => S3RemoteFs::new(
-                self.config_obj.data_dir.clone(),
-                region.to_string(),
-                bucket_name.to_string(),
-                sub_path.clone(),
-            )?,
+            } => {
+                let data_dir = self.config_obj.data_dir.clone();
+                let region = region.to_string();
+                let bucket_name = bucket_name.to_string();
+                let sub_path = sub_path.clone();
+                self.injector
+                    .register("original_remote_fs", async move |_| {
+                        let arc: Arc<dyn DIService> =
+                            S3RemoteFs::new(data_dir, region, bucket_name, sub_path).unwrap();
+                        arc
+                    })
+                    .await;
+            }
             FileStoreProvider::GCS {
                 bucket_name,
                 sub_path,
-            } => GCSRemoteFs::new(
-                self.config_obj.data_dir.clone(),
-                bucket_name.to_string(),
-                sub_path.clone(),
-            )?,
+            } => {
+                let data_dir = self.config_obj.data_dir.clone();
+                let bucket_name = bucket_name.to_string();
+                let sub_path = sub_path.clone();
+                self.injector
+                    .register("original_remote_fs", async move |_| {
+                        let arc: Arc<dyn DIService> =
+                            GCSRemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
+                        arc
+                    })
+                    .await;
+            }
             FileStoreProvider::Local => unimplemented!(), // TODO
-        })
+        };
+    }
+
+    async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {
+        self.configure_remote_fs().await;
+        Ok(self.injector.get_service("original_remote_fs").await)
     }
 
     pub async fn configure(&self) -> CubeServices {
-        let original_remote_fs = self.remote_fs().unwrap();
-        let remote_fs = QueueRemoteFs::new(self.config_obj.clone(), original_remote_fs.clone());
-        let (event_sender, event_receiver) = broadcast::channel(10000); // TODO config
+        self.configure_remote_fs().await;
 
-        let mut rocks_meta_store = None;
-        let meta_store: Arc<dyn MetaStore> =
-            if let Some(meta_store_remote) = self.config_obj.metastore_remote_address() {
-                let transport =
-                    ClusterMetaStoreClient::new(meta_store_remote.clone(), self.config_obj.clone());
-                Arc::new(MetaStoreRpcClient::new(transport))
-            } else {
-                let meta_store = RocksMetaStore::load_from_remote(
-                    self.meta_store_path().to_str().unwrap(),
-                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                    original_remote_fs,
-                    self.config_obj.clone(),
+        self.injector
+            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
+                QueueRemoteFs::new(
+                    i.get_service_typed::<dyn ConfigObj>().await,
+                    i.get_service("original_remote_fs").await,
                 )
-                .await
-                .unwrap();
-                rocks_meta_store = Some(meta_store.clone());
-                meta_store.add_listener(event_sender).await;
-                meta_store
-            };
+            })
+            .await;
 
-        let wal_store = WALStore::new(
-            meta_store.clone(),
-            remote_fs.clone(),
-            self.config_obj.wal_split_threshold() as usize,
-        );
-        let chunk_store = ChunkStore::new(
-            meta_store.clone(),
-            remote_fs.clone(),
-            wal_store.clone(),
-            self.config_obj.wal_split_threshold() as usize,
-        );
-        let compaction_service = CompactionServiceImpl::new(
-            meta_store.clone(),
-            chunk_store.clone(),
-            remote_fs.clone(),
-            self.config_obj.clone(),
-        );
-        let concurrency_limits = ConcurrencyLimits::new(self.config_obj.max_ingestion_data_frames);
-        let import_service = ImportServiceImpl::new(
-            meta_store.clone(),
-            chunk_store.clone(),
-            self.config_obj.clone(),
-            concurrency_limits.clone(),
-        );
-        let query_planner = QueryPlannerImpl::new(meta_store.clone());
-        let query_executor = Arc::new(QueryExecutorImpl);
-        let cluster = ClusterImpl::new(
-            self.config_obj.server_name().to_string(),
-            vec!["localhost".to_string()],
-            remote_fs.clone(),
-            Duration::from_secs(30),
-            chunk_store.clone(),
-            compaction_service.clone(),
-            meta_store.clone(),
-            import_service.clone(),
-            self.config_obj.clone(),
-            query_executor.clone(),
-        );
+        let (event_sender, _) = broadcast::channel(10000); // TODO config
+        let event_sender_to_move = event_sender.clone();
 
-        let sql_service = SqlServiceImpl::new(
-            meta_store.clone(),
-            chunk_store.clone(),
-            concurrency_limits,
-            query_planner.clone(),
-            query_executor.clone(),
-            cluster.clone(),
-            self.config_obj.wal_split_threshold as usize,
-        );
-        let scheduler = SchedulerImpl::new(
-            meta_store.clone(),
-            cluster.clone(),
-            remote_fs.clone(),
-            event_receiver,
-            self.config_obj.clone(),
-        );
+        if let Some(meta_store_remote) = self.config_obj.metastore_remote_address() {
+            let meta_store_remote = meta_store_remote.clone();
+            self.injector
+                .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
+                    let transport = ClusterMetaStoreClient::new(
+                        meta_store_remote,
+                        get_service_typed::<dyn ConfigObj>(&i).await,
+                    );
+                    Arc::new(MetaStoreRpcClient::new(transport))
+                })
+                .await;
+        } else {
+            let path = self.meta_store_path().to_str().unwrap().to_string();
+            self.injector
+                .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
+                    async move |i| {
+                        let meta_store = RocksMetaStore::load_from_remote(
+                            &path,
+                            // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                            get_service(&i, "original_remote_fs").await,
+                            get_service_typed::<dyn ConfigObj>(&i).await,
+                        )
+                        .await
+                        .unwrap();
+                        meta_store.add_listener(event_sender).await;
+                        meta_store
+                    },
+                )
+                .await;
+        };
+
+        self.injector
+            .register_typed::<dyn WALDataStore, _, _, _>(async move |i| {
+                WALStore::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .wal_split_threshold() as usize,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn ChunkDataStore, _, _, _>(async move |i| {
+                ChunkStore::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .wal_split_threshold() as usize,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
+                CompactionServiceImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<ConcurrencyLimits, _, _, _>(async move |i| {
+                Arc::new(ConcurrencyLimits::new(
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .max_ingestion_data_frames(),
+                ))
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn ImportService, _, _, _>(async move |i| {
+                ImportServiceImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
+                QueryPlannerImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn QueryExecutor, _, _, _>(async move |_| {
+                Arc::new(QueryExecutorImpl)
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn Cluster, _, _, _>(async move |i| {
+                ClusterImpl::new(
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .server_name()
+                        .to_string(),
+                    vec!["localhost".to_string()],
+                    i.get_service_typed().await,
+                    Duration::from_secs(30),
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn SqlService, _, _, _>(async move |i| {
+                SqlServiceImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .wal_split_threshold() as usize,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<SchedulerImpl, _, _, _>(async move |i| {
+                Arc::new(SchedulerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    event_sender_to_move.subscribe(),
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
 
         CubeServices {
-            sql_service,
-            scheduler: Arc::new(scheduler),
-            rocks_meta_store,
-            meta_store,
-            cluster,
-            remote_fs,
+            sql_service: self.injector.get_service_typed().await,
+            scheduler: self.injector.get_service_typed().await,
+            rocks_meta_store: if self.injector.has_service_typed::<RocksMetaStore>().await {
+                Some(self.injector.get_service_typed().await)
+            } else {
+                None
+            },
+            meta_store: self.injector.get_service_typed().await,
+            cluster: self.injector.get_service_typed().await,
+            remote_fs: self.injector.get_service_typed().await,
         }
     }
 

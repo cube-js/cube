@@ -1,3 +1,4 @@
+use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -37,6 +38,8 @@ impl GCSRemoteFs {
         }))
     }
 }
+
+di_service!(GCSRemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
