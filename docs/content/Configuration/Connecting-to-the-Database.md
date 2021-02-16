@@ -55,17 +55,18 @@ CUBEJS_API_SECRET=secret
 The table below shows which environment variables are used for different
 databases:
 
-| Database                                                           | Credentials                                                                                                                                                                                                                     |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PostgreSQL, MySQL, AWS Redshift, ClickHouse, Hive/SparkSQL, Oracle | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                        |
-| MS SQL                                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_DOMAIN`                                                                                                                    |
-| AWS Athena                                                         | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION`                                                                                                                                     |
-| Google Bigquery                                                    | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`                                                                                                                                                  |
-| MongoDB                                                            | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE`                        |
-| Snowflake                                                          | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
-| Presto                                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                 |
-| Druid                                                              | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                                                             |
-| SQLite                                                             | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
+| Database                                               | Credentials                                                                                                                                                                                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL, MySQL, AWS Redshift, Hive/SparkSQL, Oracle | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                        |
+| MS SQL                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_DOMAIN`                                                                                                                    |
+| ClickHouse                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_CLICKHOUSE_READONLY`                                                                                      |
+| AWS Athena                                             | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION`                                                                                                                                     |
+| Google BigQuery                                        | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`                                                                                                                                                  |
+| MongoDB                                                | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE`                        |
+| Snowflake                                              | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
+| Presto                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                 |
+| Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                                                             |
+| SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
 
 ## External Pre-aggregations Database
 
@@ -88,7 +89,7 @@ CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 
 ## Enabling SSL
 
-Cube.js supports SSL-encrypted connections for **Postgres**, **MongoDB**, **MS
+Cube.js supports SSL-encrypted connections for **ClickHouse**, **Postgres**, **MongoDB**, **MS
 SQL**, and **MySQL**. To enable it set the `CUBEJS_DB_SSL` environment variable
 to `true`. Cube.js can also be configured to use custom connection settings. For
 example, to use a custom CA and certificates, you could do the following:
@@ -211,7 +212,18 @@ You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
 `true`. All other SSL-related environment variables can be left unset. See
 [Enabling SSL][link-enabling-ssl] for more details.
 
+### ClickHouse
+
+You can connect to an HTTPS-enabled ClickHouse database by setting `CUBEJS_DB_SSL` to
+`true`. All other SSL-related environment variables can be left unset. See
+[Enabling SSL][link-enabling-ssl] for more details.
+
+You can connect to a ClickHouse database when your user's permissions are
+[restricted][link-clickhouse-readonly] to read-only, by setting `CUBEJS_DB_CLICKHOUSE_READONLY`
+to `true`.
+
 [link-enabling-ssl]: #enabling-ssl
+[link-clickhouse-readonly]: https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
 
 ### Connecting to Multiple Databases
 
