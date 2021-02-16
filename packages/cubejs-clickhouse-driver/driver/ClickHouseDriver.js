@@ -1,6 +1,7 @@
 const ClickHouse = require('@apla/clickhouse');
-const genericPool = require('generic-pool');
+const { getEnv } = require('@cubejs-backend/shared');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const genericPool = require('generic-pool');
 const { uuid } = require('uuidv4');
 const sqlstring = require('sqlstring');
 
@@ -11,7 +12,7 @@ class ClickHouseDriver extends BaseDriver {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT,
       auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
-      protocol: process.env.CUBEJS_DB_SSL ? 'https:' : 'http:',
+      protocol: getEnv('dbSsl') ? 'https:' : 'http:',
       queryOptions: {
         database: process.env.CUBEJS_DB_NAME || config && config.database || 'default'
       },

@@ -20,6 +20,7 @@
   "dependencies": {
     "@apla/clickhouse": "^1.5.5",
     "@cubejs-backend/query-orchestrator": "^0.26.15",
+    "@cubejs-backend/shared": "^0.26.15",
     "generic-pool": "^3.6.0",
     "sqlstring": "^2.3.1",
     "uuidv4": "^6.0.2"

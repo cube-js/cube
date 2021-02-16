@@ -65,7 +65,7 @@ databases:
 | MongoDB                                                | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE`                        |
 | Snowflake                                              | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 | Presto                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                 |
-| Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                                                             |
+| Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`                                                                                                                                                            |
 | SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
 
 ## External Pre-aggregations Database
@@ -209,6 +209,12 @@ To connect to a local MySQL database using a UNIX socket use
 `CUBEJS_DB_SOCKET_PATH`, by doing so, `CUBEJS_DB_HOST` will be ignored.
 
 You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
+`true`. All other SSL-related environment variables can be left unset. See
+[Enabling SSL][link-enabling-ssl] for more details.
+
+### Druid
+
+You can connect to an HTTPS-enabled Druid database by setting `CUBEJS_DB_SSL` to
 `true`. All other SSL-related environment variables can be left unset. See
 [Enabling SSL][link-enabling-ssl] for more details.
 

@@ -30,6 +30,7 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.15",
     "@cubejs-backend/schema-compiler": "^0.26.15",
+    "@cubejs-backend/shared": "^0.26.15",
     "axios": "^0.20.0",
     "moment-timezone": "^0.5.31"
   },
