@@ -82,9 +82,10 @@ impl SchedulerImpl {
         | MetaStoreEvent::Update(TableId::Partitions, row_id) = event
         {
             let p = self.meta_store.get_partition(row_id).await?;
-            if p.get_row().is_active() {
+            if p.get_row().is_active() && !p.get_row().is_warmed_up() {
                 if let Some(path) = p.get_row().get_full_name(p.get_id()) {
                     self.schedule_partition_warmup(p.get_id(), path).await?;
+                    self.meta_store.mark_partition_warmed_up(row_id).await?;
                 }
             }
         }
