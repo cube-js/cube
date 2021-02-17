@@ -1,3 +1,4 @@
+use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -8,7 +9,7 @@ use s3::creds::Credentials;
 use s3::Bucket;
 use std::env;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::NamedTempFile;
@@ -47,18 +48,28 @@ impl S3RemoteFs {
     }
 }
 
+di_service!(S3RemoteFs, [RemoteFs]);
+
 #[async_trait]
 impl RemoteFs for S3RemoteFs {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let path = self.s3_path(remote_path);
         let bucket = self.bucket.clone();
-        let local_path = self.dir.as_path().join(remote_path);
+        let temp_upload_path_copy = temp_upload_path.to_string();
         let status_code = tokio::task::spawn_blocking(move || {
-            bucket.put_object_stream_blocking(local_path, path)
+            bucket.put_object_stream_blocking(temp_upload_path_copy, path)
         })
         .await??;
+        let local_path = self.dir.as_path().join(remote_path);
+        if Path::new(temp_upload_path) != local_path {
+            fs::rename(&temp_upload_path, local_path).await?;
+        }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 200 {
             return Err(CubeError::user(format!(
@@ -72,18 +83,19 @@ impl RemoteFs for S3RemoteFs {
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
+        let downloads_dir = local_dir.join("downloads");
 
         let local_file_str = local_file.to_str().unwrap().to_string(); // return value.
 
-        fs::create_dir_all(local_dir).await?;
+        fs::create_dir_all(&downloads_dir).await?;
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(remote_path);
             let bucket = self.bucket.clone();
             let status_code = tokio::task::spawn_blocking(move || -> Result<u16, CubeError> {
-                let local_dir = local_file.parent().unwrap();
-                let (mut temp_file, temp_path) = NamedTempFile::new_in(local_dir)?.into_parts();
+                let (mut temp_file, temp_path) =
+                    NamedTempFile::new_in(&downloads_dir)?.into_parts();
 
                 let res = bucket.get_object_stream_blocking(path.as_str(), &mut temp_file)?;
                 temp_file.flush()?;

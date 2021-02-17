@@ -25,6 +25,8 @@ pub struct ConcurrencyLimits {
     active_data_frames: Arc<Semaphore>,
 }
 
+crate::di_service!(ConcurrencyLimits, []);
+
 impl ConcurrencyLimits {
     pub fn new(max_data_frames: usize) -> ConcurrencyLimits {
         assert!(1 <= max_data_frames, "no data frames can be processed");

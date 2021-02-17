@@ -4,6 +4,7 @@ pub mod query_executor;
 pub mod serialized_plan;
 pub mod udfs;
 
+use crate::config::injection::DIService;
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::queryplanner::query_executor::batch_to_dataframe;
@@ -39,14 +40,18 @@ use std::time::SystemTime;
 
 #[automock]
 #[async_trait]
-pub trait QueryPlanner: Send + Sync {
+pub trait QueryPlanner: DIService + Send + Sync {
     async fn logical_plan(&self, statement: Statement) -> Result<QueryPlan, CubeError>;
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError>;
 }
 
+crate::di_service!(MockQueryPlanner, [QueryPlanner]);
+
 pub struct QueryPlannerImpl {
     meta_store: Arc<dyn MetaStore>,
 }
+
+crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
 
 pub enum QueryPlan {
     Meta(LogicalPlan),

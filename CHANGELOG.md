@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.15](https://github.com/cube-js/cube.js/compare/v0.26.14...v0.26.15) (2021-02-16)
+
+
+### Bug Fixes
+
+* **cubestore:** prune partitions during initial planning ([#2100](https://github.com/cube-js/cube.js/issues/2100)) ([294928a](https://github.com/cube-js/cube.js/commit/294928a50be3a693e8098b2635399a591ba4f81d))
+
+
+### Features
+
+* Support JWK in authentication, improve JWT configuration([#1962](https://github.com/cube-js/cube.js/issues/1962)) ([6e5d2ac](https://github.com/cube-js/cube.js/commit/6e5d2ac0dc05757498b95f308be41d1be86fe206))
+* support SSL ca/cert/key in .env files as multiline text ([#2072](https://github.com/cube-js/cube.js/issues/2072)) ([d9f5154](https://github.com/cube-js/cube.js/commit/d9f5154e38c14417aa332f9bcd3d38ef00553e5a))
+* **clickhouse-driver:** HTTPS and readOnly support ([3d60ead](https://github.com/cube-js/cube.js/commit/3d60ead920635eb85c76b51a5c301e2f1fb08cb6))
+* **cubestore:** cleanup local copies of files removed remotely ([#2110](https://github.com/cube-js/cube.js/issues/2110)) ([9b3fd2e](https://github.com/cube-js/cube.js/commit/9b3fd2ee333229a107b957ea10d70b3ed16aaac1))
+* **cubestore:** handle IN SQL expression in partition pruning ([#2101](https://github.com/cube-js/cube.js/issues/2101)) ([a7871d2](https://github.com/cube-js/cube.js/commit/a7871d2e67a25f5a4c518cc7bf619bbb64a1d782))
+
+
+
+
+
 ## [0.26.14](https://github.com/cube-js/cube.js/compare/v0.26.13...v0.26.14) (2021-02-15)
 
 

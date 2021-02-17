@@ -1,3 +1,4 @@
+use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -5,7 +6,7 @@ use cloud_storage::Object;
 use futures::StreamExt;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tempfile::NamedTempFile;
@@ -38,13 +39,18 @@ impl GCSRemoteFs {
     }
 }
 
+di_service!(GCSRemoteFs, [RemoteFs]);
+
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
-        let local_path = self.dir.as_path().join(remote_path);
-        let file = File::open(local_path).await?;
+        let file = File::open(temp_upload_path).await?;
         let size = file.metadata().await?.len();
         let stream = FramedRead::new(file, BytesCodec::new());
         let stream = stream.map(|r| r.map(|b| b.to_vec()));
@@ -56,6 +62,10 @@ impl RemoteFs for GCSRemoteFs {
             "application/octet-stream",
         )
         .await?;
+        let local_path = self.dir.as_path().join(remote_path);
+        if Path::new(temp_upload_path) != local_path {
+            fs::rename(&temp_upload_path, local_path).await?;
+        }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         Ok(())
     }
@@ -63,12 +73,13 @@ impl RemoteFs for GCSRemoteFs {
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
+        let downloads_dirs = local_dir.join("downloads");
 
-        fs::create_dir_all(local_dir).await?;
+        fs::create_dir_all(&downloads_dirs).await?;
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
-            let (temp_file, temp_path) = NamedTempFile::new_in(local_dir)?.into_parts();
+            let (temp_file, temp_path) = NamedTempFile::new_in(&downloads_dirs)?.into_parts();
             let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
             let mut stream = Object::download_streamed(
                 self.bucket.as_str(),

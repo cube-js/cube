@@ -115,29 +115,36 @@ export class BaseDriver {
           if (process.env[envKey]) {
             const value = process.env[envKey];
 
-            if (canBeFile) {
-              if (isFilePath(value)) {
-                if (!fs.existsSync(value)) {
-                  throw new Error(
-                    `Unable to find ${name} from path: "${value}"`,
-                  );
-                }
-
-                return {
-                  ...agg,
-                  ...{ [name]: fs.readFileSync(value) }
-                };
-              } else if (!validate(value)) {
-                throw new Error(
-                  `${envKey} is not a valid ssl key. If it's a path, please specify it correctly`,
-                );
-              }
+            if (validate(value)) {
+              return {
+                ...agg,
+                ...{ [name]: value }
+              };
             }
 
-            return {
-              ...agg,
-              ...{ [name]: value }
-            };
+            if (canBeFile && isFilePath(value)) {
+              if (!fs.existsSync(value)) {
+                throw new Error(
+                  `Unable to find ${name} from path: "${value}"`,
+                );
+              }
+
+              const file = fs.readFileSync(value, 'utf8');
+              if (validate(file)) {
+                return {
+                  ...agg,
+                  ...{ [name]: file }
+                };
+              }
+
+              throw new Error(
+                `Content of the file from ${envKey} is not a valid SSL ${name}.`,
+              );
+            }
+
+            throw new Error(
+              `${envKey} is not a valid SSL ${name}. If it's a path, please specify it correctly`,
+            );
           }
 
           return agg;

@@ -1,6 +1,7 @@
 const ClickHouse = require('@apla/clickhouse');
-const genericPool = require('generic-pool');
+const { getEnv } = require('@cubejs-backend/shared');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const genericPool = require('generic-pool');
 const { uuid } = require('uuidv4');
 const sqlstring = require('sqlstring');
 
@@ -11,16 +12,25 @@ class ClickHouseDriver extends BaseDriver {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT,
       auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
+      protocol: getEnv('dbSsl') ? 'https:' : 'http:',
       queryOptions: {
         database: process.env.CUBEJS_DB_NAME || config && config.database || 'default'
       },
       ...config
     };
+    this.readOnlyMode = process.env.CUBEJS_DB_CLICKHOUSE_READONLY === 'true';
     this.pool = genericPool.createPool({
       create: async () => new ClickHouse({
         ...this.config,
         queryOptions: {
-          join_use_nulls: 1,
+          //
+          //
+          // If ClickHouse user's permissions are restricted with "readonly = 1",
+          // change settings queries are not allowed. Thus, "join_use_nulls" setting
+          // can not be changed
+          //
+          //
+          ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
           session_id: uuid(),
           ...this.config.queryOptions,
         }
@@ -72,12 +82,26 @@ class ClickHouseDriver extends BaseDriver {
     return this.query("SELECT 1");
   }
 
+  readOnly() {
+    return !!this.config.readOnly || this.readOnlyMode;
+  }
+
   query(query, values) {
     const formattedQuery = sqlstring.format(query, values);
 
     return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
       dataObjects: true,
-      queryOptions: { query_id: queryId, join_use_nulls: 1 }
+      queryOptions: {
+        query_id: queryId,
+        //
+        //
+        // If ClickHouse user's permissions are restricted with "readonly = 1",
+        // change settings queries are not allowed. Thus, "join_use_nulls" setting
+        // can not be changed
+        //
+        //
+        ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+      }
     }).then(res => this.normaliseResponse(res)));
   }
 

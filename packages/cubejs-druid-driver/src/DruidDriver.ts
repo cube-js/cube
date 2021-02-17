@@ -1,4 +1,6 @@
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import { getEnv } from '@cubejs-backend/shared';
+
 import { DruidClient, DruidClientBaseConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
@@ -24,7 +26,8 @@ export class DruidDriver extends BaseDriver {
       const port = process.env.CUBEJS_DB_PORT;
 
       if (host && port) {
-        url = `http://${host}:${port}`;
+        const protocol = getEnv('dbSsl') ? 'https' : 'http';
+        url = `${protocol}://${host}:${port}`;
       } else {
         throw new Error('Please specify CUBEJS_DB_URL');
       }

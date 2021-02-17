@@ -338,7 +338,7 @@ describe('asyncMemoize', () => {
 
     expect(called).toEqual(2);
 
-    await pausePromise(500);
+    await pausePromise(800);
 
     expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
 

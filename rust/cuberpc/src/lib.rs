@@ -67,9 +67,10 @@ impl RpcService {
             .iter()
             .map(|m| m.original_method())
             .collect::<Vec<_>>();
+        // TODO Supertraits
         quote! {
             #[async_trait]
-            pub trait #service_ident: Send + Sync {
+            pub trait #service_ident: DIService + Send + Sync {
                 #( #methods )*
             }
         }

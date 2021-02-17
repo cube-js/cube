@@ -20,6 +20,7 @@ use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time
 use tokio::fs;
 use tokio::sync::{Notify, RwLock};
 
+use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use crate::metastore::chunks::{ChunkIndexKey, ChunkRocksIndex};
 use crate::metastore::index::IndexIndexKey;
@@ -620,7 +621,7 @@ meta_store_table_impl!(PartitionMetaStoreTable, Partition, PartitionRocksTable);
 meta_store_table_impl!(TableMetaStoreTable, Table, TableRocksTable);
 
 #[cuberpc::service]
-pub trait MetaStore: Send + Sync {
+pub trait MetaStore: DIService + Send + Sync {
     async fn wait_for_current_seq_to_sync(&self) -> Result<(), CubeError>;
     fn schemas_table(&self) -> SchemaMetaStoreTable;
     async fn create_schema(
@@ -754,6 +755,9 @@ pub trait MetaStore: Send + Sync {
     async fn update_status(&self, job_id: u64, status: JobStatus) -> Result<IdRow<Job>, CubeError>;
     async fn update_heart_beat(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
 }
+
+crate::di_service!(RocksMetaStore, [MetaStore]);
+crate::di_service!(MetaStoreRpcClient, [MetaStore]);
 
 #[derive(Clone, Debug)]
 pub enum MetaStoreEvent {
@@ -1679,7 +1683,7 @@ impl RocksMetaStore {
             );
             let file_name = self.remote_fs.local_file(&log_name).await?;
             serializer.write_to_file(&file_name).await?;
-            self.remote_fs.upload_file(&log_name).await?;
+            self.remote_fs.upload_file(&file_name, &log_name).await?;
             let mut seq = self.last_upload_seq.write().await;
             *seq = max.unwrap();
             self.write_completed_notify.notify_waiters();
@@ -1738,8 +1742,14 @@ impl RocksMetaStore {
         }
         for v in join_all(
             files_to_upload
-                .iter()
-                .map(|f| remote_fs.upload_file(&f))
+                .into_iter()
+                .map(|f| {
+                    let remote_fs = remote_fs.clone();
+                    return async move {
+                        let local = remote_fs.local_file(&f).await?;
+                        remote_fs.upload_file(&local, &f).await
+                    };
+                })
                 .collect::<Vec<_>>(),
         )
         .await
@@ -1785,11 +1795,13 @@ impl RocksMetaStore {
         let current_metastore_file = remote_fs.local_file("metastore-current").await?;
 
         {
-            let mut file = File::create(current_metastore_file).await?;
+            let mut file = File::create(&current_metastore_file).await?;
             tokio::io::AsyncWriteExt::write_all(&mut file, remote_path.as_bytes()).await?;
         }
 
-        remote_fs.upload_file("metastore-current").await?;
+        remote_fs
+            .upload_file(&current_metastore_file, "metastore-current")
+            .await?;
 
         Ok(())
     }
@@ -3266,55 +3278,58 @@ mod tests {
 
     #[tokio::test]
     async fn cold_start_test() {
-        let config = Config::test("cold_start_test");
-
-        let _ = fs::remove_dir_all(config.local_dir());
-        let _ = fs::remove_dir_all(config.remote_dir());
-
         {
-            {
-                let services = config.configure().await;
-                services.start_processing_loops().await.unwrap();
-                services
-                    .meta_store
-                    .create_schema("foo1".to_string(), false)
-                    .await
-                    .unwrap();
-                services
-                    .rocks_meta_store
-                    .as_ref()
-                    .unwrap()
-                    .run_upload()
-                    .await
-                    .unwrap();
-                services
-                    .meta_store
-                    .create_schema("foo".to_string(), false)
-                    .await
-                    .unwrap();
-                services
-                    .rocks_meta_store
-                    .as_ref()
-                    .unwrap()
-                    .upload_check_point()
-                    .await
-                    .unwrap();
-                services
-                    .meta_store
-                    .create_schema("bar".to_string(), false)
-                    .await
-                    .unwrap();
-                services
-                    .rocks_meta_store
-                    .as_ref()
-                    .unwrap()
-                    .run_upload()
-                    .await
-                    .unwrap();
-                services.stop_processing_loops().await.unwrap();
-            }
+            let config = Config::test("cold_start_test");
+
+            let _ = fs::remove_dir_all(config.local_dir());
+            let _ = fs::remove_dir_all(config.remote_dir());
+
+            let services = config.configure().await;
+            services.start_processing_loops().await.unwrap();
+            services
+                .meta_store
+                .create_schema("foo1".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .run_upload()
+                .await
+                .unwrap();
+            services
+                .meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .upload_check_point()
+                .await
+                .unwrap();
+            services
+                .meta_store
+                .create_schema("bar".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .run_upload()
+                .await
+                .unwrap();
+            services.stop_processing_loops().await.unwrap();
+
             Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
+        }
+
+        {
+            let config = Config::test("cold_start_test");
 
             let services2 = config.configure().await;
             services2
@@ -3332,61 +3347,59 @@ mod tests {
                 .get_schema("bar".to_string())
                 .await
                 .unwrap();
+            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.remote_dir()).unwrap();
         }
-
-        fs::remove_dir_all(config.local_dir()).unwrap();
-        fs::remove_dir_all(config.remote_dir()).unwrap();
     }
 
     #[tokio::test]
     async fn discard_logs() {
-        let config = Config::test("discard_logs");
-
-        let _ = fs::remove_dir_all(config.local_dir());
-        let _ = fs::remove_dir_all(config.remote_dir());
-
         {
-            {
-                let services = config.configure().await;
-                services.start_processing_loops().await.unwrap();
-                services
-                    .meta_store
-                    .create_schema("foo1".to_string(), false)
-                    .await
-                    .unwrap();
-                services
-                    .rocks_meta_store
-                    .as_ref()
-                    .unwrap()
-                    .run_upload()
-                    .await
-                    .unwrap();
-                services
-                    .meta_store
-                    .create_schema("foo".to_string(), false)
-                    .await
-                    .unwrap();
-                services
-                    .rocks_meta_store
-                    .as_ref()
-                    .unwrap()
-                    .upload_check_point()
-                    .await
-                    .unwrap();
-                services
-                    .meta_store
-                    .create_schema("bar".to_string(), false)
-                    .await
-                    .unwrap();
-                services
-                    .rocks_meta_store
-                    .as_ref()
-                    .unwrap()
-                    .run_upload()
-                    .await
-                    .unwrap();
-                services.stop_processing_loops().await.unwrap();
-            }
+            let config = Config::test("discard_logs");
+
+            let _ = fs::remove_dir_all(config.local_dir());
+            let _ = fs::remove_dir_all(config.remote_dir());
+
+            let services = config.configure().await;
+            services.start_processing_loops().await.unwrap();
+            services
+                .meta_store
+                .create_schema("foo1".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .run_upload()
+                .await
+                .unwrap();
+            services
+                .meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .upload_check_point()
+                .await
+                .unwrap();
+            services
+                .meta_store
+                .create_schema("bar".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .run_upload()
+                .await
+                .unwrap();
+            services.stop_processing_loops().await.unwrap();
+
             Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
             let list = LocalDirRemoteFs::list_recursive(
@@ -3415,6 +3428,10 @@ mod tests {
                 .unwrap();
             println!("Size {}", file.metadata().unwrap().len());
             file.set_len(50).unwrap();
+        }
+
+        {
+            let config = Config::test("discard_logs");
 
             let services2 = config.configure().await;
             services2
@@ -3427,9 +3444,9 @@ mod tests {
                 .get_schema("foo".to_string())
                 .await
                 .unwrap();
-        }
 
-        fs::remove_dir_all(config.local_dir()).unwrap();
-        fs::remove_dir_all(config.remote_dir()).unwrap();
+            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.remote_dir()).unwrap();
+        }
     }
 }
