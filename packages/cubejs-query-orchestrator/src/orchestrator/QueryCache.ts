@@ -31,6 +31,7 @@ export class QueryCache {
       backgroundRenew?: Boolean;
       queueOptions?: object | ((dataSource: String) => object);
       redisPool?: any;
+      continueWaitTimeout?: number;
       cacheAndQueueDriver?: 'redis' | 'memory';
     } = {}
   ) {
@@ -202,6 +203,8 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          // Centralized continueWaitTimeout that can be overridden in queueOptions
+          continueWaitTimeout: this.options.continueWaitTimeout,
           ...(typeof this.options.queueOptions === 'function' ?
             this.options.queueOptions(dataSource) :
             this.options.queueOptions
@@ -227,6 +230,8 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          // Centralized continueWaitTimeout that can be overridden in queueOptions
+          continueWaitTimeout: this.options.continueWaitTimeout,
           ...this.options.externalQueueOptions
         }
       );

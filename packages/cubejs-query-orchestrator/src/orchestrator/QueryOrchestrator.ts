@@ -13,6 +13,7 @@ interface QueryOrchestratorOptions {
   queryCacheOptions?: any;
   preAggregationsOptions?: any;
   rollupOnlyMode?: boolean;
+  continueWaitTimeout?: number;
 }
 
 export class QueryOrchestrator {
@@ -45,7 +46,7 @@ export class QueryOrchestrator {
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
-    const { externalDriverFactory } = options;
+    const { externalDriverFactory, continueWaitTimeout } = options;
 
     this.driverFactory = driverFactory;
 
@@ -54,6 +55,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        continueWaitTimeout,
         ...options.queryCacheOptions,
       }
     );
@@ -63,6 +65,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        continueWaitTimeout,
         ...options.preAggregationsOptions
       }
     );

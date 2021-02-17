@@ -8,10 +8,12 @@ export class OrchestratorApi {
   protected readonly orchestrator: QueryOrchestrator;
   
   protected readonly externalDriverFactory: any;
+
+  protected readonly continueWaitTimeout: number;
   
   public constructor(protected driverFactory, protected logger, protected options: any = {}) {
     const { externalDriverFactory } = options;
-    
+    this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
     this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
     this.driverFactory = driverFactory;
     this.externalDriverFactory = externalDriverFactory;
@@ -33,7 +35,7 @@ export class OrchestratorApi {
         this.orchestrator.loadRefreshKeys(query) :
         this.orchestrator.fetchQuery(query);
 
-      fetchQueryPromise = pt.timeout(fetchQueryPromise, 5 * 1000);
+      fetchQueryPromise = pt.timeout(fetchQueryPromise, this.continueWaitTimeout * 1000);
 
       const data = await fetchQueryPromise;
 

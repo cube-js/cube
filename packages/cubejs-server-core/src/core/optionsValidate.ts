@@ -70,6 +70,7 @@ const schemaOptions = Joi.object().keys({
     Joi.func(),
     Joi.object().keys({
       redisPrefix: Joi.string().allow(''),
+      continueWaitTimeout: Joi.number().min(0).integer(),
       queryCacheOptions: Joi.object().keys({
         refreshKeyRenewalThreshold: Joi.number().min(0).integer(),
         backgroundRenew: Joi.boolean(),

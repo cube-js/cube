@@ -773,7 +773,8 @@ type PreAggregationsOptions = {
   loadCacheQueueOptions?: any;
   queueOptions?: object | ((dataSource: String) => object);
   redisPool?: any;
-  cacheAndQueueDriver?: 'redis' | 'memory'
+  continueWaitTimeout?: number;
+  cacheAndQueueDriver?: 'redis' | 'memory';
 };
 
 export class PreAggregations {
@@ -895,6 +896,8 @@ export class PreAggregations {
         logger: this.logger,
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
         redisPool: this.options.redisPool,
+        // Centralized continueWaitTimeout that can be overridden in queueOptions
+        continueWaitTimeout: this.options.continueWaitTimeout,
         ...(typeof this.options.queueOptions === 'function' ?
           this.options.queueOptions(dataSource) :
           this.options.queueOptions
