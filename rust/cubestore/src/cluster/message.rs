@@ -13,8 +13,6 @@ pub enum NetworkMessage {
 
     WarmupDownload(/*remote_path*/ String),
     WarmupDownloadResult(Result<(), CubeError>),
-    WarmupCleanup(/*remote_path*/ String),
-    WarmupCleanupResult(Result<(), CubeError>),
 
     MetaStoreCall(MetaStoreRpcMethodCall),
     MetaStoreCallResult(MetaStoreRpcMethodResult),

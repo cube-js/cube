@@ -51,10 +51,6 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError>;
 
-    /// Deletes the local copy of `remote_path`, if the latter exists.
-    /// If no file was downloaded, nothing happens.
-    async fn delete_local_copy(&self, remote_path: &str) -> Result<(), CubeError>;
-
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError>;
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError>;
@@ -141,21 +137,15 @@ impl RemoteFs for LocalDirRemoteFs {
             }
         }
 
-        self.delete_local_copy(remote_path).await
-    }
-
-    async fn delete_local_copy(&self, remote_path: &str) -> Result<(), CubeError> {
-        let _guard = self.dir_delete_mut.lock().await;
+        let _local_guard = self.dir_delete_mut.lock().await;
         let local = self.dir.as_path().join(remote_path);
-        if let Err(e) = fs::remove_file(local.clone()).await {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                return Ok(());
-            } else {
-                return Err(e)?;
-            }
+        if fs::metadata(local.clone()).await.is_ok() {
+            fs::remove_file(local.clone()).await?;
+            LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
+                .await?;
         }
-        // We have removed a file, cleanup.
-        LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone()).await
+
+        Ok(())
     }
 
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
