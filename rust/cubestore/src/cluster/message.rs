@@ -12,7 +12,7 @@ pub enum NetworkMessage {
     SelectResult(Result<SerializedRecordBatchStream, CubeError>),
 
     WarmupDownload(/*remote_path*/ String),
-    WarmupDownloadResult(Result<(), CubeError>),
+    WarmupDownloadResult,
 
     MetaStoreCall(MetaStoreRpcMethodCall),
     MetaStoreCallResult(MetaStoreRpcMethodResult),

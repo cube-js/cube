@@ -182,7 +182,7 @@ impl Cluster for ClusterImpl {
             .send_or_process_locally(node_name, NetworkMessage::WarmupDownload(remote_path))
             .await?;
         match response {
-            NetworkMessage::WarmupDownloadResult(r) => r,
+            NetworkMessage::WarmupDownloadResult => Ok(()),
             _ => panic!("unexpected result for warmup download"),
         }
     }
@@ -580,10 +580,16 @@ impl ClusterImpl {
                 NetworkMessage::SelectResult(res)
             }
             NetworkMessage::WarmupDownload(remote_path) => {
-                let res = self.remote_fs.download_file(&remote_path).await;
-                NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
+                // Do not wait for the download to complete to avoid keeping the worker busy.
+                let fs = self.remote_fs.clone();
+                tokio::task::spawn(async move {
+                    if let Err(e) = fs.download_file(&remote_path).await {
+                        log::info!("Error ignored during warmup download: {}", e);
+                    }
+                });
+                NetworkMessage::WarmupDownloadResult
             }
-            NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
+            NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult => {
                 panic!("result sent to worker");
             }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
