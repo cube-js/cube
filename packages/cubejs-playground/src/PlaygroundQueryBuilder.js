@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Col, Row, Divider, Space, Typography } from 'antd';
+import { Col, Row, Divider } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
 import styled from 'styled-components';
@@ -15,13 +15,7 @@ import { Card, SectionHeader, SectionRow, Button } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
 import { useSecurityContext } from './hooks';
-
-const { Text, Paragraph } = Typography;
-
-const Code = styled.pre`
-  padding: 0.4em 0.8em;
-  font-size: 13px;
-`;
+import { FatalError } from '@/atoms';
 
 const Section = styled.div`
   display: flex;
@@ -83,28 +77,6 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
       },
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
-
-function FatalError({ error }) {
-  return (
-    <Space direction="vertical">
-      <Text strong>Error 😢</Text>
-
-      <Paragraph>
-        Ask about it in{' '}
-        <a
-          href="https://slack.cube.dev"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Slack
-        </a>
-        . These guys know how to fix this for sure!
-      </Paragraph>
-
-      <Code>{error.stack?.toString() || error.toString()}</Code>
-    </Space>
-  );
-}
 
 function SchemaRefresher({ schemaVersion, refresh }) {
   useEffect(() => {
