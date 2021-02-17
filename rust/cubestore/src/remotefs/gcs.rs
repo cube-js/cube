@@ -73,12 +73,13 @@ impl RemoteFs for GCSRemoteFs {
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
+        let downloads_dirs = local_dir.join("downloads");
 
-        fs::create_dir_all(local_dir).await?;
+        fs::create_dir_all(&downloads_dirs).await?;
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
-            let (temp_file, temp_path) = NamedTempFile::new_in(local_dir)?.into_parts();
+            let (temp_file, temp_path) = NamedTempFile::new_in(&downloads_dirs)?.into_parts();
             let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
             let mut stream = Object::download_streamed(
                 self.bucket.as_str(),

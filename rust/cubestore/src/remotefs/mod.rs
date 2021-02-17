@@ -111,11 +111,12 @@ impl RemoteFs for LocalDirRemoteFs {
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
-        fs::create_dir_all(local_dir).await?;
+        let downloads_dir = local_dir.join("downloads");
+        fs::create_dir_all(&downloads_dir).await?;
         if !local_file.exists() {
             debug!("Downloading {}", remote_path);
             let remote_dir = self.remote_dir.read().await;
-            let temp_path = NamedTempFile::new_in(local_dir)?.into_temp_path();
+            let temp_path = NamedTempFile::new_in(&downloads_dir)?.into_temp_path();
             fs::copy(remote_dir.as_path().join(remote_path), &temp_path)
                 .await
                 .map_err(|e| {
