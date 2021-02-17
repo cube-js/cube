@@ -269,13 +269,9 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
                         if *projected.in_quotes {
                             let quote_pos = memchr::memchr(b'"', available);
                             if let Some(i) = quote_pos {
-                                if !(i != 0 && available[i - 1] == b'"'
-                                    || i == 0
-                                        && !projected.buf.is_empty()
-                                        && projected.buf[projected.buf.len() - 1] == b'"')
-                                {
-                                    *projected.in_quotes = false;
-                                }
+                                // It consumes every pair of quotes.
+                                // Matching for escapes is unnecessary as it's double "" sequence
+                                *projected.in_quotes = false;
                                 projected.buf.extend_from_slice(&available[..=i]);
                                 (false, i + 1)
                             } else {
