@@ -4,12 +4,16 @@ on:
   push:
     paths:
       - '.github/workflows/rust.yml'
+      - '.github/actions/cross-ubuntu-gnu.sh'
+      - '.github/actions/cross-ubuntu-musl.sh'
       - 'rust/**'
     branches-ignore:
       - master
   pull_request:
     paths:
       - '.github/workflows/rust.yml'
+      - '.github/actions/cross-ubuntu-gnu.sh'
+      - '.github/actions/cross-ubuntu-musl.sh'
       - 'rust/**'
 
 jobs:
@@ -90,27 +94,40 @@ jobs:
     strategy:
       matrix:
         target:
-          #- x86_64-unknown-linux-musl
+          - x86_64-unknown-linux-gnu
+#          - x86_64-unknown-linux-musl
           # procspawn is using libc::kill(pid as i32, libc::SIGKILL) which is not supported in windows
           # - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
         include:
+          - os: ubuntu-latest
+            before_script: cross-ubuntu-gnu
+            target: x86_64-unknown-linux-gnu
+            artifact_name: rust/target/x86_64-unknown-linux-gnu/release/cubestored
+            # Because it's buggy
+            cross: false
+            strip: true
+            compress: false
           #- os: ubuntu-latest
+          #  before_script: cross-ubuntu-musl
           #  target: x86_64-unknown-linux-musl
-          #  artifact_name: rust/target/x86_64-unknown-linux-musl/release/miniserve
-          #  # Maybe will be enabled later
+          #  artifact_name: rust/target/x86_64-unknown-linux-musl/release/cubestored
+          #  # Because it's buggy
           #  cross: false
           #  strip: true
+          #  compress: true
           #- os: windows-latest
           #  target: x86_64-pc-windows-msvc
           #  artifact_name: rust/target/x86_64-pc-windows-msvc/release/cubestored.exe
           #  cross: false
           #  strip: true
+          #  compress: true
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: rust/target/x86_64-apple-darwin/release/cubestored
             cross: false
             strip: true
+            compress: true
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -122,18 +139,28 @@ jobs:
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
-      - run: rust/cross/scripts/${{ matrix.os }}-install.sh
+      - run: source .github/actions/${{ matrix.before_script }}.sh
+        if: ${{ matrix.before_script }}
         shell: bash
+      - name: Set Env Variables for Musl
+        uses: allenevans/set-env@v2.0.0
+        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        with:
+          OPENSSL_STATIC: true
+          OPENSSL_DIR: "/musl"
       # https://github.com/actions-rs/cargo/issues/6
       #- uses: actions-rs/cargo@v1
       - uses: marcopolo/cargo@master
         with:
           working-directory: rust
           command: build
-          args: --release --locked --target=${{ matrix.target }}
+          args: --release --target=${{ matrix.target }}
+          # We need to force it everywhere before using it in cross building
+          #args: --release --locked --target=${{ matrix.target }}
           use-cross: ${{ matrix.cross }}
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
+        if: ${{ matrix.compress }}
         with:
           file: ${{ matrix.artifact_name }}
           args: --lzma
