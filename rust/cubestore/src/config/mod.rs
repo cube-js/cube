@@ -53,7 +53,7 @@ impl CubeServices {
             let cluster = self.cluster.clone();
             tokio::spawn(async move { ClusterImpl::listen_on_metastore_port(cluster).await });
             let scheduler = self.scheduler.clone();
-            tokio::spawn(async move { scheduler.run_scheduler().await });
+            tokio::spawn(async move { SchedulerImpl::run_scheduler(scheduler).await });
         } else {
             let cluster = self.cluster.clone();
             tokio::spawn(async move { ClusterImpl::listen_on_worker_port(cluster).await });

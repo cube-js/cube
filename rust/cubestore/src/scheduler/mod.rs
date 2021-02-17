@@ -42,10 +42,10 @@ impl SchedulerImpl {
         }
     }
 
-    pub async fn run_scheduler(&self) -> Result<(), CubeError> {
+    pub async fn run_scheduler(scheduler: Arc<SchedulerImpl>) -> Result<(), CubeError> {
         loop {
-            let mut stop_receiver = self.stop_receiver.lock().await;
-            let mut event_receiver = self.event_receiver.lock().await;
+            let mut stop_receiver = scheduler.stop_receiver.lock().await;
+            let mut event_receiver = scheduler.event_receiver.lock().await;
             let event = tokio::select! {
                 res = stop_receiver.changed() => {
                     if res.is_err() || *stop_receiver.borrow() {
@@ -58,10 +58,13 @@ impl SchedulerImpl {
                     event?
                 }
             };
-            let res = self.process_event(event.clone()).await;
-            if let Err(e) = res {
-                error!("Error processing event {:?}: {}", event, e);
-            }
+            let scheduler_to_move = scheduler.clone();
+            tokio::spawn(async move {
+                let res = scheduler_to_move.process_event(event.clone()).await;
+                if let Err(e) = res {
+                    error!("Error processing event {:?}: {}", event, e);
+                }
+            });
         }
     }
 
