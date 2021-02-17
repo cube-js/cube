@@ -1,15 +1,16 @@
 [target.x86_64-apple-darwin]
 image = "cubejs/rust-cross:x86_64-apple-darwin"
-xargo = true
+xargo = false
 
 [target.x86_64-pc-windows-gnu]
 image = "cubejs/rust-cross:x86_64-pc-windows-gnu"
-xargo = true
+xargo = false
 
-# [target.x86_64-unknown-linux-gnu]
-# image = "cubejs/rust-cross:x86_64-unknown-linux-gnu"
-# xargo = false
+[target.x86_64-unknown-linux-gnu]
+image = "cubejs/rust-cross:x86_64-unknown-linux-gnu"
+xargo = false
 
 [target.x86_64-unknown-linux-musl]
 image = "cubejs/rust-cross:x86_64-unknown-linux-musl"
-xargo = true
+xargo = false
+# linker = "./cross/x86_64-unknown-linux-musl-linker"
