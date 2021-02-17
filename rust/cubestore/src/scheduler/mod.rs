@@ -149,8 +149,6 @@ impl SchedulerImpl {
             if partition.get_row().is_active() {
                 if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
                     self.remote_fs.delete_file(file_name.as_str()).await?;
-                    self.schedule_partition_cleanup(partition.get_id(), file_name)
-                        .await?;
                 }
             }
         }
@@ -166,8 +164,6 @@ impl SchedulerImpl {
                 {
                     if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
                         self.remote_fs.delete_file(file_name.as_str()).await?;
-                        self.schedule_partition_cleanup(partition.get_id(), file_name)
-                            .await?;
                     }
                 }
             }
@@ -280,17 +276,5 @@ impl SchedulerImpl {
             .node_name_by_partitions(&[partition_id])
             .await?;
         self.cluster.warmup_download(&node_name, path).await
-    }
-
-    async fn schedule_partition_cleanup(
-        &self,
-        partition_id: u64,
-        path: String,
-    ) -> Result<(), CubeError> {
-        let node_name = self
-            .cluster
-            .node_name_by_partitions(&[partition_id])
-            .await?;
-        self.cluster.warmup_cleanup(&node_name, path).await
     }
 }
