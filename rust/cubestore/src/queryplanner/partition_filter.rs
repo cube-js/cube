@@ -312,6 +312,15 @@ impl Builder<'_> {
             ScalarValue::Int64(v) => v.unwrap() as i64,
             ScalarValue::Float64(v) => v.unwrap() as i64,
             ScalarValue::Float32(v) => v.unwrap() as i64,
+            ScalarValue::Utf8(s) | ScalarValue::LargeUtf8(s) => {
+                match s.as_ref().unwrap().parse::<i64>() {
+                    Ok(v) => v,
+                    Err(_) => {
+                        log::error!("could not convert string to int: {}", s.as_ref().unwrap());
+                        return None;
+                    }
+                }
+            }
             _ => return None, // TODO: casts.
         };
         Some(TableValue::Int(ival))
@@ -782,6 +791,30 @@ mod tests {
         let f = extract("(a <= 1 or b <= 2) and (a <= 2 or b <= 3) and (a <= 4 or b <= 5) and (a <= 6 or b <= 7) and (a <= 8 or b <= 9) and (a <= 10 or b <= 11)");
         // Must bail out to avoid too much compute.
         assert_eq!(f.min_max.len(), 50)
+    }
+
+    #[test]
+    fn test_conversions() {
+        let s = schema(&[("a", DataType::Utf8)]);
+        let extract = |sql| PartitionFilter::extract(&s, &[parse(sql, &s)]);
+
+        assert_eq!(
+            extract("a <= 1").min_max,
+            vec![MinMaxCondition {
+                min: vec![None],
+                max: vec![Some(TableValue::String("1".to_string()))],
+            }]
+        );
+
+        let s = schema(&[("b", DataType::Int64)]);
+        let extract = |sql| PartitionFilter::extract(&s, &[parse(sql, &s)]);
+        assert_eq!(
+            extract("b <= '1'").min_max,
+            vec![MinMaxCondition {
+                min: vec![None],
+                max: vec![Some(TableValue::Int(1))],
+            }]
+        );
     }
 
     fn schema(s: &[(&str, DataType)]) -> Schema {
