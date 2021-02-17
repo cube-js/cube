@@ -473,6 +473,8 @@ pub struct Partition {
     min_value: Option<Row>,
     max_value: Option<Row>,
     active: bool,
+    #[serde(default)]
+    warmed_up: bool,
     main_table_row_count: u64,
     #[serde(default)]
     last_used: Option<DateTime<Utc>>
@@ -685,6 +687,7 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
     async fn is_partition_used(&self, partition_id: u64) -> Result<bool, CubeError>;
     async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
+    async fn mark_partition_warmed_up(&self, partition_id: u64) -> Result<(), CubeError>;
 
     fn index_table(&self) -> IndexMetaStoreTable;
     async fn create_index(
@@ -2457,6 +2460,21 @@ impl MetaStore for RocksMetaStore {
     async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             PartitionRocksTable::new(db_ref).delete(partition_id, batch_pipe)
+        })
+        .await
+    }
+
+    async fn mark_partition_warmed_up(&self, partition_id: u64) -> Result<(), CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let table = PartitionRocksTable::new(db_ref);
+            let partition = table.get_row_or_not_found(partition_id)?;
+            table.update(
+                partition_id,
+                partition.row.to_warmed_up(),
+                &partition.row,
+                batch_pipe,
+            )?;
+            Ok(())
         })
         .await
     }

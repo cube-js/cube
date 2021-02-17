@@ -19,6 +19,7 @@ impl Partition {
             max_value,
             parent_partition_id: None,
             active: true,
+            warmed_up: false,
             main_table_row_count: 0,
             last_used: None,
         }
@@ -31,6 +32,7 @@ impl Partition {
             max_value: None,
             parent_partition_id: Some(id),
             active: false,
+            warmed_up: false,
             main_table_row_count: 0,
             last_used: None,
         }
@@ -50,15 +52,15 @@ impl Partition {
     }
 
     pub fn to_active(&self, active: bool) -> Partition {
-        Partition {
-            index_id: self.index_id,
-            min_value: self.min_value.clone(),
-            max_value: self.max_value.clone(),
-            parent_partition_id: self.parent_partition_id,
-            active,
-            main_table_row_count: self.main_table_row_count,
-            last_used: self.last_used.clone(),
-        }
+        let mut p = self.clone();
+        p.active = active;
+        p
+    }
+
+    pub fn to_warmed_up(&self) -> Partition {
+        let mut p = self.clone();
+        p.warmed_up = true;
+        p
     }
 
     pub fn update_min_max_and_row_count(
@@ -67,15 +69,11 @@ impl Partition {
         max_value: Option<Row>,
         main_table_row_count: u64,
     ) -> Partition {
-        Partition {
-            index_id: self.index_id,
-            min_value,
-            max_value,
-            parent_partition_id: self.parent_partition_id,
-            active: self.active,
-            main_table_row_count,
-            last_used: self.last_used.clone(),
-        }
+        let mut p = self.clone();
+        p.min_value = min_value;
+        p.max_value = max_value;
+        p.main_table_row_count = main_table_row_count;
+        p
     }
 
     pub fn update_last_used(&self) -> Self {
@@ -94,6 +92,10 @@ impl Partition {
 
     pub fn is_active(&self) -> bool {
         self.active
+    }
+
+    pub fn is_warmed_up(&self) -> bool {
+        self.warmed_up
     }
 
     pub fn main_table_row_count(&self) -> u64 {
