@@ -100,6 +100,7 @@ describe('index.test', () => {
       allowUngroupedWithoutPrimaryKey: true,
       scheduledRefreshConcurrency: 4,
       orchestratorOptions: {
+        continueWaitTimeout: 10,
         redisPrefix: 'some-prefix',
         queryCacheOptions: {
           refreshKeyRenewalThreshold: 1000,
