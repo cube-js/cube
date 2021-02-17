@@ -83,18 +83,19 @@ impl RemoteFs for S3RemoteFs {
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
+        let downloads_dir = local_dir.join("downloads");
 
         let local_file_str = local_file.to_str().unwrap().to_string(); // return value.
 
-        fs::create_dir_all(local_dir).await?;
+        fs::create_dir_all(&downloads_dir).await?;
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(remote_path);
             let bucket = self.bucket.clone();
             let status_code = tokio::task::spawn_blocking(move || -> Result<u16, CubeError> {
-                let local_dir = local_file.parent().unwrap();
-                let (mut temp_file, temp_path) = NamedTempFile::new_in(local_dir)?.into_parts();
+                let (mut temp_file, temp_path) =
+                    NamedTempFile::new_in(&downloads_dir)?.into_parts();
 
                 let res = bucket.get_object_stream_blocking(path.as_str(), &mut temp_file)?;
                 temp_file.flush()?;
