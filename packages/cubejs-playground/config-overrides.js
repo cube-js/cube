@@ -2,6 +2,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
 const { addLessLoader } = require('customize-cra');
 const VARIABLES = require('./src/variables');
+const path = require('path');
 
 const LESS_VARIABLES = {};
 
@@ -12,6 +13,11 @@ Object.keys(VARIABLES)
   });
 
 module.exports = function override(config, env) {
+  config.resolve.alias = {
+    ...config.resolve.alias,
+    '@': path.resolve(__dirname, './src'),
+  };
+  
   config.optimization = {
     minimizer: [
       new TerserPlugin({

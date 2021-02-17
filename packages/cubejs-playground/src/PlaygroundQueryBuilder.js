@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Col, Row, Divider } from 'antd';
+import { Col, Row, Divider, Space, Typography } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
+import styled from 'styled-components';
 
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
@@ -11,10 +12,16 @@ import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { Card, SectionHeader, SectionRow, Button } from './components';
-import styled from 'styled-components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
 import { useSecurityContext } from './hooks';
+
+const { Text, Paragraph } = Typography;
+
+const Code = styled.pre`
+  padding: 0.4em 0.8em;
+  font-size: 13px;
+`;
 
 const Section = styled.div`
   display: flex;
@@ -77,12 +84,45 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
+function FatalError({ error }) {
+  return (
+    <Space direction="vertical">
+      <Text strong>Error 😢</Text>
+
+      <Paragraph>
+        Ask about it in{' '}
+        <a
+          href="https://slack.cube.dev"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Slack
+        </a>
+        . These guys know how to fix this for sure!
+      </Paragraph>
+
+      <Code>{error.stack?.toString() || error.toString()}</Code>
+    </Space>
+  );
+}
+
+function SchemaRefresher({ schemaVersion, refresh }) {
+  useEffect(() => {
+    if (schemaVersion > 0) {
+      refresh();
+    }
+  }, [schemaVersion, refresh]);
+
+  return null;
+}
+
 export default function PlaygroundQueryBuilder({
   query = {},
   apiUrl,
   cubejsToken,
   setQuery,
   dashboardSource,
+  schemaVersion = 0,
 }) {
   const ref = useRef(null);
   const [framework, setFramework] = useState('react');
@@ -102,7 +142,7 @@ export default function PlaygroundQueryBuilder({
   const { response } = useDryRun(query, {
     skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
   });
-  
+
   let parsedDateRange;
   if (response) {
     const { timeDimensions = [] } = response.pivotQuery || {};
@@ -140,7 +180,8 @@ export default function PlaygroundQueryBuilder({
         updateOrder,
         pivotConfig,
         updatePivotConfig,
-        missingMembers
+        missingMembers,
+        refresh,
       }) => {
         return (
           <>
@@ -191,7 +232,7 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
-                    
+
                     <Section>
                       <SectionHeader>Dimensions</SectionHeader>
                       <MemberGroup
@@ -205,7 +246,7 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
-                    
+
                     <Section>
                       <SectionHeader>Segment</SectionHeader>
                       <MemberGroup
@@ -219,7 +260,7 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
-                    
+
                     <Section>
                       <SectionHeader>Time</SectionHeader>
                       <TimeGroup
@@ -292,7 +333,19 @@ export default function PlaygroundQueryBuilder({
                   paddingRight: 16,
                 }}
               >
-                {isQueryPresent ? (
+                {!isQueryPresent && metaError ? (
+                  <Card>
+                    <FatalError error={metaError} />
+                  </Card>
+                ) : null}
+
+                {!isQueryPresent && !metaError && (
+                  <h2 style={{ textAlign: 'center' }}>
+                    Choose a measure or dimension to get started
+                  </h2>
+                )}
+
+                {isQueryPresent && (
                   <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
@@ -321,9 +374,9 @@ export default function PlaygroundQueryBuilder({
                     dashboardSource={dashboardSource}
                     render={({ framework }) => {
                       if (metaError) {
-                        return <pre>{metaError.stack?.toString() || metaError.toString()}</pre>;
+                        return <FatalError error={metaError} />;
                       }
-                      
+
                       return (
                         <ChartRenderer
                           isChartRendererReady={isChartRendererReady}
@@ -340,13 +393,11 @@ export default function PlaygroundQueryBuilder({
                     }}
                     onChartRendererReadyChange={setChartRendererReady}
                   />
-                ) : (
-                  <h2 style={{ textAlign: 'center' }}>
-                    Choose a measure or dimension to get started
-                  </h2>
                 )}
               </Col>
             </Row>
+
+            <SchemaRefresher schemaVersion={schemaVersion} refresh={refresh} />
           </>
         );
       }}

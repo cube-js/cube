@@ -2,14 +2,14 @@ import { Component } from 'react';
 import {
   Layout,
   Button,
-  Spin,
   Modal,
   Empty,
 } from 'antd';
 
 import PrismCode from '../../PrismCode';
 import { playgroundAction } from '../../events';
-import { Menu, Tabs, Tree, Alert } from '../../components';
+import { Menu, Tabs, Tree } from '@/components';
+import { Alert, CubeLoader } from '@/atoms';
 import fetch from '../../playgroundFetch';
 
 const { Content, Sider } = Layout;
@@ -226,7 +226,7 @@ export default class SchemaPage extends Component {
           >
             <TabPane tab="Tables" key="schema">
               {schemaLoading ? (
-                <Spin style={{ width: '100%' }} />
+                <CubeLoader />
               ) : (
                 renderTreeOrError()
               )}

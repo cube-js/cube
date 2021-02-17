@@ -1,14 +1,24 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Alert, Spin, Typography } from 'antd';
+import { Alert, Typography } from 'antd';
 import styled from 'styled-components';
 
-import { dispatchPlaygroundEvent } from '../../utils';
-import { useDeepCompareMemoize } from '../../hooks';
+import { CubeLoader } from '@/atoms';
+import { dispatchPlaygroundEvent } from '@/utils';
+import { useDeepCompareMemoize } from '@/hooks';
 
 const { Text } = Typography;
 
+const Positioner = styled.div`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 0;
+`;
+
 const ChartContainer = styled.div`
-  visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
+  visibility: ${(props) => (props.invisible ? 'hidden' : 'visible')};
+  min-height: 400px;
 
   & > iframe {
     width: 100%;
@@ -38,6 +48,8 @@ export default function ChartRenderer({
 }) {
   const [slowQuery, setSlowQuery] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
+  const [isQueryLoading, setQueryLoading] = useState(true);
+  const [queryError, setQueryError] = useState(null);
 
   useEffect(() => {
     return () => {
@@ -54,6 +66,8 @@ export default function ChartRenderer({
         chartType,
         chartingLibrary,
       });
+      setQueryLoading(true);
+      setQueryError(null);
     }
     // eslint-disable-next-line
   }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType, queryHasMissingMembers]));
@@ -63,9 +77,11 @@ export default function ChartRenderer({
       ...window['__cubejsPlayground'],
       onQueryLoad: (data) => {
         let resultSet;
+        let error = null;
 
         if (data?.resultSet !== undefined) {
           resultSet = data.resultSet;
+          error = data.error;
         } else {
           resultSet = data;
         }
@@ -74,12 +90,21 @@ export default function ChartRenderer({
           const { loadResponse } = resultSet.serialize();
 
           setSlowQuery(Boolean(loadResponse.slowQuery));
+          setQueryLoading(false);
+          setQueryError(null);
+        }
+        if (error) {
+          setQueryLoading(false);
+          setQueryError(error);
         }
       },
       onQueryProgress: (progress) => {
         setBuildInProgress(
           Boolean(progress?.stage?.stage.includes('pre-aggregation'))
         );
+        // setSlowQuery(
+        //   Boolean(progress?.stage?.stage.includes('Executing query'))
+        // );
       },
       onChartRendererReady() {
         onChartRendererReadyChange(true);
@@ -87,29 +112,55 @@ export default function ChartRenderer({
     };
   }, [onChartRendererReadyChange]);
 
+  const invisible =
+    !isChartRendererReady ||
+    isPreAggregationBuildInProgress ||
+    queryError ||
+    queryHasMissingMembers;
+  const loading =
+    !isChartRendererReady || queryHasMissingMembers || isQueryLoading;
+
+  const extras = () => {
+    if (queryError) {
+      return <div>{queryError?.toString()}</div>;
+    }
+
+    if (isPreAggregationBuildInProgress) {
+      return (
+        <Positioner>
+          <RequestMessage>
+            <Text strong style={{ fontSize: 18 }}>
+              Building pre-aggregations...
+            </Text>
+          </RequestMessage>
+        </Positioner>
+      );
+    }
+
+    if (loading) {
+      return (
+        <Positioner key="loader">
+          <CubeLoader />
+        </Positioner>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <>
-      {slowQuery ? (
+      {slowQuery && (
         <Alert
           style={{ marginBottom: 24 }}
           message="Query is too slow to be renewed during the user request and was served from the cache. Please consider using low latency pre-aggregations."
           type="warning"
         />
-      ) : null}
+      )}
 
-      {isPreAggregationBuildInProgress ? (
-        <RequestMessage>
-          <Text strong style={{ fontSize: 18 }}>
-            Building pre-aggregations...
-          </Text>
-        </RequestMessage>
-      ) : !isChartRendererReady || queryHasMissingMembers ? (
-        <Spin />
-      ) : null}
+      {extras()}
 
-      <ChartContainer
-        hidden={!isChartRendererReady || isPreAggregationBuildInProgress}
-      >
+      <ChartContainer invisible={invisible}>
         <iframe
           ref={iframeRef}
           title="Chart renderer"
