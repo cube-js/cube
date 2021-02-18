@@ -657,7 +657,7 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
             },
             ColumnType::Float => {
                 let decimal_val = parse_decimal(cell)?;
-                TableValue::Float(decimal_val.to_string())
+                TableValue::Float(decimal_val.into())
             }
         }
     };
@@ -999,21 +999,21 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Float("5.892".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Float(5.892.into())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float("0.45".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float(0.45.into())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < '10'")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float("0.45".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float(0.45.into())]));
         })
             .await;
     }
@@ -1116,7 +1116,7 @@ mod tests {
                 "SELECT SUM(decimal_value) FROM foo.decimal_group"
             ).await.unwrap();
 
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Float("7456503871042.786".to_string())])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Float(7456503871042.786.into())])]);
         }).await;
     }
 

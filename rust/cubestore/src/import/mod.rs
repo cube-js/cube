@@ -11,6 +11,7 @@ use crate::store::{ChunkDataStore, DataFrame};
 use crate::sys::malloc::trim_allocs;
 use crate::table::{Row, TableValue};
 use crate::util::maybe_owned::MaybeOwnedStr;
+use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
@@ -142,7 +143,7 @@ impl ImportFormat {
                                     }
                                     ColumnType::Timestamp => timestamp_from_string(value)?,
                                     ColumnType::Float => {
-                                        TableValue::Float(value.parse::<f64>()?.to_string())
+                                        TableValue::Float(OrdF64(value.parse::<f64>()?))
                                     }
                                     ColumnType::Boolean => {
                                         TableValue::Boolean(value.to_lowercase() == "true")

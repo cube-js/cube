@@ -386,7 +386,7 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Float(value.to_string()));
+                                        vec_result[i].push(TableValue::Float(value.into()));
                                         cur_value_index += 1;
                                     } else {
                                         vec_result[i].push(TableValue::Null);
@@ -694,16 +694,17 @@ impl RowParquetWriter {
                                     [column_index]
                                 {
                                     TableValue::Float(val) => match column.get_column_type() {
-                                        ColumnType::Float => Ok(val.parse::<f64>()?),
+                                        ColumnType::Float => Ok(val),
                                         x => panic!("Unexpected type: {:?}", x),
                                     },
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
                             .map(|res_val| {
-                                if res_val.is_err() {
-                                    return res_val;
+                                if let Err(e) = res_val {
+                                    return Err(e);
                                 }
+                                // We must use OrdF64 here!
                                 let v = res_val.unwrap();
                                 if min.is_none() || v < min.unwrap() {
                                     min = Some(v)
@@ -711,7 +712,7 @@ impl RowParquetWriter {
                                 if max.is_none() || max.unwrap() < v {
                                     max = Some(v)
                                 }
-                                return Ok(v);
+                                return Ok(v.0);
                             })
                             .collect::<Result<Vec<f64>, _>>()?;
                         let def_levels = self.get_def_levels(
@@ -725,8 +726,8 @@ impl RowParquetWriter {
                             &column_values,
                             def_levels.as_ref().map(|b| b.as_slice()),
                             None,
-                            &min,
-                            &max,
+                            &min.map(|f| f.0),
+                            &max.map(|f| f.0),
                             None,
                             None,
                         )?;
