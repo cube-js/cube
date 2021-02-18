@@ -231,7 +231,7 @@ declare module '@cubejs-client/react' {
     /**
      * Used for query order update
      */
-    updateOrder: OrderUpdader;
+    updateOrder: OrderUpdater;
     /**
      * See [Pivot Config](@cubejs-client-core#types-pivot-config)
      */
@@ -483,8 +483,8 @@ declare module '@cubejs-client/react' {
     update: (member: MemberType, updateWith: MemberType) => void;
   };
 
-  type OrderUpdader = {
-    set: (memberId: string, order: QueryOrder & 'none') => void;
+  type OrderUpdater = {
+    set: (memberId: string, order: QueryOrder | 'none') => void;
     update: (order: TQueryOrderArray) => void;
     reorder: (sourceIndex: number, destinationIndex: number) => void;
   };

@@ -748,7 +748,7 @@ declare module '@cubejs-client/core' {
   type TOrderMember = {
     id: string;
     title: string;
-    order: QueryOrder & 'none'
+    order: QueryOrder | 'none'
   }
   
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
