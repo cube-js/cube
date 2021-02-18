@@ -217,7 +217,7 @@ impl SchedulerImpl {
     }
 
     async fn schedule_table_import(&self, table_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.server_name().to_string(); // TODO find best node to run import
+        let node = self.cluster.node_name_for_import(table_id).await?;
         let job = self
             .meta_store
             .add_job(Job::new(

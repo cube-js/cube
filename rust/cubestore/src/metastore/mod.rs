@@ -129,7 +129,7 @@ macro_rules! base_rocks_secondary_index {
 
 #[macro_export]
 macro_rules! rocks_table_impl {
-    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $delete_event: tt) => {
+    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block) => {
         pub(crate) struct $rocks_table<'a> {
             db: crate::metastore::DbTableRef<'a>,
         }
@@ -180,8 +180,16 @@ macro_rules! rocks_table_impl {
                 $indexes
             }
 
+            fn update_event(
+                &self,
+                old_row: IdRow<Self::T>,
+                new_row: IdRow<Self::T>,
+            ) -> MetaStoreEvent {
+                paste::expr! { MetaStoreEvent::[<Update $table>](old_row, new_row) }
+            }
+
             fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent {
-                MetaStoreEvent::$delete_event(row)
+                paste::expr! { MetaStoreEvent::[<Delete $table>](row) }
             }
         }
 
@@ -767,13 +775,22 @@ pub enum MetaStoreEvent {
     Insert(TableId, u64),
     Update(TableId, u64),
     Delete(TableId, u64),
+
+    UpdateChunk(IdRow<Chunk>, IdRow<Chunk>),
+    UpdateIndex(IdRow<Index>, IdRow<Index>),
+    UpdateJob(IdRow<Job>, IdRow<Job>),
+    UpdatePartition(IdRow<Partition>, IdRow<Partition>),
+    UpdateSchema(IdRow<Schema>, IdRow<Schema>),
+    UpdateTable(IdRow<Table>, IdRow<Table>),
+    UpdateWAL(IdRow<WAL>, IdRow<WAL>),
+
     DeleteChunk(IdRow<Chunk>),
     DeleteIndex(IdRow<Index>),
     DeleteJob(IdRow<Job>),
     DeletePartition(IdRow<Partition>),
     DeleteSchema(IdRow<Schema>),
     DeleteTable(IdRow<Table>),
-    DeleteWal(IdRow<WAL>),
+    DeleteWAL(IdRow<WAL>),
 }
 
 type SecondaryKey = Vec<u8>;
@@ -1001,6 +1018,7 @@ where
 trait RocksTable: Debug + Send + Sync {
     type T: Serialize + Clone + Debug + Send;
     fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent;
+    fn update_event(&self, old_row: IdRow<Self::T>, new_row: IdRow<Self::T>) -> MetaStoreEvent;
     fn db(&self) -> &DB;
     fn snapshot(&self) -> &Snapshot;
     fn mem_seq(&self) -> &MemorySequence;
@@ -1156,6 +1174,10 @@ trait RocksTable: Debug + Send + Sync {
 
         let updated_row = self.update_row(row_id, serialized_row)?;
         batch_pipe.add_event(MetaStoreEvent::Update(self.table_id(), row_id));
+        batch_pipe.add_event(self.update_event(
+            IdRow::new(row_id, old_row.clone()),
+            IdRow::new(row_id, new_row.clone()),
+        ));
         batch_pipe.batch().put(updated_row.key, updated_row.val);
 
         let index_row = self.insert_index_row(&new_row, row_id)?;

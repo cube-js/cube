@@ -7,7 +7,7 @@ use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
+use crate::metastore::{IdRow, MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
     MetaStoreRpcServer,
@@ -42,7 +42,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::{broadcast, oneshot, watch, Notify, RwLock};
+use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 
 #[automock]
@@ -65,6 +65,8 @@ pub trait Cluster: DIService + Send + Sync {
     fn job_result_listener(&self) -> JobResultListener;
 
     async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError>;
+
+    async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError>;
 }
 
 crate::di_service!(MockCluster, [Cluster]);
@@ -86,10 +88,8 @@ pub struct ClusterImpl {
     server_name: String,
     server_addresses: Vec<String>,
     job_notify: Arc<Notify>,
-    event_sender: Sender<JobEvent>,
+    meta_store_sender: Sender<MetaStoreEvent>,
     jobs_enabled: Arc<RwLock<bool>>,
-    // used just to hold a reference so event_sender won't be collected
-    _receiver: Receiver<JobEvent>,
     select_process_pool: RwLock<
         Option<Arc<WorkerPool<WorkerMessage, SerializedRecordBatchStream, WorkerProcessor>>>,
     >,
@@ -133,7 +133,6 @@ struct JobRunner {
     import_service: Arc<dyn ImportService>,
     server_name: String,
     notify: Arc<Notify>,
-    event_sender: Sender<JobEvent>,
     jobs_enabled: Arc<RwLock<bool>>,
 }
 
@@ -189,7 +188,7 @@ impl Cluster for ClusterImpl {
 
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
-            receiver: self.event_sender.subscribe(),
+            receiver: self.meta_store_sender.subscribe(),
         }
     }
 
@@ -205,10 +204,18 @@ impl Cluster for ClusterImpl {
         }
         Ok(workers[(hasher.finish() % workers.len() as u64) as usize].to_string())
     }
+
+    async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError> {
+        let workers = self.config_obj.select_workers();
+        if workers.is_empty() {
+            return Ok(self.server_name.to_string());
+        }
+        Ok(workers[(table_id % workers.len() as u64) as usize].to_string())
+    }
 }
 
 pub struct JobResultListener {
-    receiver: Receiver<JobEvent>,
+    receiver: Receiver<MetaStoreEvent>,
 }
 
 impl JobResultListener {
@@ -235,13 +242,37 @@ impl JobResultListener {
                 return Ok(res);
             }
             let event = self.receiver.recv().await?;
-            if let JobEvent::Success(k, t) | JobEvent::Error(k, t, _) = &event {
-                if let Some((index, _)) = results
-                    .iter()
-                    .find_position(|(row_key, job_type)| k == row_key && t == job_type)
-                {
-                    res.push(event);
-                    results.remove(index);
+            if let MetaStoreEvent::UpdateJob(old, new) = &event {
+                if old.get_row().status() != new.get_row().status() {
+                    let job_event = match new.get_row().status() {
+                        JobStatus::Scheduled(_) => None,
+                        JobStatus::ProcessingBy(_) => None,
+                        JobStatus::Completed => Some(JobEvent::Success(
+                            new.get_row().row_reference().clone(),
+                            new.get_row().job_type().clone(),
+                        )),
+                        JobStatus::Timeout => Some(JobEvent::Error(
+                            new.get_row().row_reference().clone(),
+                            new.get_row().job_type().clone(),
+                            "Job timed out".to_string(),
+                        )),
+                        JobStatus::Error(e) => Some(JobEvent::Error(
+                            new.get_row().row_reference().clone(),
+                            new.get_row().job_type().clone(),
+                            e.to_string(),
+                        )),
+                    };
+                    if let Some(event) = job_event {
+                        if let JobEvent::Success(k, t) | JobEvent::Error(k, t, _) = &event {
+                            if let Some((index, _)) = results
+                                .iter()
+                                .find_position(|(row_key, job_type)| k == row_key && t == job_type)
+                            {
+                                res.push(event);
+                                results.remove(index);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -297,14 +328,10 @@ impl JobRunner {
             }
         });
         debug!("Running job: {:?}", job);
-        self.event_sender.send(JobEvent::Started(
-            job.get_row().row_reference().clone(),
-            job.get_row().job_type().clone(),
-        ))?;
         let res = timeout(Duration::from_secs(600), self.route_job(job.get_row())).await;
         mem::drop(rx);
         heart_beat_timer.await?;
-        if let Err(timeout_err) = res {
+        if let Err(_) = res {
             self.meta_store
                 .update_status(job_id, JobStatus::Timeout)
                 .await?;
@@ -313,11 +340,6 @@ impl JobRunner {
                 start.elapsed()?,
                 self.meta_store.get_job(job_id).await?
             );
-            self.event_sender.send(JobEvent::Error(
-                job.get_row().row_reference().clone(),
-                job.get_row().job_type().clone(),
-                timeout_err.to_string(),
-            ))?;
         } else if let Ok(Err(cube_err)) = res {
             self.meta_store
                 .update_status(job_id, JobStatus::Error(cube_err.to_string()))
@@ -327,22 +349,14 @@ impl JobRunner {
                 start.elapsed()?,
                 self.meta_store.get_job(job_id).await?
             );
-            self.event_sender.send(JobEvent::Error(
-                job.get_row().row_reference().clone(),
-                job.get_row().job_type().clone(),
-                cube_err.to_string(),
-            ))?;
         } else {
-            let deleted_job = self.meta_store.delete_job(job_id).await?;
-            info!(
-                "Running job completed ({:?}): {:?}",
-                start.elapsed()?,
-                deleted_job
-            );
-            self.event_sender.send(JobEvent::Success(
-                job.get_row().row_reference().clone(),
-                job.get_row().job_type().clone(),
-            ))?;
+            let job = self
+                .meta_store
+                .update_status(job_id, JobStatus::Completed)
+                .await?;
+            info!("Running job completed ({:?}): {:?}", start.elapsed()?, job);
+            // TODO delete jobs on reconciliation
+            self.meta_store.delete_job(job_id).await?;
         }
         Ok(())
     }
@@ -409,8 +423,8 @@ impl ClusterImpl {
         import_service: Arc<dyn ImportService>,
         config_obj: Arc<dyn ConfigObj>,
         query_executor: Arc<dyn QueryExecutor>,
+        meta_store_sender: Sender<MetaStoreEvent>,
     ) -> Arc<ClusterImpl> {
-        let (sender, receiver) = broadcast::channel(10000); // TODO config
         let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
         Arc::new(ClusterImpl {
             server_name,
@@ -422,9 +436,8 @@ impl ClusterImpl {
             import_service,
             meta_store,
             job_notify: Arc::new(Notify::new()),
-            event_sender: sender,
+            meta_store_sender,
             jobs_enabled: Arc::new(RwLock::new(true)),
-            _receiver: receiver,
             select_process_pool: RwLock::new(None),
             config_obj,
             query_executor,
@@ -466,7 +479,6 @@ impl ClusterImpl {
                 import_service: self.import_service.clone(),
                 server_name: self.server_name.clone(),
                 notify: self.job_notify.clone(),
-                event_sender: self.event_sender.clone(),
                 jobs_enabled: self.jobs_enabled.clone(),
             };
             tokio::spawn(async move {
@@ -787,143 +799,5 @@ impl MetaStoreRpcClientTransport for ClusterMetaStoreClient {
             NetworkMessage::MetaStoreCallResult(res) => res,
             x => panic!("Unexpected message: {:?}", x),
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::import::MockImportService;
-    use crate::metastore::{table::Table, Chunk, IdRow, RocksMetaStore, WAL};
-    use crate::queryplanner::query_executor::QueryExecutorImpl;
-    use crate::remotefs::LocalDirRemoteFs;
-    use crate::store::{ChunkUploadJob, DataFrame, WALDataStore};
-    use async_trait::async_trait;
-    use std::{env, fs};
-
-    struct MockWalStore;
-
-    crate::di_service!(MockWalStore, [WALDataStore]);
-
-    #[async_trait]
-    impl WALDataStore for MockWalStore {
-        async fn add_wal(
-            &self,
-            _table: IdRow<Table>,
-            _data: DataFrame,
-        ) -> Result<IdRow<WAL>, CubeError> {
-            unimplemented!()
-        }
-
-        async fn get_wal(&self, _wal_id: u64) -> Result<DataFrame, CubeError> {
-            unimplemented!()
-        }
-
-        fn get_wal_chunk_size(&self) -> usize {
-            unimplemented!()
-        }
-    }
-
-    struct MockChunkStore;
-
-    crate::di_service!(MockChunkStore, [ChunkDataStore]);
-
-    #[async_trait]
-    impl ChunkDataStore for MockChunkStore {
-        async fn partition(&self, _wal_id: u64) -> Result<(), CubeError> {
-            unimplemented!()
-        }
-
-        async fn partition_data(
-            &self,
-            _table_id: u64,
-            _data: DataFrame,
-        ) -> Result<Vec<ChunkUploadJob>, CubeError> {
-            unimplemented!()
-        }
-
-        async fn repartition(&self, _partition_id: u64) -> Result<(), CubeError> {
-            unimplemented!()
-        }
-
-        async fn get_chunk(&self, _chunk: IdRow<Chunk>) -> Result<DataFrame, CubeError> {
-            unimplemented!()
-        }
-
-        async fn download_chunk(&self, _chunk: IdRow<Chunk>) -> Result<String, CubeError> {
-            unimplemented!()
-        }
-
-        async fn delete_remote_chunk(&self, _chunk: IdRow<Chunk>) -> Result<(), CubeError> {
-            unimplemented!()
-        }
-    }
-
-    struct MockCompaction;
-
-    crate::di_service!(MockCompaction, [CompactionService]);
-
-    #[async_trait]
-    impl CompactionService for MockCompaction {
-        async fn compact(&self, _partition_id: u64) -> Result<(), CubeError> {
-            unimplemented!()
-        }
-    }
-
-    #[tokio::test]
-    async fn elect_leader() {
-        let config = Config::test("leader");
-        let local = env::temp_dir().join(Path::new("local-leader"));
-        if fs::read_dir(local.to_owned()).is_ok() {
-            fs::remove_dir_all(local.to_owned()).unwrap();
-        }
-        fs::create_dir_all(local.to_owned()).unwrap();
-
-        let remote = env::temp_dir().join(Path::new("remote-leader"));
-        if fs::read_dir(remote.to_owned()).is_ok() {
-            fs::remove_dir_all(remote.to_owned()).unwrap();
-        }
-        fs::create_dir_all(remote.to_owned()).unwrap();
-
-        let remote_fs = LocalDirRemoteFs::new(remote, local);
-        let chunk_store = Arc::new(MockChunkStore);
-        let compaction = Arc::new(MockCompaction);
-        let meta_store = RocksMetaStore::new(
-            &remote_fs.local_file("meta").await.unwrap(),
-            remote_fs.clone(),
-            config.config_obj(),
-        );
-
-        let foo = ClusterImpl::new(
-            "foo".to_string(),
-            vec!["foo".to_string(), "bar".to_string()],
-            remote_fs.clone(),
-            Duration::from_secs(30),
-            chunk_store.clone(),
-            compaction.clone(),
-            meta_store.clone(),
-            Arc::new(MockImportService::new()),
-            config.config_obj(),
-            Arc::new(QueryExecutorImpl),
-        );
-
-        let bar = ClusterImpl::new(
-            "bar".to_string(),
-            vec!["foo".to_string(), "bar".to_string()],
-            remote_fs.clone(),
-            Duration::from_secs(30),
-            chunk_store.clone(),
-            compaction.clone(),
-            meta_store.clone(),
-            Arc::new(MockImportService::new()),
-            config.config_obj(),
-            Arc::new(QueryExecutorImpl),
-        );
-
-        remote_fs.drop_local_path().await.unwrap();
-
-        assert_eq!(bar.elect_leader().await.unwrap(), "bar");
-        assert_eq!(foo.elect_leader().await.unwrap(), "foo");
-        assert_eq!(foo.elect_leader().await.unwrap(), "foo");
     }
 }

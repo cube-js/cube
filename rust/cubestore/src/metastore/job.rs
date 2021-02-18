@@ -16,7 +16,7 @@ pub enum JobType {
     Repartition,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub enum JobStatus {
     Scheduled(String),
     ProcessingBy(String),
@@ -89,18 +89,12 @@ pub enum JobRocksIndex {
 
 base_rocks_secondary_index!(Job, JobRocksIndex);
 
-rocks_table_impl!(
-    Job,
-    JobRocksTable,
-    TableId::Jobs,
-    {
-        vec![
-            Box::new(JobRocksIndex::RowReference),
-            Box::new(JobRocksIndex::ByShard),
-        ]
-    },
-    DeleteJob
-);
+rocks_table_impl!(Job, JobRocksTable, TableId::Jobs, {
+    vec![
+        Box::new(JobRocksIndex::RowReference),
+        Box::new(JobRocksIndex::ByShard),
+    ]
+});
 
 #[derive(Hash, Clone, Debug)]
 pub enum JobIndexKey {

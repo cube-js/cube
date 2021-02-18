@@ -78,13 +78,9 @@ pub(crate) enum ChunkRocksIndex {
     PartitionId = 1,
 }
 
-rocks_table_impl!(
-    Chunk,
-    ChunkRocksTable,
-    TableId::Chunks,
-    { vec![Box::new(ChunkRocksIndex::PartitionId)] },
-    DeleteChunk
-);
+rocks_table_impl!(Chunk, ChunkRocksTable, TableId::Chunks, {
+    vec![Box::new(ChunkRocksIndex::PartitionId)]
+});
 
 base_rocks_secondary_index!(Chunk, ChunkRocksIndex);
 

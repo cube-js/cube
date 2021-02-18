@@ -114,13 +114,9 @@ pub(crate) enum PartitionRocksIndex {
     IndexId = 1,
 }
 
-rocks_table_impl!(
-    Partition,
-    PartitionRocksTable,
-    TableId::Partitions,
-    { vec![Box::new(PartitionRocksIndex::IndexId)] },
-    DeletePartition
-);
+rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
+    vec![Box::new(PartitionRocksIndex::IndexId)]
+});
 
 #[derive(Hash, Clone, Debug)]
 pub enum PartitionIndexKey {

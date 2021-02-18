@@ -67,18 +67,12 @@ impl BaseRocksSecondaryIndex<Index> for IndexRocksIndex {
     }
 }
 
-rocks_table_impl!(
-    Index,
-    IndexRocksTable,
-    TableId::Indexes,
-    {
-        vec![
-            Box::new(IndexRocksIndex::TableID),
-            Box::new(IndexRocksIndex::Name),
-        ]
-    },
-    DeleteIndex
-);
+rocks_table_impl!(Index, IndexRocksTable, TableId::Indexes, {
+    vec![
+        Box::new(IndexRocksIndex::TableID),
+        Box::new(IndexRocksIndex::Name),
+    ]
+});
 
 #[derive(Hash, Clone, Debug)]
 pub enum IndexIndexKey {

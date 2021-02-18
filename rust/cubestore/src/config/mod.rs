@@ -653,6 +653,8 @@ impl Config {
             })
             .await;
 
+        let cluster_meta_store_sender = event_sender_to_move.clone();
+
         self.injector
             .register_typed_with_default::<dyn Cluster, _, _, _>(async move |i| {
                 ClusterImpl::new(
@@ -669,6 +671,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    cluster_meta_store_sender,
                 )
             })
             .await;

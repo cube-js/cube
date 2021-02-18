@@ -132,13 +132,9 @@ impl Column {
     }
 }
 
-rocks_table_impl!(
-    Table,
-    TableRocksTable,
-    TableId::Tables,
-    { vec![Box::new(TableRocksIndex::Name)] },
-    DeleteTable
-);
+rocks_table_impl!(Table, TableRocksTable, TableId::Tables, {
+    vec![Box::new(TableRocksIndex::Name)]
+});
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum TableRocksIndex {

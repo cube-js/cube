@@ -1104,6 +1104,7 @@ dependencies = [
  "num",
  "parquet",
  "parquet-format",
+ "paste",
  "pin-project-lite 0.2.4",
  "procspawn",
  "rand 0.8.3",
