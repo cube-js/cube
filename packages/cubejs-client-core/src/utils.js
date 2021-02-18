@@ -5,15 +5,15 @@ export function defaultOrder(query) {
 
   if (granularity) {
     return {
-      [granularity.dimension]: 'asc'
+      [granularity.dimension]: 'asc',
     };
   } else if ((query.measures || []).length > 0 && (query.dimensions || []).length > 0) {
     return {
-      [query.measures[0]]: 'desc'
+      [query.measures[0]]: 'desc',
     };
   } else if ((query.dimensions || []).length > 0) {
     return {
-      [query.dimensions[0]]: 'asc'
+      [query.dimensions[0]]: 'asc',
     };
   }
 
@@ -217,13 +217,11 @@ export function flattenFilters(filters = []) {
 export function getQueryMembers(query = {}) {
   const keys = ['measures', 'dimensions', 'segments'];
   const members = new Set();
-  
+
   keys.forEach((key) => (query[key] || []).forEach((member) => members.add(member)));
   (query.timeDimensions || []).forEach((td) => members.add(td.dimension));
-  // todo: support for boolean filters
-  if (Array.isArray(query.filters)) {
-    query.filters.forEach((filter) => members.add(filter.dimension || filter.member));
-  }
-  
+
+  flattenFilters(query.filters).forEach((filter) => members.add(filter.dimension || filter.member));
+
   return [...members];
 }
