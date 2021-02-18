@@ -50,8 +50,8 @@ const FilterGroup = ({
 
           <Select
             value={m.operator}
-            onChange={(operator) => updateMethods.update(m, { ...m, operator })}
             style={{ width: 200 }}
+            onChange={(operator) => updateMethods.update(m, { ...m, operator })}
           >
             {m.operators.map((operator) => (
               <Select.Option key={operator.name} value={operator.name}>
@@ -69,10 +69,10 @@ const FilterGroup = ({
       );
     })}
     <MemberDropdown
-      onClick={(m) => updateMethods.add({ dimension: m })}
       availableMembers={availableMembers}
       type="dashed"
       icon={<PlusOutlined />}
+      onClick={(m) => updateMethods.add({ member: m })}
     >
       {!members.length ? addMemberName : null}
     </MemberDropdown>

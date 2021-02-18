@@ -179,7 +179,7 @@ export default class QueryBuilder extends React.Component {
       };
     };
     const toFilter = (member) => ({
-      dimension: member.dimension.name,
+      member: member.member?.name || member.dimension?.name,
       operator: member.operator,
       values: member.values,
     });
