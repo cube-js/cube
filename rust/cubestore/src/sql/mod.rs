@@ -1999,6 +1999,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn information_schema() {
+        Config::run_test("information_schema", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service
+                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query("SELECT schema_name FROM information_schema.schemata")
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows(),
+                &vec![Row::new(vec![TableValue::String("foo".to_string())])]
+            );
+
+            let result = service
+                .exec_query("SELECT table_name FROM information_schema.tables")
+                .await
+                .unwrap();
+
+            assert_eq!(
+                result.get_rows(),
+                &vec![Row::new(vec![TableValue::String("timestamps".to_string())])]
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn case_column_escaping() {
         Config::run_test("case_column_escaping", async move |services| {
             let service = services.sql_service;

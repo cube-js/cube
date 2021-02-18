@@ -65,7 +65,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let schema_provider = MetaStoreSchemaProvider::new(
             self.meta_store.get_tables_with_path().await?,
-            ctx.clone(),
+            self.meta_store.clone(),
         );
 
         let query_planner = SqlToRel::new(&schema_provider);
@@ -112,38 +112,20 @@ impl QueryPlannerImpl {
 
 impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
-        let mut ctx = ExecutionContext::new();
-
-        ctx.register_table(
-            "information_schema.tables",
-            Box::new(InfoSchemaTableProvider::new(
-                self.meta_store.clone(),
-                InfoSchemaTable::Tables,
-            )),
-        );
-
-        ctx.register_table(
-            "information_schema.schemata",
-            Box::new(InfoSchemaTableProvider::new(
-                self.meta_store.clone(),
-                InfoSchemaTable::Schemata,
-            )),
-        );
-
-        Ok(Arc::new(ctx))
+        Ok(Arc::new(ExecutionContext::new()))
     }
 }
 
 struct MetaStoreSchemaProvider {
     tables: HashMap<String, TablePath>,
-    information_schema_context: Arc<ExecutionContext>,
+    meta_store: Arc<dyn MetaStore>,
 }
 
 impl MetaStoreSchemaProvider {
-    pub fn new(tables: Vec<TablePath>, information_schema_context: Arc<ExecutionContext>) -> Self {
+    pub fn new(tables: Vec<TablePath>, meta_store: Arc<dyn MetaStore>) -> Self {
         Self {
             tables: tables.into_iter().map(|t| (t.table_name(), t)).collect(),
-            information_schema_context,
+            meta_store,
         }
     }
 }
@@ -168,13 +150,16 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     schema,
                 })
             });
-        // TODO .unwrap
-        res.or_else(|| {
-            self.information_schema_context
-                .state
-                .lock()
-                .unwrap()
-                .get_table_provider(name)
+        res.or_else(|| match name {
+            "information_schema.tables" => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::Tables,
+            ))),
+            "information_schema.schemata" => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::Schemata,
+            ))),
+            _ => None,
         })
     }
 
