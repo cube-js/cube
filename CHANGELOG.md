@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.18](https://github.com/cube-js/cube.js/compare/v0.26.17...v0.26.18) (2021-02-18)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** revert path alias ([e577040](https://github.com/cube-js/cube.js/commit/e57704096914ce07fcc0ea1ae07435046f08701f))
+
+
+
+
+
 ## [0.26.17](https://github.com/cube-js/cube.js/compare/v0.26.16...v0.26.17) (2021-02-18)
 
 
