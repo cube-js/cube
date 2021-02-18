@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.16](https://github.com/cube-js/cube.js/compare/v0.26.15...v0.26.16) (2021-02-18)
+
+
+### Features
+
+* **druid-driver:** Support CUBEJS_DB_SSL ([d8124d0](https://github.com/cube-js/cube.js/commit/d8124d0a91c926ce0e1ffd21d6d057c164b01e79))
+
+
+
+
+
 ## [0.26.15](https://github.com/cube-js/cube.js/compare/v0.26.14...v0.26.15) (2021-02-16)
 
 

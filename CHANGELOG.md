@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.16](https://github.com/cube-js/cube.js/compare/v0.26.15...v0.26.16) (2021-02-18)
+
+
+### Bug Fixes
+
+* **cubestore:** allow conversion from string to int in partition pruning ([#2128](https://github.com/cube-js/cube.js/issues/2128)) ([af920ca](https://github.com/cube-js/cube.js/commit/af920caa00e665b38c53a37b00cdf8170744e308))
+* **cubestore:** CSV import silently fails on empty "" strings ([c82583a](https://github.com/cube-js/cube.js/commit/c82583a16ada49af8fab4f4faf18c35a5907f4ed))
+* **cubestore:** Do not block scheduler loop during event processing ([3a0875e](https://github.com/cube-js/cube.js/commit/3a0875e23b441e35e42495ba14581b1cda28cc43))
+* **cubestore:** fix index schema used for partition pruning ([#2125](https://github.com/cube-js/cube.js/issues/2125)) ([99635be](https://github.com/cube-js/cube.js/commit/99635befce1df8f7cb4b4fdd4bd577175fd68bf3))
+* **cubestore:** put temporary downloads into a separate directory ([33986e9](https://github.com/cube-js/cube.js/commit/33986e959ee714f830c0e1f46da11a9b87a0ee3d))
+* **cubestore:** Remove information_schema lock access to avoid any possible tokio thread blocks ([e7450a9](https://github.com/cube-js/cube.js/commit/e7450a94fc995f05dc1ae0abf4c11f6a2a4bbe81))
+* **cubestore:** warmup partitions only once ([#2123](https://github.com/cube-js/cube.js/issues/2123)) ([c4c009c](https://github.com/cube-js/cube.js/commit/c4c009c382c0f93472a80fd4e3a6ab2ecb6cf185))
+* continueWaitTimeout is ignored: expose single centralized continueWaitTimeout option ([#2120](https://github.com/cube-js/cube.js/issues/2120)) ([2735d2c](https://github.com/cube-js/cube.js/commit/2735d2c1b60c0a31e3970c65b7dd1c293351614e)), closes [#225](https://github.com/cube-js/cube.js/issues/225)
+
+
+### Features
+
+* **cubestore:** Build Linux (gnu) ([#2088](https://github.com/cube-js/cube.js/issues/2088)) ([3ef9576](https://github.com/cube-js/cube.js/commit/3ef95766ab1cde8923de7a887a451b43b07a253a))
+* **cubestore:** Introduce Dependency Injection ([#2111](https://github.com/cube-js/cube.js/issues/2111)) ([0d97357](https://github.com/cube-js/cube.js/commit/0d97357dbc8ee1eaf858387f7e7a8572ef76562f))
+* **cubestore:** Schedule imports on worker nodes ([c0cb164](https://github.com/cube-js/cube.js/commit/c0cb16448b70299844c643c3c07d65cb999e3c30))
+* **druid-driver:** Support CUBEJS_DB_SSL ([d8124d0](https://github.com/cube-js/cube.js/commit/d8124d0a91c926ce0e1ffd21d6d057c164b01e79))
+
+
+### Reverts
+
+* Revert "fix(cubestore): cleanup warmup downloads on partition removal (#2025)" (#2121) ([f9ae6af](https://github.com/cube-js/cube.js/commit/f9ae6af65fb8a1dfdd1317d3e272de71a02f9f6f)), closes [#2025](https://github.com/cube-js/cube.js/issues/2025) [#2121](https://github.com/cube-js/cube.js/issues/2121)
+
+
+
+
+
 ## [0.26.15](https://github.com/cube-js/cube.js/compare/v0.26.14...v0.26.15) (2021-02-16)
 
 
