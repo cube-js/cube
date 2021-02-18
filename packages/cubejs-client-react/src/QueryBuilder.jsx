@@ -106,6 +106,10 @@ export default class QueryBuilder extends React.Component {
   }
 
   async componentDidMount() {
+    await this.fetchMeta();
+  }
+  
+  fetchMeta = async () => {
     const { query, pivotConfig } = this.state;
     let dryRunResponse;
     let missingMembers = [];
@@ -321,6 +325,7 @@ export default class QueryBuilder extends React.Component {
         },
       },
       missingMembers,
+      refresh: this.fetchMeta,
       ...queryRendererProps,
     };
   }

@@ -39,6 +39,7 @@ const StyledCard = styled(Card)`
   .ant-card-body {
     max-width: 100%;
     overflow: auto;
+    position: relative;
   }
 `;
 
@@ -185,6 +186,10 @@ class ChartContainer extends Component {
     const frameworkMenu = (
       <Menu
         onClick={(e) => {
+          if (e.key === framework) {
+            return;
+          }
+          
           playgroundAction('Set Framework', { framework: e.key });
           setFramework(e.key);
           onChartRendererReadyChange(false);
