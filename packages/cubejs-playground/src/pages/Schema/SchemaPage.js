@@ -8,8 +8,8 @@ import {
 
 import PrismCode from '../../PrismCode';
 import { playgroundAction } from '../../events';
-import { Menu, Tabs, Tree } from '@/components';
-import { Alert, CubeLoader } from '@/atoms';
+import { Menu, Tabs, Tree } from '../../components';
+import { Alert, CubeLoader } from '../../atoms';
 import fetch from '../../playgroundFetch';
 
 const { Content, Sider } = Layout;

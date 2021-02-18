@@ -2,9 +2,9 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, Typography } from 'antd';
 import styled from 'styled-components';
 
-import { CubeLoader } from '@/atoms';
-import { dispatchPlaygroundEvent } from '@/utils';
-import { useDeepCompareMemoize } from '@/hooks';
+import { CubeLoader } from '../../atoms';
+import { dispatchPlaygroundEvent } from '../../utils';
+import { useDeepCompareMemoize } from '../../hooks';
 
 const { Text } = Typography;
 

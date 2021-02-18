@@ -13,11 +13,6 @@ Object.keys(VARIABLES)
   });
 
 module.exports = function override(config, env) {
-  config.resolve.alias = {
-    ...config.resolve.alias,
-    '@': path.resolve(__dirname, './src'),
-  };
-  
   config.optimization = {
     minimizer: [
       new TerserPlugin({

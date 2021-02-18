@@ -15,7 +15,7 @@ import { Card, SectionHeader, SectionRow, Button } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
 import { useSecurityContext } from './hooks';
-import { FatalError } from '@/atoms';
+import { FatalError } from './atoms';
 
 const Section = styled.div`
   display: flex;

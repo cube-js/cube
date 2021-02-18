@@ -5,9 +5,9 @@ import { Layout, Alert } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { withRouter } from 'react-router';
 
-import Header from '@/components/Header';
-import GlobalStyles from '@/components/GlobalStyles';
-import { CubeLoader } from '@/atoms';
+import Header from './components/Header';
+import GlobalStyles from './components/GlobalStyles';
+import { CubeLoader } from './atoms';
 import { event, setAnonymousId } from './events';
 import './index.less';
 import './index.css';

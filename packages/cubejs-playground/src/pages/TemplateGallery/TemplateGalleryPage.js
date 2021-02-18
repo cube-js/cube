@@ -2,15 +2,15 @@ import { Component } from 'react';
 import styled from 'styled-components';
 import { Col, Row, Typography } from 'antd';
 import { Redirect, withRouter } from 'react-router-dom';
+import { PlusOutlined } from '@ant-design/icons';
 import '@ant-design/compatible/assets/index.css';
 
 import DashboardSource from '../../DashboardSource';
 import { frameworks } from '../../ChartContainer';
 import { Button, Card } from '../../components';
-import { ReactComponent as PlusSVG } from './plus.svg';
 import CreateOwnModal from './CreateOwnModal';
 import { frameworkChartLibraries } from '../../PlaygroundQueryBuilder';
-import { CubeLoader } from '@/atoms';
+import { CubeLoader } from '../../atoms';
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>
@@ -238,7 +238,7 @@ class TemplateGalleryPage extends Component {
             hoverable
             createYourOwn
             bordered={false}
-            cover={<PlusSVG />}
+            cover={<PlusOutlined style={{ fontSize: 60 }} />}
           >
             <Card.Meta
               title="Create your Own"
