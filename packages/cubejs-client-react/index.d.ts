@@ -11,6 +11,10 @@ import {
   TCubeMember,
   ProgressResponse,
   TDryRunResponse,
+  TOrderMember,
+  QueryOrder,
+  TQueryOrderArray,
+  TSourceAxis,
 } from '@cubejs-client/core';
 
 /**
@@ -134,7 +138,7 @@ declare module '@cubejs-client/react' {
    */
   export class QueryRenderer extends React.Component<QueryRendererProps> {}
 
-  type ChartType = 'line' | 'bar' | 'table' | 'area';
+  type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
 
   type VizState = {
     [key: string]: any;
@@ -214,10 +218,39 @@ declare module '@cubejs-client/react' {
     updateDimensions: MemberUpdater;
     updateSegments: MemberUpdater;
     updateTimeDimensions: MemberUpdater;
+    updateFilters: MemberUpdater;
     /**
      * Used for partial of full query update
      */
     updateQuery: (query: Query) => void;
+    filters: Filter[];
+    /**
+     * All possible order members for the query
+     */
+    orderMembers: TOrderMember[];
+    /**
+     * Used for query order update
+     */
+    updateOrder: OrderUpdater;
+    /**
+     * See [Pivot Config](@cubejs-client-core#types-pivot-config)
+     */
+    pivotConfig: PivotConfig;
+    /**
+     * Helper method for `pivotConfig` updates
+     */
+    updatePivotConfig: PivotConfigUpdater;
+    
+    /**
+     * Selected chart type
+     */
+    chartType: ChartType;
+    
+    /**
+     * Used for chart type update
+     */
+    updateChartType: (chartType: ChartType) => void;
+    validatedQuery: Query;
   };
 
   /**
@@ -448,5 +481,21 @@ declare module '@cubejs-client/react' {
     add: (member: MemberType) => void;
     remove: (member: MemberType) => void;
     update: (member: MemberType, updateWith: MemberType) => void;
+  };
+
+  type OrderUpdater = {
+    set: (memberId: string, order: QueryOrder | 'none') => void;
+    update: (order: TQueryOrderArray) => void;
+    reorder: (sourceIndex: number, destinationIndex: number) => void;
+  };
+
+  type PivotConfigUpdater = {
+    moveItem: (
+      sourceIndex: number,
+      destinationIndex: number,
+      sourceAxis: TSourceAxis,
+      destinationAxis: TSourceAxis
+    ) => void;
+    update: (pivotConfig: PivotConfig & { limit: number }) => void;
   };
 }

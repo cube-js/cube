@@ -745,6 +745,12 @@ declare module '@cubejs-client/core' {
 
   export type MemberType = 'measures' | 'dimensions' | 'segments';
 
+  type TOrderMember = {
+    id: string;
+    title: string;
+    order: QueryOrder | 'none'
+  }
+  
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
   type TCubeMember = {
