@@ -212,27 +212,7 @@ export class ApiGateway {
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
     
-    const playgroundAuthSecret = getEnv('playgroundAuthSecret');
-    const mainCheckAuthFn = options.checkAuth
-      ? this.wrapCheckAuth(options.checkAuth)
-      : this.createDefaultCheckAuth(options.jwt);
-    const playgroundCheckAuthFn = this.createDefaultCheckAuth({
-      key: playgroundAuthSecret,
-      algorithms: ['HS256']
-    });
-      
-    this.checkAuthFn = async (ctx, authorization) => {
-      try {
-        await mainCheckAuthFn(ctx, authorization);
-      } catch (error) {
-        if (playgroundAuthSecret) {
-          await playgroundCheckAuthFn(ctx, authorization);
-        } else {
-          throw error;
-        }
-      }
-    };
-    
+    this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
@@ -907,6 +887,30 @@ export class ApiGateway {
         throw new UserError('Authorization header isn\'t set');
       }
     };
+  }
+  
+  protected createCheckAuthFn(options: ApiGatewayOptions) {
+    const playgroundAuthSecret = getEnv('playgroundAuthSecret');
+    const mainCheckAuthFn = options.checkAuth
+      ? this.wrapCheckAuth(options.checkAuth)
+      : this.createDefaultCheckAuth(options.jwt);
+      
+    if (playgroundAuthSecret) {
+      const playgroundCheckAuthFn = this.createDefaultCheckAuth({
+        key: playgroundAuthSecret,
+        algorithms: ['HS256']
+      });
+        
+      return async (ctx, authorization) => {
+        try {
+          await mainCheckAuthFn(ctx, authorization);
+        } catch (error) {
+          await playgroundCheckAuthFn(ctx, authorization);
+        }
+      };
+    }
+      
+    return (ctx, authorization) => mainCheckAuthFn(ctx, authorization);
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
