@@ -2,7 +2,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
-import { getRealType } from '@cubejs-backend/shared';
+import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
   Response, NextFunction,
@@ -211,14 +211,33 @@ export class ApiGateway {
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
-    this.checkAuthFn = options.checkAuth
+    
+    const playgroundAuthSecret = getEnv('playgroundAuthSecret');
+    const mainCheckAuthFn = options.checkAuth
       ? this.wrapCheckAuth(options.checkAuth)
       : this.createDefaultCheckAuth(options.jwt);
+    const playgroundCheckAuthFn = this.createDefaultCheckAuth({
+      key: playgroundAuthSecret,
+      algorithms: ['HS256']
+    });
+      
+    this.checkAuthFn = async (ctx, authorization) => {
+      try {
+        await mainCheckAuthFn(ctx, authorization);
+      } catch (error) {
+        if (playgroundAuthSecret) {
+          await playgroundCheckAuthFn(ctx, authorization);
+        } else {
+          throw error;
+        }
+      }
+    };
+    
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
-      : this.checkAuth.bind(this);
+      : this.checkAuth;
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
-    this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger.bind(this);
+    this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
   }
 
   public initApp(app: ExpressApplication) {
@@ -827,7 +846,7 @@ export class ApiGateway {
     type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
-      algorithms: <JWTAlgorithm[]|undefined>options?.algorithms,
+      algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
       issuer: options?.issuer,
       audience: options?.audience,
       subject: options?.subject,
@@ -835,7 +854,7 @@ export class ApiGateway {
 
     let checkAuthFn: VerifyTokenFn = verifyToken;
 
-    if (options && options.jwkUrl) {
+    if (options?.jwkUrl) {
       const jwks = createJWKsFetcher(options);
 
       // Precache JWKs response to speedup first auth
