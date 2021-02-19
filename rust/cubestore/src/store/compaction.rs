@@ -4,6 +4,7 @@ use crate::metastore::MetaStore;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
+use crate::table::data::{cmp_row_key, RowsView, TableValueR};
 use crate::table::parquet::ParquetTableStore;
 use crate::table::TableStore;
 use crate::CubeError;
@@ -11,6 +12,7 @@ use async_trait::async_trait;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
 use scopeguard::defer;
+use std::mem::swap;
 use std::sync::Arc;
 
 #[async_trait]
@@ -87,13 +89,15 @@ impl CompactionService for CompactionServiceImpl {
             );
         }
 
-        let mut rows = Vec::new();
+        let mut data = Vec::new();
+        let mut total_data_rows = 0;
+        let num_columns = index.get_row().columns().len();
         for chunk in chunks.iter() {
-            let mut data = self.chunk_store.get_chunk(chunk.clone()).await?;
-            rows.append(data.mut_rows());
+            let d = self.chunk_store.get_chunk(chunk.clone()).await?;
+            assert_eq!(num_columns, d.num_columns());
+            total_data_rows += d.num_rows();
+            data.push(d);
         }
-        let sort_key_size = index.get_row().sort_key_size();
-        rows.sort_by(|a, b| a.sort_key(sort_key_size).cmp(&b.sort_key(sort_key_size)));
 
         let store = ParquetTableStore::new(index.get_row().clone(), 16384); // TODO config
         let old_partition_local =
@@ -111,6 +115,19 @@ impl CompactionService for CompactionServiceImpl {
 
         let new_partition_file_names = new_partition_local_files.clone();
         let count_and_min_max = tokio::task::spawn_blocking(move || {
+            let mut merge_buffer = Vec::with_capacity(total_data_rows * num_columns);
+            for d in &data {
+                merge_buffer.extend_from_slice(d.all_values());
+            }
+            let sort_key_size = index.get_row().sort_key_size() as usize;
+            sort_rows(
+                &mut merge_buffer,
+                total_data_rows,
+                num_columns,
+                sort_key_size,
+            );
+
+            let rows = RowsView::new(&merge_buffer, num_columns);
             store.merge_rows(
                 old_partition_local.as_ref().map(|s| s.as_str()),
                 new_partition_file_names,
@@ -159,7 +176,7 @@ impl CompactionService for CompactionServiceImpl {
                 chunks.iter().map(|c| c.get_id()).collect(),
                 count_and_min_max
                     .iter()
-                    .zip_longest(count_and_min_max.iter().skip(1))
+                    .zip_longest(count_and_min_max.iter().skip(1 as usize))
                     .enumerate()
                     .map(|(i, item)| -> Result<_, CubeError> {
                         match item {
@@ -219,12 +236,38 @@ impl CompactionService for CompactionServiceImpl {
     }
 }
 
+fn sort_rows(
+    values: &mut Vec<TableValueR>,
+    num_rows: usize,
+    num_columns: usize,
+    sort_key_size: usize,
+) {
+    assert_eq!(values.len(), num_rows * num_columns);
+    let mut rows = (0..num_rows).collect_vec();
+    rows.sort_unstable_by(|l, r| {
+        cmp_row_key(
+            sort_key_size,
+            &values[l * num_columns..l * num_columns + num_columns],
+            &values[r * num_columns..r * num_columns + num_columns],
+        )
+    });
+
+    // TODO: apply permutation without extra memory.
+    let mut result = Vec::with_capacity(values.len());
+    for i in rows {
+        result.extend_from_slice(&values[i * num_columns..i * num_columns + num_columns]);
+    }
+
+    swap(&mut *values, &mut result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::MockConfigObj;
     use crate::metastore::{Column, ColumnType, RocksMetaStore};
-    use crate::store::{DataFrame, MockChunkDataStore};
+    use crate::store::MockChunkDataStore;
+    use crate::table::data::MutRows;
     use crate::table::{Row, TableValue};
 
     #[tokio::test]
@@ -267,24 +310,20 @@ mod tests {
         metastore.chunk_uploaded(3).await.unwrap();
 
         chunk_store.expect_get_chunk().returning(move |i| {
-            Ok(DataFrame::new(
-                cols.clone(),
-                (0..{
-                    if i.get_id() == 1 {
-                        10
-                    } else if i.get_id() == 2 {
-                        16
-                    } else if i.get_id() == 3 {
-                        20
-                    } else if i.get_id() == 4 {
-                        2
-                    } else {
-                        unimplemented!()
-                    }
-                })
-                    .map(|i| Row::new(vec![TableValue::String(format!("foo{}", i))]))
-                    .collect::<Vec<_>>(),
-            ))
+            let limit = match i.get_id() {
+                1 => 10,
+                2 => 16,
+                3 => 20,
+                4 => 2,
+                _ => unimplemented!(),
+            };
+
+            let mut rows = MutRows::new(cols.len());
+            for i in 0..limit {
+                rows.add_row()
+                    .set_interned(0, TableValueR::String(&format!("foo{}", i)));
+            }
+            Ok(rows.freeze())
         });
 
         config.expect_partition_split_threshold().returning(|| 20);

@@ -1,6 +1,6 @@
 use super::TimestampValue;
 use crate::metastore::{Column, ColumnType, Index};
-use crate::table::{Row, RowSortKey, TableStore, TableValue};
+use crate::table::{Row, TableStore};
 use crate::CubeError;
 use parquet::column::reader::ColumnReader;
 use parquet::column::writer::ColumnWriter;
@@ -9,9 +9,13 @@ use parquet::file::properties::{WriterProperties, WriterVersion};
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use parquet::file::writer::{FileWriter, SerializedFileWriter};
 use parquet::schema::types;
-use std::cmp::{max, min};
+use std::cmp::{max, min, Ordering};
 use std::fs::File;
 
+use crate::table::data::{
+    cmp_row_key, cmp_row_key_heap, convert_row_to_heap_allocated, MutRows, Rows, RowsView,
+    TableValueR,
+};
 use bigdecimal::{BigDecimal, Num, ToPrimitive};
 use num::integer::div_ceil;
 use num::BigInt;
@@ -25,7 +29,7 @@ pub struct ParquetTableStore {
 pub struct RowParquetWriter {
     columns: Vec<Column>,
     parquet_writer: SerializedFileWriter<File>,
-    buffer: Vec<Row>,
+    buffer: MutRows,
     row_group_size: usize,
 }
 
@@ -46,8 +50,8 @@ impl TableStore for ParquetTableStore {
         &'a self,
         source_file: Option<&'a str>,
         dest_files: Vec<String>,
-        rows: Vec<Row>,
-        sort_key_size: u64,
+        rows: RowsView<'a>,
+        sort_key_size: usize,
     ) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
         let mut writers = Vec::new();
         for f in dest_files.iter() {
@@ -60,7 +64,7 @@ impl TableStore for ParquetTableStore {
         }
         if source_file.is_none() {
             let mut split_writer = SplitRowParquetWriter::new(writers, rows.len(), sort_key_size);
-            split_writer.write_rows(rows.as_slice())?;
+            split_writer.write_rows(rows)?;
             return Ok(split_writer.close()?);
         }
 
@@ -71,28 +75,32 @@ impl TableStore for ParquetTableStore {
         let mut split_writer = SplitRowParquetWriter::new(writers, total_row_number, sort_key_size);
 
         for row_group_index in 0..reader.parquet_reader.num_row_groups() {
-            let read_rows = reader.read_rows(row_group_index)?;
-            let (new_pos, to_write) =
-                ParquetTableStore::merge_sort(read_rows, &rows, right_position, sort_key_size);
-            split_writer.write_rows(to_write.as_slice())?;
+            let mut read_rows = MutRows::new(reader.column_with_buffer.len());
+            reader.read_rows(row_group_index, &mut read_rows)?;
+            let (new_pos, to_write) = ParquetTableStore::merge_sort(
+                read_rows.freeze(),
+                rows,
+                right_position,
+                sort_key_size as usize,
+            );
+            split_writer.write_rows(to_write.view())?;
             right_position = new_pos;
         }
 
         if right_position < rows.len() {
-            split_writer.write_rows(&rows[right_position..rows.len()])?;
+            split_writer.write_rows(rows.slice(right_position, rows.len()))?;
         }
 
         Ok(split_writer.close()?)
     }
 
-    fn read_rows(&self, file: &str) -> Result<Vec<Row>, CubeError> {
-        let mut result = Vec::<Row>::new();
+    fn read_rows(&self, file: &str) -> Result<Rows, CubeError> {
         let mut reader = RowParquetReader::open(&self.table, file, None)?;
+        let mut result = MutRows::new(reader.column_with_buffer.len());
         for row_group_index in 0..reader.parquet_reader.num_row_groups() {
-            let mut rows = reader.read_rows(row_group_index)?;
-            result.append(&mut rows);
+            reader.read_rows(row_group_index, &mut result)?;
         }
-        Ok(result)
+        Ok(result.freeze())
     }
 
     fn read_filtered_rows(
@@ -100,19 +108,17 @@ impl TableStore for ParquetTableStore {
         file: &str,
         columns: &Vec<Column>,
         limit: usize,
-    ) -> Result<Vec<Row>, CubeError> {
-        let mut result = Vec::<Row>::new();
+    ) -> Result<Rows, CubeError> {
         let mut reader = RowParquetReader::open(&self.table, file, Some(columns))?;
-        'outer: for row_group_index in 0..reader.parquet_reader.num_row_groups() {
-            let row_group = reader.read_rows(row_group_index)?;
-            for row in &row_group {
-                if result.len() >= limit {
-                    break 'outer;
-                }
-                result.push(row.clone());
+        let mut result = MutRows::new(reader.column_with_buffer.len());
+        for row_group_index in 0..reader.parquet_reader.num_row_groups() {
+            reader.read_rows(row_group_index, &mut result)?;
+            if limit <= result.num_rows() {
+                result.truncate(limit);
+                break;
             }
         }
-        Ok(result)
+        Ok(result.freeze())
     }
 
     // fn scan_node(
@@ -138,40 +144,55 @@ impl ParquetTableStore {
         }
     }
 
+    #[cfg(test)]
+    pub fn merge_rows_from_heap<'a>(
+        &'a self,
+        source_file: Option<&'a str>,
+        dest_files: Vec<String>,
+        rows: Vec<Row>,
+        sort_key_size: usize,
+    ) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
+        let mut buffer = Vec::new();
+        self.merge_rows(
+            source_file,
+            dest_files,
+            RowsView::from_heap_allocated(&mut buffer, rows[0].len(), &rows),
+            sort_key_size,
+        )
+    }
+
     fn merge_sort(
-        left: Vec<Row>,
-        right: &Vec<Row>,
+        left: Rows,
+        right: RowsView,
         initial_right_pos: usize,
-        sort_key_size: u64,
-    ) -> (usize, Vec<Row>) {
+        sort_key_size: usize,
+    ) -> (usize, Rows) {
+        let leftv = left.view();
         if right.len() == initial_right_pos
-            || left[left.len() - 1].sort_key(sort_key_size)
-                <= right[initial_right_pos].sort_key(sort_key_size)
+            || cmp_row_key(
+                sort_key_size,
+                &leftv[leftv.len() - 1],
+                &right[initial_right_pos],
+            ) <= Ordering::Equal
         {
             return (initial_right_pos, left);
         }
-        let mut result = Vec::with_capacity(left.len());
+        let mut result = MutRows::with_capacity(left.num_columns(), left.num_rows());
         let mut left_position = 0;
         let mut right_position = initial_right_pos;
-        while left_position < left.len() {
-            let left_key = Some(left[left_position].sort_key(sort_key_size));
-            let right_key = if right_position < right.len() {
-                Some(right[right_position].sort_key(sort_key_size))
-            } else {
-                None
-            };
-            let option = left_key.as_ref().zip(right_key.as_ref());
-            if right_key.is_none() || option.map(|(l, r)| l <= r).unwrap_or(false) {
-                result.push(left[left_position].clone()); // TODO clone
+        while left_position < left.num_rows() {
+            if right.len() <= right_position
+                || cmp_row_key(sort_key_size, &leftv[left_position], &right[right_position])
+                    <= Ordering::Equal
+            {
+                result.add_row_copy(&leftv[left_position]); // TODO copy
                 left_position += 1;
-            } else if option.map(|(l, r)| l > r).unwrap_or(false) {
-                result.push(right[right_position].clone()); // TODO clone
-                right_position += 1;
             } else {
-                panic!("Shouldn't get here");
+                result.add_row_copy(&right[right_position]); // TODO copy
+                right_position += 1;
             }
         }
-        (right_position, result)
+        (right_position, result.freeze())
     }
 }
 
@@ -284,13 +305,14 @@ impl<'a> RowParquetReader<'a> {
         Ok(values_read)
     }
 
-    fn read_rows(&mut self, row_group_index: usize) -> Result<Vec<Row>, CubeError> {
+    fn read_rows(&mut self, row_group_index: usize, output: &mut MutRows) -> Result<(), CubeError> {
+        assert_eq!(output.num_columns(), self.column_with_buffer.len());
+
         let values_read = self.load_row_group(row_group_index)?;
-        let mut vec_result = Vec::<Row>::with_capacity(values_read);
-        for _ in 0..values_read {
-            vec_result.push(Row::new(Vec::with_capacity(self.column_with_buffer.len())))
-        }
-        for (col, _, column_accessor, def_levels) in &self.column_with_buffer {
+        let mut result = output.add_rows(values_read);
+        for (col_i, (col, _, column_accessor, def_levels)) in
+            self.column_with_buffer.iter().enumerate()
+        {
             let mut cur_value_index = 0;
             match def_levels {
                 Some(levels) => {
@@ -300,10 +322,10 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index].as_utf8()?;
-                                        vec_result[i].push(TableValue::String(value.to_string()));
+                                        result.set_interned(i, col_i, TableValueR::String(value));
                                         cur_value_index += 1;
                                     } else {
-                                        vec_result[i].push(TableValue::Null);
+                                        result.set_interned(i, col_i, TableValueR::Null);
                                     }
                                 }
                             }
@@ -313,10 +335,9 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index].as_bytes();
-                                        vec_result[i].push(TableValue::Bytes(value.to_vec()));
-                                        cur_value_index += 1;
+                                        result.set_interned(i, col_i, TableValueR::Bytes(value));
                                     } else {
-                                        vec_result[i].push(TableValue::Null);
+                                        result.set_interned(i, col_i, TableValueR::Null);
                                     }
                                 }
                             }
@@ -326,10 +347,10 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Int(value));
+                                        result.set_interned(i, col_i, TableValueR::Int(value));
                                         cur_value_index += 1;
                                     } else {
-                                        vec_result[i].push(TableValue::Null);
+                                        result.set_interned(i, col_i, TableValueR::Null);
                                     }
                                 }
                             }
@@ -339,16 +360,21 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Decimal(
-                                            BigDecimal::new(
-                                                BigInt::from(value),
-                                                col.get_column_type().target_scale() as i64,
-                                            )
-                                            .to_string(),
-                                        ));
+
+                                        result.set_interned(
+                                            i,
+                                            col_i,
+                                            TableValueR::Decimal(
+                                                &BigDecimal::new(
+                                                    BigInt::from(value),
+                                                    col.get_column_type().target_scale() as i64,
+                                                )
+                                                .to_string(),
+                                            ),
+                                        );
                                         cur_value_index += 1;
                                     } else {
-                                        vec_result[i].push(TableValue::Null);
+                                        result.set_interned(i, col_i, TableValueR::Null);
                                     }
                                 }
                             }
@@ -358,12 +384,17 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Timestamp(
-                                            TimestampValue::new(value * 1000 as i64),
-                                        ));
+
+                                        result.set_interned(
+                                            i,
+                                            col_i,
+                                            TableValueR::Timestamp(TimestampValue::new(
+                                                value * 1000 as i64,
+                                            )),
+                                        );
                                         cur_value_index += 1;
                                     } else {
-                                        vec_result[i].push(TableValue::Null);
+                                        result.set_interned(i, col_i, TableValueR::Null);
                                     }
                                 }
                             }
@@ -373,10 +404,10 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Boolean(value));
+                                        result.set_interned(i, col_i, TableValueR::Boolean(value));
                                         cur_value_index += 1;
                                     } else {
-                                        vec_result[i].push(TableValue::Null);
+                                        result.set_interned(i, col_i, TableValueR::Null);
                                     }
                                 }
                             }
@@ -386,10 +417,14 @@ impl<'a> RowParquetReader<'a> {
                                 for i in 0..values_read {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index];
-                                        vec_result[i].push(TableValue::Float(value.into()));
+                                        result.set_interned(
+                                            i,
+                                            col_i,
+                                            TableValueR::Float(value.into()),
+                                        );
                                         cur_value_index += 1;
                                     } else {
-                                        vec_result[i].push(TableValue::Null);
+                                        result.set_interned(i, col_i, TableValueR::Null);
                                     }
                                 }
                             }
@@ -399,7 +434,7 @@ impl<'a> RowParquetReader<'a> {
                 x => panic!("Unsupported value: {:?}", x),
             }
         }
-        Ok(vec_result)
+        Ok(())
     }
 }
 
@@ -412,14 +447,14 @@ pub struct SplitRowParquetWriter {
     min_max_rows: Vec<(u64, (Row, Row))>,
     first_row: Option<Row>,
     last_row: Option<Row>,
-    sort_key_size: u64,
+    sort_key_size: usize,
 }
 
 impl SplitRowParquetWriter {
     pub fn new(
         writers: Vec<RowParquetWriter>,
         total_row_number: usize,
-        sort_key_size: u64,
+        sort_key_size: usize,
     ) -> SplitRowParquetWriter {
         let chunk_size = div_ceil(total_row_number, writers.len());
         SplitRowParquetWriter {
@@ -435,12 +470,12 @@ impl SplitRowParquetWriter {
         }
     }
 
-    fn write_rows(&mut self, rows: &[Row]) -> Result<(), CubeError> {
+    fn write_rows(&'a mut self, rows: RowsView<'a>) -> Result<(), CubeError> {
         if rows.len() == 0 {
             return Ok(());
         }
         if self.first_row.is_none() {
-            self.first_row = Some(rows[0].clone());
+            self.first_row = Some(convert_row_to_heap_allocated(&rows[0]));
         }
         let mut remaining_slice = rows;
         while remaining_slice.len() + self.rows_written
@@ -454,8 +489,7 @@ impl SplitRowParquetWriter {
             };
             // move to the last position with a matching sort_key
             while split_at < remaining_slice.len()
-                && Some(remaining_slice[split_at].sort_key(self.sort_key_size))
-                    == self.get_current_key(remaining_slice, split_at)
+                && self.is_current_key_equal(&remaining_slice, split_at)
             {
                 split_at += 1;
             }
@@ -471,7 +505,7 @@ impl SplitRowParquetWriter {
                     ),
                 ));
             } else {
-                self.writers[self.current_writer].write_rows(&remaining_slice[0..split_at])?;
+                self.writers[self.current_writer].write_rows(remaining_slice.slice(0, split_at))?;
                 self.rows_written += split_at;
                 self.rows_written_current_file += split_at as u64;
                 self.min_max_rows.push((
@@ -479,23 +513,25 @@ impl SplitRowParquetWriter {
                     (
                         self.first_row
                             .as_ref()
-                            .unwrap_or(&remaining_slice[0])
-                            .clone(),
-                        remaining_slice[split_at - 1].clone(),
+                            .map(|r| r.clone())
+                            .unwrap_or_else(|| convert_row_to_heap_allocated(&remaining_slice[0])),
+                        convert_row_to_heap_allocated(&remaining_slice[split_at - 1]),
                     ),
                 ));
             }
             self.rows_written_current_file = 0;
             self.first_row = None;
             self.current_writer += 1;
-            remaining_slice = &remaining_slice[split_at..];
+            remaining_slice = remaining_slice.slice(split_at, remaining_slice.len());
         }
         if remaining_slice.len() > 0 {
             if self.first_row.is_none() {
-                self.first_row = Some(remaining_slice[0].clone());
+                self.first_row = Some(convert_row_to_heap_allocated(&remaining_slice[0]));
             }
             self.writers[self.current_writer].write_rows(remaining_slice)?;
-            self.last_row = Some(remaining_slice[remaining_slice.len() - 1].clone());
+            self.last_row = Some(convert_row_to_heap_allocated(
+                &remaining_slice[remaining_slice.len() - 1],
+            ));
             self.rows_written += remaining_slice.len();
             self.rows_written_current_file += remaining_slice.len() as u64;
         }
@@ -503,17 +539,24 @@ impl SplitRowParquetWriter {
         Ok(())
     }
 
-    fn get_current_key<'a>(
+    fn is_current_key_equal<'a>(
         &'a self,
-        remaining_slice: &'a [Row],
+        remaining_slice: &'a RowsView<'a>,
         split_at: usize,
-    ) -> Option<RowSortKey<'a>> {
+    ) -> bool {
         if split_at == 0 {
-            self.last_row
-                .as_ref()
-                .map(|v| v.sort_key(self.sort_key_size))
+            return self.last_row.is_some()
+                && cmp_row_key_heap(
+                    self.sort_key_size,
+                    &self.last_row.as_ref().unwrap().values,
+                    &remaining_slice[split_at],
+                ) == Ordering::Equal;
         } else {
-            Some(remaining_slice[split_at - 1].sort_key(self.sort_key_size))
+            return cmp_row_key(
+                self.sort_key_size,
+                &remaining_slice[split_at - 1],
+                &remaining_slice[split_at],
+            ) == Ordering::Equal;
         }
     }
 
@@ -533,7 +576,7 @@ impl SplitRowParquetWriter {
         for w in self.writers.into_iter() {
             w.close()?;
         }
-        let sort_key_size = self.sort_key_size as usize;
+        let sort_key_size = self.sort_key_size;
         Ok(self
             .min_max_rows
             .into_iter()
@@ -555,7 +598,7 @@ impl RowParquetWriter {
         table: &'a Index,
         file: &'a str,
         row_group_size: usize,
-        _sort_key_size: u64,
+        _sort_key_size: usize,
     ) -> Result<RowParquetWriter, CubeError> {
         let file = File::create(file)?;
 
@@ -582,29 +625,32 @@ impl RowParquetWriter {
             columns: table.get_columns().clone(),
             parquet_writer,
             row_group_size,
-            buffer: Vec::with_capacity(row_group_size as usize),
+            buffer: MutRows::with_capacity(table.get_columns().len(), row_group_size as usize),
         })
     }
 
-    fn write_rows(&mut self, rows: &[Row]) -> Result<(), CubeError> {
-        self.buffer.extend_from_slice(rows); // TODO optimize
+    fn write_rows(&'a mut self, rows: RowsView<'a>) -> Result<(), CubeError> {
+        self.buffer.add_from_slice(rows); // TODO avoid copying data.
 
-        if self.buffer.len() >= self.row_group_size {
+        if self.buffer.num_rows() >= self.row_group_size {
             self.write_buffer()?;
         }
 
         Ok(())
     }
 
-    fn write_buffer(&mut self) -> Result<(), CubeError> {
+    fn write_buffer(&'a mut self) -> Result<(), CubeError> {
         let batch_size = self.row_group_size;
-        let row_group_count = div_ceil(self.buffer.len(), self.row_group_size);
+        let row_group_count = div_ceil(self.buffer.num_rows(), self.row_group_size);
         for row_batch_index in 0..row_group_count {
             let mut row_group_writer = self.parquet_writer.next_row_group()?;
 
             let mut column_index = 0;
 
-            let rows_in_group = min(batch_size, self.buffer.len() - row_batch_index * batch_size);
+            let rows_in_group = min(
+                batch_size,
+                self.buffer.num_rows() - row_batch_index * batch_size,
+            );
 
             while let Some(mut col_writer) = row_group_writer.next_column()? {
                 // TODO types
@@ -615,17 +661,17 @@ impl RowParquetWriter {
                         let mut max = None;
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
-                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                &self.buffer.rows()[row_batch_index * batch_size + row_index]
                                     [column_index]
-                                    != &TableValue::Null
+                                    != &TableValueR::Null
                             })
                             .map(|row_index| -> Result<_, CubeError> {
                                 // TODO types
-                                match &self.buffer[row_batch_index * batch_size + row_index].values
+                                match &self.buffer.rows()[row_batch_index * batch_size + row_index]
                                     [column_index]
                                 {
-                                    TableValue::Int(val) => Ok(i64::from(val.clone())),
-                                    TableValue::Decimal(val) => match column.get_column_type() {
+                                    TableValueR::Int(val) => Ok(*val),
+                                    TableValueR::Decimal(val) => match column.get_column_type() {
                                         ColumnType::Decimal { .. } => {
                                             Ok((BigDecimal::from_str_radix(val, 10)?)
                                                 .with_scale(
@@ -641,7 +687,7 @@ impl RowParquetWriter {
                                         }
                                         x => panic!("Unexpected type: {:?}", x),
                                     },
-                                    TableValue::Timestamp(t) => {
+                                    TableValueR::Timestamp(t) => {
                                         Ok(i64::from(t.clone().get_time_stamp() / 1000))
                                     }
                                     x => panic!("Unsupported value: {:?}", x),
@@ -684,17 +730,17 @@ impl RowParquetWriter {
                         let mut max = None;
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
-                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                &self.buffer.rows()[row_batch_index * batch_size + row_index]
                                     [column_index]
-                                    != &TableValue::Null
+                                    != &TableValueR::Null
                             })
                             .map(|row_index| -> Result<_, CubeError> {
                                 // TODO types
-                                match &self.buffer[row_batch_index * batch_size + row_index].values
+                                match &self.buffer.rows()[row_batch_index * batch_size + row_index]
                                     [column_index]
                                 {
-                                    TableValue::Float(val) => match column.get_column_type() {
-                                        ColumnType::Float => Ok(val),
+                                    TableValueR::Float(val) => match column.get_column_type() {
+                                        ColumnType::Float => Ok(*val),
                                         x => panic!("Unexpected type: {:?}", x),
                                     },
                                     x => panic!("Unsupported value: {:?}", x),
@@ -737,12 +783,12 @@ impl RowParquetWriter {
                         let mut min: Option<String> = None;
                         let mut max: Option<String> = None;
                         let mut use_min_max = true;
-                        let mut update_stats = |v: &TableValue| {
+                        let mut update_stats = |v: &TableValueR| {
                             if !use_min_max {
                                 return;
                             }
                             let s;
-                            if let TableValue::String(ss) = v {
+                            if let TableValueR::String(ss) = v {
                                 s = ss;
                             } else {
                                 use_min_max = false;
@@ -750,28 +796,27 @@ impl RowParquetWriter {
                                 max = None;
                                 return;
                             }
-                            // TODO: do not clone(), only sort strings.
-                            if min.is_none() || s < min.as_ref().unwrap() {
-                                min = Some(s.clone())
+                            if min.is_none() || s < &min.as_deref().unwrap() {
+                                min = Some(s.to_string()) // TODO: remove allocations.
                             }
-                            if max.is_none() || max.as_ref().unwrap() < s {
-                                max = Some(s.clone())
+                            if max.is_none() || &max.as_deref().unwrap() < s {
+                                max = Some(s.to_string()) // TODO: remove allocations
                             }
                         };
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
-                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                &self.buffer.rows()[row_batch_index * batch_size + row_index]
                                     [column_index]
-                                    != &TableValue::Null
+                                    != &TableValueR::Null
                             })
                             .map(|row_index| {
-                                let v = &self.buffer[row_batch_index * batch_size + row_index]
-                                    .values[column_index];
+                                let v = &self.buffer.rows()
+                                    [row_batch_index * batch_size + row_index][column_index];
                                 update_stats(v);
                                 // TODO types
                                 match v {
-                                    TableValue::String(str) => ByteArray::from(str.as_str()),
-                                    TableValue::Bytes(bytes) => ByteArray::from(bytes.clone()),
+                                    TableValueR::String(str) => ByteArray::from(*str),
+                                    TableValueR::Bytes(bytes) => ByteArray::from(bytes.to_vec()),
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
@@ -799,16 +844,16 @@ impl RowParquetWriter {
                         let mut max = None;
                         let column_values = (0..rows_in_group)
                             .filter(|row_index| {
-                                &self.buffer[row_batch_index * batch_size + row_index].values
+                                &self.buffer.rows()[row_batch_index * batch_size + row_index]
                                     [column_index]
-                                    != &TableValue::Null
+                                    != &TableValueR::Null
                             })
                             .map(|row_index| {
                                 // TODO types
-                                match &self.buffer[row_batch_index * batch_size + row_index].values
+                                match &self.buffer.rows()[row_batch_index * batch_size + row_index]
                                     [column_index]
                                 {
-                                    TableValue::Boolean(b) => *b,
+                                    TableValueR::Boolean(b) => *b,
                                     x => panic!("Unsupported value: {:?}", x),
                                 }
                             })
@@ -850,15 +895,18 @@ impl RowParquetWriter {
             self.parquet_writer.close_row_group(row_group_writer)?;
         }
 
-        let target_size = if row_group_count * self.row_group_size > self.buffer.len() {
+        let target_size = if row_group_count * self.row_group_size > self.buffer.num_rows() {
             0
         } else {
-            self.buffer.len() - row_group_count * self.row_group_size
+            self.buffer.num_rows() - row_group_count * self.row_group_size
         };
-        for i in (0..target_size).rev() {
-            self.buffer.swap_remove(i);
-        }
-        self.buffer.truncate(target_size);
+        let mut leftovers = MutRows::with_capacity(self.buffer.num_columns(), self.row_group_size);
+        leftovers.add_from_slice(
+            self.buffer
+                .rows()
+                .slice(self.buffer.num_rows() - target_size, self.buffer.num_rows()),
+        );
+        self.buffer = leftovers;
         Ok(())
     }
 
@@ -874,10 +922,10 @@ impl RowParquetWriter {
             (0..rows_in_group)
                 .map(|row_index| {
                     // TODO types
-                    match &self.buffer[row_batch_index * batch_size + row_index].values
+                    match &self.buffer.rows()[row_batch_index * batch_size + row_index]
                         [column_index]
                     {
-                        TableValue::Null => 0,
+                        TableValueR::Null => 0,
                         _ => 1,
                     }
                 })
@@ -916,8 +964,10 @@ mod tests {
 
     extern crate test;
 
+    use crate::table::data::convert_row_to_heap_allocated;
     use bigdecimal::BigDecimal;
     use csv::ReaderBuilder;
+    use itertools::Itertools;
     use num::BigInt;
     use parquet::file::reader::FileReader;
     use parquet::file::statistics::Statistics;
@@ -979,12 +1029,12 @@ mod tests {
             .collect::<Vec<_>>();
         first_rows.sort_by(|a, b| a.sort_key(1).cmp(&b.sort_key(1)));
         store
-            .merge_rows(None, vec![file_name.to_string()], first_rows.clone(), 3)
+            .merge_rows_from_heap(None, vec![file_name.to_string()], first_rows.clone(), 3)
             .unwrap();
         let read_rows = store.read_rows(file_name).unwrap();
         assert_eq!(read_rows.len(), first_rows.len());
-        for (read, expected) in read_rows.iter().zip(first_rows.clone()) {
-            assert_eq!(read, &expected);
+        for (read, expected) in read_rows.view().iter().zip(first_rows.clone()) {
+            assert_eq!(&convert_row_to_heap_allocated(&read), &expected);
         }
 
         let next_file = "foo-2.parquet";
@@ -1001,7 +1051,7 @@ mod tests {
             .collect::<Vec<_>>();
         next_rows.sort_by(|a, b| a.sort_key(3).cmp(&b.sort_key(3)));
         store
-            .merge_rows(
+            .merge_rows_from_heap(
                 Some(file_name),
                 vec![next_file.to_string()],
                 next_rows.clone(),
@@ -1015,10 +1065,11 @@ mod tests {
 
         let read_rows = store.read_rows(next_file).unwrap();
         assert_eq!(read_rows.len(), resulting.len());
-        for ((read, expected), _) in read_rows.iter().zip(resulting.iter()).zip(0..) {
+        for ((read, expected), _) in read_rows.view().iter().zip(resulting.iter()).zip(0..) {
             // println!("{}", i);
             // println!("{:?} - {:?}", read, expected);
-            assert_eq!(read, expected);
+
+            assert_eq!(&convert_row_to_heap_allocated(&read), expected);
         }
 
         // Split
@@ -1038,7 +1089,7 @@ mod tests {
             .collect::<Vec<_>>();
         next_rows.sort_by(|a, b| a.sort_key(1).cmp(&b.sort_key(1)));
         let min_max = store
-            .merge_rows(
+            .merge_rows_from_heap(
                 Some(next_file),
                 vec![split_1.to_string(), split_2.to_string()],
                 next_rows.clone(),
@@ -1052,10 +1103,15 @@ mod tests {
         let read_rows_1 = store.read_rows(split_1).unwrap();
         let read_rows_2 = store.read_rows(split_2).unwrap();
         assert_eq!(read_rows_1.len() + read_rows_2.len(), resulting.len());
-        let read_rows = read_rows_1.iter().chain(read_rows_2.iter());
-        for (read, expected) in read_rows.zip(resulting.iter()) {
+        let read_rows = read_rows_1
+            .view()
+            .iter()
+            .chain(read_rows_2.view().iter())
+            .map(|r| convert_row_to_heap_allocated(r))
+            .collect_vec();
+        for (read, expected) in read_rows.iter().zip(resulting.iter()) {
             // println!("{}", i);
-            // println!("{:?} - {:?}", read, expected);
+            // println!("{:?} - {:?}", read, right);
             assert_eq!(read, expected);
         }
 
@@ -1285,7 +1341,7 @@ mod tests {
         swap(&mut tmp, &mut to_merge);
         tmp.sort_by(|a, b| a.sort_key(2).cmp(&b.sort_key(2)));
         store
-            .merge_rows(
+            .merge_rows_from_heap(
                 current_file.as_ref().map(|s| s.as_str()),
                 vec![dest_file],
                 tmp,

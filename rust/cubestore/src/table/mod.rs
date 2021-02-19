@@ -1,9 +1,11 @@
+use crate::table::data::{Rows, RowsView};
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
 use chrono::{SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
+pub mod data;
 pub(crate) mod parquet;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -18,7 +20,7 @@ pub enum TableValue {
     Boolean(bool),
 }
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct TimestampValue {
     unix_nano: i64,
 }
@@ -132,18 +134,18 @@ pub trait TableStore {
         &'a self,
         source_file: Option<&'a str>,
         dest_files: Vec<String>,
-        rows: Vec<Row>,
-        sort_key_size: u64,
+        rows: RowsView<'a>,
+        sort_key_size: usize,
     ) -> Result<Vec<(u64, (Row, Row))>, CubeError>;
 
-    fn read_rows(&self, file: &str) -> Result<Vec<Row>, CubeError>;
+    fn read_rows(&self, file: &str) -> Result<Rows, CubeError>;
 
     fn read_filtered_rows(
         &self,
         file: &str,
         columns: &Vec<crate::metastore::Column>,
         limit: usize,
-    ) -> Result<Vec<Row>, CubeError>;
+    ) -> Result<Rows, CubeError>;
 
     // fn scan_node(
     //     &self,
