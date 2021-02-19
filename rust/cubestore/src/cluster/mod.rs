@@ -490,7 +490,7 @@ impl ClusterImpl {
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
         let mut jobs_enabled = self.jobs_enabled.write().await;
         *jobs_enabled = false;
-        for _ in 0..4 {
+        for _ in 0..self.config_obj.job_runners_count() {
             // TODO number of job event loops
             self.job_notify.notify_waiters();
         }
