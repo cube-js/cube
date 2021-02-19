@@ -243,8 +243,6 @@ impl Dialect for MySqlDialectWithBackTicks {
 #[async_trait]
 impl SqlService for SqlServiceImpl {
     async fn exec_query(&self, q: &str) -> Result<DataFrame, CubeError> {
-        let _trim_allocs_guard; // scope guard to call trim_alloc() when necessary.
-
         if !q.to_lowercase().starts_with("insert") {
             trace!("Query: '{}'", q);
         }
@@ -377,7 +375,7 @@ impl SqlService for SqlServiceImpl {
                 columns,
                 source,
             }) => {
-                _trim_allocs_guard = scopeguard::guard((), |_| trim_allocs());
+                scopeguard::defer!(trim_allocs());
 
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
@@ -400,6 +398,7 @@ impl SqlService for SqlServiceImpl {
                 Ok(DataFrame::new(vec![], vec![]))
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
+                scopeguard::defer!(trim_allocs());
                 let logical_plan = self
                     .query_planner
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))
