@@ -48,8 +48,8 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function generateAuthToken(payload: object = {}, options?: SignOptions) {
-  return jwt.sign(payload, 'secret', {
+function generateAuthToken(payload: object = {}, options?: SignOptions, secret: string = 'secret') {
+  return jwt.sign(payload, secret, {
     expiresIn: '10000d',
     ...options,
   });
@@ -90,6 +90,58 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
     // authInfo was deprecated, but should exists as computability
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
+  });
+  
+  test('playground auth token', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const expectSecurityContext = (securityContext) => {
+      expect(securityContext.uid).toEqual(5);
+      expect(securityContext.iat).toBeDefined();
+      expect(securityContext.exp).toBeDefined();
+    };
+
+    const handlerMock = jest.fn((req, res) => {
+      expectSecurityContext(req.context.authInfo);
+      expectSecurityContext(req.context.securityContext);
+
+      res.status(200).end();
+    });
+
+    const playgroundSecret = 'playgroundSecret';
+    process.env.PLAYGROUND_AUTH_SECRET = playgroundSecret;
+    const { app } = createApiGateway(handlerMock, loggerMock, {});
+
+    const token = generateAuthToken({ uid: 5, }, {});
+    const playgroundToken = generateAuthToken({ uid: 5, }, {}, playgroundSecret);
+    const badToken = generateAuthToken({ uid: 5, }, {}, 'bad');
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(200);
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${playgroundToken}`)
+      .expect(200);
+      
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${badToken}`)
+      .expect(403);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    expect(handlerMock.mock.calls.length).toEqual(2);
+
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
+    // authInfo was deprecated, but should exists as computability
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
+    
+    delete process.env.PLAYGROUND_AUTH_SECRET;
   });
 
   test('default authorization with JWT token and securityContext in u', async () => {
