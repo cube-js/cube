@@ -1,6 +1,6 @@
 // Server options go here: https://cube.dev/docs/config#options-reference
 module.exports = {
-  auth: {
+  jwt: {
     /**
      * Please specify your namespace, if you are using custom Rule to add claims to you JWT's payload
      */
