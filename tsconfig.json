@@ -24,6 +24,9 @@
     },
     {
       "path": "packages/cubejs-cli"
+    },
+    {
+      "path": "rust"
     }
   ]
 }

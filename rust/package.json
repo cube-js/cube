@@ -1,0 +1,17 @@
+{
+  "name": "@cubejs-backend/cubestore",
+  "version": "0.26.16",
+  "description": "Cube.js pre-aggregation storage layer.",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w"
+  },
+  "author": "Cube Dev, Inc.",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^4.1.5"
+  }
+}
