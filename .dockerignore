@@ -4,6 +4,10 @@
 !yarn.lock
 !lerna.json
 !packages/
+!rust/js-wrapper/
+!rust/tsconfig.json
+!rust/package.json
+!rust/yarn.lock
 
 packages/*/node_modules/
 packages/cubejs-jdbc-driver

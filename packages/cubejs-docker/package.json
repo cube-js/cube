@@ -9,6 +9,7 @@
     "@cubejs-backend/athena-driver": "^0.26.22",
     "@cubejs-backend/bigquery-driver": "^0.26.22",
     "@cubejs-backend/clickhouse-driver": "^0.26.22",
+    "@cubejs-backend/cubestore": "^0.26.22",
     "@cubejs-backend/cubestore-driver": "^0.26.22",
     "@cubejs-backend/dremio-driver": "^0.26.22",
     "@cubejs-backend/druid-driver": "^0.26.22",
