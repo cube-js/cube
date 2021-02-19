@@ -7,8 +7,9 @@ use crate::metastore::table::Table;
 use crate::metastore::{is_valid_hll, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::sql::timestamp_from_string;
-use crate::store::{ChunkDataStore, DataFrame};
+use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
+use crate::table::data::{MutRows, Rows};
 use crate::table::{Row, TableValue};
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::util::ordfloat::OrdF64;
@@ -141,7 +142,9 @@ impl ImportFormat {
 
                                         TableValue::Bytes(data)
                                     }
-                                    ColumnType::Timestamp => timestamp_from_string(value)?,
+                                    ColumnType::Timestamp => {
+                                        TableValue::Timestamp(timestamp_from_string(value)?)
+                                    }
                                     ColumnType::Float => {
                                         TableValue::Float(OrdF64(value.parse::<f64>()?))
                                     }
@@ -426,21 +429,21 @@ impl ImportService for ImportServiceImpl {
                 self.limits.clone(),
                 table.clone(),
             );
-            let mut rows = Vec::new();
+            let mut rows = MutRows::new(table.get_row().get_columns().len());
             while let Some(row) = row_stream.next().await {
                 if let Some(row) = row? {
-                    rows.push(row);
-                    if rows.len() >= self.config_obj.wal_split_threshold() as usize {
-                        let mut to_add = Vec::new();
+                    rows.add_row_heap_allocated(&row);
+                    if rows.num_rows() >= self.config_obj.wal_split_threshold() as usize {
+                        let mut to_add = MutRows::new(table.get_row().get_columns().len());
                         mem::swap(&mut rows, &mut to_add);
-                        ingestion.queue_data_frame(to_add).await?;
+                        ingestion.queue_data_frame(to_add.freeze()).await?;
                     }
                 }
             }
 
             mem::drop(temp_files);
 
-            ingestion.queue_data_frame(rows).await?;
+            ingestion.queue_data_frame(rows.freeze()).await?;
             ingestion.wait_completion().await?;
         }
 
@@ -474,7 +477,7 @@ impl Ingestion {
         }
     }
 
-    pub async fn queue_data_frame(&mut self, rows: Vec<Row>) -> Result<(), CubeError> {
+    pub async fn queue_data_frame(&mut self, rows: Rows) -> Result<(), CubeError> {
         let active_data_frame = self.limits.acquire_data_frame().await?;
 
         let meta_store = self.meta_store.clone();
@@ -482,9 +485,7 @@ impl Ingestion {
         let columns = self.table.get_row().get_columns().clone().clone();
         let table_id = self.table.get_id();
         self.partition_jobs.push(tokio::spawn(async move {
-            let new_chunks = chunk_store
-                .partition_data(table_id, DataFrame::new(columns, rows))
-                .await?;
+            let new_chunks = chunk_store.partition_data(table_id, rows, &columns).await?;
             std::mem::drop(active_data_frame);
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.
