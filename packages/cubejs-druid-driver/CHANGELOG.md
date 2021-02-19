@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.19](https://github.com/cube-js/cube.js/compare/v0.26.18...v0.26.19) (2021-02-19)
+
+
+### Bug Fixes
+
+* **druid-driver:** now() is not supported  ([#2151](https://github.com/cube-js/cube.js/issues/2151)) ([78a21d1](https://github.com/cube-js/cube.js/commit/78a21d1a3db61241d215b676a81cbad272cc3cfb))
+
+
+
+
+
 ## [0.26.16](https://github.com/cube-js/cube.js/compare/v0.26.15...v0.26.16) (2021-02-18)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.19](https://github.com/cube-js/cube.js/compare/v0.26.18...v0.26.19) (2021-02-19)
+
+
+### Bug Fixes
+
+* **@cubejs-schema-compilter:** MSSQL remove order by from subqueries ([75c1903](https://github.com/cube-js/cube.js/commit/75c19035e2732adfb7c4711197bba57245e9673e))
+
+
+
+
+
 ## [0.26.16](https://github.com/cube-js/cube.js/compare/v0.26.15...v0.26.16) (2021-02-18)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

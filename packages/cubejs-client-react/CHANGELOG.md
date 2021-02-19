@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.19](https://github.com/cube-js/cube.js/compare/v0.26.18...v0.26.19) (2021-02-19)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** replace dimension with member ([#2142](https://github.com/cube-js/cube.js/issues/2142)) ([622f398](https://github.com/cube-js/cube.js/commit/622f3987ee5d0d1313008f92e9d96aa586ac25c1))
+* **@cubejs-client/react:** type fixes ([#2140](https://github.com/cube-js/cube.js/issues/2140)) ([bca1ff7](https://github.com/cube-js/cube.js/commit/bca1ff72b0204a3cce1d4ee658396b3e22adb1cd))
+
+
+
+
+
 ## [0.26.17](https://github.com/cube-js/cube.js/compare/v0.26.16...v0.26.17) (2021-02-18)
 
 
