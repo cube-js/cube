@@ -31,9 +31,9 @@ CUBEJS_WEB_SOCKETS=true
 CUBEJS_API_SECRET=SECRET
 ```
 
-**Second, let's compose a data schema.** We need to describe our data in terms of [measures](https://cube.dev/docs/measures?utm_source=dev-to&utm_medium=post&utm_campaign=clickhouse-dashboard) and [dimensions](https://cube.dev/docs/dimensions?utm_source=dev-to&utm_medium=post&utm_campaign=clickhouse-dashboard) or, in simpler words, in terms of "what we want to know" about the data (i.e., measures) and "how we can decompose" the data (i.e., dimensions). In our case, stock prices have two obvious dimensions: stock ticker (i.e., company identifier) and date.
+**Second, let's compose a data schema.** We need to describe our data in terms of [measures](https://cube.dev/docs/measures) and [dimensions](https://cube.dev/docs/dimensions) or, in simpler words, in terms of "what we want to know" about the data (i.e., measures) and "how we can decompose" the data (i.e., dimensions). In our case, stock prices have two obvious dimensions: stock ticker (i.e., company identifier) and date.
 
-However, measures are not that straightforward because we'll need to use different [aggregation functions](https://cube.dev/docs/types-and-formats?utm_source=dev-to&utm_medium=post&utm_campaign=clickhouse-dashboard) (i.e., ways to calculate needed values). For example, daily low prices should be aggregated with the `min` type because the weekly low price is the lowest price of all days, right? Then, obviously, daily high prices should use the `max` type. For open and close prices we'll use the `avg` type, and we'll also employ the `count` type to calculate the total number of data entries.
+However, measures are not that straightforward because we'll need to use different [aggregation functions](https://cube.dev/docs/types-and-formats) (i.e., ways to calculate needed values). For example, daily low prices should be aggregated with the `min` type because the weekly low price is the lowest price of all days, right? Then, obviously, daily high prices should use the `max` type. For open and close prices we'll use the `avg` type, and we'll also employ the `count` type to calculate the total number of data entries.
 
 Now, make sure that the only file in your `schema` folder is named `Stocks.js` and has the following contents:
 
@@ -272,6 +272,6 @@ Now we can explore the prices of basically every public company or ETF. Just typ
 
 I strongly encourage you to [spend some time](https://clickhouse-dashboard-demo.cube.dev) with this ClickHouse dashboard we've just created. Pay attention to how responsive the API is: all the data is served from the back-end by Cube.js and queried from ClickHouse in real-time. Works smoothly, right?
 
-**Thank you for following this tutorial, learning more about ClickHouse, building an analytical dashboard, exploring the power of [Cube.js](https://cube.dev?utm_source=dev-to&utm_medium=post&utm_campaign=clickhouse-dashboard), investigating the stock prices, etc. I sincerely hope that you liked it 😇**
+**Thank you for following this tutorial, learning more about ClickHouse, building an analytical dashboard, exploring the power of [Cube.js](https://cube.dev), investigating the stock prices, etc. I sincerely hope that you liked it 😇**
 
 Please don't hesitate to like and bookmark this post, write a short comment, and give a star to [Cube.js](https://github.com/cube-js/cube.js) or [ClickHouse](https://github.com/ClickHouse/ClickHouse) on GitHub. And I hope that you'll give Cube.js and ClickHouse a shot in your next fun pet project or your next important production thing. Cheers!

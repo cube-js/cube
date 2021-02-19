@@ -11,7 +11,7 @@ Also, it claims to be blazing fast due to its columnar storage engine. Sounds le
 
 **In this tutorial we're going to explore how to:**
 * start working with ClickHouse,
-* build an analytical API on top of it with [Cube.js](https://cube.dev?utm_source=dev-to&utm_medium=post&utm_campaign=clickhouse-dashboard), and
+* build an analytical API on top of it with [Cube.js](https://cube.dev), and
 * query this API from a front-end dashboard, so you can
 * visualize query results with charts.
 
