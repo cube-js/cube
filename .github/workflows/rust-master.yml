@@ -159,6 +159,7 @@ jobs:
             before_script: cross-ubuntu-gnu
             target: x86_64-unknown-linux-gnu
             artifact_name: rust/target/x86_64-unknown-linux-gnu/release/cubestored
+            executable_name: cubestored
             # Because it's buggy
             cross: false
             strip: true
@@ -167,6 +168,7 @@ jobs:
           #  before_script: cross-ubuntu-musl
           #  target: x86_64-unknown-linux-musl
           #  artifact_name: rust/target/x86_64-unknown-linux-musl/release/cubestored
+          #  executable_name: cubestored
           #  # Because it's buggy
           #  cross: false
           #  strip: true
@@ -174,12 +176,14 @@ jobs:
           #- os: windows-latest
           #  target: x86_64-pc-windows-msvc
           #  artifact_name: rust/target/x86_64-pc-windows-msvc/release/cubestored.exe
+          #  executable_name: cubestored.exe
           #  cross: false
           #  strip: true
           #  compress: true
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: rust/target/x86_64-apple-darwin/release/cubestored
+            executable_name: cubestored
             cross: false
             strip: true
             compress: true
