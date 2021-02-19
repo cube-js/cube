@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.base.json",
+  "include": [
+    "js-wrapper",
+  ],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "js-wrapper",
+    "baseUrl": ".",
+    "allowJs": true,
+    "checkJs": true,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+  }
+}

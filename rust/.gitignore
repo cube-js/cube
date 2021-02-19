@@ -3,3 +3,5 @@
 upstream
 .cubestore
 .cargo/config.toml
+dist
+node_modules
