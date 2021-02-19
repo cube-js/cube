@@ -23,7 +23,7 @@ ReactDOM.render(
     domain={config.domain}
     clientId={config.clientId}
     scope={config.scope}
-    redirectUri={window.location.origin}
+    redirectUri={process.env.REACT_APP_AUTH0_REDIRECT_URI || window.location.origin}
     onRedirectCallback={onRedirectCallback}
   >
     <React.StrictMode>
