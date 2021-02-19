@@ -147,6 +147,8 @@ const variables = {
     .asString(),
   jwtClaimsNamespace: () => get('CUBEJS_JWT_CLAIMS_NAMESPACE')
     .asString(),
+  playgroundAuthSecret: () => get('PLAYGROUND_AUTH_SECRET')
+    .asString(),
 };
 
 type Vars = typeof variables;
