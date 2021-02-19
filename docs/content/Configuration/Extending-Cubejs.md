@@ -60,3 +60,30 @@ module.exports = {
   },
 };
 ```
+## Using CubejsServer and CubejsServerCore
+
+You can directly use `@cubejs-backend/server-core` or `@cubejs-backend/server` Node.js packages to run Cube.js.
+
+<!-- prettier-ignore-start -->
+[[warning | ]]
+| We do not recommend embedding Cube.js into existing Express application to share the runtime. Cube.js should be scaled very differently vs. other parts of Express, and embedding Cube.js is not the right approach in the long term, especially for larger deployments.
+<!-- prettier-ignore-end -->
+
+
+You can create `index.js` file with the following content.
+
+```js
+const CubejsServer = require('@cubejs-backend/server');
+
+const server = new CubejsServer();
+
+server.listen().then(({ version, port }) => {
+  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+});
+```
+
+And then start Cube.js as a regular Node.js application.
+
+```bash
+$ node index.js
+```
