@@ -43,4 +43,8 @@ export class DruidQuery extends BaseQuery {
   timeStampParam() {
     return this.timeStampCast('?');
   }
+
+  nowTimestampSql(): string {
+    return `CURRENT_TIMESTAMP`;
+  }
 }
