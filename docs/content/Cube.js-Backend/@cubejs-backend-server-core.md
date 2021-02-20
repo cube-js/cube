@@ -6,7 +6,7 @@ subCategory: Reference
 menuOrder: 6
 ---
 
-THis package provides wiring of all essential Cube.js components and is used by  [@cubejs-backend/server](@cubejs-backend-server).
+This package provides wiring of all essential Cube.js components and is used by  [@cubejs-backend/server](@cubejs-backend-server).
 
 ## API Reference
 ### CubejsServerCore.create(options)
