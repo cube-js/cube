@@ -4,6 +4,4 @@ upstream
 .cubestore
 .cargo/config.toml
 dist
-!dist/post-install.js
 node_modules
-
