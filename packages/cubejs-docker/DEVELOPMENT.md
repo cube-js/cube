@@ -21,3 +21,7 @@ Not released, development (from `cubejs-docker` directory)
 ```sh
 docker build -t cubejs/cube:dev -f dev.Dockerfile ../../
 ```
+
+```sh
+docker build -t cubejs/cube:dev-alpine -f dev-alpine.Dockerfile ../../
+```

@@ -1,4 +1,4 @@
-FROM node:12.20.1
+FROM node:12.20.1-buster-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -7,9 +7,11 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 \
     && rm -rf /var/lib/apt/lists/*
 
+# For now Cube.js docker image is building without waiting cross jobs, it's why we are not able to install it
+ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
 ENV NODE_ENV production
 

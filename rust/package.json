@@ -7,14 +7,28 @@
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "postinstall": "npm run build && node ./dist/post-install.js"
   },
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@types/bytes": "^3.1.0",
+    "@types/node": "^10.17.54",
+    "@types/node-fetch": "^2.5.8",
+    "@types/tar": "^4.0.4",
+    "@types/throttle-debounce": "^2.1.0",
     "typescript": "^4.1.5"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@octokit/core": "^3.2.5",
+    "bytes": "^3.1.0",
+    "cli-ux": "^5.5.1",
+    "node-fetch": "^2.6.1",
+    "tar": "^6.1.0",
+    "throttle-debounce": "^3.0.1"
   }
 }

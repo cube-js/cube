@@ -270,11 +270,12 @@ jobs:
           mkdir cubestore-archive
           mkdir cubestore-archive/bin
           mv ${{ matrix.artifact_name }} cubestore-archive/bin/${{ matrix.executable_name }}
-          tar czf cubestored-${{ matrix.target }}.tar.gz cubestore-archive
+          cd cubestore-archive
+          tar cvf cubestored-${{ matrix.target }}.tar.gz *
       - name: Upload Binary to Release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cubestored-${{ matrix.target }}.tar.gz
+          file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
