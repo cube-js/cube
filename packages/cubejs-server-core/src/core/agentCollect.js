@@ -1,3 +1,5 @@
+import { getEnv } from '@cubejs-backend/shared';
+
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 
@@ -12,7 +14,7 @@ export default async (event, endpointUrl, logger) => {
   });
   const flush = async (toFlush, retries) => {
     if (!toFlush) {
-      toFlush = trackEvents.splice(0, 50);
+      toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
     }
     if (!toFlush.length) {
       return false;

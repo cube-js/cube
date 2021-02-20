@@ -149,6 +149,9 @@ const variables = {
     .asString(),
   playgroundAuthSecret: () => get('PLAYGROUND_AUTH_SECRET')
     .asString(),
+  agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
+    .default('200')
+    .asInt(),
 };
 
 type Vars = typeof variables;
