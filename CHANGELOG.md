@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.25](https://github.com/cube-js/cube.js/compare/v0.26.24...v0.26.25) (2021-02-20)
+
+
+### Features
+
+* **bigquery-driver:** Support changing location, CUBEJS_DB_BQ_LOCATION env variable ([204c73c](https://github.com/cube-js/cube.js/commit/204c73c4290760234242b1d3eecdd498bf848e0f))
+
+
+
+
+
 ## [0.26.24](https://github.com/cube-js/cube.js/compare/v0.26.23...v0.26.24) (2021-02-20)
 
 
