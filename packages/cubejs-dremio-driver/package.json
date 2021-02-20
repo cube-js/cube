@@ -18,7 +18,7 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.25",
     "@cubejs-backend/schema-compiler": "^0.26.25",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "moment-timezone": "^0.5.31",
     "sqlstring": "^2.3.1"
   },
