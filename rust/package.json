@@ -11,7 +11,8 @@
     "postinstall": "npm run build && node ./dist/post-install.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "tsconfig.json"
   ],
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
