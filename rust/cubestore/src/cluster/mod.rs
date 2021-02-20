@@ -7,7 +7,7 @@ use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::{IdRow, MetaStore, MetaStoreEvent, RowKey, TableId};
+use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
     MetaStoreRpcServer,
@@ -62,6 +62,12 @@ pub trait Cluster: DIService + Send + Sync {
     fn server_name(&self) -> &str;
 
     async fn warmup_download(&self, node_name: &str, remote_path: String) -> Result<(), CubeError>;
+
+    async fn warmup_partition(
+        &self,
+        partition: IdRow<Partition>,
+        chunks: Vec<IdRow<Chunk>>,
+    ) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
 
@@ -212,6 +218,27 @@ impl Cluster for ClusterImpl {
             return Ok(self.server_name.to_string());
         }
         Ok(workers[(table_id % workers.len() as u64) as usize].to_string())
+    }
+
+    async fn warmup_partition(
+        &self,
+        partition: IdRow<Partition>,
+        chunks: Vec<IdRow<Chunk>>,
+    ) -> Result<(), CubeError> {
+        let node_name = self.node_name_by_partitions(&[partition.get_id()]).await?;
+        let mut futures = Vec::new();
+        if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
+            futures.push(self.warmup_download(&node_name, name));
+        }
+        for chunk in chunks.iter() {
+            let name = chunk.get_row().get_full_name(chunk.get_id());
+            futures.push(self.warmup_download(&node_name, name));
+        }
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
     }
 }
 

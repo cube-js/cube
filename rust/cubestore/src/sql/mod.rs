@@ -33,6 +33,7 @@ use crate::sys::malloc::trim_allocs;
 use chrono::{TimeZone, Utc};
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
+use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
@@ -137,6 +138,22 @@ impl SqlServiceImpl {
                 return Err(CubeError::user(format!("Create table failed: {}", e)));
             }
 
+            let mut futures = Vec::new();
+            let indexes = self.db.get_table_indexes(table.get_id()).await?;
+            for index in indexes.into_iter() {
+                // TODO it may be too much to mark those as last used in a light of it can be still compacted
+                let partitions = self
+                    .db
+                    .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
+                    .await?;
+                for (partition, chunks) in partitions.into_iter() {
+                    futures.push(self.cluster.warmup_partition(partition, chunks));
+                }
+            }
+            join_all(futures)
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(table)
         } else {
             self.db
