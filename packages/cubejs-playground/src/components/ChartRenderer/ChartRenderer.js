@@ -28,11 +28,34 @@ const ChartContainer = styled.div`
 `;
 
 const RequestMessage = styled.div`
-  display: flex;
+  position: absolute;
+  bottom: 24px;
   width: 100%;
-  min-height: 400px;
+  bottom: -4em;
+  animation: fadeIn 0.3s;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+`;
+
+const Centered = styled.div`
+  display: flex;
   align-items: center;
   justify-content: center;
+  height: 100%;
+`;
+
+const Wrapper = styled.div`
+  position: relative;
+  width: 100%;
+  text-align: center;
 `;
 
 export default function ChartRenderer({
@@ -102,9 +125,12 @@ export default function ChartRenderer({
         setBuildInProgress(
           Boolean(progress?.stage?.stage.includes('pre-aggregation'))
         );
-        // setSlowQuery(
-        //   Boolean(progress?.stage?.stage.includes('Executing query'))
-        // );
+
+        const isQuerySlow =
+          progress?.stage?.stage.includes('Executing query') &&
+          (progress.stage.timeElapsed || 0) >= 5000;
+
+        setSlowQuery(isQuerySlow);
       },
       onChartRendererReady() {
         onChartRendererReadyChange(true);
@@ -118,29 +144,32 @@ export default function ChartRenderer({
     queryError ||
     queryHasMissingMembers;
   const loading =
-    !isChartRendererReady || queryHasMissingMembers || isQueryLoading;
+    !isChartRendererReady ||
+    queryHasMissingMembers ||
+    isQueryLoading ||
+    isPreAggregationBuildInProgress;
 
   const extras = () => {
     if (queryError) {
       return <div>{queryError?.toString()}</div>;
     }
 
-    if (isPreAggregationBuildInProgress) {
-      return (
-        <Positioner>
-          <RequestMessage>
-            <Text strong style={{ fontSize: 18 }}>
-              Building pre-aggregations...
-            </Text>
-          </RequestMessage>
-        </Positioner>
-      );
-    }
-
     if (loading) {
       return (
-        <Positioner key="loader">
-          <CubeLoader />
+        <Positioner>
+          <Centered>
+            <Wrapper>
+              <CubeLoader full={false} />
+
+              {isPreAggregationBuildInProgress && (
+                <RequestMessage>
+                  <Text strong style={{ fontSize: 18 }}>
+                    Building pre-aggregations...
+                  </Text>
+                </RequestMessage>
+              )}
+            </Wrapper>
+          </Centered>
         </Positioner>
       );
     }
