@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.22](https://github.com/cube-js/cube.js/compare/v0.26.21...v0.26.22) (2021-02-20)
+
+
+### Features
+
+* Introduce CUBEJS_AGENT_FRAME_SIZE to tweak agent performance ([4550b64](https://github.com/cube-js/cube.js/commit/4550b6475536af016dd5b584adb0f8d3f583dd2a))
+* **cubestore:** Return success for create table only after table has been warmed up ([991a538](https://github.com/cube-js/cube.js/commit/991a538968b59104729a95a5be5d6b55a0aa6dcc))
+
+
+
+
+
 ## [0.26.21](https://github.com/cube-js/cube.js/compare/v0.26.20...v0.26.21) (2021-02-19)
 
 
