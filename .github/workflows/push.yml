@@ -72,6 +72,10 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
@@ -118,6 +122,10 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna lint
@@ -157,6 +165,10 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Check Yarn lock wasn't modified
@@ -216,6 +228,10 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
@@ -299,6 +315,10 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
@@ -394,6 +414,10 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
@@ -482,6 +506,10 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
