@@ -4,6 +4,7 @@ import { Octokit } from '@octokit/core';
 import * as process from 'process';
 import fetch, { Request, Headers, Response } from 'node-fetch';
 import cli from 'cli-ux';
+import color from '@oclif/color';
 import tar from 'tar';
 import { throttle } from 'throttle-debounce';
 import bytes from 'bytes'
@@ -48,7 +49,7 @@ async function extractFile(fileName: string) {
   }
 }
 
-type ByteProgressCallback = (info: { progress: number, eta: number, speed }) => void
+type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void
 
 async function streamWithProgress(
   response: Response,
@@ -156,24 +157,46 @@ function getTarget(): string {
   }
 }
 
+export const displayError = async (text: string) => {
+  console.error('');
+  console.error(color.cyan('Cube.js CubeStore Installer ---------------------------------------'));
+  console.error('');
+
+  console.error(text);
+
+  console.error('');
+  console.error(color.yellow('Need some help? -------------------------------------'));
+
+  console.error('');
+  console.error(`${color.yellow('  Ask this question in Cube.js Slack:')} https://slack.cube.dev`);
+  console.error(`${color.yellow('  Post an issue:')} https://github.com/cube-js/cube.js/issues`);
+  console.error('');
+
+  process.exit(1);
+};
+
 (async () => {
-  const release = await fetchRelease();
-  if (release) {
-    if (release.assets.length === 0) {
-      throw new Error('No assets in release');
-    }
+  try {
+    const release = await fetchRelease();
+    if (release) {
+      if (release.assets.length === 0) {
+        throw new Error('No assets in release');
+      }
 
-    const target = getTarget();
+      const target = getTarget();
 
-    for (const asset of release.assets) {
-      const fileName = asset.name.substr(0, asset.name.length - 7);
-      if (fileName.startsWith('cubestored-')) {
-        const assetTarget = fileName.substr('cubestored-'.length);
-        if (assetTarget === target) {
-          await downloadFile(asset.browser_download_url, asset.name);
-          await extractFile(asset.name);
+      for (const asset of release.assets) {
+        const fileName = asset.name.substr(0, asset.name.length - 7);
+        if (fileName.startsWith('cubestored-')) {
+          const assetTarget = fileName.substr('cubestored-'.length);
+          if (assetTarget === target) {
+            await downloadFile(asset.browser_download_url, asset.name);
+            await extractFile(asset.name);
+          }
         }
       }
     }
+  } catch (e) {
+    await displayError(e);
   }
 })();
