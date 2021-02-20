@@ -111,7 +111,7 @@ describe('test authorization', () => {
     });
 
     const playgroundSecret = 'playgroundSecret';
-    process.env.PLAYGROUND_AUTH_SECRET = playgroundSecret;
+    process.env.CUBEJS_PLAYGROUND_AUTH_SECRET = playgroundSecret;
     const { app } = createApiGateway(handlerMock, loggerMock, {});
 
     const token = generateAuthToken({ uid: 5, }, {});
@@ -141,7 +141,7 @@ describe('test authorization', () => {
     // authInfo was deprecated, but should exists as computability
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
     
-    delete process.env.PLAYGROUND_AUTH_SECRET;
+    delete process.env.CUBEJS_PLAYGROUND_AUTH_SECRET;
   });
 
   test('default authorization with JWT token and securityContext in u', async () => {

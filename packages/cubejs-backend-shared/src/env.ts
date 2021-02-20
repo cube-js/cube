@@ -147,7 +147,7 @@ const variables = {
     .asString(),
   jwtClaimsNamespace: () => get('CUBEJS_JWT_CLAIMS_NAMESPACE')
     .asString(),
-  playgroundAuthSecret: () => get('PLAYGROUND_AUTH_SECRET')
+  playgroundAuthSecret: () => get('CUBEJS_PLAYGROUND_AUTH_SECRET')
     .asString(),
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
