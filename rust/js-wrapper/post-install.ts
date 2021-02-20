@@ -12,10 +12,6 @@ import { WriteStream } from 'fs';
 
 const { version } = require('../package.json');
 
-if (process.env.CUBESTORE_SKIP_POST_INSTALL) {
-  process.exit(0);
-}
-
 const client = new Octokit();
 
 async function fetchRelease() {
