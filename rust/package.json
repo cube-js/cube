@@ -10,6 +10,9 @@
     "watch": "tsc -w",
     "postinstall": "npm run build && node ./dist/post-install.js"
   },
+  "files": [
+    "dist"
+  ],
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
@@ -24,6 +27,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@oclif/color": "^0.1.2",
     "@octokit/core": "^3.2.5",
     "bytes": "^3.1.0",
     "cli-ux": "^5.5.1",
