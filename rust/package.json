@@ -8,11 +8,10 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "postinstall": "npm run build && node ./dist/post-install.js"
+    "postinstall": "if [[ -z \"${CUBESTORE_SKIP_POST_INSTALL}\" ]]; then node ./dist/post-install.js; else echo \"Skipping Cube Store Post Installing\"; fi"
   },
   "files": [
-    "dist",
-    "tsconfig.json"
+    "dist"
   ],
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
