@@ -6,7 +6,7 @@ subCategory: Reference
 menuOrder: 7
 ---
 
-`@cubejs-backend/server` is an Express server for the [@cubejs-backend/server-core](/@cubejs-backend-server-core). You can generate an app using [Cube.js CLI](/using-the-cubejs-cli). There are also multiple options to run Cube.js Backend Server [in production](/deployment).
+`@cubejs-backend/server` is a web server for the [@cubejs-backend/server-core](/@cubejs-backend-server-core). There are also multiple options to run Cube.js Backend Server [in production](/deployment).
 
 ## API Reference
 
