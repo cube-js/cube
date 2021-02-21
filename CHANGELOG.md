@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.28](https://github.com/cube-js/cube.js/compare/v0.26.27...v0.26.28) (2021-02-21)
+
+
+### Features
+
+* **docker:** Upgrade default image to Buster (required for Cube Store) ([5908d28](https://github.com/cube-js/cube.js/commit/5908d2807877ba1d77213a8667cba6afe7acbd2b))
+
+
+
+
+
 ## [0.26.27](https://github.com/cube-js/cube.js/compare/v0.26.26...v0.26.27) (2021-02-20)
 
 
