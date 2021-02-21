@@ -1,3 +1,4 @@
+use crate::config::processing_loop::ProcessingLoop;
 use crate::sql::SqlService;
 use crate::table::TableValue;
 use crate::{metastore, CubeError};
@@ -9,6 +10,7 @@ use std::io;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::net::TcpListener;
+use tokio::sync::{watch, RwLock};
 
 struct Backend {
     sql_service: Arc<dyn SqlService>,
@@ -105,21 +107,44 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     }
 }
 
-pub struct MySqlServer;
+pub struct MySqlServer {
+    address: String,
+    sql_service: Arc<dyn SqlService>,
+    close_socket_rx: RwLock<watch::Receiver<bool>>,
+    close_socket_tx: watch::Sender<bool>,
+}
 
-impl MySqlServer {
-    pub async fn listen(
-        address: String,
-        sql_service: Arc<dyn SqlService>,
-    ) -> Result<(), CubeError> {
-        let listener = TcpListener::bind(address.clone()).await?;
+crate::di_service!(MySqlServer, []);
 
-        info!("MySQL port open on {}", address);
+#[async_trait]
+impl ProcessingLoop for MySqlServer {
+    async fn processing_loop(&self) -> Result<(), CubeError> {
+        let listener = TcpListener::bind(self.address.clone()).await?;
+
+        info!("MySQL port open on {}", self.address);
 
         loop {
-            let (socket, _) = listener.accept().await?;
+            let mut stop_receiver = self.close_socket_rx.write().await;
+            let (socket, _) = tokio::select! {
+                res = stop_receiver.changed() => {
+                    if res.is_err() || *stop_receiver.borrow() {
+                        return Ok(());
+                    } else {
+                        continue;
+                    }
+                }
+                accept_res = listener.accept() => {
+                    match accept_res {
+                        Ok(res) => res,
+                        Err(err) => {
+                            error!("Network error: {}", err);
+                            continue;
+                        }
+                    }
+                }
+            };
 
-            let sql_service_clone = sql_service.clone();
+            let sql_service_clone = self.sql_service.clone();
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Backend {
@@ -133,5 +158,22 @@ impl MySqlServer {
                 }
             });
         }
+    }
+
+    async fn stop_processing(&self) -> Result<(), CubeError> {
+        self.close_socket_tx.send(true)?;
+        Ok(())
+    }
+}
+
+impl MySqlServer {
+    pub fn new(address: String, sql_service: Arc<dyn SqlService>) -> Arc<Self> {
+        let (close_socket_tx, close_socket_rx) = watch::channel(false);
+        Arc::new(Self {
+            address,
+            sql_service,
+            close_socket_rx: RwLock::new(close_socket_rx),
+            close_socket_tx,
+        })
     }
 }

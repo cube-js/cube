@@ -1,6 +1,7 @@
 use crate::CubeError;
 use async_trait::async_trait;
 use deadqueue::unlimited;
+use futures::future::join_all;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
@@ -23,6 +24,7 @@ pub struct WorkerPool<
 > {
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     stopped_tx: watch::Sender<bool>,
+    workers: Vec<Arc<WorkerProcess<T, R, P>>>,
     processor: PhantomData<P>,
 }
 
@@ -62,14 +64,23 @@ impl<
                 stopped_rx.clone(),
             ));
             workers.push(process.clone());
-            tokio::spawn(async move { process.processing_loop().await });
         }
 
         WorkerPool {
             stopped_tx,
             queue,
+            workers,
             processor: PhantomData,
         }
+    }
+
+    pub async fn wait_processing_loops(&self) {
+        let futures = self
+            .workers
+            .iter()
+            .map(|w| w.processing_loop())
+            .collect::<Vec<_>>();
+        join_all(futures).await;
     }
 
     pub async fn process(&self, message: T) -> Result<R, CubeError> {
@@ -83,7 +94,6 @@ impl<
 
     pub async fn stop_workers(&self) -> Result<(), CubeError> {
         self.stopped_tx.send(true)?;
-        self.stopped_tx.closed().await;
         Ok(())
     }
 }
@@ -243,6 +253,7 @@ mod tests {
     use futures_timer::Delay;
     use procspawn::{self};
     use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
     use tokio::runtime::Builder;
 
     // Code from procspawn::enable_test_support!();
@@ -287,8 +298,12 @@ mod tests {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
-            let pool =
-                WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(1000),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
             assert_eq!(
                 pool.process(Message::Delay(100)).await.unwrap(),
                 Response::Foo(100)
@@ -302,8 +317,12 @@ mod tests {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
-            let pool =
-                WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(1000),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..10 {
                 futures.push((i, pool.process(Message::Delay(i * 100))));
@@ -321,8 +340,12 @@ mod tests {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
-            let pool =
-                WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(450));
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(450),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..5 {
                 futures.push((i, pool.process(Message::Delay(i * 300))));
