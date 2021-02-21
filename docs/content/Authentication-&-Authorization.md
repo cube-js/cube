@@ -19,27 +19,27 @@ Cube.js:
   />
 </p>
 
-Authentication is handled outside of Cube.js. Your authentication server issues
-JWTs to your client application, which, when sent as part of the request, are
-verified and decoded by Cube.js to get security context claims to evaluate
-access control rules.
+Your authentication server issues JWTs to your client application, which, when
+sent as part of the request, are verified and decoded by Cube.js to get security
+context claims to evaluate access control rules. Inbound JWTs are decoded and
+verified using industry-standard [JSON Web Key Sets (JWKS)][link-auth0-jwks].
 
 For access control or authorization, Cube.js allows you to define granular
-access control rules for every cube in your data schema. Cube.js uses the
-request and the security context claims in the JWT token to generate a SQL
-query, which includes row-level constraints from the access control rules.
+access control rules for every cube in your data schema. Cube.js uses both the
+request and security context claims in the JWT token to generate a SQL query,
+which includes row-level constraints from the access control rules.
 
-Cube.js uses [JSON Web Tokens (JWT)][link-jwt] which should be passed in the
-`Authorization: <JWT>` header to authenticate requests.
+JWTs sent to Cube.js should be passed in the `Authorization: <JWT>` header to
+authenticate requests.
 
 JWTs can also be used to pass additional information about the user, known as a
-[security context][link-security-context]. It will be accessible in the
-[SECURITY_CONTEXT][link-security-context] object in the Data Schema and in
-[securityContext][link-securitycontext] variable which is used to support
+[security context][ref-sec-ctx]. It will be accessible in the
+[`SECURITY_CONTEXT`][ref-schema-sec-ctx] object in the Data Schema and in
+[`securityContext`][ref-config-sec-ctx] variable which is used to support
 [Multitenancy][link-multitenancy].
 
 In the example below **user_id** will be passed inside the security context and
-will be accessible in the [SECURITY_CONTEXT][link-security-context] object.
+will be accessible in the [`SECURITY_CONTEXT`][ref-schema-sec-ctx] object.
 
 ```json
 {
@@ -49,11 +49,6 @@ will be accessible in the [SECURITY_CONTEXT][link-security-context] object.
 }
 ```
 
-[link-jwt]: https://jwt.io/
-[link-security-context]: /cube#context-variables-security-context
-[link-securitycontext]: /config#securitycontext
-[link-multitenancy]: /multitenancy-setup
-
 Authentication is handled outside of Cube.js. A typical use case would be:
 
 1. A web server serves an HTML page containing the Cube.js client, which needs
@@ -62,19 +57,105 @@ Authentication is handled outside of Cube.js. A typical use case would be:
    server could include the token in the HTML it serves or provide the token to
    the frontend via an XHR request, which is then stored it in local storage or
    a cookie.
-3. The JavaSript client is initialized using this token, and includes it in
+3. The JavaScript client is initialized using this token, and includes it in
    calls to the Cube.js API.
-
-[link-rest-api]: /rest-api
-[link-cubejs-client-core-ref]: /@cubejs-client-core#cubejs
+4. The token is received by Cube.js, and verified using any available JWKS (if
+   configured)
+5. Once decoded, the token claims are injected into the [security
+   context][ref-sec-ctx].
 
 <!-- prettier-ignore-start -->
 [[info |]]
 | **In development mode, the token is not required for authorization**, but you
-| can still use it to [pass a security context][link-security-context].
+| can still use it to [pass a security context][ref-sec-ctx].
 <!-- prettier-ignore-end -->
 
-[link-security-context]: /security#security-context
+## Using JSON Web Key Sets (JWKS)
+
+### Configuration
+
+As mentioned previously, Cube.js supports verifying JWTs using industry-standard
+JWKS. The JWKS can be provided either from a URL, or as a JSON object conforming
+to [JWK specification RFC 7517 Section 4][link-jwk-ref], encoded as a string.
+
+#### Using a key as a JSON string
+
+Add the following to your `cube.js` configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    key: '<JWKS_AS_STRING>',
+  },
+};
+```
+
+Or configure the same using environment variables:
+
+```dotenv
+CUBEJS_JWK_KEY='<JWKS_AS_STRING>'
+```
+
+#### Using a key from a URL
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| When using a URL to fetch the JWKS, Cube.js will automatically cache the
+| response, re-use it and update if a key rotation has occurred.
+<!-- prettier-ignore-end -->
+
+Add the following to your `cube.js` configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    jwkUrl: '<URL_TO_JWKS_JSON>',
+  },
+};
+```
+
+Or configure the same using environment variables:
+
+```dotenv
+CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
+```
+
+### Verifying claims
+
+Cube.js can also verify the audience, subject and issuer claims in JWTs.
+Similarly to JWK configuration, these can also be configured in the `cube.js`
+configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    audience: '<AUDIENCE_FROM_IDENTITY_PROVIDER>',
+    issuer: ['<ISSUER_FROM_IDENTITY_PROVIDER>'],
+    subject: '<SUBJECT_FROM_IDENTITY_PROVIDER>',
+  },
+};
+```
+
+Using environment variables:
+
+```dotenv
+CUBEJS_JWT_AUDIENCE='<AUDIENCE_FROM_IDENTITY_PROVIDER>'
+CUBEJS_JWT_ISSUER='<ISSUER_FROM_IDENTITY_PROVIDER>'
+CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'
+```
+
+### Custom claims namespace
+
+Cube.js can also extract claims defined in custom namespaces. Simply specify the
+namespace in your `cube.js` configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    claimsNamespace: 'my-custom-namespace',
+  },
+};
+```
 
 ## Generating Tokens
 
@@ -95,11 +176,8 @@ You can generate two types of tokens:
 | lifetime of your public tokens. [Learn more in the JWT docs][link-jwt-docs].
 <!-- prettier-ignore-end -->
 
-[link-jwt-docs]:
-  https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
-
-You can find a library for JWT generation for your programming language
-[here](https://jwt.io/#libraries-io).
+You can find a library to generate JWTs for your programming language
+[here][link-jwt-libs].
 
 In Node.js, the following code shows how to generate a token which will expire
 in 30 days. We recommend using the `jsonwebtoken` package for this.
@@ -174,7 +252,7 @@ structure:
 ```
 
 In this case, the `{ "user_id": 42 }` object will be accessible as
-[SECURITY_CONTEXT][link-security-context] in the Cube.js Data Schema.
+[`SECURITY_CONTEXT`][ref-schema-sec-ctx] in the Cube.js Data Schema.
 
 The Cube.js server expects the context to be an object. If you don't provide an
 object as the JWT payload, you will receive an error of the form
@@ -239,17 +317,12 @@ Cube.js also allows you to provide your own JWT verification logic by setting a
 file. This function is expected to verify a JWT and assigns its' claims to the
 security context.
 
-[link-check-auth-ref]: /config#options-reference-check-auth
-
 <!-- prettier-ignore-start -->
 [[warning | Note]]
 | Previous versions of Cube.js allowed setting a `checkAuthMiddleware()`
 | parameter, which is now deprecated. We advise [migrating to a newer version
 | of Cube.js][link-migrate-cubejs].
 <!-- prettier-ignore-end -->
-
-[link-migrate-cubejs]:
-  /configuration/overview#migration-from-express-to-docker-template
 
 For example, if you're using AWS Cognito:
 
@@ -270,3 +343,20 @@ module.exports = {
   },
 };
 ```
+
+[link-auth0-jwks]:
+  https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
+[link-check-auth-ref]: /config#options-reference-check-auth
+[link-cubejs-client-core-ref]: /@cubejs-client-core#cubejs
+[link-jwt-docs]:
+  https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
+[link-jwt]: https://jwt.io/
+[link-jwt-libs]: https://jwt.io/#libraries-io
+[link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
+[link-migrate-cubejs]:
+  /configuration/overview#migration-from-express-to-docker-template
+[link-multitenancy]: /multitenancy-setup
+[link-rest-api]: /rest-api
+[ref-config-sec-ctx]: /config#request-context-security-context
+[ref-schema-sec-ctx]: /cube#context-variables-security-context
+[ref-sec-ctx]: /security#security-context
