@@ -40,15 +40,15 @@ interface CubejsConfiguration {
   queryTransformer: (query: object, context: RequestContext) => object;
   preAggregationsSchema: string | (context: RequestContext) => string;
   schemaVersion: (context: RequestContext) => string;
-  extendContext: (req: ExpressRequest) => any;
   scheduledRefreshTimer: boolean | number;
   scheduledRefreshTimeZones: string[],
   scheduledRefreshContexts: () => Promise<object[]>,
+  extendContext: (req: ExpressRequest) => any;
   compilerCacheSize: number;
   maxCompilerCacheKeepAlive: number;
   updateCompilerCacheKeepAlive: boolean;
-  telemetry: boolean;
   allowUngroupedWithoutPrimaryKey: boolean;
+  telemetry: boolean;
   http: {
     cors: {
       methods: string | string[];
@@ -60,6 +60,15 @@ interface CubejsConfiguration {
       preflightContinue: boolean;
       optionsSuccessStatus: number;
     },
+  },
+  jwt: {
+    jwkUrl?: ((payload: any) => string) | string;
+    key?: string;
+    algorithms?: string[];
+    issuer?: string[];
+    audience?: string;
+    subject?: string;
+    claimsNamespace?: string;
   },
   orchestratorOptions: {
     redisPrefix: string;
@@ -481,6 +490,43 @@ module.exports = {
 CORS settings for the Cube.js REST API can be configured by providing an object
 with options [from here][link-express-cors-opts].
 
+### jwt
+
+#### jwkUrl
+
+The URL from which JSON Web Key Sets (JWKS) can be retrieved. Can also be set
+using `CUBEJS_JWK_URL`.
+
+#### key
+
+A JSON string that represents a cryptographic key and its' properties. Can also
+be set using `CUBEJS_JWK_KEY`.
+
+#### algorithms
+
+[Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs]. Can also be
+set using `CUBEJS_JWT_ALGS`.
+
+#### issuer
+
+An issuer value which will be used to enforce the [`iss` claim from inbound
+JWTs][link-jwt-ref-iss]. Can also be set using `CUBEJS_JWT_ISSUER`.
+
+#### audience
+
+An audience value which will be used to enforce the [`aud` claim from inbound
+JWTs][link-jwt-ref-aud]. Can also be set using `CUBEJS_JWT_AUDIENCE`.
+
+#### subject
+
+A subject value which will be used to enforce the [`sub` claim from inbound
+JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
+
+#### claimsNamespace
+
+A namespace within the decoded JWT under which any custom claims can be found.
+Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+
 ### orchestratorOptions
 
 <!-- prettier-ignore-start -->
@@ -574,9 +620,14 @@ Boolean to enable or disable a check duplicate property names in all objects of
 a schema. The default value is `false`, and it is means the compiler would use
 the additional transpiler for check duplicates.
 
+[gh-jsonwebtoken-algs]:
+  https://github.com/auth0/node-jsonwebtoken#algorithms-supported
 [link-express-cors-opts]:
   https://expressjs.com/en/resources/middleware/cors.html#configuration-options
 [link-jwt]: https://jwt.io/
+[link-jwt-ref-iss]: https://tools.ietf.org/html/rfc7519#section-4.1.1
+[link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
+[link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_databas
 [ref-caching-up-to-date]: /caching#keeping-cache-up-to-date
 [ref-cube-refresh-key]: /cube#parameters-refresh-key
