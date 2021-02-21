@@ -30,6 +30,8 @@ jobs:
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
