@@ -6,6 +6,7 @@
 #![feature(box_patterns)]
 #![feature(slice_internals)]
 #![feature(raw)]
+#![feature(total_cmp)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);

@@ -1,3 +1,4 @@
+use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
 use chrono::{SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ pub enum TableValue {
     String(String),
     Int(i64),
     Decimal(String), // TODO bincode is incompatible with BigDecimal
-    Float(String),   // TODO Eq
+    Float(OrdF64),
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
     Boolean(bool),

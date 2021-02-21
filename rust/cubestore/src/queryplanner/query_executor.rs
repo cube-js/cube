@@ -815,7 +815,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                             TableValue::Null
                         } else {
                             let decimal = a.value(i) as f64;
-                            TableValue::Float(decimal.to_string())
+                            TableValue::Float(decimal.into())
                         });
                     }
                 }

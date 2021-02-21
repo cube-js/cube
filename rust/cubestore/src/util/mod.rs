@@ -1,4 +1,5 @@
 pub mod maybe_owned;
+pub mod ordfloat;
 
 use crate::CubeError;
 use log::error;
