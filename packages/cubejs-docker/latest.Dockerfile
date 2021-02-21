@@ -1,4 +1,6 @@
-FROM node:12.20.1-buster-slim
+# It's required to use Buster, because Cube Store is using modern glibc
+# We should think about migration to buster-slim
+FROM node:12.20.1-buster
 
 ARG IMAGE_VERSION=unknown
 
