@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.29](https://github.com/cube-js/cube.js/compare/v0.26.28...v0.26.29) (2021-02-22)
+
+
+### Features
+
+* **cubestore:** Ability to control process in Node.js ([f45e875](https://github.com/cube-js/cube.js/commit/f45e87560139beff1fc013f4a82b4b6a16799c1e))
+* **docker:** Alpine - initial support for Cube Store ([6a48bcd](https://github.com/cube-js/cube.js/commit/6a48bcdb681ab47fba7c6d3e47b740fa58f7ee1a))
+
+
+
+
+
 ## [0.26.28](https://github.com/cube-js/cube.js/compare/v0.26.27...v0.26.28) (2021-02-21)
 
 
