@@ -25,23 +25,25 @@
         }"
       >
         <v-container fluid class="pa-4 pa-md-8 pt-6 background-white">
-          <div>DEBUG isQueryPresent: {{ isQueryPresent }}</div>
           <div class="wrap">
-            <v-btn
-              color="primary"
-              depressed
-              elevation="2"
-              raised
-              v-on:click="setMeasures(['Orders.count', 'Orders.number'])"
+            <div class="py-6">
+              <v-btn
+                class="mx-2"
+                color="primary"
+                depressed
+                elevation="2"
+                raised
+                v-on:click="setMeasures(['Orders.count', 'Orders.number'])"
               >add member</v-btn
-            >
-            <v-btn color="primary" depressed elevation="2" raised v-on:click="setMeasures(['Sales.count'])"
+              >
+              <v-btn class="mx-2" color="primary" depressed elevation="2" raised v-on:click="setMeasures(['Sales.count'])"
               >remove member</v-btn
-            >
+              >
 
-            <v-btn color="primary" depressed elevation="2" raised v-on:click="setOrder({ 'Orders.count': 'desc' })"
+              <v-btn class="mx-2" color="primary" depressed elevation="2" raised v-on:click="setOrder({ 'Orders.count': 'desc' })"
               >Click Me!</v-btn
-            >
+              >
+            </div>
 
             <v-row>
               <v-col cols="12" md="2">

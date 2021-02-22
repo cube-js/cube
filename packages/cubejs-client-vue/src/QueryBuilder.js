@@ -239,6 +239,7 @@ export default {
           this.prevValidatedQuery,
           {
             meta: this.meta,
+            sessionGranularity: validatedQuery?.timeDimensions?.[0]?.granularity
           }
         );
 
