@@ -6,6 +6,7 @@
   ],
   "command": {
     "bootstrap": {
+      "npmClient": "yarn",
       "npmClientArgs": [
         "--frozen-lockfile"
       ]
