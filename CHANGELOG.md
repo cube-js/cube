@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.30](https://github.com/cube-js/cube.js/compare/v0.26.29...v0.26.30) (2021-02-22)
+
+
+### Features
+
+* **bigquery-driver:** Upgrade @google-cloud/bigquery 5.x ([dbbd29c](https://github.com/cube-js/cube.js/commit/dbbd29cb41fcb093b37526e9c1d00b9170f38f41))
+
+
+
+
+
 ## [0.26.29](https://github.com/cube-js/cube.js/compare/v0.26.28...v0.26.29) (2021-02-22)
 
 
