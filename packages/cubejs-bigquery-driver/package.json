@@ -16,7 +16,7 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.25",
     "@cubejs-backend/shared": "^0.26.25",
-    "@google-cloud/bigquery": "^4.1.4",
+    "@google-cloud/bigquery": "^5.5.0",
     "@google-cloud/storage": "^5.7.2",
     "ramda": "^0.27.0"
   },
