@@ -11,6 +11,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "lint": "linter js-wrapper/* --ext .ts,.js",
+    "lint:fix": "linter --fix js-wrapper/* --ext .ts,js",
     "postinstall": "if [[ -z \"${CUBESTORE_SKIP_POST_INSTALL}\" ]]; then node ./dist/post-install.js; else echo \"Skipping Cube Store Post Installing\"; fi"
   },
   "files": [
@@ -30,6 +32,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@cubejs-backend/linter": "^0.26.13",
     "@oclif/color": "^0.1.2",
     "@octokit/core": "^3.2.5",
     "bytes": "^3.1.0",
@@ -37,5 +40,8 @@
     "node-fetch": "^2.6.1",
     "tar": "^6.1.0",
     "throttle-debounce": "^3.0.1"
+  },
+  "eslintConfig": {
+    "extends": "../packages/cubejs-linter"
   }
 }

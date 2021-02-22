@@ -2,7 +2,9 @@
 import * as process from 'process';
 import color from '@oclif/color';
 
-export const displayError = async (text: string) => {
+import { downloadBinaryFromRelease } from './download';
+
+const displayError = async (text: string) => {
   console.error('');
   console.error(color.cyan('Cube.js CubeStore Installer ---------------------------------------'));
   console.error('');
@@ -22,7 +24,7 @@ export const displayError = async (text: string) => {
 
 (async () => {
   try {
-
+    await downloadBinaryFromRelease();
   } catch (e) {
     await displayError(e);
   }

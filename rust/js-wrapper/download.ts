@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import tar from 'tar';
 import fs, { WriteStream } from 'fs';
 import fetch, { Headers, Request, Response } from 'node-fetch';
@@ -8,28 +9,7 @@ import process from 'process';
 import { Octokit } from '@octokit/core';
 import * as path from 'path';
 
-export async function extractFile(fileName: string, workingDirectory: string) {
-  await new Promise<void>(
-    (resolve, reject) => {
-      // @ts-ignore
-      tar.extract({ file: path.join(workingDirectory, fileName), cwd: workingDirectory }, (err) => {
-        if (err) {
-          return reject(err);
-        }
-
-        resolve();
-      });
-    }
-  );
-
-  try {
-    fs.unlinkSync(path.join(workingDirectory, fileName));
-  } catch (err) {
-    // console.error(err);
-  }
-}
-
-type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void
+type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
 
 export async function streamWithProgress(
   response: Response,
@@ -60,20 +40,21 @@ export async function streamWithProgress(
   );
 
   response.body.pipe(writer);
-
-  return new Promise((resolve, reject) => {
-    response.body.on('data', (chunk) => {
-      done += chunk.length;
-      return throttled();
-    });
-
-    response.body.on('end', () => {
-      resolve();
-    });
+  response.body.on('data', (chunk) => {
+    done += chunk.length;
+    throttled();
   });
+
+  return new Promise(
+    (resolve) => {
+      response.body.on('end', () => {
+        resolve();
+      });
+    }
+  );
 }
 
-export async function downloadFile(url: string, fileName: string, workingDirectory: string) {
+export async function downloadAndExtractFile(url: string, fileName: string, workingDirectory: string) {
   const request = new Request(url, {
     headers: new Headers({
       'Content-Type': 'application/octet-stream'
@@ -85,30 +66,16 @@ export async function downloadFile(url: string, fileName: string, workingDirecto
     throw new Error(`unexpected response ${response.statusText}`);
   }
 
-  try {
-    fs.unlinkSync(path.join(workingDirectory, fileName));
-  } catch (err) {
-    // console.error(err);
-  }
-
   const bar = cli.progress({
     format: 'Downloading from GitHub [{bar}] {percentage}% | Speed: {speed}',
   });
   bar.start(100, 0);
 
-  const writer = await new Promise<WriteStream>((resolve, reject) => {
-    const stream = fs.createWriteStream(path.join(workingDirectory, fileName));
-
-    stream.on('open', () => {
-      resolve(stream);
-    });
-
-    stream.on('error', (e) => {
-      reject(e);
-    });
+  const writer = tar.x({
+    cwd: workingDirectory,
   });
 
-  await streamWithProgress(response, writer, ({ progress, speed, eta }) => {
+  await streamWithProgress(response, <WriteStream>writer, ({ progress, speed, eta }) => {
     bar.update(progress, {
       speed,
       eta
@@ -138,6 +105,7 @@ export function getTarget(): string {
 }
 
 async function fetchRelease() {
+  // eslint-disable-next-line global-require
   const { version } = require('../package.json');
 
   const client = new Octokit();
@@ -165,8 +133,7 @@ export async function downloadBinaryFromRelease() {
       if (fileName.startsWith('cubestored-')) {
         const assetTarget = fileName.substr('cubestored-'.length);
         if (assetTarget === target) {
-          await downloadFile(asset.browser_download_url, asset.name, path.resolve(__dirname, '..'));
-          await extractFile(asset.name, path.resolve(__dirname, '..'));
+          await downloadAndExtractFile(asset.browser_download_url, asset.name, path.resolve(__dirname, '..'));
         }
       }
     }
