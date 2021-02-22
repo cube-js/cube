@@ -4,6 +4,9 @@
   "description": "Cube.js pre-aggregation storage layer.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
+  "bin": {
+    "cubestore-dev": "dist/cubestore-dev.js"
+  },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",

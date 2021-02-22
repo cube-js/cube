@@ -117,6 +117,7 @@ COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
 
 RUN yarn lerna run build
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
+COPY packages/cubejs-docker/bin/cubestore-dev /usr/local/bin/cubestore-dev
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
