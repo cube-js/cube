@@ -80,6 +80,8 @@ jobs:
           cmd: install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
@@ -130,6 +132,8 @@ jobs:
           cmd: install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
@@ -173,6 +177,8 @@ jobs:
           cmd: install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
@@ -236,6 +242,8 @@ jobs:
           cmd: install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
@@ -323,6 +331,8 @@ jobs:
           cmd: install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
@@ -422,6 +432,8 @@ jobs:
           cmd: install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
@@ -514,6 +526,8 @@ jobs:
           cmd: install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
           CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap

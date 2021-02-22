@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { downloadBinaryFromRelease } from './download';
 import { spawn } from 'child_process';
+import { downloadBinaryFromRelease } from './download';
 
 const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored';
 
+// eslint-disable-next-line import/prefer-default-export
 export async function startCubeStore() {
   const pathToExecutable = path.join(__dirname, '..', 'bin', binaryName);
 
