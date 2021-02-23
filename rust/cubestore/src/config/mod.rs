@@ -578,7 +578,11 @@ impl Config {
         Ok(self.injector.get_service("original_remote_fs").await)
     }
 
-    pub async fn configure(&self) -> CubeServices {
+    pub fn injector(&self) -> Arc<Injector> {
+        self.injector.clone()
+    }
+
+    pub async fn configure_injector(&self) {
         self.configure_remote_fs().await;
 
         self.injector
@@ -759,7 +763,9 @@ impl Config {
                 })
                 .await;
         }
+    }
 
+    pub async fn cube_services(&self) -> CubeServices {
         CubeServices {
             injector: self.injector.clone(),
             sql_service: self.injector.get_service_typed().await,
@@ -773,6 +779,11 @@ impl Config {
             cluster: self.injector.get_service_typed().await,
             remote_fs: self.injector.get_service_typed().await,
         }
+    }
+
+    pub async fn configure(&self) -> CubeServices {
+        self.configure_injector().await;
+        self.cube_services().await
     }
 
     pub fn configure_worker(&self) {

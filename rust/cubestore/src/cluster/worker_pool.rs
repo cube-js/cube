@@ -135,51 +135,52 @@ impl<
             let process = self.spawn_process();
 
             match process {
-                Ok((mut args_tx, mut res_rx, mut handle)) => loop {
-                    let mut stopped_rx = self.stopped_rx.write().await;
-                    let Message { message, sender } = tokio::select! {
-                        res = stopped_rx.changed() => {
-                            if res.is_err() || *stopped_rx.borrow() {
-                                <WorkerProcess<T, R, P>>::kill(&mut handle);
-                                self.finished_notify.notify_waiters();
-                                return;
+                Ok((mut args_tx, mut res_rx, mut handle)) => {
+                    scopeguard::defer!(<WorkerProcess<T, R, P>>::kill(&mut handle));
+                    loop {
+                        let mut stopped_rx = self.stopped_rx.write().await;
+                        let Message { message, sender } = tokio::select! {
+                            res = stopped_rx.changed() => {
+                                if res.is_err() || *stopped_rx.borrow() {
+                                    self.finished_notify.notify_waiters();
+                                    return;
+                                }
+                                continue;
                             }
-                            continue;
-                        }
-                        message = self.queue.pop() => {
-                            message
-                        }
-                    };
-                    let process_message_res_timeout = tokio::time::timeout(
-                        self.timeout,
-                        self.process_message(message, args_tx, res_rx),
-                    )
-                    .await;
-                    let process_message_res = match process_message_res_timeout {
-                        Ok(r) => r,
-                        Err(e) => Err(CubeError::internal(format!(
-                            "Timed out after waiting for {}",
-                            e
-                        ))),
-                    };
-                    match process_message_res {
-                        Ok((res, a, r)) => {
-                            if sender.send(Ok(res)).is_err() {
-                                error!("Error during worker message processing: Send Error");
+                            message = self.queue.pop() => {
+                                message
                             }
-                            args_tx = a;
-                            res_rx = r;
-                        }
-                        Err(e) => {
-                            error!("Error during worker message processing: {}", e);
-                            if sender.send(Err(e.clone())).is_err() {
-                                error!("Error during worker message processing: Send Error");
+                        };
+                        let process_message_res_timeout = tokio::time::timeout(
+                            self.timeout,
+                            self.process_message(message, args_tx, res_rx),
+                        )
+                        .await;
+                        let process_message_res = match process_message_res_timeout {
+                            Ok(r) => r,
+                            Err(e) => Err(CubeError::internal(format!(
+                                "Timed out after waiting for {}",
+                                e
+                            ))),
+                        };
+                        match process_message_res {
+                            Ok((res, a, r)) => {
+                                if sender.send(Ok(res)).is_err() {
+                                    error!("Error during worker message processing: Send Error");
+                                }
+                                args_tx = a;
+                                res_rx = r;
                             }
-                            <WorkerProcess<T, R, P>>::kill(&mut handle);
-                            break;
+                            Err(e) => {
+                                error!("Error during worker message processing: {}", e);
+                                if sender.send(Err(e.clone())).is_err() {
+                                    error!("Error during worker message processing: Send Error");
+                                }
+                                break;
+                            }
                         }
                     }
-                },
+                }
                 Err(e) => {
                     error!("Can't start process: {}", e);
                 }

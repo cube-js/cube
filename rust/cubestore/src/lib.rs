@@ -61,21 +61,21 @@ pub enum CubeErrorCauseType {
 }
 
 impl CubeError {
-    fn user(message: String) -> CubeError {
+    pub fn user(message: String) -> CubeError {
         CubeError {
             message,
             cause: CubeErrorCauseType::User,
         }
     }
 
-    fn internal(message: String) -> CubeError {
+    pub fn internal(message: String) -> CubeError {
         CubeError {
             message,
             cause: CubeErrorCauseType::Internal,
         }
     }
 
-    fn from_error<E: fmt::Display>(error: E) -> CubeError {
+    pub fn from_error<E: fmt::Display>(error: E) -> CubeError {
         CubeError {
             message: format!("{}\n{}", error, Backtrace::capture()),
             cause: CubeErrorCauseType::Internal,
