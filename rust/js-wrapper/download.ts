@@ -1,13 +1,16 @@
 /* eslint-disable no-restricted-syntax */
 import tar from 'tar';
-import fs, { WriteStream } from 'fs';
+import fs, { mkdirSync, WriteStream } from 'fs';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import { throttle } from 'throttle-debounce';
+import { internalExceptions } from '@cubejs-backend/shared';
 import bytes from 'bytes';
 import cli from 'cli-ux';
 import process from 'process';
 import { Octokit } from '@octokit/core';
 import * as path from 'path';
+
+import { detectLibc } from './utils';
 
 type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
 
@@ -71,8 +74,15 @@ export async function downloadAndExtractFile(url: string, fileName: string, work
   });
   bar.start(100, 0);
 
+  try {
+    mkdirSync(path.join(workingDirectory, 'downloaded'));
+    mkdirSync(path.join(workingDirectory, 'downloaded', 'latest'));
+  } catch (e) {
+    internalExceptions(e);
+  }
+
   const writer = tar.x({
-    cwd: workingDirectory,
+    cwd: path.join(workingDirectory, 'downloaded', 'latest'),
   });
 
   await streamWithProgress(response, <WriteStream>writer, ({ progress, speed, eta }) => {
@@ -93,8 +103,10 @@ export function getTarget(): string {
   }
 
   switch (process.platform) {
+    case 'win32':
+      return 'x86_64-pc-windows-gnu';
     case 'linux':
-      return 'x86_64-unknown-linux-gnu';
+      return `x86_64-unknown-linux-${detectLibc()}`;
     case 'darwin':
       return 'x86_64-apple-darwin';
     default:

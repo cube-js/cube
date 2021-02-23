@@ -8,6 +8,7 @@
 !rust/tsconfig.json
 !rust/package.json
 !rust/yarn.lock
+!rust/bin
 
 packages/*/node_modules/
 packages/cubejs-jdbc-driver

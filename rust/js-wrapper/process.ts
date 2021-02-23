@@ -7,7 +7,7 @@ const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored
 
 // eslint-disable-next-line import/prefer-default-export
 export async function startCubeStore() {
-  const pathToExecutable = path.join(__dirname, '..', 'bin', binaryName);
+  const pathToExecutable = path.join(__dirname, '..', 'downloaded', 'latest', 'bin', binaryName);
 
   if (!fs.existsSync(pathToExecutable)) {
     await downloadBinaryFromRelease();

@@ -5,3 +5,4 @@ upstream
 .cargo/config.toml
 dist
 node_modules
+downloaded

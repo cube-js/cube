@@ -35,6 +35,14 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
+"@cubejs-backend/shared@^0.26.25":
+  version "0.26.25"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.25.tgz#6c63d882a8bf917836d3fc4e6e5a27d61e52b761"
+  integrity sha512-cJY9QIx/13Oaf6vtg5/U4t5YesjJQzoB5kTUqXgqf4QkLewi36f2qYFM8JUJkL3d71xRfMf15t7wMIUNTLmJHQ==
+  dependencies:
+    env-var "^6.3.0"
+    node-fetch "^2.6.1"
+
 "@eslint/eslintrc@^0.3.0":
   version "0.3.0"
   resolved "https://registry.yarnpkg.com/@eslint/eslintrc/-/eslintrc-0.3.0.tgz#d736d6963d7003b6514e6324bec9c602ac340318"
@@ -740,6 +748,11 @@ enquirer@^2.3.5:
   integrity sha512-yjNnPr315/FjS4zIsUxYguYUPP2e1NK4d7E7ZOLiyYCcbFBiTMyID+2wvm2w6+pZ/odMA7cRkjhsPbltwBOrLg==
   dependencies:
     ansi-colors "^4.1.1"
+
+env-var@^6.3.0:
+  version "6.3.0"
+  resolved "https://registry.yarnpkg.com/env-var/-/env-var-6.3.0.tgz#b4ace5bcd1d293629a2c509ae7b46f8add2f8892"
+  integrity sha512-gaNzDZuVaJQJlP2SigAZLu/FieZN5MzdN7lgHNehESwlRanHwGQ/WUtJ7q//dhrj3aGBZM45yEaKOuvSJaf4mA==
 
 error-ex@^1.2.0:
   version "1.3.2"
