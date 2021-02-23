@@ -63,7 +63,9 @@ impl CubeServices {
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
+        #[cfg(not(target_os = "windows"))]
         self.cluster.stop_processing_loops().await?;
+
         self.remote_fs.stop_processing_loops()?;
         if let Some(rocks_meta) = &self.rocks_meta_store {
             rocks_meta.stop_processing_loops().await;

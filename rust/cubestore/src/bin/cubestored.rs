@@ -33,6 +33,7 @@ fn main() {
 
     debug!("New process started");
 
+    #[cfg(not(target_os = "windows"))]
     procspawn::init();
 
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();

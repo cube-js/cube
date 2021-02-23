@@ -9,6 +9,10 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
 
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+procspawn = { version = "0.9.0", features = ["test-support"] }
+ipc-channel = { version = "0.14.1" }
+
 [dependencies]
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt"] }
@@ -50,9 +54,7 @@ bigdecimal = { version = "0.2.0", features = ["serde"] }
 rust-s3 = "0.26.3"
 aws-creds = "0.24.1"
 aws-region = "0.22.1"
-procspawn = { version = "0.9.0", features = ["test-support"] }
 deadqueue = "0.1.0"
-ipc-channel = "0.14.1"
 reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
 rand = "0.8.0"

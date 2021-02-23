@@ -1,9 +1,14 @@
 pub mod message;
+
+#[cfg(not(target_os = "windows"))]
 pub mod worker_pool;
 
-use crate::cluster::message::NetworkMessage;
+#[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
+
+use crate::cluster::message::NetworkMessage;
 use crate::config::injection::DIService;
+#[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -97,6 +102,7 @@ pub struct ClusterImpl {
     job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
     jobs_enabled: Arc<RwLock<bool>>,
+    #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
         Option<Arc<WorkerPool<WorkerMessage, SerializedRecordBatchStream, WorkerProcessor>>>,
     >,
@@ -112,9 +118,10 @@ crate::di_service!(ClusterImpl, [Cluster]);
 pub enum WorkerMessage {
     Select(SerializedPlan, HashMap<String, String>),
 }
-
+#[cfg(not(target_os = "windows"))]
 pub struct WorkerProcessor;
 
+#[cfg(not(target_os = "windows"))]
 #[async_trait]
 impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProcessor {
     async fn process(args: WorkerMessage) -> Result<SerializedRecordBatchStream, CubeError> {
@@ -466,6 +473,7 @@ impl ClusterImpl {
             job_notify: Arc::new(Notify::new()),
             meta_store_sender,
             jobs_enabled: Arc::new(RwLock::new(true)),
+            #[cfg(not(target_os = "windows"))]
             select_process_pool: RwLock::new(None),
             config_obj,
             query_executor,
@@ -491,6 +499,7 @@ impl ClusterImpl {
     }
 
     pub async fn start_processing_loops(&self) {
+        #[cfg(not(target_os = "windows"))]
         if self.config_obj.select_worker_pool_size() > 0 {
             let mut pool = self.select_process_pool.write().await;
             *pool = Some(Arc::new(WorkerPool::new(
@@ -498,6 +507,7 @@ impl ClusterImpl {
                 Duration::from_secs(self.config_obj.query_timeout()),
             )));
         }
+
         for _ in 0..self.config_obj.job_runners_count() {
             // TODO number of job event loops
             let job_runner = JobRunner {
@@ -522,9 +532,12 @@ impl ClusterImpl {
             // TODO number of job event loops
             self.job_notify.notify_waiters();
         }
+
+        #[cfg(not(target_os = "windows"))]
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
             pool.stop_workers().await?;
         }
+
         self.close_worker_socket_tx.send(true)?;
         Ok(())
     }
@@ -677,24 +690,43 @@ impl ClusterImpl {
         if warmup.as_millis() > 200 {
             warn!("Warmup download for select ({:?})", warmup);
         }
-        let pool_option = self.select_process_pool.read().await.clone();
-        let res = if let Some(pool) = pool_option {
-            let serialized_plan_node = plan_node.clone();
-            pool.process(WorkerMessage::Select(
-                serialized_plan_node,
-                remote_to_local_names,
-            ))
-            .await
-        } else {
+
+        #[cfg(target_os = "windows")]
+        {
             // TODO optimize for no double conversion
-            SerializedRecordBatchStream::write(
+            let res = SerializedRecordBatchStream::write(
                 self.query_executor
                     .execute_worker_plan(plan_node.clone(), remote_to_local_names)
                     .await?,
-            )
-        };
-        info!("Running select completed ({:?})", start.elapsed()?);
-        res
+            );
+
+            info!("Running select completed ({:?})", start.elapsed()?);
+            res
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let pool_option = self.select_process_pool.read().await.clone();
+
+            let res = if let Some(pool) = pool_option {
+                let serialized_plan_node = plan_node.clone();
+                pool.process(WorkerMessage::Select(
+                    serialized_plan_node,
+                    remote_to_local_names,
+                ))
+                .await
+            } else {
+                // TODO optimize for no double conversion
+                SerializedRecordBatchStream::write(
+                    self.query_executor
+                        .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                        .await?,
+                )
+            };
+
+            info!("Running select completed ({:?})", start.elapsed()?);
+            res
+        }
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {
