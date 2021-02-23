@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "bin": {
-    "cubestore-dev": "dist/cubestore-dev.js"
+    "cubestore-dev": "bin/cubestore-dev"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@cubejs-backend/linter": "^0.26.13",
+    "@cubejs-backend/shared": "^0.26.25",
     "@oclif/color": "^0.1.2",
     "@octokit/core": "^3.2.5",
     "bytes": "^3.1.0",
