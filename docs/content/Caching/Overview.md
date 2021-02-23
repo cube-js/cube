@@ -1,5 +1,5 @@
 ---
-title: Caching
+title: Overview
 permalink: /caching
 category: Caching
 menuOrder: 1
@@ -28,112 +28,36 @@ unless it is necessary. To speed up query performance, consider using
 
 ## Pre-Aggregations
 
-The **pre-aggregation** engine builds a layer of aggregated data in your
-database during runtime and maintains it to be up-to-date.
+Pre-aggregations is a layer of the aggregated data built and refreshed by Cube.js. It can dramatically improve the query performance and provide a higher concurrency.
 
-<img
-src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/pre-aggregations-schema.png"
-style="border: none"
-/>
+To start building pre-aggregations, Cube.js should have write access to the [pre-aggregations schema](/config#options-reference-pre-aggregations-schema): `dev_pre_aggregations` in the development and `prod_pre_aggregations` in production. Cube.js first builds pre-aggregations as tables in the source database and then exports them into the pre-aggregations storage. 
 
-Upon an incoming request, Cube.js will first look for a relevant
-pre-aggregation. If it cannot find any, it will build a new one. Once the
-pre-aggregation is built, all the subsequent requests will go to the
-pre-aggregated layer instead of hitting the raw data. It could speed the
-response time by hundreds or even thousands of times.
+Pre-aggregations are defined in the data schema. You can learn more about defining pre-aggregations in [schema reference](/pre-aggregations).
 
-Pre-aggregations are materialized query results persisted as tables. In order to
-start using pre-aggregations, Cube.js should have write access to the
-`stb_pre_aggregations` schema where pre-aggregation tables will be stored.
-
-Pre-aggregations are defined in the data schema. Below is an example of `rollup`
-pre-aggregation. You can learn about defining pre-aggregations in
-[schema reference.](/pre-aggregations)
-
-```javascript
-cube(`Orders`, {
-  // ...
-
-  preAggregations: {
-    amountByCreated: {
-      type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
-      granularity: `month`,
-    },
-  },
-});
-```
-
-### Refresh Strategy
-
-Refresh strategy can be customized by setting the
-[refreshKey](/pre-aggregations#refresh-key) property for the pre-aggregation.
-
-The default value of `refreshKey` is `every: '1 hour'`. It can be redefined
-either by providing SQL:
-
-```javascript
-cube(`Orders`, {
-  // ...
-
-  preAggregations: {
-    amountByCreated: {
-      type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
-      granularity: `month`,
-      refreshKey: {
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
-```
-
-Or by providing a refresh time interval:
-
-```javascript
-cube(`Orders`, {
-  // ...
-
-  preAggregations: {
-    amountByCreated: {
-      type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
-      granularity: `month`,
-      refreshKey: {
-        every: `12 hour`,
-      },
-    },
-  },
-});
-```
-
-### Background Refresh
-
-You can refresh pre-aggregations in the background by setting
-`scheduledRefresh: true`.
-
-In development mode, Cube.js enables background refresh by default and will
-refresh all pre-aggregations marked with the
-[`scheduledRefresh`](/pre-aggregations#scheduled-refresh) parameter.
-
-Please consult the [Production Checklist][link-production-checklist-refresh] for
-best practices on running background refresh in production environments.
 
 ```js
 cube(`Orders`, {
-  // ...
+  measures: {
+    totalAmount: {
+      sql: `amount`,
+      type: `sum`
+    }
+  },
+
+  dimensions: {
+    createdAt: {
+      sql: `created_at`,
+      type: `time`
+    }
+  },
 
   preAggregations: {
     amountByCreated: {
       type: `rollup`,
-      measureReferences: [amount],
+      external: true,
+      measureReferences: [totalAmount],
       timeDimensionReference: createdAt,
       granularity: `month`,
-      scheduledRefresh: true,
     },
   },
 });
