@@ -28,7 +28,7 @@ unless it is necessary. To speed up query performance, consider using
 
 ## Pre-Aggregations
 
-Pre-aggregations is the layer of the aggregated data built and refreshed by Cube.js. It can dramatically improve the queries performance and provide a higher concurrency.
+Pre-aggregations is a layer of the aggregated data built and refreshed by Cube.js. It can dramatically improve the query performance and provide a higher concurrency.
 
 To start building pre-aggregations, Cube.js should have write access to the [pre-aggregations schema](/config#options-reference-pre-aggregations-schema): `dev_pre_aggregations` in the development and `prod_pre_aggregations` in production. Cube.js first builds pre-aggregations as tables in the source database and then exports them into the pre-aggregations storage. 
 
