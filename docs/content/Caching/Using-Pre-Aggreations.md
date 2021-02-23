@@ -6,7 +6,7 @@ menuOrder: 2
 ---
 
 Pre-aggregations is a powerfull way to speed up your Cube.js queries. There are many
-configuration options to consider. Please make sure also to check [this
+configuration options to consider. Please make sure to also check [this
 Pre-Aggregations page in the data schema section](/pre-aggregations).
 
 ## Refresh Strategy
