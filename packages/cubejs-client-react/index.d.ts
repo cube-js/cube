@@ -5,16 +5,18 @@ import {
   ResultSet,
   Filter,
   PivotConfig,
-  MemberType,
   TCubeMeasure,
   TCubeDimension,
-  TCubeMember,
+  TCubeSegment,
+  TimeDimension,
   ProgressResponse,
   TDryRunResponse,
   TOrderMember,
   QueryOrder,
   TQueryOrderArray,
   TSourceAxis,
+  TimeDimensionComparison,
+  TimeDimensionRanged,
 } from '@cubejs-client/core';
 
 /**
@@ -141,9 +143,8 @@ declare module '@cubejs-client/react' {
   type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
 
   type VizState = {
-    [key: string]: any;
+    query?: Query;
     pivotConfig?: PivotConfig;
-    shouldApplyHeuristicOrder?: boolean;
     chartType?: ChartType;
   };
 
@@ -155,12 +156,12 @@ declare module '@cubejs-client/react' {
     /**
      * Default query
      */
-    query?: Query;
-    vizState?: VizState;
+    defaultQuery?: Query;
+    defaultChartType?: ChartType;
+    initialVizState?: VizState;
     /**
      * @default defaultChartType line
      */
-    defaultChartType?: ChartType;
     /**
      * Defaults to `false`. This means that the default heuristics will be applied. For example: when the query is empty and you select a measure that has a default time dimension it will be pushed to the query.
      * @default disableHeuristics false
@@ -173,10 +174,9 @@ declare module '@cubejs-client/react' {
      */
     stateChangeHeuristics?: (state: QueryBuilderState) => QueryBuilderState;
     /**
-     * Called by the `QueryBuilder` when the query state has changed. Use it when state is maintained outside of the `QueryBuilder` component.
+     * Called by the `QueryBuilder` when the viz state has changed. Use it to save state outside of the `QueryBuilder` component.
      */
-    setQuery?: (query: Query) => void;
-    setVizState?: (vizState: VizState) => void;
+    onVizStateChanged?: (vizState: VizState) => void;
   };
 
   type QueryBuilderState = VizState & {
@@ -188,14 +188,15 @@ declare module '@cubejs-client/react' {
     resultSet?: ResultSet | null;
     error?: Error | null;
     loadingState?: TLoadingState;
+
     /**
      * Indicates whether the query is ready to be displayed or not
      */
     isQueryPresent: boolean;
-    measures: string[];
-    dimensions: string[];
-    segments: string[];
-    timeDimensions: Filter[];
+    measures: (TCubeMeasure & { index: number })[];
+    dimensions: (TCubeDimension & { index: number })[];
+    segments: (TCubeSegment & { index: number })[];
+    timeDimensions: (TimeDimensionWithExtraFields & { index: number })[];
 
     /**
      * An array of available measures to select. They are loaded via the API from Cube.js Backend.
@@ -212,18 +213,18 @@ declare module '@cubejs-client/react' {
     /**
      * An array of available segments to select. They are loaded via the API from Cube.js Backend.
      */
-    availableSegments: TCubeMember[];
+    availableSegments: TCubeSegment[];
 
-    updateMeasures: MemberUpdater;
-    updateDimensions: MemberUpdater;
-    updateSegments: MemberUpdater;
-    updateTimeDimensions: MemberUpdater;
-    updateFilters: MemberUpdater;
+    updateMeasures: MeasureUpdater;
+    updateDimensions: DimensionUpdater;
+    updateSegments: SegmentUpdater;
+    updateTimeDimensions: TimeDimensionUpdater;
+    updateFilters: FilterUpdater;
     /**
      * Used for partial of full query update
      */
     updateQuery: (query: Query) => void;
-    filters: Filter[];
+    filters: (FilterWithExtraFields & { index: number })[];
     /**
      * All possible order members for the query
      */
@@ -235,22 +236,24 @@ declare module '@cubejs-client/react' {
     /**
      * See [Pivot Config](@cubejs-client-core#types-pivot-config)
      */
-    pivotConfig: PivotConfig;
+    pivotConfig?: PivotConfig;
     /**
      * Helper method for `pivotConfig` updates
      */
     updatePivotConfig: PivotConfigUpdater;
-    
+
     /**
      * Selected chart type
      */
-    chartType: ChartType;
-    
+    chartType?: ChartType;
+
     /**
      * Used for chart type update
      */
     updateChartType: (chartType: ChartType) => void;
+
     validatedQuery: Query;
+    refresh: () => void;
   };
 
   /**
@@ -477,25 +480,44 @@ declare module '@cubejs-client/react' {
    * />
    * ```
    */
-  type MemberUpdater = {
-    add: (member: MemberType) => void;
-    remove: (member: MemberType) => void;
-    update: (member: MemberType, updateWith: MemberType) => void;
+
+  type FilterWithExtraFields = Omit<Filter, 'dimension'> & {
+    dimension: TCubeDimension | TCubeMeasure;
+    operators: { name: string; title: string }[];
   };
+  type TimeDimensionWithExtraFields = Omit<TimeDimension, 'dimension'> & {
+    dimension: TCubeDimension & { granularities: { name: string; title: string }[] };
+  };
+
+  type MemberUpdater<T> = {
+    add: (member: T) => void;
+    remove: (member: { index: number }) => void;
+    update: (member: { index: number }, updateWith: T) => void;
+  };
+  type DimensionUpdater = MemberUpdater<TCubeDimension>;
+  type MeasureUpdater = MemberUpdater<TCubeMeasure>;
+  type SegmentUpdater = MemberUpdater<TCubeSegment>;
+  // Only require the fields that are actually used (otherwise fields like `operators` are required just to add/update)
+  type TimeDimensionUpdater = MemberUpdater<
+    (Pick<TimeDimensionRanged, 'granularity' | 'dateRange'> | Pick<TimeDimensionComparison, 'granularity' | 'compareDateRange'>) & { dimension: TCubeDimension }
+  >;
+  type FilterUpdater = MemberUpdater<
+    Pick<Filter, 'member' | 'operator' | 'values'> & { dimension: TCubeDimension | TCubeMeasure }
+  >;
 
   type OrderUpdater = {
     set: (memberId: string, order: QueryOrder | 'none') => void;
-    update: (order: TQueryOrderArray) => void;
+    update: (order: Query['order']) => void;
     reorder: (sourceIndex: number, destinationIndex: number) => void;
   };
 
   type PivotConfigUpdater = {
-    moveItem: (
-      sourceIndex: number,
-      destinationIndex: number,
-      sourceAxis: TSourceAxis,
-      destinationAxis: TSourceAxis
-    ) => void;
-    update: (pivotConfig: PivotConfig & { limit: number }) => void;
+    moveItem: (args: {
+      sourceIndex: number;
+      destinationIndex: number;
+      sourceAxis: TSourceAxis;
+      destinationAxis: TSourceAxis;
+    }) => void;
+    update: (pivotConfig: PivotConfig & { limit?: number }) => void;
   };
 }
