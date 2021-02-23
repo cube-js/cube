@@ -19,3 +19,17 @@ Playground:
 ![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Developer-Tools/playground.gif)
 
 [link-dev-mode]: /configuration/overview
+
+## Running Playground in production
+
+Developer playground is only enabled when `CUBEJS_DEV_MODE` is set to `true`. Since Playground exposes data schema and admin access to all the possible queries we do not recommend running it on production instance. You can use [Cube.js frontend SDks](/frontend-introduction) to build your own query builder and use it to query your Cube.js API in a secure way.
+
+You can also securely run Playground on top of the production Cube.js instance inside the Cube Cloud.
+
+[[info |]]
+| [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
+| an account yet, you can [sign up to the waitlist here][link-cube-cloud].
+
+![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Developer-Tools/cube-cloud-playground.png)
+
+[link-cube-cloud]: https://cube.dev/cloud
