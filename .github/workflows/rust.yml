@@ -97,8 +97,7 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
-          # Its need some workaround to compile librocks-db with musl, for now I dont know how to solve it
-          #- x86_64-unknown-linux-musl
+          - x86_64-unknown-linux-musl
           - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
         include:
@@ -109,6 +108,14 @@ jobs:
             executable_name: cubestored
             # Because it's buggy
             cross: false
+            strip: true
+            compress: false
+          - os: ubuntu-latest
+            before_script: cross-ubuntu-musl
+            target: x86_64-unknown-linux-musl
+            artifact_name: rust/target/x86_64-unknown-linux-musl/release/cubestored
+            executable_name: cubestored
+            cross: true
             strip: true
             compress: false
           - os: ubuntu-latest
