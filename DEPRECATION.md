@@ -244,7 +244,7 @@ New shape of `authInfo`:
 ```
 
 
-[ref-security-context]: https://cube.dev/docs/security#security-context
+[ref-security-context]: https://cube.dev/docs/security/context
 
 Deprecated:
 

@@ -2,7 +2,8 @@
 title: Auth0 Guide
 permalink: /security/jwt/auth0
 category: Authentication & Authorization
-menuOrder: 1
+subCategory: Guides
+menuOrder: 3
 ---
 
 ## Introduction
@@ -250,6 +251,6 @@ your own Cube.js application.
 [link-auth0-api]:
   https://auth0.com/docs/tokens/access-tokens#json-web-token-access-tokens
 [link-openid-playground]: https://openidconnect.net/
-[ref-sec-ctx]: /security#security-context
+[ref-sec-ctx]: /security/context
 [gh-cubejs-auth0-example]:
   https://github.com/cube-js/cube.js/tree/master/examples/auth0

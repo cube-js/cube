@@ -644,6 +644,6 @@ the additional transpiler for check duplicates.
 [ref-schemafilerepo]: #SchemaFileRepository
 [ref-schemapath]: #schemaPath
 [ref-sec]: /security
-[ref-sec-ctx]: /security#security-context
+[ref-sec-ctx]: /security/context
 [ref-rest-api]: /rest-api
 [ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh

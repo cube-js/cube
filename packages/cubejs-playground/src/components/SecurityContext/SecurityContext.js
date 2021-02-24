@@ -184,7 +184,7 @@ export default function SecurityContext() {
         <Text type="secondary">
           Learn more about Security Context in{' '}
           <Link
-            href="https://cube.dev/docs/security#security-context"
+            href="https://cube.dev/docs/security/context"
             target="_blank"
           >
             docs
