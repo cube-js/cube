@@ -21,7 +21,7 @@ You can use Cube Cloud IDE to develop and run Cube.js applications. By connectin
 
 ## Run and Scale Cube.js applications
 
-Cube Cloud provides on-demand scalable infrastructure and pre-aggregations storage. Cube Cloud run hundreds of Cube Store instances to ingest and query pre-aggregations with low latency and high concurrency. It is available to all users on the Standard plan higher.
+Cube Cloud provides on-demand scalable infrastructure and pre-aggregations storage. Cube Cloud run hundreds of Cube Store instances to ingest and query pre-aggregations with low latency and high concurrency. It is available to all users on the Standard plan and higher.
 
 ## Live preview your feature branchs
 
