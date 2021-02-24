@@ -1,6 +1,7 @@
 use crate::CubeError;
 use async_trait::async_trait;
 use deadqueue::unlimited;
+use futures::future::join_all;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
@@ -23,6 +24,7 @@ pub struct WorkerPool<
 > {
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     stopped_tx: watch::Sender<bool>,
+    workers: Vec<Arc<WorkerProcess<T, R, P>>>,
     processor: PhantomData<P>,
 }
 
@@ -62,14 +64,23 @@ impl<
                 stopped_rx.clone(),
             ));
             workers.push(process.clone());
-            tokio::spawn(async move { process.processing_loop().await });
         }
 
         WorkerPool {
             stopped_tx,
             queue,
+            workers,
             processor: PhantomData,
         }
+    }
+
+    pub async fn wait_processing_loops(&self) {
+        let futures = self
+            .workers
+            .iter()
+            .map(|w| w.processing_loop())
+            .collect::<Vec<_>>();
+        join_all(futures).await;
     }
 
     pub async fn process(&self, message: T) -> Result<R, CubeError> {
@@ -83,7 +94,6 @@ impl<
 
     pub async fn stop_workers(&self) -> Result<(), CubeError> {
         self.stopped_tx.send(true)?;
-        self.stopped_tx.closed().await;
         Ok(())
     }
 }
@@ -125,51 +135,52 @@ impl<
             let process = self.spawn_process();
 
             match process {
-                Ok((mut args_tx, mut res_rx, mut handle)) => loop {
-                    let mut stopped_rx = self.stopped_rx.write().await;
-                    let Message { message, sender } = tokio::select! {
-                        res = stopped_rx.changed() => {
-                            if res.is_err() || *stopped_rx.borrow() {
-                                <WorkerProcess<T, R, P>>::kill(&mut handle);
-                                self.finished_notify.notify_waiters();
-                                return;
+                Ok((mut args_tx, mut res_rx, mut handle)) => {
+                    scopeguard::defer!(<WorkerProcess<T, R, P>>::kill(&mut handle));
+                    loop {
+                        let mut stopped_rx = self.stopped_rx.write().await;
+                        let Message { message, sender } = tokio::select! {
+                            res = stopped_rx.changed() => {
+                                if res.is_err() || *stopped_rx.borrow() {
+                                    self.finished_notify.notify_waiters();
+                                    return;
+                                }
+                                continue;
                             }
-                            continue;
-                        }
-                        message = self.queue.pop() => {
-                            message
-                        }
-                    };
-                    let process_message_res_timeout = tokio::time::timeout(
-                        self.timeout,
-                        self.process_message(message, args_tx, res_rx),
-                    )
-                    .await;
-                    let process_message_res = match process_message_res_timeout {
-                        Ok(r) => r,
-                        Err(e) => Err(CubeError::internal(format!(
-                            "Timed out after waiting for {}",
-                            e
-                        ))),
-                    };
-                    match process_message_res {
-                        Ok((res, a, r)) => {
-                            if sender.send(Ok(res)).is_err() {
-                                error!("Error during worker message processing: Send Error");
+                            message = self.queue.pop() => {
+                                message
                             }
-                            args_tx = a;
-                            res_rx = r;
-                        }
-                        Err(e) => {
-                            error!("Error during worker message processing: {}", e);
-                            if sender.send(Err(e.clone())).is_err() {
-                                error!("Error during worker message processing: Send Error");
+                        };
+                        let process_message_res_timeout = tokio::time::timeout(
+                            self.timeout,
+                            self.process_message(message, args_tx, res_rx),
+                        )
+                        .await;
+                        let process_message_res = match process_message_res_timeout {
+                            Ok(r) => r,
+                            Err(e) => Err(CubeError::internal(format!(
+                                "Timed out after waiting for {}",
+                                e
+                            ))),
+                        };
+                        match process_message_res {
+                            Ok((res, a, r)) => {
+                                if sender.send(Ok(res)).is_err() {
+                                    error!("Error during worker message processing: Send Error");
+                                }
+                                args_tx = a;
+                                res_rx = r;
                             }
-                            <WorkerProcess<T, R, P>>::kill(&mut handle);
-                            break;
+                            Err(e) => {
+                                error!("Error during worker message processing: {}", e);
+                                if sender.send(Err(e.clone())).is_err() {
+                                    error!("Error during worker message processing: Send Error");
+                                }
+                                break;
+                            }
                         }
                     }
-                },
+                }
                 Err(e) => {
                     error!("Can't start process: {}", e);
                 }
@@ -243,6 +254,7 @@ mod tests {
     use futures_timer::Delay;
     use procspawn::{self};
     use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
     use tokio::runtime::Builder;
 
     // Code from procspawn::enable_test_support!();
@@ -287,8 +299,12 @@ mod tests {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
-            let pool =
-                WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(1000),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
             assert_eq!(
                 pool.process(Message::Delay(100)).await.unwrap(),
                 Response::Foo(100)
@@ -302,8 +318,12 @@ mod tests {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
-            let pool =
-                WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(1000),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..10 {
                 futures.push((i, pool.process(Message::Delay(i * 100))));
@@ -321,8 +341,12 @@ mod tests {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
-            let pool =
-                WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(450));
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(450),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..5 {
                 futures.push((i, pool.process(Message::Delay(i * 300))));

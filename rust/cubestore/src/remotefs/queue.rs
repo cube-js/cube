@@ -5,6 +5,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 use core::fmt;
 use deadqueue::unlimited;
+use futures::future::join_all;
 use log::error;
 use smallvec::alloc::fmt::Formatter;
 use std::collections::HashSet;
@@ -74,10 +75,11 @@ impl QueueRemoteFs {
         })
     }
 
-    pub fn start_processing_loops(queue_remote_fs: Arc<Self>) {
+    pub async fn wait_processing_loops(queue_remote_fs: Arc<Self>) -> Result<(), CubeError> {
+        let mut futures = Vec::new();
         for _ in 0..queue_remote_fs.config.upload_concurrency() {
             let to_move = queue_remote_fs.clone();
-            tokio::spawn(async move {
+            futures.push(tokio::spawn(async move {
                 let mut stopped_rx = to_move.stopped_rx.clone();
                 loop {
                     let to_process = tokio::select! {
@@ -96,12 +98,12 @@ impl QueueRemoteFs {
                         error!("Error during upload: {:?}", err);
                     }
                 }
-            });
+            }));
         }
 
         for _ in 0..queue_remote_fs.config.download_concurrency() {
             let to_move = queue_remote_fs.clone();
-            tokio::spawn(async move {
+            futures.push(tokio::spawn(async move {
                 let mut stopped_rx = to_move.stopped_rx.clone();
                 loop {
                     let to_process = tokio::select! {
@@ -120,13 +122,18 @@ impl QueueRemoteFs {
                         error!("Error during download: {:?}", err);
                     }
                 }
-            });
+            }));
         }
 
         let to_move = queue_remote_fs.clone();
-        tokio::task::spawn(async move {
+        futures.push(tokio::task::spawn(async move {
             to_move.cleanup_loop().await;
-        });
+        }));
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
     }
 
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {

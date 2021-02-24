@@ -1663,12 +1663,15 @@ impl RocksMetaStore {
         Ok(spawn_res)
     }
 
-    pub fn run_upload_loop(meta_store: Arc<Self>) {
-        meta_store.upload_loop.process(
-            meta_store.clone(),
-            async move |_| Ok(Delay::new(Duration::from_secs(60)).await),
-            async move |m, _| m.run_upload().await,
-        );
+    pub async fn wait_upload_loop(meta_store: Arc<Self>) {
+        meta_store
+            .upload_loop
+            .process(
+                meta_store.clone(),
+                async move |_| Ok(Delay::new(Duration::from_secs(60)).await),
+                async move |m, _| m.run_upload().await,
+            )
+            .await;
     }
 
     pub async fn stop_processing_loops(&self) {

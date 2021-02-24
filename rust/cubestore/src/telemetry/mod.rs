@@ -109,7 +109,7 @@ pub fn track_event_spawn(event: String, properties: HashMap<String, String>) {
 
 pub async fn start_track_event_loop() {
     let sender = SENDER.clone();
-    tokio::spawn(async move { sender.send_loop().await });
+    sender.send_loop().await;
 }
 
 pub async fn stop_track_event_loop() {

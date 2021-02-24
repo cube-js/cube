@@ -1,10 +1,13 @@
 pub mod injection;
+pub mod processing_loop;
 
 use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
 use crate::config::injection::{get_service, get_service_typed, DIService, Injector, InjectorRef};
+use crate::config::processing_loop::ProcessingLoop;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
+use crate::mysql::{MySqlAuth, MySqlAuthDefaultImpl, MySqlServer};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::gcs::GCSRemoteFs;
@@ -17,8 +20,9 @@ use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
-use log::debug;
+use futures::future::join_all;
 use log::Level;
+use log::{debug, error};
 use mockall::automock;
 use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
@@ -31,6 +35,7 @@ use tokio::time::{timeout_at, Duration, Instant};
 
 #[derive(Clone)]
 pub struct CubeServices {
+    pub injector: Arc<Injector>,
     pub sql_service: Arc<dyn SqlService>,
     pub scheduler: Arc<SchedulerImpl>,
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
@@ -46,19 +51,61 @@ pub struct WorkerServices {
 
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
-        self.cluster.start_processing_loops().await;
-        QueueRemoteFs::start_processing_loops(self.remote_fs.clone());
+        let services = self.clone();
+        tokio::spawn(async move {
+            if let Err(e) = services.wait_processing_loops().await {
+                error!("Error in processing loop: {}", e);
+            }
+        });
+        Ok(())
+    }
+
+    pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
+        let mut futures = Vec::new();
+        let cluster = self.cluster.clone();
+        futures.push(tokio::spawn(async move {
+            cluster.wait_processing_loops().await
+        }));
+        let remote_fs = self.remote_fs.clone();
+        futures.push(tokio::spawn(async move {
+            QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
+        }));
         if !self.cluster.is_select_worker() {
-            RocksMetaStore::run_upload_loop(self.rocks_meta_store.clone().unwrap());
+            let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
+            futures.push(tokio::spawn(async move {
+                RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
+                Ok(())
+            }));
             let cluster = self.cluster.clone();
-            tokio::spawn(async move { ClusterImpl::listen_on_metastore_port(cluster).await });
+            futures.push(tokio::spawn(async move {
+                ClusterImpl::listen_on_metastore_port(cluster).await
+            }));
             let scheduler = self.scheduler.clone();
-            tokio::spawn(async move { SchedulerImpl::run_scheduler(scheduler).await });
+            futures.push(tokio::spawn(async move {
+                SchedulerImpl::run_scheduler(scheduler).await
+            }));
+            if self.injector.has_service_typed::<MySqlServer>().await {
+                let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
+                futures.push(tokio::spawn(
+                    async move { mysql_server.processing_loop().await },
+                ));
+            }
         } else {
             let cluster = self.cluster.clone();
-            tokio::spawn(async move { ClusterImpl::listen_on_worker_port(cluster).await });
+            futures.push(tokio::spawn(async move {
+                ClusterImpl::listen_on_worker_port(cluster).await
+            }));
         }
-        start_track_event_loop().await;
+        futures.push(tokio::spawn(async move {
+            start_track_event_loop().await;
+            Ok(())
+        }));
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(())
     }
 
@@ -112,9 +159,7 @@ pub trait ConfigObj: DIService {
 
     fn job_runners_count(&self) -> usize;
 
-    fn bind_port(&self) -> u16;
-
-    fn bind_address(&self) -> &str;
+    fn bind_address(&self) -> &Option<String>;
 
     fn query_timeout(&self) -> u64;
 
@@ -151,8 +196,7 @@ pub struct ConfigObjImpl {
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
-    pub bind_port: u16,
-    pub bind_address: String,
+    pub bind_address: Option<String>,
     pub query_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
@@ -193,11 +237,7 @@ impl ConfigObj for ConfigObjImpl {
         self.job_runners_count
     }
 
-    fn bind_port(&self) -> u16 {
-        self.bind_port
-    }
-
-    fn bind_address(&self) -> &str {
+    fn bind_address(&self) -> &Option<String> {
         &self.bind_address
     }
 
@@ -298,13 +338,12 @@ impl Config {
                     .ok()
                     .map(|v| v.parse::<usize>().unwrap())
                     .unwrap_or(4),
-                bind_address: env::var("CUBESTORE_BIND_ADDR")
-                    .ok()
-                    .unwrap_or("0.0.0.0".to_string()),
-                bind_port: env::var("CUBESTORE_PORT")
-                    .ok()
-                    .map(|v| v.parse::<u16>().unwrap())
-                    .unwrap_or(3306u16),
+                bind_address: Some(env::var("CUBESTORE_BIND_ADDR").ok().unwrap_or(
+                    format!("0.0.0.0:{}", env::var("CUBESTORE_PORT")
+                            .ok()
+                            .map(|v| v.parse::<u16>().unwrap())
+                            .unwrap_or(3306u16)),
+                )),
                 query_timeout: env::var("CUBESTORE_QUERY_TIMEOUT")
                     .ok()
                     .map(|v| v.parse::<u64>().unwrap())
@@ -359,8 +398,7 @@ impl Config {
                 },
                 select_worker_pool_size: 0,
                 job_runners_count: 4,
-                bind_port: 3306,
-                bind_address: "0.0.0.0".to_string(),
+                bind_address: None,
                 query_timeout: 15,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
@@ -540,7 +578,11 @@ impl Config {
         Ok(self.injector.get_service("original_remote_fs").await)
     }
 
-    pub async fn configure(&self) -> CubeServices {
+    pub fn injector(&self) -> Arc<Injector> {
+        self.injector.clone()
+    }
+
+    pub async fn configure_injector(&self) {
         self.configure_remote_fs().await;
 
         self.injector
@@ -706,7 +748,33 @@ impl Config {
             })
             .await;
 
+        if self.config_obj.bind_address().is_some() {
+            self.injector
+                .register_typed::<dyn MySqlAuth, _, _, _>(async move |_| {
+                    Arc::new(MySqlAuthDefaultImpl)
+                })
+                .await;
+
+            self.injector
+                .register_typed::<MySqlServer, _, _, _>(async move |i| {
+                    MySqlServer::new(
+                        i.get_service_typed::<dyn ConfigObj>()
+                            .await
+                            .bind_address()
+                            .as_ref()
+                            .unwrap()
+                            .to_string(),
+                        i.get_service_typed().await,
+                        i.get_service_typed().await,
+                    )
+                })
+                .await;
+        }
+    }
+
+    pub async fn cube_services(&self) -> CubeServices {
         CubeServices {
+            injector: self.injector.clone(),
             sql_service: self.injector.get_service_typed().await,
             scheduler: self.injector.get_service_typed().await,
             rocks_meta_store: if self.injector.has_service_typed::<RocksMetaStore>().await {
@@ -718,6 +786,11 @@ impl Config {
             cluster: self.injector.get_service_typed().await,
             remote_fs: self.injector.get_service_typed().await,
         }
+    }
+
+    pub async fn configure(&self) -> CubeServices {
+        self.configure_injector().await;
+        self.cube_services().await
     }
 
     pub fn configure_worker(&self) {

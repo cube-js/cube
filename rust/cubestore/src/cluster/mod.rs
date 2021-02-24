@@ -498,14 +498,19 @@ impl ClusterImpl {
         }
     }
 
-    pub async fn start_processing_loops(&self) {
+    pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
+        let mut futures = Vec::new();
         #[cfg(not(target_os = "windows"))]
         if self.config_obj.select_worker_pool_size() > 0 {
             let mut pool = self.select_process_pool.write().await;
-            *pool = Some(Arc::new(WorkerPool::new(
+            let arc = Arc::new(WorkerPool::new(
                 self.config_obj.select_worker_pool_size(),
                 Duration::from_secs(self.config_obj.query_timeout()),
-            )));
+            ));
+            *pool = Some(arc.clone());
+            futures.push(tokio::spawn(
+                async move { arc.wait_processing_loops().await },
+            ));
         }
 
         for _ in 0..self.config_obj.job_runners_count() {
@@ -519,10 +524,15 @@ impl ClusterImpl {
                 notify: self.job_notify.clone(),
                 jobs_enabled: self.jobs_enabled.clone(),
             };
-            tokio::spawn(async move {
+            futures.push(tokio::spawn(async move {
                 job_runner.processing_loop().await;
-            });
+            }));
         }
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
