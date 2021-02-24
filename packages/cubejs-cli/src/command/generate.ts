@@ -38,7 +38,7 @@ const generate = async (options) => {
   }
 
   logStage('Fetching DB schema');
-  const serverPackage = await requireFromPackage<{ ServerContainer: any }>(
+  const serverPackage = requireFromPackage<{ ServerContainer: any }>(
     '@cubejs-backend/server',
     {
       relative,
@@ -70,7 +70,7 @@ const generate = async (options) => {
   }
 
   logStage('Generating schema files');
-  const ScaffoldingTemplate = await requireFromPackage<any>(
+  const ScaffoldingTemplate = requireFromPackage<any>(
     '@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate.js',
     {
       relative,

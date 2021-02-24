@@ -537,7 +537,7 @@ describe('ScaffoldingSchema', () => {
       dataSource: 'testDataSource',
       preAggregations: {
         main: {
-          type: `originalSql`
+          type: 'originalSql'
         }
       }
     };

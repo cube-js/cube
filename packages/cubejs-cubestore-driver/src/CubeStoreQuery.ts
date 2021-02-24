@@ -1,7 +1,7 @@
-const moment = require('moment-timezone');
-const { BaseQuery, BaseFilter, UserError } = require('@cubejs-backend/schema-compiler');
+import moment from 'moment-timezone';
+import { BaseFilter, BaseQuery, UserError } from '@cubejs-backend/schema-compiler';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
   week: 'week',
   hour: 'hour',
@@ -12,72 +12,72 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class CubeStoreFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
+  public likeIgnoreCase(column, not, param) {
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
   }
 }
 
-class CubeStoreQuery extends BaseQuery {
-  newFilter(filter) {
+export class CubeStoreQuery extends BaseQuery {
+  public newFilter(filter) {
     return new CubeStoreFilter(this, filter);
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     return `CONVERT_TZ(${field}, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
-  timeStampParam() {
-    return `to_timestamp(?)`;
+  public timeStampParam() {
+    return 'to_timestamp(?)';
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `CAST(${value} as TIMESTAMP)`; // TODO
   }
 
-  inDbTimeZone(date) {
+  public inDbTimeZone(date) {
     return this.inIntegrationTimeZone(date).clone().utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `to_timestamp(${value})`;
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     return `DATE_SUB(${date}, INTERVAL ${interval})`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     return `DATE_ADD(${date}, INTERVAL ${interval})`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  escapeColumnName(name) {
+  public escapeColumnName(name) {
     return `\`${name}\``;
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select to_timestamp('${from}') date_from, to_timestamp('${to}') date_to`
     ).join(' UNION ALL ');
     return values;
   }
 
-  concatStringsSql(strings) {
+  public concatStringsSql(strings) {
     return `CONCAT(${strings.join(', ')})`;
   }
 
-  unixTimestampSql() {
-    return `UNIX_TIMESTAMP()`;
+  public unixTimestampSql() {
+    return 'UNIX_TIMESTAMP()';
   }
 
-  wrapSegmentForDimensionSelect(sql) {
+  public wrapSegmentForDimensionSelect(sql) {
     return `IF(${sql}, 1, 0)`;
   }
 
-  preAggregationTableName(cube, preAggregationName, skipSchema) {
+  public preAggregationTableName(cube, preAggregationName, skipSchema) {
     const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
     if (name.length > 64) {
       throw new UserError(`MySQL can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
@@ -85,14 +85,12 @@ class CubeStoreQuery extends BaseQuery {
     return name;
   }
 
-  hllMerge(sql) {
+  public hllMerge(sql) {
     return `cardinality(merge(${sql}))`;
   }
 
-  countDistinctApprox(sql) {
+  public countDistinctApprox(sql) {
     // TODO: We should throw an error, but this gets called even when only `hllMerge` result is used.
     return `approx_distinct_is_unsupported_in_cubestore(${sql}))`;
   }
 }
-
-module.exports = CubeStoreQuery;

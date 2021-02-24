@@ -11,29 +11,41 @@
   "engines": {
     "node": ">=10.8.0"
   },
-  "main": "driver/CubeStoreDriver.js",
-  "typings": "driver/index.d.ts",
+  "files": [
+    "README.md",
+    "dist/src/*"
+  ],
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
-    "lint": "eslint driver/*.js test/*.js",
-    "lint:fix": "eslint --fix driver/*.js test/*.js"
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/*.ts",
+    "lint:fix": "eslint --fix src/*.ts"
   },
   "dependencies": {
+    "@cubejs-backend/cubestore": "^0.26.33",
     "@cubejs-backend/query-orchestrator": "^0.26.25",
     "@cubejs-backend/schema-compiler": "^0.26.25",
+    "@cubejs-backend/shared": "^0.26.25",
     "generic-pool": "^3.6.0",
     "moment-timezone": "^0.5.31",
     "mysql": "^2.16.0"
   },
   "devDependencies": {
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
-    "jest": "^25.1.0",
-    "testcontainers": "^2.4.0"
+    "@cubejs-backend/linter": "^0.26.13",
+    "@types/generic-pool": "^3.1.9",
+    "@types/mysql": "^2.15.17",
+    "jest": "^26.6.3",
+    "testcontainers": "^6.4.2",
+    "typescript": "^4.1.5"
   },
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   }
 }

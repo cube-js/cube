@@ -1,12 +1,15 @@
-import { startCubeStore } from './process';
+import { startCubeStoreHandler } from './process';
 
 (async () => {
-  const process = await startCubeStore();
+  const handler = await startCubeStoreHandler({
+    stdout: (v) => {
+      console.log(v.toString());
+    },
+    stderr: (v) => {
+      console.log(v.toString());
+    },
+    onRestart: () => console.log('Cube Store Restarting'),
+  });
 
-  process.stdout.on('data', (v) => {
-    console.log(v.toString());
-  });
-  process.stderr.on('data', (v) => {
-    console.log(v.toString());
-  });
+  await handler.acquire();
 })();

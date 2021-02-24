@@ -248,11 +248,20 @@ export class BaseDriver {
     return this.query(loadSql, params, options);
   }
 
+  /**
+   * @param {string} tableName
+   * @param {unknown} [options]
+   * @return {Promise<unknown>}
+   */
   dropTable(tableName, options) {
     return this.query(`DROP TABLE ${tableName}`, [], options);
   }
 
-  param(/* paramIndex */) {
+  /**
+   * @param {number} paramIndex
+   * @return {string}
+   */
+  param(paramIndex) {
     return '?';
   }
 
@@ -325,14 +334,26 @@ export class BaseDriver {
     return `CREATE TABLE ${quotedTableName} (${columns.join(', ')})`;
   }
 
+  /**
+   * @param {string} columnType
+   * @return {string}
+   */
   toGenericType(columnType) {
     return DbTypeToGenericType[columnType.toLowerCase()] || columnType;
   }
 
+  /**
+   * @param {string} columnType
+   * @return {string}
+   */
   fromGenericType(columnType) {
     return columnType;
   }
 
+  /**
+   * @param {string} identifier
+   * @return {string}
+   */
   quoteIdentifier(identifier) {
     return `"${identifier}"`;
   }

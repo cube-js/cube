@@ -1,6 +1,6 @@
-import { BaseDriver } from "@cubejs-backend/query-orchestrator";
+import type { Options as PoolConfiguration } from 'generic-pool';
 
-interface ConnectionConfig {
+export interface ConnectionConfig {
   /**
    * The hostname of the database you are connecting to. (Default: localhost)
    */
@@ -20,10 +20,9 @@ interface ConnectionConfig {
    * The password of that MySQL user
    */
   password?: string;
-}
 
-declare module "@cubejs-backend/cubestore-driver" {
-  export default class CubeStoreDriver extends BaseDriver {
-    constructor(options?: ConnectionConfig);
-  }
+  /**
+   * Pool options
+   */
+  pool?: PoolConfiguration;
 }
