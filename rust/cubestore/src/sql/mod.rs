@@ -30,7 +30,12 @@ use crate::queryplanner::query_executor::QueryExecutor;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
-use chrono::{TimeZone, Utc};
+use chrono::format::Fixed::Nanosecond3;
+use chrono::format::Item::{Fixed, Literal, Numeric, Space};
+use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
+use chrono::format::Pad::Zero;
+use chrono::format::Parsed;
+use chrono::{ParseResult, Utc};
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
@@ -686,14 +691,28 @@ fn extract_data(cell: &Expr, column: &Vec<&Column>, i: usize) -> Result<TableVal
 }
 
 pub fn timestamp_from_string(v: &str) -> Result<TableValue, CubeError> {
-    let result = string_to_timestamp_nanos(v).or_else(|_| {
+    let nanos;
+    if v.ends_with("UTC") {
         // TODO this parsed as nanoseconds instead of milliseconds
-        if let Ok(ts) = Utc.datetime_from_str(v, "%Y-%m-%d %H:%M:%S%.3f UTC") {
-            return Ok(ts.timestamp_nanos());
+        #[rustfmt::skip] // built from "%Y-%m-%d %H:%M:%S%.3f UTC".
+        const FORMAT: [chrono::format::Item; 14] = [Numeric(Year, Zero), Literal("-"), Numeric(Month, Zero), Literal("-"), Numeric(Day, Zero), Space(" "), Numeric(Hour, Zero), Literal(":"), Numeric(Minute, Zero), Literal(":"), Numeric(Second, Zero), Fixed(Nanosecond3), Space(" "), Literal("UTC")];
+        match parse_time(v, &FORMAT).and_then(|p| p.to_datetime_with_timezone(&Utc)) {
+            Ok(ts) => nanos = ts.timestamp_nanos(),
+            Err(_) => return Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
         }
-        return Err(CubeError::user(format!("Can't parse timestamp: {}", v)));
-    });
-    Ok(TableValue::Timestamp(TimestampValue::new(result?)))
+    } else {
+        match string_to_timestamp_nanos(v) {
+            Ok(ts) => nanos = ts,
+            Err(_) => return Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
+        }
+    }
+    Ok(TableValue::Timestamp(TimestampValue::new(nanos)))
+}
+
+fn parse_time(s: &str, format: &[chrono::format::Item]) -> ParseResult<Parsed> {
+    let mut p = Parsed::new();
+    chrono::format::parse(&mut p, s, format.into_iter())?;
+    Ok(p)
 }
 
 fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
