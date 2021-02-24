@@ -1,4 +1,3 @@
-import { memo } from 'react';
 import styled from 'styled-components';
 
 const POSITIONS = [
@@ -134,27 +133,33 @@ const Centered = styled.div`
   height: 100%;
 `;
 
-function CubeLoader({ size = 80 }) {
-  return (
-    <Centered>
-      <div
-        role="img"
-        aria-label="Loading animation"
-        style={{
-          position: 'relative',
-          width: size,
-          height: size * 1.1388888889,
-        }}
-      >
-        <Cube style={{ transform: 'translate(0%, 72.5%)' }} />
-        <Cube style={{ transform: 'translate(98%, 72.5%)' }} />
-        <Cube style={{ transform: 'translate(49%, 96.5%)' }} />
-        <Cube index={0} />
-        <Cube index={1} />
-        <Cube index={2} />
-      </div>
-    </Centered>
+function CubeLoader({ size = 80, full = true }) {
+  const img = (
+    <div
+      key="loader"
+      role="img"
+      aria-label="Loading animation"
+      style={{
+        position: 'relative',
+        width: size,
+        height: size * 1.1388888889,
+        margin: '0 auto',
+      }}
+    >
+      <Cube style={{ transform: 'translate(0%, 72.5%)' }} />
+      <Cube style={{ transform: 'translate(98%, 72.5%)' }} />
+      <Cube style={{ transform: 'translate(49%, 96.5%)' }} />
+      <Cube index={0} />
+      <Cube index={1} />
+      <Cube index={2} />
+    </div>
   );
+
+  if (full) {
+    return <Centered>{img}</Centered>;
+  }
+
+  return img;
 }
 
-export default memo(CubeLoader);
+export default CubeLoader;
