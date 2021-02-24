@@ -200,15 +200,12 @@ jobs:
           - x86_64-apple-darwin
         include:
           - os: ubuntu-latest
-            before_script: cross-ubuntu-gnu
             target: x86_64-unknown-linux-gnu
             executable_name: cubestored
-            # Because it's buggy
-            cross: false
+            cross: true
             strip: true
             compress: false
           - os: ubuntu-latest
-            before_script: cross-ubuntu-musl
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             cross: true
@@ -274,7 +271,7 @@ jobs:
         run: |
           mkdir cubestore-archive
           mkdir cubestore-archive/bin
-          mv rust/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar cvf cubestored-${{ matrix.target }}.tar.gz *
       - name: Upload Binary to Release
