@@ -37,6 +37,7 @@ use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
+use serde::{Deserialize, Serialize};
 
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
@@ -49,7 +50,7 @@ pub trait SqlService: DIService + Send + Sync {
     ) -> Result<DataFrame, CubeError>;
 }
 
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
 }

@@ -187,12 +187,12 @@ impl dyn DIService {
 #[macro_export]
 macro_rules! di_service (
     ( $ty: ident, [ $( $trait_ty: ident ),* ]) => {
-        impl crate::config::injection::DIService for $ty {
+        impl $crate::config::injection::DIService for $ty {
             fn downcast_ref(
                 &self,
                 target: core::any::TypeId,
                 type_name: &'static str,
-                arc: Arc<dyn crate::config::injection::DIService>,
+                arc: Arc<dyn $crate::config::injection::DIService>,
             ) -> Result<core::raw::TraitObject, CubeError> {
                 unsafe {
                     let ptr = Arc::into_raw(arc);
