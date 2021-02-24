@@ -10,13 +10,12 @@ menuOrder: 3
 
 In this guide, you'll learn how to integrate Auth0 authentication with a Cube.js
 deployment. If you already have a pre-existing application on Auth0 that you'd
-like to re-use, please skip ahead to
-[Configure Cube.js to use Auth0](#configure-cube-js-to-use-auth-0).
+like to re-use, please skip ahead to [Configure Cube.js][ref-config-auth0].
 
-## Create and configure an application on Auth0
+## Create an application
 
 First, go to the [Auth0 dashboard][link-auth0-app], and click on the
-'Applications' menu option on the left and then click the '+ Create Application'
+Applications menu option on the left and then click the Create Application
 button.
 
 <p
@@ -29,8 +28,8 @@ button.
   />
 </p>
 
-In the 'Create Application' popup, set the name of your application and select
-'Single Page Web Applications'.
+In the popup, set the name of your application and select Single Page Web
+Applications.
 
 <p
   style="text-align: center"
@@ -54,8 +53,11 @@ dashboard, click on 'Rules' and add a rule to add any custom claims to the JWT.
 
 #### Auth0.js
 
-Take note of the value of `namespace` here, you will need it later to configure
-Cube.js.
+<!-- prettier-ignore-start -->
+[[info |]]
+| Take note of the value of `namespace` here, you will need it later to
+| [configure Cube.js][ref-config-auth0].
+<!-- prettier-ignore-end -->
 
 ```javascript
 function (user, context, callback) {
@@ -72,8 +74,11 @@ function (user, context, callback) {
 
 #### Auth0 SPA SDK
 
-Take note of the value of `namespace` here, you will need it later to configure
-Cube.js.
+<!-- prettier-ignore-start -->
+[[info |]]
+| Take note of the value of `namespace` here, you will need it later to
+| [configure Cube.js][ref-config-auth0].
+<!-- prettier-ignore-end -->
 
 ```javascript
 function (user, context, callback) {
@@ -88,12 +93,12 @@ function (user, context, callback) {
 }
 ```
 
-## Create an API on Auth0
+## Create an API
 
 If you're using the Auth0 SPA SDK, you'll also need to [create an
 API][link-auth0-api]. First, go to the [Auth0 dashboard][link-auth0-app] and
-click on the 'APIs' menu option from the left sidebar, then click the '+ Create
-API' button.
+click on the APIs menu option from the left sidebar, then click the Create API
+button.
 
 <p
   style="text-align: center"
@@ -106,13 +111,7 @@ API' button.
 </p>
 
 In the 'New API' popup, set a name for this API and an identifier (e.g.
-`cubejs`)
-
-<!-- prettier-ignore-start -->
-[[info |]]
-| After creating the API, take note of the Client ID and Secret as you'll need
-| them later.
-<!-- prettier-ignore-end -->
+`cubejs-app`), then click the Create button.
 
 <p
   style="text-align: center"
@@ -123,6 +122,12 @@ In the 'New API' popup, set a name for this API and an identifier (e.g.
   width="80%"
   />
 </p>
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| Take note of the Identifier here, as it is used to
+| [set the JWT Audience option in Cube.js][ref-config-auth0].
+<!-- prettier-ignore-end -->
 
 In your application code, configure your API identifier as the audience when
 initializing Auth0:
@@ -137,7 +142,7 @@ initializing Auth0:
 >
 ```
 
-## Configure Cube.js to use Auth0
+## Configure Cube.js
 
 Now we're ready to configure Cube.js to use Auth0. Go to your Cube.js project
 and open the `.env` file and add the following, replacing the values wrapped in
@@ -171,8 +176,9 @@ Configuration.
 Enter the following values:
 
 - **Auth0 domain**: `<AUTH0-SUBDOMAIN>.auth0.com`
-- **OIDC Client ID**: Retrieve from Auth0 API settings page
-- **OIDC Client Secret**: Retrieve from Auth0 API settings page
+- **OIDC Client ID**: Retrieve from Auth0 Application settings page
+- **OIDC Client Secret**: Retrieve from Auth0 Application settings page
+- **Audience**: Retrieve from Auth0 API settings
 
 Click 'Use Auth0 Discovery Document' to auto-fill the remaining values, then
 click Save.
@@ -194,9 +200,7 @@ click Save.
 <!-- prettier-ignore-end -->
 
 Now click Start; if the login is successful, you should see the code, as well as
-a button called 'Exchange'. Click on it to exchange the token for a JWT, then
-click Next. You should now have a valid JWT. Copy it for use in the next
-section.
+a button called 'Exchange'. Click on it to exchange the code for your tokens:
 
 <p
   style="text-align: center"
@@ -207,6 +211,10 @@ section.
   width="80%"
   />
 </p>
+
+Copy the `access_token` from the response, and use the [JWT.IO
+Debugger][link-jwt-io-debug] to decode the token and verify any custom claims
+were successfully added.
 
 ### Set JWT in Developer Playground
 
@@ -250,7 +258,9 @@ your own Cube.js application.
 [link-auth0-spa-sdk]: https://auth0.com/docs/libraries/auth0-spa-js
 [link-auth0-api]:
   https://auth0.com/docs/tokens/access-tokens#json-web-token-access-tokens
+[link-jwt-io-debug]: https://jwt.io/#debugger-io
 [link-openid-playground]: https://openidconnect.net/
+[ref-config-auth0]: #configure-cube-js
 [ref-sec-ctx]: /security/context
 [gh-cubejs-auth0-example]:
   https://github.com/cube-js/cube.js/tree/master/examples/auth0
