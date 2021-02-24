@@ -1,5 +1,5 @@
 import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { APP_INITIALIZER, NgModule } from '@angular/core';
+import { APP_INITIALIZER, InjectionToken, NgModule } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatGridListModule } from '@angular/material/grid-list';
@@ -41,18 +41,45 @@ import { AddToDashboardDialogComponent } from './explore/add-to-dashboard-dialog
 import { QueryRendererComponent } from './explore/query-renderer/query-renderer.component';
 import apolloClient from '../graphql/client';
 
-const cubejsOptions = {
-  token: 'environment.CUBEJS_API_TOKEN',
-  options: {
-    apiUrl: 'http://localhost:4000/cubejs-api/v1',
-  },
-};
+import { AuthService } from './auth.service';
+
+// const cubejsOptions = of({
+//   token: 'environment.CUBEJS_API_TOKEN',
+//   options: {
+//     apiUrl: 'http://localhost:4000/cubejs-api/v1',
+//   },
+// }).pipe(delay(4000));
 
 export function cubejsClientFactory(http: HttpClient) {
   return () =>
     new Promise((resolve) => {
       setTimeout(() => resolve({ token: '100500' }), 2000);
     });
+}
+
+export type CubejsConfig = {
+  token: string;
+  options?: Object;
+};
+
+export const cubejsOptions: CubejsConfig = {
+  token: 'environment.CUBEJS_API_TOKEN111',
+  options: {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  },
+};
+
+export const CUBEJS_CONFIG = new InjectionToken<CubejsConfig>('config');
+
+function cubejsConfigFactory(authService: AuthService) {
+  // return authService.isAuthorized
+  //   ? {
+  //       token: authService.token,
+  //       options: {
+  //         apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  //       },
+  //     }
+  //   : null;
 }
 
 @NgModule({
@@ -104,11 +131,16 @@ export function cubejsClientFactory(http: HttpClient) {
       deps: [HttpLink],
     },
     {
-      provide: APP_INITIALIZER,
-      useFactory: cubejsClientFactory,
-      deps: [HttpClient],
-      multi: true,
+      provide: CUBEJS_CONFIG,
+      useFactory: () => cubejsConfigFactory,
+      deps: [AuthService],
     },
+    // {
+    //   provide: APP_INITIALIZER,
+    //   useFactory: cubejsClientFactory,
+    //   deps: [HttpClient],
+    //   multi: true,
+    // },
   ],
   bootstrap: [AppComponent],
 })

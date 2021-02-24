@@ -8,6 +8,7 @@ import {
   Query,
   QueryBuilderService,
 } from '@cubejs-client/ngx';
+import {AuthService} from '../auth.service';
 
 import { SettingsDialogComponent } from '../settings-dialog/settings-dialog.component';
 import { AddToDashboardDialogComponent } from './add-to-dashboard-dialog/add-to-dashboard-dialog.component';
@@ -52,7 +53,8 @@ export class ExploreComponent implements OnInit, OnDestroy {
     public cubejsClient: CubejsClient,
     public queryBuilder: QueryBuilderService,
     public dialog: MatDialog,
-    private route: ActivatedRoute
+    public authService: AuthService,
+    private route: ActivatedRoute,
   ) {
     queryBuilder.setCubejsClient(cubejsClient);
     this.chartTypeMap = this.chartTypeToIcon.reduce(

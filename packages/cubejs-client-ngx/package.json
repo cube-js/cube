@@ -28,9 +28,12 @@
   "scripts": {
     "build": "yarn ng build && rm dist/package.json",
     "ng:watch": "yarn ng build --watch && rm dist/package.json",
-    "dev": "yarn build && yalc publish --push"
+    "dev": "yarn build && yalc publish --push",
+    "lint": "linter src/* --ext .ts",
+    "lint:fix": "linter --fix src/* --ext .ts"
   },
   "devDependencies": {
+    "@cubejs-backend/linter": "^0.26.13",
     "@angular-devkit/build-angular": "^0.1000.3",
     "@angular-devkit/build-ng-packagr": "^0.1000.3",
     "@angular/cli": "^10.0.3",
