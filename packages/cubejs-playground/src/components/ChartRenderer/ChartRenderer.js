@@ -120,7 +120,7 @@ export default function ChartRenderer({
   const loading =
     !isChartRendererReady || queryHasMissingMembers || isQueryLoading;
 
-  const extras = () => {
+  const renderExtras = () => {
     if (queryError) {
       return <div>{queryError?.toString()}</div>;
     }
@@ -158,7 +158,7 @@ export default function ChartRenderer({
         />
       )}
 
-      {extras()}
+      {renderExtras()}
 
       <ChartContainer invisible={invisible}>
         <iframe

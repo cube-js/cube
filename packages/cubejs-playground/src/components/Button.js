@@ -14,6 +14,16 @@ const StyledButton = styled(AntdButton)`
       color: var(--primary-color);
     }
     
+    &:disabled {
+      color: var(--disabled-color);
+      border-color: var(--disabled-color); 
+      
+      &:hover, &:active, &:focus {
+        color: var(--disabled-color);
+        border-color: var(--disabled-color); 
+      }
+    }
+    
     &.ant-btn-primary:not([disabled]) {
       background: var(--primary-color);
       color: white;

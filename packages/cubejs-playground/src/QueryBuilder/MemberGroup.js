@@ -7,6 +7,7 @@ import { SectionRow } from '../components';
 import MissingMemberTooltip from './MissingMemberTooltip';
 
 const MemberGroup = ({
+  disabled = false,
   members,
   availableMembers,
   missingMembers,
@@ -20,10 +21,13 @@ const MemberGroup = ({
       const buttonGroup = (
         <RemoveButtonGroup
           key={m.index || m.name}
+          disabled={disabled}
+          className={disabled ? 'disabled' : null}
           color={isMissing ? 'danger' : 'primary'}
           onRemoveClick={() => updateMethods.remove(m)}
         >
           <MemberDropdown
+            disabled={disabled}
             availableMembers={availableMembers}
             onClick={(updateWith) => updateMethods.update(m, updateWith)}
           >
@@ -41,10 +45,11 @@ const MemberGroup = ({
       );
     })}
     <MemberDropdown
-      onClick={(m) => updateMethods.add(m)}
+      disabled={disabled}
       availableMembers={availableMembers}
       type="dashed"
       icon={<PlusOutlined />}
+      onClick={(m) => updateMethods.add(m)}
     >
       {!members.length ? addMemberName : null}
     </MemberDropdown>

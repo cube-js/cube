@@ -36,6 +36,7 @@ const DateRanges = [
 
 const TimeGroup = ({
   members = [],
+  disabled = false,
   availableMembers,
   missingMembers,
   addMemberName,
@@ -85,14 +86,17 @@ const TimeGroup = ({
 
         const buttonGroup = (
           <RemoveButtonGroup
+            disabled={disabled}
+            className={disabled ? 'disabled' : null}
             color={isMissing ? 'danger' : 'primary'}
             onRemoveClick={() => updateMethods.remove(m)}
           >
             <MemberDropdown
+              disabled={disabled}
+              availableMembers={availableMembers}
               onClick={(updateWith) =>
                 updateMethods.update(m, { ...m, dimension: updateWith })
               }
-              availableMembers={availableMembers}
             >
               {m.dimension.title}
             </MemberDropdown>
@@ -111,6 +115,7 @@ const TimeGroup = ({
             <Label>for</Label>
 
             <ButtonDropdown
+              disabled={disabled}
               overlay={dateRangeMenu((dateRange) => {
                 if (dateRange.value === 'custom') {
                   toggleRangePicker(true);
@@ -130,6 +135,7 @@ const TimeGroup = ({
 
             {isRangePickerVisible || isCustomDateRange ? (
               <RangePicker
+                disabled={disabled}
                 format="YYYY-MM-DD"
                 defaultValue={(parsedDateRange || []).map((date) =>
                   moment(date)
@@ -141,6 +147,7 @@ const TimeGroup = ({
             <Label>by</Label>
 
             <ButtonDropdown
+              disabled={disabled}
               overlay={granularityMenu(m.dimension, (granularity) =>
                 updateMethods.update(m, { ...m, granularity: granularity.name })
               )}

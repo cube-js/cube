@@ -148,6 +148,7 @@ class ChartContainer extends Component {
       history,
       framework,
       setFramework,
+      isFetchingMeta,
       onChartRendererReadyChange,
     } = this.props;
 
@@ -178,7 +179,9 @@ class ChartContainer extends Component {
           }}
         >
           {(chartLibraries[framework] || []).map((library) => (
-            <Menu.Item key={library.value}>{library.title}</Menu.Item>
+            <Menu.Item key={library.value}>
+              test
+            </Menu.Item>
           ))}
         </Menu>
       ) : null;
@@ -189,7 +192,7 @@ class ChartContainer extends Component {
           if (e.key === framework) {
             return;
           }
-          
+
           playgroundAction('Set Framework', { framework: e.key });
           setFramework(e.key);
           onChartRendererReadyChange(false);
@@ -218,16 +221,17 @@ class ChartContainer extends Component {
         ) : null}
         <SectionRow>
           <Button.Group>
-            <Dropdown overlay={frameworkMenu}>
+            <Dropdown overlay={frameworkMenu} disabled={isFetchingMeta}>
               <Button size="small">
                 {frameworkItem?.title}
                 <DownOutlined />
               </Button>
             </Dropdown>
+
             {chartLibrariesMenu ? (
               <Dropdown
                 overlay={chartLibrariesMenu}
-                disabled={!frameworkItem.supported}
+                disabled={!frameworkItem.supported || isFetchingMeta}
               >
                 <Button size="small">
                   {currentLibraryItem?.title}
@@ -236,6 +240,7 @@ class ChartContainer extends Component {
               </Dropdown>
             ) : null}
           </Button.Group>
+
           <Button.Group>
             <Button
               onClick={() => {
@@ -246,10 +251,11 @@ class ChartContainer extends Component {
               }}
               size="small"
               type={!showCode ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               Chart
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show Query');
@@ -260,10 +266,11 @@ class ChartContainer extends Component {
               icon={<ThunderboltOutlined />}
               size="small"
               type={showCode === 'query' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               JSON Query
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show Code');
@@ -272,10 +279,11 @@ class ChartContainer extends Component {
               icon={<CodeOutlined />}
               size="small"
               type={showCode === 'code' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               Code
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show SQL');
@@ -284,10 +292,11 @@ class ChartContainer extends Component {
               icon={<QuestionCircleOutlined />}
               size="small"
               type={showCode === 'sql' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               SQL
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show Cache');
@@ -298,20 +307,22 @@ class ChartContainer extends Component {
               icon={<SyncOutlined />}
               size="small"
               type={showCode === 'cache' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               Cache
             </Button>
           </Button.Group>
+
           <Button
             icon={<CodeSandboxOutlined />}
             size="small"
             onClick={() => playgroundAction('Open Code Sandbox')}
             htmlType="submit"
-            disabled={!frameworkItem.supported}
+            disabled={!frameworkItem.supported || isFetchingMeta}
           >
             Edit
           </Button>
+
           {dashboardSource && (
             <Button
               onClick={async () => {
@@ -347,7 +358,7 @@ class ChartContainer extends Component {
               icon={<PlusOutlined />}
               size="small"
               loading={addingToDashboard}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
               type="primary"
             >
               {addingToDashboard
