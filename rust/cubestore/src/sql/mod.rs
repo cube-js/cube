@@ -41,6 +41,17 @@ use parser::Statement as CubeStoreStatement;
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
     async fn exec_query(&self, query: &str) -> Result<DataFrame, CubeError>;
+
+    async fn exec_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<DataFrame, CubeError>;
+}
+
+#[derive(Default)]
+pub struct SqlQueryContext {
+    pub user: Option<String>,
 }
 
 pub struct SqlServiceImpl {
@@ -260,6 +271,15 @@ impl Dialect for MySqlDialectWithBackTicks {
 #[async_trait]
 impl SqlService for SqlServiceImpl {
     async fn exec_query(&self, q: &str) -> Result<DataFrame, CubeError> {
+        self.exec_query_with_context(SqlQueryContext::default(), q)
+            .await
+    }
+
+    async fn exec_query_with_context(
+        &self,
+        _context: SqlQueryContext,
+        q: &str,
+    ) -> Result<DataFrame, CubeError> {
         if !q.to_lowercase().starts_with("insert") {
             trace!("Query: '{}'", q);
         }

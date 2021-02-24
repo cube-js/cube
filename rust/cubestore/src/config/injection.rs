@@ -104,7 +104,7 @@ pub async fn get_service<T: ?Sized + Send + Sync + 'static>(
         .read()
         .await
         .get(name)
-        .unwrap()
+        .expect(&format!("Service is not found: {}", name))
         .read()
         .await
         .is_none()

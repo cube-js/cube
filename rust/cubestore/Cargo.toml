@@ -70,3 +70,4 @@ tempfile = "3.2.0"
 tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
+mysql_common = "0.26.0"
