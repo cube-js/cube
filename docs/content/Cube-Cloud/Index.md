@@ -12,3 +12,26 @@ high-availability, pre-aggregations management, caching, scalability, real-time
 monitoring and tracing.
 
 [Quickstart](/cloud/quickstart)
+
+## Develop Cube.js projects
+
+You can use Cube Cloud IDE to develop and run Cube.js applications. By connecting your Github account, you can keep your data schema under version control.
+
+![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Cube-Cloud/deploy-screenshot.png)
+
+## Run and Scale Cube.js applications
+
+Cube Cloud provides on-demand scalable infrastructure and pre-aggregations storage. Cube Cloud run hundreds of Cube Store instances to ingest and query pre-aggregations with low latency and high concurrency. It is available to all users on the Standard plan higher.
+
+## Live preview your feature branchs
+
+Cube Cloud can spin up Cube.js API instances to test changes to the data schema
+in feature branches. You can use branch-based development API URLs in your
+frontend application to test changes before shipping them to production.
+
+
+## Inspect Cube.js queries
+
+You can trace and inspect your Cube.js queries to find performance flaws and
+apply optimizations. Cube Cloud also provides tips and suggestions on what
+pre-aggregation should be used.
