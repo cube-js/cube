@@ -7,7 +7,10 @@ menuOrder: 1
 
 This guide covers features and tools you can use to deploy your Cube.js project to Cube Cloud.
 
-## Cube.js CLI
+## Deploy with Git
+Continuous deployment works by connecting a Git repository to a Cube Cloud deployment and keeping the two in sync.
+
+## Deploy with CLI
 
 You can use the CLI to set up continuous deployment for a Git repository. You can also use the CLI to manual deploys changes without continuous deployment.
 
