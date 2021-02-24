@@ -5,6 +5,14 @@ category: Overview
 menuOrder: 1
 ---
 
+<!-- prettier-ignore-start -->
+[[info |]]
+| [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
+| an account yet, you can [sign up to the waitlist here][link-cube-cloud].
+<!-- prettier-ignore-end -->
+
+[link-cube-cloud]: https://cube.dev/cloud
+
 Cube Cloud offers hosted Cube.js service with extra features for reliability and
 performance. It includes all the core features of Cube.js, while taking care of
 infrastructure concerns such as the number of instances, memory,
