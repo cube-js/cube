@@ -4,16 +4,12 @@ on:
   push:
     paths:
       - '.github/workflows/rust.yml'
-      - '.github/actions/cross-ubuntu-gnu.sh'
-      - '.github/actions/cross-ubuntu-musl.sh'
       - 'rust/**'
     branches-ignore:
       - master
   pull_request:
     paths:
       - '.github/workflows/rust.yml'
-      - '.github/actions/cross-ubuntu-gnu.sh'
-      - '.github/actions/cross-ubuntu-musl.sh'
       - 'rust/**'
 
 jobs:
@@ -102,15 +98,12 @@ jobs:
           - x86_64-apple-darwin
         include:
           - os: ubuntu-latest
-            before_script: cross-ubuntu-gnu
             target: x86_64-unknown-linux-gnu
             executable_name: cubestored
-            # Because it's buggy
-            cross: false
+            cross: true
             strip: true
             compress: false
           - os: ubuntu-latest
-            before_script: cross-ubuntu-musl
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             cross: true
