@@ -125,6 +125,15 @@ export default function ChartRenderer({
       return <div>{queryError?.toString()}</div>;
     }
 
+    if (queryHasMissingMembers) {
+      return (
+        <div>
+          At least of the query members is missing from your data schema. Please
+          update your query or data schema.
+        </div>
+      );
+    }
+
     if (isPreAggregationBuildInProgress) {
       return (
         <Positioner>
