@@ -498,7 +498,7 @@ impl ClusterImpl {
         }
     }
 
-    pub async fn start_processing_loops(&self) {
+    pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
         let mut futures = Vec::new();
         #[cfg(not(target_os = "windows"))]
         if self.config_obj.select_worker_pool_size() > 0 {
