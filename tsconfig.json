@@ -17,6 +17,12 @@
       "path": "packages/cubejs-druid-driver"
     },
     {
+      "path": "rust/"
+    },
+    {
+      "path": "packages/cubejs-cubestore-driver"
+    },
+    {
       "path": "packages/cubejs-server-core"
     },
     {

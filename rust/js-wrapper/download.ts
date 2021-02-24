@@ -50,7 +50,8 @@ export async function streamWithProgress(
 
   return new Promise(
     (resolve) => {
-      response.body.on('end', () => {
+      // Wait before writer will finish, because response can be done earlier then extracting
+      writer.on('finish', () => {
         resolve();
       });
     }

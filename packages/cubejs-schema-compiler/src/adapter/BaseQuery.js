@@ -755,6 +755,10 @@ export class BaseQuery {
     return `SELECT ${this.dateTimeCast('date_from')}, ${this.dateTimeCast('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
+  /**
+   * @param {string} timeDimension
+   * @return {string}
+   */
   timeStampParam(timeDimension) {
     return timeDimension.dateFieldType() === 'string' ? '?' : this.timeStampCast('?');
   }
@@ -1646,6 +1650,10 @@ export class BaseQuery {
     return this.inIntegrationTimeZone(date).clone().utc().format();
   }
 
+  /**
+   * @param {string} field
+   * @return {string}
+   */
   convertTz(field) {
     throw new Error('Not implemented');
   }

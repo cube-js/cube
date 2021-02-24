@@ -33,7 +33,7 @@ export const token = async (options: TokenOptions) => {
     event: 'Generate Token'
   });
 
-  const cubejsServer = await requireFromPackage<any>('@cubejs-backend/server', {
+  const cubejsServer = requireFromPackage<any>('@cubejs-backend/server', {
     relative: isDockerImage()
   });
   const { expiry = defaultExpiry, secret = cubejsServer.apiSecret() } = options;
