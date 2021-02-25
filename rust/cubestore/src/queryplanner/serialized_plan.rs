@@ -632,14 +632,20 @@ impl SerializedPlan {
 
                 let mut partition_snapshots = Vec::new();
                 for (partition, chunks) in partitions.into_iter() {
-                    if let (Some(ref min_row), Some(ref max_row)) = (
-                        partition.get_row().get_min_val(),
-                        partition.get_row().get_max_val(),
-                    ) {
-                        if !partition_filter.can_match(min_row.values(), max_row.values()) {
-                            pruned_partitions += 1;
-                            continue;
-                        }
+                    let min_row = partition
+                        .get_row()
+                        .get_min_val()
+                        .as_ref()
+                        .map(|r| r.values().as_slice());
+                    let max_row = partition
+                        .get_row()
+                        .get_max_val()
+                        .as_ref()
+                        .map(|r| r.values().as_slice());
+
+                    if !partition_filter.can_match(min_row, max_row) {
+                        pruned_partitions += 1;
+                        continue;
                     }
 
                     partition_snapshots.push(PartitionSnapshot { chunks, partition });

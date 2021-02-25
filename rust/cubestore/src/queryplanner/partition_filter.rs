@@ -28,8 +28,20 @@ impl PartitionFilter {
 
     /// Returns whether any rows between `min_row` and `max_row` could potentially match the filter.
     /// When this returns false, the corresponding rows can safely be ignored.
-    pub fn can_match(&self, min_row: &[TableValue], max_row: &[TableValue]) -> bool {
-        self.min_max.is_empty() || self.min_max.iter().any(|mm| mm.can_match(min_row, max_row))
+    pub fn can_match(
+        &self,
+        min_row: Option<&[TableValue]>,
+        max_row: Option<&[TableValue]>,
+    ) -> bool {
+        if self.min_max.is_empty() {
+            return true;
+        }
+        match (min_row, max_row) {
+            (Some(mn), Some(mx)) => self.min_max.iter().any(|mm| mm.can_match(mn, mx)),
+            (Some(mn), None) => self.min_max.iter().any(|mm| mm.can_match_min(mn)),
+            (None, Some(mx)) => self.min_max.iter().any(|mm| mm.can_match_max(mx)),
+            (None, None) => true,
+        }
     }
 }
 
@@ -40,6 +52,46 @@ struct MinMaxCondition {
 }
 
 impl MinMaxCondition {
+    /// Assuming max is unbounded.
+    pub fn can_match_min(&self, min_row: &[TableValue]) -> bool {
+        let n = self.max.len();
+        assert_eq!(n, min_row.len());
+        for i in 0..n {
+            if !self.max[i].is_some() {
+                return true;
+            }
+            let ord = cmp_same_types(self.max[i].as_ref().unwrap(), &min_row[i]);
+            if ord < Ordering::Equal {
+                return false;
+            }
+            if ord > Ordering::Equal {
+                return true;
+            }
+            // continue if equal.
+        }
+        return true;
+    }
+
+    /// Assuming min is unbounded.
+    pub fn can_match_max(&self, max_row: &[TableValue]) -> bool {
+        let n = self.min.len();
+        assert_eq!(n, max_row.len());
+        for i in 0..n {
+            if !self.min[i].is_some() {
+                return true;
+            }
+            let ord = cmp_same_types(&max_row[i], self.min[i].as_ref().unwrap());
+            if ord < Ordering::Equal {
+                return false;
+            }
+            if ord > Ordering::Equal {
+                return true;
+            }
+            // continue if equal.
+        }
+        return true;
+    }
+
     pub fn can_match(&self, min_row: &[TableValue], max_row: &[TableValue]) -> bool {
         let n = self.min.len();
         assert_eq!(n, min_row.len());
@@ -542,8 +594,8 @@ mod tests {
             }]
         );
 
-        assert!(!f.can_match(&[TableValue::Int(1)], &[TableValue::Int(1)]));
-        assert!(f.can_match(&[TableValue::Null], &[TableValue::Int(1)]));
+        assert!(!f.can_match(Some(&[TableValue::Int(1)]), Some(&[TableValue::Int(1)])));
+        assert!(f.can_match(Some(&[TableValue::Null]), Some(&[TableValue::Int(1)])));
 
         let f = extract("a != NULL");
         assert_eq!(
@@ -722,7 +774,52 @@ mod tests {
             &[Expr::Literal(ScalarValue::Boolean(Some(true)))],
         );
         assert_eq!(f.min_max, vec![]);
-        assert!(f.can_match(&[], &[]));
+        assert!(f.can_match(Some(&[]), Some(&[])));
+    }
+
+    #[test]
+    fn test_missing_min_or_max() {
+        let mm = MinMaxCondition {
+            min: vec![Some(TableValue::Int(10))],
+            max: vec![Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(9)]));
+        assert!(mm.can_match_min(&[TableValue::Int(10)]));
+        assert!(mm.can_match_min(&[TableValue::Int(11)]));
+        assert!(!mm.can_match_min(&[TableValue::Int(12)]));
+
+        assert!(!mm.can_match_max(&[TableValue::Int(9)]));
+        assert!(mm.can_match_max(&[TableValue::Int(10)]));
+        assert!(mm.can_match_max(&[TableValue::Int(11)]));
+        assert!(mm.can_match_max(&[TableValue::Int(12)]));
+
+        let mm = MinMaxCondition {
+            min: vec![Some(TableValue::Int(0)), Some(TableValue::Int(10))],
+            max: vec![Some(TableValue::Int(0)), Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(9)]));
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(10)]));
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(11)]));
+        assert!(!mm.can_match_min(&[TableValue::Int(0), TableValue::Int(12)]));
+
+        assert!(!mm.can_match_max(&[TableValue::Int(0), TableValue::Int(9)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(10)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(11)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(12)]));
+
+        let mm = MinMaxCondition {
+            min: vec![Some(TableValue::Int(0)), Some(TableValue::Int(10))],
+            max: vec![Some(TableValue::Int(1)), Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(-1), TableValue::Int(12)]));
+        assert!(mm.can_match_max(&[TableValue::Int(3), TableValue::Int(9)]));
+
+        let mm = MinMaxCondition {
+            min: vec![None, Some(TableValue::Int(10))],
+            max: vec![None, Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(12)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(9)]));
     }
 
     #[test]
