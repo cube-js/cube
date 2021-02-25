@@ -25,7 +25,7 @@ monitoring and tracing.
 
 You can use Cube Cloud IDE to develop and run Cube.js applications. By connecting your Github account, you can keep your data schema under version control.
 
-![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Cube-Cloud/deploy-screenshot.png)
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/cube-ide.png)
 
 ## Run and Scale Cube.js applications
 
