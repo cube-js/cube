@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.36](https://github.com/cube-js/cube.js/compare/v0.26.35...v0.26.36) (2021-02-25)
+
+
+### Bug Fixes
+
+* this.externalDriverFactory is not a function ([#2216](https://github.com/cube-js/cube.js/issues/2216)) ([e47d152](https://github.com/cube-js/cube.js/commit/e47d1523c0278d1087eb8f209021e6a5097dd38a))
+* **cubestore:** speed up ingestion ([#2205](https://github.com/cube-js/cube.js/issues/2205)) ([22685ea](https://github.com/cube-js/cube.js/commit/22685ea2d313893479ee9eaf88073158b0059c91))
+
+
+
+
+
 ## [0.26.35](https://github.com/cube-js/cube.js/compare/v0.26.34...v0.26.35) (2021-02-25)
 
 
