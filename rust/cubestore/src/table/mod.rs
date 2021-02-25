@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
 pub(crate) mod parquet;
+pub mod data;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub enum TableValue {
@@ -152,3 +153,4 @@ pub trait TableStore {
     //     row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
     // ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError>;
 }
+// Dummy change
