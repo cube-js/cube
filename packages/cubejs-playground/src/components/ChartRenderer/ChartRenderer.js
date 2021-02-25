@@ -163,18 +163,6 @@ export default function ChartRenderer({
       );
     }
 
-    if (isPreAggregationBuildInProgress) {
-      return (
-        <Positioner>
-          <RequestMessage>
-            <Text strong style={{ fontSize: 18 }}>
-              Building pre-aggregations...
-            </Text>
-          </RequestMessage>
-        </Positioner>
-      );
-    }
-
     if (loading) {
       return (
         <Positioner>
