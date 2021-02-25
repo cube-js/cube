@@ -149,9 +149,30 @@ export default function ChartRenderer({
     isQueryLoading ||
     isPreAggregationBuildInProgress;
 
-  const extras = () => {
+  const renderExtras = () => {
     if (queryError) {
       return <div>{queryError?.toString()}</div>;
+    }
+
+    if (queryHasMissingMembers) {
+      return (
+        <div>
+          At least of the query members is missing from your data schema. Please
+          update your query or data schema.
+        </div>
+      );
+    }
+
+    if (isPreAggregationBuildInProgress) {
+      return (
+        <Positioner>
+          <RequestMessage>
+            <Text strong style={{ fontSize: 18 }}>
+              Building pre-aggregations...
+            </Text>
+          </RequestMessage>
+        </Positioner>
+      );
     }
 
     if (loading) {
@@ -187,7 +208,7 @@ export default function ChartRenderer({
         />
       )}
 
-      {extras()}
+      {renderExtras()}
 
       <ChartContainer invisible={invisible}>
         <iframe

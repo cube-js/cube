@@ -101,7 +101,7 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
-
+  
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
       dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
@@ -154,6 +154,7 @@ export default function PlaygroundQueryBuilder({
         updatePivotConfig,
         missingMembers,
         refresh,
+        isFetchingMeta
       }) => {
         return (
           <>
@@ -181,7 +182,7 @@ export default function PlaygroundQueryBuilder({
             </Row>
 
             <Divider style={{ margin: 0 }} />
-
+            
             <Row
               justify="space-around"
               align="top"
@@ -194,6 +195,7 @@ export default function PlaygroundQueryBuilder({
                     <Section>
                       <SectionHeader>Measures</SectionHeader>
                       <MemberGroup
+                        disabled={isFetchingMeta}
                         members={measures}
                         availableMembers={availableMeasures}
                         missingMembers={missingMembers}
@@ -208,6 +210,7 @@ export default function PlaygroundQueryBuilder({
                     <Section>
                       <SectionHeader>Dimensions</SectionHeader>
                       <MemberGroup
+                        disabled={isFetchingMeta}
                         members={dimensions}
                         availableMembers={availableDimensions}
                         missingMembers={missingMembers}
@@ -222,6 +225,7 @@ export default function PlaygroundQueryBuilder({
                     <Section>
                       <SectionHeader>Segment</SectionHeader>
                       <MemberGroup
+                        disabled={isFetchingMeta}
                         members={segments}
                         availableMembers={availableSegments}
                         missingMembers={missingMembers}
@@ -236,6 +240,7 @@ export default function PlaygroundQueryBuilder({
                     <Section>
                       <SectionHeader>Time</SectionHeader>
                       <TimeGroup
+                        disabled={isFetchingMeta}
                         members={timeDimensions}
                         availableMembers={availableTimeDimensions}
                         missingMembers={missingMembers}
@@ -251,6 +256,7 @@ export default function PlaygroundQueryBuilder({
                     <Section>
                       <SectionHeader>Filters</SectionHeader>
                       <FilterGroup
+                        disabled={isFetchingMeta}
                         members={filters}
                         availableMembers={availableDimensions.concat(
                           availableMeasures
@@ -344,6 +350,7 @@ export default function PlaygroundQueryBuilder({
                     }}
                     chartLibraries={frameworkChartLibraries}
                     dashboardSource={dashboardSource}
+                    isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
                       if (metaError) {
                         return <FatalError error={metaError} />;
@@ -351,7 +358,7 @@ export default function PlaygroundQueryBuilder({
 
                       return (
                         <ChartRenderer
-                          isChartRendererReady={isChartRendererReady}
+                          isChartRendererReady={isChartRendererReady && !isFetchingMeta}
                           framework={framework}
                           chartingLibrary={chartingLibrary}
                           chartType={chartType}

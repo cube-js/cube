@@ -9,6 +9,7 @@ import MissingMemberTooltip from './MissingMemberTooltip';
 import { SectionRow, Select } from '../components';
 
 const FilterGroup = ({
+  disabled = false,
   members,
   availableMembers,
   addMemberName,
@@ -21,19 +22,22 @@ const FilterGroup = ({
 
       const buttonGroup = (
         <RemoveButtonGroup
+          disabled={disabled}
+          className={disabled ? 'disabled' : null}
           color={isMissing ? 'danger' : 'primary'}
           onRemoveClick={() => updateMethods.remove(m)}
         >
           <MemberDropdown
-            onClick={(updateWith) =>
-              updateMethods.update(m, { ...m, dimension: updateWith })
-            }
+            disabled={disabled}
             availableMembers={availableMembers}
             style={{
               width: 150,
               textOverflow: 'ellipsis',
               overflow: 'hidden',
             }}
+            onClick={(updateWith) =>
+              updateMethods.update(m, { ...m, dimension: updateWith })
+            }
           >
             {m.dimension.title}
           </MemberDropdown>
@@ -49,6 +53,7 @@ const FilterGroup = ({
           )}
 
           <Select
+            disabled={disabled}
             value={m.operator}
             style={{ width: 200 }}
             onChange={(operator) => updateMethods.update(m, { ...m, operator })}
@@ -61,8 +66,9 @@ const FilterGroup = ({
           </Select>
           
           <FilterInput
-            member={m}
             key="filterInput"
+            disabled={disabled}
+            member={m}
             updateMethods={updateMethods}
           />
         </Fragment>
@@ -71,6 +77,7 @@ const FilterGroup = ({
     <MemberDropdown
       availableMembers={availableMembers}
       type="dashed"
+      disabled={disabled}
       icon={<PlusOutlined />}
       onClick={(m) => updateMethods.add({ member: m })}
     >

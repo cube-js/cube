@@ -32,8 +32,8 @@ const MemberDropdown = ({ onClick, availableMembers, ...buttonProps }) => (
 );
 
 MemberDropdown.propTypes = {
-  onClick: PropTypes.func.isRequired,
   availableMembers: PropTypes.array.isRequired,
+  onClick: PropTypes.func.isRequired,
 };
 
 export default MemberDropdown;

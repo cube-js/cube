@@ -99,6 +99,7 @@ export default class QueryBuilder extends React.Component {
       pivotConfig: null,
       validatedQuery: props.query,
       missingMembers: [],
+      isFetchingMeta: false,
       ...props.vizState,
     };
 
@@ -117,6 +118,7 @@ export default class QueryBuilder extends React.Component {
     let metaError = null;
     
     try {
+      this.setState({ isFetchingMeta: true });
       meta = await this.cubejsApi().meta();
     } catch (error) {
       metaError = error;
@@ -136,6 +138,7 @@ export default class QueryBuilder extends React.Component {
       orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
       pivotConfig: ResultSet.getNormalizedPivotConfig(dryRunResponse?.pivotQuery || {}, pivotConfig),
       missingMembers,
+      isFetchingMeta: false
     });
   }
 
@@ -217,7 +220,8 @@ export default class QueryBuilder extends React.Component {
       chartType,
       pivotConfig,
       validatedQuery,
-      missingMembers
+      missingMembers,
+      isFetchingMeta
     } = this.state;
 
     const flatFilters = uniqBy(
@@ -326,6 +330,7 @@ export default class QueryBuilder extends React.Component {
       },
       missingMembers,
       refresh: this.fetchMeta,
+      isFetchingMeta,
       ...queryRendererProps,
     };
   }

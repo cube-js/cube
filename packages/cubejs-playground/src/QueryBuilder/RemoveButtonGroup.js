@@ -6,7 +6,12 @@ import { Button } from '../components';
 const UnstyledRemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group {...props}>
     {children}
-    <Button ghost onClick={onRemoveClick} className="remove-btn">
+    <Button
+      ghost
+      className="remove-btn"
+      disabled={props.disabled}
+      onClick={onRemoveClick}
+    >
       <CloseOutlined />
     </Button>
   </Button.Group>
@@ -15,26 +20,45 @@ const UnstyledRemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
 function color(props) {
   const colorMap = {
     primary: 'primary',
-    danger: 'pink'
+    danger: 'pink',
   };
-  
+
   if (props.color == null) {
     return 'primary';
   }
-  
+
   return colorMap[props.color];
 }
 
 const RemoveButtonGroup = styled(UnstyledRemoveButtonGroup)`
   && {
+    border-radius: calc(var(--border-radius-base) + 1px);
+    
+    .ant-btn {
+      border: none;
+
+      & + .ant-btn {
+        margin-left: 0;
+      }
+    }
+
+    .remove-btn {
+      padding: 8px;
+
+      .anticon {
+        height: 14px;
+        display: block;
+      }
+    }
+  }
+
+  &&:not(.disabled) {
     border: 1px solid var(--${color}-color);
     color: var(--${color}-color);
-    border-radius: calc(var(--border-radius-base) + 1px);
 
     .ant-btn {
       background-color: var(--${color}-9);
       color: var(--${color}-color);
-      border: none;
 
       span {
         color: var(--${color}-color);
@@ -45,26 +69,33 @@ const RemoveButtonGroup = styled(UnstyledRemoveButtonGroup)`
         border: none;
         box-shadow: none;
       }
-
-      & + .ant-btn {
-        margin-left: 0;
-      }
     }
 
     .remove-btn {
       background-color: white !important;
       color: var(--${color}-color);
-      padding: 8px;
 
       &:hover {
         background-color: var(--${color}-8) !important;
       }
+    }
+  }
 
-      .anticon {
-        height: 14px;
-        display: block;
-        vertical-align: initial;
+  &&.disabled {
+    border: 1px solid var(--disabled-color);
+    color: var(--disabled-color);
+
+    .ant-btn {
+      color: var(--disabled-color);
+      border: none;
+
+      span {
+        color: var(--disabled-color);
       }
+    }
+
+    .remove-btn {
+      color: var(--disabled-color);
     }
   }
 `;
