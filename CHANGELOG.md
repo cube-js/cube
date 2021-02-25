@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.34](https://github.com/cube-js/cube.js/compare/v0.26.33...v0.26.34) (2021-02-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** loading state ([#2206](https://github.com/cube-js/cube.js/issues/2206)) ([9f21f44](https://github.com/cube-js/cube.js/commit/9f21f44aa9eec03d66b30345631972b3553ecbd5))
+* **@cubejs-client/playground:** pre-aggregation loader ([6f60988](https://github.com/cube-js/cube.js/commit/6f609885227f0b790aa183349dfe90e0cc5c9891))
+* **@cubejs-client/playground:** slow query, loading position ([#2207](https://github.com/cube-js/cube.js/issues/2207)) ([aa0090a](https://github.com/cube-js/cube.js/commit/aa0090a31d49ad10d5d71eaedda89d582ba14f22))
+
+
+### Features
+
+* **cubestore:** speed up import with faster timestamp parsing ([#2203](https://github.com/cube-js/cube.js/issues/2203)) ([18958aa](https://github.com/cube-js/cube.js/commit/18958aab4597930111211de3e8497040bce9432e))
+
+
+
+
+
 ## [0.26.33](https://github.com/cube-js/cube.js/compare/v0.26.32...v0.26.33) (2021-02-24)
 
 

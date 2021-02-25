@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/docker",
-  "version": "0.26.33",
+  "version": "0.26.34",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -9,7 +9,7 @@
     "@cubejs-backend/athena-driver": "^0.26.25",
     "@cubejs-backend/bigquery-driver": "^0.26.30",
     "@cubejs-backend/clickhouse-driver": "^0.26.25",
-    "@cubejs-backend/cubestore": "^0.26.33",
+    "@cubejs-backend/cubestore": "^0.26.34",
     "@cubejs-backend/cubestore-driver": "^0.26.25",
     "@cubejs-backend/dremio-driver": "^0.26.30",
     "@cubejs-backend/druid-driver": "^0.26.30",
