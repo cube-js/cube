@@ -7,6 +7,7 @@
 #![feature(slice_internals)]
 #![feature(raw)]
 #![feature(total_cmp)]
+#![feature(vec_into_raw_parts)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
