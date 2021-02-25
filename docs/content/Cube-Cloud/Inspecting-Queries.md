@@ -7,4 +7,4 @@ menuOrder: 1
 
 You can inspect your Cube.js queries in Cube Cloud.
 
-![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Cube-Cloud/inspecting-queries.png)
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/inspect-queries.png)
