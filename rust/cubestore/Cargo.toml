@@ -15,6 +15,7 @@ ipc-channel = { version = "0.14.1" }
 
 [dependencies]
 base64 = "0.13.0"
+bumpalo = "3.6.1"
 tokio = { version = "1.0", features = ["full", "rt"] }
 warp = "0.2"
 sqlparser = "0.7.0"
