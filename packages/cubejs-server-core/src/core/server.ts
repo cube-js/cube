@@ -295,21 +295,20 @@ export class CubejsServerCore {
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
     const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
 
-    let externalDriverFactory = null;
-    let externalDialectFactory = null;
-
-    // User defines external dbType, let's use it
-    if (externalDbType) {
-      externalDialectFactory = () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
+    let externalDriverFactory = externalDbType && (
+      () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
         host: process.env.CUBEJS_EXT_DB_HOST,
         database: process.env.CUBEJS_EXT_DB_NAME,
         port: process.env.CUBEJS_EXT_DB_PORT,
         user: process.env.CUBEJS_EXT_DB_USER,
         password: process.env.CUBEJS_EXT_DB_PASS,
-      });
-      externalDialectFactory = () => CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
-        CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
-    } else if (getEnv('devMode')) {
+      })
+    );
+    let externalDialectFactory = () => typeof externalDbType === 'string' &&
+      CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
+      CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
+
+    if (!externalDbType && getEnv('devMode')) {
       const cubeStorePackage = requireFromPackage<{
         isCubeStoreSupported: typeof isCubeStoreSupported,
         CubeStoreDevDriver: typeof CubeStoreDevDriver,

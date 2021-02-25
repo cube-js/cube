@@ -89,6 +89,10 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 
+export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
+
+export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
+
 export type DbTypeFn = (context: RequestContext) => DatabaseType;
 
 export interface CreateOptions {
@@ -101,8 +105,8 @@ export interface CreateOptions {
   logger?: (msg: string, params: any) => void;
   driverFactory?: (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
   dialectFactory?: (context: DialectContext) => BaseQuery;
-  externalDriverFactory?: (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
-  externalDialectFactory?: (context: RequestContext) => BaseQuery;
+  externalDriverFactory?: ExternalDriverFactoryFn;
+  externalDialectFactory?: ExternalDialectFactoryFn;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
