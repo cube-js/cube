@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.37](https://github.com/cube-js/cube.js/compare/v0.26.36...v0.26.37) (2021-02-26)
+
+
+### Features
+
+* Optional SQL cache ([4431520](https://github.com/cube-js/cube.js/commit/443152058d63fee0c699fd436f7d3cc38403e0dd))
+
+
+
+
+
 ## [0.26.36](https://github.com/cube-js/cube.js/compare/v0.26.35...v0.26.36) (2021-02-25)
 
 

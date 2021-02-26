@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.37](https://github.com/cube-js/cube.js/compare/v0.26.36...v0.26.37) (2021-02-26)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dremio-driver:** Typo in error message ([49f0af8](https://github.com/cube-js/cube.js/commit/49f0af84533ceaea0f0074d9ebfc10a1b4bd8274))
+
+
+
+
+
 ## [0.26.35](https://github.com/cube-js/cube.js/compare/v0.26.34...v0.26.35) (2021-02-25)
 
 **Note:** Version bump only for package @cubejs-backend/dremio-driver
