@@ -444,7 +444,6 @@ impl SqlService for SqlServiceImpl {
                 Ok(DataFrame::new(vec![], vec![]))
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
-                scopeguard::defer!(trim_allocs());
                 let logical_plan = self
                     .query_planner
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))

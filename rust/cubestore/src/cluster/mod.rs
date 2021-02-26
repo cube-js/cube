@@ -677,7 +677,6 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
     ) -> Result<SerializedRecordBatchStream, CubeError> {
-        scopeguard::defer!(trim_allocs());
         let start = SystemTime::now();
         debug!("Running select: {:?}", plan_node);
         let to_download = plan_node.files_to_download();
