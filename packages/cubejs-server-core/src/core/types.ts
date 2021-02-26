@@ -132,4 +132,5 @@ export interface CreateOptions {
   contextToDataSourceId?: any;
   dashboardAppPath?: string;
   dashboardAppPort?: number;
+  sqlCache?: boolean;
 }

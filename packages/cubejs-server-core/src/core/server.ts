@@ -353,6 +353,7 @@ export class CubejsServerCore {
         ? devLogger(process.env.CUBEJS_LOG_LEVEL)
         : prodLogger(process.env.CUBEJS_LOG_LEVEL),
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
+      sqlCache: false,
       ...opts,
       jwt: {
         key: getEnv('jwkKey'),
@@ -559,7 +560,8 @@ export class CubejsServerCore {
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
-      allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema
+      allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
+      sqlCache: this.options.sqlCache,
     });
   }
 

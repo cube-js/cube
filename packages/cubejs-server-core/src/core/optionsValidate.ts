@@ -85,7 +85,8 @@ const schemaOptions = Joi.object().keys({
     })
   ),
   allowJsDuplicatePropsInSchema: Joi.boolean(),
-  scheduledRefreshContexts: Joi.func()
+  scheduledRefreshContexts: Joi.func(),
+  sqlCache: Joi.boolean(),
 });
 
 export default (options: any) => {
