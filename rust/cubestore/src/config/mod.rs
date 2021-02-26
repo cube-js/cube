@@ -117,6 +117,13 @@ impl CubeServices {
         if let Some(rocks_meta) = &self.rocks_meta_store {
             rocks_meta.stop_processing_loops().await;
         }
+        if self.injector.has_service_typed::<MySqlServer>().await {
+            self.injector
+                .get_service_typed::<MySqlServer>()
+                .await
+                .stop_processing()
+                .await?;
+        }
         self.scheduler.stop_processing_loops()?;
         stop_track_event_loop().await;
         Ok(())
