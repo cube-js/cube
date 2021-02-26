@@ -99,7 +99,8 @@ impl QueryPlanner for QueryPlannerImpl {
             "Meta query data processing time: {:?}",
             execution_time.elapsed()?
         );
-        let data_frame = batch_to_dataframe(&results)?;
+        let data_frame =
+            tokio::task::spawn_blocking(move || batch_to_dataframe(&results)).await??;
         Ok(data_frame)
     }
 }

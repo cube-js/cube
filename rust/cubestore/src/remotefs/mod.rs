@@ -13,7 +13,7 @@ use log::debug;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
 use tokio::sync::{Mutex, RwLock};
 
@@ -105,14 +105,17 @@ impl RemoteFs for LocalDirRemoteFs {
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let local_file = self.dir.as_path().join(remote_path);
+        let mut local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
         fs::create_dir_all(&downloads_dir).await?;
         if !local_file.exists() {
             debug!("Downloading {}", remote_path);
             let remote_dir = self.remote_dir.read().await;
-            let temp_path = NamedTempFile::new_in(&downloads_dir)?.into_temp_path();
+            let temp_path =
+                tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dir))
+                    .await??
+                    .into_temp_path();
             fs::copy(remote_dir.as_path().join(remote_path), &temp_path)
                 .await
                 .map_err(|e| {
@@ -121,7 +124,12 @@ impl RemoteFs for LocalDirRemoteFs {
                         remote_path, e
                     ))
                 })?;
-            temp_path.persist(&local_file)?;
+            local_file =
+                tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
+                    temp_path.persist(&local_file)?;
+                    Ok(local_file)
+                })
+                .await??;
         }
         Ok(local_file.into_os_string().into_string().unwrap())
     }
