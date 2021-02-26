@@ -19,7 +19,7 @@ infrastructure concerns such as the number of instances, memory,
 high-availability, pre-aggregations management, caching, scalability, real-time
 monitoring and tracing.
 
-[Quickstart](/cloud/quickstart)
+[Get Started with Cube Cloud](/cloud/quickstart)
 
 ## Develop Cube.js projects
 
