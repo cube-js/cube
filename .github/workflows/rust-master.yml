@@ -30,6 +30,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./rust
+          key: ubuntu-latest
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -189,6 +190,8 @@ jobs:
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
+        with:
+          key: ${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
