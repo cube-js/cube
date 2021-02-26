@@ -13,10 +13,10 @@ import {
   TDryRunResponse,
   TOrderMember,
   QueryOrder,
-  TQueryOrderArray,
   TSourceAxis,
   TimeDimensionComparison,
   TimeDimensionRanged,
+  Meta,
 } from '@cubejs-client/core';
 
 /**
@@ -188,6 +188,10 @@ declare module '@cubejs-client/react' {
     resultSet?: ResultSet | null;
     error?: Error | null;
     loadingState?: TLoadingState;
+
+    meta: Meta;
+    metaError?: Error | null;
+    isFetchingMeta: boolean;
 
     /**
      * Indicates whether the query is ready to be displayed or not
