@@ -10,3 +10,23 @@ browser. Cube Cloud can create branch-based develolment API instances to test ch
 in your frontend applications before pushing them into production.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/cube-ide.png)
+
+## Development Mode
+
+In development mode you can safely make changes to your project without affecting production deployment. Developer mode uses a separate Git branch and allows to test your changes in Playground or via Dev API endpoint specific to this branch. The Dev API hot-reloads your schema changes, allowing you to quickly test API changes from your applications.
+
+To enter into the development mode navigate to the **Schema** page and click **Enter
+Development Mode**.
+
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/enter-dev-mode.png)
+
+When you enter the development mode you can see the grey bar on top. It provides
+several useful controls and indicators:
+* It displays the name of the current development Git branch.
+* It shows the status of the dev API. When you make changes to the project files the
+  API will hot-reload changes and the API status will show it.
+* "Copy API URL" will copy the API URL to the clipboard for the current development branch.
+
+You can exit development mode by clicking **Exit** button in the grey banner.
+
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/dev-mode-bar.png)
