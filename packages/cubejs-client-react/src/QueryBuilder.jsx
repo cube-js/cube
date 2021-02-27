@@ -542,7 +542,7 @@ export default class QueryBuilder extends React.Component {
   }
 
   render() {
-    const { query, meta } = this.state;
+    const { query } = this.state;
     const { cubejsApi, render, wrapWithQueryRenderer } = this.props;
 
     if (wrapWithQueryRenderer) {
