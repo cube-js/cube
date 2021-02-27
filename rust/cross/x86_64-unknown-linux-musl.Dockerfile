@@ -10,14 +10,17 @@ RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm &
 
 RUN mkdir /musl
 
-RUN wget https://www.openssl.org/source/openssl-1.1.1i.tar.gz -O - | tar -xz &&\
-    cd openssl-1.1.1i && \
+# https://www.openssl.org/source/old/1.1.1/
+ARG OPENSSL_VERSION=1.1.1h
+
+RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
+    cd openssl-${OPENSSL_VERSION} && \
     CC="musl-gcc -fPIE -pie" ./Configure no-shared no-async --prefix=/musl --openssldir=/musl/ssl linux-x86_64 && \
     make depend && \
     make -j $(nproc) && \
     make install_sw && \
     make install_ssldirs && \
-    cd .. && rm -rf openssl-1.1.1i
+    cd .. && rm -rf openssl-${OPENSSL_VERSION}
 
 ENV PKG_CONFIG_ALLOW_CROSS=true
 ENV PKG_CONFIG_ALL_STATIC=true
