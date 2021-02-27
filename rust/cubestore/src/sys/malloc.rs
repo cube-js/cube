@@ -8,17 +8,17 @@
 ///
 /// Use this function after code that produces considerable amount of memory allocations that
 /// **have been already freed**.
-#[cfg(all(target_os = "linux", target_env = "gnu"))] // Musl doesnt support malloc_trim, probably only gnu has it.
+#[cfg(all(target_os = "linux", not(target_env = "musl")))] // Musl doesnt support malloc_trim, probably only gnu has it.
 pub fn trim_allocs() {
     unsafe {
         malloc_trim(0);
     }
 }
 
-#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+#[cfg(any(not(target_os = "linux"), target_env = "musl"))]
 pub fn trim_allocs() {}
 
-#[cfg(all(target_os = "linux", target_env = "gnu"))] // Musl doesnt support malloc_trim, probably only gnu has it.
+#[cfg(all(target_os = "linux", not(target_env = "musl")))] // Musl doesnt support malloc_trim, probably only gnu has it.
 extern "C" {
     fn malloc_trim(pad: usize) -> i32;
 }
