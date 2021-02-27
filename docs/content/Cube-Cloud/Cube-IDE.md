@@ -13,7 +13,7 @@ in your frontend applications before pushing them into production.
 
 ## Development Mode
 
-In development mode you can safely make changes to your project without affecting production deployment. Developer mode uses a separate Git branch and allows to test your changes in Playground or via Dev API endpoint specific to this branch. The Dev API hot-reloads your schema changes, allowing you to quickly test API changes from your applications.
+In development mode, you can safely make changes to your project without affecting production deployment. Developer mode uses a separate Git branch and allows testing your changes in Playground or via Dev API endpoint specific to this branch. The Dev API hot-reloads your schema changes, allowing you to quickly test API changes from your applications.
 
 To enter into the development mode navigate to the **Schema** page and click **Enter
 Development Mode**.
