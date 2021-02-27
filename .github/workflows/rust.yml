@@ -138,17 +138,16 @@ jobs:
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
-      - name: Install dependencies Windows
-        run: vcpkg integrate install; vcpkg install openssl:x64-windows
-        if: matrix.os == 'windows-latest'
-        env:
-          VCPKG_ROOT: 'C:\vcpkg'
-      - name: Set Env Variables for Musl
+      #- name: Install dependencies Windows
+      #  run: vcpkg integrate install; vcpkg install openssl:x64-windows
+      #  if: matrix.os == 'windows-latest'
+      #  env:
+      #    VCPKG_ROOT: 'C:\vcpkg'
+      - name: Set Env Variables for Darwin
         uses: allenevans/set-env@v2.0.0
-        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        if: ${{ matrix.target == 'x86_64-apple-darwin' }}
         with:
           OPENSSL_STATIC: true
-          OPENSSL_DIR: "/musl"
       # https://github.com/actions-rs/cargo/issues/6
       #- uses: actions-rs/cargo@v1
       - uses: marcopolo/cargo@master
