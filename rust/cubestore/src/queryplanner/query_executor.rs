@@ -124,7 +124,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 &split_plan
             );
         }
-        let data_frame = batch_to_dataframe(&results?)?;
+        let data_frame = tokio::task::spawn_blocking(|| batch_to_dataframe(&results?)).await??;
         Ok(data_frame)
     }
 

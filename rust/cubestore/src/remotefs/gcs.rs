@@ -9,7 +9,7 @@ use regex::{NoExpand, Regex};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
@@ -71,7 +71,7 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let local_file = self.dir.as_path().join(remote_path);
+        let mut local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dirs = local_dir.join("downloads");
 
@@ -79,7 +79,10 @@ impl RemoteFs for GCSRemoteFs {
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
-            let (temp_file, temp_path) = NamedTempFile::new_in(&downloads_dirs)?.into_parts();
+            let (temp_file, temp_path) =
+                tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
+                    .await??
+                    .into_parts();
             let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
             let mut stream = Object::download_streamed(
                 self.bucket.as_str(),
@@ -95,7 +98,12 @@ impl RemoteFs for GCSRemoteFs {
             }
             writer.flush().await?;
 
-            temp_path.persist(&local_file)?;
+            local_file =
+                tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
+                    temp_path.persist(&local_file)?;
+                    Ok(local_file)
+                })
+                .await??;
 
             info!(
                 "Downloaded {} ({:?}) ({} bytes)",
