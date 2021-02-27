@@ -170,36 +170,38 @@ export default class QueryBuilder extends React.Component {
 
     const flatFilters = uniqBy(
       prop('member'),
-      flattenFilters((meta && query.filters) || []).map((filter) => ({
+      flattenFilters(query.filters || []).map((filter) => ({
         ...filter,
         member: filter.member || filter.dimension,
       }))
     );
 
-    const filters = flatFilters.map((m, i) => ({
-      ...m,
-      dimension: meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-      operators: meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
-      index: i,
-    }));
+    const filters = meta
+      ? flatFilters.map((m, i) => ({
+        ...m,
+        dimension: meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
+        operators: meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
+        index: i,
+      }))
+      : [];
 
     const measures = QueryBuilder.resolveMember('measures', this.state);
     const dimensions = QueryBuilder.resolveMember('dimensions', this.state);
     const timeDimensions = QueryBuilder.resolveMember('timeDimensions', this.state);
-    const segments = (query.segments || []).map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') }));
+    const segments = ((meta && query.segments) || []).map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') }));
 
-    const availableMeasures = meta.membersForQuery(query, 'measures');
-    const availableDimensions = meta.membersForQuery(query, 'dimensions');
-    const availableSegments = meta.membersForQuery(query, 'segments');
+    const availableMeasures = meta ? meta.membersForQuery(query, 'measures') : [];
+    const availableDimensions = meta ? meta.membersForQuery(query, 'dimensions') : [];
+    const availableSegments = meta ? meta.membersForQuery(query, 'segments') : [];
 
     let orderMembers = uniqBy(
       prop('id'),
       [
-        ...(Array.isArray(query.order) ? query.order : Object.entries(query.order))
+        ...(Array.isArray(query.order) ? query.order : Object.entries(query.order || {}))
           .map(([id, order]) => ({
             id,
             order,
-            title: meta.resolveMember(id, ['measures', 'dimensions']).title
+            title: meta ? meta.resolveMember(id, ['measures', 'dimensions']).title : ''
           })),
         // uniqBy prefers first, so these will only be added if not already in the query
         ...[
@@ -542,9 +544,6 @@ export default class QueryBuilder extends React.Component {
   render() {
     const { query, meta } = this.state;
     const { cubejsApi, render, wrapWithQueryRenderer } = this.props;
-
-    // Wait for the meta to load before attempting to render
-    if (!meta) return null;
 
     if (wrapWithQueryRenderer) {
       return (
