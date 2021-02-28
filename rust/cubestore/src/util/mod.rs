@@ -5,6 +5,7 @@ use crate::CubeError;
 use log::error;
 use std::future::Future;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 pub struct WorkerLoop {
@@ -52,6 +53,41 @@ impl WorkerLoop {
                 }
                 Err(e) => {
                     error!("Error during {}: {:?}", loop_name, e);
+                }
+            };
+        }
+    }
+
+    pub async fn process_channel<T, S: ?Sized, FR>(
+        &self,
+        service: Arc<S>,
+        rx: &mut mpsc::Receiver<T>,
+        loop_fn: impl Fn(Arc<S>, T) -> FR + Send + Sync + 'static,
+    ) where
+        T: Send + Sync + 'static,
+        S: Send + Sync + 'static,
+        FR: Future<Output = Result<(), CubeError>> + Send + 'static,
+    {
+        let token = self.stopped_token.child_token();
+        let loop_name = self.name.clone();
+        loop {
+            let res = tokio::select! {
+                _ = token.cancelled() => {
+                    return;
+                }
+                res = rx.recv() => {
+                    res
+                }
+            };
+            match res {
+                Some(r) => {
+                    let loop_res = loop_fn(service.clone(), r).await;
+                    if let Err(e) = loop_res {
+                        error!("Error during {}: {:?}", loop_name, e);
+                    }
+                }
+                None => {
+                    return;
                 }
             };
         }

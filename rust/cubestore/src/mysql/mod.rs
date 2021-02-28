@@ -14,7 +14,7 @@ use tokio::sync::{watch, RwLock};
 
 struct Backend {
     sql_service: Arc<dyn SqlService>,
-    auth: Arc<dyn MySqlAuth>,
+    auth: Arc<dyn SqlAuthService>,
     user: Option<String>,
 }
 
@@ -120,12 +120,15 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     where
         W: 'async_trait,
     {
-        if !user.is_empty() {
-            self.user = Some(String::from_utf8_lossy(user.as_slice()).to_string())
-        }
+        self.user = if !user.is_empty() {
+            Some(String::from_utf8_lossy(user.as_slice()).to_string())
+        } else {
+            None
+        };
         self.auth
-            .authenticate(user)
+            .authenticate(self.user.clone())
             .await
+            .map(|p| p.map(|p| p.as_bytes().to_vec()))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
     }
 }
@@ -133,7 +136,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 pub struct MySqlServer {
     address: String,
     sql_service: Arc<dyn SqlService>,
-    auth: Arc<dyn MySqlAuth>,
+    auth: Arc<dyn SqlAuthService>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
 }
@@ -197,7 +200,7 @@ impl MySqlServer {
     pub fn new(
         address: String,
         sql_service: Arc<dyn SqlService>,
-        auth: Arc<dyn MySqlAuth>,
+        auth: Arc<dyn SqlAuthService>,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
         Arc::new(Self {
@@ -211,17 +214,17 @@ impl MySqlServer {
 }
 
 #[async_trait]
-pub trait MySqlAuth: Send + Sync {
-    async fn authenticate(&self, user: Vec<u8>) -> Result<Option<Vec<u8>>, CubeError>;
+pub trait SqlAuthService: Send + Sync {
+    async fn authenticate(&self, user: Option<String>) -> Result<Option<String>, CubeError>;
 }
 
-pub struct MySqlAuthDefaultImpl;
+pub struct SqlAuthDefaultImpl;
 
-crate::di_service!(MySqlAuthDefaultImpl, [MySqlAuth]);
+crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 
 #[async_trait]
-impl MySqlAuth for MySqlAuthDefaultImpl {
-    async fn authenticate(&self, _user: Vec<u8>) -> Result<Option<Vec<u8>>, CubeError> {
+impl SqlAuthService for SqlAuthDefaultImpl {
+    async fn authenticate(&self, _user: Option<String>) -> Result<Option<String>, CubeError> {
         Ok(None)
     }
 }

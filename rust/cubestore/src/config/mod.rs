@@ -4,10 +4,11 @@ pub mod processing_loop;
 use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
 use crate::config::injection::{get_service, get_service_typed, DIService, Injector, InjectorRef};
 use crate::config::processing_loop::ProcessingLoop;
+use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
-use crate::mysql::{MySqlAuth, MySqlAuthDefaultImpl, MySqlServer};
+use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::gcs::GCSRemoteFs;
@@ -90,6 +91,10 @@ impl CubeServices {
                     async move { mysql_server.processing_loop().await },
                 ));
             }
+            if self.injector.has_service_typed::<HttpServer>().await {
+                let http_server = self.injector.get_service_typed::<HttpServer>().await;
+                futures.push(tokio::spawn(async move { http_server.run_server().await }));
+            }
         } else {
             let cluster = self.cluster.clone();
             futures.push(tokio::spawn(async move {
@@ -123,6 +128,13 @@ impl CubeServices {
                 .await
                 .stop_processing()
                 .await?;
+        }
+        if self.injector.has_service_typed::<HttpServer>().await {
+            self.injector
+                .get_service_typed::<HttpServer>()
+                .await
+                .stop_processing()
+                .await;
         }
         self.scheduler.stop_processing_loops()?;
         stop_track_event_loop().await;
@@ -168,6 +180,8 @@ pub trait ConfigObj: DIService {
 
     fn bind_address(&self) -> &Option<String>;
 
+    fn http_bind_address(&self) -> &Option<String>;
+
     fn query_timeout(&self) -> u64;
 
     fn not_used_timeout(&self) -> u64;
@@ -204,6 +218,7 @@ pub struct ConfigObjImpl {
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
     pub bind_address: Option<String>,
+    pub http_bind_address: Option<String>,
     pub query_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
@@ -246,6 +261,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn bind_address(&self) -> &Option<String> {
         &self.bind_address
+    }
+
+    fn http_bind_address(&self) -> &Option<String> {
+        &self.http_bind_address
     }
 
     fn query_timeout(&self) -> u64 {
@@ -351,6 +370,12 @@ impl Config {
                             .map(|v| v.parse::<u16>().unwrap())
                             .unwrap_or(3306u16)),
                 )),
+                http_bind_address: Some(env::var("CUBESTORE_HTTP_BIND_ADDR").ok().unwrap_or(
+                    format!("0.0.0.0:{}", env::var("CUBESTORE_HTTP_PORT")
+                        .ok()
+                        .map(|v| v.parse::<u16>().unwrap())
+                        .unwrap_or(3030u16)),
+                )),
                 query_timeout: env::var("CUBESTORE_QUERY_TIMEOUT")
                     .ok()
                     .map(|v| v.parse::<u64>().unwrap())
@@ -406,6 +431,7 @@ impl Config {
                 select_worker_pool_size: 0,
                 job_runners_count: 4,
                 bind_address: None,
+                http_bind_address: None,
                 query_timeout: 15,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
@@ -757,8 +783,8 @@ impl Config {
 
         if self.config_obj.bind_address().is_some() {
             self.injector
-                .register_typed::<dyn MySqlAuth, _, _, _>(async move |_| {
-                    Arc::new(MySqlAuthDefaultImpl)
+                .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
+                    Arc::new(SqlAuthDefaultImpl)
                 })
                 .await;
 
@@ -768,6 +794,21 @@ impl Config {
                         i.get_service_typed::<dyn ConfigObj>()
                             .await
                             .bind_address()
+                            .as_ref()
+                            .unwrap()
+                            .to_string(),
+                        i.get_service_typed().await,
+                        i.get_service_typed().await,
+                    )
+                })
+                .await;
+
+            self.injector
+                .register_typed::<HttpServer, _, _, _>(async move |i| {
+                    HttpServer::new(
+                        i.get_service_typed::<dyn ConfigObj>()
+                            .await
+                            .http_bind_address()
                             .as_ref()
                             .unwrap()
                             .to_string(),

@@ -17,7 +17,7 @@ ipc-channel = { version = "0.14.1" }
 base64 = "0.13.0"
 bumpalo = "3.6.1"
 tokio = { version = "1.0", features = ["full", "rt"] }
-warp = "0.2"
+warp = { git = 'https://github.com/seanmonstar/warp', version = "0.3.0" }
 sqlparser = "0.7.0"
 serde_derive = "1.0.115"
 serde = "1.0.115"
@@ -72,3 +72,5 @@ tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
 mysql_common = "0.26.0"
+flatbuffers = "0.7.0"
+http-auth-basic = "0.1.2"
