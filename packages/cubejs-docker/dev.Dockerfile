@@ -11,7 +11,6 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 \
     && rm -rf /var/lib/apt/lists/*
 
-# For now Cube.js docker image is building without waiting cross jobs, it's why we are not able to install it
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
 ENV NODE_ENV development

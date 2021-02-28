@@ -8,7 +8,6 @@ ENV CI=0
 
 RUN apk add rxvt-unicode
 
-# For now Cube.js docker image is building without waiting cross jobs, it's why we are not able to install it
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
 # Very strange issue with error Command "lerna" not found.
