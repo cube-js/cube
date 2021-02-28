@@ -29,9 +29,12 @@
     "@cubejs-backend/query-orchestrator": "^0.26.45",
     "@cubejs-backend/schema-compiler": "^0.26.49",
     "@cubejs-backend/shared": "^0.26.45",
+    "flatbuffers": "^1.12.0",
     "generic-pool": "^3.6.0",
     "moment-timezone": "^0.5.31",
-    "mysql": "^2.16.0"
+    "mysql": "^2.16.0",
+    "sqlstring": "^2.3.2",
+    "ws": "^7.4.3"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.13",

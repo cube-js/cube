@@ -843,13 +843,13 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/cubestore@^0.26.33":
-  version "0.26.33"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore/-/cubestore-0.26.33.tgz#687c989365ed8b6b2c71da66dbb5075fbc1e02a4"
-  integrity sha512-4k/cITaMqMPviKSuCXNWeZJ8oKoPBGMeWDow5CQgferQDrjm8uemQ3mU/sYZpAfEzE3KWFj8ZVX46yq8vE87dg==
+"@cubejs-backend/cubestore@^0.26.38":
+  version "0.26.38"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore/-/cubestore-0.26.38.tgz#b279bda8c1f6607e8787436bff6560f2f76e2205"
+  integrity sha512-dO9RTRi4HIza2eHmnaDenxp/VLCrT45oGhUGdsZonGOYYD/X8eTad6F/jsrUOwd+RP5sEFV5pL78/sHcz+wMCQ==
   dependencies:
     "@cubejs-backend/linter" "^0.26.13"
-    "@cubejs-backend/shared" "^0.26.25"
+    "@cubejs-backend/shared" "^0.26.35"
     "@oclif/color" "^0.1.2"
     "@octokit/core" "^3.2.5"
     bytes "^3.1.0"
@@ -870,21 +870,21 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/query-orchestrator@^0.26.25":
-  version "0.26.25"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.26.25.tgz#2b738ba013fa0fb9883203c299334b5bb6779734"
-  integrity sha512-TuZNNTgAJ6sIPIT6TXNATHI0ANqXAxsRE/NDh6mKhSjicns6Kz72fwAFempVYCXyuoA6L7NvsACslirUchT3rw==
+"@cubejs-backend/query-orchestrator@^0.26.38":
+  version "0.26.38"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.26.38.tgz#4633e110905c631f6449591f8ada6c0470978904"
+  integrity sha512-0DNG6z10IBST6RcjlS4Ia4IxihHlQKxpuyjKaBH2Ii78GE5+NiQNlzoW/lGnzkb7KHlVVTxvsqClpnoK9WfBMw==
   dependencies:
-    "@cubejs-backend/shared" "^0.26.25"
+    "@cubejs-backend/shared" "^0.26.35"
     generic-pool "^3.7.1"
     ioredis "^4.19.4"
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.26.25":
-  version "0.26.25"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.26.25.tgz#c71bcb3ef59e038c008aeaada97a396ff592450b"
-  integrity sha512-5SZ3zk4I7whbo1RTDpHsxMlYorprqrxc5DAEYQLfCXxsTKuW4WwRO/xzvg92jJ1tFqfetZyMVw6Q84Hh0gWgLg==
+"@cubejs-backend/schema-compiler@^0.26.35":
+  version "0.26.35"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.26.35.tgz#8f7b996758dfa02acb151bf46b7df1ae7fef91f5"
+  integrity sha512-ZDhgKD/Eq64/0qb2JR/svndWIlPuDm9LLP6CEibWExkhGXP0zH9+fHAQaaQEIBtBqbo9TC4KTVakGbtnk86vUA==
   dependencies:
     "@babel/code-frame" "^7.12.11"
     "@babel/core" "^7.12.10"
@@ -908,10 +908,10 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/shared@^0.26.25":
-  version "0.26.25"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.25.tgz#6c63d882a8bf917836d3fc4e6e5a27d61e52b761"
-  integrity sha512-cJY9QIx/13Oaf6vtg5/U4t5YesjJQzoB5kTUqXgqf4QkLewi36f2qYFM8JUJkL3d71xRfMf15t7wMIUNTLmJHQ==
+"@cubejs-backend/shared@^0.26.35":
+  version "0.26.35"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.35.tgz#87806a385282f9e4327259924628e92cc1d95d05"
+  integrity sha512-9cKt/Z9b3mUobks/jlWyF/7xCXWOH+XuvufZuCoAE7It0tUUPnayPiZ3NhoozNl6l2oZeaiAJt1+9ddtPgieWQ==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"
@@ -3002,6 +3002,11 @@ flat-cache@^3.0.4:
   dependencies:
     flatted "^3.1.0"
     rimraf "^3.0.2"
+
+flatbuffers@^1.12.0:
+  version "1.12.0"
+  resolved "https://registry.yarnpkg.com/flatbuffers/-/flatbuffers-1.12.0.tgz#72e87d1726cb1b216e839ef02658aa87dcef68aa"
+  integrity sha512-c7CZADjRcl6j0PlvFy0ZqXQ67qSEZfrVPynmnL+2zPc+NtMvrF8Y0QceMo7QqnSPc7+uWjUIAbvCQ5WIKlMVdQ==
 
 flatted@^3.1.0:
   version "3.1.1"
@@ -5480,6 +5485,11 @@ sqlstring@2.3.1:
   resolved "https://registry.yarnpkg.com/sqlstring/-/sqlstring-2.3.1.tgz#475393ff9e91479aea62dcaf0ca3d14983a7fb40"
   integrity sha1-R1OT/56RR5rqYtyvDKPRSYOn+0A=
 
+sqlstring@^2.3.2:
+  version "2.3.2"
+  resolved "https://registry.yarnpkg.com/sqlstring/-/sqlstring-2.3.2.tgz#cdae7169389a1375b18e885f2e60b3e460809514"
+  integrity sha512-vF4ZbYdKS8OnoJAWBmMxCQDkiEBkGQYU7UZPtL8flbDRSNkhaXvRJ279ZtI6M+zDaQovVU4tuRgzK5fVhvFAhg==
+
 ssh-remote-port-forward@^1.0.3:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/ssh-remote-port-forward/-/ssh-remote-port-forward-1.0.3.tgz#074cebed6d54a42ce4659d6aa24987e433ff5fef"
@@ -6198,7 +6208,7 @@ write-file-atomic@^3.0.0:
     signal-exit "^3.0.2"
     typedarray-to-buffer "^3.1.5"
 
-ws@^7.2.3:
+ws@^7.2.3, ws@^7.4.3:
   version "7.4.3"
   resolved "https://registry.yarnpkg.com/ws/-/ws-7.4.3.tgz#1f9643de34a543b8edb124bdcbc457ae55a6e5cd"
   integrity sha512-hr6vCR76GsossIRsr8OLR9acVVm1jyfEWvhbNjtgPOrfvAlKzvyeg/P6r8RuDjRyrcQoPQT7K0DGEPc7Ae6jzA==

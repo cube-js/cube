@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "include": [
     "src",
-    "test"
+    "test",
+    "codegen"
   ],
   "compilerOptions": {
     "noImplicitAny": false,
