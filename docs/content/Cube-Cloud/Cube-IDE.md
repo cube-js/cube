@@ -15,7 +15,7 @@ in your frontend applications before pushing them into production.
 
 In development mode, you can safely make changes to your project without affecting production deployment. Development mode uses a separate Git branch and allows testing your changes in Playground or via a separate API endpoint specific to this branch. This development API hot-reloads your schema changes, allowing you to quickly test API changes from your applications.
 
-To enter into the development mode navigate to the **Schema** page and click **Enter
+To enter development mode, navigate to the **Schema** page and click **Enter
 Development Mode**.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/enter-dev-mode.png)
