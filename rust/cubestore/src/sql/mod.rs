@@ -58,7 +58,7 @@ pub trait SqlService: DIService + Send + Sync {
     ) -> Result<DataFrame, CubeError>;
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
 }

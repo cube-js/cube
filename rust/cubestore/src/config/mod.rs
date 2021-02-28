@@ -8,7 +8,7 @@ use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
-use crate::mysql::{MySqlAuth, MySqlAuthDefaultImpl, MySqlServer};
+use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::gcs::GCSRemoteFs;
@@ -783,8 +783,8 @@ impl Config {
 
         if self.config_obj.bind_address().is_some() {
             self.injector
-                .register_typed::<dyn MySqlAuth, _, _, _>(async move |_| {
-                    Arc::new(MySqlAuthDefaultImpl)
+                .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
+                    Arc::new(SqlAuthDefaultImpl)
                 })
                 .await;
 
@@ -812,6 +812,7 @@ impl Config {
                             .as_ref()
                             .unwrap()
                             .to_string(),
+                        i.get_service_typed().await,
                         i.get_service_typed().await,
                     )
                 })
