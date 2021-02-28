@@ -22,7 +22,7 @@ Development Mode**.
 
 When development mode is active, a grey bar will be visible on the top of the screen. It provides
 several useful controls and indicators:
-* It displays the name of the current development Git branch.
+* The name of the current development Git branch
 * The status of the development API. After any changes to the project, the
   API will hot-reload changes and the API status will show it.
 * "Copy API URL" will copy the API URL to the clipboard for the current development branch.
