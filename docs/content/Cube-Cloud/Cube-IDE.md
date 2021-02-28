@@ -20,7 +20,7 @@ Development Mode**.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/enter-dev-mode.png)
 
-When you enter the development mode you can see the grey bar on top. It provides
+When development mode is active, a grey bar will be visible on the top of the screen. It provides
 several useful controls and indicators:
 * It displays the name of the current development Git branch.
 * It shows the status of the dev API. When you make changes to the project files the
