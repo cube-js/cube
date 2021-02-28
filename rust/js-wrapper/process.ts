@@ -7,11 +7,6 @@ import { downloadBinaryFromRelease } from './download';
 
 const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored';
 
-export interface CubeStoreHandler {
-  acquire: () => Promise<void>;
-  release: () => Promise<void>;
-}
-
 export interface CubeStoreHandlerOptions {
   stdout: (data: Buffer) => void;
   stderr: (data: Buffer) => void;
@@ -55,44 +50,59 @@ async function startProcess(pathToExecutable: string, config: Readonly<StartProc
   return cubeStore;
 }
 
-export async function startCubeStoreHandler(config: Readonly<CubeStoreHandlerOptions>): Promise<CubeStoreHandler> {
-  const pathToExecutable = path.join(__dirname, '..', 'downloaded', 'latest', 'bin', binaryName);
-
-  if (!fs.existsSync(pathToExecutable)) {
-    await downloadBinaryFromRelease();
-
-    if (!fs.existsSync(pathToExecutable)) {
-      throw new Error('Something wrong with downloading');
-    }
+export function isCubeStoreSupported(): boolean {
+  if (process.arch !== 'x64') {
+    return false;
   }
 
-  let cubeStore: Promise<ChildProcess> | null = null;
+  return ['win32', 'darwin', 'linux'].includes(process.platform);
+}
 
-  const onExit = (code: number|null) => {
-    config.onRestart(code);
+export class CubeStoreHandler {
+  protected cubeStore: Promise<ChildProcess> | null = null;
 
-    cubeStore = startProcess(pathToExecutable, {
-      ...config,
-      onExit
-    });
-  };
+  public constructor(
+    protected readonly config: Readonly<CubeStoreHandlerOptions>
+  ) {}
 
-  cubeStore = startProcess(pathToExecutable, {
-    ...config,
-    onExit
-  });
+  public async acquire() {
+    if (this.cubeStore) {
+      return this.cubeStore;
+    }
 
-  return {
-    acquire: async () => {
-      if (cubeStore) {
-        await cubeStore;
+    // eslint-disable-next-line no-async-promise-executor
+    this.cubeStore = new Promise<ChildProcess>(async (resolve) => {
+      const pathToExecutable = path.join(__dirname, '..', 'downloaded', 'latest', 'bin', binaryName);
+
+      if (!fs.existsSync(pathToExecutable)) {
+        await downloadBinaryFromRelease();
+
+        if (!fs.existsSync(pathToExecutable)) {
+          throw new Error('Something wrong with downloading Cube Store before running it.');
+        }
       }
-    },
-    release: async () => {
-      // @todo Use SIGTERM for gracefully shutdown?
-      // if (cubeStore) {
-      //   (await cubeStore).kill();
-      // }
-    },
-  };
+
+      const onExit = (code: number|null) => {
+        this.config.onRestart(code);
+
+        this.cubeStore = startProcess(pathToExecutable, {
+          ...this.config,
+          onExit
+        });
+      };
+
+      this.cubeStore = startProcess(pathToExecutable, {
+        ...this.config,
+        onExit
+      });
+
+      resolve(this.cubeStore);
+    });
+
+    return this.cubeStore;
+  }
+
+  public async release() {
+    // @todo Use SIGTERM for gracefully shutdown?
+  }
 }

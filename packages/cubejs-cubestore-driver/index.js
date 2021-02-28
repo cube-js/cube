@@ -1,6 +1,6 @@
 const { CubeStoreDriver } = require('./dist/src/CubeStoreDriver');
 const { CubeStoreDevDriver } = require('./dist/src/CubeStoreDevDriver');
-const { isCubeStoreSupported } = require('./dist/src/utils');
+const { isCubeStoreSupported, CubeStoreHandler } = require('./dist/src/rexport');
 
 /**
  * After 5 years working with TypeScript, now I know
@@ -14,3 +14,4 @@ module.exports = CubeStoreDriver;
  */
 module.exports.CubeStoreDevDriver = CubeStoreDevDriver;
 module.exports.isCubeStoreSupported = isCubeStoreSupported;
+module.exports.CubeStoreHandler = CubeStoreHandler;

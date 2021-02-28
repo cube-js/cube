@@ -117,10 +117,7 @@ export function getTarget(): string {
   }
 }
 
-async function fetchRelease() {
-  // eslint-disable-next-line global-require
-  const { version } = require('../package.json');
-
+async function fetchRelease(version: string) {
   const client = new Octokit();
 
   const { data } = await client.request('GET /repos/{owner}/{repo}/releases/tags/{tag}', {
@@ -133,10 +130,15 @@ async function fetchRelease() {
 }
 
 export async function downloadBinaryFromRelease() {
-  const release = await fetchRelease();
+  // eslint-disable-next-line global-require
+  const { version } = require('../package.json');
+
+  const release = await fetchRelease(version);
   if (release) {
     if (release.assets.length === 0) {
-      throw new Error('No assets in release');
+      throw new Error(
+        `There are no artifacts for Cube Store v${version}. Most probably it is still building. Please try again later.`
+      );
     }
 
     const target = getTarget();
@@ -146,9 +148,21 @@ export async function downloadBinaryFromRelease() {
       if (fileName.startsWith('cubestored-')) {
         const assetTarget = fileName.substr('cubestored-'.length);
         if (assetTarget === target) {
-          await downloadAndExtractFile(asset.browser_download_url, asset.name, path.resolve(__dirname, '..'));
+          return downloadAndExtractFile(
+            asset.browser_download_url,
+            asset.name,
+            path.resolve(__dirname, '..')
+          );
         }
       }
     }
+
+    throw new Error(
+      `Cube Store v${version} Artifact for ${process.platform} is not found. Most probably it is still building. Please try again later.`
+    );
   }
+
+  throw new Error(
+    `Unable to find Cube Store release v${version}. Most probably it was removed.`
+  );
 }

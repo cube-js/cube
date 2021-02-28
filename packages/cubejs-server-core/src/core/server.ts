@@ -17,7 +17,7 @@ import {
 
 import type { Application as ExpressApplication } from 'express';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import type { CubeStoreDevDriver, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
+import type { CubeStoreDevDriver, CubeStoreHandler, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
 import type {
   ContextToAppIdFn,
   CreateOptions,
@@ -30,6 +30,7 @@ import type {
   DriverContext,
   SchemaFileRepository,
   UserBackgroundContext,
+  LoggerFn,
 } from './types';
 
 import { FileRepository } from './FileRepository';
@@ -294,6 +295,9 @@ export class CubejsServerCore {
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
     const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
+    const logger: LoggerFn = opts.logger || process.env.NODE_ENV !== 'production'
+      ? devLogger(process.env.CUBEJS_LOG_LEVEL)
+      : prodLogger(process.env.CUBEJS_LOG_LEVEL);
 
     let externalDriverFactory = externalDbType && (
       () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
@@ -311,6 +315,7 @@ export class CubejsServerCore {
     if (!externalDbType && getEnv('devMode')) {
       const cubeStorePackage = requireFromPackage<{
         isCubeStoreSupported: typeof isCubeStoreSupported,
+        CubeStoreHandler: typeof CubeStoreHandler,
         CubeStoreDevDriver: typeof CubeStoreDevDriver,
       }>('@cubejs-backend/cubestore-driver', {
         relative: isDockerImage(),
@@ -320,8 +325,20 @@ export class CubejsServerCore {
         if (cubeStorePackage.isCubeStoreSupported()) {
           console.log(`🔥 Cube Store (${version}) is assigned to 13306 port.`);
 
+          const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
+            stdout: (data) => {
+              console.log(data.toString().trim());
+            },
+            stderr: (data) => {
+              console.log(data.toString().trim());
+            },
+            onRestart: (code) => logger('Cube Store Restarting', {
+              warning: `Instance exit with ${code}, restarting`,
+            }),
+          });
+
           // Lazy loading for Cube Store
-          externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver();
+          externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
           externalDialectFactory = () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
         }
       }
@@ -349,9 +366,7 @@ export class CubejsServerCore {
         devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
       ),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
-      logger: opts.logger || process.env.NODE_ENV !== 'production'
-        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-        : prodLogger(process.env.CUBEJS_LOG_LEVEL),
+      logger,
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
       sqlCache: false,
       ...opts,

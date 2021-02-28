@@ -1,7 +1,7 @@
-import { startCubeStoreHandler } from './process';
+import { CubeStoreHandler } from './process';
 
 (async () => {
-  const handler = await startCubeStoreHandler({
+  const handler = new CubeStoreHandler({
     stdout: (v) => {
       console.log(v.toString());
     },
