@@ -204,18 +204,20 @@ jobs:
             executable_name: cubestored
             cross: true
             strip: true
-            compress: false
+            compress: true
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             cross: true
             strip: true
+            # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
           - os: ubuntu-latest
             target: x86_64-pc-windows-gnu
             executable_name: cubestored.exe
             cross: true
             strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -248,7 +250,7 @@ jobs:
         uses: allenevans/set-env@v2.0.0
         if: ${{ matrix.target == 'x86_64-apple-darwin' }}
         with:
-          OPENSSL_STATIC: true
+          OPENSSL_STATIC: "true"
       # https://github.com/actions-rs/cargo/issues/6
       #- uses: actions-rs/cargo@v1
       - uses: marcopolo/cargo@master
