@@ -59,7 +59,7 @@ jobs:
         run: ./node_modules/.bin/lerna publish from-package --yes
 
   docker-default:
-    needs: npm
+    needs: [npm, cross]
     name: Release docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -123,7 +123,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-alpine:
-    needs: npm
+    needs: [npm, cross]
     name: Release alpine docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30

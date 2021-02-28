@@ -7,8 +7,6 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=alpine
 
 RUN apk add rxvt-unicode
 
-# For now Cube.js docker image is building without waiting cross jobs, it's why we are not able to install it
-ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
 ENV NODE_ENV production
 
