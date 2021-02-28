@@ -193,7 +193,9 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
         with:
-          key: ${{ matrix.target }}
+          working-directory: rust
+          key: cross-${{ runner.OS }}-${{ matrix.target }}
+          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
