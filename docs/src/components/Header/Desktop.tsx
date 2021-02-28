@@ -1,9 +1,9 @@
 import React from 'react';
 import { Layout, Row, Col, Button, Icon } from 'antd';
 
-import logo from '../../pages/images/Logo.png';
-
 import styles from '../../../static/styles/index.module.scss';
+import { DocsSwitcher } from '../DocsSwitcher';
+import switchStyles from '../DocsSwitcher/styles.module.scss';
 
 const layout = {
   leftSidebar: {
@@ -43,15 +43,9 @@ const Header: React.FC<Props> = (props) => (
   <Layout.Header className={props.className}>
     <div className={styles.searchDimmer}></div>
     <Row>
-      <Col {...layout.leftSidebar.width}>
-        <div className={styles.logoWrapper}>
-          <a href="/" className={styles.logo}>
-            <img src={logo} alt="Logo" style={{ height: 36 }} />
-          </a>
-          &nbsp;
-          <a href="/docs" className={styles.logo}>
-            <span className={styles.logoDocs}>docs</span>
-          </a>
+      <Col {...layout.leftSidebar.width} style={{ height: 'inherit' }}>
+        <div className={switchStyles.docsSwitcherWrapper}>
+          <DocsSwitcher />
         </div>
       </Col>
       <Col {...layout.contentArea.width}>{props.children}</Col>
@@ -64,19 +58,19 @@ const Header: React.FC<Props> = (props) => (
           {/*  Community*/}
           {/*</Button>*/}
           <Button
-            href="https://cubejs-community.herokuapp.com/"
-            target="_blank"
+            href='https://cubejs-community.herokuapp.com/'
+            target='_blank'
             className={styles.headerButton}
           >
-            <Icon style={{ fontSize: '22px' }} type="slack" />
+            <Icon style={{ fontSize: '22px' }} type='slack' />
             Slack
           </Button>
           <Button
-            href="https://github.com/cube-js/cube.js"
-            target="_blank"
+            href='https://github.com/cube-js/cube.js'
+            target='_blank'
             className={styles.headerButton}
           >
-            <Icon style={{ fontSize: '22px' }} type="github" />
+            <Icon style={{ fontSize: '22px' }} type='github' />
             GitHub
           </Button>
         </div>

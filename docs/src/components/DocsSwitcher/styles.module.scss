@@ -1,0 +1,41 @@
+.docsSwitcherWrapper {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 98%;
+}
+
+.docsSwitcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+
+  :global(.ant-btn) {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 4px;
+    margin: 0 4px;
+    border-radius: 8px;
+    border-color: transparent;
+    box-shadow: none;
+
+    &:global(.active) {
+      border-width: 1px;
+      border-color: #CAC9FF;
+    }
+
+    &:active {
+      border-color: #CAC9FF !important;
+    }
+
+    &:hover {
+      background: #F3F3FB;
+      border-color: transparent;
+    }
+  }
+}
