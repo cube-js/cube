@@ -95,6 +95,8 @@ export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type DbTypeFn = (context: RequestContext) => DatabaseType;
 
+export type LoggerFn = (msg: string, params: any) => void;
+
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
   externalDbType?: DatabaseType | ExternalDbTypeFn;
@@ -102,7 +104,7 @@ export interface CreateOptions {
   basePath?: string;
   devServer?: boolean;
   apiSecret?: string;
-  logger?: (msg: string, params: any) => void;
+  logger?: LoggerFn;
   driverFactory?: (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
   dialectFactory?: (context: DialectContext) => BaseQuery;
   externalDriverFactory?: ExternalDriverFactoryFn;
