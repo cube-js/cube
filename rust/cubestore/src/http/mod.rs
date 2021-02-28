@@ -35,7 +35,7 @@ impl HttpServer {
         Arc::new(Self {
             bind_address,
             sql_service,
-            worker_loop: WorkerLoop::new("HttpServer"),
+            worker_loop: WorkerLoop::new("HttpServer message processing"),
             cancel_token: CancellationToken::new(),
         })
     }
@@ -65,19 +65,27 @@ impl HttpServer {
                                         break;
                                     }
                                     Ok(msg) => {
-                                        if !msg.is_binary() {
-                                            error!("Websocket received non binary msg");
+                                        if msg.is_binary() {
+                                            match HttpMessage::read(msg.into_bytes()) {
+                                                Err(e) => error!("Websocket message read error: {:?}", e),
+                                                Ok(msg) => {
+                                                    if let Err(e) = tx_to_move.send((response_tx.clone(), msg)).await {
+                                                        error!("Websocket channel error: {:?}", e);
+                                                        break;
+                                                    }
+                                                }
+                                            };
+                                        } else if msg.is_ping() {
+                                            let send_res = web_socket.send(Message::pong(Vec::new())).await;
+                                            if let Err(e) = send_res {
+                                                error!("Websocket ping send error: {:?}", e)
+                                            }
+                                        } else if msg.is_close() {
+                                            break;
+                                        } else {
+                                            error!("Websocket received non binary msg: {:?}", msg);
                                             break;
                                         }
-                                        match HttpMessage::read(msg.into_bytes()) {
-                                            Err(e) => error!("Websocket message read error: {:?}", e),
-                                            Ok(msg) => {
-                                                if let Err(e) = tx_to_move.send((response_tx.clone(), msg)).await {
-                                                    error!("Websocket channel error: {:?}", e);
-                                                    break;
-                                                }
-                                            }
-                                        };
                                     }
                                 }
                             }
