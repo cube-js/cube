@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.40](https://github.com/cube-js/cube.js/compare/v0.26.39...v0.26.40) (2021-03-01)
+
+
+### Features
+
+* **docker:** built-in cubestore ([15a2599](https://github.com/cube-js/cube.js/commit/15a25990ebb172c4cb4066f591bbbf543bc082c5))
+
+
+
+
+
 ## [0.26.39](https://github.com/cube-js/cube.js/compare/v0.26.38...v0.26.39) (2021-02-28)
 
 **Note:** Version bump only for package @cubejs-backend/docker
