@@ -11,6 +11,10 @@ export class CubeStoreDevDriver extends CubeStoreDriver {
   ) {
     super({
       ...config,
+      host: '127.0.0.1',
+      // CubeStoreDriver is using env variables, let's override it by undefined
+      user: undefined,
+      password: undefined,
       // @todo Make random port selection when 13306 is already used?
       port: 13306,
     });
