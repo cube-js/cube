@@ -192,21 +192,21 @@ macro_rules! di_service (
                 &self,
                 target: core::any::TypeId,
                 type_name: &'static str,
-                arc: Arc<dyn $crate::config::injection::DIService>,
+                arc: std::sync::Arc<dyn $crate::config::injection::DIService>,
             ) -> Result<core::raw::TraitObject, CubeError> {
                 unsafe {
-                    let ptr = Arc::into_raw(arc);
-                    let arc = Arc::<Self>::from_raw(ptr as *const Self);
+                    let ptr = std::sync::Arc::into_raw(arc);
+                    let arc = std::sync::Arc::<Self>::from_raw(ptr as *const Self);
                     $(
                     if target == core::any::TypeId::of::<dyn $trait_ty>() {
-                        let iface_arc: Arc<dyn $trait_ty> = arc;
-                        let ptr = Arc::into_raw(iface_arc);
+                        let iface_arc: std::sync::Arc<dyn $trait_ty> = arc;
+                        let ptr = std::sync::Arc::into_raw(iface_arc);
                         return Ok(std::mem::transmute(&*ptr));
                     }
                     )*
                     if target == core::any::TypeId::of::<$ty>() {
-                        let typ_arc: Arc<$ty> = arc;
-                        let ptr = Arc::into_raw(typ_arc);
+                        let typ_arc: std::sync::Arc<$ty> = arc;
+                        let ptr = std::sync::Arc::into_raw(typ_arc);
                         return Ok(core::raw::TraitObject {
                             data: ptr as *const _ as *mut (),
                             vtable: std::ptr::null_mut(),

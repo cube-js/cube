@@ -421,13 +421,12 @@ impl ChunkDataStore for ChunkStore {
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::metastore::RocksMetaStore;
-    use crate::remotefs::LocalDirRemoteFs;
+    use crate::metastore::{create_test_fs, RocksMetaStore};
     use crate::table::data::MutRows;
     use crate::{metastore::ColumnType, table::TableValue};
     use rocksdb::{Options, DB};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::Path;
 
     #[tokio::test]
     async fn create_wal_test() {
@@ -440,10 +439,7 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
         {
-            let remote_fs = LocalDirRemoteFs::new(
-                Some(PathBuf::from(remote_store_path.clone())),
-                PathBuf::from(store_path.clone()),
-            );
+            let remote_fs = create_test_fs(Path::new(&store_path), Path::new(&remote_store_path));
             let store = WALStore::new(
                 RocksMetaStore::new(path, remote_fs.clone(), config.config_obj()),
                 remote_fs.clone(),
@@ -520,9 +516,9 @@ mod tests {
         let _ = fs::remove_dir_all(chunk_store_path.clone());
         let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
         {
-            let remote_fs = LocalDirRemoteFs::new(
-                Some(PathBuf::from(chunk_remote_store_path.clone())),
-                PathBuf::from(chunk_store_path.clone()),
+            let remote_fs = create_test_fs(
+                Path::new(&chunk_store_path),
+                Path::new(&chunk_remote_store_path),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);

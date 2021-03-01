@@ -878,10 +878,10 @@ mod tests {
     use super::*;
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
-    use crate::metastore::RocksMetaStore;
+    use crate::metastore::{create_test_fs, RocksMetaStore};
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use crate::remotefs::RemoteFs;
     use crate::store::{ChunkStore, WALStore};
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
@@ -892,7 +892,6 @@ mod tests {
     use rocksdb::{Options, DB};
     use std::fs::File;
     use std::io::Write;
-    use std::path::PathBuf;
     use std::time::Duration;
     use std::{env, fs};
     use tokio::io::{AsyncWriteExt, BufWriter};
@@ -909,10 +908,7 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
         {
-            let remote_fs = LocalDirRemoteFs::new(
-                Some(PathBuf::from(remote_store_path.clone())),
-                PathBuf::from(store_path.clone()),
-            );
+            let remote_fs = create_test_fs(Path::new(&store_path), Path::new(&remote_store_path));
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
@@ -959,10 +955,7 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         {
-            let remote_fs = LocalDirRemoteFs::new(
-                Some(PathBuf::from(remote_store_path.clone())),
-                PathBuf::from(store_path.clone()),
-            );
+            let remote_fs = create_test_fs(Path::new(&store_path), Path::new(&remote_store_path));
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);

@@ -21,19 +21,19 @@ use tokio::fs;
 use tokio::sync::{Notify, RwLock};
 
 use crate::config::injection::DIService;
-use crate::config::{Config, ConfigObj};
+use crate::config::ConfigObj;
 use crate::metastore::chunks::{ChunkIndexKey, ChunkRocksIndex};
 use crate::metastore::index::IndexIndexKey;
 use crate::metastore::job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus};
 use crate::metastore::partition::PartitionIndexKey;
 use crate::metastore::table::{TableIndexKey, TablePath};
 use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
-use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+use crate::remotefs::RemoteFs;
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::lock::acquire_lock;
 use crate::util::time_span::{warn_long, warn_long_fut};
-use crate::util::WorkerLoop;
+use crate::util::{ufs, WorkerLoop};
 use crate::CubeError;
 use arrow::datatypes::TimeUnit::Microsecond;
 use arrow::datatypes::{DataType, Field};
@@ -1583,7 +1583,7 @@ impl RocksMetaStore {
                 if let Some(snapshot) = last_metastore_snapshot {
                     let to_load = remote_fs.list(&format!("metastore-{}", snapshot)).await?;
                     let meta_store_path = remote_fs.local_file("metastore").await?;
-                    fs::create_dir_all(meta_store_path.to_string()).await?;
+                    ufs::create_dir_all(meta_store_path.to_string()).await?;
                     for file in to_load.iter() {
                         remote_fs.download_file(file).await?;
                         let local = remote_fs.local_file(file).await?;
@@ -1943,7 +1943,9 @@ impl RocksMetaStore {
         Ok(())
     }
 
-    pub fn prepare_test_metastore(test_name: &str) -> (Arc<LocalDirRemoteFs>, Arc<RocksMetaStore>) {
+    #[cfg(test)]
+    pub fn prepare_test_metastore(test_name: &str) -> (Arc<dyn RemoteFs>, Arc<RocksMetaStore>) {
+        use crate::config::Config;
         let config = Config::test(test_name);
         let store_path = env::current_dir()
             .unwrap()
@@ -1953,7 +1955,7 @@ impl RocksMetaStore {
             .join(format!("test-{}-remote", test_name));
         let _ = std::fs::remove_dir_all(store_path.clone());
         let _ = std::fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let remote_fs = tests::create_test_fs(&store_path, &remote_store_path);
         let meta_store = RocksMetaStore::new(
             store_path.clone().join("metastore").as_path(),
             remote_fs.clone(),
@@ -3090,10 +3092,13 @@ fn get_default_index_impl(db_ref: DbTableRef, table_id: u64) -> Result<IdRow<Ind
 }
 
 #[cfg(test)]
+pub use tests::create_test_fs;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::remotefs::LocalDirRemoteFs;
+    use crate::remotefs::{Fs, LocalDirRemoteStorage};
     use futures_timer::Delay;
     use std::thread::sleep;
     use std::time::Duration;
@@ -3107,6 +3112,13 @@ mod tests {
         assert_eq!(format_table_value!(s, name, String), "foo");
     }
 
+    pub fn create_test_fs(local: &Path, remote: &Path) -> Arc<dyn RemoteFs> {
+        Arc::new(Fs::new(
+            LocalDirRemoteStorage::new(remote.to_owned()),
+            local.to_owned(),
+        ))
+    }
+
     #[tokio::test]
     async fn schema_test() {
         let config = Config::test("schema_test");
@@ -3114,7 +3126,7 @@ mod tests {
         let remote_store_path = env::current_dir().unwrap().join("test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let remote_fs = create_test_fs(&store_path, &remote_store_path);
 
         {
             let meta_store = RocksMetaStore::new(
@@ -3302,7 +3314,7 @@ mod tests {
         let remote_store_path = env::current_dir().unwrap().join("index_repair_test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let remote_fs = create_test_fs(&store_path, &remote_store_path);
 
         {
             let meta_store = RocksMetaStore::new(
@@ -3345,7 +3357,7 @@ mod tests {
         let remote_store_path = env::current_dir().unwrap().join("test-table-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let remote_fs = create_test_fs(&store_path, &remote_store_path);
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
@@ -3543,7 +3555,7 @@ mod tests {
 
             Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
-            let list = LocalDirRemoteFs::list_recursive(
+            let list = LocalDirRemoteStorage::list_recursive(
                 config.remote_dir().clone(),
                 "metastore-".to_string(),
                 config.remote_dir().clone(),

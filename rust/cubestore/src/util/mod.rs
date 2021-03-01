@@ -3,6 +3,8 @@ mod malloc_trim_loop;
 pub mod maybe_owned;
 pub mod ordfloat;
 pub mod time_span;
+pub mod ufs;
+
 pub use malloc_trim_loop::spawn_malloc_trim_loop;
 
 use crate::CubeError;

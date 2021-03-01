@@ -1,6 +1,6 @@
 use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
-use crate::util::lock::acquire_lock;
+use crate::remotefs::remote_storage::RemoteStorage;
+use crate::remotefs::RemoteFile;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -9,25 +9,19 @@ use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
 use s3::Bucket;
 use std::env;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tempfile::NamedTempFile;
-use tokio::fs;
-use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct S3RemoteFs {
-    dir: PathBuf,
     bucket: Bucket,
     sub_path: Option<String>,
-    delete_mut: Mutex<()>,
 }
 
 impl S3RemoteFs {
     pub fn new(
-        dir: PathBuf,
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
@@ -40,19 +34,14 @@ impl S3RemoteFs {
             None,
         )?;
         let bucket = Bucket::new(&bucket_name, region.parse()?, credentials)?;
-        Ok(Arc::new(Self {
-            dir,
-            bucket,
-            sub_path,
-            delete_mut: Mutex::new(()),
-        }))
+        Ok(Arc::new(Self { bucket, sub_path }))
     }
 }
 
-di_service!(S3RemoteFs, [RemoteFs]);
+di_service!(S3RemoteFs, [RemoteStorage]);
 
 #[async_trait]
-impl RemoteFs for S3RemoteFs {
+impl RemoteStorage for S3RemoteFs {
     async fn upload_file(
         &self,
         temp_upload_path: &str,
@@ -67,19 +56,6 @@ impl RemoteFs for S3RemoteFs {
             bucket.put_object_stream_blocking(temp_upload_path_copy, path)
         })
         .await??;
-        let local_path = self.dir.as_path().join(remote_path);
-        if Path::new(temp_upload_path) != local_path {
-            fs::create_dir_all(local_path.parent().unwrap())
-                .await
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Create dir {}: {}",
-                        local_path.parent().as_ref().unwrap().to_string_lossy(),
-                        e
-                    ))
-                })?;
-            fs::rename(&temp_upload_path, local_path).await?;
-        }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 200 {
             return Err(CubeError::user(format!(
@@ -90,40 +66,28 @@ impl RemoteFs for S3RemoteFs {
         Ok(())
     }
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let local_file = self.dir.as_path().join(remote_path);
-        let local_dir = local_file.parent().unwrap();
-        let downloads_dir = local_dir.join("downloads");
-
-        let local_file_str = local_file.to_str().unwrap().to_string(); // return value.
-
-        fs::create_dir_all(&downloads_dir).await?;
-        if !local_file.exists() {
-            let time = SystemTime::now();
-            debug!("Downloading {}", remote_path);
-            let path = self.s3_path(remote_path);
-            let bucket = self.bucket.clone();
-            let status_code = tokio::task::spawn_blocking(move || -> Result<u16, CubeError> {
-                let (mut temp_file, temp_path) =
-                    NamedTempFile::new_in(&downloads_dir)?.into_parts();
-
-                let res = bucket.get_object_stream_blocking(path.as_str(), &mut temp_file)?;
-                temp_file.flush()?;
-
-                temp_path.persist(local_file)?;
-
-                Ok(res)
-            })
-            .await??;
-            info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
-            if status_code != 200 {
-                return Err(CubeError::user(format!(
-                    "S3 download returned non OK status: {}",
-                    status_code
-                )));
-            }
+    async fn download_file(
+        &self,
+        _local_file_path: &Path,
+        mut local_file: File,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
+        let time = SystemTime::now();
+        debug!("Downloading {}", remote_path);
+        let path = self.s3_path(remote_path);
+        let bucket = self.bucket.clone();
+        let status_code = tokio::task::spawn_blocking(move || {
+            bucket.get_object_stream_blocking(path.as_str(), &mut local_file)
+        })
+        .await??;
+        info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
+        if status_code != 200 {
+            return Err(CubeError::user(format!(
+                "S3 download returned non OK status: {}",
+                status_code
+            )));
         }
-        Ok(local_file_str)
+        Ok(())
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
@@ -141,24 +105,7 @@ impl RemoteFs for S3RemoteFs {
             )));
         }
 
-        let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(remote_path);
-        if fs::metadata(local.clone()).await.is_ok() {
-            fs::remove_file(local.clone()).await?;
-            LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
-                .await?;
-        }
-
         Ok(())
-    }
-
-    async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
@@ -181,16 +128,6 @@ impl RemoteFs for S3RemoteFs {
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(result)
-    }
-
-    async fn local_path(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
-    }
-
-    async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let buf = self.dir.join(remote_path);
-        fs::create_dir_all(buf.parent().unwrap()).await?;
-        Ok(buf.to_str().unwrap().to_string())
     }
 }
 

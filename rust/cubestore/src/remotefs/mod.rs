@@ -1,17 +1,21 @@
 pub mod gcs;
 pub mod queue;
+pub mod remote_storage;
 pub mod s3;
 
 use crate::config::injection::DIService;
 use crate::di_service;
-use crate::util::lock::acquire_lock;
+use crate::remotefs::remote_storage::{list_remote, RemoteStorage};
+use crate::util::ufs;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use core::mem;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
 use std::fmt::Debug;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::{NamedTempFile, PathPersistError};
@@ -42,205 +46,186 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
         // Putting files into a subdirectory prevents cleanups from removing them.
         self.local_file(&format!("uploads/{}", remote_path)).await
     }
-
     /// In addition to uploading this file to the remote filesystem, this function moves the file
     /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
     async fn upload_file(&self, temp_upload_path: &str, remote_path: &str)
         -> Result<(), CubeError>;
-
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError>;
-
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError>;
-
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError>;
-
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError>;
-
     async fn local_path(&self) -> String;
-
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError>;
 }
 
 #[derive(Debug)]
-pub struct LocalDirRemoteFs {
-    remote_dir_for_debug: Option<PathBuf>,
-    remote_dir: RwLock<Option<PathBuf>>,
-    dir: PathBuf,
-    dir_delete_mut: Mutex<()>,
+pub struct Fs {
+    remote_storage: Arc<dyn RemoteStorage>,
+    local_dir: PathBuf,
+    delete_mut: Mutex<()>,
 }
 
-impl LocalDirRemoteFs {
-    pub fn new(remote_dir: Option<PathBuf>, dir: PathBuf) -> Arc<LocalDirRemoteFs> {
-        Arc::new(LocalDirRemoteFs {
-            remote_dir_for_debug: remote_dir.clone(),
-            remote_dir: RwLock::new(remote_dir),
-            dir,
-            dir_delete_mut: Mutex::new(()),
-        })
-    }
+di_service!(Fs, [RemoteFs]);
 
-    pub fn new_noop(dir: PathBuf) -> Arc<LocalDirRemoteFs> {
-        Arc::new(LocalDirRemoteFs {
-            remote_dir_for_debug: None,
-            remote_dir: RwLock::new(None),
-            dir,
-            dir_delete_mut: Mutex::new(()),
-        })
-    }
-
-    pub async fn drop_local_path(&self) -> Result<(), CubeError> {
-        Ok(fs::remove_dir_all(&*self.dir).await?)
+impl Fs {
+    pub fn new(remote_storage: Arc<dyn RemoteStorage>, local_dir: PathBuf) -> Fs {
+        Fs {
+            remote_storage,
+            local_dir,
+            delete_mut: Mutex::new(()),
+        }
     }
 }
-
-di_service!(LocalDirRemoteFs, [RemoteFs]);
 
 #[async_trait]
-impl RemoteFs for LocalDirRemoteFs {
+impl RemoteFs for Fs {
     async fn upload_file(
         &self,
         temp_upload_path: &str,
         remote_path: &str,
     ) -> Result<(), CubeError> {
-        if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
-            debug!("Uploading {}", remote_path);
-            let dest = remote_dir.as_path().join(remote_path);
-            fs::create_dir_all(dest.parent().unwrap())
-                .await
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Create dir {}: {}",
-                        dest.parent().as_ref().unwrap().to_string_lossy(),
-                        e
-                    ))
-                })?;
-            fs::copy(&temp_upload_path, dest.clone())
-                .await
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Copy {} -> {}: {}",
-                        temp_upload_path,
-                        dest.to_string_lossy(),
-                        e
-                    ))
-                })?;
-        }
-        let local_path = self.dir.as_path().join(remote_path);
+        self.remote_storage
+            .upload_file(temp_upload_path, remote_path)
+            .await?;
+        let local_path = self.local_dir.as_path().join(remote_path);
         if Path::new(temp_upload_path) != local_path {
-            fs::create_dir_all(local_path.parent().unwrap())
-                .await
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Create dir {}: {}",
-                        local_path.parent().as_ref().unwrap().to_string_lossy(),
-                        e
-                    ))
-                })?;
-            fs::rename(&temp_upload_path, local_path.clone())
-                .await
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Rename {} -> {}: {}",
-                        temp_upload_path,
-                        local_path.to_string_lossy(),
-                        e
-                    ))
-                })?;
+            ufs::create_dir_all(local_path.parent().unwrap()).await?;
+            ufs::rename(&temp_upload_path, local_path).await?;
         }
         Ok(())
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let mut local_file = self.dir.as_path().join(remote_path);
-        let local_dir = local_file.parent().unwrap();
-        let downloads_dir = local_dir.join("downloads");
-        fs::create_dir_all(&downloads_dir).await?;
-        if !local_file.exists() {
-            debug!("Downloading {}", remote_path);
-            if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
-                let temp_path =
-                    tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dir))
-                        .await??
-                        .into_temp_path();
-                fs::copy(remote_dir.as_path().join(remote_path), &temp_path)
-                    .await
-                    .map_err(|e| {
-                        CubeError::internal(format!(
-                            "Error during downloading of {}: {}",
-                            remote_path, e
-                        ))
-                    })?;
-                local_file =
-                    tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
-                        temp_path.persist(&local_file)?;
-                        Ok(local_file)
-                    })
-                    .await??;
-            } else {
-                return Err(CubeError::internal(format!(
-                    "File not found: {}",
-                    local_file.as_os_str().to_string_lossy()
-                )));
-            }
+        let mut local_file = self.local_dir.as_path().join(remote_path);
+        if local_file.exists() {
+            return Ok(local_file.into_os_string().into_string().unwrap());
         }
+
+        let local_dir = local_file.parent().unwrap();
+        let downloads_dirs = local_dir.join("downloads");
+        ufs::create_dir_all(&downloads_dirs).await?;
+        let (temp_file, temp_path) =
+            tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
+                .await??
+                .into_parts();
+        self.remote_storage
+            .download_file(&temp_path, temp_file, remote_path)
+            .await?;
+        local_file = tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
+            temp_path.persist(&local_file)?;
+            Ok(local_file)
+        })
+        .await??;
         Ok(local_file.into_os_string().into_string().unwrap())
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
-        debug!("Deleting {}", remote_path);
-        {
-            if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
-                let remote = remote_dir.as_path().join(remote_path);
-                if fs::metadata(remote.clone()).await.is_ok() {
-                    fs::remove_file(remote.clone()).await?;
-                    Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
-                }
-            }
-        }
+        self.remote_storage.delete_file(remote_path).await?;
 
-        let _local_guard = acquire_lock("delete file", self.dir_delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(remote_path);
+        let _guard = self.delete_mut.lock().await;
+        let local = self.local_dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
-            fs::remove_file(local.clone()).await?;
-            LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
-                .await?;
+            ufs::remove_file(local.clone()).await?;
+            LocalDirRemoteStorage::remove_empty_paths(
+                self.local_dir.as_path().to_path_buf(),
+                local.clone(),
+            )
+            .await?;
         }
 
         Ok(())
     }
 
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
+        list_remote(self.remote_storage.as_ref(), remote_prefix).await
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        let remote_dir = self.remote_dir.read().await.as_ref().cloned();
-        let result = Self::list_recursive(
-            remote_dir.clone().unwrap_or(self.dir.clone()),
-            remote_prefix.to_string(),
-            remote_dir.unwrap_or(self.dir.clone()),
-        )
-        .await?;
-        Ok(result)
+        self.remote_storage.list_with_metadata(remote_prefix).await
     }
 
     async fn local_path(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
+        self.local_dir.to_str().unwrap().to_owned()
     }
 
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let buf = self.dir.join(remote_path);
-        fs::create_dir_all(buf.parent().unwrap()).await?;
+        let buf = self.local_dir.join(remote_path);
+        ufs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }
 }
 
-impl LocalDirRemoteFs {
+#[derive(Debug)]
+pub struct LocalDirRemoteStorage {
+    remote_dir_for_debug: PathBuf,
+    remote_dir: RwLock<PathBuf>,
+}
+
+di_service!(LocalDirRemoteStorage, [RemoteStorage]);
+
+impl LocalDirRemoteStorage {
+    pub fn new(remote_dir: PathBuf) -> Arc<LocalDirRemoteStorage> {
+        Arc::new(LocalDirRemoteStorage {
+            remote_dir_for_debug: remote_dir.clone(),
+            remote_dir: RwLock::new(remote_dir),
+        })
+    }
+}
+
+#[async_trait]
+impl RemoteStorage for LocalDirRemoteStorage {
+    async fn upload_file(&self, local_path: &str, remote_path: &str) -> Result<(), CubeError> {
+        debug!("Uploading {}", remote_path);
+        let remote_dir = self.remote_dir.write().await;
+        let dest = remote_dir.as_path().join(remote_path);
+        ufs::create_dir_all(dest.parent().unwrap()).await?;
+        ufs::copy(&local_path, dest.clone()).await?;
+        Ok(())
+    }
+
+    async fn download_file(
+        &self,
+        local_file_path: &Path,
+        local_file: File,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
+        let remote_dir = self.remote_dir.write().await;
+        mem::drop(local_file);
+        ufs::copy(remote_dir.as_path().join(remote_path), &local_file_path)
+            .await
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Error during downloading of {}: {}",
+                    remote_path, e
+                ))
+            })?;
+        Ok(())
+    }
+
+    async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        debug!("Deleting {}", remote_path);
+        let remote_dir = self.remote_dir.write().await;
+        let remote = remote_dir.as_path().join(remote_path);
+        if fs::metadata(remote.clone()).await.is_ok() {
+            ufs::remove_file(remote.clone()).await?;
+            Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
+        }
+        Ok(())
+    }
+
+    async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
+        let remote_dir = self.remote_dir.read().await;
+        let result = Self::list_recursive(
+            remote_dir.clone(),
+            remote_prefix.to_string(),
+            remote_dir.clone(),
+        )
+        .await?;
+        Ok(result)
+    }
+}
+
+impl LocalDirRemoteStorage {
     fn remove_empty_paths_boxed(
         root: PathBuf,
         path: PathBuf,
@@ -252,7 +237,7 @@ impl LocalDirRemoteFs {
         if let Some(parent_path) = path.parent() {
             let mut dir = fs::read_dir(parent_path).await?;
             if dir.next_entry().await?.is_none() {
-                fs::remove_dir(parent_path).await?;
+                ufs::remove_dir(parent_path).await?;
             }
             if root != parent_path.to_path_buf() {
                 return Ok(Self::remove_empty_paths_boxed(root, parent_path.to_path_buf()).await?);
@@ -269,7 +254,7 @@ impl LocalDirRemoteFs {
         async move { Self::list_recursive(remote_dir, remote_prefix, dir).await }.boxed()
     }
 
-    pub async fn list_recursive(
+    pub(crate) async fn list_recursive(
         remote_dir: PathBuf,
         remote_prefix: String,
         dir: PathBuf,

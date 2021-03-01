@@ -16,8 +16,9 @@ use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
+use crate::remotefs::remote_storage::{NoopRemoteStorage, RemoteStorage};
 use crate::remotefs::s3::S3RemoteFs;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+use crate::remotefs::{Fs, LocalDirRemoteStorage, RemoteFs};
 use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
@@ -630,31 +631,39 @@ impl Config {
             .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
             .await;
 
+        let data_dir = self.config_obj.data_dir.clone();
         match &self.config_obj.store_provider {
             FileStoreProvider::Filesystem { remote_dir } => {
                 let remote_dir = remote_dir.clone();
-                let data_dir = self.config_obj.data_dir.clone();
-                self.injector
-                    .register("original_remote_fs", async move |_| {
-                        let arc: Arc<dyn DIService> = LocalDirRemoteFs::new(remote_dir, data_dir);
-                        arc
-                    })
-                    .await;
+                let data_dir = data_dir.clone();
+                match remote_dir {
+                    Some(remote_dir) => {
+                        self.injector
+                            .register_typed::<dyn RemoteStorage, _, _, _>(async move |_| {
+                                LocalDirRemoteStorage::new(remote_dir)
+                            })
+                            .await
+                    }
+                    None => {
+                        self.injector
+                            .register_typed::<dyn RemoteStorage, _, _, _>(async move |_| {
+                                Arc::new(NoopRemoteStorage::new(data_dir))
+                            })
+                            .await
+                    }
+                }
             }
             FileStoreProvider::S3 {
                 region,
                 bucket_name,
                 sub_path,
             } => {
-                let data_dir = self.config_obj.data_dir.clone();
                 let region = region.to_string();
                 let bucket_name = bucket_name.to_string();
                 let sub_path = sub_path.clone();
                 self.injector
-                    .register("original_remote_fs", async move |_| {
-                        let arc: Arc<dyn DIService> =
-                            S3RemoteFs::new(data_dir, region, bucket_name, sub_path).unwrap();
-                        arc
+                    .register_typed::<dyn RemoteStorage, _, _, _>(async move |_| {
+                        S3RemoteFs::new(region, bucket_name, sub_path).unwrap()
                     })
                     .await;
             }
@@ -662,19 +671,24 @@ impl Config {
                 bucket_name,
                 sub_path,
             } => {
-                let data_dir = self.config_obj.data_dir.clone();
                 let bucket_name = bucket_name.to_string();
                 let sub_path = sub_path.clone();
                 self.injector
-                    .register("original_remote_fs", async move |_| {
-                        let arc: Arc<dyn DIService> =
-                            GCSRemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
-                        arc
+                    .register_typed::<dyn RemoteStorage, _, _, _>(async move |_| {
+                        GCSRemoteFs::new(bucket_name, sub_path).unwrap()
                     })
                     .await;
             }
             FileStoreProvider::Local => unimplemented!(), // TODO
         };
+
+        self.injector
+            .register("original_remote_fs", async move |i| {
+                let arc: Arc<dyn DIService> =
+                    Arc::new(Fs::new(i.get_service_typed().await, data_dir));
+                arc
+            })
+            .await
     }
 
     async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {

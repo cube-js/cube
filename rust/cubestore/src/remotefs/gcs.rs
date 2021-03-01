@@ -1,49 +1,38 @@
 use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
-use crate::util::lock::acquire_lock;
+use crate::remotefs::remote_storage::RemoteStorage;
+use crate::remotefs::RemoteFile;
 use crate::CubeError;
 use async_trait::async_trait;
 use cloud_storage::Object;
 use futures::StreamExt;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tempfile::{NamedTempFile, PathPersistError};
-use tokio::fs;
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 #[derive(Debug)]
 pub struct GCSRemoteFs {
-    dir: PathBuf,
     bucket: String,
     sub_path: Option<String>,
-    delete_mut: Mutex<()>,
 }
 
 impl GCSRemoteFs {
-    pub fn new(
-        dir: PathBuf,
-        bucket_name: String,
-        sub_path: Option<String>,
-    ) -> Result<Arc<Self>, CubeError> {
+    pub fn new(bucket_name: String, sub_path: Option<String>) -> Result<Arc<Self>, CubeError> {
         Ok(Arc::new(Self {
-            dir,
             bucket: bucket_name.to_string(),
             sub_path,
-            delete_mut: Mutex::new(()),
         }))
     }
 }
 
-di_service!(GCSRemoteFs, [RemoteFs]);
+di_service!(GCSRemoteFs, [RemoteStorage]);
 
 #[async_trait]
-impl RemoteFs for GCSRemoteFs {
+impl RemoteStorage for GCSRemoteFs {
     async fn upload_file(
         &self,
         temp_upload_path: &str,
@@ -63,66 +52,36 @@ impl RemoteFs for GCSRemoteFs {
             "application/octet-stream",
         )
         .await?;
-        let local_path = self.dir.as_path().join(remote_path);
-        if Path::new(temp_upload_path) != local_path {
-            fs::create_dir_all(local_path.parent().unwrap())
-                .await
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Create dir {}: {}",
-                        local_path.parent().as_ref().unwrap().to_string_lossy(),
-                        e
-                    ))
-                })?;
-            fs::rename(&temp_upload_path, local_path).await?;
-        }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         Ok(())
     }
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let mut local_file = self.dir.as_path().join(remote_path);
-        let local_dir = local_file.parent().unwrap();
-        let downloads_dirs = local_dir.join("downloads");
+    async fn download_file(
+        &self,
+        _local_file_path: &Path,
+        local_file: std::fs::File,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
+        let time = SystemTime::now();
+        let mut writer = BufWriter::new(tokio::fs::File::from_std(local_file));
+        let mut stream =
+            Object::download_streamed(self.bucket.as_str(), self.gcs_path(remote_path).as_str())
+                .await?;
 
-        fs::create_dir_all(&downloads_dirs).await?;
-        if !local_file.exists() {
-            let time = SystemTime::now();
-            debug!("Downloading {}", remote_path);
-            let (temp_file, temp_path) =
-                tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
-                    .await??
-                    .into_parts();
-            let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
-            let mut stream = Object::download_streamed(
-                self.bucket.as_str(),
-                self.gcs_path(remote_path).as_str(),
-            )
-            .await?;
-
-            let mut c = 0;
-            while let Some(byte) = stream.next().await {
-                // TODO it might be very slow
-                writer.write_all(&[byte?]).await?;
-                c += 1;
-            }
-            writer.flush().await?;
-
-            local_file =
-                tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
-                    temp_path.persist(&local_file)?;
-                    Ok(local_file)
-                })
-                .await??;
-
-            info!(
-                "Downloaded {} ({:?}) ({} bytes)",
-                remote_path,
-                time.elapsed()?,
-                c
-            );
+        let mut c: usize = 0;
+        while let Some(byte) = stream.next().await {
+            // TODO it might be very slow
+            writer.write_all(&[byte?]).await?;
+            c += 1;
         }
-        Ok(local_file.into_os_string().into_string().unwrap())
+        writer.flush().await?;
+        info!(
+            "Downloaded {} ({:?}) ({} bytes)",
+            remote_path,
+            time.elapsed()?,
+            c
+        );
+        Ok(())
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
@@ -130,25 +89,7 @@ impl RemoteFs for GCSRemoteFs {
         debug!("Deleting {}", remote_path);
         Object::delete(self.bucket.as_str(), self.gcs_path(remote_path).as_str()).await?;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
-
-        let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(remote_path);
-        if fs::metadata(local.clone()).await.is_ok() {
-            fs::remove_file(local.clone()).await?;
-            LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
-                .await?;
-        }
-
         Ok(())
-    }
-
-    async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
@@ -172,16 +113,6 @@ impl RemoteFs for GCSRemoteFs {
             .flatten()
             .collect::<Vec<_>>();
         Ok(result)
-    }
-
-    async fn local_path(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
-    }
-
-    async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let buf = self.dir.join(remote_path);
-        fs::create_dir_all(buf.parent().unwrap()).await?;
-        Ok(buf.to_str().unwrap().to_string())
     }
 }
 
