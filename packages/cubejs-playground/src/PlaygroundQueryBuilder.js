@@ -78,16 +78,6 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
-function SchemaRefresher({ schemaVersion, refresh }) {
-  useEffect(() => {
-    if (schemaVersion > 0) {
-      refresh();
-    }
-  }, [schemaVersion, refresh]);
-
-  return null;
-}
-
 export default function PlaygroundQueryBuilder({
   query = {},
   apiUrl,
@@ -95,6 +85,7 @@ export default function PlaygroundQueryBuilder({
   setQuery,
   dashboardSource,
   schemaVersion = 0,
+  onSchemaChange,
 }) {
   const ref = useRef(null);
   const [framework, setFramework] = useState('react');
@@ -128,6 +119,8 @@ export default function PlaygroundQueryBuilder({
       query={query}
       setQuery={setQuery}
       wrapWithQueryRenderer={false}
+      schemaVersion={schemaVersion}
+      onSchemaChange={onSchemaChange}
       render={({
         error,
         metaError,
@@ -153,7 +146,6 @@ export default function PlaygroundQueryBuilder({
         pivotConfig,
         updatePivotConfig,
         missingMembers,
-        refresh,
         isFetchingMeta
       }) => {
         return (
@@ -375,8 +367,6 @@ export default function PlaygroundQueryBuilder({
                 )}
               </Col>
             </Row>
-
-            <SchemaRefresher schemaVersion={schemaVersion} refresh={refresh} />
           </>
         );
       }}

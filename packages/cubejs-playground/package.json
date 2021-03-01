@@ -11,7 +11,7 @@
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.26.19",
     "@cubejs-client/react": "^0.26.34",
-    "antd": "^4.8.5",
+    "antd": "4.13.0",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
     "customize-cra": "^1.0.0",

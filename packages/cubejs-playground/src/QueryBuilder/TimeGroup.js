@@ -164,6 +164,7 @@ const TimeGroup = ({
 
       {!members.length && (
         <MemberDropdown
+          disabled={disabled}
           availableMembers={availableMembers}
           type="dashed"
           icon={<PlusOutlined />}
