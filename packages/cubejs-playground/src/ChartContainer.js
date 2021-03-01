@@ -180,7 +180,7 @@ class ChartContainer extends Component {
         >
           {(chartLibraries[framework] || []).map((library) => (
             <Menu.Item key={library.value}>
-              test
+              {library.title}
             </Menu.Item>
           ))}
         </Menu>
