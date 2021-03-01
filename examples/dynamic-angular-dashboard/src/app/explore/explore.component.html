@@ -93,18 +93,6 @@
     </div>
   </div>
 
-  <div>
-    <button
-      mat-button
-      mat-raised-button
-      (click)="authService.login('alex', 'test')"
-    >
-      Log in
-    </button>
-    <p *ngIf="authService.isAuthorized">Hello, username!</p>
-    <p *ngIf="!authService.isAuthorized">guest*</p>
-  </div>
-
   <div
     style="
       margin-top: 24px;

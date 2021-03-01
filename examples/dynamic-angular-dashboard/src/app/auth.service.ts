@@ -1,12 +1,13 @@
 import { Injectable } from '@angular/core';
-import { from, pipe } from 'rxjs';
+import { BehaviorSubject, from, pipe } from 'rxjs';
 
-const wait = (delay = 2000) =>
+const wait = (delay = 200) =>
   new Promise((resolve) => setTimeout(resolve, delay));
 
 @Injectable()
 export class AuthService {
-  public token: string | null = null;
+  public token$ = new BehaviorSubject<string | null>(null);
+  public token = null;
 
   constructor() {}
 
@@ -17,14 +18,14 @@ export class AuthService {
   login(userName: string, password: string) {
     const authPromise = new Promise((resolve) =>
       setTimeout(() => {
-        this.token = `${userName}:${Math.random().toString()}`;
+        this.token$.next(`${userName}:${Math.random().toString()}`);
         resolve(`${userName}:${Math.random().toString()}`);
-      }, 2000)
+      }, 1000)
     );
     return from(authPromise);
   }
 
   logout() {
-    this.token = null;
+    this.token$.next(null);
   }
 }

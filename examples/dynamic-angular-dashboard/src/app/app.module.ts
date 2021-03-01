@@ -1,5 +1,5 @@
 import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { APP_INITIALIZER, InjectionToken, NgModule } from '@angular/core';
+import { APP_INITIALIZER, FactoryProvider, InjectionToken, NgModule, Provider } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatGridListModule } from '@angular/material/grid-list';
@@ -42,6 +42,8 @@ import { QueryRendererComponent } from './explore/query-renderer/query-renderer.
 import apolloClient from '../graphql/client';
 
 import { AuthService } from './auth.service';
+import { CubejsService } from './cubejs.service';
+import { TestingComponent } from './testing/testing.component';
 
 // const cubejsOptions = of({
 //   token: 'environment.CUBEJS_API_TOKEN',
@@ -70,8 +72,30 @@ export const cubejsOptions: CubejsConfig = {
 };
 
 export const CUBEJS_CONFIG = new InjectionToken<CubejsConfig>('config');
+export const CUBEJS_SERVICE = new InjectionToken<CubejsService>(
+  'cubejs.service'
+);
 
-function cubejsConfigFactory(authService: AuthService) {
+const cubejsConfigFactory = (authService: AuthService) => {
+  console.log(
+    'function cubejsConfigFactory(authService: AuthService) {',
+    authService.token
+  );
+  return new CubejsService(
+    authService.token$
+    // {
+    //   apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    // },
+    // authService.token$
+  );
+  // return authService.isAuthorized
+  //   ? new CubejsService(
+  //       {
+  //         apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  //       },
+  //       authService.token
+  //     )
+  //   : null;
   // return authService.isAuthorized
   //   ? {
   //       token: authService.token,
@@ -80,7 +104,13 @@ function cubejsConfigFactory(authService: AuthService) {
   //       },
   //     }
   //   : null;
-}
+};
+
+export const cubejsServiceProvider: FactoryProvider = {
+  provide: CubejsService,
+  useFactory: cubejsConfigFactory,
+  deps: [AuthService],
+};
 
 @NgModule({
   declarations: [
@@ -96,6 +126,7 @@ function cubejsConfigFactory(authService: AuthService) {
     AddToDashboardDialogComponent,
     FilterGroupComponent,
     FilterComponent,
+    TestingComponent,
   ],
   entryComponents: [SettingsDialogComponent, AddToDashboardDialogComponent],
   imports: [
@@ -124,6 +155,7 @@ function cubejsConfigFactory(authService: AuthService) {
     GridsterModule,
   ],
   providers: [
+    AuthService,
     QueryBuilderService,
     {
       provide: APOLLO_OPTIONS,
@@ -131,8 +163,8 @@ function cubejsConfigFactory(authService: AuthService) {
       deps: [HttpLink],
     },
     {
-      provide: CUBEJS_CONFIG,
-      useFactory: () => cubejsConfigFactory,
+      provide: CUBEJS_SERVICE,
+      useFactory: cubejsConfigFactory,
       deps: [AuthService],
     },
     // {
