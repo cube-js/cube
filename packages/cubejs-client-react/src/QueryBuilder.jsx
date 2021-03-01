@@ -296,7 +296,9 @@ export default class QueryBuilder extends React.Component {
           nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
           nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
 
-          this.updateVizState({ pivotConfig: nextPivotConfig });
+          this.updateVizState({
+            pivotConfig: nextPivotConfig
+          });
         },
         update: (config) => {
           const { limit } = config;
@@ -319,13 +321,12 @@ export default class QueryBuilder extends React.Component {
 
   updateQuery(queryUpdate) {
     const { query } = this.state;
-    const newQuery = {
-      ...query,
-      ...queryUpdate
-    };
 
     this.updateVizState({
-      query: newQuery
+      query: {
+        ...query,
+        ...queryUpdate,
+      },
     });
   }
 
@@ -336,7 +337,7 @@ export default class QueryBuilder extends React.Component {
     state = pick(['query', 'pivotConfig', 'chartType'], state);
 
     const finalState = this.applyStateChangeHeuristics(state);
-    if (!finalState.query) finalState.query = stateQuery;
+    if (!finalState.query) finalState.query = { ...stateQuery };
 
     if (finalState.shouldApplyHeuristicOrder) {
       finalState.query.order = defaultOrder(finalState.query);
@@ -383,7 +384,7 @@ export default class QueryBuilder extends React.Component {
 
     return {
       ...query,
-      filters: (query.filters || []).filter(f => f.operator),
+      filters: (query.filters || []).filter((f) => f.operator),
     };
   }
 
