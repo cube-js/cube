@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.41](https://github.com/cube-js/cube.js/compare/v0.26.40...v0.26.41) (2021-03-01)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** chart library title ([0f5884a](https://github.com/cube-js/cube.js/commit/0f5884a7659364250f2f4578dfc9718138b18162))
+* **@cubejs-client/playground:** meta refresh refactoring ([#2242](https://github.com/cube-js/cube.js/issues/2242)) ([b3d5085](https://github.com/cube-js/cube.js/commit/b3d5085c5dea9a563f6420927ccf2c91ea2e6ec1))
+
+
+
+
+
 ## [0.26.36](https://github.com/cube-js/cube.js/compare/v0.26.35...v0.26.36) (2021-02-25)
 
 **Note:** Version bump only for package @cubejs-client/playground
