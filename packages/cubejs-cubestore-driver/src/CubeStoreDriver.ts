@@ -21,11 +21,9 @@ export class CubeStoreDriver extends BaseDriver {
 
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
-      database: process.env.CUBEJS_DB_NAME,
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
       timezone: 'Z',
       ...restConfig,
     };
