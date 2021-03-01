@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.38",
-    "sqlite3": "^4.1.0"
+    "sqlite3": "^5.0.2"
   },
   "license": "Apache-2.0",
   "devDependencies": {
