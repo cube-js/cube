@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ChildProcess, spawn } from 'child_process';
-import { pausePromise } from '@cubejs-backend/shared';
+import { withTimeout } from '@cubejs-backend/shared';
 
 import { downloadBinaryFromRelease } from './download';
 
@@ -31,23 +31,63 @@ async function startProcess(pathToExecutable: string, config: Readonly<StartProc
     env,
   });
 
-  cubeStore.on('error', (err) => {
-    console.error('Failed to start subprocess.');
-    console.error(err);
+  return new Promise<ChildProcess>((resolve, reject) => {
+    /**
+     * Default Continue Wait timeout in Orchestrator API is 5 seconds, It's not possible to use 15 seconds
+     * because pooling will fire it again and again
+     */
+    const timeout = 4 * 1000;
 
-    process.exit(1);
+    let startupExitListener: ((code: number | null) => void) | null = null;
+
+    const startupTimeout = withTimeout(() => {
+      if (startupExitListener) {
+        cubeStore.off('exit', startupExitListener);
+      }
+
+      // Let's kill it, because it's not able to start
+      cubeStore.kill();
+
+      reject(
+        new Error(
+          `Unable to start Cube Store, timeout after ${timeout / 1000}s`
+        )
+      );
+    }, timeout);
+
+    startupExitListener = (code: number | null) => {
+      startupTimeout.cancel();
+
+      reject(
+        new Error(
+          `Cube Store exited with ${code} on startup.`
+        )
+      );
+    };
+
+    cubeStore.on('exit', startupExitListener);
+
+    const startResolver = (data: Buffer) => {
+      if (data.toString().includes('MySQL port open on')) {
+        // Clear startup timeout killer
+        startupTimeout.cancel();
+        // Disable start listener, because we resolve Promise
+        cubeStore.stdout.off('data', startResolver);
+        // Clear startup exit code listener
+        if (startupExitListener) {
+          cubeStore.off('exit', startupExitListener);
+        }
+
+        // Restart can be done, if Cube Store started. Without it we change state to null status and wait next query.
+        cubeStore.on('exit', config.onExit);
+        resolve(cubeStore);
+      }
+    };
+    cubeStore.stdout.on('data', startResolver);
+
+    cubeStore.stdout.on('data', config.stdout);
+    cubeStore.stderr.on('data', config.stderr);
   });
-
-  cubeStore.on('exit', config.onExit);
-
-  cubeStore.stdout.on('data', config.stdout);
-  cubeStore.stderr.on('data', config.stderr);
-
-  // @todo We need to implement better awaiting on startup of the Cube Store
-  // Probably, it should be IPC, because parsing stdout on message, is a bad idea
-  await pausePromise(500);
-
-  return cubeStore;
 }
 
 export function isCubeStoreSupported(): boolean {
@@ -59,47 +99,88 @@ export function isCubeStoreSupported(): boolean {
 }
 
 export class CubeStoreHandler {
-  protected cubeStore: Promise<ChildProcess> | null = null;
+  protected cubeStore: ChildProcess | null = null;
+
+  // Promise that works as mutex, but can be rejected
+  protected cubeStoreStarting: Promise<ChildProcess> | null = null;
 
   public constructor(
     protected readonly config: Readonly<CubeStoreHandlerOptions>
   ) {}
+
+  protected getBinaryPath() {
+    return path.join(__dirname, '..', 'downloaded', 'latest', 'bin', binaryName);
+  }
+
+  protected async getBinary() {
+    const pathToExecutable = this.getBinaryPath();
+
+    if (!fs.existsSync(pathToExecutable)) {
+      await downloadBinaryFromRelease();
+
+      if (!fs.existsSync(pathToExecutable)) {
+        throw new Error('Something wrong with downloading Cube Store before running it.');
+      }
+    }
+
+    return pathToExecutable;
+  }
 
   public async acquire() {
     if (this.cubeStore) {
       return this.cubeStore;
     }
 
-    // eslint-disable-next-line no-async-promise-executor
-    this.cubeStore = new Promise<ChildProcess>(async (resolve) => {
-      const pathToExecutable = path.join(__dirname, '..', 'downloaded', 'latest', 'bin', binaryName);
+    if (this.cubeStoreStarting) {
+      return this.cubeStoreStarting;
+    }
 
-      if (!fs.existsSync(pathToExecutable)) {
-        await downloadBinaryFromRelease();
+    const onExit = (code: number|null) => {
+      this.config.onRestart(code);
 
-        if (!fs.existsSync(pathToExecutable)) {
-          throw new Error('Something wrong with downloading Cube Store before running it.');
-        }
-      }
-
-      const onExit = (code: number|null) => {
-        this.config.onRestart(code);
-
-        this.cubeStore = startProcess(pathToExecutable, {
+      this.cubeStoreStarting = new Promise<ChildProcess>(
+        (resolve, reject) => startProcess(this.getBinaryPath(), {
           ...this.config,
-          onExit
+          onExit,
+        }).then((cubeStore) => {
+          this.cubeStore = cubeStore;
+          this.cubeStoreStarting = null;
+
+          resolve(cubeStore);
+        }).catch((err) => {
+          this.cubeStore = null;
+          this.cubeStoreStarting = null;
+
+          reject(err);
+        })
+      );
+    };
+
+    this.cubeStoreStarting = new Promise<ChildProcess>((resolve, reject) => this.getBinary()
+      .then((pathToExecutable) => {
+        startProcess(pathToExecutable, {
+          ...this.config,
+          onExit,
+        }).then((cubeStore) => {
+          this.cubeStore = cubeStore;
+          this.cubeStoreStarting = null;
+
+          resolve(cubeStore);
+        }).catch((err) => {
+          this.cubeStore = null;
+          this.cubeStoreStarting = null;
+
+          reject(err);
         });
-      };
+      })
+      .catch((err) => {
+        this.cubeStore = null;
+        this.cubeStoreStarting = null;
 
-      this.cubeStore = startProcess(pathToExecutable, {
-        ...this.config,
-        onExit
-      });
+        reject(err);
+      }));
 
-      resolve(this.cubeStore);
-    });
-
-    return this.cubeStore;
+    return this.cubeStoreStarting;
   }
 
   public async release() {
