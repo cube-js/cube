@@ -48,7 +48,6 @@ const StyledSelect = styled(AntdSelect)`
 
     .ant-select-selector {
       height: auto;
-      border-color: 1px solid var(--dark-05-color);
       color: var(--text-color);
       font-size: 14px;
       line-height: 22px;
@@ -58,10 +57,6 @@ const StyledSelect = styled(AntdSelect)`
       &:focus {
         border-color: var(--purple-04-color);
         color: var(--primary-color);
-      }
-
-      &:disabled {
-        border: orange;
       }
     }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { prop, uniqBy, indexBy, fromPairs } from 'ramda';
+import { prop, uniqBy, indexBy, fromPairs, equals } from 'ramda';
 import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
@@ -108,6 +108,28 @@ export default class QueryBuilder extends React.Component {
 
   async componentDidMount() {
     await this.fetchMeta();
+  }
+  
+  async componentDidUpdate(prevProps) {
+    const { schemaVersion, onSchemaChange } = this.props;
+    const { meta } = this.state;
+    
+    if (prevProps.schemaVersion !== schemaVersion) {
+      try {
+        const newMeta = await this.cubejsApi().meta();
+        if (!equals(newMeta, meta) && typeof onSchemaChange === 'function') {
+          onSchemaChange({
+            schemaVersion,
+            refresh: async () => {
+              await this.fetchMeta();
+            }
+          });
+        }
+      } catch (error) {
+        // eslint-disable-next-line
+        this.setState({ metaError: error });
+      }
+    }
   }
   
   fetchMeta = async () => {
