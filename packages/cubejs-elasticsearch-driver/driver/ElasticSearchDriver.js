@@ -52,7 +52,7 @@ class ElasticSearchDriver extends BaseDriver {
       })).body;
 
       // INFO: cloud left in place for backward compatibility
-      if (this.config.cloud || (['jdbc', 'json'].indexOf(this.config.queryFormat) > -1)) {
+      if (this.config.cloud || ['jdbc', 'json'].includes(this.config.queryFormat)) {
         const compiled = result.rows.map(
           r => result.columns.reduce((prev, cur, idx) => ({ ...prev, [cur.name]: r[idx] }), {})
         );
