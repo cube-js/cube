@@ -226,3 +226,10 @@ jobs:
           file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
+      - name: Create archive for release
+        run: |
+          mkdir cubestore-archive
+          mkdir cubestore-archive/bin
+          mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          cd cubestore-archive
+          tar cv * | gzip --best  > cubestored-${{ matrix.target }}.tar.gz

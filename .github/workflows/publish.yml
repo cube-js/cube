@@ -276,7 +276,7 @@ jobs:
           mkdir cubestore-archive/bin
           mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          tar cvf cubestored-${{ matrix.target }}.tar.gz *
+          tar cv * | gzip --best  > cubestored-${{ matrix.target }}.tar.gz
       - name: Upload Binary to Release
         uses: svenstaro/upload-release-action@v2
         with:
