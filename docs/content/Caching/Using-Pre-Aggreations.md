@@ -92,7 +92,7 @@ Alternatively, you can store external pre-aggregations in a different database, 
 In order to make this work, you should set the
 [`externalDriverFactory`][ref-config-extdriverfactory] and
 [`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
-configuration file. These properties cal also be set through the environment
+configuration file. These properties can also be set through the environment
 variables.
 
 [ref-config-extdbtype]: /config#options-reference-external-db-type
