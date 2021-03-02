@@ -20,16 +20,16 @@ export class RefreshScheduler {
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
       const queryWithDataSource = await compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource);
       const [startDate, endDate] =
-        await Promise.all(queryWithDataSource.preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
-            .map(sql => orchestratorApi.executeQuery({
-              query: sql[0],
-              values: sql[1],
-              continueWait: true,
-              cacheKeyQueries: [],
-              dataSource,
-              scheduledRefresh: true,
-            }))
-        );
+        await Promise.all(queryWithDataSource
+          .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
+          .map(sql => orchestratorApi.executeQuery({
+            query: sql[0],
+            values: sql[1],
+            continueWait: true,
+            cacheKeyQueries: [],
+            dataSource,
+            scheduledRefresh: true,
+          })));
 
       const extractDate = ({ data }: any) => {
         // TODO some backends return dates as objects here. Use ApiGateway data transformation ?

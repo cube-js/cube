@@ -119,13 +119,13 @@ export class CompilerApi {
     return createQuery(
       compilers,
       dbType, {
-      ...query,
-      dialectClass,
-      externalDialectClass: this.options.externalDialectClass,
-      externalDbType: this.options.externalDbType,
-      preAggregationsSchema: this.preAggregationsSchema,
-      allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
-    }
+        ...query,
+        dialectClass,
+        externalDialectClass: this.options.externalDialectClass,
+        externalDbType: this.options.externalDbType,
+        preAggregationsSchema: this.preAggregationsSchema,
+        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
+      }
     );
   }
 
