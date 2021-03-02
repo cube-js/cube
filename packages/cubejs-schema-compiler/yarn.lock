@@ -868,10 +868,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/linter@^0.26.0":
-  version "0.26.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.26.0.tgz#bdd9b262822c377f74a03ca236c2ad78a65acfa1"
-  integrity sha512-f9DNam1VeCu/g7wC0harScInk+kq1mzrMoIvD9m+2RKQ/iEEWXUKEYMCfLP0lZAB2Axjp1CtX+Bs96Uxo9a65g==
+"@cubejs-backend/linter@^0.26.13":
+  version "0.26.13"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.26.13.tgz#e310080205ea184e246abc2627398141f4af2b8a"
+  integrity sha512-tpjsEEUfqBaP3dNjMRLQd79M4akjNm2/lOAEPslg3VK1IX/5BCIrYdgWufwwPYjlQ8X3X79CYLQAJ+85wnXHcQ==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.8.2"
     "@typescript-eslint/parser" "^4.8.2"
@@ -880,14 +880,13 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/shared@^0.26.7":
-  version "0.26.7"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.7.tgz#3e60bad859b0b59c9386059db89d9084dfb7c289"
-  integrity sha512-yoWNLvp7OdHmsvaFkf/tnk5nYp0Uy7bLtkNLw9IcvzDp2Y6lj/JeFz40XcKVu5YuNl4Vlg2W/e+u8SsASPtpfw==
+"@cubejs-backend/shared@^0.26.35":
+  version "0.26.35"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.35.tgz#87806a385282f9e4327259924628e92cc1d95d05"
+  integrity sha512-9cKt/Z9b3mUobks/jlWyF/7xCXWOH+XuvufZuCoAE7It0tUUPnayPiZ3NhoozNl6l2oZeaiAJt1+9ddtPgieWQ==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"
-    node-machine-id "^1.1.12"
 
 "@eslint/eslintrc@^0.3.0":
   version "0.3.0"
@@ -1307,10 +1306,10 @@
   resolved "https://registry.yarnpkg.com/@types/prettier/-/prettier-2.2.0.tgz#a4e8205a4955690eef712a6d0394a1d2e121e721"
   integrity sha512-O3SQC6+6AySHwrspYn2UvC6tjo6jCTMMmylxZUFhE1CulVu5l3AxU6ca9lrJDTQDVllF62LIxVSx5fuYL6LiZg==
 
-"@types/ramda@^0.27.34":
-  version "0.27.37"
-  resolved "https://registry.yarnpkg.com/@types/ramda/-/ramda-0.27.37.tgz#5ebc0672ccfb6b3451082584fa2529ff7de472cf"
-  integrity sha512-v5DEc/GEk197BL1RTn2jyq4TTCZFmlu84+M+MCXuRjVGkIwSmmsy34lAFrOielABqKg0RePNnskbA9vCpQ6diw==
+"@types/ramda@^0.27.38":
+  version "0.27.38"
+  resolved "https://registry.yarnpkg.com/@types/ramda/-/ramda-0.27.38.tgz#797d5cdc9e00482e665dfea28142bb6c3c5f11e7"
+  integrity sha512-tZoQ0lv1WKkrpBHemL8yCkI9p8kUk/1PSMwhl0eeyqMQjD+2ePUtVLV8PpNS9Kq3OktObwOx9I3k+HumxTviRg==
   dependencies:
     ts-toolbelt "^6.15.1"
 
@@ -4381,11 +4380,6 @@ node-int64@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/node-int64/-/node-int64-0.4.0.tgz#87a9065cdb355d3182d8f94ce11188b825c68a3b"
   integrity sha1-h6kGXNs1XTGC2PlM4RGIuCXGijs=
-
-node-machine-id@^1.1.12:
-  version "1.1.12"
-  resolved "https://registry.yarnpkg.com/node-machine-id/-/node-machine-id-1.1.12.tgz#37904eee1e59b320bb9c5d6c0a59f3b469cb6267"
-  integrity sha512-QNABxbrPa3qEIfrE6GOJ7BYIuignnJw7iQ2YPbc3Nla1HzRJjXzZOiikfF8m7eAMfichLt3M4VgLOetqgDmgGQ==
 
 node-modules-regexp@^1.0.0:
   version "1.0.0"
