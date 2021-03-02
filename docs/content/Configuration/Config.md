@@ -497,7 +497,7 @@ Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
 Should be used in conjunction with
 [externalDriverFactory](#external-driver-factory) option. Either `String` or
-`Function` could be passed. Providing a `Function` allows to dynamically select
+`Function` could be passed. Providing a `Function` allows you to dynamically select
 a database type depending on the user's context. It is usually used in
 [Multitenancy Setup][ref-multitenancy].
 
