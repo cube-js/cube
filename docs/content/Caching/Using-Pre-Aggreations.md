@@ -86,7 +86,7 @@ cube(`Orders`, {
 ## Pre-Aggregations Storage
 
 When using **external** pre-aggregations, Cube.js will
-store pre-aggregations inside its own storage - Cube Store.
+store pre-aggregations inside its own purpose-built storage layer: Cube Store.
 
 Alternatively, you can store external pre-aggregations in the different database, such MySQL or Postgres.
 In order to make it work, you should set the
