@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.43](https://github.com/cube-js/cube.js/compare/v0.26.42...v0.26.43) (2021-03-02)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** loading state colors ([#2252](https://github.com/cube-js/cube.js/issues/2252)) ([c7d1da4](https://github.com/cube-js/cube.js/commit/c7d1da45d9c258ffa6411c0fc31ea29c0f1d3fc1))
+
+
+
+
+
 ## [0.26.41](https://github.com/cube-js/cube.js/compare/v0.26.40...v0.26.41) (2021-03-01)
 
 
