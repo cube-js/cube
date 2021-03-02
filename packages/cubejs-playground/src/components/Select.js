@@ -6,6 +6,7 @@ const StyledSelect = styled(AntdSelect)`
     &.ant-select-disabled {
       .ant-select-selector {
         border-color: var(--disabled-color);
+        background-color: white;
       }
 
       .ant-select-selector {

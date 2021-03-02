@@ -52,7 +52,8 @@ module.exports = {
   'btn-text-shadow': 'none',
   'modal-body-padding': '32px',
   'form-item-margin-bottom': '23px',
-  'disabled-color': color('dark-04'),
+  
+  'disabled-color': color('dark-01', .25),
   'disabled-bg': color('dark-05', .2),
 
   // menu

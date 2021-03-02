@@ -86,6 +86,7 @@ const RemoveButtonGroup = styled(UnstyledRemoveButtonGroup)`
     color: var(--disabled-color);
 
     .ant-btn {
+      background-color: var(--disabled-bg);
       color: var(--disabled-color);
       border: none;
 
