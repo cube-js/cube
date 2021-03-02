@@ -1,3 +1,6 @@
+use crate::util::time_span::warn_long;
+use std::time::Duration;
+
 /// Ask the memory allocator to returned the freed memory to the system.
 /// This only has effect when compiled for glibc, this is a no-op on other systems.
 ///
@@ -10,6 +13,7 @@
 /// **have been already freed**.
 #[cfg(all(target_os = "linux", not(target_env = "musl")))] // Musl doesnt support malloc_trim, probably only gnu has it.
 pub fn trim_allocs() {
+    let _s = warn_long("malloc_trim", Duration::from_millis(100));
     unsafe {
         malloc_trim(0);
     }

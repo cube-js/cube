@@ -1,5 +1,6 @@
 pub mod maybe_owned;
 pub mod ordfloat;
+pub mod time_span;
 
 use crate::CubeError;
 use log::error;

@@ -31,6 +31,7 @@ use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
+use crate::util::time_span::{warn_long, warn_long_fut};
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use arrow::datatypes::TimeUnit::Microsecond;
@@ -1629,6 +1630,7 @@ impl RocksMetaStore {
         R: Send + 'static,
     {
         let db = self.db.write().await;
+        let db_span = warn_long("metastore write operation", Duration::from_millis(100));
         let mem_seq = MemorySequence {
             seq_store: self.seq_store.clone(),
         };
@@ -1651,6 +1653,7 @@ impl RocksMetaStore {
             .await??;
 
         mem::drop(db);
+        mem::drop(db_span);
 
         self.write_notify.notify_waiters();
 
@@ -1849,7 +1852,12 @@ impl RocksMetaStore {
         F: for<'a> FnOnce(DbTableRef<'a>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        let db = self.db.read().await;
+        let db = warn_long_fut(
+            "metastore acquire read lock",
+            Duration::from_millis(50),
+            self.db.read(),
+        )
+        .await;
         let mem_seq = MemorySequence {
             seq_store: self.seq_store.clone(),
         };
