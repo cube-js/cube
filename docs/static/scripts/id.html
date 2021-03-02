@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+</head>
+<body>
+<script>
+  function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function getCookie(name) {
+    var matches = document.cookie.match(new RegExp(
+      "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+    ))
+    const res = matches ? decodeURIComponent(matches[1]) : undefined
+    window.console.log(`getCookie: ${name}`, res)
+    debugger
+    return res;
+  }
+
+  function setCookie(name, value, options) {
+
+    window.console.log(`setCookie: ${name} = ${value}`, options)
+    const encode = function(value){
+      try {
+        return encodeURIComponent(value);
+      } catch (e) {
+        debug('error `encode(%o)` - %o', value, e)
+      }
+    }
+    options = options || {};
+    var str = encode(name) + '=' + encode(value);
+
+    if (null == value) options.maxage = -1;
+
+    if (options.maxage) {
+      options.expires = new Date(+new Date + options.maxage);
+    }
+
+    if (options.path) str += '; path=' + options.path;
+    if (options.domain) str += '; domain=' + options.domain;
+    if (options.expires) str += '; expires=' + options.expires.toUTCString();
+    if (options.secure) str += '; secure';
+    if (options.sameSite) str += '; SameSite=' + options.sameSite;
+
+    document.cookie = str;
+  }
+
+  const COOKIE_ID = "cubedev_anonymous";
+  const COOKIE_DOMAIN = ".cube.dev";
+  const MAX_AGE = 365 * 24 * 60 * 60 * 1000; // 1 year
+
+  let clientAnonymousId = getCookie(COOKIE_ID)
+  if (!clientAnonymousId) {
+    clientAnonymousId = uuidv4()
+    setCookie(COOKIE_ID, clientAnonymousId, { domain: COOKIE_DOMAIN, maxage: MAX_AGE, secure:true, sameSite:'None'})
+  }
+
+  window.top.postMessage({clientAnonymousId}, '*')
+</script>
+</body>
+</html>
