@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import tar from 'tar';
-import fs, { mkdirSync, WriteStream } from 'fs';
+import fs, { WriteStream } from 'fs';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import { throttle } from 'throttle-debounce';
 import { internalExceptions } from '@cubejs-backend/shared';
@@ -9,6 +9,7 @@ import cli from 'cli-ux';
 import process from 'process';
 import { Octokit } from '@octokit/core';
 import * as path from 'path';
+import { mkdirpSync } from 'fs-extra';
 
 import { detectLibc } from './utils';
 
@@ -58,7 +59,13 @@ export async function streamWithProgress(
   );
 }
 
-export async function downloadAndExtractFile(url: string, fileName: string, workingDirectory: string) {
+export function getBinaryPath() {
+  const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored';
+
+  return path.join(path.resolve(__dirname, '..'), 'downloaded', 'latest', 'bin', binaryName);
+}
+
+export async function downloadAndExtractFile(url: string) {
   const request = new Request(url, {
     headers: new Headers({
       'Content-Type': 'application/octet-stream'
@@ -75,15 +82,16 @@ export async function downloadAndExtractFile(url: string, fileName: string, work
   });
   bar.start(100, 0);
 
+  const cubestorePath = path.dirname(getBinaryPath());
+
   try {
-    mkdirSync(path.join(workingDirectory, 'downloaded'));
-    mkdirSync(path.join(workingDirectory, 'downloaded', 'latest'));
+    mkdirpSync(cubestorePath);
   } catch (e) {
     internalExceptions(e);
   }
 
   const writer = tar.x({
-    cwd: path.join(workingDirectory, 'downloaded', 'latest'),
+    cwd: cubestorePath,
   });
 
   await streamWithProgress(response, <WriteStream>writer, ({ progress, speed, eta }) => {
@@ -129,6 +137,30 @@ async function fetchRelease(version: string) {
   return data;
 }
 
+function parseInfoFromAssetName(assetName: string): { target: string, type: string, format: string } | null {
+  if (assetName.startsWith('cubestored-')) {
+    const fileName = assetName.slice('cubestored-'.length);
+    const targetAndType = fileName.slice(0, fileName.indexOf('.'));
+    const format = fileName.slice(fileName.indexOf('.') + 1);
+
+    if (targetAndType.endsWith('-shared')) {
+      return {
+        target: targetAndType.substr(0, targetAndType.length - '-shared'.length),
+        format,
+        type: 'shared'
+      };
+    }
+
+    return {
+      target: targetAndType,
+      format,
+      type: 'static'
+    };
+  }
+
+  return null;
+}
+
 export async function downloadBinaryFromRelease() {
   // eslint-disable-next-line global-require
   const { version } = require('../package.json');
@@ -141,19 +173,14 @@ export async function downloadBinaryFromRelease() {
       );
     }
 
-    const target = getTarget();
+    const currentTarget = getTarget();
 
     for (const asset of release.assets) {
-      const fileName = asset.name.substr(0, asset.name.length - 7);
-      if (fileName.startsWith('cubestored-')) {
-        const assetTarget = fileName.substr('cubestored-'.length);
-        if (assetTarget === target) {
-          return downloadAndExtractFile(
-            asset.browser_download_url,
-            asset.name,
-            path.resolve(__dirname, '..')
-          );
-        }
+      const assetInfo = parseInfoFromAssetName(asset.name);
+      if (assetInfo && assetInfo.target === currentTarget
+        && assetInfo.type === 'static' && assetInfo.format === 'tar.gz'
+      ) {
+        return downloadAndExtractFile(asset.browser_download_url);
       }
     }
 
