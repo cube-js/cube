@@ -116,6 +116,8 @@ databases [in this guide][link-connecting-to-db].
 
 [link-aws-regions]:
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[link-elastic-api-keys]:
+  https://www.elastic.co/guide/en/kibana/master/api-keys.html#create-api-key
 [link-cubejs-databases]: /connecting-to-the-database
 [link-nodejs-tls-options]:
   https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
