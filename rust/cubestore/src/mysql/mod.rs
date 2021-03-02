@@ -1,6 +1,7 @@
 use crate::config::processing_loop::ProcessingLoop;
 use crate::sql::{SqlQueryContext, SqlService};
 use crate::table::TableValue;
+use crate::util::time_span::warn_long;
 use crate::{metastore, CubeError};
 use async_trait::async_trait;
 use hex::ToHex;
@@ -8,6 +9,7 @@ use log::{error, info, warn};
 use msql_srv::*;
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 use std::time::SystemTime;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
@@ -65,6 +67,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
             return Ok(());
         }
+        let _s = warn_long("sending query results", Duration::from_millis(100));
         let data_frame = res.unwrap();
         let columns = data_frame
             .get_columns()
