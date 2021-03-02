@@ -1,6 +1,9 @@
 pub mod injection;
 pub mod processing_loop;
 
+use crate::cluster::transport::{
+    ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
+};
 use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
 use crate::config::injection::{get_service, get_service_typed, DIService, Injector, InjectorRef};
 use crate::config::processing_loop::ProcessingLoop;
@@ -630,14 +633,28 @@ impl Config {
         let (event_sender, _) = broadcast::channel(10000); // TODO config
         let event_sender_to_move = event_sender.clone();
 
-        if let Some(meta_store_remote) = self.config_obj.metastore_remote_address() {
-            let meta_store_remote = meta_store_remote.clone();
+        self.injector
+            .register_typed::<dyn ClusterTransport, _, _, _>(async move |i| {
+                ClusterTransportImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        if let Some(_) = self.config_obj.metastore_remote_address() {
+            self.injector
+                .register_typed::<dyn MetaStoreTransport, _, _, _>(async move |i| {
+                    MetaStoreTransportImpl::new(i.get_service_typed().await)
+                })
+                .await;
+        }
+
+        if self
+            .injector
+            .has_service_typed::<dyn MetaStoreTransport>()
+            .await
+        {
             self.injector
                 .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
-                    let transport = ClusterMetaStoreClient::new(
-                        meta_store_remote,
-                        get_service_typed::<dyn ConfigObj>(&i).await,
-                    );
+                    let transport = ClusterMetaStoreClient::new(i.get_service_typed().await);
                     Arc::new(MetaStoreRpcClient::new(transport))
                 })
                 .await;
@@ -749,6 +766,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     cluster_meta_store_sender,
+                    i.get_service_typed().await,
                 )
             })
             .await;

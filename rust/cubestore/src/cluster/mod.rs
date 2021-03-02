@@ -1,5 +1,6 @@
 pub mod message;
 
+pub mod transport;
 #[cfg(not(target_os = "windows"))]
 pub mod worker_pool;
 
@@ -7,6 +8,7 @@ pub mod worker_pool;
 use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
 
 use crate::cluster::message::NetworkMessage;
+use crate::cluster::transport::{ClusterTransport, MetaStoreTransport};
 use crate::config::injection::DIService;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
@@ -79,6 +81,10 @@ pub trait Cluster: DIService + Send + Sync {
     async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError>;
 
     async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError>;
+
+    async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage;
+
+    async fn process_metastore_message(&self, m: NetworkMessage) -> NetworkMessage;
 }
 
 crate::di_service!(MockCluster, [Cluster]);
@@ -96,6 +102,7 @@ pub struct ClusterImpl {
     chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
     import_service: Arc<dyn ImportService>,
+    cluster_transport: Arc<dyn ClusterTransport>,
     connect_timeout: Duration,
     server_name: String,
     server_addresses: Vec<String>,
@@ -161,7 +168,7 @@ impl Cluster for ClusterImpl {
         if self.server_name == node_name {
             self.job_notify.notify_waiters();
         } else {
-            self.send_to_worker(&node_name, &NetworkMessage::NotifyJobListeners)
+            self.send_to_worker(&node_name, NetworkMessage::NotifyJobListeners)
                 .await?;
         }
         Ok(())
@@ -246,6 +253,43 @@ impl Cluster for ClusterImpl {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
         Ok(())
+    }
+
+    async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
+        match m {
+            NetworkMessage::Select(plan) => {
+                let res = self.run_local_select_serialized(plan).await;
+                NetworkMessage::SelectResult(res)
+            }
+            NetworkMessage::WarmupDownload(remote_path) => {
+                let res = self.remote_fs.download_file(&remote_path).await;
+                NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
+            }
+            NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
+                panic!("result sent to worker");
+            }
+            NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
+                panic!("MetaStoreCall sent to worker");
+            }
+            NetworkMessage::NotifyJobListeners => {
+                self.job_notify.notify_waiters();
+                NetworkMessage::NotifyJobListenersSuccess
+            }
+            NetworkMessage::NotifyJobListenersSuccess => {
+                panic!("NotifyJobListenersSuccess sent to worker")
+            }
+        }
+    }
+
+    async fn process_metastore_message(&self, m: NetworkMessage) -> NetworkMessage {
+        match m {
+            NetworkMessage::MetaStoreCall(method_call) => {
+                let server = MetaStoreRpcServer::new(self.meta_store.clone());
+                let res = server.invoke_method(method_call).await;
+                NetworkMessage::MetaStoreCallResult(res)
+            }
+            x => panic!("Unexpected message: {:?}", x),
+        }
     }
 }
 
@@ -459,6 +503,7 @@ impl ClusterImpl {
         config_obj: Arc<dyn ConfigObj>,
         query_executor: Arc<dyn QueryExecutor>,
         meta_store_sender: Sender<MetaStoreEvent>,
+        cluster_transport: Arc<dyn ClusterTransport>,
     ) -> Arc<ClusterImpl> {
         let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
         Arc::new(ClusterImpl {
@@ -470,6 +515,7 @@ impl ClusterImpl {
             compaction_service,
             import_service,
             meta_store,
+            cluster_transport,
             job_notify: Arc::new(Notify::new()),
             meta_store_sender,
             jobs_enabled: Arc::new(RwLock::new(true)),
@@ -555,11 +601,11 @@ impl ClusterImpl {
     pub async fn send_to_worker(
         &self,
         worker_node: &str,
-        m: &NetworkMessage,
+        m: NetworkMessage,
     ) -> Result<NetworkMessage, CubeError> {
-        let mut stream = timeout(self.connect_timeout, TcpStream::connect(worker_node)).await??;
-        m.send(&mut stream).await?;
-        return Ok(NetworkMessage::receive(&mut stream).await?);
+        self.cluster_transport
+            .send_to_worker(worker_node.to_string(), m)
+            .await
     }
 
     pub async fn listen_on_worker_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
@@ -633,43 +679,6 @@ impl ClusterImpl {
                     error!("Network error: {}", e)
                 }
             });
-        }
-    }
-
-    async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
-        match m {
-            NetworkMessage::Select(plan) => {
-                let res = self.run_local_select_serialized(plan).await;
-                NetworkMessage::SelectResult(res)
-            }
-            NetworkMessage::WarmupDownload(remote_path) => {
-                let res = self.remote_fs.download_file(&remote_path).await;
-                NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
-            }
-            NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
-                panic!("result sent to worker");
-            }
-            NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
-                panic!("MetaStoreCall sent to worker");
-            }
-            NetworkMessage::NotifyJobListeners => {
-                self.job_notify.notify_waiters();
-                NetworkMessage::NotifyJobListenersSuccess
-            }
-            NetworkMessage::NotifyJobListenersSuccess => {
-                panic!("NotifyJobListenersSuccess sent to worker")
-            }
-        }
-    }
-
-    async fn process_metastore_message(&self, m: NetworkMessage) -> NetworkMessage {
-        match m {
-            NetworkMessage::MetaStoreCall(method_call) => {
-                let server = MetaStoreRpcServer::new(self.meta_store.clone());
-                let res = server.invoke_method(method_call).await;
-                NetworkMessage::MetaStoreCallResult(res)
-            }
-            x => panic!("Unexpected message: {:?}", x),
         }
     }
 
@@ -831,7 +840,7 @@ impl ClusterImpl {
         } else {
             timeout(
                 Duration::from_secs(self.config_obj.query_timeout()),
-                self.send_to_worker(node_name, &m),
+                self.send_to_worker(node_name, m),
             )
             .await?
         }
@@ -839,15 +848,13 @@ impl ClusterImpl {
 }
 
 pub struct ClusterMetaStoreClient {
-    meta_remote_addr: String,
-    config: Arc<dyn ConfigObj>,
+    meta_store_transport: Arc<dyn MetaStoreTransport>,
 }
 
 impl ClusterMetaStoreClient {
-    pub fn new(meta_remote_addr: String, config: Arc<dyn ConfigObj>) -> Arc<Self> {
+    pub fn new(meta_store_transport: Arc<dyn MetaStoreTransport>) -> Arc<Self> {
         Arc::new(Self {
-            meta_remote_addr,
-            config,
+            meta_store_transport,
         })
     }
 }
@@ -859,13 +866,7 @@ impl MetaStoreRpcClientTransport for ClusterMetaStoreClient {
         method_call: MetaStoreRpcMethodCall,
     ) -> Result<MetaStoreRpcMethodResult, CubeError> {
         let m = NetworkMessage::MetaStoreCall(method_call);
-        let mut stream = timeout(
-            Duration::from_secs(self.config.connection_timeout()),
-            TcpStream::connect(self.meta_remote_addr.to_string()),
-        )
-        .await??;
-        m.send(&mut stream).await?;
-        let message = NetworkMessage::receive(&mut stream).await?;
+        let message = self.meta_store_transport.meta_store_call(m).await?;
         Ok(match message {
             NetworkMessage::MetaStoreCallResult(res) => res,
             x => panic!("Unexpected message: {:?}", x),
