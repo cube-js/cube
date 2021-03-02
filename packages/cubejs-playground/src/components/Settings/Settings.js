@@ -10,6 +10,7 @@ export default function Settings({
   pivotConfig,
   orderMembers,
   limit,
+  disabled,
   onMove,
   onUpdate,
   onReorder,
@@ -36,7 +37,7 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button disabled={!isQueryPresent} style={{ border: 0 }}>
+        <Button disabled={!isQueryPresent || disabled} style={{ border: 0 }}>
           Pivot
         </Button>
       </Popover>
@@ -54,7 +55,7 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button disabled={!isQueryPresent} style={{ border: 0 }}>
+        <Button disabled={!isQueryPresent || disabled} style={{ border: 0 }}>
           Order
         </Button>
       </Popover>
@@ -68,7 +69,7 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button disabled={!isQueryPresent} style={{ border: 0 }}>
+        <Button disabled={!isQueryPresent || disabled} style={{ border: 0 }}>
           Limit
         </Button>
       </Popover>

@@ -277,6 +277,7 @@ export default function PlaygroundQueryBuilder({
                     isQueryPresent={isQueryPresent}
                     limit={query.limit}
                     pivotConfig={pivotConfig}
+                    disabled={isFetchingMeta}
                     orderMembers={orderMembers}
                     onReorder={updateOrder.reorder}
                     onOrderChange={updateOrder.set}

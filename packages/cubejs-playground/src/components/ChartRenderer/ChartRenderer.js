@@ -70,6 +70,7 @@ export default function ChartRenderer({
   onChartRendererReadyChange,
 }) {
   const [slowQuery, setSlowQuery] = useState(false);
+  const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
   const [isQueryLoading, setQueryLoading] = useState(true);
   const [queryError, setQueryError] = useState(null);
@@ -112,7 +113,8 @@ export default function ChartRenderer({
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
 
-          setSlowQuery(Boolean(loadResponse.slowQuery));
+          setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
+          Boolean(loadResponse.slowQuery) && setSlowQuery(false);
           setQueryLoading(false);
           setQueryError(null);
         }
@@ -131,6 +133,7 @@ export default function ChartRenderer({
           (progress.stage.timeElapsed || 0) >= 5000;
 
         setSlowQuery(isQuerySlow);
+        isQuerySlow && setSlowQueryFromCache(false);
       },
       onChartRendererReady() {
         onChartRendererReadyChange(true);
@@ -186,12 +189,18 @@ export default function ChartRenderer({
     return null;
   };
 
+  const slowQueryMsg = slowQuery
+    ? 'This query takes more than 5 seconds to execute. Please consider using pre-aggregations to improve its performance. '
+    : slowQueryFromCache
+    ? 'This query takes more than 5 seconds to execute. It was served from the cache because Cube.js wasn\'t able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. '
+    : '';
+
   return (
     <>
-      {slowQuery && (
+      {(slowQuery || slowQueryFromCache) && (
         <Alert
           style={{ marginBottom: 24 }}
-          message="Query is too slow to be renewed during the user request and was served from the cache. Please consider using low latency pre-aggregations."
+          message={slowQueryMsg}
           type="warning"
         />
       )}
