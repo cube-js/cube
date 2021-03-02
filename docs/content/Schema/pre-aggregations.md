@@ -459,7 +459,7 @@ cube(`Orders`, {
 
 ## Read Only Data Source Pre-Aggregations
 
-In some cases it may not be possible to stage pre-aggregation query results in
+In some cases, it may not be possible to stage pre-aggregation query results in
 materialized tables in the source database. For example, the database driver may
 not support it, or the source database may be read-only.
 
