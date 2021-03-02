@@ -266,9 +266,12 @@ cube(`Orders`, {
 
 **Cube Cloud Feature Only**
 
+<!-- prettier-ignore-start -->
 [[info |]]
 | [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
 | an account yet, you can [sign up to the waitlist here][link-cube-cloud].
+<!-- prettier-ignore-end -->
+
 [link-cube-cloud]: https://cube.dev/cloud
 
 Auto rollup is an extension to rollup which instructs Cube.js to select rollup
