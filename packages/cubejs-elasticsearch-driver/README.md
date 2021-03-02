@@ -8,8 +8,7 @@
 # Cube.js Elasticsearch Database Driver
 
 Elasticsearch driver.
-It has been originally built for OpenDistro version (local and cloud-hosted).
-Later enhanced to work with native Elasticsearch and one hosted on elastic.co.
+Works with OpenDistro, native and elastic.co hosted versions of Elasticsearch.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
