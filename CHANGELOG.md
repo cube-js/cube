@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.44](https://github.com/cube-js/cube.js/compare/v0.26.43...v0.26.44) (2021-03-02)
+
+
+### Bug Fixes
+
+* **schema-compiler:** @types/ramda is a dev dependecy, dont ship it ([0a87d11](https://github.com/cube-js/cube.js/commit/0a87d1152f454e0e4d9c30c3295ee975dd493d0d))
+
+
+### Features
+
+* **examples:** add simple example project for `asyncModule()` ([d6bbab7](https://github.com/cube-js/cube.js/commit/d6bbab7dc7c67307dbb44fdfd23da78d41bc7d4e))
+
+
+
+
+
 ## [0.26.43](https://github.com/cube-js/cube.js/compare/v0.26.42...v0.26.43) (2021-03-02)
 
 

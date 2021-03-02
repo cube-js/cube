@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/docker",
-  "version": "0.26.43",
+  "version": "0.26.44",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -10,9 +10,9 @@
     "@cubejs-backend/bigquery-driver": "^0.26.38",
     "@cubejs-backend/clickhouse-driver": "^0.26.38",
     "@cubejs-backend/cubestore": "^0.26.43",
-    "@cubejs-backend/cubestore-driver": "^0.26.43",
-    "@cubejs-backend/dremio-driver": "^0.26.38",
-    "@cubejs-backend/druid-driver": "^0.26.38",
+    "@cubejs-backend/cubestore-driver": "^0.26.44",
+    "@cubejs-backend/dremio-driver": "^0.26.44",
+    "@cubejs-backend/druid-driver": "^0.26.44",
     "@cubejs-backend/elasticsearch-driver": "^0.26.38",
     "@cubejs-backend/hive-driver": "^0.26.38",
     "@cubejs-backend/mongobi-driver": "^0.26.38",
@@ -21,10 +21,10 @@
     "@cubejs-backend/oracle-driver": "^0.26.38",
     "@cubejs-backend/postgres-driver": "^0.26.38",
     "@cubejs-backend/prestodb-driver": "^0.26.38",
-    "@cubejs-backend/server": "^0.26.43",
+    "@cubejs-backend/server": "^0.26.44",
     "@cubejs-backend/snowflake-driver": "^0.26.38",
     "@cubejs-backend/sqlite-driver": "^0.26.41",
-    "cubejs-cli": "^0.26.43",
+    "cubejs-cli": "^0.26.44",
     "typescript": "~4.1.2"
   }
 }
