@@ -21,8 +21,7 @@ table.
 If Cube.js finds a suitable pre-aggregation rule, database querying becomes a
 multi-stage process:
 
-1. Cube.js checks if an up-to-date copy of the pre-aggregation exists. If one is
-   not found or outdated, a new pre-aggregation table will be created.
+1. Cube.js checks if an up-to-date copy of the pre-aggregation exists.
 
 2. Cube.js will execute a query against the pre-aggregated tables instead of the
    raw data.
@@ -49,26 +48,6 @@ Pre-aggregations names should:
 
 Pre-aggregations must include all dimensions, measures, and filters you will
 query with.
-
-## Original SQL
-
-Original SQL pre-aggregation is the simplest type of pre-aggregation. As the
-name suggests, it persists the results of the SQL query of the cube in which it
-is defined.
-
-For example, to pre-aggregate all completed orders, you could do the following:
-
-```javascript
-cube(`CompletedOrders`, {
-  sql: `select * from orders where completed = true`,
-
-  preAggregations: {
-    main: {
-      type: `originalSql`,
-    },
-  },
-});
-```
 
 ## Rollup
 
@@ -118,7 +97,6 @@ pre-aggregation can be used by following algorithm:
    set, all query filter dimensions are included in query dimensions and that
    the rollup defines exact set of dimensions and all measures used in the
    query.
-
 **Explanation of terms:**
 
 - A query is **Leaf Measure Additive** if all of its **Leaf Measures** are
@@ -196,6 +174,7 @@ cube(`Orders`, {
   preAggregations: {
     categoryAndDate: {
       type: `rollup`,
+      external: true,
       measureReferences: [Orders.count, revenue],
       dimensionReferences: [category],
       timeDimensionReference: createdAt,
@@ -236,6 +215,7 @@ cube(`Orders`, {
   preAggregations: {
     categoryAndDate: {
       type: `rollup`,
+      external: true,
       measureReferences: [Orders.count, revenue],
       dimensionReferences: [category],
       timeDimensionReference: createdAt,
@@ -271,6 +251,7 @@ cube(`Orders`, {
   preAggregations: {
     categoryAndDate: {
       type: `rollup`,
+      external: true,
       measureReferences: [Orders.count, revenue],
       segmentReferences: [toys],
       timeDimensionReference: createdAt,
@@ -283,7 +264,15 @@ cube(`Orders`, {
 
 ## Auto Rollup
 
-**Enterprise Feature Only**
+**Cube Cloud Feature Only**
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
+| an account yet, you can [sign up to the waitlist here][link-cube-cloud].
+<!-- prettier-ignore-end -->
+
+[link-cube-cloud]: https://cube.dev/cloud
 
 Auto rollup is an extension to rollup which instructs Cube.js to select rollup
 measures and dimensions at query time. Cube.js uses the query history to select
@@ -327,103 +316,25 @@ On the other hand, more granular rollup tables reduce average response times. In
 some cases, the column count in a rollup can also affect its refresh
 performance.
 
-## External Pre-Aggregations
+## Original SQL
 
-You should use this option for scenarios where you need to handle high
-throughput for a big data backend. It allows downloading rollups and original
-SQL pre-aggregations prepared in big data backends such as AWS Athena, BigQuery,
-Presto, Hive and others to low latency databases such as MySQL for actual
-querying.
+Original SQL pre-aggregation is the simplest type of pre-aggregation. As the
+name suggests, it persists the results of the SQL query of the cube in which it
+is defined.
 
-While big data backends aren't very suitable for handling massive amounts of
-concurrent queries even on pre-aggregated data, many single-node RDBMS can do it
-very well if the cardinality of data is not too large. Leveraging this nuance
-allows the creation of a setup where you can query huge amounts of data with
-sub-second response times at the cost of pre-aggregation download time.
-
-To set it up, simply add the `external` property to your pre-aggregation:
+For example, to pre-aggregate all completed orders, you could do the following:
 
 ```javascript
-cube(`Orders`, {
-  sql: `select * from orders`,
-
-  //...
+cube(`CompletedOrders`, {
+  sql: `select * from orders where completed = true`,
 
   preAggregations: {
-    categoryAndDate: {
-      type: `rollup`,
-      measureReferences: [Orders.count, revenue],
-      dimensionReferences: [category],
-      timeDimensionReference: createdAt,
-      granularity: `day`,
-      partitionGranularity: `month`,
-      external: true,
+    main: {
+      type: `originalSql`,
     },
   },
 });
 ```
-
-In order to make external pre-aggregations work, you should set the
-[`externalDriverFactory`][ref-config-extdriverfactory] and
-[`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
-configuration file. These properties cal also be set through [environment
-variables][ref-connect-db-ext].
-
-Note that by default, Cube.js materializes the pre-aggregation query results as
-new tables in the source database. For external pre-aggregations, these source
-tables are temporary - once downloaded and uploaded to the external database,
-they are cleaned up.
-
-## Read Only Data Source Pre-Aggregations
-
-In some cases it may not be possible to stage pre-aggregation query results in
-materialized tables in the source database. For example, the database driver may
-not support it, or the source database may be read-only.
-
-To fallback to a strategy where the pre-aggregation query results are downloaded
-without first being materialized, set the `readOnly` property of
-[`driverFactory`][ref-config-driverfactory] in your configuration:
-
-```javascript
-const CubejsServer = require('@cubejs-backend/server');
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
-const options = {
-  driverFactory: () =>
-    new PostgresDriver({
-      readOnly: true,
-    }),
-  externalDbType: 'postgres',
-  externalDriverFactory: () =>
-    new PostgresDriver({
-      host: 'my_host',
-      database: 'my_db',
-      user: 'my_user',
-      password: 'my_pw',
-    }),
-};
-```
-
-### Limitations
-
-<!-- prettier-ignore-start -->
-[[warning |]]
-| The following recommendations are only suitable for small pre-aggregations
-| since they are stored on the local Cube.js deployment. We **do not**
-| recommend using `readOnly` mode for production workloads.
-<!-- prettier-ignore-end -->
-
-By default, Cube.js uses temporary tables to extract data types from executed
-query while `readOnly` is `false`. If the driver is used in `readOnly` mode, it
-will use heuristics to extract data types from the database's response, but this
-strategy has certain limitations:
-
-- The aggregation results can be empty, and Cube.js will throw an exception
-  because it is impossible to detect types
-- Data types can be incorrectly inferred, in rare cases
-
-We highly recommend leaving `readOnly` unset or explicitly setting it to `false`
-when using drivers for external pre-aggregations.
 
 ## refreshKey
 
@@ -547,6 +458,50 @@ cube(`Orders`, {
   },
 });
 ```
+
+
+## Read Only Data Source Pre-Aggregations
+
+In some cases, it may not be possible to stage pre-aggregation query results in
+materialized tables in the source database. For example, the database driver may
+not support it, or the source database may be read-only.
+
+To fallback to a strategy where the pre-aggregation query results are downloaded
+without first being materialized, set the `readOnly` property of
+[`driverFactory`][ref-config-driverfactory] in your configuration:
+
+```javascript
+const PostgresDriver = require('@cubejs-backend/postgres-driver');
+
+module.exports = {
+  driverFactory: () =>
+    new PostgresDriver({
+      readOnly: true,
+    })
+};
+```
+
+### Limitations
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| The following recommendations are only suitable for small pre-aggregations
+| since they are stored on the local Cube.js deployment. We **do not**
+| recommend using `readOnly` mode for production workloads.
+<!-- prettier-ignore-end -->
+
+By default, Cube.js uses temporary tables to extract data types from executed
+query while `readOnly` is `false`. If the driver is used in `readOnly` mode, it
+will use heuristics to extract data types from the database's response, but this
+strategy has certain limitations:
+
+- The aggregation results can be empty, and Cube.js will throw an exception
+  because it is impossible to detect types
+- Data types can be incorrectly inferred, in rare cases
+
+We highly recommend leaving `readOnly` unset or explicitly setting it to `false`
+when using drivers for external pre-aggregations.
+
 
 ## useOriginalSqlPreAggregations
 
@@ -721,6 +676,55 @@ cube(`Orders`, {
   },
 });
 ```
+## External vs Internal Pre-Aggregations
+
+In Cube.js, pre-aggregations are called **external** when they are flagged with
+`external: true` which instructs Cube.js to store pre-aggregations inside its own
+storage - Cube Store.
+
+If pre-aggregations aren't flagged `extenal: true` they are considered **internal** and will be saved and
+queried from the source database.
+
+<!-- prettier-ignore-start -->
+[[info | ]]
+| We recommend always using **external** pre-aggregations for better concurrency and performance.
+<!-- prettier-ignore-end -->
+
+You should use external pre-aggregations for scenarios where you need to handle high
+throughput for a big data backend. It allows downloading rollups and original
+SQL pre-aggregations prepared in big data backends such as AWS Athena, BigQuery,
+Presto, Hive and others to Cube Store for low latency and high throughput querying.
+
+While big data backends aren't very suitable for handling massive amounts of
+concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage can do it
+very well.
+
+To set it up, simply add the `external` property to your pre-aggregation:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  //...
+
+  preAggregations: {
+    categoryAndDate: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      dimensionReferences: [category],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+      external: true,
+    },
+  },
+});
+```
+
+Note that by default, Cube.js materializes the pre-aggregation query results as
+new tables in the source database. For external pre-aggregations, these source
+tables are temporary - once downloaded and uploaded to the external database,
+they are cleaned up.
 
 ## Pre-aggregations Garbage Collection
 
@@ -737,8 +741,6 @@ orphaned tables are dropped from the database.
 [ref-connect-db-ext]:
   /connecting-to-the-database#external-pre-aggregations-database
 [ref-config-driverfactory]: /config/#options-reference-driver-factory
-[ref-config-extdbtype]: /config#options-reference-external-db-type
-[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
 [ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
 [ref-cube-refreshkey]: /cube#parameters-refresh-key
 [ref-production-checklist-refresh]:

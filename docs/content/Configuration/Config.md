@@ -26,13 +26,11 @@ You can provide the following configuration options to Cube.js.
 ```typescript
 interface CubejsConfiguration {
   dbType: string | ((context: RequestContext) => string);
-  externalDbType: string | ((context: RequestContext) => string);
   schemaPath: string;
   basePath: string;
   webSocketsBasePath: string;
   logger: (msg: string, params: object) => any;
   driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>;
-  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
   contextToAppId: (context: RequestContext) => string;
   contextToOrchestratorId: (context: RequestContext) => string;
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
@@ -70,6 +68,8 @@ interface CubejsConfiguration {
     subject?: string;
     claimsNamespace?: string;
   },
+  externalDbType: string | ((context: RequestContext) => string);
+  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
   orchestratorOptions: {
     redisPrefix: string;
     queryCacheOptions: {
@@ -122,16 +122,6 @@ If no option is passed, Cube.js will lookup for environment variable
 
 Called only once per [`appId`][ref-opts-ctx-to-appid].
 
-### externalDbType
-
-Should be used in conjunction with
-[externalDriverFactory](#external-driver-factory) option. Either `String` or
-`Function` could be passed. Providing a `Function` allows to dynamically select
-a database type depending on the user's context. It is usually used in
-[Multitenancy Setup][ref-multitenancy].
-
-Called only once per [`appId`][ref-opts-ctx-to-appid].
-
 ### schemaPath
 
 Path to schema files. The default value is `/schema`.
@@ -178,31 +168,6 @@ module.exports = {
 };
 ```
 
-### externalDriverFactory
-
-Set database driver for external rollup database. Please refer to [External
-Rollup][ref-preagg-ext-rollup] documentation for more guidance. The function
-accepts a context object as an argument to allow dynamically loading database
-drivers, which is usually used for [Multitenant deployments][ref-multitenancy].
-
-Called once per [`appId`][ref-opts-ctx-to-appid]. Can return a `Promise` that
-resolves to a driver.
-
-```javascript
-const MySQLDriver = require('@cubejs-backend/mysql-driver');
-
-module.exports = {
-  externalDbType: 'mysql',
-  externalDriverFactory: () =>
-    new MySQLDriver({
-      host: process.env.CUBEJS_EXT_DB_HOST,
-      database: process.env.CUBEJS_EXT_DB_NAME,
-      port: process.env.CUBEJS_EXT_DB_PORT,
-      user: process.env.CUBEJS_EXT_DB_USER,
-      password: process.env.CUBEJS_EXT_DB_PASS,
-    }),
-};
-```
 
 ### contextToAppId
 
@@ -526,6 +491,43 @@ JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+
+
+### externalDbType
+
+Should be used in conjunction with
+[`externalDriverFactory`](#external-driver-factory) option. Either `String` or
+`Function` could be passed. Providing a `Function` allows you to dynamically select
+a database type depending on the user's context. It is usually used in
+[Multitenancy Setup][ref-multitenancy].
+
+Called only once per [`appId`][ref-opts-ctx-to-appid].
+
+### externalDriverFactory
+
+Set database driver for external rollup database. Please refer to [External
+Rollup][ref-preagg-ext-rollup] documentation for more guidance. The function
+accepts a context object as an argument to allow dynamically loading database
+drivers, which is usually used for [Multitenant deployments][ref-multitenancy].
+
+Called once per [`appId`][ref-opts-ctx-to-appid]. Can return a `Promise` that
+resolves to a driver.
+
+```javascript
+const MySQLDriver = require('@cubejs-backend/mysql-driver');
+
+module.exports = {
+  externalDbType: 'mysql',
+  externalDriverFactory: () =>
+    new MySQLDriver({
+      host: process.env.CUBEJS_EXT_DB_HOST,
+      database: process.env.CUBEJS_EXT_DB_NAME,
+      port: process.env.CUBEJS_EXT_DB_PORT,
+      user: process.env.CUBEJS_EXT_DB_USER,
+      password: process.env.CUBEJS_EXT_DB_PASS,
+    }),
+};
+```
 
 ### orchestratorOptions
 

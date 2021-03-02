@@ -34,8 +34,6 @@ Cube.js currently provides connectors to the following databases:
 [link-cubejs-driver-guide]:
   https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver
 
-## Source Database
-
 When you create a new Cube.js app with the [Cube.js CLI][link-cubejs-cli], the
 `.env` will be generated to manage all connection credentials. The set of
 variables could be different based on your database type. For example, for
@@ -68,24 +66,6 @@ databases:
 | Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`                                                                                                                                                            |
 | SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
 
-## External Pre-aggregations Database
-
-To enable [external pre-aggregations][link-external-preaggregation] you need to
-configure an external database to store these pre-aggregations.
-
-[link-external-preaggregation]: pre-aggregations#external-pre-aggregations
-
-Cube.js provides a set of environment variables to configure a connection to an
-external database:
-
-```bash
-CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_EXT_DB_PORT=<YOUR_DB_PORT_HERE>
-CUBEJS_EXT_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
-```
 
 ## Enabling SSL
 
