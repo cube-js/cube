@@ -21,6 +21,7 @@
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@cubejs-backend/linter": "^0.26.13",
     "@types/bytes": "^3.1.0",
     "@types/node": "^10.17.54",
     "@types/node-fetch": "^2.5.8",
@@ -32,7 +33,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@cubejs-backend/linter": "^0.26.13",
     "@cubejs-backend/shared": "^0.26.35",
     "@oclif/color": "^0.1.2",
     "@octokit/core": "^3.2.5",
