@@ -72,6 +72,8 @@ const dotEnv = env => {
 
 const gitIgnore = `.env
 node_modules
+.cubestore
+upstream
 `;
 
 const serverlessYml = env => `service: ${env.projectName}
