@@ -30,6 +30,13 @@ describe('index.test', () => {
       .toBeInstanceOf(CubejsServerCore);
   });
 
+  test('Should create instance of CubejsServerCore, dbType as async func', async () => {
+    const options = { dbType: async () => <DatabaseType>'postgres' };
+
+    expect(new CubejsServerCore(options))
+      .toBeInstanceOf(CubejsServerCore);
+  });
+
   test('Should throw error, unknown dbType', () => {
     const options = { dbType: <any>'unknown-db' };
 
