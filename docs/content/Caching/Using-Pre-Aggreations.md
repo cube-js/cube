@@ -89,7 +89,7 @@ When using **external** pre-aggregations, Cube.js will
 store pre-aggregations inside its own purpose-built storage layer: Cube Store.
 
 Alternatively, you can store external pre-aggregations in a different database, such MySQL or Postgres.
-In order to make it work, you should set the
+In order to make this work, you should set the
 [`externalDriverFactory`][ref-config-extdriverfactory] and
 [`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
 configuration file. These properties cal also be set through the environment
