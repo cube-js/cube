@@ -59,10 +59,14 @@ export async function streamWithProgress(
   );
 }
 
+export function getCubeStorePath() {
+  return path.join(path.resolve(__dirname, '..'), 'downloaded', 'latest');
+}
+
 export function getBinaryPath() {
   const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored';
 
-  return path.join(path.resolve(__dirname, '..'), 'downloaded', 'latest', 'bin', binaryName);
+  return path.join(getCubeStorePath(), 'bin', binaryName);
 }
 
 export async function downloadAndExtractFile(url: string) {
@@ -82,7 +86,7 @@ export async function downloadAndExtractFile(url: string) {
   });
   bar.start(100, 0);
 
-  const cubestorePath = path.dirname(getBinaryPath());
+  const cubestorePath = getCubeStorePath();
 
   try {
     mkdirpSync(cubestorePath);
