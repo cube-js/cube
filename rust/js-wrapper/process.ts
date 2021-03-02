@@ -1,11 +1,8 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { ChildProcess, spawn } from 'child_process';
 import { withTimeout } from '@cubejs-backend/shared';
 
-import { downloadBinaryFromRelease } from './download';
-
-const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored';
+import { downloadBinaryFromRelease, getBinaryPath } from './download';
 
 export interface CubeStoreHandlerOptions {
   stdout: (data: Buffer) => void;
@@ -108,12 +105,8 @@ export class CubeStoreHandler {
     protected readonly config: Readonly<CubeStoreHandlerOptions>
   ) {}
 
-  protected getBinaryPath() {
-    return path.join(__dirname, '..', 'downloaded', 'latest', 'bin', binaryName);
-  }
-
   protected async getBinary() {
-    const pathToExecutable = this.getBinaryPath();
+    const pathToExecutable = getBinaryPath();
 
     if (!fs.existsSync(pathToExecutable)) {
       await downloadBinaryFromRelease();
@@ -139,7 +132,7 @@ export class CubeStoreHandler {
       this.config.onRestart(code);
 
       this.cubeStoreStarting = new Promise<ChildProcess>(
-        (resolve, reject) => startProcess(this.getBinaryPath(), {
+        (resolve, reject) => startProcess(getBinaryPath(), {
           ...this.config,
           onExit,
         }).then((cubeStore) => {
