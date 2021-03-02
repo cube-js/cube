@@ -66,6 +66,12 @@ databases:
 | Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`                                                                                                                                                            |
 | SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
 
+## Multiple Databases
+
+Cube.js supports connection to multiple databases out-of-the-box. Please refer
+to [Multitenancy Guide][link-multitenancy] to learn more.
+
+[link-multitenancy]: /multitenancy-setup
 
 ## Enabling SSL
 
@@ -139,6 +145,33 @@ for more details. More info on AWS RDS SSL can be found
 [link-aws-rds-docs]:
   https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
 
+### Google Cloud SQL Postgres
+
+You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
+`true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how
+you are [connecting to Cloud SQL][link-cloud-sql-connect].
+
+[link-cloud-sql-connect]:
+  https://cloud.google.com/sql/docs/postgres/connect-functions#connecting_to
+
+### Heroku Postgres
+
+Unless you're using a Private or Shield Heroku Postgres database, Heroku Postgres does not currently support verifiable certificates. [Here is the description of the issue from Heroku](https://help.heroku.com/3DELT3RK/why-can-t-my-third-party-utility-connect-to-heroku-postgres-with-ssl).
+
+As a workaround you can set `rejectUnauthorized` option to `false` in the
+Cube.js Postgres driver.
+
+```js
+const PostgresDriver = require('@cubejs-backend/postgres-driver');
+module.exports = {
+  driverFactory: () => new PostgresDriver({
+    ssl: {
+      rejectUnauthorized: false
+    }
+  })
+};
+```
+
 ### AWS Athena
 
 For Athena, you'll need to specify the AWS access and secret keys with the
@@ -174,14 +207,6 @@ You can learn more about acquiring Google BigQuery credentials
 [link-bigquery-credentials]:
   https://console.cloud.google.com/apis/credentials/serviceaccountkey
 
-### Google Cloud SQL Postgres
-
-You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
-`true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how
-you are [connecting to Cloud SQL][link-cloud-sql-connect].
-
-[link-cloud-sql-connect]:
-  https://cloud.google.com/sql/docs/postgres/connect-functions#connecting_to
 
 ### MySQL
 
@@ -211,9 +236,3 @@ to `true`.
 [link-enabling-ssl]: #enabling-ssl
 [link-clickhouse-readonly]: https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
 
-### Connecting to Multiple Databases
-
-Cube.js supports connection to multiple databases out-of-the-box. Please refer
-to [Multitenancy Guide][link-multitenancy] to learn more.
-
-[link-multitenancy]: /multitenancy-setup
