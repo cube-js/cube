@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.42](https://github.com/cube-js/cube.js/compare/v0.26.41...v0.26.42) (2021-03-02)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** host must be 127.0.0.1 for CubeStoreDevDriver ([435d4d6](https://github.com/cube-js/cube.js/commit/435d4d68ba4e4d136fda210da6eda997bc22a686))
+
+
+
+
+
 ## [0.26.40](https://github.com/cube-js/cube.js/compare/v0.26.39...v0.26.40) (2021-03-01)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver
