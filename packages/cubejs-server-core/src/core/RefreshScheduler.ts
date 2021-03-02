@@ -13,15 +13,14 @@ export class RefreshScheduler {
 
   protected async refreshQueriesForPreAggregation(context, compilerApi: CompilerApi, preAggregation, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
-    const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
+    const query = await compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity) {
       const dataSource = query.cubeDataSource(preAggregation.cube);
 
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+      const queryWithDataSource = await compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource);
       const [startDate, endDate] =
-        await Promise.all(
-          compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
-            .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
+        await Promise.all(queryWithDataSource.preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
             .map(sql => orchestratorApi.executeQuery({
               query: sql[0],
               values: sql[1],
@@ -52,7 +51,7 @@ export class RefreshScheduler {
           dateRange
         }]
       };
-      const partitionQuery = compilerApi.createQueryByDataSource(compilers, baseQuery);
+      const partitionQuery = await compilerApi.createQueryByDataSource(compilers, baseQuery);
       const { partitionDimension } = partitionQuery.preAggregations.partitionDimension(preAggregation);
       return partitionDimension.timeSeries().map(range => ({
         ...baseQuery,
@@ -132,7 +131,7 @@ export class RefreshScheduler {
 
   protected async refreshCubesRefreshKey(context, compilerApi: CompilerApi, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
-    const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
+    const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;

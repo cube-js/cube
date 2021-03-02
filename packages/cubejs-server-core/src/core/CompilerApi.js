@@ -43,7 +43,7 @@ export class CompilerApi {
     return this.compilers;
   }
 
-  getDbType(dataSource) {
+  async getDbType(dataSource) {
     if (typeof this.dbType === 'function') {
       return this.dbType({ dataSource: dataSource || 'default' });
     }
@@ -57,25 +57,25 @@ export class CompilerApi {
   async getSql(query, options) {
     options = options || {};
     const { includeDebugInfo } = options;
-    const dbType = this.getDbType();
+    const dbType = await this.getDbType();
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = this.createQueryByDataSource(compilers, query);
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query);
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
 
     const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
 
-    if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
+    if (dataSource !== 'default' && dbType !== await this.getDbType(dataSource)) {
       // TODO consider more efficient way than instantiating query
-      sqlGenerator = this.createQueryByDataSource(
+      sqlGenerator = await this.createQueryByDataSource(
         compilers,
         query,
         dataSource
       );
 
       if (!sqlGenerator) {
-        throw new Error(`Can't find dialect for '${dataSource}' data source: ${this.getDbType(dataSource)}`);
+        throw new Error(`Can't find dialect for '${dataSource}' data source: ${await this.getDbType(dataSource)}`);
       }
     }
 
@@ -109,8 +109,8 @@ export class CompilerApi {
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  createQueryByDataSource(compilers, query, dataSource) {
-    const dbType = this.getDbType(dataSource);
+  async createQueryByDataSource(compilers, query, dataSource) {
+    const dbType = await this.getDbType(dataSource);
 
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
@@ -119,13 +119,13 @@ export class CompilerApi {
     return createQuery(
       compilers,
       dbType, {
-        ...query,
-        dialectClass,
-        externalDialectClass: this.options.externalDialectClass,
-        externalDbType: this.options.externalDbType,
-        preAggregationsSchema: this.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
-      }
+      ...query,
+      dialectClass,
+      externalDialectClass: this.options.externalDialectClass,
+      externalDbType: this.options.externalDbType,
+      preAggregationsSchema: this.preAggregationsSchema,
+      allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
+    }
     );
   }
 
