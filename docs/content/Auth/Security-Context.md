@@ -2,7 +2,7 @@
 title: Security Context
 permalink: /security/context
 category: Authentication & Authorization
-menuOrder: 1
+menuOrder: 2
 ---
 
 Your authentication server issues JWTs to your client application, which, when
