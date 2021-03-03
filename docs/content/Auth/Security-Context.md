@@ -103,45 +103,10 @@ SELECT
 LIMIT 10000
 ```
 
-## Custom authentication
 
-Cube.js also allows you to provide your own JWT verification logic by setting a
-[`checkAuth()`][link-check-auth-ref] function in the `cube.js` configuration
-file. This function is expected to verify a JWT and assigns its' claims to the
-security context.
-
-<!-- prettier-ignore-start -->
-[[warning | Note]]
-| Previous versions of Cube.js allowed setting a `checkAuthMiddleware()`
-| parameter, which is now deprecated. We advise [migrating to a newer version
-| of Cube.js][link-migrate-cubejs].
-<!-- prettier-ignore-end -->
-
-For example, if you're using AWS Cognito:
-
-```javascript
-const jwt = require('jsonwebtoken');
-const fetch = require('node-fetch');
-
-module.exports = {
-  checkAuth: async (req, auth) => {
-    // Replace `region` and `userPoolId` with your own
-    const jwks = await fetch(
-      'https://cognito-idp.{region}.amazonaws.com/{userPoolId}/.well-known/jwks.json'
-    ).then((r) => r.json());
-    const decoded = jwt.decode(auth, { complete: true });
-    const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
-    const pem = jwkToPem(jwk);
-    req.securityContext = jwt.verify(auth, pem);
-  },
-};
-```
 
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
-[link-check-auth-ref]: /config#options-reference-check-auth
-[link-migrate-cubejs]:
-  /configuration/overview#migration-from-express-to-docker-template
 [link-multitenancy]: /multitenancy-setup
 [ref-config-sec-ctx]: /config#request-context-security-context
 [ref-schema-sec-ctx]: /cube#context-variables-security-context
