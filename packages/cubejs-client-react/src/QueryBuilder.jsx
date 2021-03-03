@@ -1,6 +1,6 @@
 import React from 'react';
 import { prop, uniqBy, indexBy, fromPairs, equals } from 'ramda';
-import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers } from '@cubejs-client/core';
+import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers, movePivotItem } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 
