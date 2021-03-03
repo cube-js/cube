@@ -238,6 +238,7 @@ export default class QueryBuilder extends React.Component {
       meta,
       metaError,
       query,
+      queryError,
       orderMembers = [],
       chartType,
       pivotConfig,
@@ -265,6 +266,7 @@ export default class QueryBuilder extends React.Component {
       meta,
       metaError,
       query,
+      error: queryError, // Match same name as QueryRenderer prop
       validatedQuery,
       isQueryPresent: this.isQueryPresent(),
       chartType,
@@ -427,7 +429,8 @@ export default class QueryBuilder extends React.Component {
       ...finalState,
       query: nextQuery,
       orderMembers: currentOrderMembers,
-      missingMembers
+      missingMembers,
+      queryError: null,
     });
     
     let pivotQuery = {};
@@ -460,6 +463,9 @@ export default class QueryBuilder extends React.Component {
         }
       } catch (error) {
         console.error(error);
+        this.setState({
+          queryError: error
+        });
       }
     }
   }
