@@ -641,6 +641,7 @@ declare module '@cubejs-client/core' {
      */
     tableColumns(pivotConfig?: PivotConfig): TableColumn[];
 
+    tableRow(): ChartPivotRow;
     query(): Query;
     rawData(): T[];
     annotation(): QueryAnnotations;
