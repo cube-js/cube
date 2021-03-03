@@ -206,8 +206,43 @@ const cubejsApi = cubejs(
 You can optionally store this token in local storage or in a cookie, so that you
 can then use it to query the Cube.js API.
 
+## Custom authentication
+
+Cube.js also allows you to provide your own JWT verification logic by setting a
+[`checkAuth()`][ref-config-check-auth] function in the `cube.js` configuration
+file. This function is expected to verify a JWT and assigns its' claims to the
+security context.
+
+<!-- prettier-ignore-start -->
+[[warning | Note]]
+| Previous versions of Cube.js allowed setting a `checkAuthMiddleware()`
+| parameter, which is now deprecated. We advise [migrating to a newer version
+| of Cube.js][ref-config-migrate-cubejs].
+<!-- prettier-ignore-end -->
+
+As an example, if you needed to retrieve user information from an LDAP server,
+you might do the following:
+
+```javascript
+const jwt = require('jsonwebtoken');
+
+module.exports = {
+  checkAuth: async (req, auth) => {
+    try {
+      const userInfo = await getUserFromLDAP(req.get('X-LDAP-User-ID'));
+      req.securityContext = userInfo;
+    } catch {
+      throw new Error('Could not authenticate user from LDAP');
+    }
+  },
+};
+```
+
 [link-jwt-docs]:
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
+[ref-config-check-auth]: /config#options-reference-check-auth
+[ref-config-migrate-cubejs]:
+  /configuration/overview#migration-from-express-to-docker-template
 [ref-sec-ctx]: /security/context
