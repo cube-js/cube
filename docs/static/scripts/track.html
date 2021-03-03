@@ -16,14 +16,10 @@
       "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
     ))
     const res = matches ? decodeURIComponent(matches[1]) : undefined
-    window.console.log(`getCookie: ${name}`, res)
-    debugger
     return res;
   }
 
   function setCookie(name, value, options) {
-
-    window.console.log(`setCookie: ${name} = ${value}`, options)
     const encode = function(value){
       try {
         return encodeURIComponent(value);
