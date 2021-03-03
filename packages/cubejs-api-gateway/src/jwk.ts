@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import crypto from 'crypto';
-import { asyncMemoize, asyncRetry } from '@cubejs-backend/shared';
+import { asyncMemoizeBackground, asyncRetry, BackgroundMemoizeOptions } from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
 import jwkToPem from 'jwk-to-pem';
 import { JWTOptions } from './interfaces';
@@ -47,10 +47,12 @@ function parseCacheControl(header: string) {
   return result;
 }
 
-export const createJWKsFetcher = (options: JWTOptions) => {
-  const fetchJwkUrl = asyncMemoize(async (url: string) => {
+export type JWKsFetcherOptions = Pick<BackgroundMemoizeOptions<any, any>, 'onBackgroundException'>;
+
+export const createJWKsFetcher = (jwtOptions: JWTOptions, options: JWKsFetcherOptions) => {
+  const fetchJwkUrl = asyncMemoizeBackground(async (url: string) => {
     const response = await asyncRetry(() => fetch(url), {
-      times: options.jwkRetry || 3,
+      times: jwtOptions.jwkRetry || 3,
     });
     const json = await response.json();
 
@@ -90,15 +92,18 @@ export const createJWKsFetcher = (options: JWTOptions) => {
         return lifeTime;
       }
 
-      if (options.jwkDefaultExpire) {
-        return options.jwkDefaultExpire * 1000;
+      if (jwtOptions.jwkDefaultExpire) {
+        return jwtOptions.jwkDefaultExpire * 1000;
       }
 
       return 5 * 60 * 1000;
     },
+    // 1 minute is ok, if rotation will be done it will be refreshed by jwkRefetchWindow
+    backgroundRefreshInterval: 60 * 1000,
+    ...options,
   });
 
-  const jwkRefetchWindow = options.jwkRefetchWindow || 60 * 1000;
+  const jwkRefetchWindow = jwtOptions.jwkRefetchWindow || 60 * 1000;
 
   return {
     // Fetch only, it's needed to speedup first auth
@@ -127,6 +132,9 @@ export const createJWKsFetcher = (options: JWTOptions) => {
       }
 
       return null;
-    }
+    },
+    release: fetchJwkUrl.release,
   };
 };
+
+export type JWKSFetcher = ReturnType<typeof createJWKsFetcher>;
