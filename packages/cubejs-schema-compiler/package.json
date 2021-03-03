@@ -43,7 +43,7 @@
     "@babel/traverse": "^7.12.10",
     "@babel/types": "^7.12.12",
     "@hapi/joi": "^15.1.1",
-    "antlr4ts": "^0.5.0-alpha.4",
+    "antlr4ts": "0.5.0-alpha.4",
     "cron-parser": "^2.16.3",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
