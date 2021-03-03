@@ -22,10 +22,11 @@ declare module '@cubejs-client/core' {
      */
     headers?: Record<string, string>;
     credentials?: 'omit' | 'same-origin' | 'include';
+    method?: 'GET' | 'PUT' | 'POST' | 'PATCH'
   };
 
   export interface ITransport {
-    request(method: string, params: any): () => Promise<void>;
+    request(method: string, params: Record<string, unknown>): () => Promise<void>;
   }
 
   /**
@@ -33,6 +34,11 @@ declare module '@cubejs-client/core' {
    * @order 3
    */
   export class HttpTransport implements ITransport {
+    protected authorization: TransportOptions['authorization'];
+    protected apiUrl: TransportOptions['apiUrl'];
+    protected method: TransportOptions['method'];
+    protected headers: TransportOptions['headers'];
+    protected credentials: TransportOptions['credentials'];
     constructor(options: TransportOptions);
     request(method: string, params: any): () => Promise<any>;
   }
