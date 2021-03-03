@@ -117,7 +117,7 @@ class CubejsApi {
         if (!options.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
         }
-        
+
         const error = new RequestError(body.error, body); // TODO error class
         if (callback) {
           callback(error);
@@ -198,7 +198,7 @@ class CubejsApi {
       callback
     );
   }
-  
+
   dryRun(query, options, callback) {
     return this.loadMethod(
       () => this.request('dry-run', { query }),
@@ -231,6 +231,7 @@ export {
   moveItemInArray,
   defaultOrder,
   flattenFilters,
+  getQueryMembers,
   getOrderMembersFromOrder,
   GRANULARITIES
 } from './utils';

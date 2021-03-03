@@ -15,10 +15,11 @@ class MongoBIDriver extends BaseDriver {
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
       ssl: this.getSslOptions(),
-      authSwitchHandler: (data, cb) => {
-        const password = config.password || process.env.CUBEJS_DB_PASS || '';
-        const buffer = Buffer.from((password).concat('\0'));
-        cb(null, buffer);
+      authPlugins: {
+        mysql_clear_password: () => () => {
+          const password = config.password || process.env.CUBEJS_DB_PASS || '';
+          return Buffer.from((password).concat('\0'));
+        }
       },
       ...config
     };

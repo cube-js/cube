@@ -103,8 +103,15 @@ class AppContainer {
     }
 
     const toInstall = R.toPairs(dependencies)
-      .filter(([dependency]) => !packageJson.dependencies[dependency])
-      .map(([dependency, version]) => (version !== 'latest' ? `${dependency}@${version}` : dependency));
+      .map(([dependency, version]) => {
+        const currentDependency = (version !== 'latest' ? `${dependency}@${version}` : dependency);
+        if (!packageJson.dependencies[dependency] || version !== 'latest') {
+          return currentDependency;
+        }
+      
+        return false;
+      })
+      .filter(Boolean);
 
     if (toInstall.length) {
       await this.executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(this.appPath) });

@@ -1,5 +1,7 @@
 use crate::CubeError;
+use async_trait::async_trait;
 use deadqueue::unlimited;
+use futures::future::join_all;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
@@ -11,6 +13,7 @@ use std::marker::PhantomData;
 use std::panic;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::Builder;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 
@@ -19,10 +22,9 @@ pub struct WorkerPool<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static,
 > {
-    // TODO stop implementation
-    workers: Vec<Arc<WorkerProcess<T, R, P>>>,
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     stopped_tx: watch::Sender<bool>,
+    workers: Vec<Arc<WorkerProcess<T, R, P>>>,
     processor: PhantomData<P>,
 }
 
@@ -34,12 +36,13 @@ pub struct Message<
     sender: Sender<Result<R, CubeError>>,
 }
 
+#[async_trait]
 pub trait MessageProcessor<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    fn process(args: T) -> Result<R, CubeError>;
+    async fn process(args: T) -> Result<R, CubeError>;
 }
 
 impl<
@@ -55,21 +58,29 @@ impl<
         let mut workers = Vec::new();
 
         for _ in 0..num {
-            let process = Arc::new(WorkerProcess::new(
+            let process = Arc::new(WorkerProcess::<T, R, P>::new(
                 queue.clone(),
                 timeout.clone(),
                 stopped_rx.clone(),
             ));
             workers.push(process.clone());
-            tokio::spawn(async move { process.processing_loop().await });
         }
 
         WorkerPool {
-            workers: workers,
             stopped_tx,
             queue,
+            workers,
             processor: PhantomData,
         }
+    }
+
+    pub async fn wait_processing_loops(&self) {
+        let futures = self
+            .workers
+            .iter()
+            .map(|w| w.processing_loop())
+            .collect::<Vec<_>>();
+        join_all(futures).await;
     }
 
     pub async fn process(&self, message: T) -> Result<R, CubeError> {
@@ -82,10 +93,7 @@ impl<
     }
 
     pub async fn stop_workers(&self) -> Result<(), CubeError> {
-        self.stopped_tx.broadcast(true)?;
-        for worker in self.workers.iter() {
-            worker.finished_notify.notified().await;
-        }
+        self.stopped_tx.send(true)?;
         Ok(())
     }
 }
@@ -127,53 +135,52 @@ impl<
             let process = self.spawn_process();
 
             match process {
-                Ok((mut args_tx, mut res_rx, mut handle)) => loop {
-                    let mut stopped_rx = self.stopped_rx.write().await;
-                    let Message { message, sender } = tokio::select! {
-                        stopped = stopped_rx.recv() => {
-                            if let Some(x) = stopped {
-                                if x {
-                                    <WorkerProcess<T, R, P>>::kill(&mut handle);
-                                    self.finished_notify.notify();
+                Ok((mut args_tx, mut res_rx, mut handle)) => {
+                    scopeguard::defer!(<WorkerProcess<T, R, P>>::kill(&mut handle));
+                    loop {
+                        let mut stopped_rx = self.stopped_rx.write().await;
+                        let Message { message, sender } = tokio::select! {
+                            res = stopped_rx.changed() => {
+                                if res.is_err() || *stopped_rx.borrow() {
+                                    self.finished_notify.notify_waiters();
                                     return;
                                 }
+                                continue;
                             }
-                            continue;
-                        }
-                        message = self.queue.pop() => {
-                            message
-                        }
-                    };
-                    let process_message_res_timeout = tokio::time::timeout(
-                        self.timeout,
-                        self.process_message(message, args_tx, res_rx),
-                    )
-                    .await;
-                    let process_message_res = match process_message_res_timeout {
-                        Ok(r) => r,
-                        Err(e) => Err(CubeError::internal(format!(
-                            "Timed out after waiting for {}",
-                            e
-                        ))),
-                    };
-                    match process_message_res {
-                        Ok((res, a, r)) => {
-                            if sender.send(Ok(res)).is_err() {
-                                error!("Error during worker message processing: Send Error");
+                            message = self.queue.pop() => {
+                                message
                             }
-                            args_tx = a;
-                            res_rx = r;
-                        }
-                        Err(e) => {
-                            error!("Error during worker message processing: {}", e);
-                            if sender.send(Err(e.clone())).is_err() {
-                                error!("Error during worker message processing: Send Error");
+                        };
+                        let process_message_res_timeout = tokio::time::timeout(
+                            self.timeout,
+                            self.process_message(message, args_tx, res_rx),
+                        )
+                        .await;
+                        let process_message_res = match process_message_res_timeout {
+                            Ok(r) => r,
+                            Err(e) => Err(CubeError::internal(format!(
+                                "Timed out after waiting for {}",
+                                e
+                            ))),
+                        };
+                        match process_message_res {
+                            Ok((res, a, r)) => {
+                                if sender.send(Ok(res)).is_err() {
+                                    error!("Error during worker message processing: Send Error");
+                                }
+                                args_tx = a;
+                                res_rx = r;
                             }
-                            <WorkerProcess<T, R, P>>::kill(&mut handle);
-                            break;
+                            Err(e) => {
+                                error!("Error during worker message processing: {}", e);
+                                if sender.send(Err(e.clone())).is_err() {
+                                    error!("Error during worker message processing: Send Error");
+                                }
+                                break;
+                            }
                         }
                     }
-                },
+                }
                 Err(e) => {
                     error!("Can't start process: {}", e);
                 }
@@ -210,19 +217,23 @@ impl<
     > {
         let (args_tx, args_rx) = ipc::channel()?;
         let (res_tx, res_rx) = ipc::channel()?;
-        let handle = procspawn::spawn((args_rx, res_tx), |(rx, tx)| loop {
-            let res = rx.recv();
-            match res {
-                Ok(args) => {
-                    let send_res = tx.send(P::process(args));
-                    if let Err(e) = send_res {
-                        error!("Worker message send error: {:?}", e);
+
+        let handle = procspawn::spawn((args_rx, res_tx), |(rx, tx)| {
+            let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+            loop {
+                let res = rx.recv();
+                match res {
+                    Ok(args) => {
+                        let send_res = tx.send(runtime.block_on(P::process(args)));
+                        if let Err(e) = send_res {
+                            error!("Worker message send error: {:?}", e);
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Worker message receive error: {:?}", e);
                         return;
                     }
-                }
-                Err(e) => {
-                    error!("Worker message receive error: {:?}", e);
-                    return;
                 }
             }
         });
@@ -232,16 +243,19 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
     use std::time::Duration;
 
     use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::CubeError;
     use arrow::datatypes::{DataType, Field, Schema};
+    use async_trait::async_trait;
     use datafusion::logical_plan::ToDFSchema;
+    use futures_timer::Delay;
     use procspawn::{self};
     use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
+    use tokio::runtime::Builder;
 
     // Code from procspawn::enable_test_support!();
     #[procspawn::testsupport::ctor]
@@ -268,57 +282,85 @@ mod tests {
 
     pub struct Processor;
 
+    #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
-        fn process(args: Message) -> Result<Response, CubeError> {
+        async fn process(args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
-                    thread::sleep(Duration::from_millis(x));
+                    Delay::new(Duration::from_millis(x)).await;
                     Ok(Response::Foo(x))
                 }
             }
         }
     }
 
-    #[tokio::test]
-    async fn test_basic() {
-        let pool = WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
-        assert_eq!(
-            pool.process(Message::Delay(100)).await.unwrap(),
-            Response::Foo(100)
-        );
-        pool.stop_workers().await.unwrap();
+    #[test]
+    fn test_basic() {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(1000),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            assert_eq!(
+                pool.process(Message::Delay(100)).await.unwrap(),
+                Response::Foo(100)
+            );
+            pool.stop_workers().await.unwrap();
+        });
     }
 
-    #[tokio::test]
-    async fn test_concurrent() {
-        let pool = WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(1000));
-        let mut futures = Vec::new();
-        for i in 0..10 {
-            futures.push((i, pool.process(Message::Delay(i * 100))));
-        }
-        for (i, f) in futures {
-            println!("Testing {} future", i);
-            assert_eq!(f.await.unwrap(), Response::Foo(i * 100));
-        }
-        pool.stop_workers().await.unwrap();
-    }
+    #[test]
+    fn test_concurrent() {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
-    #[tokio::test]
-    async fn test_timeout() {
-        let pool = WorkerPool::<Message, Response, Processor>::new(4, Duration::from_millis(450));
-        let mut futures = Vec::new();
-        for i in 0..5 {
-            futures.push((i, pool.process(Message::Delay(i * 300))));
-        }
-        for (i, f) in futures {
-            println!("Testing {} future", i);
-            if i > 1 {
-                assert_eq!(f.await.is_err(), true);
-            } else {
-                assert_eq!(f.await.unwrap(), Response::Foo(i * 300));
+        runtime.block_on(async move {
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(1000),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            let mut futures = Vec::new();
+            for i in 0..10 {
+                futures.push((i, pool.process(Message::Delay(i * 100))));
             }
-        }
-        pool.stop_workers().await.unwrap();
+            for (i, f) in futures {
+                println!("Testing {} future", i);
+                assert_eq!(f.await.unwrap(), Response::Foo(i * 100));
+            }
+            pool.stop_workers().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn test_timeout() {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(450),
+            ));
+            let pool_to_move = pool.clone();
+            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            let mut futures = Vec::new();
+            for i in 0..5 {
+                futures.push((i, pool.process(Message::Delay(i * 300))));
+            }
+            for (i, f) in futures {
+                println!("Testing {} future", i);
+                if i > 1 {
+                    assert_eq!(f.await.is_err(), true);
+                } else {
+                    assert_eq!(f.await.unwrap(), Response::Foo(i * 300));
+                }
+            }
+            pool.stop_workers().await.unwrap();
+        });
     }
 
     #[tokio::test]

@@ -1,12 +1,13 @@
-/* globals describe, beforeEach, afterEach, test, expect */
+/* globals jest, describe, beforeEach, afterEach, test, expect */
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
-  constructor() {
+  constructor({ csvImport } = {}) {
     this.tables = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
+    this.csvImport = csvImport;
   }
 
   query(query) {
@@ -63,7 +64,10 @@ class MockDriver {
     return this.query(`DROP TABLE ${tableName}`);
   }
 
-  async downloadTable(table) {
+  async downloadTable(table, { csvImport } = {}) {
+    if (this.csvImport && csvImport) {
+      return { csvFile: `${table}.csv` };
+    }
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
@@ -76,6 +80,7 @@ class ExternalMockDriver extends MockDriver {
   constructor() {
     super();
     this.indexes = [];
+    this.csvFiles = [];
   }
 
   async uploadTable(table) {
@@ -85,18 +90,27 @@ class ExternalMockDriver extends MockDriver {
 
   async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
     this.tables.push(table.substring(0, 100));
+    if (tableData.csvFile) {
+      this.csvFiles.push(tableData.csvFile);
+    }
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
       await this.query(query, params);
     }
     this.indexes = this.indexes.concat(indexesSql);
   }
+
+  capabilities() {
+    return { csvImport: true };
+  }
 }
 
 describe('QueryOrchestrator', () => {
+  jest.setTimeout(15000);
   let mockDriver = null;
   let fooMockDriver = null;
   let barMockDriver = null;
+  let csvMockDriver = null;
   let externalMockDriver = null;
   const queryOrchestrator = new QueryOrchestrator(
     'TEST', (dataSource) => {
@@ -104,6 +118,8 @@ describe('QueryOrchestrator', () => {
         return fooMockDriver;
       } else if (dataSource === 'bar') {
         return barMockDriver;
+      } else if (dataSource === 'csv') {
+        return csvMockDriver;
       } else {
         return mockDriver;
       }
@@ -111,7 +127,7 @@ describe('QueryOrchestrator', () => {
     (msg, params) => console.log(new Date().toJSON(), msg, params), {
       preAggregationsOptions: {
         queueOptions: {
-          executionTimeout: 1
+          executionTimeout: 2
         },
         usedTablePersistTime: 1
       },
@@ -123,6 +139,7 @@ describe('QueryOrchestrator', () => {
     mockDriver = new MockDriver();
     fooMockDriver = new MockDriver();
     barMockDriver = new MockDriver();
+    csvMockDriver = new MockDriver({ csvImport: 'true' });
     externalMockDriver = new ExternalMockDriver();
   });
 
@@ -244,6 +261,77 @@ describe('QueryOrchestrator', () => {
     expect(externalMockDriver.tables).toContainEqual(expect.stringMatching(/stb_pre_aggregations.customers/));
     expect(externalMockDriver.tables).toContainEqual(expect.stringMatching(/stb_pre_aggregations.orders/));
     expect(externalMockDriver.executedQueries.join(',')).toMatch(/SELECT \* FROM stb_pre_aggregations\.orders.*, stb_pre_aggregations\.customers.*/);
+  });
+
+  test('csv import', async () => {
+    const query = {
+      query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
+      values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_number_and_count_week20191101 ON stb_pre_aggregations.orders_number_and_count20191101 ("orders__created_at_week")', []],
+          indexName: 'orders_number_and_count_week20191101'
+        }],
+        external: true,
+        dataSource: 'csv',
+      }],
+      renewQuery: true,
+      requestId: 'csv import'
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    console.log(result.data[0]);
+    expect(externalMockDriver.csvFiles).toContainEqual(expect.stringMatching(/orders_number_and_count20191101.*\.csv$/));
+  });
+
+  test('non default data source pre-aggregation', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders, stb_pre_aggregations.customers',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders', []],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        dataSource: 'foo'
+      }],
+      renewQuery: true,
+      requestId: 'non default data source pre-aggregation',
+      dataSource: 'foo',
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    console.log(result.data[0]);
+    expect(fooMockDriver.executedQueries.join(',')).toMatch(/CREATE TABLE stb_pre_aggregations.orders/);
+    expect(mockDriver.executedQueries.length).toEqual(0);
+  });
+
+  test('non default data source query', async () => {
+    const query = {
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      renewQuery: true,
+      requestId: 'non default data source query',
+      dataSource: 'foo',
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    console.log(result.data[0]);
+    expect(fooMockDriver.executedQueries.join(',')).toMatch(/orders/);
+    expect(mockDriver.executedQueries.length).toEqual(0);
   });
 
   test('silent truncate', async () => {
@@ -421,7 +509,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('continue serve old tables cache without resetting it', async () => {
-    mockDriver.tablesQueryDelay = 300;
+    mockDriver.tablesQueryDelay = 600;
     const requestId = 'continue serve old tables cache without resetting it';
     const baseQuery = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d20181103',
@@ -452,7 +540,7 @@ describe('QueryOrchestrator', () => {
       requestId: `${requestId}: start refresh`
     });
 
-    await mockDriver.delay(100);
+    await mockDriver.delay(200);
 
     let firstResolve = null;
 
@@ -469,7 +557,7 @@ describe('QueryOrchestrator', () => {
           firstResolve = 'query';
         }
       }),
-      mockDriver.delay(150).then(() => {
+      mockDriver.delay(300).then(() => {
         if (!firstResolve) {
           firstResolve = 'delay';
         }

@@ -134,4 +134,15 @@ export class MssqlQuery extends BaseQuery {
       'date_to'
     )} date_to FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
+
+  subtractInterval(date, interval) {
+    const amountInterval = interval.split(' ', 2);
+    const negativeInterval = (amountInterval[0]) * -1;
+    return `DATEADD(${amountInterval[1]}, ${negativeInterval}, ${date})`;
+  }
+
+  addInterval(date, interval) {
+    const amountInterval = interval.split(' ', 2);
+    return `DATEADD(${amountInterval[1]}, ${amountInterval[0]}, ${date})`;
+  }
 }

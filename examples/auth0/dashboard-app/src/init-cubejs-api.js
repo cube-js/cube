@@ -1,11 +1,11 @@
 import cubejs from '@cubejs-client/core';
- 
-const API_URL = 'http://localhost:4000';
- 
-export default (accessToken) => {
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000/cubejs-api/v1';
+
+export const initCubejsApi = (accessToken) => {
  return cubejs({
-  apiUrl: `${API_URL}/cubejs-api/v1`,
-  headers: { 
+  apiUrl: `${API_URL}`,
+  headers: {
     Authorization: `Bearer ${accessToken}`
   },
  });

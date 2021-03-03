@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/rust.yml'
       - 'rust/**'
+    branches-ignore:
+      - master
   pull_request:
     paths:
       - '.github/workflows/rust.yml'
@@ -14,10 +16,11 @@ jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly-2020-10-25]
+        rust: [nightly-2021-02-17]
     env:
       RUST: ${{ matrix.rust }}
     steps:
@@ -30,6 +33,19 @@ jobs:
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust
+          key: ubuntu-latest
+      - name: Run cargo fmt cubestore
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path rust/cubestore/Cargo.toml -- --check
+      - name: Run cargo fmt cubehll
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --manifest-path rust/cubehll/Cargo.toml -- --check
       - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:
@@ -41,3 +57,122 @@ jobs:
           command: test
           args: --manifest-path rust/Cargo.toml -j 1
 
+  docker-image-latest:
+    name: Build only :latest image
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Build only
+        uses: docker/build-push-action@v2
+        timeout-minutes: 60
+        with:
+          context: ./rust/
+          file: ./rust/Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+
+  cross:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-pc-windows-gnu
+          - x86_64-apple-darwin
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            executable_name: cubestored
+            cross: true
+            strip: true
+            compress: true
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            executable_name: cubestored
+            cross: true
+            strip: true
+            # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
+            compress: false
+          - os: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            executable_name: cubestored.exe
+            cross: true
+            strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
+            compress: false
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            executable_name: cubestored
+            cross: false
+            strip: true
+            compress: true
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-02-17
+          target: ${{ matrix.target }}
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: rust
+          key: cross-${{ runner.OS }}-${{ matrix.target }}
+          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
+      - run: source .github/actions/${{ matrix.before_script }}.sh
+        if: ${{ matrix.before_script }}
+        shell: bash
+      #- name: Install dependencies Windows
+      #  run: vcpkg integrate install; vcpkg install openssl:x64-windows
+      #  if: matrix.os == 'windows-latest'
+      #  env:
+      #    VCPKG_ROOT: 'C:\vcpkg'
+      - name: Set Env Variables for Darwin
+        uses: allenevans/set-env@v2.0.0
+        if: ${{ matrix.target == 'x86_64-apple-darwin' }}
+        with:
+          OPENSSL_STATIC: "true"
+      # https://github.com/actions-rs/cargo/issues/6
+      #- uses: actions-rs/cargo@v1
+      - uses: marcopolo/cargo@master
+        with:
+          working-directory: rust
+          command: build
+          args: --release --target=${{ matrix.target }}
+          # We need to force it everywhere before using it in cross building
+          #args: --release --locked --target=${{ matrix.target }}
+          use-cross: ${{ matrix.cross }}
+      - name: Compress binaries
+        uses: svenstaro/upx-action@v2
+        if: ${{ matrix.compress }}
+        with:
+          file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          args: --lzma
+          strip: ${{ matrix.strip }}
+      - name: Create archive for release
+        run: |
+          mkdir cubestore-archive
+          mkdir cubestore-archive/bin
+          mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          cd cubestore-archive
+          tar cv * | gzip --best  > cubestored-${{ matrix.target }}.tar.gz

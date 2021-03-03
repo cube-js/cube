@@ -11,8 +11,8 @@
     "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
-    "@cubejs-backend/athena-driver": "^0.23.6",
-    "@cubejs-backend/cubestore-driver": "^0.23.6",
-    "@cubejs-backend/server": "^0.23.14"
+    "@cubejs-backend/athena-driver": "^0.25.30",
+    "@cubejs-backend/cubestore-driver": "^0.25.30",
+    "@cubejs-backend/server": "^0.25.30"
   }
 }

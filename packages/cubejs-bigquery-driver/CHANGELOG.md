@@ -3,6 +3,218 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.38](https://github.com/cube-js/cube.js/compare/v0.26.37...v0.26.38) (2021-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.35](https://github.com/cube-js/cube.js/compare/v0.26.34...v0.26.35) (2021-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.30](https://github.com/cube-js/cube.js/compare/v0.26.29...v0.26.30) (2021-02-22)
+
+
+### Features
+
+* **bigquery-driver:** Upgrade @google-cloud/bigquery 5.x ([dbbd29c](https://github.com/cube-js/cube.js/commit/dbbd29cb41fcb093b37526e9c1d00b9170f38f41))
+
+
+
+
+
+## [0.26.25](https://github.com/cube-js/cube.js/compare/v0.26.24...v0.26.25) (2021-02-20)
+
+
+### Features
+
+* **bigquery-driver:** Support changing location, CUBEJS_DB_BQ_LOCATION env variable ([204c73c](https://github.com/cube-js/cube.js/commit/204c73c4290760234242b1d3eecdd498bf848e0f))
+
+
+
+
+
+## [0.26.23](https://github.com/cube-js/cube.js/compare/v0.26.22...v0.26.23) (2021-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.22](https://github.com/cube-js/cube.js/compare/v0.26.21...v0.26.22) (2021-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.19](https://github.com/cube-js/cube.js/compare/v0.26.18...v0.26.19) (2021-02-19)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.16](https://github.com/cube-js/cube.js/compare/v0.26.15...v0.26.16) (2021-02-18)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.15](https://github.com/cube-js/cube.js/compare/v0.26.14...v0.26.15) (2021-02-16)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.13](https://github.com/cube-js/cube.js/compare/v0.26.12...v0.26.13) (2021-02-12)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.12](https://github.com/cube-js/cube.js/compare/v0.26.11...v0.26.12) (2021-02-11)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.11](https://github.com/cube-js/cube.js/compare/v0.26.10...v0.26.11) (2021-02-10)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.10](https://github.com/cube-js/cube.js/compare/v0.26.9...v0.26.10) (2021-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.7](https://github.com/cube-js/cube.js/compare/v0.26.6...v0.26.7) (2021-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.6](https://github.com/cube-js/cube.js/compare/v0.26.5...v0.26.6) (2021-02-08)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.26.5](https://github.com/cube-js/cube.js/compare/v0.26.4...v0.26.5) (2021-02-03)
+
+
+### Features
+
+* **cubestore:** Multiple location load support ([#1982](https://github.com/cube-js/cube.js/issues/1982)) ([2b509ec](https://github.com/cube-js/cube.js/commit/2b509ec3c50be0688d613d2cda1ac3f53e80e093))
+
+
+
+
+
+## [0.26.2](https://github.com/cube-js/cube.js/compare/v0.26.1...v0.26.2) (2021-02-01)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+# [0.26.0](https://github.com/cube-js/cube.js/compare/v0.25.33...v0.26.0) (2021-02-01)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.25.32](https://github.com/cube-js/cube.js/compare/v0.25.31...v0.25.32) (2021-01-29)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.25.30](https://github.com/cube-js/cube.js/compare/v0.25.29...v0.25.30) (2021-01-26)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.25.29](https://github.com/cube-js/cube.js/compare/v0.25.28...v0.25.29) (2021-01-26)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.25.26](https://github.com/cube-js/cube.js/compare/v0.25.25...v0.25.26) (2021-01-25)
+
+
+### Features
+
+* BigQuery CSV pre-aggregation download support ([#1867](https://github.com/cube-js/cube.js/issues/1867)) ([5a2ea3f](https://github.com/cube-js/cube.js/commit/5a2ea3f27058a01bf08f697495c8ccce5abf9fa2))
+
+
+
+
+
+## [0.25.24](https://github.com/cube-js/cube.js/compare/v0.25.23...v0.25.24) (2021-01-22)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.25.23](https://github.com/cube-js/cube.js/compare/v0.25.22...v0.25.23) (2021-01-22)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.25.22](https://github.com/cube-js/cube.js/compare/v0.25.21...v0.25.22) (2021-01-21)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
 ## [0.25.21](https://github.com/cube-js/cube.js/compare/v0.25.20...v0.25.21) (2021-01-19)
 
 **Note:** Version bump only for package @cubejs-backend/bigquery-driver

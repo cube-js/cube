@@ -1,3 +1,4 @@
-src/parser/GenericSqlListener.js
-src/parser/GenericSqlLexer.js
-src/parser/GenericSqlParser.js
+src/parser/GenericSqlLexer.ts
+src/parser/GenericSqlListener.ts
+src/parser/GenericSqlParser.ts
+src/parser/GenericSqlVisitor.ts

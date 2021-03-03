@@ -16,7 +16,13 @@ import {
 import { MenuMode } from 'antd/lib/menu';
 import { layout } from '../../theme';
 
-const menuOrderCloud = ['Quickstart', 'Configuring Cube Cloud', 'Deploys'];
+const menuOrderCloud = [
+  'Quickstart',
+  'Configuring Cube Cloud',
+  'Cube IDE',
+  'Deploys',
+  'Inspecting Queries'
+];
 
 const menuOrder = [
   'Getting Started',
@@ -28,7 +34,7 @@ const menuOrder = [
   'Data Schema',
   'Cube.js Frontend',
   'Deployment',
-  'Cube.js CLI',
+  'Developer Tools',
   'Examples & Tutorials',
 ];
 

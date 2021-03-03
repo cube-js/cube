@@ -2,6 +2,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
 import { isDockerImage, requireFromPackage, packageExists } from '@cubejs-backend/shared';
+import type { ServerContainer as ServerContainerType } from '@cubejs-backend/server';
+
 import { displayError, event } from '../utils';
 
 // @todo There is another function with similar name inside utils, but without analytics
@@ -36,28 +38,47 @@ const generate = async (options) => {
   }
 
   logStage('Fetching DB schema');
-  const CubejsServer = await requireFromPackage<any>(
+  const serverPackage = requireFromPackage<{ ServerContainer: any }>(
     '@cubejs-backend/server',
     {
       relative,
     }
   );
-  const driver = await CubejsServer.createDriver();
-  await driver.testConnection();
+
+  if (!serverPackage.ServerContainer) {
+    await displayError(
+      '@cubejs-backend/server is too old. Please use @cubejs-backend/server >= v0.26.11',
+      generateSchemaOptions
+    );
+  }
+
+  const container: ServerContainerType = new serverPackage.ServerContainer({ debug: false });
+  const configuration = await container.lookupConfiguration();
+  const server = await container.runServerInstance(configuration, true);
+
+  const driver = await server.getDriver({
+    dataSource: options.dataSource,
+    authInfo: null,
+    securityContext: null,
+    requestId: 'CLI REQUEST'
+  });
+
   const dbSchema = await driver.tablesSchema();
-  if (driver.release) {
-    await driver.release();
+
+  if ((<any>driver).release) {
+    await (<any>driver).release();
   }
 
   logStage('Generating schema files');
-  const ScaffoldingTemplate = await requireFromPackage<any>(
+  const ScaffoldingTemplate = requireFromPackage<any>(
     '@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate.js',
     {
       relative,
     }
   );
   const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
-  const files = scaffoldingTemplate.generateFilesByTableNames(options.tables);
+  const { tables, dataSource } = options;
+  const files = scaffoldingTemplate.generateFilesByTableNames(tables, { dataSource });
   await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
 
   await event({
@@ -74,6 +95,7 @@ export function configureGenerateCommand(program: CommanderStatic) {
   program
     .command('generate')
     .option('-t, --tables <tables>', 'Comma delimited list of tables to generate schema from', list)
+    .option('-d, --dataSource <dataSource>', '', 'default')
     .description('Generate Cube.js schema from DB tables schema')
     .action(
       (options) => generate(options)

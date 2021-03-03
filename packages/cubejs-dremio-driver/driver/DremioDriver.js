@@ -105,7 +105,7 @@ class DremioDriver extends BaseDriver {
       if (data.jobState === 'FAILED') {
         throw new Error(data.errorMessage);
       } else if (data.jobState === 'CANCELED') {
-        throw new Error(`Job ${jobId} was been canceled`);
+        throw new Error(`Job ${jobId} has been canceled`);
       } else if (data.jobState === 'COMPLETED') {
         let rows = [];
         const querys = [];

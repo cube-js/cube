@@ -1,10 +1,16 @@
+pub mod hll;
+mod partition_filter;
 pub mod query_executor;
 pub mod serialized_plan;
+pub mod udfs;
 
+use crate::config::injection::DIService;
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStore, MetaStoreTable};
 use crate::queryplanner::query_executor::batch_to_dataframe;
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::queryplanner::udfs::aggregate_udf_by_kind;
+use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 use crate::store::DataFrame;
 use crate::CubeError;
 use arrow::array::StringArray;
@@ -12,34 +18,40 @@ use arrow::datatypes::Field;
 use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
-use datafusion::datasource::datasource::Statistics;
+use core::fmt;
+use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{Expr, LogicalPlan};
+use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::{collect, ExecutionPlan};
+use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRecordBatchStream};
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
-use datafusion::{datasource::MemTable, datasource::TableProvider, prelude::ExecutionContext};
+use datafusion::{datasource::TableProvider, prelude::ExecutionContext};
 use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
+use smallvec::alloc::fmt::Formatter;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::runtime::Handle;
 
 #[automock]
 #[async_trait]
-pub trait QueryPlanner: Send + Sync {
+pub trait QueryPlanner: DIService + Send + Sync {
     async fn logical_plan(&self, statement: Statement) -> Result<QueryPlan, CubeError>;
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError>;
 }
 
+crate::di_service!(MockQueryPlanner, [QueryPlanner]);
+
 pub struct QueryPlannerImpl {
     meta_store: Arc<dyn MetaStore>,
 }
+
+crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
 
 pub enum QueryPlan {
     Meta(LogicalPlan),
@@ -53,7 +65,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let schema_provider = MetaStoreSchemaProvider::new(
             self.meta_store.get_tables_with_path().await?,
-            ctx.clone(),
+            self.meta_store.clone(),
         );
 
         let query_planner = SqlToRel::new(&schema_provider);
@@ -87,7 +99,8 @@ impl QueryPlanner for QueryPlannerImpl {
             "Meta query data processing time: {:?}",
             execution_time.elapsed()?
         );
-        let data_frame = batch_to_dataframe(&results)?;
+        let data_frame =
+            tokio::task::spawn_blocking(move || batch_to_dataframe(&results)).await??;
         Ok(data_frame)
     }
 }
@@ -100,38 +113,20 @@ impl QueryPlannerImpl {
 
 impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
-        let mut ctx = ExecutionContext::new();
-
-        ctx.register_table(
-            "information_schema.tables",
-            Box::new(InfoSchemaTableProvider::new(
-                self.meta_store.clone(),
-                InfoSchemaTable::Tables,
-            )),
-        );
-
-        ctx.register_table(
-            "information_schema.schemata",
-            Box::new(InfoSchemaTableProvider::new(
-                self.meta_store.clone(),
-                InfoSchemaTable::Schemata,
-            )),
-        );
-
-        Ok(Arc::new(ctx))
+        Ok(Arc::new(ExecutionContext::new()))
     }
 }
 
 struct MetaStoreSchemaProvider {
     tables: HashMap<String, TablePath>,
-    information_schema_context: Arc<ExecutionContext>,
+    meta_store: Arc<dyn MetaStore>,
 }
 
 impl MetaStoreSchemaProvider {
-    pub fn new(tables: Vec<TablePath>, information_schema_context: Arc<ExecutionContext>) -> Self {
+    pub fn new(tables: Vec<TablePath>, meta_store: Arc<dyn MetaStore>) -> Self {
         Self {
             tables: tables.into_iter().map(|t| (t.table_name(), t)).collect(),
-            information_schema_context,
+            meta_store,
         }
     }
 }
@@ -156,25 +151,39 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     schema,
                 })
             });
-        // TODO .unwrap
-        res.or_else(|| {
-            self.information_schema_context
-                .state
-                .lock()
-                .unwrap()
-                .get_table_provider(name)
+        res.or_else(|| match name {
+            "information_schema.tables" => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::Tables,
+            ))),
+            "information_schema.schemata" => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::Schemata,
+            ))),
+            _ => None,
         })
     }
 
-    fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
-        None
+    fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
+        let kind = match name {
+            "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
+            _ => return None,
+        };
+        return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
     }
 
-    fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
-        None
+    fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
+        // HyperLogLog.
+        // TODO: case-insensitive names.
+        let kind = match name {
+            "merge" | "MERGE" => CubeAggregateUDFKind::MergeHll,
+            _ => return None,
+        };
+        return Some(Arc::new(aggregate_udf_by_kind(kind).descriptor()));
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum InfoSchemaTable {
     Tables,
     Schemata,
@@ -240,11 +249,6 @@ impl InfoSchemaTableProvider {
     fn new(meta_store: Arc<dyn MetaStore>, table: InfoSchemaTable) -> InfoSchemaTableProvider {
         InfoSchemaTableProvider { meta_store, table }
     }
-
-    async fn mem_table(&self) -> Result<MemTable, DataFusionError> {
-        let batch = self.table.scan(self.meta_store.clone()).await?;
-        MemTable::try_new(batch.schema(), vec![vec![batch]])
-    }
 }
 
 impl TableProvider for InfoSchemaTableProvider {
@@ -258,13 +262,15 @@ impl TableProvider for InfoSchemaTableProvider {
 
     fn scan(
         &self,
-        projection: &Option<Vec<usize>>,
-        batch_size: usize,
-        filters: &[Expr],
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let handle = Handle::current();
-        let mem_table = handle.block_on(async move { self.mem_table().await })?;
-        mem_table.scan(projection, batch_size, filters)
+        let exec = InfoSchemaTableExec {
+            meta_store: self.meta_store.clone(),
+            table: self.table.clone(),
+        };
+        Ok(Arc::new(exec))
     }
 
     fn statistics(&self) -> Statistics {
@@ -273,6 +279,54 @@ impl TableProvider for InfoSchemaTableProvider {
             total_byte_size: None,
             column_statistics: None,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct InfoSchemaTableExec {
+    meta_store: Arc<dyn MetaStore>,
+    table: InfoSchemaTable,
+}
+
+impl fmt::Debug for InfoSchemaTableExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_fmt(format_args!("{:?}", self.table))
+    }
+}
+
+#[async_trait]
+impl ExecutionPlan for InfoSchemaTableExec {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> DFSchemaRef {
+        self.table.schema().to_dfschema_ref().unwrap()
+    }
+
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(1)
+    }
+
+    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+        vec![]
+    }
+
+    fn with_new_children(
+        &self,
+        _children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        Ok(Arc::new(self.clone()))
+    }
+
+    async fn execute(
+        &self,
+        partition: usize,
+    ) -> Result<SendableRecordBatchStream, DataFusionError> {
+        let batch = self.table.scan(self.meta_store.clone()).await?;
+        let schema = batch.schema();
+        let mem_exec = MemoryExec::try_new(&vec![vec![batch]], schema, None)?;
+        mem_exec.execute(partition).await
     }
 }
 
@@ -307,5 +361,12 @@ impl TableProvider for CubeTableLogical {
             total_byte_size: None,
             column_statistics: None,
         }
+    }
+
+    fn supports_filter_pushdown(
+        &self,
+        _filter: &Expr,
+    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
+        return Ok(TableProviderFilterPushDown::Inexact);
     }
 }

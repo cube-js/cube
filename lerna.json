@@ -1,15 +1,17 @@
 {
   "packages": [
     "docs",
-    "packages/*"
+    "packages/*",
+    "rust"
   ],
   "command": {
     "bootstrap": {
+      "npmClient": "yarn",
       "npmClientArgs": [
         "--frozen-lockfile"
       ]
     }
   },
   "npmClient": "yarn",
-  "version": "0.25.21"
+  "version": "0.26.44"
 }

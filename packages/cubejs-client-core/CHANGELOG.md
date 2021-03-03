@@ -3,6 +3,48 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.19](https://github.com/cube-js/cube.js/compare/v0.26.18...v0.26.19) (2021-02-19)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** manage boolean filters for missing members ([#2139](https://github.com/cube-js/cube.js/issues/2139)) ([6fad355](https://github.com/cube-js/cube.js/commit/6fad355ea47c0e9dda1e733345a0de0a0d99e7cb))
+* **@cubejs-client/react:** type fixes ([#2140](https://github.com/cube-js/cube.js/issues/2140)) ([bca1ff7](https://github.com/cube-js/cube.js/commit/bca1ff72b0204a3cce1d4ee658396b3e22adb1cd))
+
+
+
+
+
+## [0.26.13](https://github.com/cube-js/cube.js/compare/v0.26.12...v0.26.13) (2021-02-12)
+
+
+### Features
+
+* **@cubejs-client/playground:** handle missing members ([#2067](https://github.com/cube-js/cube.js/issues/2067)) ([348b245](https://github.com/cube-js/cube.js/commit/348b245f4086095fbe1515d7821d631047f0008c))
+
+
+
+
+
+# [0.26.0](https://github.com/cube-js/cube.js/compare/v0.25.33...v0.26.0) (2021-02-01)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+
+
+
+
+## [0.25.31](https://github.com/cube-js/cube.js/compare/v0.25.30...v0.25.31) (2021-01-28)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** propagate time dimension to the drill down query ([#1911](https://github.com/cube-js/cube.js/issues/1911)) ([59701da](https://github.com/cube-js/cube.js/commit/59701dad6f6cb6d78954d18b309716a9d51aa6b7))
+
+
+
+
+
 # [0.25.0](https://github.com/cube-js/cube.js/compare/v0.24.15...v0.25.0) (2020-12-21)
 
 **Note:** Version bump only for package @cubejs-client/core

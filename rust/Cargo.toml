@@ -1,6 +1,10 @@
 [workspace]
+resolver = "2"
 members = [
-    "cubestore"
+    "cubestore",
+    "cubehll",
+    "cubezetasketch",
+    "cuberpc",
 ]
 
 [patch.crates-io]

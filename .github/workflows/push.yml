@@ -6,6 +6,9 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
+      - 'rust/js-wrapper/**'
+      - 'rust/tsconfig.json'
+      - 'rust/package.json'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -19,6 +22,9 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
+      - 'rust/js-wrapper/**'
+      - 'rust/tsconfig.json'
+      - 'rust/package.json'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -35,12 +41,16 @@ jobs:
 
     strategy:
       matrix:
+        # We should use our minimal version, but there are problems with packages...
         node-version: [10.x, 12.x, 14.x, 15.x]
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          # pulls all commits (needed for codecov)
+          fetch-depth: 2
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
@@ -68,12 +78,23 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
       - name: Lerna test
         run: yarn lerna run --concurrency 1 unit
+      - uses: codecov/codecov-action@v1
+        if: (matrix.node-version == '15.x')
+        with:
+          files: ./packages/*/coverage/clover.xml
+          verbose: true # optional (default = false)
 
   lint:
     runs-on: ubuntu-latest
@@ -109,6 +130,12 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna lint
@@ -148,6 +175,12 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Check Yarn lock wasn't modified
@@ -156,6 +189,95 @@ jobs:
         run: yarn build
       - name: Build other packages
         run: yarn lerna run --concurrency 1 build
+
+  integration-redis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      matrix:
+        node-version: [12.x]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v2
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: |
+            ~/.npm
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+      - name: Yarn install
+        uses: borales/actions-yarn@v2.3.0
+        with:
+          cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
+      - name: Lerna bootstrap
+        run: yarn lerna bootstrap
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Run Redis Integration with Redis Driver
+        timeout-minutes: 10
+        run: |
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
+        env:
+          CUBEJS_REDIS_USE_IOREDIS: false
+      - name: Run Redis Integration with IORedis Driver
+        timeout-minutes: 10
+        run: |
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
+        env:
+          CUBEJS_REDIS_USE_IOREDIS: true
+      - name: Setup Redis Cluster
+        uses: vishnudxb/redis-cluster@1.0.5
+        with:
+          master1-port: 5000
+          master2-port: 5001
+          master3-port: 5002
+          slave1-port: 5003
+          slave2-port: 5004
+          slave3-port: 5005
+      - name: Run Redis Integration with Cluster
+        timeout-minutes: 10
+        run: |
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
+        env:
+          CUBEJS_REDIS_USE_IOREDIS: true
+          CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
 
   integration-wrk-1:
     runs-on: ubuntu-latest
@@ -207,54 +329,56 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
-      - name: Run Redis Integration
-        timeout-minutes: 10
-        run: |
-          yarn lerna run --concurrency 1 integration:redis
       - name: Run Postgres Integration with 9.6
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 9.6
       - name: Run Postgres Integration with 10
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 10
       - name: Run Postgres Integration with 11
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 11
       - name: Run Postgres Integration with 12
         timeout-minutes: 10
         run: |
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:postgres
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:postgres
         env:
           TEST_PGSQL_VERSION: 12
       - name: Run MS SQL Integration with 2017-latest
         timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mssql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mssql
         env:
           TEST_MSSQL_VERSION: 2017-latest
       - name: Run MS SQL Integration with 2019-latest
         timeout-minutes: 10
         run: |
           docker pull mcr.microsoft.com/mssql/server:${TEST_MSSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mssql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mssql
         env:
           TEST_MSSQL_VERSION: 2019-latest
 
@@ -306,6 +430,12 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
@@ -314,35 +444,35 @@ jobs:
         timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mysql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.6
       - name: Run MySQL Integration with 5.7
         timeout-minutes: 10
         run: |
           docker pull mysql:${TEST_MYSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:mysql
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:mysql
         env:
           TEST_MYSQL_VERSION: 5.7
+      - name: Run Clickhouse Integration with 21.1.2
+        timeout-minutes: 10
+        run: |
+          docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:clickhouse
+        env:
+          TEST_CLICKHOUSE_VERSION: 21.1.2
       - name: Run Clickhouse Integration with 20.6
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 integration:clickhouse
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 20.6
-      - name: Run Clickhouse Integration with 20
-        timeout-minutes: 10
-        run: |
-          docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 integration:clickhouse
-        env:
-          TEST_CLICKHOUSE_VERSION: 20
       - name: Run Clickhouse Integration with 19
         timeout-minutes: 10
         run: |
           docker pull yandex/clickhouse-server:${TEST_CLICKHOUSE_VERSION}
-          yarn lerna run --concurrency 1 integration:clickhouse
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:clickhouse
         env:
           TEST_CLICKHOUSE_VERSION: 19
 
@@ -394,6 +524,12 @@ jobs:
         uses: borales/actions-yarn@v2.3.0
         with:
           cmd: install --frozen-lockfile
+      - name: Set environment variables
+        uses: allenevans/set-env@v2.0.0
+        # Skip installation only for release, because units will be started before release will be released
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
         run: yarn lerna bootstrap
       - name: Lerna tsc
@@ -404,7 +540,7 @@ jobs:
           docker pull lewuathe/presto-coordinator:${TEST_PRESTO_VERSION}
           docker pull lewuathe/presto-worker:${TEST_PRESTO_VERSION}
           docker pull postgres:${TEST_PGSQL_VERSION}
-          yarn lerna run --concurrency 1 integration:presto
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:presto
         env:
           TEST_PGSQL_VERSION: 12.4
           TEST_PRESTO_VERSION: 341-SNAPSHOT
@@ -414,7 +550,7 @@ jobs:
           docker pull postgres:${TEST_POSTGRES_VERSION}
           docker pull zookeeper:${TEST_ZOOKEEPER_VERSION}
           docker pull apache/druid:${TEST_DRUID_VERSION}
-          yarn lerna run --concurrency 1 integration:druid
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:druid
         env:
           TEST_POSTGRES_VERSION: latest
           TEST_ZOOKEEPER_VERSION: 3.5
@@ -498,5 +634,26 @@ jobs:
         with:
           context: .
           file: ./packages/cubejs-docker/dev.Dockerfile
+          platforms: linux/amd64
+          push: false
+
+  docker-image-alpine-dev:
+    name: Build only Alpine :dev image
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build only
+        uses: docker/build-push-action@v2
+        timeout-minutes: 15
+        with:
+          context: .
+          file: ./packages/cubejs-docker/dev-alpine.Dockerfile
           platforms: linux/amd64
           push: false

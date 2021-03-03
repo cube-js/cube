@@ -4,7 +4,7 @@ import rp, { RequestPromiseOptions } from 'request-promise';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import os from 'os';
-import dotenv from 'dotenv';
+import dotenv from '@cubejs-backend/dotenv';
 import { isFilePath } from '@cubejs-backend/shared';
 import { displayWarning } from './utils';
 
@@ -44,7 +44,7 @@ export class Config {
 
   public async envFile(envFile: string) {
     if (await fs.pathExists(envFile)) {
-      const env = dotenv.config({ path: envFile }).parsed;
+      const env = dotenv.config({ path: envFile, multiline: 'line-breaks' }).parsed;
       if (env) {
         if ('CUBEJS_DEV_MODE' in env) {
           delete env.CUBEJS_DEV_MODE;
@@ -85,24 +85,12 @@ export class Config {
   }
 
   public async deployAuth(url?: string) {
+    const config = await this.loadConfig();
+
     if (process.env.CUBE_CLOUD_DEPLOY_AUTH) {
-      const payload = jwt.decode(process.env.CUBE_CLOUD_DEPLOY_AUTH);
-      if (!payload || typeof payload !== 'object' || !payload.url) {
-        throw new Error('Malformed token in CUBE_CLOUD_DEPLOY_AUTH');
-      }
-
-      if (url && payload.url !== url) {
-        throw new Error('CUBE_CLOUD_DEPLOY_AUTH token doesn\'t match url in .cubecloud');
-      }
-
-      return {
-        [payload.url]: {
-          auth: process.env.CUBE_CLOUD_DEPLOY_AUTH
-        }
-      };
+      return (await this.addAuthToken(process.env.CUBE_CLOUD_DEPLOY_AUTH, config)).auth;
     }
 
-    const config = await this.loadConfig();
     if (config.auth) {
       return config.auth;
     }

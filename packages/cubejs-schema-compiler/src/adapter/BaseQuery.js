@@ -14,7 +14,7 @@ import { BaseGroupFilter } from './BaseGroupFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
-import SqlParser from '../parser/SqlParser';
+import { SqlParser } from '../parser/SqlParser';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -132,7 +132,10 @@ export class BaseQuery {
   }
 
   initFromOptions() {
-    this.contextSymbols = Object.assign({ userContext: {} }, this.options.contextSymbols || {});
+    this.contextSymbols = {
+      securityContext: {},
+      ...this.options.contextSymbols,
+    };
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
@@ -752,6 +755,10 @@ export class BaseQuery {
     return `SELECT ${this.dateTimeCast('date_from')}, ${this.dateTimeCast('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
+  /**
+   * @param {string} timeDimension
+   * @return {string}
+   */
   timeStampParam(timeDimension) {
     return timeDimension.dateFieldType() === 'string' ? '?' : this.timeStampCast('?');
   }
@@ -920,7 +927,8 @@ export class BaseQuery {
       dimensions: [this.primaryKeyName(cubeName)],
       filters,
       segments,
-      timeDimensions
+      timeDimensions,
+      order: {}
     });
     return { prefix, subQuery, cubeName };
   }
@@ -1642,6 +1650,10 @@ export class BaseQuery {
     return this.inIntegrationTimeZone(date).clone().utc().format();
   }
 
+  /**
+   * @param {string} field
+   * @return {string}
+   */
   convertTz(field) {
     throw new Error('Not implemented');
   }
@@ -1855,9 +1867,11 @@ export class BaseQuery {
     // Mon, 01 Jan 2018 00:00:00 GMT
     const startDate = 1514764800000;
     const opt = {
+      utc: true,
       currentDate: new Date(startDate)
     };
     let utcOffset = 0;
+
     if (refreshKey.timezone) {
       utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
     }
@@ -1886,6 +1900,7 @@ export class BaseQuery {
     ) {
       throw new UserError(`Your cron string ('${every}') is correct, but we support only equal time intervals.`);
     }
+
     return {
       utcOffset,
       interval: delta,

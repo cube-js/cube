@@ -14,6 +14,7 @@ export class CompilerApi {
     this.schemaVersion = this.options.schemaVersion;
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
+    this.sqlCache = options.sqlCache;
   }
 
   async getCompilers(options) {
@@ -78,7 +79,7 @@ export class CompilerApi {
       }
     }
 
-    return compilers.compiler.withQuery(sqlGenerator, () => ({
+    const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
@@ -92,6 +93,15 @@ export class CompilerApi {
         sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
       canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
     }));
+
+    if (this.sqlCache) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId, ...keyOptions } = query;
+      const key = { query: keyOptions, options };
+      return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
+    } else {
+      return getSqlFn();
+    }
   }
 
   async scheduledPreAggregations() {

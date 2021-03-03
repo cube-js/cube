@@ -38,7 +38,7 @@ export class DruidClient {
     let cancelled = false;
     const cancelObj: any = {};
 
-    const promise: Promise<unknown> & { cancel?: () => void } = (async () => {
+    const promise: Promise<unknown[]> & { cancel?: () => void } = (async () => {
       cancelObj.cancel = async () => {
         cancelled = true;
       };

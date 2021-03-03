@@ -1,4 +1,6 @@
-const pgp = require('pg-promise')();
+import { Wait } from 'testcontainers';
+
+const pgPromise = require('pg-promise');
 const { GenericContainer } = require('testcontainers');
 const { BaseDbRunner } = require('./BaseDbRunner');
 
@@ -6,14 +8,17 @@ process.env.TZ = 'GMT';
 
 export class PostgresDBRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
+    const pgp = pgPromise();
+
     const db = pgp({
       host: 'localhost',
       port,
       password: this.password(),
       database: 'model_test',
       poolSize: 1,
-      user: process.env.TEST_PG_USER || 'root'
+      user: process.env.TEST_PG_USER || 'root',
     });
+
     const defaultFixture = this.prepareFixture.bind(this);
     return {
       testQueries(queries, prepareDataSet) {
@@ -23,6 +28,9 @@ export class PostgresDBRunner extends BaseDbRunner {
             .then(() => queries
               .map(([query, params]) => () => tx.query(query, params)).reduce((a, b) => a.then(b), Promise.resolve()))
             .then(r => JSON.parse(JSON.stringify(r)))));
+      },
+      close() {
+        return pgp.end();
       }
     };
   }
@@ -73,6 +81,15 @@ export class PostgresDBRunner extends BaseDbRunner {
       .withEnv('POSTGRES_DB', 'model_test')
       .withEnv('POSTGRES_PASSWORD', this.password())
       .withExposedPorts(this.port())
+      // .withHealthCheck({
+      //   test: 'pg_isready -U root -d model_test',
+      //   interval: 2 * 1000,
+      //   timeout: 500,
+      //   retries: 3
+      // })
+      // .withWaitStrategy(Wait.forHealthCheck())
+      // Postgresql do fast shutdown on start for db applying
+      .withStartupTimeout(10 * 1000)
       .start();
   }
 
@@ -84,3 +101,10 @@ export class PostgresDBRunner extends BaseDbRunner {
     return 5432;
   }
 }
+
+export const dbRunner = new PostgresDBRunner();
+
+// eslint-disable-next-line no-undef
+afterAll(async () => {
+  await dbRunner.tearDown();
+});

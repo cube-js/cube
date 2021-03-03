@@ -8,15 +8,16 @@ category: Getting Started
 [link-cubejs-schema]: /getting-started-cubejs-schema
 [link-getting-started-docker]: /getting-started-docker
 
-This guide walks you through getting started with Cube.js and requires [Node.js](https://nodejs.org/en/) to be installed.
+This guide walks you through getting started with Cube.js and requires
+[Node.js](https://nodejs.org/en/) to be installed.
 
-In case you don't have Node.js, or you'd like to run Cube.js with Docker, follow the [Getting started with Docker guide][link-getting-started-docker].
-
+In case you don't have Node.js, or you'd like to run Cube.js with Docker, follow
+the [Getting started with Docker guide][link-getting-started-docker].
 
 ## 1. Scaffold the project
 
-Run the following command to get started with Cube.js, specifying
-the project name and optionally your database using the `-d` flag.
+Run the following command to get started with Cube.js, specifying the project
+name and optionally your database using the `-d` flag.
 
 ```bash
 $ npx cubejs-cli create <project name> -d <database type>
@@ -30,32 +31,34 @@ following:
 $ npx cubejs-cli create hello-world -d postgres
 ```
 
-Once run, the `create` command will create a new project directory that
-contains the scaffolding for your new Cube.js project. This includes all the
-files necessary to spin up the Cube.js backend and some example
-schema files to highlight the format of the Cube.js Data Schema layer.
+Once run, the `create` command will create a new project directory that contains
+the scaffolding for your new Cube.js project. This includes all the files
+necessary to spin up the Cube.js backend and some example schema files to
+highlight the format of the Cube.js Data Schema layer.
 
-The `.env` file in this project directory contains placeholders for the
-relevant database credentials. Setting credentials is covered in the
-[Connecting to the Database][link-connecting-to-the-database] section.
+The `.env` file in this project directory contains placeholders for the relevant
+database credentials. Setting credentials is covered in the [Connecting to the
+Database][link-connecting-to-the-database] section.
 
 ## 2. Define Your Data Schema
 
 Cube.js uses [Data Schema][link-cubejs-schema] to generate and execute SQL.
 
 It acts as an ORM for your database and it is flexible enough to model
-everything from simple counts to cohort retention and funnel analysis.
-[Read more about Cube.js Schema][link-cubejs-schema].
+everything from simple counts to cohort retention and funnel analysis. [Read
+more about Cube.js Schema][link-cubejs-schema].
 
-You can generate schema files using the Playground. To do so, you can
-start the dev server from project directory like this:
+You can generate schema files using [Developer Playground][link-dev-playground].
+To do so, you can start the dev server from project directory like this:
 
 ```bash
 $ npm run dev
 ```
 
-Then go to `http://localhost:4000` and use the Playground to generate
+Then go to `http://localhost:4000` and use Developer Playground to generate
 schema files.
+
+[link-dev-playground]: /dev-tools/dev-playground
 
 ### Manually creating Data Schema files
 
@@ -65,26 +68,26 @@ You can also add schema files to the `schema` folder manually:
 // schema/users.js
 
 cube(`Users`, {
-   measures: {
-     type: `count`
-   },
+  measures: {
+    type: `count`,
+  },
 
-   dimensions: {
-     age: {
-       type: `number`,
-       sql: `age`
-     },
+  dimensions: {
+    age: {
+      type: `number`,
+      sql: `age`,
+    },
 
-     createdAt: {
-       type: `time`,
-       sql: `createdAt`
-     },
+    createdAt: {
+      type: `time`,
+      sql: `createdAt`,
+    },
 
-     country: {
-       type: `string`,
-       sql: `country`
-     }
-   }
+    country: {
+      type: `string`,
+      sql: `country`,
+    },
+  },
 });
 ```
 
@@ -115,6 +118,7 @@ programmatically.
 ### Cube.js Client Installation
 
 Vanilla JS:
+
 ```bash
 $ npm i --save @cubejs-client/core
 ```
@@ -143,33 +147,36 @@ $ npm i --save @cubejs-client/ngx
 ### Example Usage
 
 #### Vanilla Javascript
-Instantiate the Cube.js API and then use it to fetch data. `CubejsApi.load()` accepts a
-query, which is a plain Javascript object. [Learn more about the query format
-here](query-format).
+
+Instantiate the Cube.js API and then use it to fetch data. `CubejsApi.load()`
+accepts a query, which is a plain Javascript object.
+[Learn more about the query format here](query-format).
 
 ```js
 import cubejs from '@cubejs-client/core';
 import Chart from 'chart.js';
 import chartjsConfig from './toChartjsData';
 
-const cubejsApi = cubejs(
-  'YOUR-CUBEJS-API-TOKEN',
-  { apiUrl: 'http://localhost:4000/cubejs-api/v1' },
-);
+const cubejsApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
+  apiUrl: 'http://localhost:4000/cubejs-api/v1',
+});
 
 const resultSet = await cubejsApi.load({
   measures: ['Stories.count'],
-  timeDimensions: [{
-    dimension: 'Stories.time',
-    dateRange: ['2015-01-01', '2015-12-31'],
-    granularity: 'month'
-  }]
-})
+  timeDimensions: [
+    {
+      dimension: 'Stories.time',
+      dateRange: ['2015-01-01', '2015-12-31'],
+      granularity: 'month',
+    },
+  ],
+});
 const context = document.getElementById('myChart');
 new Chart(context, chartjsConfig(resultSet));
 ```
 
 #### React
+
 Import `cubejs` and `QueryRenderer` components, and use them to fetch the data.
 In the example below, we use `recharts` to visualize data.
 
@@ -179,17 +186,16 @@ import { LineChart, Line, XAxis, YAxis } from 'recharts';
 import cubejs from '@cubejs-client/core';
 import { QueryRenderer } from '@cubejs-client/react';
 
-const cubejsApi = cubejs(
-  'YOUR-CUBEJS-API-TOKEN',
-  { apiUrl: 'http://localhost:4000/cubejs-api/v1' },
-);
+const cubejsApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
+  apiUrl: 'http://localhost:4000/cubejs-api/v1',
+});
 
 export default () => {
   return (
     <QueryRenderer
       query={{
         measures: ['Stories.count'],
-        dimensions: ['Stories.time.month']
+        dimensions: ['Stories.time.month'],
       }}
       cubejsApi={cubejsApi}
       render={({ resultSet }) => {
@@ -199,18 +205,19 @@ export default () => {
 
         return (
           <LineChart data={resultSet.rawData()}>
-            <XAxis dataKey="Stories.time"/>
-            <YAxis/>
-            <Line type="monotone" dataKey="Stories.count" stroke="#8884d8"/>
+            <XAxis dataKey="Stories.time" />
+            <YAxis />
+            <Line type="monotone" dataKey="Stories.count" stroke="#8884d8" />
           </LineChart>
         );
       }}
     />
-  )
-}
+  );
+};
 ```
 
 #### Vue
+
 Import `cubejs` and `QueryRenderer` components, and use them to fetch the data.
 In the example below, we use `vue-chartkick` to visualize data.
 
@@ -234,10 +241,9 @@ import Chart from 'chart.js';
 
 Vue.use(VueChartkick, { adapter: Chart });
 
-const cubejsApi = cubejs(
-  'YOUR-CUBEJS-API-TOKEN',
-  { apiUrl: 'http://localhost:4000/cubejs-api/v1' },
-);
+const cubejsApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
+  apiUrl: 'http://localhost:4000/cubejs-api/v1',
+});
 
 export default {
   name: 'HelloWorld',
@@ -269,7 +275,7 @@ export default {
       const pivot = resultSet.chartPivot();
       const series = [];
       seriesNames.forEach((e) => {
-        const data = pivot.map(p => [p.x, p[e.key]]);
+        const data = pivot.map((p) => [p.x, p[e.key]]);
         series.push({ name: e.key, data });
       });
       return series;
@@ -280,6 +286,7 @@ export default {
 ```
 
 #### Angular
+
 Add CubejsClientModule to your `app.module.ts` file:
 
 ```typescript
@@ -311,17 +318,19 @@ Then you can inject `CubejsClient` into your components or services:
 import { CubejsClient } from '@cubejs-client/ngx';
 
 export class AppComponent {
-  constructor(private cubejs:CubejsClient){}
+  constructor(private cubejs: CubejsClient) {}
 
-  ngOnInit(){
-    this.cubejs.load({
-      measures: ["some_measure"]
-    }).subscribe(
-      resultSet => {
-        this.data = resultSet.chartPivot();
-      },
-      err => console.log('HTTP Error', err)
-    );
+  ngOnInit() {
+    this.cubejs
+      .load({
+        measures: ['some_measure'],
+      })
+      .subscribe(
+        (resultSet) => {
+          this.data = resultSet.chartPivot();
+        },
+        (err) => console.log('HTTP Error', err)
+      );
   }
 }
 ```

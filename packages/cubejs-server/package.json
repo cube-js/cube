@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
-  "version": "0.25.21",
+  "version": "0.26.44",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
@@ -10,7 +10,7 @@
     "directory": "packages/cubejs-server"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "main": "index.js",
   "typings": "dist/index.d.ts",
@@ -39,8 +39,9 @@
     "jest:shapshot": "jest --updateSnapshot test"
   },
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.25.21",
-    "@cubejs-backend/shared": "^0.25.18",
+    "@cubejs-backend/dotenv": "^9.0.2",
+    "@cubejs-backend/server-core": "^0.26.44",
+    "@cubejs-backend/shared": "^0.26.35",
     "@oclif/color": "^0.1.2",
     "@oclif/command": "^1.8.0",
     "@oclif/config": "^1.17.0",
@@ -50,18 +51,19 @@
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
-    "cubejs-dotenv": "^8.3.0",
     "express": "^4.17.1",
     "jsonwebtoken": "^8.4.0",
-    "node-machine-id": "^1.1.10",
     "semver": "^7.3.2",
     "source-map-support": "^0.5.19",
     "ws": "^7.1.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.25.0",
+    "@cubejs-backend/linter": "^0.26.13",
+    "@cubejs-backend/query-orchestrator": "^0.26.38",
     "@oclif/dev-cli": "^1.23.1",
+    "@types/body-parser": "^1.19.0",
     "@types/cors": "^2.8.8",
+    "@types/express": "^4.17.11",
     "@types/node": "^10.0.10",
     "@types/semver": "^7.3.4",
     "@types/ws": "^7.2.9",

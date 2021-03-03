@@ -44,7 +44,7 @@ cube(`Users`, {
 
 ## Naming
 
-There are certain rules to follow for a cube and cube member names. 
+There are certain rules to follow for a cube and cube member names.
 You can use only `0-9`, `_`, and letter characters when naming a cube or a cube member.
 Names should always start with a letter.
 
@@ -63,17 +63,17 @@ Referencing cubes directly renders it's alias. For example it's handy to avoid n
 ```javascript
 cube(`Users`, {
   sql: `select * from users`,
-  
+
   joins: {
     Contacts: {
       sql: `${CUBE}.contact_id = ${Contacts}.id`,
       relationship: `hasOne`
     }
   }
-  
+
   dimensions: {
     // primary key,
-    
+
     name: {
       sql: `COALESCE(${CUBE}.name, ${Contacts}.name)`,
       type: `string`
@@ -83,7 +83,7 @@ cube(`Users`, {
 
 cube(`Contacts`, {
   sql: `select * from contacts`
-  
+
   // primary key
 });
 ```
@@ -100,9 +100,38 @@ For previous example following query
 leads to a join
 
 ```sql
-select COALESCE("users".name, "contacts".name) "users__name" 
+select COALESCE("users".name, "contacts".name) "users__name"
 FROM users "users"
 LEFT JOIN contacts "contacts" ON "users".contact_id = "contacts".id
+```
+
+## Abstract cubes
+
+Abstract cubes can be defined by simply omitting the first parameter to the
+`cube()` function. Cubes defined in this way can still be extended, but will be
+"hidden" from the [Developer Playground][ref-dev-playground] and calls to the
+[`/meta` API endpoint][ref-rest-api-meta].
+
+[ref-dev-playground]: /dev-tools/dev-playground
+[ref-rest-api-meta]: /rest-api#api-reference-v-1-meta
+
+```javascript
+const Users = cube({
+  sql: `select * from users`,
+
+  dimensions: {
+    // primary key,
+
+    name: {
+      sql: `${CUBE}.name`,
+      type: `string`
+    }
+  }
+});
+
+cube(`Contacts`, {
+  extends: Users,
+});
 ```
 
 ## Parameters
@@ -273,7 +302,7 @@ cube(`OrderFacts`, {
 
 `every` can accept only equal time intervals - so  "Day of month" and "month" intervals in CRON expressions are not supported.
 
-Such `refreshKey` is just a syntactic sugar over `refreshKey` SQL. 
+Such `refreshKey` is just a syntactic sugar over `refreshKey` SQL.
 It's guaranteed that `refreshKey` change it's value at least once during `every` interval.
 It will be converted to appropriate SQL select which value will change over time based on interval value.
 Values of interval based `refreshKey` are tried to be checked ten times within defined interval but not more than once per `1 second` and not less than once per `5 minute`.
@@ -290,7 +319,7 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 ### dataSource
 
 Each cube in schema can have it's own `dataSource` name to support scenarios where data should be fetched from multiple databases.
-Value of `dataSource` parameter will be passed to [dbType](@cubejs-backend-server-core#options-reference-db-type) and 
+Value of `dataSource` parameter will be passed to [dbType](@cubejs-backend-server-core#options-reference-db-type) and
 [driverFactory](@cubejs-backend-server-core#options-reference-driver-factory) functions as part of context param.
 By default each cube has a `default` value for it's `dataSource`.
 To override it you can use:
@@ -298,7 +327,7 @@ To override it you can use:
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
-  
+
   dataSource: `prod_db`
 });
 ```
@@ -310,9 +339,9 @@ Use `sqlAlias` when auto-generated cube alias prefix is too long and truncated b
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
-  
+
   sqlAlias: `ofacts`,
-  
+
   // ...
 });
 ```
@@ -329,7 +358,7 @@ For example:
 ```javascript
 cube(`Tickets`, {
   rewriteQueries: true,
-  
+
   // ...
 });
 ```
@@ -353,7 +382,7 @@ examples below.
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders WHERE ${FILTER_PARAMS.OrderFacts.date.filter('date')}`,
-  
+
   measures: {
     count: {
       type: `count`
@@ -411,18 +440,18 @@ cube(`Events`, {
 });
 ```
 
-### User Context
+### Security Context
 
-`USER_CONTEXT` is a user security object that is passed by the Cube.js Client.
+`SECURITY_CONTEXT` is a user security object that is passed by the Cube.js Client.
 
-Please see [Security Context section](security#security-context) on how to set `USER_CONTEXT` value.
+Please see [Security Context section](security#security-context) on how to set `SECURITY_CONTEXT` value.
 
-User context is suitable for the row level security implementation.
+Security context is suitable for the row level security implementation.
 For example, if you have an `orders` table that contains an `email` field you can restrict all queries to render results that belong only to the current user as follows:
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM orders WHERE ${USER_CONTEXT.email.filter('email')}`,
+  sql: `SELECT * FROM orders WHERE ${SECURITY_CONTEXT.email.filter('email')}`,
 
   dimensions: {
     date: {
@@ -437,7 +466,7 @@ To ensure filter value presents for all requests `requiredFilter` can be used:
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM orders WHERE ${USER_CONTEXT.email.requiredFilter('email')}`,
+  sql: `SELECT * FROM orders WHERE ${SECURITY_CONTEXT.email.requiredFilter('email')}`,
 
   dimensions: {
     date: {
@@ -458,7 +487,7 @@ For example:
 
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM ${USER_CONTEXT.type.unsafeValue() === 'employee' ? 'employee' : 'public'}.orders`,
+  sql: `SELECT * FROM ${SECURITY_CONTEXT.type.unsafeValue() === 'employee' ? 'employee' : 'public'}.orders`,
 
   dimensions: {
     date: {
@@ -472,10 +501,10 @@ cube(`Orders`, {
 ### SQL Utils
 #### convertTz
 
-In case you need to convert your timestamp to user request timezone in cube or member SQL you can use `SQL_UTILS.convertTz()` method. Note that Cube.js will automatically convert timezones for `timeDimensions` fields in [queries](Query-Format#query-properties). 
+In case you need to convert your timestamp to user request timezone in cube or member SQL you can use `SQL_UTILS.convertTz()` method. Note that Cube.js will automatically convert timezones for `timeDimensions` fields in [queries](Query-Format#query-properties).
 
 [[warning | Note]]
-| Dimensions that use `SQL_UTILS.convertTz()` should not be used as `timeDimensions` in queries. Doing so will apply the conversion multiple times and yield wrong results. 
+| Dimensions that use `SQL_UTILS.convertTz()` should not be used as `timeDimensions` in queries. Doing so will apply the conversion multiple times and yield wrong results.
 
 In case the same database field needs to be queried in `dimensions` and `timeDimensions`, create dedicated dimensions in the cube definition for the respective use:
 
@@ -499,19 +528,19 @@ cube(`visitors`, {
 ### Compile context
 
 There's global `COMPILE_CONTEXT` that captured as [RequestContext](@cubejs-backend-server-core#request-context) at the time of schema compilation.
-It contains `authInfo` and any other variables provided by [extendContext](@cubejs-backend-server-core#options-reference-extend-context).
+It contains `securityContext` and any other variables provided by [extendContext](@cubejs-backend-server-core#options-reference-extend-context).
 
 [[warning | Note]]
-| While `authInfo` defined in `COMPILE_CONTEXT` it doesn't change it's value for different users. It may change however for different tenants.
+| While `securityContext` defined in `COMPILE_CONTEXT` it doesn't change it's value for different users. It may change however for different tenants.
 
 ```javascript
-const { authInfo: { deploymentId } } = COMPILE_CONTEXT;
+const { securityContext: { deploymentId } } = COMPILE_CONTEXT;
 
 const schemaName = `user_${deploymentId}`;
 
 cube(`Users`, {
   sql: `select * from ${schemaName}.users`,
-  
+
   // ...
 });
 ```

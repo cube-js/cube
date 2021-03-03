@@ -173,10 +173,13 @@ provider:
 When you assign a VPC to a Lambda function, internet access will be disabled by
 default. Lambda functions require internet access to send SNS messages for query
 processing. Please follow [this guide][link-vpc-internet] to set up internet
-access for your Lambda functions.
+access for your Lambda functions or use [this template][link-vpc-cf-template] to
+create the VPC, subnets and NAT configuration using CloudFormation.
 
 [link-vpc-internet]:
   https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12
+[link-vpc-cf-template]:
+  https://raw.githubusercontent.com/awsdocs/aws-lambda-developer-guide/main/templates/vpc-privatepublic.yaml
 
 ### Athena permissions
 

@@ -45,13 +45,9 @@ pub(crate) enum WALRocksIndex {
     TableID = 1,
 }
 
-rocks_table_impl!(
-    WAL,
-    WALRocksTable,
-    TableId::WALs,
-    { vec![Box::new(WALRocksIndex::TableID)] },
-    DeleteWal
-);
+rocks_table_impl!(WAL, WALRocksTable, TableId::WALs, {
+    vec![Box::new(WALRocksIndex::TableID)]
+});
 
 #[derive(Hash, Clone, Debug)]
 pub enum WALIndexKey {

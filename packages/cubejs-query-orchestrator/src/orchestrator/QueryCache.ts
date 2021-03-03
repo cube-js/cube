@@ -31,6 +31,7 @@ export class QueryCache {
       backgroundRenew?: Boolean;
       queueOptions?: object | ((dataSource: String) => object);
       redisPool?: any;
+      continueWaitTimeout?: number;
       cacheAndQueueDriver?: 'redis' | 'memory';
     } = {}
   ) {
@@ -96,6 +97,7 @@ export class QueryCache {
       this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
         requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource,
         refreshKeyRenewalThresholds
       });
 
@@ -121,6 +123,7 @@ export class QueryCache {
       this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
         external: queryBody.external,
         requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource,
         refreshKeyRenewalThresholds
       });
     }
@@ -200,6 +203,8 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          // Centralized continueWaitTimeout that can be overridden in queueOptions
+          continueWaitTimeout: this.options.continueWaitTimeout,
           ...(typeof this.options.queueOptions === 'function' ?
             this.options.queueOptions(dataSource) :
             this.options.queueOptions
@@ -225,6 +230,8 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          // Centralized continueWaitTimeout that can be overridden in queueOptions
+          continueWaitTimeout: this.options.continueWaitTimeout,
           ...this.options.externalQueueOptions
         }
       );
@@ -269,7 +276,13 @@ export class QueryCache {
     return queue;
   }
 
-  public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options) {
+  public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {
+    requestId?: string,
+    skipRefreshKeyWaitForRenew?: boolean,
+    external?: boolean,
+    refreshKeyRenewalThresholds?: Array<number>
+    dataSource: string
+  }) {
     this.renewQuery(
       query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
     ).catch(e => {
@@ -322,12 +335,12 @@ export class QueryCache {
       ));
   }
 
-  public loadRefreshKeysFromQuery(query: Query) {
-    return this.loadRefreshKeys(this.cacheKeyQueriesFrom(query), this.getExpireSecs(query), {
+  public async loadRefreshKeysFromQuery(query: Query) {
+    return Promise.all(this.loadRefreshKeys(this.cacheKeyQueriesFrom(query), this.getExpireSecs(query), {
       requestId: query.requestId,
       dataSource: query.dataSource,
       refreshKeyRenewalThresholds: this.getRefreshKeyRenewalThresholds(query)
-    });
+    }));
   }
 
   public loadRefreshKeys(

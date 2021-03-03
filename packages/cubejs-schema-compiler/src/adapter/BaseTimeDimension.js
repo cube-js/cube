@@ -118,6 +118,10 @@ export class BaseTimeDimension extends BaseFilter {
     );
   }
 
+  localDateTimeFromParam() {
+    return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateFromFormatted()));
+  }
+
   dateToFormatted() {
     if (!this.dateToFormattedValue) {
       this.dateToFormattedValue = this.formatToDate(this.dateRange[1]);
@@ -136,6 +140,10 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.paramAllocator.allocateParamsForQuestionString(
       this.query.timeStampParam(this), [this.dateTo()]
     );
+  }
+
+  localDateTimeToParam() {
+    return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateToFormatted()));
   }
 
   dateRangeGranularity() {

@@ -39,10 +39,10 @@ module.exports = {
       2,
       {
         ignoreUrls: true,
-        ignoreComments: false,
+        ignoreComments: true,
         ignoreRegExpLiterals: true,
         ignoreStrings: true,
-        ignoreTemplateLiterals: true
+        ignoreTemplateLiterals: true,
       }
     ],
     'no-trailing-spaces': ['error', { skipBlankLines: true }],

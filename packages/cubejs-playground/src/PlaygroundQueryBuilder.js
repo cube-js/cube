@@ -1,7 +1,8 @@
-import { useState, useRef, useLayoutEffect } from 'react';
-import * as PropTypes from 'prop-types';
-import { Col, Row } from 'antd';
+import { useState, useRef, useEffect } from 'react';
+import { Col, Row, Divider } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 import { QueryBuilder, useDryRun } from '@cubejs-client/react';
+import styled from 'styled-components';
 
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
@@ -10,10 +11,11 @@ import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
-import { Card, SectionHeader, SectionRow } from './components';
-import styled from 'styled-components';
+import { Card, SectionHeader, SectionRow, Button } from './components';
 import ChartContainer from './ChartContainer';
-import { dispatchChartEvent } from './utils';
+import { dispatchPlaygroundEvent } from './utils';
+import { useSecurityContext } from './hooks';
+import { FatalError } from './atoms';
 
 const Section = styled.div`
   display: flex;
@@ -78,24 +80,27 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
 
 export default function PlaygroundQueryBuilder({
   query = {},
-  cubejsApi,
   apiUrl,
   cubejsToken,
   setQuery,
+  dashboardSource,
+  schemaVersion = 0,
+  onSchemaChange,
 }) {
   const ref = useRef(null);
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
+  const { token, setIsModalOpen } = useSecurityContext();
   
-  useLayoutEffect(() => {
-    window['__cubejsPlayground'] = {
-      ...window['__cubejsPlayground'],
-      onChartRendererReady() {
-        setChartRendererReady(true);
-      }
+  useEffect(() => {
+    if (isChartRendererReady && ref.current) {
+      dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
+        token: cubejsToken,
+        apiUrl,
+      });
     }
-  }, []);
+  }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
 
   const { response } = useDryRun(query, {
     skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
@@ -113,10 +118,12 @@ export default function PlaygroundQueryBuilder({
     <QueryBuilder
       query={query}
       setQuery={setQuery}
-      cubejsApi={cubejsApi}
       wrapWithQueryRenderer={false}
+      schemaVersion={schemaVersion}
+      onSchemaChange={onSchemaChange}
       render={({
         error,
+        metaError,
         isQueryPresent,
         chartType,
         updateChartType,
@@ -138,9 +145,36 @@ export default function PlaygroundQueryBuilder({
         updateOrder,
         pivotConfig,
         updatePivotConfig,
+        missingMembers,
+        isFetchingMeta
       }) => {
         return (
           <>
+            <Row>
+              <Col span={24}>
+                <Card
+                  bordered={false}
+                  style={{
+                    borderRadius: 0,
+                    borderBottom: 1,
+                  }}
+                >
+                  <Button.Group>
+                    <Button
+                      icon={<LockOutlined />}
+                      size="small"
+                      type={token ? 'primary' : 'default'}
+                      onClick={() => setIsModalOpen(true)}
+                    >
+                      {token ? 'Edit' : 'Add'} Security Context
+                    </Button>
+                  </Button.Group>
+                </Card>
+              </Col>
+            </Row>
+
+            <Divider style={{ margin: 0 }} />
+            
             <Row
               justify="space-around"
               align="top"
@@ -149,17 +183,14 @@ export default function PlaygroundQueryBuilder({
             >
               <Col span={24}>
                 <Card bordered={false} style={{ borderRadius: 0 }}>
-                  <Row
-                    justify="stretch"
-                    align="top"
-                    gutter={0}
-                    style={{ marginBottom: -12 }}
-                  >
+                  <Row align="top" gutter={0} style={{ marginBottom: -12 }}>
                     <Section>
                       <SectionHeader>Measures</SectionHeader>
                       <MemberGroup
+                        disabled={isFetchingMeta}
                         members={measures}
                         availableMembers={availableMeasures}
+                        missingMembers={missingMembers}
                         addMemberName="Measure"
                         updateMethods={playgroundActionUpdateMethods(
                           updateMeasures,
@@ -167,11 +198,14 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
+
                     <Section>
                       <SectionHeader>Dimensions</SectionHeader>
                       <MemberGroup
+                        disabled={isFetchingMeta}
                         members={dimensions}
                         availableMembers={availableDimensions}
+                        missingMembers={missingMembers}
                         addMemberName="Dimension"
                         updateMethods={playgroundActionUpdateMethods(
                           updateDimensions,
@@ -179,11 +213,14 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
+
                     <Section>
                       <SectionHeader>Segment</SectionHeader>
                       <MemberGroup
+                        disabled={isFetchingMeta}
                         members={segments}
                         availableMembers={availableSegments}
+                        missingMembers={missingMembers}
                         addMemberName="Segment"
                         updateMethods={playgroundActionUpdateMethods(
                           updateSegments,
@@ -191,11 +228,14 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
+
                     <Section>
                       <SectionHeader>Time</SectionHeader>
                       <TimeGroup
+                        disabled={isFetchingMeta}
                         members={timeDimensions}
                         availableMembers={availableTimeDimensions}
+                        missingMembers={missingMembers}
                         addMemberName="Time"
                         updateMethods={playgroundActionUpdateMethods(
                           updateTimeDimensions,
@@ -208,10 +248,12 @@ export default function PlaygroundQueryBuilder({
                     <Section>
                       <SectionHeader>Filters</SectionHeader>
                       <FilterGroup
+                        disabled={isFetchingMeta}
                         members={filters}
                         availableMembers={availableDimensions.concat(
                           availableMeasures
                         )}
+                        missingMembers={missingMembers}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(
                           updateFilters,
@@ -235,6 +277,7 @@ export default function PlaygroundQueryBuilder({
                     isQueryPresent={isQueryPresent}
                     limit={query.limit}
                     pivotConfig={pivotConfig}
+                    disabled={isFetchingMeta}
                     orderMembers={orderMembers}
                     onReorder={updateOrder.reorder}
                     onOrderChange={updateOrder.set}
@@ -261,7 +304,19 @@ export default function PlaygroundQueryBuilder({
                   paddingRight: 16,
                 }}
               >
-                {isQueryPresent ? (
+                {!isQueryPresent && metaError ? (
+                  <Card>
+                    <FatalError error={metaError} />
+                  </Card>
+                ) : null}
+
+                {!isQueryPresent && !metaError && (
+                  <h2 style={{ textAlign: 'center' }}>
+                    Choose a measure or dimension to get started
+                  </h2>
+                )}
+
+                {isQueryPresent && (
                   <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
@@ -276,34 +331,40 @@ export default function PlaygroundQueryBuilder({
                     setFramework={setFramework}
                     setChartLibrary={(value) => {
                       if (ref.current) {
-                        dispatchChartEvent(ref.current.contentDocument, {
-                          chartingLibrary: value,
-                        });
+                        dispatchPlaygroundEvent(
+                          ref.current.contentDocument,
+                          'chart',
+                          {
+                            chartingLibrary: value,
+                          }
+                        );
                       }
                       setChartingLibrary(value);
                     }}
                     chartLibraries={frameworkChartLibraries}
-                    cubejsApi={cubejsApi}
+                    dashboardSource={dashboardSource}
+                    isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
+                      if (metaError) {
+                        return <FatalError error={metaError} />;
+                      }
+
                       return (
                         <ChartRenderer
-                          isChartRendererReady={isChartRendererReady}
+                          isChartRendererReady={isChartRendererReady && !isFetchingMeta}
                           framework={framework}
                           chartingLibrary={chartingLibrary}
                           chartType={chartType}
                           query={query}
                           pivotConfig={pivotConfig}
                           iframeRef={ref}
+                          queryHasMissingMembers={missingMembers.length > 0}
                           onChartRendererReadyChange={setChartRendererReady}
                         />
                       );
                     }}
                     onChartRendererReadyChange={setChartRendererReady}
                   />
-                ) : (
-                  <h2 style={{ textAlign: 'center' }}>
-                    Choose a measure or dimension to get started
-                  </h2>
                 )}
               </Col>
             </Row>
@@ -313,11 +374,3 @@ export default function PlaygroundQueryBuilder({
     />
   );
 }
-
-PlaygroundQueryBuilder.propTypes = {
-  query: PropTypes.object,
-  setQuery: PropTypes.func,
-  cubejsApi: PropTypes.object,
-  apiUrl: PropTypes.string,
-  cubejsToken: PropTypes.string,
-};

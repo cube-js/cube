@@ -31,6 +31,7 @@ pub enum Statement {
     CreateTable {
         create_table: SQLStatement,
         indexes: Vec<SQLStatement>,
+        locations: Option<Vec<String>>,
     },
     CreateSchema {
         schema_name: ObjectName,
@@ -96,8 +97,11 @@ impl<'a> CubeStoreParser<'a> {
                 indexes.push(self.parse_with_index(name.clone())?);
             }
 
-            let location = if self.parser.parse_keyword(Keyword::LOCATION) {
-                Some(self.parser.parse_literal_string()?)
+            let locations = if self.parser.parse_keyword(Keyword::LOCATION) {
+                Some(
+                    self.parser
+                        .parse_comma_separated(|p| p.parse_literal_string())?,
+                )
             } else {
                 None
             };
@@ -110,13 +114,14 @@ impl<'a> CubeStoreParser<'a> {
                     constraints,
                     with_options,
                     if_not_exists,
-                    external: location.is_some(),
+                    external: locations.is_some(),
                     file_format,
-                    location,
+                    location: None,
                     query,
                     without_rowid,
                 },
                 indexes,
+                locations,
             })
         } else {
             Ok(Statement::Statement(statement))

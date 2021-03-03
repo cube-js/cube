@@ -1,5 +1,9 @@
+pub mod gcs;
+pub mod queue;
 pub mod s3;
 
+use crate::config::injection::DIService;
+use crate::di_service;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -7,10 +11,11 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
 use std::fmt::Debug;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
@@ -29,8 +34,18 @@ impl RemoteFile {
 }
 
 #[async_trait]
-pub trait RemoteFs: Send + Sync + Debug {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError>;
+pub trait RemoteFs: DIService + Send + Sync + Debug {
+    /// Use this path to prepare files for upload. Writing into `local_path()` directly can result
+    /// in files being deleted by the background cleanup process, see `QueueRemoteFs::cleanup_loop`.
+    async fn temp_upload_path(&self, remote_path: &str) -> Result<String, CubeError> {
+        // Putting files into a subdirectory prevents cleanups from removing them.
+        self.local_file(&format!("uploads/{}", remote_path)).await
+    }
+
+    /// In addition to uploading this file to the remote filesystem, this function moves the file
+    /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
+    async fn upload_file(&self, temp_upload_path: &str, remote_path: &str)
+        -> Result<(), CubeError>;
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError>;
 
@@ -49,7 +64,8 @@ pub trait RemoteFs: Send + Sync + Debug {
 pub struct LocalDirRemoteFs {
     remote_dir_for_debug: PathBuf,
     remote_dir: RwLock<PathBuf>,
-    dir: RwLock<PathBuf>,
+    dir: PathBuf,
+    dir_delete_mut: Mutex<()>,
 }
 
 impl LocalDirRemoteFs {
@@ -57,36 +73,50 @@ impl LocalDirRemoteFs {
         Arc::new(LocalDirRemoteFs {
             remote_dir_for_debug: remote_dir.clone(),
             remote_dir: RwLock::new(remote_dir),
-            dir: RwLock::new(dir),
+            dir,
+            dir_delete_mut: Mutex::new(()),
         })
     }
 
     pub async fn drop_local_path(&self) -> Result<(), CubeError> {
-        Ok(fs::remove_dir_all(&*self.dir.write().await).await?)
+        Ok(fs::remove_dir_all(&*self.dir).await?)
     }
 }
 
+di_service!(LocalDirRemoteFs, [RemoteFs]);
+
 #[async_trait]
 impl RemoteFs for LocalDirRemoteFs {
-    async fn upload_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<(), CubeError> {
         debug!("Uploading {}", remote_path);
         let remote_dir = self.remote_dir.write().await;
         let dest = remote_dir.as_path().join(remote_path);
         fs::create_dir_all(dest.parent().unwrap()).await?;
-        let dir = self.dir.read().await;
-        fs::copy(dir.as_path().join(remote_path), dest.clone()).await?;
+        fs::copy(&temp_upload_path, dest.clone()).await?;
+        let local_path = self.dir.as_path().join(remote_path);
+        if Path::new(temp_upload_path) != local_path {
+            fs::rename(&temp_upload_path, local_path).await?;
+        }
         Ok(())
     }
 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let dir = self.dir.write().await;
-        let local = dir.as_path().join(remote_path);
-        let path = local.to_str().unwrap().to_owned();
-        fs::create_dir_all(local.parent().unwrap()).await?;
-        if !local.exists() {
+        let mut local_file = self.dir.as_path().join(remote_path);
+        let local_dir = local_file.parent().unwrap();
+        let downloads_dir = local_dir.join("downloads");
+        fs::create_dir_all(&downloads_dir).await?;
+        if !local_file.exists() {
             debug!("Downloading {}", remote_path);
             let remote_dir = self.remote_dir.read().await;
-            fs::copy(remote_dir.as_path().join(remote_path), local)
+            let temp_path =
+                tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dir))
+                    .await??
+                    .into_temp_path();
+            fs::copy(remote_dir.as_path().join(remote_path), &temp_path)
                 .await
                 .map_err(|e| {
                     CubeError::internal(format!(
@@ -94,24 +124,32 @@ impl RemoteFs for LocalDirRemoteFs {
                         remote_path, e
                     ))
                 })?;
+            local_file =
+                tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
+                    temp_path.persist(&local_file)?;
+                    Ok(local_file)
+                })
+                .await??;
         }
-        Ok(path)
+        Ok(local_file.into_os_string().into_string().unwrap())
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
         debug!("Deleting {}", remote_path);
-        let remote_dir = self.remote_dir.write().await;
-        let remote = remote_dir.as_path().join(remote_path);
-        if fs::metadata(remote.clone()).await.is_ok() {
-            fs::remove_file(remote.clone()).await?;
-            Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
+        {
+            let remote_dir = self.remote_dir.write().await;
+            let remote = remote_dir.as_path().join(remote_path);
+            if fs::metadata(remote.clone()).await.is_ok() {
+                fs::remove_file(remote.clone()).await?;
+                Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
+            }
         }
 
-        let dir = self.dir.write().await;
-        let local = dir.as_path().join(remote_path);
+        let _local_guard = self.dir_delete_mut.lock().await;
+        let local = self.dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
-            LocalDirRemoteFs::remove_empty_paths(dir.as_path().to_path_buf(), local.clone())
+            LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
                 .await?;
         }
 
@@ -139,13 +177,11 @@ impl RemoteFs for LocalDirRemoteFs {
     }
 
     async fn local_path(&self) -> String {
-        let dir = self.dir.read().await;
-        dir.to_str().unwrap().to_owned()
+        self.dir.to_str().unwrap().to_owned()
     }
 
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
-        let dir = self.dir.read().await;
-        let buf = dir.join(remote_path);
+        let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }

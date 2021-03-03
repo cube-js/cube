@@ -14,6 +14,17 @@ const StyledButton = styled(AntdButton)`
       color: var(--primary-color);
     }
     
+    &:disabled {
+      color: var(--disabled-color);
+      border-color: var(--disabled-color); 
+      background-color: white;
+      
+      &:hover, &:active, &:focus {
+        color: var(--disabled-color);
+        border-color: var(--disabled-color); 
+      }
+    }
+    
     &.ant-btn-primary:not([disabled]) {
       background: var(--primary-color);
       color: white;
@@ -70,6 +81,10 @@ StyledButton.Group = styled(AntdButton.Group)`
     &:hover, &:active, &:focus {
       border-left-color: var(--primary-color);
     }
+  }
+  
+  &&& .ant-btn:disabled {
+    background-color: var(--disabled-bg);
   }
 `;
 

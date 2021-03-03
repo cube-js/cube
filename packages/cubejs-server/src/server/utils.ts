@@ -46,7 +46,7 @@ export function getMajorityVersion(pkg: SemVer, strict: boolean = false): string
 
 export type ProjectLock = {
   resolveVersion: (pkg: string) => string|null
-}
+};
 
 export function parseNpmLock(): ProjectLock|null {
   const file = fs.readFileSync(

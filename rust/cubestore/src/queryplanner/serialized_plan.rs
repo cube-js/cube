@@ -1,9 +1,15 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition};
+use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::query_executor::CubeTable;
+use crate::queryplanner::udfs::aggregate_udf_by_kind;
+use crate::queryplanner::udfs::{
+    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
+    CubeScalarUDFKind,
+};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, Field};
 use datafusion::logical_plan::{DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning};
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
@@ -332,10 +338,23 @@ pub enum SerializedExpr {
         fun: functions::BuiltinScalarFunction,
         args: Vec<SerializedExpr>,
     },
+    ScalarUDF {
+        fun: CubeScalarUDFKind,
+        args: Vec<SerializedExpr>,
+    },
     AggregateFunction {
         fun: aggregates::AggregateFunction,
         args: Vec<SerializedExpr>,
         distinct: bool,
+    },
+    AggregateUDF {
+        fun: CubeAggregateUDFKind,
+        args: Vec<SerializedExpr>,
+    },
+    InList {
+        expr: Box<SerializedExpr>,
+        list: Vec<SerializedExpr>,
+        negated: bool,
     },
     Wildcard,
 }
@@ -372,6 +391,10 @@ impl SerializedExpr {
                 fun: fun.clone(),
                 args: args.iter().map(|e| e.expr()).collect(),
             },
+            SerializedExpr::ScalarUDF { fun, args } => Expr::ScalarUDF {
+                fun: Arc::new(scalar_udf_by_kind(*fun).descriptor()),
+                args: args.iter().map(|e| e.expr()).collect(),
+            },
             SerializedExpr::AggregateFunction {
                 fun,
                 args,
@@ -380,6 +403,10 @@ impl SerializedExpr {
                 fun: fun.clone(),
                 args: args.iter().map(|e| e.expr()).collect(),
                 distinct: *distinct,
+            },
+            SerializedExpr::AggregateUDF { fun, args } => Expr::AggregateUDF {
+                fun: Arc::new(aggregate_udf_by_kind(*fun).descriptor()),
+                args: args.iter().map(|e| e.expr()).collect(),
             },
             SerializedExpr::Case {
                 expr,
@@ -405,6 +432,15 @@ impl SerializedExpr {
                 negated: *negated,
                 low: Box::new(low.expr()),
                 high: Box::new(high.expr()),
+            },
+            SerializedExpr::InList {
+                expr,
+                list,
+                negated,
+            } => Expr::InList {
+                expr: Box::new(expr.expr()),
+                list: list.iter().map(|e| e.expr()).collect(),
+                negated: *negated,
             },
         }
     }
@@ -502,6 +538,7 @@ impl SerializedPlan {
             LogicalPlan::TableScan {
                 table_name,
                 projection,
+                filters,
                 ..
             } => {
                 let name_split = table_name.split(".").collect::<Vec<_>>();
@@ -587,11 +624,37 @@ impl SerializedPlan {
                     .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
                     .await?;
 
-                let mut partition_snapshots = Vec::new();
+                let partition_filter =
+                    PartitionFilter::extract(&partition_filter_schema(&index), filters);
+                log::trace!("Extracted partition filter is {:?}", partition_filter);
+                let candidate_partitions = partitions.len();
+                let mut pruned_partitions = 0;
 
+                let mut partition_snapshots = Vec::new();
                 for (partition, chunks) in partitions.into_iter() {
+                    let min_row = partition
+                        .get_row()
+                        .get_min_val()
+                        .as_ref()
+                        .map(|r| r.values().as_slice());
+                    let max_row = partition
+                        .get_row()
+                        .get_max_val()
+                        .as_ref()
+                        .map(|r| r.values().as_slice());
+
+                    if !partition_filter.can_match(min_row, max_row) {
+                        pruned_partitions += 1;
+                        continue;
+                    }
+
                     partition_snapshots.push(PartitionSnapshot { chunks, partition });
                 }
+                log::trace!(
+                    "Pruned {} of {} partitions",
+                    pruned_partitions,
+                    candidate_partitions
+                );
 
                 index_snapshots.push(IndexSnapshot {
                     index,
@@ -876,7 +939,10 @@ impl SerializedPlan {
                 fun: fun.clone(),
                 args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
             },
-            Expr::ScalarUDF { .. } => unimplemented!(),
+            Expr::ScalarUDF { fun, args } => SerializedExpr::ScalarUDF {
+                fun: scalar_kind_by_name(&fun.name).unwrap(),
+                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
+            },
             Expr::AggregateFunction {
                 fun,
                 args,
@@ -886,7 +952,10 @@ impl SerializedPlan {
                 args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
                 distinct: *distinct,
             },
-            Expr::AggregateUDF { .. } => unimplemented!(),
+            Expr::AggregateUDF { fun, args } => SerializedExpr::AggregateUDF {
+                fun: aggregate_kind_by_name(&fun.name).unwrap(),
+                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
+            },
             Expr::Case {
                 expr,
                 when_then_expr,
@@ -921,6 +990,27 @@ impl SerializedPlan {
                 low: Box::new(Self::serialized_expr(&low)),
                 high: Box::new(Self::serialized_expr(&high)),
             },
+            Expr::InList {
+                expr,
+                list,
+                negated,
+            } => SerializedExpr::InList {
+                expr: Box::new(Self::serialized_expr(&expr)),
+                list: list.iter().map(|e| Self::serialized_expr(&e)).collect(),
+                negated: *negated,
+            },
         }
     }
+}
+
+fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
+    let schema_fields: Vec<Field>;
+    schema_fields = index
+        .get_row()
+        .columns()
+        .iter()
+        .map(|c| c.clone().into())
+        .take(index.get_row().sort_key_size() as usize)
+        .collect();
+    arrow::datatypes::Schema::new(schema_fields)
 }

@@ -1,7 +1,8 @@
 import * as PropTypes from 'prop-types';
 import { Menu as AntdMenu } from 'antd';
-import ButtonDropdown from './ButtonDropdown';
 import styled from 'styled-components';
+
+import ButtonDropdown from './ButtonDropdown';
 
 const Menu = styled(AntdMenu)`
   max-height: 320px;
@@ -31,8 +32,8 @@ const MemberDropdown = ({ onClick, availableMembers, ...buttonProps }) => (
 );
 
 MemberDropdown.propTypes = {
-  onClick: PropTypes.func.isRequired,
   availableMembers: PropTypes.array.isRequired,
+  onClick: PropTypes.func.isRequired,
 };
 
 export default MemberDropdown;

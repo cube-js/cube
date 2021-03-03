@@ -11,7 +11,7 @@ configuration options in the `cube.js` file.
 
 Example of setting a custom logger in the `cube.js` file.
 
-```js
+```javascript
 module.exports = {
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
@@ -23,81 +23,91 @@ module.exports = {
 
 You can provide the following configuration options to Cube.js.
 
-```javascript
-{
-  dbType: String | (context: RequestContext) => String,
-  externalDbType: String | (context: RequestContext) => String,
-  schemaPath: String,
-  basePath: String,
-  webSocketsBasePath: String,
-  logger: (msg: String, params: Object) => any,
-  driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>,
-  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>,
-  contextToAppId: (context: RequestContext) => String,
-  contextToOrchestratorId: (context: RequestContext) => String,
-  repositoryFactory: (context: RequestContext) => SchemaFileRepository,
-  checkAuth: (req: ExpressRequest, authorization: String) => any,
-  checkAuthMiddleware: (req: ExpressRequest, res: ExpressResponse, next: ExpressMiddleware) => any,
-  queryTransformer: (query: Object, context: RequestContext) => Object,
-  preAggregationsSchema: String | (context: RequestContext) => String,
-  schemaVersion: (context: RequestContext) => String,
-  extendContext: (req: ExpressRequest) => any,
-  scheduledRefreshTimer: Boolean | Number,
-  compilerCacheSize: Number,
-  maxCompilerCacheKeepAlive: Number,
-  updateCompilerCacheKeepAlive: Boolean,
-  telemetry: Boolean,
-  allowUngroupedWithoutPrimaryKey: Boolean,
+```typescript
+interface CubejsConfiguration {
+  dbType: string | ((context: RequestContext) => string);
+  schemaPath: string;
+  basePath: string;
+  webSocketsBasePath: string;
+  logger: (msg: string, params: object) => any;
+  driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>;
+  contextToAppId: (context: RequestContext) => string;
+  contextToOrchestratorId: (context: RequestContext) => string;
+  repositoryFactory: (context: RequestContext) => SchemaFileRepository;
+  checkAuth: (req: ExpressRequest, authorization: string) => any;
+  queryTransformer: (query: object, context: RequestContext) => object;
+  preAggregationsSchema: string | (context: RequestContext) => string;
+  schemaVersion: (context: RequestContext) => string;
+  scheduledRefreshTimer: boolean | number;
+  scheduledRefreshTimeZones: string[],
+  scheduledRefreshContexts: () => Promise<object[]>,
+  extendContext: (req: ExpressRequest) => any;
+  compilerCacheSize: number;
+  maxCompilerCacheKeepAlive: number;
+  updateCompilerCacheKeepAlive: boolean;
+  allowUngroupedWithoutPrimaryKey: boolean;
+  telemetry: boolean;
   http: {
     cors: {
-      methods: String | String[],
-      origin: String,
-      allowedHeaders: String | String[],
-      exposedHeaders: String | String[],
-      credentials: Boolean,
-      maxAge: Number,
-      preflightContinue: Boolean,
-      optionsSuccessStatus: Number,
+      methods: string | string[];
+      origin: string;
+      allowedHeaders: string | string[];
+      exposedHeaders: string | string[];
+      credentials: boolean;
+      maxAge: number;
+      preflightContinue: boolean;
+      optionsSuccessStatus: number;
     },
   },
+  jwt: {
+    jwkUrl?: ((payload: any) => string) | string;
+    key?: string;
+    algorithms?: string[];
+    issuer?: string[];
+    audience?: string;
+    subject?: string;
+    claimsNamespace?: string;
+  },
+  externalDbType: string | ((context: RequestContext) => string);
+  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
   orchestratorOptions: {
-    redisPrefix: String,
+    redisPrefix: string;
     queryCacheOptions: {
-      refreshKeyRenewalThreshold: number,
-      backgroundRenew: Boolean,
-      queueOptions: QueueOptions
+      refreshKeyRenewalThreshold: number;
+      backgroundRenew: boolean;
+      queueOptions: QueueOptions;
     }
     preAggregationsOptions: {
-      queueOptions: QueueOptions
+      queueOptions: QueueOptions;
     }
   },
-  allowJsDuplicatePropsInSchema: Boolean
+  allowJsDuplicatePropsInSchema: boolean;
 }
 
-QueueOptions {
-  concurrency: number
-  continueWaitTimeout: number,
-  executionTimeout: number,
-  orphanedTimeout: number,
-  heartBeatInterval: number
+interface QueueOptions {
+  concurrency: number;
+  continueWaitTimeout: number;
+  executionTimeout: number;
+  orphanedTimeout: number;
+  heartBeatInterval: number;
 }
 
-RequestContext {
-  authInfo: Object,
-  requestId: String
+interface RequestContext {
+  securityContext: object;
+  requestId: string;
 }
 
-DriverContext extends RequestContext {
-  dataSource: String
+interface DriverContext extends RequestContext {
+  dataSource: string;
 }
 
-SchemaFileRepository {
-  dataSchemaFiles(): Promise<FileContent[]>
+interface SchemaFileRepository {
+  dataSchemaFiles(): Promise<FileContent[]>;
 }
 
-FileContent {
-  fileName: String,
-  content: String
+interface FileContent {
+  fileName: string;
+  content: string;
 }
 ```
 
@@ -105,22 +115,12 @@ FileContent {
 
 Either `String` or `Function` could be passed. Providing a `Function` allows to
 dynamically select a database type depending on the user's context. It is
-usually used in [Multitenancy Setup](multitenancy-setup).
+usually used in [Multitenancy Setup][ref-multitenancy].
 
 If no option is passed, Cube.js will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve `dbType`.
 
-Called only once per [appId](#options-reference-context-to-app-id).
-
-### externalDbType
-
-Should be used in conjunction with
-[externalDriverFactory](#external-driver-factory) option. Either `String` or
-`Function` could be passed. Providing a `Function` allows to dynamically select
-a database type depending on the user's context. It is usually used in
-[Multitenancy Setup](multitenancy-setup).
-
-Called only once per [appId](#options-reference-context-to-app-id).
+Called only once per [`appId`][ref-opts-ctx-to-appid].
 
 ### schemaPath
 
@@ -132,8 +132,8 @@ Path to schema files. The default value is `/schema`.
 
 ### webSocketsBasePath
 
-base path for the websockets server. By default the websocket server will run on
-the root path.
+The base path for the websockets server. By default, the WebSockets server will
+run on the root path.
 
 ### logger
 
@@ -153,11 +153,11 @@ module.exports = {
 ### driverFactory
 
 Set a custom database driver. The function accepts context object as an argument
-to let dynamically load database drivers, which is usually used in
-[Multitenancy Applications](multitenancy-setup).
+to allow dynamically loading database drivers, which is usually used in
+[Multitenancy Applications][ref-multitenancy].
 
-Called once per [dataSourceId](#options-reference-context-to-data-source-id).
-Can return a `Promise` for a driver.
+Called once per [`dataSourceId`][ref-opts-ctx-to-datasourceid]. Can return a
+`Promise` which resolves to a driver.
 
 ```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -168,36 +168,10 @@ module.exports = {
 };
 ```
 
-### externalDriverFactory
-
-Set database driver for external rollup database. Please refer to
-[External Rollup](pre-aggregations#external-rollup) documentation for more info.
-The function accepts context object as an argument to let dynamically load
-database drivers, which is usually used in
-[Multitenancy Applications](multitenancy-setup).
-
-Called once per [appId](#options-reference-context-to-app-id). Can return a
-`Promise` for a driver.
-
-```javascript
-const MySQLDriver = require('@cubejs-backend/mysql-driver');
-
-module.exports = {
-  externalDbType: 'mysql',
-  externalDriverFactory: () =>
-    new MySQLDriver({
-      host: process.env.CUBEJS_EXT_DB_HOST,
-      database: process.env.CUBEJS_EXT_DB_NAME,
-      port: process.env.CUBEJS_EXT_DB_PORT,
-      user: process.env.CUBEJS_EXT_DB_USER,
-      password: process.env.CUBEJS_EXT_DB_PASS,
-    }),
-};
-```
 
 ### contextToAppId
 
-It is a [Multitenancy Setup](multitenancy-setup) option.
+It is a [Multitenancy Setup][ref-multitenancy] option.
 
 `contextToAppId` is a function to determine an App ID which is used as caching
 key for various in-memory structures like schema compilation results, connection
@@ -207,24 +181,30 @@ Called on each request.
 
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.user_id}`,
+  contextToAppId: ({ securityContext }) =>
+    `CUBEJS_APP_${securityContext.user_id}`,
 };
 ```
 
 ### contextToOrchestratorId
 
-`contextToOrchestratorId` is a function to determine a caching key for Query Orchestrator instance.
-Query Orchestrator instance holds database connections, execution queues, pre-aggregation table caches.
-By default, returns the same value as `contextToAppId`.
+`contextToOrchestratorId` is a function to determine a caching key for Query
+Orchestrator instance. Query Orchestrator instance holds database connections,
+execution queues, pre-aggregation table caches. By default, returns the same
+value as `contextToAppId`.
 
-Override it only in case multiple tenants should share the same execution queue and database connections while having different schemas instead of default Query Orchestrator per tenant strategy. 
+Override it only in case multiple tenants should share the same execution queue
+and database connections while having different schemas instead of default Query
+Orchestrator per tenant strategy.
 
 Called on each request.
 
 ```javascript
 module.exports = {
-  contextToAppId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}_${authInfo.user_id}`,
-  contextToOrchestratorId: ({ authInfo }) => `CUBEJS_APP_${authInfo.tenantId}`,
+  contextToAppId: ({ securityContext }) =>
+    `CUBEJS_APP_${securityContext.tenantId}_${securityContext.user_id}`,
+  contextToOrchestratorId: ({ securityContext }) =>
+    `CUBEJS_APP_${securityContext.tenantId}`,
 };
 ```
 
@@ -233,23 +213,23 @@ module.exports = {
 This option allows to customize the repository for Cube.js data schema files. It
 is a function, which accepts a context object and can dynamically select
 repositories with schema files based on
-[SchemaFileRepository](#SchemaFileRepository) contract. Learn more about it in
-[Multitenancy Setup](multitenancy-setup) guide.
+[`SchemaFileRepository`][ref-schemafilerepo] contract. Learn more about it in
+[Multitenancy guide][ref-multitenancy].
 
-Called only once per [appId](#options-reference-context-to-app-id).
+Called only once per [`appId`][ref-opts-ctx-to-appid].
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
 
 // using built-in SchemaFileRepository implementation and supplying the path to schema files
 module.exports = {
-  repositoryFactory: ({ authInfo }) =>
-    new FileRepository(`schema/${authInfo.appId}`),
+  repositoryFactory: ({ securityContext }) =>
+    new FileRepository(`schema/${securityContext.appId}`),
 };
 
 // supplying your own SchemaFileRepository implementation to return array of files
 module.exports = {
-  repositoryFactory: ({ authInfo }) => {
+  repositoryFactory: ({ securityContext }) => {
     return {
       dataSchemaFiles: async () =>
         await Promise.resolve([
@@ -262,13 +242,13 @@ module.exports = {
 
 ### checkAuth
 
-Used in both REST and Websocket API. Can be `async` functon. Default
-implementation parses [JSON Web Tokens (JWT)](https://jwt.io/) in
-`Authorization` header and sets payload to `req.authInfo` if it's verified. More
-info on how to generate such tokens is [here](security#security-context).
+Used in both REST and WebSockets API. Can be an `async` functon. Default
+implementation parses [JSON Web Tokens (JWT)][link-jwt] in `Authorization`
+header and sets payload to `req.securityContext` if it's verified. More
+information on how to generate these tokens is [here][ref-sec-ctx].
 
-You can set `req.authInfo = { u: { ...userContextObj } }` inside the middleware
-if you want to customize [USER_CONTEXT](cube#context-variables-user-context).
+You can set `req.securityContext = userContextObj` inside the middleware if you
+want to customize [`SECURITY_CONTEXT`][ref-cube-ctx-sec-ctx].
 
 Called on each request.
 
@@ -280,15 +260,6 @@ module.exports = {
   checkAuth: (req, auth) => {},
 };
 ```
-
-### checkAuthMiddleware
-
-This is an
-[Express Middleware](https://expressjs.com/en/guide/using-middleware.html) for
-authentication. Default implementation calls
-[checkAuth](#options-reference-check-auth).
-
-Called on each request.
 
 ### queryTransformer
 
@@ -303,8 +274,8 @@ where needed.
 
 ```javascript
 module.exports = {
-  queryTransformer: (query, { authInfo }) => {
-    const user = authInfo.u;
+  queryTransformer: (query, { securityContext }) => {
+    const user = securityContext.u;
     if (user.filterByRegion) {
       query.filters.push({
         member: 'Regions.id',
@@ -325,59 +296,114 @@ there. Either `String` or `Function` could be passed. Providing a `Function`
 allows to dynamically set the pre-aggregation schema name depending on the
 user's context.
 
-Called once per [appId](#options-reference-context-to-app-id).
+Called once per [`appId`][ref-opts-ctx-to-appid].
 
 ```javascript
 module.exports = {
-  preAggregationsSchema: ({ authInfo }) =>
-    `pre_aggregations_${authInfo.tenantId}`,
+  preAggregationsSchema: ({ securityContext }) =>
+    `pre_aggregations_${securityContext.tenantId}`,
 };
 ```
 
-It is usually used in [Multitenancy Setup](multitenancy-setup).
+It is usually used in [Multitenancy Setup][ref-multitenancy].
 
 ### schemaVersion
 
 Schema version can be used to tell Cube.js schema should be recompiled in case
 schema code depends on dynamic definitions fetched from some external database
 or API. This method is called on each request however `RequestContext` parameter
-is reused per application id returned by
-[contextToAppId](#options-reference-context-to-app-id). If returned string has
-been changed, schema will be recompiled. It can be used in both multitenant and
-single tenant environments.
+is reused per application ID as determined by
+[`contextToAppId`][ref-opts-ctx-to-appid]. If the returned string is different,
+the schema will be recompiled. It can be used in both multi-tenant and single
+tenant environments.
 
 ```javascript
 const tenantIdToDbVersion = {};
 
 module.exports = {
-  schemaVersion: ({ authInfo }) => tenantIdToDbVersion[authInfo.tenantId],
+  schemaVersion: ({ securityContext }) =>
+    tenantIdToDbVersion[securityContext.tenantId],
 };
 ```
 
 ### scheduledRefreshTimer
 
-Pass `true` to enable scheduled refresh timer. Can be also set using
+Cube.js enables background refresh by default. You can specify an interval as a
+number in seconds or as a string format e.g. `30s`, `1m`. Can be also set using
 `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
 
 ```javascript
 module.exports = {
-  scheduledRefreshTimer: true,
+  scheduledRefreshTimer: 60,
 };
 ```
 
-Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date)
+Learn more about [scheduled refreshes here][ref-caching-up-to-date].
 
-You can pass comma separated list of timezones to refresh in
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` env variable. For example:
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
+instance. For Serverless deployments, [REST API][ref-rest-api-sched-refresh]
+should be used instead.
 
+You may also need to configure
+[`scheduledRefreshTimeZones`][ref-opts-sched-refresh-tz] and
+[`scheduledRefreshContexts`][ref-opts-sched-refresh-ctxs].
+
+### scheduledRefreshTimeZones
+
+All time-based calculations performed within Cube.js are timezone-aware. Using
+this property you can specify multiple timezones in [TZ Database
+Name][link-wiki-tz] format e.g. `America/Los_Angeles`. The default value is
+`UTC`.
+
+```javascript
+module.exports = {
+  // You can define one or multiple timezones based on your requirements
+  scheduledRefreshTimeZones: ['America/Vancouver', 'America/Toronto'],
+};
 ```
+
+This configuration option can be also set using the
+`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. You can set a
+comma-separated list of timezones to refresh in
+`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. For example:
+
+```bash
 CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 ```
 
-Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
-instance. For serverless deployments
-[REST API](rest-api#api-reference-v-1-run-scheduled-refresh) should be used
-instead of timer.
+### scheduledRefreshContexts
+
+When trying to configure scheduled refreshes for pre-aggregations that use the
+`securityContext` inside `contextToAppId` or `contextToOrchestratorId`, you must
+also set up `scheduledRefreshContexts`. This will allow Cube.js to generate the
+necessary security contexts prior to running the scheduled refreshes.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| Leaving `scheduledRefreshContexts` unconfigured will lead to issues where the
+| security context will be `undefined`. This is because there is no way for
+| Cube.js to know how to generate a context without the required input.
+<!-- prettier-ignore-end -->
+
+```javascript
+module.exports = {
+  // scheduledRefreshContexts should return array of objects, which can declare authInfo
+  scheduledRefreshContexts: async () => [
+    {
+      authInfo: {
+        myappid: 'demoappid',
+        bucket: 'demo',
+      },
+    },
+    {
+      authInfo: {
+        myappid: 'demoappid2',
+        bucket: 'demo2',
+      },
+    },
+  ],
+};
+```
 
 ### extendContext
 
@@ -429,26 +455,100 @@ module.exports = {
 CORS settings for the Cube.js REST API can be configured by providing an object
 with options [from here][link-express-cors-opts].
 
-[link-express-cors-opts]:
-  https://expressjs.com/en/resources/middleware/cors.html#configuration-options
+### jwt
+
+#### jwkUrl
+
+The URL from which JSON Web Key Sets (JWKS) can be retrieved. Can also be set
+using `CUBEJS_JWK_URL`.
+
+#### key
+
+A JSON string that represents a cryptographic key and its' properties. Can also
+be set using `CUBEJS_JWK_KEY`.
+
+#### algorithms
+
+[Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs]. Can also be
+set using `CUBEJS_JWT_ALGS`.
+
+#### issuer
+
+An issuer value which will be used to enforce the [`iss` claim from inbound
+JWTs][link-jwt-ref-iss]. Can also be set using `CUBEJS_JWT_ISSUER`.
+
+#### audience
+
+An audience value which will be used to enforce the [`aud` claim from inbound
+JWTs][link-jwt-ref-aud]. Can also be set using `CUBEJS_JWT_AUDIENCE`.
+
+#### subject
+
+A subject value which will be used to enforce the [`sub` claim from inbound
+JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
+
+#### claimsNamespace
+
+A namespace within the decoded JWT under which any custom claims can be found.
+Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+
+
+### externalDbType
+
+Should be used in conjunction with
+[`externalDriverFactory`](#external-driver-factory) option. Either `String` or
+`Function` could be passed. Providing a `Function` allows you to dynamically select
+a database type depending on the user's context. It is usually used in
+[Multitenancy Setup][ref-multitenancy].
+
+Called only once per [`appId`][ref-opts-ctx-to-appid].
+
+### externalDriverFactory
+
+Set database driver for external rollup database. Please refer to [External
+Rollup][ref-preagg-ext-rollup] documentation for more guidance. The function
+accepts a context object as an argument to allow dynamically loading database
+drivers, which is usually used for [Multitenant deployments][ref-multitenancy].
+
+Called once per [`appId`][ref-opts-ctx-to-appid]. Can return a `Promise` that
+resolves to a driver.
+
+```javascript
+const MySQLDriver = require('@cubejs-backend/mysql-driver');
+
+module.exports = {
+  externalDbType: 'mysql',
+  externalDriverFactory: () =>
+    new MySQLDriver({
+      host: process.env.CUBEJS_EXT_DB_HOST,
+      database: process.env.CUBEJS_EXT_DB_NAME,
+      port: process.env.CUBEJS_EXT_DB_PORT,
+      user: process.env.CUBEJS_EXT_DB_USER,
+      password: process.env.CUBEJS_EXT_DB_PASS,
+    }),
+};
+```
 
 ### orchestratorOptions
 
+<!-- prettier-ignore-start -->
+[[warning | ]]
+| We **strongly** recommend leaving these options set to the defaults. Changing these values can result in application instability and/or downtime.
+<!-- prettier-ignore-end -->
+
 You can pass this object to set advanced options for Cube.js Query Orchestrator.
 
-_Please note that this is advanced configuration._
-
-| Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                                      | Default Value           |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| redisPrefix                                  | Prefix to be set an all Redis keys                                                                                                                                                                                                                                                                                                                                                                                               | `STANDALONE`            |
-| rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                                                 | `false`                 |
-| queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                                               | `{}`                    |
-| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey](cube#parameters-refresh-key) check                                                                                                                                                                                                                                                                                                                                           | `defined by DB dialect` |
-| queryCacheOptions.backgroundRenew            | Controls whether to wait in foreground for refreshed query data if `refreshKey` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [refreshKey](cube#parameters-refresh-key) check to renew in foreground. Default value before 0.15.0 was `true` | `false`                 |
-| queryCacheOptions.queueOptions               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                                                               | `{}`                    |
-| preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                         | `{}`                    |
-| preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                         | `{}`                    |
-| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube.js to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                                                       | `false`                 |
+| Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                               | Default Value           |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| redisPrefix                                  | Prefix to be set an all Redis keys                                                                                                                                                                                                                                                                                                                                                                                        | `STANDALONE`            |
+| rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                                          | `false`                 |
+| queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                                        | `{}`                    |
+| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey][ref-cube-refresh-key] check                                                                                                                                                                                                                                                                                                                                           | `defined by DB dialect` |
+| queryCacheOptions.backgroundRenew            | Controls whether to wait in foreground for refreshed query data if `refreshKey` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [refreshKey][ref-cube-refresh-key] check to renew in foreground. Default value before 0.15.0 was `true` | `false`                 |
+| queryCacheOptions.queueOptions               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                                                        | `{}`                    |
+| preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                  | `{}`                    |
+| preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                  | `{}`                    |
+| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube.js to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                                                | `false`                 |
 
 To set options for `queryCache` and `preAggregations`, set an object with key
 queueOptions. `queryCacheOptions` are used while querying database tables, while
@@ -475,33 +575,33 @@ module.exports = {
 
 Timeout and interval options' values are in seconds.
 
-| Option              | Description                                                                                                  | Default Value |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
+| Option              | Description                                                                                                                                    | Default Value |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. | `2`           |
-| continueWaitTimeout | Long polling interval                                                                                        | `5`           |
-| executionTimeout    | Total timeout of single query                                                                                | `600`         |
-| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                   | `120`         |
-| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled. | `30`          |
+| continueWaitTimeout | Long polling interval                                                                                                                          | `5`           |
+| executionTimeout    | Total timeout of single query                                                                                                                  | `600`         |
+| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                     | `120`         |
+| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                   | `30`          |
 
 ## RequestContext
 
 `RequestContext` object is filled by context data on a HTTP request level.
 
-### authInfo
+### securityContext
 
-Defined as `req.authInfo` which should be set by
-[checkAuth](#options-reference-check-auth). Default implementation of
-[checkAuth](#options-reference-check-auth) uses [JWT Security Token](security)
-payload and sets it to `req.authInfo`.
+Defined as `req.securityContext` which should be set by
+[`checkAuth`][ref-opts-checkauth]. Default implementation of
+[`checkAuth`][ref-opts-checkauth] uses [JWT Security Token][ref-sec] payload and
+sets it to `req.securityContext`.
 
 ## SchemaFileRepository
 
 The `SchemaFileRepository` contract defines an async `dataSchemaFiles` function
 which returns the files to compile for a schema. Returned by
-[repositoryFactory](#repositoryFactory).
+[repositoryFactory][ref-repofactory].
 `@cubejs-backend/server-core/core/FileRepository` is the default implementation
-of the `SchemaFileRepository` contract which accepts [schemaPath](#schemaPath)
-in the constructor.
+of the `SchemaFileRepository` contract which accepts
+[schemaPath][ref-schemapath] in the constructor.
 
 ```javascript
 class ApiFileRepository {
@@ -512,7 +612,7 @@ class ApiFileRepository {
 }
 
 module.exports = {
-  repositoryFactory: ({ authInfo }) => new ApiFileRepository(),
+  repositoryFactory: ({ securityContext }) => new ApiFileRepository(),
 };
 ```
 
@@ -521,3 +621,31 @@ module.exports = {
 Boolean to enable or disable a check duplicate property names in all objects of
 a schema. The default value is `false`, and it is means the compiler would use
 the additional transpiler for check duplicates.
+
+[gh-jsonwebtoken-algs]:
+  https://github.com/auth0/node-jsonwebtoken#algorithms-supported
+[link-express-cors-opts]:
+  https://expressjs.com/en/resources/middleware/cors.html#configuration-options
+[link-jwt]: https://jwt.io/
+[link-jwt-ref-iss]: https://tools.ietf.org/html/rfc7519#section-4.1.1
+[link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
+[link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
+[link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_databas
+[ref-caching-up-to-date]: /caching#keeping-cache-up-to-date
+[ref-cube-refresh-key]: /cube#parameters-refresh-key
+[ref-cube-ctx-sec-ctx]: /cube#context-variables-security-context
+[ref-multitenancy]: /multitenancy-setup
+[ref-ext-driverfactory]: #external-driver-factory
+[ref-opts-checkauth]: #options-reference-check-auth
+[ref-opts-ctx-to-appid]: #options-reference-context-to-app-id
+[ref-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
+[ref-opts-sched-refresh-ctxs]: #options-reference-scheduled-refresh-contexts
+[ref-opts-sched-refresh-tz]: #options-reference-scheduled-refresh-time-zones
+[ref-preagg-ext-rollup]: /pre-aggregations#external-rollup
+[ref-repofactory]: #repositoryFactory
+[ref-schemafilerepo]: #SchemaFileRepository
+[ref-schemapath]: #schemaPath
+[ref-sec]: /security
+[ref-sec-ctx]: /security/context
+[ref-rest-api]: /rest-api
+[ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh

@@ -248,6 +248,18 @@ export function flattenFilters(filters = []) {
   }, []);
 }
 
+export function getQueryMembers(query = {}) {
+  const keys = ['measures', 'dimensions', 'segments'];
+  const members = new Set();
+
+  keys.forEach((key) => (query[key] || []).forEach((member) => members.add(member)));
+  (query.timeDimensions || []).forEach((td) => members.add(td.dimension));
+
+  flattenFilters(query.filters).forEach((filter) => members.add(filter.dimension || filter.member));
+
+  return [...members];
+}
+
 export function getOrderMembersFromOrder(orderMembers, order) {
   const ids = new Set();
   const indexedOrderMembers = indexBy(prop('id'), orderMembers);
@@ -267,6 +279,6 @@ export function getOrderMembersFromOrder(orderMembers, order) {
       nextOrderMembers.push(member);
     }
   });
-  
+
   return nextOrderMembers;
 }

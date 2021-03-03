@@ -1,64 +1,104 @@
 import styled from 'styled-components';
-import * as PropTypes from 'prop-types';
 import { CloseOutlined } from '@ant-design/icons';
+
 import { Button } from '../components';
 
-const RemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
+const UnstyledRemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group {...props}>
     {children}
-    <Button ghost onClick={onRemoveClick} className="remove-btn">
+    <Button
+      ghost
+      className="remove-btn"
+      disabled={props.disabled}
+      onClick={onRemoveClick}
+    >
       <CloseOutlined />
     </Button>
   </Button.Group>
 );
 
-RemoveButtonGroup.propTypes = {
-  onRemoveClick: PropTypes.func.isRequired,
-  children: PropTypes.object.isRequired,
-};
+function color(props) {
+  const colorMap = {
+    primary: 'primary',
+    danger: 'pink',
+  };
 
-const styledRemoveButtonGroup = styled(RemoveButtonGroup)`
+  if (props.color == null) {
+    return 'primary';
+  }
+
+  return colorMap[props.color];
+}
+
+const RemoveButtonGroup = styled(UnstyledRemoveButtonGroup)`
   && {
-    border: 1px solid var(--primary-color);
-    color: var(--primary-color);
     border-radius: calc(var(--border-radius-base) + 1px);
-  
+    
     .ant-btn {
-      background-color: var(--primary-9);
-      color: var(--primary-color);
       border: none;
-      
-      span {
-        color: var(--primary-color);
-      }
-      
-      &:hover {
-        background-color: var(--primary-8);
-        border: none;
-        box-shadow: none;
-      }
-      
+
       & + .ant-btn {
         margin-left: 0;
       }
     }
 
     .remove-btn {
-      background-color: white !important;    
-      color: var(--primary-color);
       padding: 8px;
-      
-      &:hover {
-        background-color: var(--remove-btn-hover-bg) !important;
-      }
-      
+
       .anticon {
         height: 14px;
         display: block;
-        vertical-align: initial;
       }
+    }
+  }
+
+  &&:not(.disabled) {
+    border: 1px solid var(--${color}-color);
+    color: var(--${color}-color);
+
+    .ant-btn {
+      background-color: var(--${color}-9);
+      color: var(--${color}-color);
+
+      span {
+        color: var(--${color}-color);
+      }
+
+      &:hover {
+        background-color: var(--${color}-8);
+        border: none;
+        box-shadow: none;
+      }
+    }
+
+    .remove-btn {
+      background-color: white !important;
+      color: var(--${color}-color);
+
+      &:hover {
+        background-color: var(--${color}-8) !important;
+      }
+    }
+  }
+
+  &&.disabled {
+    border: 1px solid var(--disabled-color);
+    color: var(--disabled-color);
+
+    .ant-btn {
+      background-color: var(--disabled-bg);
+      color: var(--disabled-color);
+      border: none;
+
+      span {
+        color: var(--disabled-color);
+      }
+    }
+
+    .remove-btn {
+      color: var(--disabled-color);
     }
   }
 `;
 
-export default styledRemoveButtonGroup;
+export default RemoveButtonGroup;

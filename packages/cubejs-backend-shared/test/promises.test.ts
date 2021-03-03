@@ -5,6 +5,7 @@ import {
   retryWithTimeout,
   withTimeout,
   withTimeoutRace,
+  asyncMemoize, asyncRetry, asyncDebounce,
 } from '../src';
 
 test('createCancelablePromise', async () => {
@@ -67,91 +68,120 @@ test('createCancelablePromise(defer async + with)', async () => {
   expect(finished).toBe(true);
 });
 
-test('createCancelableInterval(handle too fast execution)', async () => {
-  let started = 0;
-  let finished = 0;
-  let onDuplicatedExecution = 0;
+describe('createCancelableInterval', () => {
+  test('handle too fast execution', async () => {
+    let started = 0;
+    let finished = 0;
+    let onDuplicatedExecution = 0;
+    let onDuplicatedStateResolved = 0;
 
-  const interval = createCancelableInterval(async (token) => {
-    started++;
+    const interval = createCancelableInterval(async (token) => {
+      started++;
 
-    await pausePromise(25);
+      await pausePromise(100);
 
-    finished++;
-  }, {
-    interval: 10,
-    onDuplicatedExecution: () => {
-      onDuplicatedExecution++;
-    },
+      finished++;
+    }, {
+      interval: 50,
+      onDuplicatedExecution: (intervalId) => {
+        expect(Number.isInteger(intervalId)).toBeTruthy();
+
+        onDuplicatedExecution++;
+      },
+      onDuplicatedStateResolved: (intervalId, elapsed) => {
+        expect(Number.isInteger(intervalId)).toBeTruthy();
+        expect(elapsed).toBeGreaterThanOrEqual(50 - 5);
+
+        onDuplicatedStateResolved++;
+      }
+    });
+
+    /**
+     * Interval is 50, when execution is 100
+     * Let's wait 5 intervals, which will do 2 executions
+     */
+    await pausePromise(50 * 5 + 25);
+    await interval.cancel(true);
+
+    expect(started).toBeGreaterThanOrEqual(2);
+    expect(finished).toEqual(started);
+
+    expect(onDuplicatedExecution).toBeGreaterThanOrEqual(2);
+    expect(onDuplicatedStateResolved).toBeGreaterThanOrEqual(2);
   });
 
-  await pausePromise(25 * 2 + 5);
-  await interval.cancel(true);
+  test('simple interval', async () => {
+    let started = 0;
+    let finished = 0;
+    let onDuplicatedExecution = 0;
+    let onDuplicatedStateResolved = 0;
+    let canceled = false;
 
-  expect(started).toEqual(2);
-  expect(finished).toEqual(2);
-  expect(onDuplicatedExecution).toBeLessThanOrEqual(3);
-});
+    const interval = createCancelableInterval(async (token) => {
+      started++;
 
-test('createCancelableInterval(simple interval)', async () => {
-  let started = 0;
-  let finished = 0;
-  let canceled = false;
+      await pausePromise(25);
 
-  const interval = createCancelableInterval(async (token) => {
-    started++;
+      if (token.isCanceled()) {
+        // console.log('canceling');
 
-    await pausePromise(25);
+        canceled = true;
 
-    if (token.isCanceled()) {
-      // console.log('canceling');
+        return;
+      }
 
-      canceled = true;
+      await pausePromise(25);
 
-      return;
-    }
+      finished++;
+    }, {
+      interval: 100,
+      onDuplicatedExecution: () => {
+        onDuplicatedExecution++;
+      },
+      onDuplicatedStateResolved: () => {
+        onDuplicatedStateResolved++;
+      }
+    });
 
-    await pausePromise(25);
+    await pausePromise(100 + 25 + 25 + 10);
 
-    finished++;
-  }, {
-    interval: 100,
+    expect(started).toEqual(1);
+    expect(finished).toEqual(1);
+
+    await pausePromise(50);
+
+    await interval.cancel(true);
+
+    expect(canceled).toEqual(true);
+    expect(started).toEqual(2);
+    expect(finished).toEqual(1);
+
+    // Interval 100ms, when execution takes ~50ms
+    expect(onDuplicatedExecution).toEqual(0);
+    expect(onDuplicatedStateResolved).toEqual(0);
   });
 
-  await pausePromise(100 + 25 + 25 + 10);
+  test('cancel should wait latest execution', async () => {
+    let started = 0;
+    let finished = 0;
 
-  expect(started).toEqual(1);
-  expect(finished).toEqual(1);
+    const interval = createCancelableInterval(async (token) => {
+      started++;
 
-  await pausePromise(50);
+      await pausePromise(250);
 
-  await interval.cancel(true);
+      finished++;
+    }, {
+      interval: 100,
+    });
 
-  expect(canceled).toEqual(true);
-  expect(started).toEqual(2);
-  expect(finished).toEqual(1);
-});
+    await pausePromise(100);
 
-test('createCancelableInterval(cancel should wait latest execution)', async () => {
-  let started = 0;
-  let finished = 0;
+    await interval.cancel();
 
-  const interval = createCancelableInterval(async (token) => {
-    started++;
-
-    await pausePromise(250);
-
-    finished++;
-  }, {
-    interval: 100,
+    expect(started).toEqual(1);
+    expect(finished).toEqual(1);
   });
-
-  await pausePromise(100);
-
-  await interval.cancel();
-
-  expect(started).toEqual(1);
-  expect(finished).toEqual(1);
 });
 
 test('withTimeoutRace(ok)', async () => {
@@ -203,6 +233,62 @@ test('withTimeoutRace(timeout)', async () => {
   expect(finished).toEqual(false);
 });
 
+test('withTimeout(fired)', async () => {
+  let cbFired = false;
+  let isFulfilled = false;
+
+  const promise = withTimeout(
+    async (token) => {
+      cbFired = true;
+    },
+    50
+  );
+  promise.then(
+    (v) => {
+      isFulfilled = true;
+    },
+  );
+
+  await pausePromise(100);
+
+  expect(isFulfilled).toEqual(true);
+  expect(cbFired).toEqual(true);
+});
+
+test('withTimeout(cancellation)', async () => {
+  let cbFired = false;
+  let isFulfilled = false;
+  let isPending = true;
+  let isRejected = false;
+
+  const promise = withTimeout(
+    async (token) => {
+      cbFired = true;
+    },
+    1000
+  );
+  promise.then(
+    (v) => {
+      isFulfilled = true;
+      isPending = false;
+      return v;
+    },
+    () => {
+      isRejected = true;
+      isPending = false;
+    },
+  );
+
+  expect(isPending).toEqual(true);
+
+  await promise.cancel();
+
+  expect(isFulfilled).toEqual(true);
+  expect(isPending).toEqual(false);
+  expect(isRejected).toEqual(false);
+  expect(cbFired).toEqual(false);
+});
+
 test('retryWithTimeout', async () => {
   let iterations = 0;
 
@@ -221,4 +307,178 @@ test('retryWithTimeout', async () => {
 
   expect(result).toEqual(256);
   expect(iterations).toEqual(10);
+});
+
+describe('asyncMemoize', () => {
+  test('asyncMemoize cache', async () => {
+    let called = 0;
+
+    const memCall = await asyncMemoize(
+      async (url: string) => {
+        called++;
+
+        return Math.random();
+      },
+      {
+        extractCacheLifetime: () => 1 * 500,
+        extractKey: (url) => url,
+      }
+    );
+
+    const firstCallRandomValue = await memCall('test');
+
+    expect(called).toEqual(1);
+
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+
+    expect(called).toEqual(1);
+
+    await memCall('anotherValue');
+
+    expect(called).toEqual(2);
+
+    await pausePromise(800);
+
+    expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
+
+    expect(called).toEqual(3);
+  });
+
+  test('asyncMemoize force', async () => {
+    let called = 0;
+
+    const memCall = await asyncMemoize(
+      async (url: string) => {
+        called++;
+
+        return Math.random();
+      },
+      {
+        extractCacheLifetime: () => 1 * 500,
+        extractKey: (url) => url,
+      }
+    );
+
+    const firstCallRandomValue = await memCall('test');
+
+    expect(called).toEqual(1);
+
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+
+    expect(called).toEqual(1);
+
+    const secondCallRandomValue = await memCall.force('test');
+
+    expect(secondCallRandomValue !== firstCallRandomValue).toEqual(true);
+
+    expect(called).toEqual(2);
+
+    expect(await memCall('test')).toEqual(secondCallRandomValue);
+    expect(await memCall('test')).toEqual(secondCallRandomValue);
+
+    expect(called).toEqual(2);
+  });
+});
+
+describe('asyncRetry', () => {
+  test('without exception', async () => {
+    let called = 0;
+
+    const result = await asyncRetry(
+      async () => {
+        called++;
+
+        return 5555;
+      },
+      {
+        times: 3,
+      }
+    );
+
+    expect(called).toEqual(1);
+    expect(result).toEqual(5555);
+  });
+
+  test('once time exception', async () => {
+    let called = 0;
+    let exception = false;
+
+    const result = await asyncRetry(
+      async () => {
+        called++;
+
+        if (!exception) {
+          exception = true;
+
+          throw new Error('test');
+        }
+
+        return 555;
+      },
+      {
+        times: 3,
+      }
+    );
+
+    expect(called).toEqual(2);
+    expect(result).toEqual(555);
+  });
+
+  test('all time exception', async () => {
+    let called = 0;
+
+    try {
+      await asyncRetry(
+        async () => {
+          called++;
+
+          throw new Error('test');
+        },
+        {
+          times: 3,
+        }
+      );
+
+      throw new Error('should throw exception');
+    } catch (e) {
+      expect(e.message).toEqual('test');
+      expect(called).toEqual(3);
+    }
+  });
+});
+
+describe('asyncDebounce', () => {
+  test('multiple async calls to single', async () => {
+    let called = 0;
+
+    const doOnce = asyncDebounce(
+      async (arg1: string, arg2: string) => {
+        called++;
+
+        expect(arg1).toEqual('arg1');
+        expect(arg2).toEqual('arg2');
+
+        await pausePromise(200);
+
+        return Math.random();
+      }
+    );
+
+    const [first, second, third] = await Promise.all([
+      doOnce('arg1', 'arg2'),
+      doOnce('arg1', 'arg2'),
+      doOnce('arg1', 'arg2'),
+    ]);
+
+    expect(called).toEqual(1);
+    expect(first === second).toEqual(true);
+    expect(second === third).toEqual(true);
+
+    await pausePromise(200 + 25);
+
+    await doOnce('arg1', 'arg2');
+    expect(called).toEqual(2);
+  });
 });

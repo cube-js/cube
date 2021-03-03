@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.25.21",
+  "version": "0.26.43",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -9,15 +9,16 @@
   "dependencies": {
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.25.0",
-    "@cubejs-client/react": "^0.25.14",
-    "antd": "^4.8.5",
+    "@cubejs-client/core": "^0.26.19",
+    "@cubejs-client/react": "^0.26.41",
+    "antd": "4.13.0",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
     "customize-cra": "^1.0.0",
     "fast-deep-equal": "^3.1.3",
     "fetch-retry": "^4.0.1",
     "history": "^4.9.0",
+    "jwt-decode": "^3.1.2",
     "less": "^3.10.3",
     "less-loader": "^5.0.0",
     "moment": "^2.24.0",

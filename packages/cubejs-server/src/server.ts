@@ -1,25 +1,29 @@
-import dotenv from 'cubejs-dotenv';
+import dotenv from '@cubejs-backend/dotenv';
 
 import CubeCore, {
   CreateOptions as CoreCreateOptions,
   CubejsServerCore,
   DatabaseType,
+  DriverContext,
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
 import express from 'express';
-import https from 'https';
 import http from 'http';
 import util from 'util';
 import bodyParser from 'body-parser';
 import cors, { CorsOptions } from 'cors';
+import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
 import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
+import { gracefulMiddleware } from './graceful-middleware';
+import { ServerStatusHandler } from './server-status';
 
 const { version } = require('../package.json');
 
 dotenv.config({
   override: true,
+  multiline: 'line-breaks',
 });
 
 export type InitAppFn = (app: express.Application) => void | Promise<void>;
@@ -39,18 +43,18 @@ type RequireOne<T, K extends keyof T> = {
   [X in Exclude<keyof T, K>]?: T[X]
 } & {
   [P in K]-?: T[P]
-}
+};
 
 export class CubejsServer {
   protected readonly core: CubejsServerCore;
 
   protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http'>;
 
-  protected redirector: http.Server | null = null;
-
   protected server: GracefulHttpServer | null = null;
 
   protected socketServer: WebSocketServer | null = null;
+
+  protected readonly status: ServerStatusHandler = new ServerStatusHandler();
 
   public constructor(config: CreateOptions = {}) {
     this.config = {
@@ -66,20 +70,22 @@ export class CubejsServer {
     };
 
     this.core = CubeCore.create(config);
-    this.redirector = null;
     this.server = null;
   }
 
-  public async listen(options: https.ServerOptions | http.ServerOptions = {}) {
+  public async listen(options: http.ServerOptions = {}) {
     try {
       if (this.server) {
         throw new Error('CubeServer is already listening');
       }
 
       const app = express();
-
       app.use(cors(this.config.http.cors));
       app.use(bodyParser.json({ limit: '50mb' }));
+
+      if (this.config.gracefulShutdown) {
+        app.use(gracefulMiddleware(this.status, this.config.gracefulShutdown));
+      }
 
       if (this.config.initApp) {
         await this.config.initApp(app);
@@ -87,57 +93,24 @@ export class CubejsServer {
 
       await this.core.initApp(app);
 
-      const PORT = getEnv('port');
-      const TLS_PORT = getEnv('tlsPort');
-
       const enableTls = getEnv('tls');
       if (enableTls) {
-        process.emitWarning(
-          'Environment variable CUBEJS_ENABLE_TLS was deprecated and will be removed. \n' +
-          'Use own reverse proxy in front of Cube.js for proxying HTTPS traffic.',
-          'DeprecationWarning',
-        );
-
-        this.redirector = http.createServer((req, res) => {
-          if (req.headers.host) {
-            res.writeHead(301, {
-              Location: `https://${req.headers.host.split(':')[0]}:${TLS_PORT}${req.url}`
-            });
-          }
-
-          res.end();
-        });
-
-        this.redirector.listen(PORT);
+        throw new Error('CUBEJS_ENABLE_TLS has been deprecated and removed.');
       }
 
-      if (enableTls) {
-        this.server = gracefulHttp(https.createServer(options, app));
-      } else {
-        const [major] = process.version.split('.');
-        if (major === '8' && Object.keys(options).length) {
-          process.emitWarning(
-            'There is no support for passing options inside listen method in Node.js 8.',
-            'CustomWarning',
-          );
-
-          this.server = gracefulHttp(http.createServer(app));
-        } else {
-          this.server = gracefulHttp(http.createServer(options, app));
-        }
-      }
+      this.server = gracefulHttp(http.createServer(options, app));
 
       if (this.config.webSockets) {
         this.socketServer = new WebSocketServer(this.core, this.config);
         this.socketServer.initServer(this.server);
       }
 
-      await this.server.listen(enableTls ? TLS_PORT : PORT);
+      const PORT = getEnv('port');
+      await this.server.listen(PORT);
 
       return {
         app,
         port: PORT,
-        tlsPort: enableTls ? TLS_PORT : undefined,
         server: this.server,
         version
       };
@@ -147,6 +120,7 @@ export class CubejsServer {
           error: (e.stack || e.message || e).toString()
         });
       }
+
       throw e;
     }
   }
@@ -155,8 +129,19 @@ export class CubejsServer {
     return this.core.testConnections();
   }
 
+  // @internal
+  public handleScheduledRefreshInterval() {
+    return this.core.handleScheduledRefreshInterval();
+  }
+
+  // @internal
   public runScheduledRefresh(context: any, queryingOptions: any) {
     return this.core.runScheduledRefresh(context, queryingOptions);
+  }
+
+  // @internal
+  public async getDriver(ctx: DriverContext): Promise<BaseDriver> {
+    return this.core.getDriver(ctx);
   }
 
   public async close() {
@@ -171,12 +156,6 @@ export class CubejsServer {
 
       await util.promisify(this.server.close)();
       this.server = null;
-
-      if (this.redirector) {
-        await util.promisify(this.redirector.close)();
-
-        this.redirector = null;
-      }
 
       await this.core.releaseConnections();
     } catch (e) {
@@ -207,22 +186,20 @@ export class CubejsServer {
   }
 
   public async shutdown(signal: string, graceful: boolean = true) {
-    if (graceful) {
-      console.log(`Received ${signal} signal, shutting down ${this.config.gracefulShutdown}s`);
-    }
-
     try {
       const timeoutKiller = withTimeout(
         () => {
-          console.error('Unable to stop Cube.js in expected time, force kill');
+          this.core.logger('Graceful Shutdown Timeout Kill', {
+            error: 'Unable to stop Cube.js in expected time, force kill',
+          });
+
           process.exit(1);
         },
-        (this.config.gracefulShutdown || 2) * 1000,
+        // this.server.stop can be closed in this.config.gracefulShutdown, let's add 1s before kill
+        ((this.config.gracefulShutdown || 2) + 1) * 1000,
       );
 
-      if (this.redirector) {
-        this.redirector.close();
-      }
+      this.status.shutdown();
 
       const locks: Promise<any>[] = [
         this.core.beforeShutdown()

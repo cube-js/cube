@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.25.21",
+  "version": "0.26.44",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-server-core"
   },
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "main": "index.js",
   "types": "dist/src/index.d.ts",
@@ -27,13 +27,13 @@
     "lint": "linter src/* test/* --ext .ts,.js",
     "lint:fix": "linter --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
-    "unit": "jest --runInBand dist/test"
+    "unit": "jest --runInBand --coverage dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.25.21",
-    "@cubejs-backend/query-orchestrator": "^0.25.21",
-    "@cubejs-backend/schema-compiler": "^0.25.21",
-    "@cubejs-backend/shared": "^0.25.18",
+    "@cubejs-backend/api-gateway": "^0.26.35",
+    "@cubejs-backend/query-orchestrator": "^0.26.38",
+    "@cubejs-backend/schema-compiler": "^0.26.44",
+    "@cubejs-backend/shared": "^0.26.35",
     "@hapi/joi": "^15.1.1",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
@@ -55,11 +55,13 @@
     "uuid": "^3.3.3"
   },
   "devDependencies": {
+    "@cubejs-backend/cubestore-driver": "^0.26.44",
     "@cubejs-backend/linter": "^0.24.5",
     "@types/cross-spawn": "^6.0.2",
     "@types/express": "^4.17.9",
     "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^25.2.3",
+    "@types/jsonwebtoken": "^8.5.0",
     "@types/lru-cache": "^5.1.0",
     "@types/node": "^10.17.49",
     "@types/node-fetch": "^2.5.7",
@@ -75,6 +77,15 @@
   "jest": {
     "setupFilesAfterEnv": [
       "<rootDir>/dist/test/setup.js"
+    ],
+    "collectCoverage": false,
+    "coverageDirectory": "coverage/",
+    "collectCoverageFrom": [
+      "dist/src/**/*.js",
+      "dist/src/**/*.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
     ]
   }
 }

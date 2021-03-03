@@ -1,13 +1,18 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
+import { withTimeout } from '@cubejs-backend/shared';
 import { CubejsServerCore } from '../../src';
 import { DatabaseType } from '../../src/core/types';
 
 process.env.CUBEJS_API_SECRET = 'api-secret';
 
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public detectScheduledRefreshTimer(scheduledRefreshTimer?:string | number | boolean) {
+  public detectScheduledRefreshTimer(scheduledRefreshTimer: number|boolean) {
     return super.detectScheduledRefreshTimer(scheduledRefreshTimer);
+  }
+
+  public getRefreshScheduler() {
+    return super.getRefreshScheduler();
   }
 }
 
@@ -95,6 +100,7 @@ describe('index.test', () => {
       allowUngroupedWithoutPrimaryKey: true,
       scheduledRefreshConcurrency: 4,
       orchestratorOptions: {
+        continueWaitTimeout: 10,
         redisPrefix: 'some-prefix',
         queryCacheOptions: {
           refreshKeyRenewalThreshold: 1000,
@@ -109,7 +115,16 @@ describe('index.test', () => {
         },
         rollupOnlyMode: false
       },
-      allowJsDuplicatePropsInSchema: true
+      allowJsDuplicatePropsInSchema: true,
+      jwk: {
+        claimsNamespace: 'http://localhost:4000',
+        jwkUrl: () => '',
+        jwkRetry: 5,
+        jwkDefaultExpire: 5 * 60,
+        algorithms: ['RS256'],
+        audience: 'http://localhost:4000/v1',
+        issuer: 'http://localhost:4000',
+      }
     };
 
     const cubejsServerCore = new CubejsServerCore(<any>options);
@@ -126,7 +141,7 @@ describe('index.test', () => {
 
   test('Should throw error, dbType is required', () => {
     delete process.env.CUBEJS_DB_TYPE;
-    
+
     expect(() => {
       jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
       // eslint-disable-next-line
@@ -135,10 +150,10 @@ describe('index.test', () => {
     })
       .toThrowError(/driverFactory, apiSecret, dbType are required options/);
   });
-  
+
   test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
     delete process.env.CUBEJS_DB_TYPE;
-    
+
     expect(() => {
       jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => false);
       // eslint-disable-next-line
@@ -162,18 +177,93 @@ describe('index.test', () => {
       expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
       expect(cubejsServerCore.detectScheduledRefreshTimer(input)).toBe(output);
 
-      await cubejsServerCore.releaseConnections();
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
       delete process.env.NODE_ENV;
-
-      await new Promise((resolve => { setTimeout(resolve, 1000); }));
     });
   };
 
+  expectRefreshTimerOption(0, false);
+  expectRefreshTimerOption(1, 1000);
   expectRefreshTimerOption(10, 10000);
-  expectRefreshTimerOption('9', 9000);
   expectRefreshTimerOption(true, 30000);
   expectRefreshTimerOption(false, false);
-  expectRefreshTimerOption('false', false);
-  expectRefreshTimerOption(undefined, 30000);
-  expectRefreshTimerOption(undefined, false, true);
+
+  test('scheduledRefreshContexts option', async () => {
+    const cubejsServerCore = new CubejsServerCoreOpen({
+      dbType: 'mysql',
+      apiSecret: 'secret',
+      // 250ms
+      scheduledRefreshTimer: 1,
+      scheduledRefreshConcurrency: 2,
+      scheduledRefreshContexts: async () => [
+        {
+          securityContext: {
+            appid: 'test1',
+            u: {
+              prop1: 'value1'
+            }
+          }
+        },
+        // securityContext is required in typings, but can be empty in user-space
+        <any>{
+          // Renamed to securityContext, let's test that it migrate automatically
+          authInfo: {
+            appid: 'test2',
+            u: {
+              prop2: 'value2'
+            }
+          },
+        },
+        // Null is a default placeholder
+        null
+      ],
+    });
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCoreOpen);
+
+    const timeoutKiller = withTimeout(
+      () => {
+        throw new Error('runScheduledRefresh was not called');
+      },
+      2 * 1000,
+    );
+
+    const refreshSchedulerMock = {
+      runScheduledRefresh: jest.fn(async () => {
+        await timeoutKiller.cancel();
+
+        return {
+          finished: true,
+        };
+      })
+    };
+
+    jest.spyOn(cubejsServerCore, 'getRefreshScheduler').mockImplementation(() => <any>refreshSchedulerMock);
+
+    await timeoutKiller;
+
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls.length).toEqual(3);
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls[0]).toEqual([
+      {
+        authInfo: { appid: 'test1', u: { prop1: 'value1' } },
+        securityContext: { appid: 'test1', u: { prop1: 'value1' } },
+      },
+      { concurrency: 2 },
+    ]);
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls[1]).toEqual([
+      {
+        authInfo: { appid: 'test2', u: { prop2: 'value2' } },
+        securityContext: { appid: 'test2', u: { prop2: 'value2' } },
+      },
+      { concurrency: 2 },
+    ]);
+    expect(refreshSchedulerMock.runScheduledRefresh.mock.calls[2]).toEqual([
+      // RefreshScheduler will populate it
+      null,
+      { concurrency: 2 },
+    ]);
+
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
+  });
 });

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/shared",
-  "version": "0.25.18",
+  "version": "0.26.35",
   "description": "Shared code for Cube.js backend packages",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -10,19 +10,19 @@
     "watch": "tsc -w",
     "lint": "linter src/* --ext .ts",
     "lint:fix": "linter --fix src/* --ext .ts",
-    "unit": "jest dist"
+    "unit": "jest --coverage dist/test"
   },
   "files": [
     "README.md",
     "dist/src/*"
   ],
   "engines": {
-    "node": ">=8.11.1"
+    "node": ">=10.8.0"
   },
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.25.0",
+    "@cubejs-backend/linter": "^0.26.13",
     "@types/jest": "^26.0.16",
     "@types/node-fetch": "^2.5.7",
     "jest": "^26.6.3",
@@ -30,8 +30,7 @@
   },
   "dependencies": {
     "env-var": "^6.3.0",
-    "node-fetch": "^2.6.1",
-    "node-machine-id": "^1.1.12"
+    "node-fetch": "^2.6.1"
   },
   "publishConfig": {
     "access": "public"
@@ -40,6 +39,15 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "collectCoverage": false,
+    "coverageDirectory": "coverage/",
+    "collectCoverageFrom": [
+      "dist/src/**/*.js",
+      "dist/src/**/*.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ]
   }
 }

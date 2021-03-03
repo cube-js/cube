@@ -66,7 +66,7 @@ const create = async (projectName, options) => {
   await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
 
   if (!options.dbType) {
-    const Drivers = await requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/DriverDependencies.js');
+    const Drivers = requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/DriverDependencies.js');
     const prompt = await inquirer.prompt([{
       type: 'list',
       name: 'dbType',
@@ -78,7 +78,7 @@ const create = async (projectName, options) => {
   }
 
   logStage('Installing DB driver dependencies');
-  const CubejsServer = await requireFromPackage<any>('@cubejs-backend/server');
+  const CubejsServer = requireFromPackage<any>('@cubejs-backend/server');
 
   let driverDependencies = CubejsServer.driverDependencies(options.dbType);
   if (!driverDependencies) {
@@ -119,7 +119,7 @@ const create = async (projectName, options) => {
 
   logStage('Writing files from template');
 
-  const driverClass = await requireFromPackage<any>(driverDependencies[0]);
+  const driverClass = requireFromPackage<any>(driverDependencies[0]);
 
   const driverPackageManifest = await requirePackageManifest(driverDependencies[0]);
   const serverCorePackageManifest = await requirePackageManifest('@cubejs-backend/server-core');
@@ -159,6 +159,10 @@ const create = async (projectName, options) => {
     projectName,
     dbType: options.dbType
   });
+
+  // It's placed here, because fail of it can affect whole creation. Let's do it in the end for preview period.
+  logStage('Installing Cube Store driver');
+  await npmInstall(['@cubejs-backend/cubestore-driver'], options.template === 'docker');
 
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
 

@@ -1,13 +1,17 @@
 module.exports = {
   root: true,
   extends: 'airbnb-base',
+  env: {
+    node: true,
+  },
   plugins: [
     'import',
     '@typescript-eslint/eslint-plugin',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    sourceType: 'module'
+    sourceType: 'module',
+    ecmaVersion: 2020
   },
   rules: {
     'no-useless-constructor': 0,
@@ -51,6 +55,7 @@ module.exports = {
     '@typescript-eslint/prefer-as-const': 'error',
     '@typescript-eslint/prefer-namespace-keyword': 'error',
     '@typescript-eslint/triple-slash-reference': 'error',
+    '@typescript-eslint/type-annotation-spacing': 'error',
   },
   overrides: [
     {
@@ -82,6 +87,11 @@ module.exports = {
         '@typescript-eslint/explicit-member-accessibility': 'warn',
         'no-shadow': 'off',
         '@typescript-eslint/no-shadow': ['error', { ignoreTypeValueShadow: true }],
+        //
+        'no-duplicate-imports': 'off',
+        '@typescript-eslint/no-duplicate-imports': 'error',
+        semi: 'off',
+        '@typescript-eslint/semi': 'error',
       },
     },
   ],

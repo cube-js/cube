@@ -2,11 +2,13 @@ import { PlusOutlined } from '@ant-design/icons';
 import { DatePicker, Menu } from 'antd';
 import moment from 'moment';
 import { useState, Fragment } from 'react';
+import styled from 'styled-components';
+
 import ButtonDropdown from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
+import MissingMemberTooltip from './MissingMemberTooltip';
 import { SectionRow } from '../components';
-import styled from 'styled-components';
 
 const Label = styled.div`
   color: var(--dark-04-color);
@@ -34,7 +36,9 @@ const DateRanges = [
 
 const TimeGroup = ({
   members = [],
+  disabled = false,
   availableMembers,
+  missingMembers,
   addMemberName,
   updateMethods,
   parsedDateRange,
@@ -46,9 +50,7 @@ const TimeGroup = ({
     if (dateRange && !dateRange.some((d) => !d)) {
       updateMethods.update(m, {
         ...m,
-        dateRange: dateRange.map((dateTime) =>
-          dateTime.format('YYYY-MM-DD')
-        ),
+        dateRange: dateRange.map((dateTime) => dateTime.format('YYYY-MM-DD')),
       });
     }
   }
@@ -79,61 +81,90 @@ const TimeGroup = ({
 
   return (
     <SectionRow>
-      {members.map((m, index) => (
-        <Fragment key={index}>
-          <RemoveButtonGroup onRemoveClick={() => updateMethods.remove(m)}>
+      {members.map((m, index) => {
+        const isMissing = missingMembers.includes(m.dimension.title);
+
+        const buttonGroup = (
+          <RemoveButtonGroup
+            disabled={disabled}
+            className={disabled ? 'disabled' : null}
+            color={isMissing ? 'danger' : 'primary'}
+            onRemoveClick={() => updateMethods.remove(m)}
+          >
             <MemberDropdown
+              disabled={disabled}
+              availableMembers={availableMembers}
               onClick={(updateWith) =>
                 updateMethods.update(m, { ...m, dimension: updateWith })
               }
-              availableMembers={availableMembers}
             >
               {m.dimension.title}
             </MemberDropdown>
           </RemoveButtonGroup>
+        );
 
-          <Label>for</Label>
-
-          <ButtonDropdown
-            overlay={dateRangeMenu((dateRange) => {
-              if (dateRange.value === 'custom') {
-                toggleRangePicker(true);
-              } else {
-                updateMethods.update(m, {
-                  ...m,
-                  dateRange: dateRange.value,
-                });
-                toggleRangePicker(false);
-              }
-            })}
-          >
-            {(isRangePickerVisible || isCustomDateRange) ? 'Custom' : m.dateRange || 'All time'}
-          </ButtonDropdown>
-
-          {isRangePickerVisible || isCustomDateRange ? (
-            <RangePicker
-              format="YYYY-MM-DD"
-              defaultValue={(parsedDateRange || []).map((date) => moment(date))}
-              onChange={(dateRange) => onDateRangeSelect(m, dateRange)}
-            />
-          ) : null}
-
-          <Label>by</Label>
-
-          <ButtonDropdown
-            overlay={granularityMenu(m.dimension, (granularity) =>
-              updateMethods.update(m, { ...m, granularity: granularity.name })
+        return (
+          <Fragment key={index}>
+            {isMissing ? (
+              <MissingMemberTooltip>
+                {buttonGroup}
+              </MissingMemberTooltip>
+            ) : (
+              buttonGroup
             )}
-          >
-            {m.dimension.granularities.find((g) => g.name === m.granularity) &&
-              m.dimension.granularities.find((g) => g.name === m.granularity)
-                .title}
-          </ButtonDropdown>
-        </Fragment>
-      ))}
+            <Label>for</Label>
+
+            <ButtonDropdown
+              disabled={disabled}
+              overlay={dateRangeMenu((dateRange) => {
+                if (dateRange.value === 'custom') {
+                  toggleRangePicker(true);
+                } else {
+                  updateMethods.update(m, {
+                    ...m,
+                    dateRange: dateRange.value,
+                  });
+                  toggleRangePicker(false);
+                }
+              })}
+            >
+              {isRangePickerVisible || isCustomDateRange
+                ? 'Custom'
+                : m.dateRange || 'All time'}
+            </ButtonDropdown>
+
+            {isRangePickerVisible || isCustomDateRange ? (
+              <RangePicker
+                disabled={disabled}
+                format="YYYY-MM-DD"
+                defaultValue={(parsedDateRange || []).map((date) =>
+                  moment(date)
+                )}
+                onChange={(dateRange) => onDateRangeSelect(m, dateRange)}
+              />
+            ) : null}
+
+            <Label>by</Label>
+
+            <ButtonDropdown
+              disabled={disabled}
+              overlay={granularityMenu(m.dimension, (granularity) =>
+                updateMethods.update(m, { ...m, granularity: granularity.name })
+              )}
+            >
+              {m.dimension.granularities.find(
+                (g) => g.name === m.granularity
+              ) &&
+                m.dimension.granularities.find((g) => g.name === m.granularity)
+                  .title}
+            </ButtonDropdown>
+          </Fragment>
+        );
+      })}
 
       {!members.length && (
         <MemberDropdown
+          disabled={disabled}
           availableMembers={availableMembers}
           type="dashed"
           icon={<PlusOutlined />}

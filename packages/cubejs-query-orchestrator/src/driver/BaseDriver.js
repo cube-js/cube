@@ -1,6 +1,6 @@
 import { reduce } from 'ramda';
 import fs from 'fs';
-import { isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
+import { getEnv, isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
 
 import { cancelCombinator } from './utils';
 
@@ -17,6 +17,9 @@ const sortByKeys = (unordered) => {
 const DbTypeToGenericType = {
   'timestamp without time zone': 'timestamp',
   integer: 'int',
+  int8: 'int',
+  int4: 'int',
+  int2: 'int',
   'character varying': 'text',
   varchar: 'text',
   nvarchar: 'text',
@@ -30,6 +33,9 @@ const DbTypeToGenericType = {
   'double precision': 'decimal'
 };
 
+const DB_BIG_INT_MAX = BigInt('9223372036854775807');
+const DB_BIG_INT_MIN = BigInt('-9223372036854775808');
+
 const DB_INT_MAX = 2147483647;
 const DB_INT_MIN = -2147483648;
 
@@ -37,9 +43,39 @@ const DB_INT_MIN = -2147483648;
 const DbTypeValueMatcher = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
   date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
-  bigint: (v) => Number.isInteger(v) && (v > DB_INT_MAX || v < DB_INT_MIN),
-  int: (v) => Number.isInteger(v) || v.toString().match(/^\d+$/),
-  decimal: (v) => v instanceof Number || v.toString().match(/^\d+(\.\d+)?$/),
+  int: (v) => {
+    if (Number.isInteger(v)) {
+      return (v <= DB_INT_MAX && v >= DB_INT_MIN);
+    }
+
+    if (v.toString().match(/^[-]?\d+$/)) {
+      const value = BigInt(v.toString());
+
+      return value <= DB_INT_MAX && value >= DB_INT_MIN;
+    }
+
+    return false;
+  },
+  bigint: (v) => {
+    if (Number.isInteger(v)) {
+      return (v <= DB_BIG_INT_MAX && v >= DB_BIG_INT_MIN);
+    }
+
+    if (v.toString().match(/^[-]?\d+$/)) {
+      const value = BigInt(v.toString());
+
+      return value <= DB_BIG_INT_MAX && value >= DB_BIG_INT_MIN;
+    }
+
+    return false;
+  },
+  decimal: (v) => {
+    if (v instanceof Number) {
+      return true;
+    }
+
+    return v.toString().match(/^[-]?\d+(\.\d+)?$/);
+  },
   boolean: (v) => v === false || v === true || v.toString().toLowerCase() === 'true' || v.toString().toLowerCase() === 'false',
   string: (v) => v.length < 256,
   text: () => true
@@ -70,8 +106,8 @@ export class BaseDriver {
     ];
 
     if (
-      process.env.CUBEJS_DB_SSL === 'true' ||
-      process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED ||
+      getEnv('dbSsl') ||
+      getEnv('dbSslRejectUnauthorized') ||
       sslOptions.find(o => !!process.env[o.value])
     ) {
       ssl = sslOptions.reduce(
@@ -79,29 +115,36 @@ export class BaseDriver {
           if (process.env[envKey]) {
             const value = process.env[envKey];
 
-            if (canBeFile) {
-              if (isFilePath(value)) {
-                if (!fs.existsSync(value)) {
-                  throw new Error(
-                    `Unable to find ${name} from path: "${value}"`,
-                  );
-                }
-
-                return {
-                  ...agg,
-                  ...{ [name]: fs.readFileSync(value) }
-                };
-              } else if (!validate(value)) {
-                throw new Error(
-                  `${envKey} is not a valid ssl key. If it's a path, please specify it correctly`,
-                );
-              }
+            if (validate(value)) {
+              return {
+                ...agg,
+                ...{ [name]: value }
+              };
             }
 
-            return {
-              ...agg,
-              ...{ [name]: value }
-            };
+            if (canBeFile && isFilePath(value)) {
+              if (!fs.existsSync(value)) {
+                throw new Error(
+                  `Unable to find ${name} from path: "${value}"`,
+                );
+              }
+
+              const file = fs.readFileSync(value, 'utf8');
+              if (validate(file)) {
+                return {
+                  ...agg,
+                  ...{ [name]: file }
+                };
+              }
+
+              throw new Error(
+                `Content of the file from ${envKey} is not a valid SSL ${name}.`,
+              );
+            }
+
+            throw new Error(
+              `${envKey} is not a valid SSL ${name}. If it's a path, please specify it correctly`,
+            );
           }
 
           return agg;
@@ -109,10 +152,7 @@ export class BaseDriver {
         {}
       );
 
-      if (process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED) {
-        ssl.rejectUnauthorized =
-          process.env.CUBEJS_DB_SSL_REJECT_UNAUTHORIZED.toLowerCase() === 'true';
-      }
+      ssl.rejectUnauthorized = getEnv('dbSslRejectUnauthorized');
     }
 
     return ssl;
@@ -120,9 +160,8 @@ export class BaseDriver {
 
   /**
    * @abstract
-   * @return Promise<Array<unknown>>
    */
-  testConnection() {
+  async testConnection() {
     throw new Error('Not implemented');
   }
 
@@ -130,9 +169,9 @@ export class BaseDriver {
    * @abstract
    * @param {string} query
    * @param {Array<unknown>} values
-   * @return Promise<Array<unknown>>
+   * @return {Promise<Array<unknown>>}
    */
-  query(query, values) {
+  async query(query, values) {
     throw new Error('Not implemented');
   }
 
@@ -182,7 +221,11 @@ export class BaseDriver {
     return this.query(query).then(data => reduce(reduceCb, {}, data));
   }
 
-  createSchemaIfNotExists(schemaName) {
+  /**
+   * @param {string} schemaName
+   * @return {Promise<Array<unknown>>}
+   */
+  async createSchemaIfNotExists(schemaName) {
     return this.query(
       `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
       [schemaName]
@@ -205,11 +248,20 @@ export class BaseDriver {
     return this.query(loadSql, params, options);
   }
 
+  /**
+   * @param {string} tableName
+   * @param {unknown} [options]
+   * @return {Promise<unknown>}
+   */
   dropTable(tableName, options) {
     return this.query(`DROP TABLE ${tableName}`, [], options);
   }
 
-  param(/* paramIndex */) {
+  /**
+   * @param {number} paramIndex
+   * @return {string}
+   */
+  param(paramIndex) {
     return '?';
   }
 
@@ -217,7 +269,8 @@ export class BaseDriver {
     return 10000;
   }
 
-  async downloadTable(table) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async downloadTable(table, options) {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
@@ -281,14 +334,26 @@ export class BaseDriver {
     return `CREATE TABLE ${quotedTableName} (${columns.join(', ')})`;
   }
 
+  /**
+   * @param {string} columnType
+   * @return {string}
+   */
   toGenericType(columnType) {
     return DbTypeToGenericType[columnType.toLowerCase()] || columnType;
   }
 
+  /**
+   * @param {string} columnType
+   * @return {string}
+   */
   fromGenericType(columnType) {
     return columnType;
   }
 
+  /**
+   * @param {string} identifier
+   * @return {string}
+   */
   quoteIdentifier(identifier) {
     return `"${identifier}"`;
   }
@@ -316,5 +381,9 @@ export class BaseDriver {
         error: (error.stack || error).toString()
       });
     }
+  }
+
+  capabilities() {
+    return {};
   }
 }

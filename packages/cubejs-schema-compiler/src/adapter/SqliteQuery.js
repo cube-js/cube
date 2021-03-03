@@ -32,6 +32,11 @@ export class SqliteQuery extends BaseQuery {
     }'`;
   }
 
+  floorSql(numeric) {
+    // SQLite doesnt support FLOOR
+    return `(CAST((${numeric}) as int) - ((${numeric}) < CAST((${numeric}) as int)))`;
+  }
+
   timeStampCast(value) {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${value})`;
   }

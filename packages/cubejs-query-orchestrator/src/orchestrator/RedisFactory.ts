@@ -1,23 +1,9 @@
-import redis, { ClientOpts, RedisClient, Commands } from 'redis';
+import redis, { ClientOpts, RedisClient } from 'redis';
+import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
+import AsyncRedisClient from './AsyncRedisClient';
 
-export interface AsyncRedisClient extends RedisClient {
-  brpopAsync: Commands<Promise<any>>['brpop'],
-  delAsync: Commands<Promise<any>>['del'],
-  getAsync: Commands<Promise<any>>['get'],
-  hgetAsync: Commands<Promise<any>>['hget'],
-  rpopAsync: Commands<Promise<any>>['rpop'],
-  setAsync: Commands<Promise<any>>['set'],
-  zaddAsync: Commands<Promise<any>>['zadd'],
-  zrangeAsync: Commands<Promise<any>>['zrange'],
-  zrangebyscoreAsync: Commands<Promise<any>>['zrangebyscore'],
-  keysAsync: Commands<Promise<any>>['keys'],
-  watchAsync: Commands<Promise<any>>['watch'],
-  unwatchAsync: Commands<Promise<any>>['unwatch'],
-  incrAsync: Commands<Promise<any>>['incr'],
-  decrAsync: Commands<Promise<any>>['decr'],
-  lpushAsync: Commands<Promise<any>>['lpush'],
-}
+export type RedisOptions = ClientOpts;
 
 function decorateRedisClient(client: RedisClient): AsyncRedisClient {
   [
@@ -42,26 +28,26 @@ function decorateRedisClient(client: RedisClient): AsyncRedisClient {
     }
   );
 
-  return <any>client;
+  return <AsyncRedisClient>client;
 }
 
-export function createRedisClient(url: string, opts: ClientOpts = {}) {
-  redis.Multi.prototype.execAsync = function execAsync() {
-    return new Promise((resolve, reject) => this.exec((err, res) => (
-      err ? reject(err) : resolve(res)
-    )));
-  };
+redis.Multi.prototype.execAsync = function execAsync() {
+  return new Promise((resolve, reject) => this.exec((err, res) => (
+    err ? reject(err) : resolve(res)
+  )));
+};
 
+export async function createRedisClient(url: string, opts: ClientOpts = {}) {
   const options: ClientOpts = {
     url,
   };
 
-  if (process.env.REDIS_TLS === 'true') {
+  if (getEnv('redisTls')) {
     options.tls = {};
   }
 
-  if (process.env.REDIS_PASSWORD) {
-    options.password = process.env.REDIS_PASSWORD;
+  if (getEnv('redisPassword')) {
+    options.password = getEnv('redisPassword');
   }
 
   return decorateRedisClient(

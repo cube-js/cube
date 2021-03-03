@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
@@ -12,6 +13,7 @@ interface QueryOrchestratorOptions {
   queryCacheOptions?: any;
   preAggregationsOptions?: any;
   rollupOnlyMode?: boolean;
+  continueWaitTimeout?: number;
 }
 
 export class QueryOrchestrator {
@@ -33,8 +35,10 @@ export class QueryOrchestrator {
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;
 
-    const cacheAndQueueDriver = options.cacheAndQueueDriver || process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER || (
-      process.env.NODE_ENV === 'production' || process.env.REDIS_URL ? 'redis' : 'memory'
+    const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
+      (getEnv('nodeEnv') === 'production' || getEnv('redisUrl') || getEnv('redisUseIORedis'))
+        ? 'redis'
+        : 'memory'
     );
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
@@ -42,7 +46,7 @@ export class QueryOrchestrator {
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
-    const { externalDriverFactory } = options;
+    const { externalDriverFactory, continueWaitTimeout } = options;
 
     this.driverFactory = driverFactory;
 
@@ -51,6 +55,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        continueWaitTimeout,
         ...options.queryCacheOptions,
       }
     );
@@ -60,6 +65,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        continueWaitTimeout,
         ...options.preAggregationsOptions
       }
     );
@@ -101,6 +107,7 @@ export class QueryOrchestrator {
       }
       return preAggregationsQueryStageStateByDataSource[dataSource];
     };
+
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
@@ -108,9 +115,11 @@ export class QueryOrchestrator {
             PreAggregations.preAggregationQueryCacheKey(p), 10, await preAggregationsQueryStageState(p.dataSource)
           ))
       )).findIndex(p => !!p);
+
     if (pendingPreAggregationIndex === -1) {
       return this.queryCache.getQueue(queryBody.dataSource).getQueryStage(QueryCache.queryCacheKey(queryBody));
     }
+
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
     const preAggregationStage = await this.preAggregations.getQueue(preAggregation.dataSource).getQueryStage(
       PreAggregations.preAggregationQueryCacheKey(preAggregation),

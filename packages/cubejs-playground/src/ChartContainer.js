@@ -9,7 +9,7 @@ import {
   SyncOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { Dropdown, Menu, Modal, notification } from 'antd';
+import { Dropdown, Menu, Modal } from 'antd';
 import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
@@ -20,7 +20,7 @@ import PropTypes from 'prop-types';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
-import { codeSandboxDefinition } from './utils';
+import { codeSandboxDefinition, copyToClipboard } from './utils';
 
 const frameworkToTemplate = {
   react: 'create-react-app',
@@ -39,6 +39,7 @@ const StyledCard = styled(Card)`
   .ant-card-body {
     max-width: 100%;
     overflow: auto;
+    position: relative;
   }
 `;
 
@@ -80,9 +81,9 @@ class ChartContainer extends Component {
         return {
           ...state,
           chartRendererError: 'The chart renderer failed to load',
-        }
+        };
       }
-      
+
       const codesandboxFiles = __cubejsPlayground.getCodesandboxFiles(
         props.chartingLibrary,
         {
@@ -90,15 +91,18 @@ class ChartContainer extends Component {
           query: JSON.stringify(props.query, null, 2),
           pivotConfig: JSON.stringify(props.pivotConfig, null, 2),
           apiUrl: props.apiUrl,
-          cubejsToken: props.cubejsToken
+          cubejsToken: props.cubejsToken,
         }
       );
       let codeExample = '';
-      
+
       if (props.framework === 'react') {
         codeExample = codesandboxFiles['index.js'];
       } else if (props.framework === 'angular') {
-        codeExample = codesandboxFiles['src/app/query-renderer/query-renderer.component.ts'];
+        codeExample =
+          codesandboxFiles[
+            'src/app/query-renderer/query-renderer.component.ts'
+          ];
       }
 
       return {
@@ -116,7 +120,7 @@ class ChartContainer extends Component {
     super(props);
     this.state = {
       showCode: false,
-      chartRendererError: null
+      chartRendererError: null,
     };
   }
 
@@ -128,7 +132,7 @@ class ChartContainer extends Component {
       redirectToDashboard,
       showCode,
       addingToDashboard,
-      chartRendererError
+      chartRendererError,
     } = this.state;
     const {
       isChartRendererReady,
@@ -138,13 +142,13 @@ class ChartContainer extends Component {
       dashboardSource,
       hideActions,
       query,
-      cubejsApi,
       chartingLibrary,
       setChartLibrary,
       chartLibraries,
       history,
       framework,
       setFramework,
+      isFetchingMeta,
       onChartRendererReadyChange,
     } = this.props;
 
@@ -155,7 +159,7 @@ class ChartContainer extends Component {
     if (chartRendererError) {
       return <div>{chartRendererError}</div>;
     }
-    
+
     const parameters = isChartRendererReady
       ? getParameters(
           codeSandboxDefinition(
@@ -175,7 +179,9 @@ class ChartContainer extends Component {
           }}
         >
           {(chartLibraries[framework] || []).map((library) => (
-            <Menu.Item key={library.value}>{library.title}</Menu.Item>
+            <Menu.Item key={library.value}>
+              {library.title}
+            </Menu.Item>
           ))}
         </Menu>
       ) : null;
@@ -183,6 +189,10 @@ class ChartContainer extends Component {
     const frameworkMenu = (
       <Menu
         onClick={(e) => {
+          if (e.key === framework) {
+            return;
+          }
+
           playgroundAction('Set Framework', { framework: e.key });
           setFramework(e.key);
           onChartRendererReadyChange(false);
@@ -211,16 +221,17 @@ class ChartContainer extends Component {
         ) : null}
         <SectionRow>
           <Button.Group>
-            <Dropdown overlay={frameworkMenu}>
+            <Dropdown overlay={frameworkMenu} disabled={isFetchingMeta}>
               <Button size="small">
                 {frameworkItem?.title}
                 <DownOutlined />
               </Button>
             </Dropdown>
+
             {chartLibrariesMenu ? (
               <Dropdown
                 overlay={chartLibrariesMenu}
-                disabled={!frameworkItem.supported}
+                disabled={!frameworkItem.supported || isFetchingMeta}
               >
                 <Button size="small">
                   {currentLibraryItem?.title}
@@ -229,6 +240,7 @@ class ChartContainer extends Component {
               </Dropdown>
             ) : null}
           </Button.Group>
+
           <Button.Group>
             <Button
               onClick={() => {
@@ -239,10 +251,11 @@ class ChartContainer extends Component {
               }}
               size="small"
               type={!showCode ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               Chart
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show Query');
@@ -253,10 +266,11 @@ class ChartContainer extends Component {
               icon={<ThunderboltOutlined />}
               size="small"
               type={showCode === 'query' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               JSON Query
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show Code');
@@ -265,10 +279,11 @@ class ChartContainer extends Component {
               icon={<CodeOutlined />}
               size="small"
               type={showCode === 'code' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               Code
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show SQL');
@@ -277,10 +292,11 @@ class ChartContainer extends Component {
               icon={<QuestionCircleOutlined />}
               size="small"
               type={showCode === 'sql' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               SQL
             </Button>
+
             <Button
               onClick={() => {
                 playgroundAction('Show Cache');
@@ -291,20 +307,22 @@ class ChartContainer extends Component {
               icon={<SyncOutlined />}
               size="small"
               type={showCode === 'cache' ? 'primary' : 'default'}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
             >
               Cache
             </Button>
           </Button.Group>
+
           <Button
             icon={<CodeSandboxOutlined />}
             size="small"
             onClick={() => playgroundAction('Open Code Sandbox')}
             htmlType="submit"
-            disabled={!frameworkItem.supported}
+            disabled={!frameworkItem.supported || isFetchingMeta}
           >
             Edit
           </Button>
+
           {dashboardSource && (
             <Button
               onClick={async () => {
@@ -340,7 +358,7 @@ class ChartContainer extends Component {
               icon={<PlusOutlined />}
               size="small"
               loading={addingToDashboard}
-              disabled={!frameworkItem.supported}
+              disabled={!frameworkItem.supported || isFetchingMeta}
               type="primary"
             >
               {addingToDashboard
@@ -386,7 +404,6 @@ class ChartContainer extends Component {
           <QueryRenderer
             loadSql="only"
             query={query}
-            cubejsApi={cubejsApi}
             render={({ sqlQuery }) => {
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
@@ -397,33 +414,12 @@ class ChartContainer extends Component {
           />
         );
       } else if (showCode === 'cache') {
-        return <CachePane query={query} cubejsApi={cubejsApi} />;
+        return <CachePane query={query} />;
       }
       return render({ framework, error });
     };
 
     let title;
-
-    const copyCodeToClipboard = async () => {
-      if (!navigator.clipboard) {
-        notification.error({
-          message: "Your browser doesn't support copy to clipboard",
-        });
-      }
-      try {
-        await navigator.clipboard.writeText(
-          showCode === 'query' ? queryText : codeExample
-        );
-        notification.success({
-          message: 'Copied to clipboard',
-        });
-      } catch (e) {
-        notification.error({
-          message: "Can't copy to clipboard",
-          description: e,
-        });
-      }
-    };
 
     if (showCode === 'code') {
       title = (
@@ -433,7 +429,7 @@ class ChartContainer extends Component {
             icon={<CopyOutlined />}
             size="small"
             onClick={() => {
-              copyCodeToClipboard();
+              copyToClipboard(codeExample);
               playgroundAction('Copy Code to Clipboard');
             }}
             type="primary"
@@ -450,7 +446,7 @@ class ChartContainer extends Component {
             icon={<CopyOutlined />}
             size="small"
             onClick={() => {
-              copyCodeToClipboard();
+              copyToClipboard(query);
               playgroundAction('Copy Query to Clipboard');
             }}
             type="primary"
@@ -483,7 +479,6 @@ ChartContainer.propTypes = {
   dashboardSource: PropTypes.object,
   hideActions: PropTypes.array,
   query: PropTypes.object,
-  cubejsApi: PropTypes.object,
   history: PropTypes.object.isRequired,
   chartingLibrary: PropTypes.string.isRequired,
   setChartLibrary: PropTypes.func.isRequired,
@@ -491,7 +486,6 @@ ChartContainer.propTypes = {
 
 ChartContainer.defaultProps = {
   query: {},
-  cubejsApi: null,
   hideActions: null,
   dashboardSource: null,
   codeSandboxSource: null,

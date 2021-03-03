@@ -24,7 +24,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
     if (packageManifest.cubejsCliVersion) {
       const cliManifest = loadCliManifest();
       if (semver.satisfies(cliManifest.version, packageManifest.cubejsCliVersion)) {
-        const OriginalCommandPackage = await requireFromPackage<any>(
+        const OriginalCommandPackage = requireFromPackage<any>(
           `@cubejs-backend/server/dist/command/${command}.js`,
           {
             relative,

@@ -33,11 +33,14 @@ module.exports = {
   'remove-btn-bg': color('purple', .1),
   'remove-btn-hover-bg': color('purple', .2),
   'primary-color': color('purple'),
+  
+  'pink-8': color('pink', .2),
+  'pink-9': color('pink', .1),
 
   'heading-color': color('dark', .65),
   'link-color': color('purple'),
   'info-color': color('purple'),
-  'layout-body-background': '#f3f3fc',
+  'layout-body-background': '#f6f6f8;',
   'layout-header-background': '#eeeef5',
   'menu-highlight-color': color('dark-01'),
   'item-hover-bg': color('light'),
@@ -49,7 +52,8 @@ module.exports = {
   'btn-text-shadow': 'none',
   'modal-body-padding': '32px',
   'form-item-margin-bottom': '23px',
-  'disabled-color': color('dark-04'),
+  
+  'disabled-color': color('dark-01', .25),
   'disabled-bg': color('dark-05', .2),
 
   // menu

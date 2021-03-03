@@ -30,9 +30,9 @@ const queries = {
   uniqPageviews: {
     chartType: 'number',
     query: {
-      measures: ['PageUsers.uniqPageviews'],
+      measures: ['PageViews.uniqPageviews'],
       timeDimensions: [{
-        dimension: 'PageUsers.time'
+        dimension: 'PageViews.time'
       }]
     }
   },

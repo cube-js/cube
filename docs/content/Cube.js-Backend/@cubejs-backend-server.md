@@ -6,7 +6,7 @@ subCategory: Reference
 menuOrder: 7
 ---
 
-`@cubejs-backend/server` is an Express server for the [@cubejs-backend/server-core](/@cubejs-backend-server-core). You can generate an app using [Cube.js CLI](/using-the-cubejs-cli). There are also multiple options to run Cube.js Backend Server [in production](/deployment).
+`@cubejs-backend/server` is a web server for the [@cubejs-backend/server-core](/@cubejs-backend-server-core). There are also multiple options to run Cube.js Backend Server [in production](/deployment).
 
 ## API Reference
 
@@ -103,25 +103,7 @@ Cube.js can also support TLS encryption. See the [Security page on how to enable
 
 ### this.testConnections()
 
-Tests all existing open connections in the application.  Can be used for healthchecks by implementing custom methods, or extending the server with other packages such as [@godaddy/terminus](https://github.com/godaddy/terminus).
-
-```javascript
-const CubejsServer = require('@cubejs-backend/server');
-const { createTerminus } = require('@godaddy/terminus');
-
-const cubejsServer = new CubejsServer();
-
-cubejsServer.listen().then(({ version, port, server }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-
-  createTerminus(server, {
-    healthChecks: {
-      '/ready': () => cubejsServer.testConnections()
-    },
-    onSignal: () => cubejsServer.close()
-  });
-});
-```
+Tests all existing open connections in the application. 
 
 ### this.close()
 

@@ -8,9 +8,10 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 \
     && rm -rf /var/lib/apt/lists/*
 
+ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
 ENV NODE_ENV development
 
@@ -35,6 +36,7 @@ RUN yarn install
 # ls  | awk '{ print "COPY packages/" $1 "/package.json packages/" $1 "/package.json"}'
 # ls  | awk '{ print "COPY packages/" $1 "/yarn.lock packages/" $1 "/yarn.lock"}'
 
+COPY rust/package.json rust/package.json
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
@@ -60,6 +62,7 @@ COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/packag
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
 
+COPY rust/yarn.lock rust/yarn.lock
 COPY packages/cubejs-backend-shared/yarn.lock packages/cubejs-backend-shared/yarn.lock
 COPY packages/cubejs-api-gateway/yarn.lock packages/cubejs-api-gateway/yarn.lock
 COPY packages/cubejs-athena-driver/yarn.lock packages/cubejs-athena-driver/yarn.lock
@@ -88,6 +91,7 @@ COPY packages/cubejs-sqlite-driver/yarn.lock packages/cubejs-sqlite-driver/yarn.
 #  --ignore @cubejs-backend/jdbc-driver not needed, because it's ignored by .dockerignore
 RUN yarn lerna bootstrap
 
+COPY rust/ rust/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
@@ -119,6 +123,7 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
+RUN ln -s  /cubejs/rust/bin/cubestore-dev /usr/local/bin/cubestore-dev
 
 WORKDIR /cube/conf
 

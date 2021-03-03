@@ -2,6 +2,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
 const { addLessLoader } = require('customize-cra');
 const VARIABLES = require('./src/variables');
+const path = require('path');
 
 const LESS_VARIABLES = {};
 

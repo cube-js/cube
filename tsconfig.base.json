@@ -6,12 +6,14 @@
   "files": [],
   "compilerOptions": {
     "incremental": true,
-    "lib": ["es2017"],
-    "target": "es2017",
+    "lib": ["es2017", "es2018", "es2019", "es2020"],
+    "target": "es2018",
     "module": "commonjs",
     "baseUrl": ".",
     "paths": {
       "@cubejs-backend/*": [
+        "rust/js-wrapper",
+        "packages/cubejs-cubestore-driver/src",
         "packages/cubejs-api-gateway/src",
         "packages/cubejs-cli/src",
         "packages/cubejs-query-orchestrator/src",

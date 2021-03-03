@@ -1,18 +1,18 @@
 /* eslint-disable global-require */
-// Playground version: 0.19.31
 import type { ChildProcess } from 'child_process';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
 import crypto from 'crypto';
+import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
 import type { Application as ExpressApplication } from 'express';
+import jwt from 'jsonwebtoken';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import AppContainer from '../dev/AppContainer';
 import DependencyTree from '../dev/DependencyTree';
 import PackageFetcher from '../dev/PackageFetcher';
 import DevPackageFetcher from '../dev/DevPackageFetcher';
-import { executeCommand } from '../dev/utils';
 
 const repo = {
   owner: 'cube-js',
@@ -30,13 +30,12 @@ export class DevServer {
   }
 
   public initDevEnv(app: ExpressApplication, options: ServerCoreInitializedOptions) {
-    const jwt = require('jsonwebtoken');
     const port = process.env.PORT || 4000; // TODO
     const apiUrl = process.env.CUBEJS_API_URL || `http://localhost:${port}`;
-    
+
     // todo: empty/default `apiSecret` in dev mode to allow the DB connection wizard
     const cubejsToken = jwt.sign({}, options.apiSecret || 'secret', { expiresIn: '1d' });
-    
+
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.');
     } else {
@@ -71,7 +70,13 @@ export class DevServer {
 
     app.get('/playground/db-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server DB Schema Load');
-      const driver = await this.cubejsServer.getDriver();
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        securityContext: null,
+        requestId: getRequestIdFromRequest(req),
+      });
+
       const tablesSchema = await driver.tablesSchema();
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
@@ -101,12 +106,19 @@ export class DevServer {
         throw new Error('You have to select at least one table');
       }
 
-      const driver = await this.cubejsServer.getDriver();
+      const dataSource = req.body.dataSource || 'default';
+
+      const driver = await this.cubejsServer.getDriver({
+        dataSource,
+        authInfo: null,
+        securityContext: null,
+        requestId: getRequestIdFromRequest(req),
+      });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
       const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
       const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver);
-      const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables);
+      const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
       const schemaPath = options.schemaPath || 'schema';
 
@@ -279,13 +291,15 @@ export class DevServer {
         }
       }
     }));
-    
-    app.get('/playground/test-connection', catchErrors(async (_, res) => {
+
+    app.get('/playground/test-connection', catchErrors(async (req, res) => {
       const orchestratorApi = this.cubejsServer.getOrchestratorApi({
+        dataSource: req.query.dataSource || 'default',
+        securityContext: null,
         authInfo: null,
-        requestId: ''
+        requestId: getRequestIdFromRequest(req),
       });
-      
+
       try {
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
@@ -296,45 +310,44 @@ export class DevServer {
           error: error.toString()
         });
       }
-      
+
       return res.json('ok');
     }));
-    
-    let restartPromise = null;
-    
+
     app.get('/restart', catchErrors(async (_, res) => {
-      if (restartPromise === null) {
-        restartPromise = new Promise<void>((resolve, reject) => {
-          (async () => {
-            try {
-              await executeCommand('kill', ['-SIGUSR1', process.pid]);
-              resolve();
-            } catch (error) {
-              reject();
-            }
-            restartPromise = null;
-          })();
-        });
-      } else {
-        return res.json('Restart is in progress');
-      }
-      
+      process.kill(process.pid, 'SIGUSR1');
+
       return res.json('Restarting...');
     }));
-    
+
     app.post('/playground/env', catchErrors(async (req, res) => {
       let { variables = {} } = req.body || {};
-      
+
       if (!variables.CUBEJS_API_SECRET) {
         variables.CUBEJS_API_SECRET = crypto.randomBytes(64).toString('hex');
       }
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
-      
+
       if (fs.existsSync('./.env')) {
         fs.removeSync('./.env');
       }
+
+      if (!fs.existsSync('./schema')) {
+        fs.mkdirSync('./schema');
+      }
+
       fs.writeFileSync('.env', variables.join('\n'));
+
       res.status(200).json('ok');
+    }));
+    
+    app.post('/playground/token', catchErrors(async (req, res) => {
+      const { payload = {} } = req.body;
+      const jwtOptions = typeof payload.exp != null ? {} : { expiresIn: '1d' };
+      
+      const token = jwt.sign(payload, options.apiSecret, jwtOptions);
+      
+      res.json({ token });
     }));
   }
 }

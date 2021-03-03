@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import color from '@oclif/color';
-import dotenv from 'cubejs-dotenv';
+import dotenv from '@cubejs-backend/dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import {
   getEnv,
@@ -213,18 +213,25 @@ export class ServerContainer {
     }
   }
 
-  public async runServerInstance(configuration: CreateOptions) {
+  public async runServerInstance(configuration: CreateOptions, embedded: boolean = false) {
+    if (embedded) {
+      process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'false';
+      configuration.scheduledRefreshTimer = false;
+    }
+
     const server = new CubejsServer(configuration);
 
-    try {
-      const { version, port } = await server.listen();
+    if (!embedded) {
+      try {
+        const { version, port } = await server.listen();
 
-      console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-    } catch (e) {
-      console.error('Fatal error during server start: ');
-      console.error(e.stack || e);
+        console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+      } catch (e) {
+        console.error('Fatal error during server start: ');
+        console.error(e.stack || e);
 
-      process.exit(1);
+        process.exit(1);
+      }
     }
 
     return server;
@@ -233,6 +240,7 @@ export class ServerContainer {
   public async lookupConfiguration(): Promise<CreateOptions> {
     dotenv.config({
       override: true,
+      multiline: 'line-breaks'
     });
 
     const devMode = getEnv('devMode');
@@ -273,33 +281,66 @@ export class ServerContainer {
     );
   }
 
-  public async start() {
+  /**
+   * @param embedded Cube.js will start without https/ws/graceful shutdown + without timers
+   */
+  public async start(embedded: boolean = false) {
     const makeInstance = async () => {
-      const configuration = await this.lookupConfiguration();
-      return this.runServerInstance({
-        gracefulShutdown: getEnv('gracefulShutdown') || process.env.NODE_ENV === 'production' ? 30 : 15,
-        ...configuration,
-      });
+      const userConfig = await this.lookupConfiguration();
+
+      const configuration = {
+        // By default graceful shutdown is disabled, but this value is needed for reboot
+        gracefulShutdown: getEnv('gracefulShutdown') || (process.env.NODE_ENV === 'production' ? 30 : 2),
+        ...userConfig,
+      };
+
+      const server = await this.runServerInstance(configuration, embedded);
+
+      return {
+        configuration,
+        gracefulEnabled: !!(getEnv('gracefulShutdown') || userConfig.gracefulShutdown),
+        server
+      };
     };
 
-    let server = await makeInstance();
+    let instance = await makeInstance();
 
-    // eslint-disable-next-line no-restricted-syntax
-    for (const bindSignal of ['SIGTERM', 'SIGINT']) {
-      // eslint-disable-next-line no-loop-func
-      process.on(bindSignal, async (signal) => {
-        process.exit(
-          await server.shutdown(signal)
-        );
+    if (!embedded) {
+      if (instance.gracefulEnabled) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const bindSignal of ['SIGTERM', 'SIGINT']) {
+          // eslint-disable-next-line no-loop-func
+          process.on(bindSignal, async (signal) => {
+            console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
+
+            process.exit(
+              await instance.server.shutdown(signal, true)
+            );
+          });
+        }
+      }
+
+      let restartHandler: Promise<0|1>|null = null;
+
+      process.addListener('SIGUSR1', async (signal) => {
+        console.log(`Received ${signal} signal, reloading in ${instance.configuration.gracefulShutdown}s`);
+
+        if (restartHandler) {
+          console.log('Unable to restart server while it\'s already restarting');
+
+          return;
+        }
+
+        try {
+          restartHandler = instance.server.shutdown(signal, true);
+
+          await restartHandler;
+        } finally {
+          restartHandler = null;
+        }
+
+        instance = await makeInstance();
       });
     }
-
-    process.addListener('SIGUSR1', async (signal) => {
-      console.log(`Received ${signal} signal, reloading`);
-
-      await server.shutdown(signal, true);
-
-      server = await makeInstance();
-    });
   }
 }

@@ -1,8 +1,11 @@
+use crate::table::data::{Rows, RowsView};
+use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
 use chrono::{SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
+pub mod data;
 pub(crate) mod parquet;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -11,13 +14,13 @@ pub enum TableValue {
     String(String),
     Int(i64),
     Decimal(String), // TODO bincode is incompatible with BigDecimal
-    Float(String),   // TODO Eq
+    Float(OrdF64),
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
     Boolean(bool),
 }
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct TimestampValue {
     unix_nano: i64,
 }
@@ -96,21 +99,27 @@ impl<'a> PartialOrd for RowSortKey<'a> {
             return None;
         }
         for i in 0..self.sort_key_size {
-            if self.row.values[i] != other.row.values[i] {
-                return match (&self.row.values[i], &other.row.values[i]) {
-                    (TableValue::Null, _) => Some(Ordering::Less),
-                    (_, TableValue::Null) => Some(Ordering::Greater),
-                    (TableValue::String(a), TableValue::String(b)) => a.partial_cmp(b),
-                    (TableValue::Int(a), TableValue::Int(b)) => a.partial_cmp(b),
-                    (TableValue::Decimal(a), TableValue::Decimal(b)) => a.partial_cmp(b),
-                    (TableValue::Bytes(a), TableValue::Bytes(b)) => a.partial_cmp(b),
-                    (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.partial_cmp(b),
-                    (TableValue::Boolean(a), TableValue::Boolean(b)) => a.partial_cmp(b),
-                    (a, b) => panic!("Can't compare {:?} to {:?}", a, b),
-                };
+            let ord = cmp_same_types(&self.row.values[i], &other.row.values[i]);
+            if ord != Ordering::Equal {
+                return Some(ord);
             }
         }
         Some(Ordering::Equal)
+    }
+}
+
+pub fn cmp_same_types(l: &TableValue, r: &TableValue) -> Ordering {
+    match (l, r) {
+        (TableValue::Null, TableValue::Null) => Ordering::Equal,
+        (TableValue::Null, _) => Ordering::Less,
+        (_, TableValue::Null) => Ordering::Greater,
+        (TableValue::String(a), TableValue::String(b)) => a.cmp(b),
+        (TableValue::Int(a), TableValue::Int(b)) => a.cmp(b),
+        (TableValue::Decimal(a), TableValue::Decimal(b)) => a.cmp(b),
+        (TableValue::Bytes(a), TableValue::Bytes(b)) => a.cmp(b),
+        (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.cmp(b),
+        (TableValue::Boolean(a), TableValue::Boolean(b)) => a.cmp(b),
+        (a, b) => panic!("Can't compare {:?} to {:?}", a, b),
     }
 }
 
@@ -125,18 +134,18 @@ pub trait TableStore {
         &'a self,
         source_file: Option<&'a str>,
         dest_files: Vec<String>,
-        rows: Vec<Row>,
-        sort_key_size: u64,
+        rows: RowsView<'a>,
+        sort_key_size: usize,
     ) -> Result<Vec<(u64, (Row, Row))>, CubeError>;
 
-    fn read_rows(&self, file: &str) -> Result<Vec<Row>, CubeError>;
+    fn read_rows(&self, file: &str) -> Result<Rows, CubeError>;
 
     fn read_filtered_rows(
         &self,
         file: &str,
         columns: &Vec<crate::metastore::Column>,
         limit: usize,
-    ) -> Result<Vec<Row>, CubeError>;
+    ) -> Result<Rows, CubeError>;
 
     // fn scan_node(
     //     &self,

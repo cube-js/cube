@@ -67,7 +67,7 @@ export const transformMeasures = (measures) => {
     return {
       ...result,
       [dimensionName]: convertStringPropToFunction(
-        ['sql, drillMembers'],
+        ['sql', 'drillMembers'],
         dimensionDefinition
       ),
     };
@@ -146,12 +146,12 @@ be specified as an asynchronous function:
 ```javascript
 // cube.js
 module.exports = {
-  schemaVersion: async ({ authInfo }) => {
+  schemaVersion: async ({ securityContext }) => {
     const schemaVersions = await (
       await fetch('http://your-api-endpoint/schemaVersion')
     ).json();
 
-    return schemaVersions[authInfo.tenantId];
+    return schemaVersions[securityContext.tenantId];
   },
 };
 ```
@@ -173,7 +173,7 @@ import { convertStringPropToFunction, transformDimensions, transformMeasures } f
 
 asyncModule(async () => {
   const {
-    authInfo: { tenantId },
+    securityContext: { tenantId },
   } = COMPILE_CONTEXT;
 
   const dynamicCubes = await (

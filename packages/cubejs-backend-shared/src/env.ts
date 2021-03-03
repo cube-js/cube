@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
 
 export class InvalidConfiguration extends Error {
@@ -52,11 +53,11 @@ function asPortOrSocket(input: string, envName: string): number|string {
 }
 
 function asBoolOrTime(input: string, envName: string): number|boolean {
-  if (input === 'true') {
+  if (input.toLowerCase() === 'true') {
     return true;
   }
 
-  if (input === 'false') {
+  if (input.toLowerCase() === 'false' || input === '0') {
     return false;
   }
 
@@ -72,19 +73,24 @@ const variables = {
     .default('false')
     .asBoolStrict(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
-  tlsPort: () => asPortOrSocket(process.env.TLS_PORT || '4433', 'TLS_PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
     .asBoolStrict(),
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
-  refreshTimer: () => process.env.CUBEJS_SCHEDULED_REFRESH_TIMER
-    && asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER'),
-  gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
-    .asIntPositive(),
+  refreshTimer: () => {
+    if (process.env.CUBEJS_SCHEDULED_REFRESH_TIMER) {
+      return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
+    }
+
+    // Refresh timer is true by default for development
+    return process.env.NODE_ENV !== 'production';
+  },
   scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
     .asBool(),
+  gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
+    .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
   // It's only excepted for CI, nothing else.
@@ -100,13 +106,68 @@ const variables = {
   dbPollMaxInterval: () => {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
-  }
+  },
+  // BigQuery Driver
+  bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
+    .asString(),
+  // Redis
+  redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
+    .default('2')
+    .asInt(),
+  redisPoolMax: () => get('CUBEJS_REDIS_POOL_MAX')
+    .default('1000')
+    .asInt(),
+  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
+    .default('false')
+    .asBoolStrict(),
+  redisUrl: () => get('REDIS_URL')
+    .asString(),
+  dbSsl: () => get('CUBEJS_DB_SSL')
+    .default('false')
+    .asBoolStrict(),
+  dbSslRejectUnauthorized: () => get('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED')
+    .default('false')
+    .asBoolStrict(),
+  nodeEnv: () => get('NODE_ENV')
+    .asString(),
+  cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
+    .asString(),
+  redisPassword: () => get('REDIS_PASSWORD')
+    .asString(),
+  redisTls: () => get('REDIS_TLS')
+    .default('false')
+    .asBoolStrict(),
+  jwkKey: () => get('CUBEJS_JWK_KEY')
+    .asUrlString(),
+  jwkUrl: () => get('CUBEJS_JWK_URL')
+    .asUrlString(),
+  jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
+    .asArray(','),
+  jwtAudience: () => get('CUBEJS_JWT_AUDIENCE')
+    .asString(),
+  jwtIssuer: () => get('CUBEJS_JWT_ISSUER')
+    .asArray(','),
+  jwtSubject: () => get('CUBEJS_JWT_SUBJECT')
+    .asString(),
+  jwtClaimsNamespace: () => get('CUBEJS_JWT_CLAIMS_NAMESPACE')
+    .asString(),
+  playgroundAuthSecret: () => get('CUBEJS_PLAYGROUND_AUTH_SECRET')
+    .asString(),
+  agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
+    .default('200')
+    .asInt(),
 };
 
 type Vars = typeof variables;
 
 export function getEnv<T extends keyof Vars>(key: T): ReturnType<Vars[T]> {
-  return <any>variables[key]();
+  if (key in variables) {
+    return <any>variables[key]();
+  }
+
+  throw new Error(
+    `Unsupported env variable: "${key}"`,
+  );
 }
 
 export function isDockerImage(): boolean {

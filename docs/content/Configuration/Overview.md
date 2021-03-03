@@ -15,10 +15,7 @@ variables][link-env-vars].
 
 ## Configuration Precedence
 
-In Cube.js, environment variables take precedence over values specified in
-`cube.js`. In production scenarios, it allows changing configuration by simply
-switching environment variables, which is generally safer, faster and easier
-than re-deploying the codebase.
+In Cube.js, values specified in `cube.js` take precedence over environment variables.
 
 ## Development Mode
 
@@ -30,18 +27,19 @@ mode does the following:
 - Enables background refresh for in-memory cache and [scheduled
   pre-aggregations][link-scheduled-refresh]
 - Allows another log level to be set (`trace`)
-- Enables the Playground on `http://localhost:4000`
+- Enables [Developer Playground][link-dev-playground] on `http://localhost:4000`
 - Uses `memory` instead of `redis` as the default cache/queue engine
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors
 
 [link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
+[link-dev-playground]: /dev-tools/dev-playground
 
 ## Configuring CORS
 
-The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API requests.
-By default, the middleware allows requests from any origin (`*`). To change the allowed
-domain, you can do the following:
+The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API
+requests. By default, the middleware allows requests from any origin (`*`). To
+change the allowed domain, you can do the following:
 
 ```javascript
 module.exports = {
@@ -53,7 +51,8 @@ module.exports = {
 };
 ```
 
-Please consult the Configuration Reference [for more options][link-config-cors-opts].
+Please consult the Configuration Reference [for more
+options][link-config-cors-opts].
 
 [link-config-cors-opts]: /config#options-reference-http
 
@@ -124,11 +123,10 @@ const server = new CubejsServer({
     const decoded = jwt.decode(auth, { complete: true });
     const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
     const pem = jwkToPem(jwk);
-    req.authInfo = jwt.verify(auth, pem);
+    req.securityContext = jwt.verify(auth, pem);
   },
-  contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) =>
-    'pre_aggregations_${authInfo.userId}',
+  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
 });
 
 server
@@ -156,10 +154,9 @@ module.exports = {
     const decoded = jwt.decode(auth, { complete: true });
     const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
     const pem = jwkToPem(jwk);
-    req.authInfo = jwt.verify(auth, pem);
+    req.securityContext = jwt.verify(auth, pem);
   },
-  contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) =>
-    'pre_aggregations_${authInfo.userId}',
+  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
 };
 ```

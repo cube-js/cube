@@ -20,6 +20,8 @@ pub struct SchedulerImpl {
     config: Arc<dyn ConfigObj>,
 }
 
+crate::di_service!(SchedulerImpl, []);
+
 impl SchedulerImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
@@ -40,13 +42,13 @@ impl SchedulerImpl {
         }
     }
 
-    pub async fn run_scheduler(&self) -> Result<(), CubeError> {
+    pub async fn run_scheduler(scheduler: Arc<SchedulerImpl>) -> Result<(), CubeError> {
         loop {
-            let mut stop_receiver = self.stop_receiver.lock().await;
-            let mut event_receiver = self.event_receiver.lock().await;
+            let mut stop_receiver = scheduler.stop_receiver.lock().await;
+            let mut event_receiver = scheduler.event_receiver.lock().await;
             let event = tokio::select! {
-                Some(stopped) = stop_receiver.recv() => {
-                    if stopped {
+                res = stop_receiver.changed() => {
+                    if res.is_err() || *stop_receiver.borrow() {
                         return Ok(());
                     } else {
                         continue;
@@ -56,15 +58,18 @@ impl SchedulerImpl {
                     event?
                 }
             };
-            let res = self.process_event(event.clone()).await;
-            if let Err(e) = res {
-                error!("Error processing event {:?}: {}", event, e);
-            }
+            let scheduler_to_move = scheduler.clone();
+            tokio::spawn(async move {
+                let res = scheduler_to_move.process_event(event.clone()).await;
+                if let Err(e) = res {
+                    error!("Error processing event {:?}: {}", event, e);
+                }
+            });
         }
     }
 
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        Ok(self.stop_sender.broadcast(true)?)
+        Ok(self.stop_sender.send(true)?)
     }
 
     async fn process_event(&self, event: MetaStoreEvent) -> Result<(), CubeError> {
@@ -74,6 +79,17 @@ impl SchedulerImpl {
             let wal = self.meta_store.get_wal(row_id).await?;
             if wal.get_row().uploaded() {
                 self.schedule_wal_to_process(row_id).await?;
+            }
+        }
+        if let MetaStoreEvent::Insert(TableId::Partitions, row_id)
+        | MetaStoreEvent::Update(TableId::Partitions, row_id) = event
+        {
+            let p = self.meta_store.get_partition(row_id).await?;
+            if p.get_row().is_active() && !p.get_row().is_warmed_up() {
+                if let Some(path) = p.get_row().get_full_name(p.get_id()) {
+                    self.schedule_partition_warmup(p.get_id(), path).await?;
+                    self.meta_store.mark_partition_warmed_up(row_id).await?;
+                }
             }
         }
         if let MetaStoreEvent::Insert(TableId::Chunks, row_id)
@@ -116,14 +132,16 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::Insert(TableId::Tables, row_id) = event {
             let table = self.meta_store.get_table_by_id(row_id).await?;
-            if table.get_row().location().is_some() {
+            if table.get_row().locations().is_some() {
                 self.schedule_table_import(row_id).await?;
             }
         }
         if let MetaStoreEvent::Delete(TableId::WALs, row_id) = event {
-            self.remote_fs
-                .delete_file(WALStore::wal_remote_path(row_id).as_str())
-                .await?
+            let file = self
+                .remote_fs
+                .local_file(WALStore::wal_remote_path(row_id).as_str())
+                .await?;
+            tokio::fs::remove_file(file).await?;
         }
         if let MetaStoreEvent::Delete(TableId::Chunks, row_id) = event {
             self.remote_fs
@@ -131,8 +149,11 @@ impl SchedulerImpl {
                 .await?
         }
         if let MetaStoreEvent::DeletePartition(partition) = &event {
-            if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
-                self.remote_fs.delete_file(file_name.as_str()).await?;
+            // remove file only if partition is active otherwise it should be removed when it's deactivated
+            if partition.get_row().is_active() {
+                if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
+                    self.remote_fs.delete_file(file_name.as_str()).await?;
+                }
             }
         }
         if let MetaStoreEvent::Update(TableId::Partitions, row_id) = event {
@@ -176,7 +197,10 @@ impl SchedulerImpl {
     }
 
     async fn schedule_repartition(&self, partition_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.server_name().to_string(); // TODO find best node to run import
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
@@ -193,7 +217,7 @@ impl SchedulerImpl {
     }
 
     async fn schedule_table_import(&self, table_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.server_name().to_string(); // TODO find best node to run import
+        let node = self.cluster.node_name_for_import(table_id).await?;
         let job = self
             .meta_store
             .add_job(Job::new(
@@ -227,19 +251,34 @@ impl SchedulerImpl {
     }
 
     async fn schedule_partition_to_compact(&self, partition_id: u64) -> Result<(), CubeError> {
-        let wal_node_name = self.cluster.server_name().to_string(); // TODO move to WAL
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
                 RowKey::Table(TableId::Partitions, partition_id),
                 JobType::PartitionCompaction,
-                wal_node_name.clone(),
+                node.clone(),
             ))
             .await?;
         if job.is_some() {
             // TODO queue failover
-            self.cluster.notify_job_runner(wal_node_name).await?;
+            self.cluster.notify_job_runner(node).await?;
         }
         Ok(())
+    }
+
+    async fn schedule_partition_warmup(
+        &self,
+        partition_id: u64,
+        path: String,
+    ) -> Result<(), CubeError> {
+        let node_name = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
+        self.cluster.warmup_download(&node_name, path).await
     }
 }

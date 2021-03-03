@@ -1,16 +1,16 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
 import { Component } from 'react';
-import * as PropTypes from 'prop-types';
 import '@ant-design/compatible/assets/index.css';
-import './index.less';
-import './index.css';
-import { Layout, Alert, notification, Spin } from 'antd';
+import { Layout, Alert } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { withRouter } from 'react-router';
+
 import Header from './components/Header';
-import { event, setAnonymousId } from './events';
 import GlobalStyles from './components/GlobalStyles';
-import { AppContext } from './hooks/slow-query';
+import { CubeLoader } from './atoms';
+import { event, setAnonymousId } from './events';
+import './index.less';
+import './index.css';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
@@ -28,22 +28,13 @@ class App extends Component {
   state = {
     fatalError: null,
     context: null,
-    slowQuery: false
+    showLoader: false,
   };
 
   async componentDidMount() {
     const { history } = this.props;
 
-    window['__cubejsPlayground'] = {
-      ...window['__cubejsPlayground'],
-      onQueryLoad: (resultSet) => {
-        if (resultSet) {
-          const { loadResponse } = resultSet.serialize();
-
-          this.setState({ slowQuery: Boolean(loadResponse.slowQuery) });
-        }
-      },
-    };
+    setTimeout(() => this.setState({ showLoader: true }), 700);
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
       const error = promiseRejectionEvent.reason;
@@ -51,26 +42,6 @@ class App extends Component {
       const e = (error.stack || error).toString();
       event('Playground Error', {
         error: e,
-      });
-      notification.error({
-        message: (
-          <span>
-            <b>Error</b>
-            &nbsp;😢
-            <div>
-              Ask about it in&nbsp;
-              <a
-                href="https://slack.cube.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Slack
-              </a>
-              . These guys know how to fix this for sure!
-            </div>
-          </span>
-        ),
-        description: e,
       });
     });
 
@@ -95,46 +66,35 @@ class App extends Component {
   }
 
   render() {
-    const { context, fatalError, slowQuery } = this.state || {};
+    const { context, fatalError, showLoader } = this.state || {};
     const { location, children } = this.props;
 
+    if (!showLoader) {
+      return null;
+    }
+    
     if (context == null) {
-      return <Spin />;
+      return <CubeLoader />;
     }
 
     return (
-      <AppContext.Provider
-        value={{
-          slowQuery,
-        }}
-      >
-        <Layout style={{ height: '100%' }}>
-          <GlobalStyles />
-          <Header selectedKeys={selectedTab(location.pathname)} />
-          <Layout.Content style={{ height: '100%' }}>
-            {fatalError ? (
-              <Alert
-                message="Error occured while rendering"
-                description={fatalError.stack}
-                type="error"
-              />
-            ) : (
-              children
-            )}
-          </Layout.Content>
-        </Layout>
-      </AppContext.Provider>
+      <Layout style={{ height: '100%' }}>
+        <GlobalStyles />
+        <Header selectedKeys={selectedTab(location.pathname)} />
+        <Layout.Content style={{ height: '100%' }}>
+          {fatalError ? (
+            <Alert
+              message="Error occured while rendering"
+              description={fatalError.stack}
+              type="error"
+            />
+          ) : (
+            children
+          )}
+        </Layout.Content>
+      </Layout>
     );
   }
 }
-
-App.propTypes = {
-  location: PropTypes.object.isRequired,
-  children: PropTypes.array,
-};
-
-App.defaultProps = {
-  children: [],
-};
 
 export default withRouter(App);

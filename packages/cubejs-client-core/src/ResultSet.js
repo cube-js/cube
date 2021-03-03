@@ -154,14 +154,23 @@ class ResultSet {
           });
         }
       });
-
+    
+    const { query } = this.loadResponses[0];
+    if (
+      timeDimensions.length === 0 &&
+      query.timeDimensions.length > 0 &&
+      query.timeDimensions[0].granularity == null
+    ) {
+      timeDimensions.push(query.timeDimensions[0]);
+    }
+    
     return {
       ...measures[measureName].drillMembersGrouped,
       filters,
       ...(segments.length > 0 ? { segments } : {}),
       timeDimensions,
       segments,
-      timezone: this.loadResponses[0].query.timezone
+      timezone: query.timezone
     };
   }
 

@@ -1,4 +1,5 @@
 use crate::cluster::Cluster;
+use crate::config::injection::DIService;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
@@ -18,11 +19,12 @@ use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use core::fmt;
-use datafusion::datasource::datasource::Statistics;
+use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
+use datafusion::logical_plan;
 use datafusion::logical_plan::{DFSchemaRef, Expr, ToDFSchema};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
@@ -41,7 +43,7 @@ use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -49,7 +51,7 @@ use std::time::SystemTime;
 
 #[automock]
 #[async_trait]
-pub trait QueryExecutor: Send + Sync {
+pub trait QueryExecutor: DIService + Send + Sync {
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
@@ -63,7 +65,11 @@ pub trait QueryExecutor: Send + Sync {
     ) -> Result<Vec<RecordBatch>, CubeError>;
 }
 
+crate::di_service!(MockQueryExecutor, [QueryExecutor]);
+
 pub struct QueryExecutorImpl;
+
+crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
@@ -118,7 +124,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 &split_plan
             );
         }
-        let data_frame = batch_to_dataframe(&results?)?;
+        let data_frame = tokio::task::spawn_blocking(|| batch_to_dataframe(&results?)).await??;
         Ok(data_frame)
     }
 
@@ -409,6 +415,7 @@ impl CubeTable {
         &self,
         projection: &Option<Vec<usize>>,
         batch_size: usize,
+        filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
         let table = self.index_snapshot.table();
         let index = self.index_snapshot.index();
@@ -423,6 +430,7 @@ impl CubeTable {
                 .collect::<Vec<_>>()
         });
 
+        let predicate = combine_filters(filters);
         for partition_snapshot in partition_snapshots {
             if !self
                 .worker_partition_ids
@@ -440,6 +448,7 @@ impl CubeTable {
                 let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path(
                     &local_path,
                     mapped_projection.clone(),
+                    predicate.clone(),
                     batch_size,
                     1,
                 )?);
@@ -456,6 +465,7 @@ impl CubeTable {
                 let node = Arc::new(ParquetExec::try_from_path(
                     local_path,
                     mapped_projection.clone(),
+                    predicate.clone(),
                     batch_size,
                     1,
                 )?);
@@ -528,11 +538,19 @@ impl CubeTable {
     }
 }
 
-#[derive(Debug)]
 pub struct CubeTableExec {
     schema: DFSchemaRef,
     index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
+}
+
+impl Debug for CubeTableExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CubeTableExec")
+            .field("index", self.index_snapshot.index())
+            .field("partition_execs", &self.partition_execs)
+            .finish()
+    }
 }
 
 #[async_trait]
@@ -593,13 +611,7 @@ impl ClusterSendExec {
             .map(|union| {
                 union
                     .iter()
-                    .flat_map(|index| {
-                        index
-                            .partitions()
-                            .iter()
-                            .map(|p| p.partition().clone())
-                            .collect::<Vec<_>>()
-                    })
+                    .flat_map(|index| index.partitions().iter().map(|p| p.partition().clone()))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -658,8 +670,14 @@ impl ExecutionPlan for ClusterSendExec {
         let record_batches = self
             .cluster
             .run_select(
-                self.cluster
-                    .node_name_by_partitions(&self.partitions[partition])
+                &self
+                    .cluster
+                    .node_name_by_partitions(
+                        &self.partitions[partition]
+                            .iter()
+                            .map(|p| p.get_id())
+                            .collect_vec(),
+                    )
                     .await?,
                 self.serialized_plan.with_partition_id_to_execute(
                     self.partitions[partition]
@@ -698,9 +716,9 @@ impl TableProvider for CubeTable {
         &self,
         projection: &Option<Vec<usize>>,
         batch_size: usize,
-        _filters: &[Expr],
+        filters: &[Expr],
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let res = self.async_scan(projection, batch_size)?;
+        let res = self.async_scan(projection, batch_size, filters)?;
         Ok(res)
     }
 
@@ -711,6 +729,13 @@ impl TableProvider for CubeTable {
             total_byte_size: None,
             column_statistics: None,
         }
+    }
+
+    fn supports_filter_pushdown(
+        &self,
+        _filter: &Expr,
+    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
+        return Ok(TableProviderFilterPushDown::Inexact);
     }
 }
 
@@ -790,7 +815,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                             TableValue::Null
                         } else {
                             let decimal = a.value(i) as f64;
-                            TableValue::Float(decimal.to_string())
+                            TableValue::Float(decimal.into())
                         });
                     }
                 }
@@ -960,4 +985,21 @@ impl SerializedRecordBatchStream {
         let reader = StreamReader::try_new(cursor)?;
         Ok(reader.collect::<Result<Vec<_>, _>>()?)
     }
+}
+/// Note: copy of the function in 'datafusion/src/datasource/parquet.rs'.
+///
+/// Combines an array of filter expressions into a single filter expression
+/// consisting of the input filter expressions joined with logical AND.
+/// Returns None if the filters array is empty.
+fn combine_filters(filters: &[Expr]) -> Option<Expr> {
+    if filters.is_empty() {
+        return None;
+    }
+    let combined_filter = filters
+        .iter()
+        .skip(1)
+        .fold(filters[0].clone(), |acc, filter| {
+            logical_plan::and(acc, filter.clone())
+        });
+    Some(combined_filter)
 }
