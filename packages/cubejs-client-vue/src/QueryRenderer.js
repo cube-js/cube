@@ -1,9 +1,6 @@
 import { toPairs, fromPairs, equals } from 'ramda';
 import { isQueryPresent } from '@cubejs-client/core';
 
-// todo: remove
-const d = (v) => JSON.parse(JSON.stringify(v));
-
 export default {
   props: {
     query: {
@@ -70,7 +67,7 @@ export default {
           loading,
           error,
           ...this.builderProps,
-          ...slotProps
+          ...slotProps,
         };
       }
 
@@ -88,12 +85,21 @@ export default {
         this.loading = true;
         this.error = undefined;
 
-        if (query && Object.keys(query).length > 0) {
+        if (Object.keys(query || {}).length > 0) {
           if (this.loadSql === 'only') {
-            this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
+            this.sqlQuery = await this.cubejsApi.sql(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'sql',
+            });
           } else if (this.loadSql) {
-            this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
-            this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
+            this.sqlQuery = await this.cubejsApi.sql(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'sql',
+            });
+            this.resultSet = await this.cubejsApi.load(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'query',
+            });
           } else {
             this.resultSet = await this.cubejsApi.load(query, {
               mutexObj: this.mutexObj,
@@ -103,8 +109,8 @@ export default {
         }
 
         this.loading = false;
-      } catch (exc) {
-        this.error = exc;
+      } catch (error) {
+        this.error = error;
         this.resultSet = undefined;
         this.loading = false;
       }
@@ -128,8 +134,8 @@ export default {
 
         this.resultSet = fromPairs(await resultPromises);
         this.loading = false;
-      } catch (exc) {
-        this.error = exc;
+      } catch (error) {
+        this.error = error;
         this.loading = false;
       }
     },
@@ -138,7 +144,18 @@ export default {
     query: {
       deep: true,
       handler(query, prevQuery) {
-        if (isQueryPresent(query) && !equals(query, prevQuery)) {
+        console.log('query has changed', JSON.stringify(query.measures), Date.now());
+        const hasOrderChanged = !equals(
+          Object.keys(query?.order || {}),
+          Object.keys(prevQuery?.order || {})
+        );
+
+        console.log({
+          query: JSON.stringify((query)),
+          prevQuery: JSON.stringify((prevQuery)),
+        })
+
+        if (isQueryPresent(query) && (!equals(query, prevQuery) || hasOrderChanged)) {
           this.load();
         }
       },

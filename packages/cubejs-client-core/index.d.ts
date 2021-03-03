@@ -1007,7 +1007,7 @@ declare module '@cubejs-client/core' {
     order: TQueryOrderObject | TQueryOrderArray
   ): TOrderMember[];
 
-  const GRANULARITIES: TGranularityMap[];
+  export const GRANULARITIES: TGranularityMap[];
 
   /**
    * @hidden

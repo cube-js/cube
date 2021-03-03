@@ -4,9 +4,11 @@ import {
   defaultHeuristics,
   GRANULARITIES,
   ResultSet,
-  getOrderMembersFromOrder
+  getOrderMembersFromOrder,
+  moveItemInArray,
 } from '@cubejs-client/core';
-import { equals, fromPairs, indexBy, prop } from 'ramda';
+import { equals, fromPairs } from 'ramda';
+
 import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
@@ -40,9 +42,10 @@ export default {
   },
   data() {
     return {
+      skipHeuristics: true,
       meta: undefined,
       mutex: {},
-      chartType: undefined,
+      chartType: 'line',
       measures: [],
       dimensions: [],
       segments: [],
@@ -128,8 +131,12 @@ export default {
               order: orderMember.id === memberId ? order : orderMember.order,
             }));
           },
-          update() {},
-          reorder(sourceIndex, destinationIndex) {},
+          update: (newOrder) => {
+            this.order = newOrder;
+          },
+          reorder: (sourceIndex, destinationIndex) => {
+            this.orderMembers = moveItemInArray(this.orderMembers, sourceIndex, destinationIndex);
+          },
         },
       };
 
@@ -155,7 +162,9 @@ export default {
     }
 
     // Pass parent slots to child QueryRenderer component
-    const children = Object.keys(this.$slots).map((slot) => createElement('template', { slot }, this.$slots[slot]));
+    const children = Object.keys(this.$slots).map((slot) =>
+      createElement('template', { slot }, this.$slots[slot])
+    );
 
     return createElement(
       QueryRenderer,
@@ -232,14 +241,19 @@ export default {
         }
       }
 
-      if (!this.disableHeuristics && isQueryPresent(validatedQuery) && this.meta) {
+      if (
+        !this.skipHeuristics &&
+        !this.disableHeuristics &&
+        isQueryPresent(validatedQuery) &&
+        this.meta
+      ) {
         const heuristicsFn = this.stateChangeHeuristics || defaultHeuristics;
-        const { query, shouldApplyHeuristicOrder, pivotConfig } = heuristicsFn(
+        const { query, chartType, shouldApplyHeuristicOrder, pivotConfig } = heuristicsFn(
           validatedQuery,
           this.prevValidatedQuery,
           {
             meta: this.meta,
-            sessionGranularity: validatedQuery?.timeDimensions?.[0]?.granularity
+            sessionGranularity: validatedQuery?.timeDimensions?.[0]?.granularity,
           }
         );
 
@@ -249,13 +263,22 @@ export default {
           ...(shouldApplyHeuristicOrder ? { order: defaultOrder(query) } : null),
         };
 
-        this.pivotConfig = ResultSet.getNormalizedPivotConfig(validatedQuery, pivotConfig || this.pivotConfig);
+        this.chartType = chartType || this.chartType;
+        this.pivotConfig = ResultSet.getNormalizedPivotConfig(
+          validatedQuery,
+          pivotConfig || this.pivotConfig
+        );
         this.copyQueryFromProps(validatedQuery);
       }
 
       this.prevValidatedQuery = validatedQuery;
       return validatedQuery;
     },
+  },
+
+  updated() {
+    // query heuristics should only apply on query change (not applied to the initial query)
+    this.skipHeuristics = false;
   },
 
   async mounted() {
@@ -282,31 +305,34 @@ export default {
         order,
       } = query || this.query;
 
-      this.measures = measures.map((m, i) => ({
-        index: i,
+      this.measures = measures.map((m, index) => ({
+        index,
         ...this.meta.resolveMember(m, 'measures'),
       }));
-      this.dimensions = dimensions.map((m, i) => ({
-        index: i,
+      this.dimensions = dimensions.map((m, index) => ({
+        index,
         ...this.meta.resolveMember(m, 'dimensions'),
       }));
-      this.segments = segments.map((m, i) => ({
-        index: i,
+      this.segments = segments.map((m, index) => ({
+        index,
         ...this.meta.resolveMember(m, 'segments'),
       }));
-      this.timeDimensions = timeDimensions.map((m, i) => ({
+      this.timeDimensions = timeDimensions.map((m, index) => ({
         ...m,
         dimension: {
           ...this.meta.resolveMember(m.dimension, 'dimensions'),
           granularities: this.granularities,
         },
-        index: i,
+        index,
       }));
-      this.filters = filters.map((m, i) => ({
+      this.filters = filters.map((m, index) => ({
         ...m,
         member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-        operators: this.meta.filterOperatorsForMember(m.member || m.dimension, ['dimensions', 'measures']),
-        index: i,
+        operators: this.meta.filterOperatorsForMember(m.member || m.dimension, [
+          'dimensions',
+          'measures',
+        ]),
+        index,
       }));
 
       this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
@@ -315,7 +341,7 @@ export default {
         (m) => m.type === 'time'
       );
       this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
-      this.limit = limit || 10_000;
+      this.limit = limit || 10000;
       this.offset = offset || null;
       this.renewQuery = renewQuery || false;
       this.order = order || null;
@@ -481,15 +507,22 @@ export default {
         ...this.measures,
         ...this.dimensions,
         ...this.timeDimensions.map(({ dimension }) => toOrderMember(dimension)),
-      ].map((member, index) => {
-        const id = member.name || member.id;
-        return {
-          index,
-          id,
-          title: member.title,
-          order: this.order?.[id] || 'none',
-        };
-      });
+      ]
+        .map((member, index) => {
+          const id = member.name || member.id;
+
+          if (!id) {
+            return false;
+          }
+
+          return {
+            index,
+            id,
+            title: member.title,
+            order: this.order?.[id] || 'none',
+          };
+        })
+        .filter(Boolean);
     },
   },
 
@@ -529,6 +562,10 @@ export default {
       deep: true,
       handler(order) {
         const nextOrderMembers = getOrderMembersFromOrder(this.getOrderMembers(), order);
+
+        // debugger;
+        console.log('>>', nextOrderMembers, this.getOrderMembers());
+
         if (!equals(nextOrderMembers, this.getOrderMembers())) {
           this.orderMembers = nextOrderMembers;
         }
@@ -537,7 +574,9 @@ export default {
     orderMembers: {
       deep: true,
       handler(orderMembers) {
-        const nextOrder = orderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean);
+        const nextOrder = orderMembers
+          .map(({ id, order }) => (order !== 'none' ? [id, order] : false))
+          .filter(Boolean);
         if (!equals(Object.entries(this.order || {}), nextOrder)) {
           this.order = fromPairs(nextOrder);
         }

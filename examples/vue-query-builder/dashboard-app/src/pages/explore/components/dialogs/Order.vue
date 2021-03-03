@@ -7,7 +7,7 @@
     <v-card>
       <v-card-title>Order</v-card-title>
       <v-card-text class="container">
-        <draggable id="y" class="list-group" group="pivot" :list="orderMembers">
+        <draggable class="list-group" :list="orderMembers">
           <div v-for="member in orderMembers" :key="member.id" class="order-member">
             <div class="order-member-name">
               <v-icon small>mdi-arrow-all</v-icon>

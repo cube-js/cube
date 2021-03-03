@@ -79,4 +79,36 @@ describe('default heuristics', () => {
       },
     });
   });
+
+  it('handles dateRange correctly', () => {
+    const meta = {
+      defaultTimeDimensionNameFor() {
+        return 'Orders.createdAt';
+      },
+    };
+
+    const query = {
+      measures: ['Orders.count'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.createdAt',
+          granularity: 'month',
+          dateRange: 'This quarter'
+        },
+      ],
+    };
+
+    const oldQuery = {};
+
+    expect(defaultHeuristics(query, oldQuery, { meta })).toMatchObject({
+      query: {
+        timeDimensions: [
+          {
+            granularity: 'month',
+            dateRange: 'This quarter'
+          },
+        ],
+      },
+    });
+  });
 });

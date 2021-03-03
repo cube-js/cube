@@ -11,39 +11,38 @@
 </template>
 
 <script>
-  export default {
-    props: {
-      timeDimensions: Array
+export default {
+  name: 'DateRangeSelect',
+  props: {
+    timeDimensions: Array,
+  },
+  mounted() {
+    console.log(this.timeDimensions);
+  },
+  data() {
+    return {
+      dateRangeItems: [
+        'Today',
+        'Yesterday',
+        'This week',
+        'This month',
+        'This quarter',
+        'This year',
+        'Last 30 days',
+        'Last year',
+      ],
+    };
+  },
+  methods: {
+    changeHandler(value) {
+      this.$emit('change', [
+        {
+          dimension: this.timeDimensions[0].dimension.name,
+          granularity: this.timeDimensions[0].granularity,
+          dateRange: value,
+        },
+      ]);
     },
-    name: "DateRangeSelect.vue",
-    data() {
-      return {
-        dateRangeItems: [
-          "Today",
-          "Yesterday",
-          "This week",
-          "This month",
-          "This quarter",
-          "This year",
-          "Last 30 days",
-          "Last year"
-        ]
-      };
-    },
-    methods: {
-      changeHandler(value) {
-        this.$emit("change", [
-          {
-            dimension: this.timeDimensions[0].dimension.name,
-            granularity: this.timeDimensions[0].granularity,
-            dateRange: value
-          }
-        ]);
-      }
-    }
-  };
+  },
+};
 </script>
-
-<style scoped>
-
-</style>

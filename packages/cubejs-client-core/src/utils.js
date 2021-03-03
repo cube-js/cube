@@ -61,17 +61,18 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
         (newQuery.measures || []).length === 1 &&
         oldQuery.measures[0] !== newQuery.measures[0])
     ) {
-      const [td] = (newQuery.timeDimensions || []);
+      const [td] = newQuery.timeDimensions || [];
       const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
       newQuery = {
         ...newQuery,
         timeDimensions: defaultTimeDimension
           ? [
-            {
-              dimension: defaultTimeDimension,
-              granularity: td && td.granularity || granularity,
-            },
-          ]
+              {
+                dimension: defaultTimeDimension,
+                granularity: (td && td.granularity) || granularity,
+                dateRange: td && td.dateRange
+              },
+            ]
           : [],
       };
 
@@ -180,7 +181,8 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
 
 export function isQueryPresent(query) {
   return (Array.isArray(query) ? query : [query]).every(
-    (q) => (q.measures && q.measures.length) ||
+    (q) =>
+      (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );
@@ -266,7 +268,7 @@ export function getOrderMembersFromOrder(orderMembers, order) {
   const nextOrderMembers = [];
 
   Object.entries(order).forEach(([memberId, currentOrder]) => {
-    if (currentOrder !== 'none') {
+    if (currentOrder !== 'none' && indexedOrderMembers[memberId]) {
       ids.add(memberId);
       nextOrderMembers.push({
         ...indexedOrderMembers[memberId],
