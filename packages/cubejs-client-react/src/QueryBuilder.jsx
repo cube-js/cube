@@ -1,5 +1,5 @@
 import React from 'react';
-import { prop, uniqBy, indexBy, fromPairs, equals } from 'ramda';
+import { prop, uniqBy, equals } from 'ramda';
 import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
@@ -64,38 +64,12 @@ export default class QueryBuilder extends React.Component {
     }));
   }
 
-  static getOrderMembers(state) {
-    const { query, meta } = state;
-
-    if (!meta) {
-      return [];
-    }
-
-    const toOrderMember = (member) => ({
-      id: member.name,
-      title: member.title,
-    });
-
-    return uniqBy(
-      prop('id'),
-      [
-        ...QueryBuilder.resolveMember('measures', state).map(toOrderMember),
-        ...QueryBuilder.resolveMember('dimensions', state).map(toOrderMember),
-        ...QueryBuilder.resolveMember('timeDimensions', state).map((td) => toOrderMember(td.dimension)),
-      ].map((member) => ({
-        ...member,
-        order: query.order?.[member.id] || 'none',
-      }))
-    );
-  }
-
   constructor(props) {
     super(props);
 
     this.state = {
       query: props.query,
       chartType: 'line',
-      orderMembers: [],
       pivotConfig: null,
       validatedQuery: props.query,
       missingMembers: [],
@@ -157,7 +131,6 @@ export default class QueryBuilder extends React.Component {
     this.setState({
       meta,
       metaError,
-      orderMembers: QueryBuilder.getOrderMembers({ meta, query }),
       pivotConfig: ResultSet.getNormalizedPivotConfig(dryRunResponse?.pivotQuery || {}, pivotConfig),
       missingMembers,
       isFetchingMeta: false
@@ -238,7 +211,6 @@ export default class QueryBuilder extends React.Component {
       meta,
       metaError,
       query,
-      orderMembers = [],
       chartType,
       pivotConfig,
       validatedQuery,
@@ -261,6 +233,38 @@ export default class QueryBuilder extends React.Component {
       index: i,
     }));
 
+    const measures = QueryBuilder.resolveMember('measures', this.state);
+    const dimensions = QueryBuilder.resolveMember('dimensions', this.state);
+    const timeDimensions = QueryBuilder.resolveMember('timeDimensions', this.state);
+    const segments = ((meta && query.segments) || []).map((m, i) => ({
+      index: i,
+      ...meta.resolveMember(m, 'segments'),
+    }));
+
+    const availableMeasures = meta ? meta.membersForQuery(query, 'measures') : [];
+    const availableDimensions = meta ? meta.membersForQuery(query, 'dimensions') : [];
+    const availableSegments = meta ? meta.membersForQuery(query, 'segments') : [];
+
+    let orderMembers = uniqBy(prop('id'), [
+      ...(Array.isArray(query.order) ? query.order : Object.entries(query.order || {})).map(([id, order]) => ({
+        id,
+        order,
+        title: meta ? meta.resolveMember(id, ['measures', 'dimensions']).title : '',
+      })),
+      // uniqBy prefers first, so these will only be added if not already in the query
+      ...[...measures, ...dimensions].map(({ name, title }) => ({ id: name, title, order: 'none' })),
+    ]);
+
+    // Preserve order until the members change or manually re-ordered
+    // This is needed so that when an order member becomes active, it doesn't jump to the top of the list
+    const orderMemberOrderKey = JSON.stringify(orderMembers.map(({ id }) => id).sort());
+    if (this.orderMemberOrderKey && this.orderMemberOrder && orderMemberOrderKey === this.orderMemberOrderKey) {
+      orderMembers = this.orderMemberOrder.map((id) => orderMembers.find((member) => member.id === id));
+    } else {
+      this.orderMemberOrderKey = orderMemberOrderKey;
+      this.orderMemberOrder = orderMembers.map(({ id }) => id);
+    }
+
     return {
       meta,
       metaError,
@@ -268,18 +272,16 @@ export default class QueryBuilder extends React.Component {
       validatedQuery,
       isQueryPresent: this.isQueryPresent(),
       chartType,
-      measures: QueryBuilder.resolveMember('measures', this.state),
-      dimensions: QueryBuilder.resolveMember('dimensions', this.state),
-      timeDimensions: QueryBuilder.resolveMember('timeDimensions', this.state),
-      segments: ((meta && query.segments) || []).map((m, i) => ({ index: i, ...meta.resolveMember(m, 'segments') })),
+      measures,
+      dimensions,
+      timeDimensions,
+      segments,
       filters,
       orderMembers,
-      availableMeasures: (meta && meta.membersForQuery(query, 'measures')) || [],
-      availableDimensions: (meta && meta.membersForQuery(query, 'dimensions')) || [],
-      availableTimeDimensions: ((meta && meta.membersForQuery(query, 'dimensions')) || []).filter(
-        (m) => m.type === 'time'
-      ),
-      availableSegments: (meta && meta.membersForQuery(query, 'segments')) || [],
+      availableMeasures,
+      availableDimensions,
+      availableTimeDimensions: availableDimensions.filter((m) => m.type === 'time'),
+      availableSegments,
       updateQuery: (queryUpdate) => this.updateQuery(queryUpdate),
       updateMeasures: updateMethods('measures'),
       updateDimensions: updateMethods('dimensions'),
@@ -288,12 +290,14 @@ export default class QueryBuilder extends React.Component {
       updateFilters: updateMethods('filters', toFilter),
       updateChartType: (newChartType) => this.updateVizState({ chartType: newChartType }),
       updateOrder: {
-        set: (memberId, order = 'asc') => {
-          this.updateVizState({
-            orderMembers: orderMembers.map((orderMember) => ({
-              ...orderMember,
-              order: orderMember.id === memberId ? order : orderMember.order,
-            })),
+        set: (memberId, newOrder = 'asc') => {
+          this.updateQuery({
+            order: orderMembers
+              .map((orderMember) => ({
+                ...orderMember,
+                order: orderMember.id === memberId ? newOrder : orderMember.order,
+              }))
+              .reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []),
           });
         },
         update: (order) => {
@@ -306,8 +310,11 @@ export default class QueryBuilder extends React.Component {
             return;
           }
 
-          this.updateVizState({
-            orderMembers: moveItemInArray(orderMembers, sourceIndex, destinationIndex),
+          this.updateQuery({
+            order: moveItemInArray(orderMembers, sourceIndex, destinationIndex).reduce(
+              (acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc),
+              []
+            ),
           });
         },
       },
@@ -389,47 +396,28 @@ export default class QueryBuilder extends React.Component {
       query.order = defaultOrder(query);
     }
 
-    const updatedOrderMembers = indexBy(
-      prop('id'),
-      QueryBuilder.getOrderMembers({
-        ...this.state,
-        ...finalState,
-      })
-    );
-    const currentOrderMemberIds = (finalState.orderMembers || []).map(({ id }) => id);
-    const currentOrderMembers = (finalState.orderMembers || []).filter(({ id }) => Boolean(updatedOrderMembers[id]));
-
-    Object.entries(updatedOrderMembers).forEach(([id, orderMember]) => {
-      if (!currentOrderMemberIds.includes(id)) {
-        currentOrderMembers.push(orderMember);
-      }
-    });
-
     const nextQuery = {
       ...query,
-      order: fromPairs(currentOrderMembers.map(({ id, order }) => (order !== 'none' ? [id, order] : false)).filter(Boolean))
     };
 
     finalState.pivotConfig = ResultSet.getNormalizedPivotConfig(
       nextQuery,
       finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig
     );
-    
+
     const missingMembers = this.getMissingMembers(nextQuery, meta);
 
     runSetters({
       ...state,
       query: nextQuery,
-      orderMembers: currentOrderMembers,
     });
-    
+
     this.setState({
       ...finalState,
       query: nextQuery,
-      orderMembers: currentOrderMembers,
-      missingMembers
+      missingMembers,
     });
-    
+
     let pivotQuery = {};
     if (QueryRenderer.isQueryPresent(query) && missingMembers.length === 0) {
       try {
