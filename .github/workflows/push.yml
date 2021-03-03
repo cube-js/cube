@@ -89,7 +89,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Lerna test
-        run: yarn lerna run --concurrency 1 unit
+        run:  yarn lerna run --concurrency 1 --stream --no-prefix unit
       - uses: codecov/codecov-action@v1
         if: (matrix.node-version == '15.x')
         with:

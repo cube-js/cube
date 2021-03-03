@@ -5,7 +5,7 @@ import {
   retryWithTimeout,
   withTimeout,
   withTimeoutRace,
-  asyncMemoize, asyncRetry, asyncDebounce,
+  asyncMemoize, asyncRetry, asyncDebounce, asyncMemoizeBackground,
 } from '../src';
 
 test('createCancelablePromise', async () => {
@@ -480,5 +480,105 @@ describe('asyncDebounce', () => {
 
     await doOnce('arg1', 'arg2');
     expect(called).toEqual(2);
+  });
+});
+
+describe('asyncMemoizeBackground', () => {
+  test('asyncMemoizeBackground cache', async () => {
+    let called = 0;
+
+    const memCall = await asyncMemoizeBackground(
+      async (url: string) => {
+        called++;
+
+        return Math.random();
+      },
+      {
+        extractCacheLifetime: () => 1 * 500,
+        extractKey: (url) => url,
+        backgroundRefreshInterval: 500,
+        onBackgroundException: (e) => {
+          throw e;
+        },
+      }
+    );
+
+    const firstCallRandomValue = await memCall('test');
+
+    expect(called).toEqual(1);
+
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+
+    expect(called).toEqual(1);
+
+    await memCall('anotherValue');
+
+    expect(called).toEqual(2);
+
+    await pausePromise(500 + 300);
+
+    expect(called).toBeGreaterThanOrEqual(3);
+
+    expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
+
+    expect(called).toBeGreaterThanOrEqual(3);
+
+    // Disable background updates
+    await memCall.release();
+
+    await pausePromise(500 * 2 + 300);
+
+    // No calls should be done, because timer is disabled
+    expect(called).toBeGreaterThanOrEqual(3);
+
+    expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
+    expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
+
+    // Items with expired cache should not call function
+    expect(called).toBeGreaterThanOrEqual(3);
+  });
+
+  test('asyncMemoizeBackground force', async () => {
+    let called = 0;
+
+    const memCall = await asyncMemoizeBackground(
+      async (url: string) => {
+        called++;
+
+        return Math.random();
+      },
+      {
+        extractCacheLifetime: () => 1 * 500,
+        extractKey: (url) => url,
+        backgroundRefreshInterval: 500,
+        onBackgroundException: (e) => {
+          throw e;
+        },
+      }
+    );
+
+    const firstCallRandomValue = await memCall('test');
+
+    expect(called).toEqual(1);
+
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+
+    expect(called).toEqual(1);
+
+    const secondCallRandomValue = await memCall.force('test');
+
+    expect(secondCallRandomValue !== firstCallRandomValue).toEqual(true);
+
+    expect(called).toEqual(2);
+
+    expect(await memCall('test')).toEqual(secondCallRandomValue);
+    expect(await memCall('test')).toEqual(secondCallRandomValue);
+
+    expect(called).toEqual(2);
+
+    // clear timer
+    memCall.release();
   });
 });
