@@ -251,7 +251,7 @@ Deprecated:
 ```js
 const server = new CubejsServer({
   checkAuth: async (req, auth) => {
-    // Notice how we're using the `u` property in `jwt.verify()` and assigning the result to `req.authInfo``
+    // Notice how we're using the `u` property in `jwt.verify()` and assigning the result to `req.authInfo`
     req.authInfo = jwt.verify({ u: auth }, pem);
   },
   contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
@@ -265,10 +265,10 @@ You should use:
 ```js
 const server = new CubejsServer({
   checkAuth: async (req, auth) => {
-    // We're now using directly assiging the result of `jet.verify()` to the `securityContext` property
+    // We're now using directly assigning the result of `jet.verify()` to the `securityContext` property
     req.securityContext = jwt.verify(auth, pem);
   },
-  // And here we're now using the `securityContext` parameter`
+  // And here we're now using the `securityContext` parameter
   contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
   // And the same here
   preAggregationsSchema: ({ securityContext }) =>
