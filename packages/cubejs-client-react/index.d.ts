@@ -17,6 +17,10 @@ import {
   TimeDimensionComparison,
   TimeDimensionRanged,
   TimeDimension,
+  TimeDimensionGranularity,
+  DateRange,
+  UnaryOperator,
+  BinaryOperator,
 } from '@cubejs-client/core';
 
 /**
@@ -483,33 +487,50 @@ declare module '@cubejs-client/react' {
    * />
    * ```
    */
-
-  type FilterWithExtraFields = Omit<Filter, 'dimension'> & {
-    dimension: TCubeDimension | TCubeMeasure;
-    operators: { name: string; title: string }[];
-  };
-  type TimeDimensionWithExtraFields = Omit<TimeDimension, 'dimension'> & {
-    dimension: TCubeDimension & { granularities: { name: string; title: string }[] };
-  };
-
   type MemberUpdater<T> = {
     add: (member: T) => void;
     remove: (member: { index: number }) => void;
     update: (member: { index: number }, updateWith: T) => void;
   };
+
+  type FilterExtraFields = {
+    dimension: TCubeDimension | TCubeMeasure;
+    operators: { name: string; title: string }[];
+  };
+  type FilterWithExtraFields = Omit<Filter, 'dimension'> & FilterExtraFields;
+
+  type GranularityOptions = {
+    granularities: { name: string; title: string }[];
+  };
+  type TimeDimensionExtraFields = {
+    dimension: TCubeDimension & GranularityOptions;
+  };
+  type TimeDimensionWithExtraFields = Omit<TimeDimension, 'dimension'> & TimeDimensionExtraFields;
+
   type DimensionUpdater = MemberUpdater<TCubeDimension>;
   type MeasureUpdater = MemberUpdater<TCubeMeasure>;
   type SegmentUpdater = MemberUpdater<TCubeSegment>;
+
   // Only require the fields that are actually used (otherwise fields like `operators` are required just to add/update)
-  type TimeDimensionUpdater = MemberUpdater<
-    (
-      | Pick<TimeDimensionRanged, 'granularity' | 'dateRange'>
-      | Pick<TimeDimensionComparison, 'granularity' | 'compareDateRange'>
-    ) & { dimension: TCubeDimension }
-  >;
-  type FilterUpdater = MemberUpdater<
-    Pick<Filter, 'member' | 'operator' | 'values'> & { dimension: TCubeDimension | TCubeMeasure }
-  >;
+  type TimeDimensionRangedUpdateFields = {
+    granularity?: TimeDimensionGranularity;
+    dateRange?: DateRange;
+    dimension: TCubeDimension;
+  };
+  type TimeDimensionComparisonUpdateFields = {
+    granularity?: TimeDimensionGranularity;
+    compareDateRange: Array<DateRange>;
+    dimension: TCubeDimension;
+  };
+  type TimeDimensionUpdater = MemberUpdater<TimeDimensionRangedUpdateFields | TimeDimensionComparisonUpdateFields>;
+
+  type FilterUpdateFields = {
+    member?: string;
+    operator: BinaryOperator | UnaryOperator;
+    values: string[];
+    dimension: TCubeDimension | TCubeMeasure
+  }
+  type FilterUpdater = MemberUpdater<FilterUpdateFields>;
 
   type OrderUpdater = {
     set: (memberId: string, order: QueryOrder | 'none') => void;

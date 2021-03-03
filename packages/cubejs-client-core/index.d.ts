@@ -34,10 +34,25 @@ declare module '@cubejs-client/core' {
    * @order 3
    */
   export class HttpTransport implements ITransport {
+    /**
+     * @hidden
+     */
     protected authorization: TransportOptions['authorization'];
+    /**
+     * @hidden
+     */
     protected apiUrl: TransportOptions['apiUrl'];
+    /**
+     * @hidden
+     */
     protected method: TransportOptions['method'];
+    /**
+     * @hidden
+     */
     protected headers: TransportOptions['headers'];
+    /**
+     * @hidden
+     */
     protected credentials: TransportOptions['credentials'];
     constructor(options: TransportOptions);
     request(method: string, params: any): () => Promise<any>;
@@ -694,14 +709,16 @@ declare module '@cubejs-client/core' {
     granularity?: TimeDimensionGranularity;
   };
 
-  export type TimeDimensionComparison = TimeDimensionBase & {
+  type TimeDimensionComparisonFields = {
     compareDateRange: Array<DateRange>;
     dateRange?: never;
-  };
+  }
+  export type TimeDimensionComparison = TimeDimensionBase & TimeDimensionComparisonFields;
 
-  export type TimeDimensionRanged = TimeDimensionBase & {
+  type TimeDimensionRangedFields = {
     dateRange?: DateRange;
-  };
+  }
+  export type TimeDimensionRanged = TimeDimensionBase & TimeDimensionRangedFields;
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
 
