@@ -5,16 +5,22 @@ import {
   ResultSet,
   Filter,
   PivotConfig,
-  MemberType,
   TCubeMeasure,
   TCubeDimension,
-  TCubeMember,
   ProgressResponse,
   TDryRunResponse,
   TOrderMember,
   QueryOrder,
-  TQueryOrderArray,
   TSourceAxis,
+  Meta,
+  TCubeSegment,
+  TimeDimensionComparison,
+  TimeDimensionRanged,
+  TimeDimension,
+  TimeDimensionGranularity,
+  DateRange,
+  UnaryOperator,
+  BinaryOperator,
 } from '@cubejs-client/core';
 
 /**
@@ -141,9 +147,8 @@ declare module '@cubejs-client/react' {
   type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
 
   type VizState = {
-    [key: string]: any;
+    query?: Query;
     pivotConfig?: PivotConfig;
-    shouldApplyHeuristicOrder?: boolean;
     chartType?: ChartType;
   };
 
@@ -188,14 +193,18 @@ declare module '@cubejs-client/react' {
     resultSet?: ResultSet | null;
     error?: Error | null;
     loadingState?: TLoadingState;
+
+    meta: Meta | undefined;
+    metaError?: Error | null;
+    isFetchingMeta: boolean;
     /**
      * Indicates whether the query is ready to be displayed or not
      */
     isQueryPresent: boolean;
-    measures: string[];
-    dimensions: string[];
-    segments: string[];
-    timeDimensions: Filter[];
+    measures: (TCubeMeasure & { index: number })[];
+    dimensions: (TCubeDimension & { index: number })[];
+    segments: (TCubeSegment & { index: number })[];
+    timeDimensions: (TimeDimensionWithExtraFields & { index: number })[];
 
     /**
      * An array of available measures to select. They are loaded via the API from Cube.js Backend.
@@ -212,18 +221,18 @@ declare module '@cubejs-client/react' {
     /**
      * An array of available segments to select. They are loaded via the API from Cube.js Backend.
      */
-    availableSegments: TCubeMember[];
+    availableSegments: TCubeSegment[];
 
-    updateMeasures: MemberUpdater;
-    updateDimensions: MemberUpdater;
-    updateSegments: MemberUpdater;
-    updateTimeDimensions: MemberUpdater;
-    updateFilters: MemberUpdater;
+    updateMeasures: MeasureUpdater;
+    updateDimensions: DimensionUpdater;
+    updateSegments: SegmentUpdater;
+    updateTimeDimensions: TimeDimensionUpdater;
+    updateFilters: FilterUpdater;
     /**
      * Used for partial of full query update
      */
     updateQuery: (query: Query) => void;
-    filters: Filter[];
+    filters: (FilterWithExtraFields & { index: number })[];
     /**
      * All possible order members for the query
      */
@@ -235,22 +244,23 @@ declare module '@cubejs-client/react' {
     /**
      * See [Pivot Config](@cubejs-client-core#types-pivot-config)
      */
-    pivotConfig: PivotConfig;
+    pivotConfig?: PivotConfig;
     /**
      * Helper method for `pivotConfig` updates
      */
     updatePivotConfig: PivotConfigUpdater;
-    
+
     /**
      * Selected chart type
      */
-    chartType: ChartType;
-    
+    chartType?: ChartType;
+
     /**
      * Used for chart type update
      */
     updateChartType: (chartType: ChartType) => void;
     validatedQuery: Query;
+    refresh: () => void;
   };
 
   /**
@@ -477,25 +487,64 @@ declare module '@cubejs-client/react' {
    * />
    * ```
    */
-  type MemberUpdater = {
-    add: (member: MemberType) => void;
-    remove: (member: MemberType) => void;
-    update: (member: MemberType, updateWith: MemberType) => void;
+  type MemberUpdater<T> = {
+    add: (member: T) => void;
+    remove: (member: { index: number }) => void;
+    update: (member: { index: number }, updateWith: T) => void;
   };
+
+  type FilterExtraFields = {
+    dimension: TCubeDimension | TCubeMeasure;
+    operators: { name: string; title: string }[];
+  };
+  type FilterWithExtraFields = Omit<Filter, 'dimension'> & FilterExtraFields;
+
+  type GranularityOptions = {
+    granularities: { name: string; title: string }[];
+  };
+  type TimeDimensionExtraFields = {
+    dimension: TCubeDimension & GranularityOptions;
+  };
+  type TimeDimensionWithExtraFields = Omit<TimeDimension, 'dimension'> & TimeDimensionExtraFields;
+
+  type DimensionUpdater = MemberUpdater<TCubeDimension>;
+  type MeasureUpdater = MemberUpdater<TCubeMeasure>;
+  type SegmentUpdater = MemberUpdater<TCubeSegment>;
+
+  // Only require the fields that are actually used (otherwise fields like `operators` are required just to add/update)
+  type TimeDimensionRangedUpdateFields = {
+    granularity?: TimeDimensionGranularity;
+    dateRange?: DateRange;
+    dimension: TCubeDimension;
+  };
+  type TimeDimensionComparisonUpdateFields = {
+    granularity?: TimeDimensionGranularity;
+    compareDateRange: Array<DateRange>;
+    dimension: TCubeDimension;
+  };
+  type TimeDimensionUpdater = MemberUpdater<TimeDimensionRangedUpdateFields | TimeDimensionComparisonUpdateFields>;
+
+  type FilterUpdateFields = {
+    member?: string;
+    operator: BinaryOperator | UnaryOperator;
+    values: string[];
+    dimension: TCubeDimension | TCubeMeasure
+  }
+  type FilterUpdater = MemberUpdater<FilterUpdateFields>;
 
   type OrderUpdater = {
     set: (memberId: string, order: QueryOrder | 'none') => void;
-    update: (order: TQueryOrderArray) => void;
+    update: (order: Query['order']) => void;
     reorder: (sourceIndex: number, destinationIndex: number) => void;
   };
 
   type PivotConfigUpdater = {
-    moveItem: (
-      sourceIndex: number,
-      destinationIndex: number,
-      sourceAxis: TSourceAxis,
-      destinationAxis: TSourceAxis
-    ) => void;
+    moveItem: (args: {
+      sourceIndex: number;
+      destinationIndex: number;
+      sourceAxis: TSourceAxis;
+      destinationAxis: TSourceAxis;
+    }) => void;
     update: (pivotConfig: PivotConfig & { limit: number }) => void;
   };
 }
