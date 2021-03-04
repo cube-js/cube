@@ -17,6 +17,11 @@ on:
       - 'yarn.lock'
       - 'docs-gen/**'
       - 'docs/**'
+    branches:
+      - 'master'
+      # feature or legacy releases
+      - 'v*.*.*'
+      - 'v*.*'
   pull_request:
     paths:
       - '.github/workflows/push.yml'
