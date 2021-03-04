@@ -72,10 +72,10 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -117,10 +117,10 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -155,10 +155,10 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -213,10 +213,10 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -295,10 +295,10 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -389,10 +389,10 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -476,10 +476,10 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
