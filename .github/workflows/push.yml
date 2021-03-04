@@ -17,6 +17,11 @@ on:
       - 'yarn.lock'
       - 'docs-gen/**'
       - 'docs/**'
+    branches:
+      - 'master'
+      # feature or legacy releases
+      - 'v*.*.*'
+      - 'v*.*'
   pull_request:
     paths:
       - '.github/workflows/push.yml'
@@ -56,6 +61,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -67,10 +73,11 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -101,6 +108,7 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -112,10 +120,11 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -139,6 +148,7 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -150,10 +160,11 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -197,6 +208,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -208,10 +220,11 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -279,6 +292,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -290,10 +304,11 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -373,6 +388,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -384,10 +400,11 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
@@ -460,6 +477,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -471,10 +489,11 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
         # Skip installation only for release, because units will be started before release will be released
