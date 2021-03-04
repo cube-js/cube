@@ -1,0 +1,23 @@
+.selector {
+    background-color: #fff;
+}
+
+.list {
+    font-size: var(--font-size-h2);
+    line-height: 1.55em;
+    list-style-type: none;
+    margin: 0 auto;
+    padding: 5vh 0;
+    width: min-content;
+}
+
+.country {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.letter  {
+    position: absolute;
+    margin-left: -2em;
+    opacity: 0.5;
+}

@@ -1,0 +1,29 @@
+.header {
+    font-size: var(--font-size-h1);
+    font-weight: 400;
+    line-height: 1.25em;
+    margin: 0 0 0.5em 0;
+    text-align: center;
+}
+
+.subtitle {
+    font-size: var(--font-size-h2);
+    opacity: 0.5;
+    font-weight: 400;
+    line-height: 1.25em;
+    margin: 0 0 1em 0;
+    text-align: center;
+}
+
+.selector {
+    border-bottom: solid 2px var(--color-link-underline);
+    color: inherit;
+    cursor: pointer;
+    text-decoration: inherit;
+}
+
+.button {
+    cursor: pointer;
+    margin-left: 0.25em;
+    opacity: 0.5;
+}
