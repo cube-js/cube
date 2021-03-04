@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.47](https://github.com/cube-js/cube.js/compare/v0.26.46...v0.26.47) (2021-03-04)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** missing chart renderers ([a76b39f](https://github.com/cube-js/cube.js/commit/a76b39ff76666e338d94c8d3aedd5bb3db2c8957))
+* **cubestore:** post-install - compatbility with non bash env ([4b0c9ef](https://github.com/cube-js/cube.js/commit/4b0c9ef19b20d4cbfaee63337b7a0025bb31e6e9))
+
+
+
+
+
 ## [0.26.46](https://github.com/cube-js/cube.js/compare/v0.26.45...v0.26.46) (2021-03-04)
 
 
