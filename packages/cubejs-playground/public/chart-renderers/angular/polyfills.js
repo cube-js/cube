@@ -3023,4 +3023,35 @@ Zone.__load_patch('XHR', (global, Zone) => {
 Zone.__load_patch('geolocation', (global) => {
     /// GEO_LOCATION
     if (global['navigator'] && global['navigator'].geolocation) {
-        patchPrototype(global['navigator'].g
+        patchPrototype(global['navigator'].geolocation, ['getCurrentPosition', 'watchPosition']);
+    }
+});
+Zone.__load_patch('PromiseRejectionEvent', (global, Zone) => {
+    // handle unhandled promise rejection
+    function findPromiseRejectionHandler(evtName) {
+        return function (e) {
+            const eventTasks = findEventTasks(global, evtName);
+            eventTasks.forEach(eventTask => {
+                // windows has added unhandledrejection event listener
+                // trigger the event listener
+                const PromiseRejectionEvent = global['PromiseRejectionEvent'];
+                if (PromiseRejectionEvent) {
+                    const evt = new PromiseRejectionEvent(evtName, { promise: e.promise, reason: e.rejection });
+                    eventTask.invoke(evt);
+                }
+            });
+        };
+    }
+    if (global['PromiseRejectionEvent']) {
+        Zone[zoneSymbol('unhandledPromiseRejectionHandler')] =
+            findPromiseRejectionHandler('unhandledrejection');
+        Zone[zoneSymbol('rejectionHandledHandler')] =
+            findPromiseRejectionHandler('rejectionhandled');
+    }
+});
+
+
+/***/ })
+
+},[[1,"runtime"]]]);
+//# sourceMappingURL=polyfills.js.map
