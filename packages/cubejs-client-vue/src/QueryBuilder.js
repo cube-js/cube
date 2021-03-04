@@ -13,9 +13,6 @@ import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
 
-// todo: remove
-const d = (v) => JSON.parse(JSON.stringify(v));
-
 const toOrderMember = (member) => ({
   id: member.name,
   title: member.title,
@@ -562,9 +559,6 @@ export default {
       deep: true,
       handler(order) {
         const nextOrderMembers = getOrderMembersFromOrder(this.getOrderMembers(), order);
-
-        // debugger;
-        console.log('>>', nextOrderMembers, this.getOrderMembers());
 
         if (!equals(nextOrderMembers, this.getOrderMembers())) {
           this.orderMembers = nextOrderMembers;
