@@ -61,6 +61,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -75,6 +76,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
+        if: steps.cache.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
@@ -106,6 +108,7 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -120,6 +123,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
+        if: steps.cache.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
@@ -144,6 +148,7 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -158,6 +163,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
+        if: steps.cache.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
@@ -202,6 +208,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -216,6 +223,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
+        if: steps.cache.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
@@ -284,6 +292,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -298,6 +307,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
+        if: steps.cache.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
@@ -378,6 +388,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -392,6 +403,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
+        if: steps.cache.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
@@ -465,6 +477,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
+        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -479,6 +492,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
+        if: steps.cache.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Set environment variables
         uses: allenevans/set-env@v2.0.0
