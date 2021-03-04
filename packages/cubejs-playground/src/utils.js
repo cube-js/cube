@@ -5,7 +5,7 @@ const bootstrapDefinition = {
     files: {
       'src/polyfills.ts': {
         content: `import 'core-js/proposals/reflect-metadata';
-import 'zone.js/dist/zone`,
+import 'zone.js/dist/zone';`,
       },
       'src/main.ts': {
         content: `import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
@@ -75,7 +75,10 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
           dependencies: {
             ...bootstrapDefinition[template]?.dependencies,
             ...dependencies.reduce(
-              (memo, d) => ({ ...memo, [d]: 'latest' }),
+              (memo, d) => {
+                const [name, version] = Array.isArray(d) ? d : [d, 'latest'];
+                return ({ ...memo, [name]: version });
+              },
               {}
             ),
           },
