@@ -60,24 +60,23 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Restore lerna
-        id: cache
-        uses: actions/cache@v2
+        uses: shonansurvivors/actions-s3-cache@v1.0.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CACHE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CACHE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CACHE_AWS_DEFAULT_REGION }}
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
-          path: |
+          s3-bucket: cubejs-oss-cache
+          cache-key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          paths: |
             ~/.npm
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+          command: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
@@ -101,24 +100,23 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Restore lerna
-        id: cache
-        uses: actions/cache@v2
+        uses: shonansurvivors/actions-s3-cache@v1.0.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CACHE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CACHE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CACHE_AWS_DEFAULT_REGION }}
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
-          path: |
+          s3-bucket: cubejs-oss-cache
+          cache-key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          paths: |
             ~/.npm
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+          command: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna lint
@@ -135,24 +133,23 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Restore lerna
-        id: cache
-        uses: actions/cache@v2
+        uses: shonansurvivors/actions-s3-cache@v1.0.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CACHE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CACHE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CACHE_AWS_DEFAULT_REGION }}
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
-          path: |
+          s3-bucket: cubejs-oss-cache
+          cache-key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          paths: |
             ~/.npm
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+          command: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Check Yarn lock wasn't modified
@@ -189,24 +186,23 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Restore lerna
-        id: cache
-        uses: actions/cache@v2
+        uses: shonansurvivors/actions-s3-cache@v1.0.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CACHE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CACHE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CACHE_AWS_DEFAULT_REGION }}
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
-          path: |
+          s3-bucket: cubejs-oss-cache
+          cache-key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          paths: |
             ~/.npm
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+          command: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
@@ -267,24 +263,23 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Restore lerna
-        id: cache
-        uses: actions/cache@v2
+        uses: shonansurvivors/actions-s3-cache@v1.0.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CACHE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CACHE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CACHE_AWS_DEFAULT_REGION }}
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
-          path: |
+          s3-bucket: cubejs-oss-cache
+          cache-key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          paths: |
             ~/.npm
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+          command: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
@@ -357,24 +352,23 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Restore lerna
-        id: cache
-        uses: actions/cache@v2
+        uses: shonansurvivors/actions-s3-cache@v1.0.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CACHE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CACHE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CACHE_AWS_DEFAULT_REGION }}
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
-          path: |
+          s3-bucket: cubejs-oss-cache
+          cache-key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          paths: |
             ~/.npm
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+          command: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
@@ -440,24 +434,23 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Restore lerna
-        id: cache
-        uses: actions/cache@v2
+        uses: shonansurvivors/actions-s3-cache@v1.0.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CACHE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CACHE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.CACHE_AWS_DEFAULT_REGION }}
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
-          path: |
+          s3-bucket: cubejs-oss-cache
+          cache-key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          paths: |
             ~/.npm
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+          command: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
