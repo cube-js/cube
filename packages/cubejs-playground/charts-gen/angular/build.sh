@@ -8,7 +8,7 @@ node angular/index.js
 
 echo 'Building the app'
 cd ../charts-dist/angular/angular-charts && npm run build
-cd -
+cd - || exit
 
 echo 'Moving files'
 rm -r ../public/chart-renderers/angular 2> /dev/null

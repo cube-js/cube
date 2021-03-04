@@ -8,7 +8,7 @@ node react/index.js
 
 echo 'Building the app'
 cd ../charts-dist/react/react-charts && SKIP_PREFLIGHT_CHECK=true GENERATE_SOURCEMAP=false npm run build
-cd -
+cd - || exit
 
 echo 'Moving files'
 rm -r ../public/chart-renderers/react 2> /dev/null

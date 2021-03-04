@@ -90,13 +90,15 @@ __webpack_require__.r(__webpack_exports__);
   !*** ./node_modules/zone.js/dist/zone-evergreen.js ***!
   \*****************************************************/
 /*! no static exports found */
-/***/ (function(module, exports) {
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
 
 /**
-* @license Angular v11.0.0-next.6+162.sha-170af07
-* (c) 2010-2020 Google LLC. https://angular.io/
-* License: MIT
-*/
+ * @license Angular v12.0.0-next.0
+ * (c) 2010-2020 Google LLC. https://angular.io/
+ * License: MIT
+ */
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -169,9 +171,12 @@ const Zone$1 = (function (global) {
             return _currentTask;
         }
         // tslint:disable-next-line:require-internal-with-underscore
-        static __load_patch(name, fn) {
+        static __load_patch(name, fn, ignoreDuplicate = false) {
             if (patches.hasOwnProperty(name)) {
-                if (checkDuplicate) {
+                // `checkDuplicate` option is defined from global variable
+                // so it works for all modules.
+                // `ignoreDuplicate` can work for the specified module
+                if (!ignoreDuplicate && checkDuplicate) {
                     throw Error('Already loaded patch: ' + name);
                 }
             }
@@ -1054,7 +1059,7 @@ function patchMethod(target, name, patchFn) {
     }
     const delegateName = zoneSymbol(name);
     let delegate = null;
-    if (proto && !(delegate = proto[delegateName])) {
+    if (proto && (!(delegate = proto[delegateName]) || !proto.hasOwnProperty(delegateName))) {
         delegate = proto[delegateName] = proto[name];
         // check whether proto[name] is writable
         // some property is readonly in safari, such as HtmlCanvasElement.prototype.toBlob
@@ -2627,29 +2632,9 @@ function patchTimer(window, setName, cancelName, nameSuffix) {
     const tasksByHandleId = {};
     function scheduleTask(task) {
         const data = task.data;
-        function timer() {
-            try {
-                task.invoke.apply(this, arguments);
-            }
-            finally {
-                // issue-934, task will be cancelled
-                // even it is a periodic task such as
-                // setInterval
-                if (!(task.data && task.data.isPeriodic)) {
-                    if (typeof data.handleId === 'number') {
-                        // in non-nodejs env, we remove timerId
-                        // from local cache
-                        delete tasksByHandleId[data.handleId];
-                    }
-                    else if (data.handleId) {
-                        // Node returns complex objects as handleIds
-                        // we remove task reference from timer object
-                        data.handleId[taskSymbol] = null;
-                    }
-                }
-            }
-        }
-        data.args[0] = timer;
+        data.args[0] = function () {
+            return task.invoke.apply(this, arguments);
+        };
         data.handleId = setNative.apply(window, data.args);
         return task;
     }
@@ -2664,6 +2649,33 @@ function patchTimer(window, setName, cancelName, nameSuffix) {
                     delay: (nameSuffix === 'Timeout' || nameSuffix === 'Interval') ? args[1] || 0 :
                         undefined,
                     args: args
+                };
+                const callback = args[0];
+                args[0] = function timer() {
+                    try {
+                        return callback.apply(this, arguments);
+                    }
+                    finally {
+                        // issue-934, task will be cancelled
+                        // even it is a periodic task such as
+                        // setInterval
+                        // https://github.com/angular/angular/issues/40387
+                        // Cleanup tasksByHandleId should be handled before scheduleTask
+                        // Since some zoneSpec may intercept and doesn't trigger
+                        // scheduleFn(scheduleTask) provided here.
+                        if (!(options.isPeriodic)) {
+                            if (typeof options.handleId === 'number') {
+                                // in non-nodejs env, we remove timerId
+                                // from local cache
+                                delete tasksByHandleId[options.handleId];
+                            }
+                            else if (options.handleId) {
+                                // Node returns complex objects as handleIds
+                                // we remove task reference from timer object
+                                options.handleId[taskSymbol] = null;
+                            }
+                        }
+                    }
                 };
                 const task = scheduleMacroTaskWithCurrentZone(setName, args[0], options, scheduleTask, clearTask);
                 if (!task) {
@@ -2797,6 +2809,13 @@ Zone.__load_patch('legacy', (global) => {
     if (legacyPatch) {
         legacyPatch();
     }
+});
+Zone.__load_patch('queueMicrotask', (global, Zone, api) => {
+    api.patchMethod(global, 'queueMicrotask', delegate => {
+        return function (self, args) {
+            Zone.current.scheduleMicroTask('queueMicrotask', args[0]);
+        };
+    });
 });
 Zone.__load_patch('timers', (global) => {
     const set = 'set';
@@ -3004,35 +3023,4 @@ Zone.__load_patch('XHR', (global, Zone) => {
 Zone.__load_patch('geolocation', (global) => {
     /// GEO_LOCATION
     if (global['navigator'] && global['navigator'].geolocation) {
-        patchPrototype(global['navigator'].geolocation, ['getCurrentPosition', 'watchPosition']);
-    }
-});
-Zone.__load_patch('PromiseRejectionEvent', (global, Zone) => {
-    // handle unhandled promise rejection
-    function findPromiseRejectionHandler(evtName) {
-        return function (e) {
-            const eventTasks = findEventTasks(global, evtName);
-            eventTasks.forEach(eventTask => {
-                // windows has added unhandledrejection event listener
-                // trigger the event listener
-                const PromiseRejectionEvent = global['PromiseRejectionEvent'];
-                if (PromiseRejectionEvent) {
-                    const evt = new PromiseRejectionEvent(evtName, { promise: e.promise, reason: e.rejection });
-                    eventTask.invoke(evt);
-                }
-            });
-        };
-    }
-    if (global['PromiseRejectionEvent']) {
-        Zone[zoneSymbol('unhandledPromiseRejectionHandler')] =
-            findPromiseRejectionHandler('unhandledrejection');
-        Zone[zoneSymbol('rejectionHandledHandler')] =
-            findPromiseRejectionHandler('rejectionhandled');
-    }
-});
-
-
-/***/ })
-
-},[[1,"runtime"]]]);
-//# sourceMappingURL=polyfills.js.map
+        patchPrototype(global['navigator'].g
