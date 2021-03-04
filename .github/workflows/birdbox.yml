@@ -29,7 +29,16 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Create project
+        id: create
+        continue-on-error: true
         run: npx cubejs-cli@${{ github.event.inputs.version }} create new-project -d postgres
+      - name: Slack Failure
+        if: steps.create.outcome != 'success'
+        uses: kpritam/slack-job-status-action@v1
+        with:
+          job-status: ${{ job.status }}
+          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: oss-ci
 
   docker:
     runs-on: ubuntu-latest
@@ -48,8 +57,17 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Birdbox
+        id: birdbox
+        continue-on-error: true
         run: |
           cd packages/cubejs-docker/
           yarn install
           yarn tsc
           yarn run birdbox:${{ matrix.target }}
+      - name: Slack Failure
+        if: steps.birdbox.outcome != 'success'
+        uses: kpritam/slack-job-status-action@v1
+        with:
+          job-status: ${{ job.status }}
+          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: oss-ci
