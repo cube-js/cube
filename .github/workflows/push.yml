@@ -72,8 +72,11 @@ jobs:
           path: |
             ~/.npm
             node_modules
+            */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lerna-
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
@@ -124,8 +127,11 @@ jobs:
           path: |
             ~/.npm
             node_modules
+            */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lerna-
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
@@ -169,8 +175,11 @@ jobs:
           path: |
             ~/.npm
             node_modules
+            */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lerna-
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
@@ -234,8 +243,11 @@ jobs:
           path: |
             ~/.npm
             node_modules
+            */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lerna-
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
@@ -323,8 +335,11 @@ jobs:
           path: |
             ~/.npm
             node_modules
+            */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lerna-
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
@@ -424,8 +439,11 @@ jobs:
           path: |
             ~/.npm
             node_modules
+            */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lerna-
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
@@ -518,8 +536,11 @@ jobs:
           path: |
             ~/.npm
             node_modules
+            */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lerna-
       - name: Yarn install
         uses: borales/actions-yarn@v2.3.0
         with:
