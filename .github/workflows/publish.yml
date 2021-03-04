@@ -34,12 +34,8 @@ jobs:
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: yarn install --frozen-lockfile
-      - name: Set environment variables
-        uses: allenevans/set-env@v2.0.0
-        with:
-          CUBESTORE_SKIP_POST_INSTALL: true
       - name: Lerna bootstrap
-        run: yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
