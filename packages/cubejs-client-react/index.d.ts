@@ -14,8 +14,6 @@ import {
   TSourceAxis,
   Meta,
   TCubeSegment,
-  TimeDimensionComparison,
-  TimeDimensionRanged,
   TimeDimension,
   TimeDimensionGranularity,
   DateRange,
@@ -538,13 +536,15 @@ declare module '@cubejs-client/react' {
     reorder: (sourceIndex: number, destinationIndex: number) => void;
   };
 
+  type PivotConfigUpdaterArgs = {
+    sourceIndex: number;
+    destinationIndex: number;
+    sourceAxis: TSourceAxis;
+    destinationAxis: TSourceAxis;
+  };
+
   type PivotConfigUpdater = {
-    moveItem: (args: {
-      sourceIndex: number;
-      destinationIndex: number;
-      sourceAxis: TSourceAxis;
-      destinationAxis: TSourceAxis;
-    }) => void;
+    moveItem: (args: PivotConfigUpdaterArgs) => void;
     update: (pivotConfig: PivotConfig & { limit: number }) => void;
   };
 }
