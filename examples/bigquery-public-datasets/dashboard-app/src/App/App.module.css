@@ -1,0 +1,31 @@
+.indicator {
+    display: grid;
+    grid-template-columns: 2fr 5fr 2fr;
+    grid-gap: 5vw;
+    margin: 2em 0;
+}
+
+@media (max-width: 700px) {
+    .indicator {
+        grid-template-columns: none;
+        grid-template-rows: repeat(3, auto);
+    }
+}
+
+.footnotes {
+    display: grid;
+    font-size: var(--font-size-small);
+    margin: 0 0 4em 0;
+    text-align: center;
+}
+
+@media (max-width: 700px) {
+    .footnotes {
+        grid-template-columns: 1fr;
+    }
+}
+
+.loader {
+    opacity: 0.5;
+    text-align: center;
+}
