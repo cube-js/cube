@@ -483,103 +483,124 @@ describe('asyncDebounce', () => {
   });
 });
 
-// Epic strange problem, disabled
-// describe('asyncMemoizeBackground', () => {
-//   test('asyncMemoizeBackground cache', async () => {
-//     let called = 0;
-//
-//     const memCall = await asyncMemoizeBackground(
-//       async (url: string) => {
-//         called++;
-//
-//         return Math.random();
-//       },
-//       {
-//         extractCacheLifetime: () => 1 * 500,
-//         extractKey: (url) => url,
-//         backgroundRefreshInterval: 500,
-//         onBackgroundException: (e) => {
-//           throw e;
-//         },
-//       }
-//     );
-//
-//     const firstCallRandomValue = await memCall('test');
-//
-//     expect(called).toEqual(1);
-//
-//     expect(await memCall('test')).toEqual(firstCallRandomValue);
-//     expect(await memCall('test')).toEqual(firstCallRandomValue);
-//
-//     expect(called).toEqual(1);
-//
-//     await memCall('anotherValue');
-//
-//     expect(called).toEqual(2);
-//
-//     await pausePromise(500 + 300);
-//
-//     expect(called).toBeGreaterThanOrEqual(2);
-//
-//     expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
-//
-//     expect(called).toBeGreaterThanOrEqual(2);
-//
-//     // Disable background updates
-//     await memCall.release();
-//
-//     await pausePromise(500 * 2 + 300);
-//
-//     // No calls should be done, because timer is disabled
-//     expect(called).toBeGreaterThanOrEqual(2);
-//
-//     expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
-//     expect(await memCall('test') !== firstCallRandomValue).toEqual(true);
-//
-//     // Items with expired cache should not call function
-//     expect(called).toBeGreaterThanOrEqual(2);
-//   });
-//
-//   test('asyncMemoizeBackground force', async () => {
-//     let called = 0;
-//
-//     const memCall = await asyncMemoizeBackground(
-//       async (url: string) => {
-//         called++;
-//
-//         return Math.random();
-//       },
-//       {
-//         extractCacheLifetime: () => 1 * 500,
-//         extractKey: (url) => url,
-//         backgroundRefreshInterval: 500,
-//         onBackgroundException: (e) => {
-//           throw e;
-//         },
-//       }
-//     );
-//
-//     const firstCallRandomValue = await memCall('test');
-//
-//     expect(called).toEqual(1);
-//
-//     expect(await memCall('test')).toEqual(firstCallRandomValue);
-//     expect(await memCall('test')).toEqual(firstCallRandomValue);
-//
-//     expect(called).toEqual(1);
-//
-//     const secondCallRandomValue = await memCall.force('test');
-//
-//     expect(secondCallRandomValue !== firstCallRandomValue).toEqual(true);
-//
-//     expect(called).toEqual(2);
-//
-//     expect(await memCall('test')).toEqual(secondCallRandomValue);
-//     expect(await memCall('test')).toEqual(secondCallRandomValue);
-//
-//     expect(called).toEqual(2);
-//
-//     // clear timer
-//     memCall.release();
-//   });
-// });
+describe('asyncMemoizeBackground', () => {
+  beforeEach(() => {
+    jest.useFakeTimers('legacy');
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+  });
+
+  // Wait for promises running in the non-async timer callback to complete.
+  // From https://stackoverflow.com/a/58716087/308237
+  const flushPromises = () => new Promise(resolve => setImmediate(resolve));
+
+  test('asyncMemoizeBackground cache', async () => {
+    let called = 0;
+
+    const memCall = await asyncMemoizeBackground(
+      async (url: string) => {
+        called++;
+
+        return Math.random() * Math.random() * Math.random() * Math.random();
+      },
+      {
+        extractCacheLifetime: () => 1 * 100,
+        extractKey: (url) => url,
+        backgroundRefreshInterval: 500,
+        onBackgroundException: (e) => {
+          throw e;
+        },
+      }
+    );
+
+    const startTime = Date.now();
+    Date.now = jest.fn(() => startTime);
+
+    const firstCallRandomValue = await memCall('arg1');
+
+    expect(called).toEqual(1);
+
+    expect(await memCall('arg1')).toEqual(firstCallRandomValue);
+    expect(await memCall('arg1')).toEqual(firstCallRandomValue);
+
+    expect(called).toEqual(1);
+
+    const secondCallRandomValue = await memCall('arg2');
+
+    expect(called).toEqual(2);
+
+    Date.now = jest.fn(() => startTime + 525);
+    jest.advanceTimersByTime(525);
+    await flushPromises();
+
+    expect(called).toEqual(4);
+
+    expect(await memCall('arg1') !== firstCallRandomValue).toEqual(true);
+    expect(await memCall('arg2') !== secondCallRandomValue).toEqual(true);
+
+    expect(called).toEqual(4);
+
+    // Disable background updates
+    await memCall.release();
+
+    Date.now = jest.fn(() => startTime + 525 * 2);
+    jest.advanceTimersByTime(525);
+    await flushPromises();
+
+    // No calls should be done, because timer is disabled
+    expect(called).toEqual(4);
+
+    expect(await memCall('arg1') !== firstCallRandomValue).toEqual(true);
+    expect(await memCall('arg1') !== firstCallRandomValue).toEqual(true);
+
+    // Items with expired cache should not call function
+    expect(called).toEqual(4);
+
+    expect(jest.getTimerCount()).toEqual(0);
+  });
+
+  test('asyncMemoizeBackground force', async () => {
+    let called = 0;
+
+    const memCall = await asyncMemoizeBackground(
+      async (url: string) => {
+        called++;
+
+        return Math.random() * Math.random() * Math.random() * Math.random();
+      },
+      {
+        extractCacheLifetime: () => 1 * 500,
+        extractKey: (url) => url,
+        backgroundRefreshInterval: 500,
+        onBackgroundException: (e) => {
+          throw e;
+        },
+      }
+    );
+
+    const firstCallRandomValue = await memCall('test');
+
+    expect(called).toEqual(1);
+
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+    expect(await memCall('test')).toEqual(firstCallRandomValue);
+
+    expect(called).toEqual(1);
+
+    const secondCallRandomValue = await memCall.force('test');
+
+    expect(secondCallRandomValue !== firstCallRandomValue).toEqual(true);
+
+    expect(called).toEqual(2);
+
+    expect(await memCall('test')).toEqual(secondCallRandomValue);
+    expect(await memCall('test')).toEqual(secondCallRandomValue);
+
+    expect(called).toEqual(2);
+
+    // clear timer
+    memCall.release();
+  });
+});
