@@ -6,6 +6,11 @@ on:
         description: 'Version'
         required: true
         default: 'latest'
+  workflow_run:
+    workflows: [ "Release" ]
+    branches: [ master ]
+    types:
+      - completed
 
 jobs:
   cli:
@@ -24,4 +29,4 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Create project
-        run: npx cubejs-cli@${{ inputs.version }} create new-project
+        run: npx cubejs-cli@${{ github.event.inputs.version }} create new-project
