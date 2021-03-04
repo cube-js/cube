@@ -1,26 +1,3 @@
-import * as React from 'react';
-import {
-  CubejsApi,
-  Query,
-  ResultSet,
-  Filter,
-  PivotConfig,
-  TCubeMeasure,
-  TCubeDimension,
-  ProgressResponse,
-  TDryRunResponse,
-  TOrderMember,
-  QueryOrder,
-  TSourceAxis,
-  Meta,
-  TCubeSegment,
-  TimeDimension,
-  TimeDimensionGranularity,
-  DateRange,
-  UnaryOperator,
-  BinaryOperator,
-} from '@cubejs-client/core';
-
 /**
  * @title @cubejs-client/react
  * @permalink /@cubejs-client-react
@@ -31,6 +8,29 @@ import {
  */
 
 declare module '@cubejs-client/react' {
+  import * as React from 'react';
+  import {
+    CubejsApi,
+    Query,
+    ResultSet,
+    Filter,
+    PivotConfig,
+    TCubeMeasure,
+    TCubeDimension,
+    ProgressResponse,
+    TDryRunResponse,
+    TOrderMember,
+    QueryOrder,
+    TSourceAxis,
+    Meta,
+    TCubeSegment,
+    TimeDimension,
+    TimeDimensionGranularity,
+    DateRange,
+    UnaryOperator,
+    BinaryOperator,
+  } from '@cubejs-client/core';
+
   type CubeProviderProps = {
     cubejsApi: CubejsApi;
     children: React.ReactNode;
@@ -108,6 +108,7 @@ declare module '@cubejs-client/react' {
     resultSet: ResultSet | null;
     error: Error | null;
     loadingState: TLoadingState;
+    sqlQuery: string | null;
   };
 
   type QueryRendererProps = {
@@ -128,7 +129,7 @@ declare module '@cubejs-client/react' {
     /**
      * `CubejsApi` instance to use
      */
-    cubejsApi: CubejsApi;
+    cubejsApi?: CubejsApi;
     /**
      * Output of this function will be rendered by the `QueryRenderer`
      */
