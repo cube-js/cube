@@ -83,11 +83,11 @@ export default class QueryBuilder extends React.Component {
   async componentDidMount() {
     await this.fetchMeta();
   }
-  
+
   async componentDidUpdate(prevProps) {
     const { schemaVersion, onSchemaChange } = this.props;
     const { meta } = this.state;
-    
+
     if (prevProps.schemaVersion !== schemaVersion) {
       try {
         const newMeta = await this.cubejsApi().meta();
@@ -105,14 +105,14 @@ export default class QueryBuilder extends React.Component {
       }
     }
   }
-  
+
   fetchMeta = async () => {
     const { query, pivotConfig } = this.state;
     let dryRunResponse;
     let missingMembers = [];
     let meta;
     let metaError = null;
-    
+
     try {
       this.setState({ isFetchingMeta: true });
       meta = await this.cubejsApi().meta();
@@ -122,7 +122,7 @@ export default class QueryBuilder extends React.Component {
 
     if (this.isQueryPresent()) {
       missingMembers = this.getMissingMembers(query, meta);
-      
+
       if (missingMembers.length === 0) {
         dryRunResponse = this.cubejsApi().dryRun(query);
       }
@@ -142,12 +142,12 @@ export default class QueryBuilder extends React.Component {
     // eslint-disable-next-line react/destructuring-assignment
     return cubejsApi || (this.context && this.context.cubejsApi);
   }
-  
+
   getMissingMembers(query, meta) {
     if (!meta) {
       return [];
     }
-    
+
     return getQueryMembers(query)
       .map((member) => {
         const resolvedMember = meta.resolveMember(member, ['measures', 'dimensions', 'segments']);
@@ -212,7 +212,6 @@ export default class QueryBuilder extends React.Component {
       metaError,
       query,
       queryError,
-      orderMembers = [],
       chartType,
       pivotConfig,
       validatedQuery,
@@ -418,7 +417,6 @@ export default class QueryBuilder extends React.Component {
     this.setState({
       ...finalState,
       query: nextQuery,
-      orderMembers: currentOrderMembers,
       missingMembers,
       queryError: null,
     });

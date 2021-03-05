@@ -21,7 +21,8 @@
   "module": "dist/cubejs-client-react.esm.js",
   "types": "index.d.ts",
   "scripts": {
-    "lint": "eslint src/*.js src/*.jsx"
+    "lint": "eslint src/*.js src/*.jsx",
+    "lint:fix": "eslint --fix src/*.js src/*.jsx"
   },
   "files": [
     "src",
