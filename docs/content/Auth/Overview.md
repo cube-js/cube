@@ -121,6 +121,19 @@ can then use it to query the Cube.js API.
 
 ## Using JSON Web Key Sets (JWKS)
 
+Cube.js has out-of-the-box support for the following identity providers:
+
+- [Auth0][ref-jwt-auth0]
+- [AWS Cognito][ref-jwt-aws-cognito]
+
+[[info | ]]
+| If you don't see your identity provider listed, please let us know on under
+| the [Ideas category on our Discourse forum][link-discourse-ideas].
+
+[link-discourse-ideas]: https://forum.cube.dev/c/ideas/12
+[ref-jwt-auth0]: /security/jwt/auth0
+[ref-jwt-aws-cognito]: /security/jwt/aws-cognito
+
 ### Configuration
 
 As mentioned previously, Cube.js supports verifying JWTs using industry-standard
