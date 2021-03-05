@@ -161,6 +161,16 @@ server {
 }
 ```
 
+## Configure JWKS
+
+If you're using JWTs, you can configure Cube.js to correctly decode them and
+inject their contents into the [Security Context][ref-sec-ctx]. Add your
+authentication provider's configuration under [the `jwt` property of your
+`cube.js` configuration file][ref-config-jwt].
+
+[ref-sec-ctx]: /security/context
+[ref-config-jwt]: /config#options-reference-jwt
+
 ## Set up health checks
 
 Cube.js provides [Kubernetes-API compatible][link-k8s-healthcheck-api] health

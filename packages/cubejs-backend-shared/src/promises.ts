@@ -1,4 +1,4 @@
-/* eslint-disable arrow-body-style */
+/* eslint-disable arrow-body-style,no-restricted-syntax */
 import crypto from 'crypto';
 
 export interface CancelablePromise<T> extends Promise<T> {
@@ -239,10 +239,10 @@ export const retryWithTimeout = <T>(
 /**
  * High order function that makes to debounce multi async calls to single call at one time
  */
-export const asyncDebounce = <ReturnType, Arguments>(
-  fn: (...args: Arguments[]) => Promise<ReturnType>,
+export const asyncDebounce = <Ret, Arguments>(
+  fn: (...args: Arguments[]) => Promise<Ret>,
 ) => {
-  const cache = new Map<string, Promise<ReturnType>>();
+  const cache = new Map<string, Promise<Ret>>();
 
   return async (...args: Arguments[]) => {
     const key = crypto.createHash('md5')
@@ -250,7 +250,7 @@ export const asyncDebounce = <ReturnType, Arguments>(
       .digest('hex');
 
     if (cache.has(key)) {
-      return <Promise<ReturnType>>cache.get(key);
+      return <Promise<Ret>>cache.get(key);
     }
 
     try {
@@ -265,9 +265,9 @@ export const asyncDebounce = <ReturnType, Arguments>(
   };
 };
 
-export type MemoizeOptions<ReturnType, Arguments> = {
+export type MemoizeOptions<Ret, Arguments> = {
   extractKey: (...args: Arguments[]) => string,
-  extractCacheLifetime: (result: ReturnType) => number,
+  extractCacheLifetime: (result: Ret) => number,
 };
 
 type MemoizeBucket<T> = {
@@ -275,20 +275,19 @@ type MemoizeBucket<T> = {
   lifetime: number,
 };
 
-export const asyncMemoize = <ReturnType, Arguments>(
-  fn: (...args: Arguments[]) => Promise<ReturnType>,
-  options: MemoizeOptions<ReturnType, Arguments>
+export const asyncMemoize = <Ret, Arguments>(
+  fn: (...args: Arguments[]) => Promise<Ret>,
+  options: MemoizeOptions<Ret, Arguments>
 ) => {
-  const cache = new Map<string, MemoizeBucket<ReturnType>>();
+  const cache = new Map<string, MemoizeBucket<Ret>>();
 
   const debouncedFn = asyncDebounce(fn);
-  const debouncedFnForce = asyncDebounce(fn);
 
   const call = async (...args: Arguments[]) => {
     const key = options.extractKey(...args);
 
     if (cache.has(key)) {
-      const bucket = <MemoizeBucket<ReturnType>>cache.get(key);
+      const bucket = <MemoizeBucket<Ret>>cache.get(key);
       if (bucket.lifetime >= Date.now()) {
         return bucket.item;
       } else {
@@ -308,7 +307,7 @@ export const asyncMemoize = <ReturnType, Arguments>(
   call.force = async (...args: Arguments[]) => {
     const key = options.extractKey(...args);
 
-    const item = await debouncedFnForce(...args);
+    const item = await debouncedFn(...args);
     cache.set(key, {
       lifetime: Date.now() + options.extractCacheLifetime(item),
       item,
@@ -320,6 +319,95 @@ export const asyncMemoize = <ReturnType, Arguments>(
   return call;
 };
 
+export type BackgroundMemoizeOptions<Ret, Arguments> = {
+  extractKey: (...args: Arguments[]) => string,
+  extractCacheLifetime: (result: Ret) => number,
+  backgroundRefreshInterval: number,
+  onBackgroundException: (err: Error) => void,
+};
+
+type BackgroundMemoizeBucket<T, A> = {
+  item: T,
+  args: A[],
+  lifetime: number,
+};
+
+export const decorateWithCancel = <T, C = () => void>(fn: Promise<T>, cancel: C): CancelablePromise<T> => {
+  (<any>fn).cancel = cancel;
+
+  return <any>fn;
+};
+
+export const asyncMemoizeBackground = <Ret, Arguments>(
+  fn: (...args: Arguments[]) => Promise<Ret>,
+  options: BackgroundMemoizeOptions<Ret, Arguments>
+) => {
+  const cache = new Map<string, BackgroundMemoizeBucket<Ret, Arguments>>();
+
+  const debouncedFn = asyncDebounce(fn);
+
+  const refreshBucket = async (bucket: BackgroundMemoizeBucket<Ret, Arguments>) => {
+    try {
+      const item = await debouncedFn(...bucket.args);
+
+      bucket.item = item;
+      bucket.lifetime = Date.now() + options.extractCacheLifetime(item);
+    } catch (e) {
+      options.onBackgroundException(e);
+    }
+  };
+
+  const refreshInterval = createCancelableInterval(async () => {
+    const refreshBatch: Promise<any>[] = [];
+    const now = Date.now();
+
+    for (const bucket of cache.values()) {
+      if (bucket.lifetime < now) {
+        refreshBatch.push(refreshBucket(bucket));
+      }
+    }
+
+    return Promise.all(refreshBatch);
+  }, {
+    interval: options.backgroundRefreshInterval,
+  });
+
+  const call = async (...args: Arguments[]) => {
+    const key = options.extractKey(...args);
+
+    if (cache.has(key)) {
+      // If cache exists, only background timer or force can update it.
+      return (<MemoizeBucket<Ret>>cache.get(key)).item;
+    }
+
+    const item = await debouncedFn(...args);
+    cache.set(key, {
+      lifetime: Date.now() + options.extractCacheLifetime(item),
+      args,
+      item,
+    });
+
+    return item;
+  };
+
+  call.force = async (...args: Arguments[]) => {
+    const key = options.extractKey(...args);
+
+    const item = await debouncedFn(...args);
+    cache.set(key, {
+      lifetime: Date.now() + options.extractCacheLifetime(item),
+      args,
+      item,
+    });
+
+    return item;
+  };
+
+  call.release = refreshInterval.cancel;
+
+  return call;
+};
+
 export type RetryOptions = {
   times: number,
 };
@@ -327,8 +415,8 @@ export type RetryOptions = {
 /**
  * High order function that do retry when async function throw an exception
  */
-export const asyncRetry = async <ReturnType>(
-  fn: () => Promise<ReturnType>,
+export const asyncRetry = async <Ret>(
+  fn: () => Promise<Ret>,
   options: RetryOptions
 ) => {
   if (options.times <= 0) {

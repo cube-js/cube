@@ -40,7 +40,99 @@ Authentication is handled outside of Cube.js. A typical use case would be:
 | can still use it to [pass a security context][ref-sec-ctx].
 <!-- prettier-ignore-end -->
 
+## Generating JSON Web Tokens (JWT)
+
+Authentication tokens are generated based on your API secret. Cube.js CLI
+generates an API Secret when a project is scaffolded and saves this value in the
+`.env` file as `CUBEJS_API_SECRET`.
+
+You can generate two types of tokens:
+
+- Without security context, which will mean that all users will have the same
+  data access permissions.
+- With security context, which will allow you to implement role-based security
+  models where users will have different levels of access to data.
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| It is considered best practice to use an `exp` expiration claim to limit the
+| lifetime of your public tokens. [Learn more in the JWT docs][link-jwt-docs].
+<!-- prettier-ignore-end -->
+
+You can find a library to generate JWTs for your programming language
+[here][link-jwt-libs].
+
+In Node.js, the following code shows how to generate a token which will expire
+in 30 days. We recommend using the `jsonwebtoken` package for this.
+
+```javascript
+const jwt = require('jsonwebtoken');
+const CUBE_API_SECRET = 'secret';
+
+const cubejsToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: '30d' });
+```
+
+Then, in a web server or cloud function, create a route which generates and
+returns a token. In general, you will want to protect the URL that generates
+your token using your own user authentication and authorization:
+
+```javascript
+app.use((req, res, next) => {
+  if (!req.user) {
+    res.redirect('/login');
+    return;
+  }
+  next();
+});
+
+app.get('/auth/cubejs-token', (req, res) => {
+  res.json({
+    // Take note: cubejs expects the JWT payload to contain an object!
+    token: jwt.sign(req.user, process.env.CUBEJS_API_SECRET, {
+      expiresIn: '1d',
+    }),
+  });
+});
+```
+
+Then, on the client side, (assuming the user is signed in), fetch a token from
+the web server:
+
+```javascript
+let apiTokenPromise;
+
+const cubejsApi = cubejs(
+  () => {
+    if (!apiTokenPromise) {
+      apiTokenPromise = fetch(`${API_URL}/auth/cubejs-token`)
+        .then((res) => res.json())
+        .then((r) => r.token);
+    }
+    return apiTokenPromise;
+  },
+  {
+    apiUrl: `${API_URL}/cubejs-api/v1`,
+  }
+);
+```
+
+You can optionally store this token in local storage or in a cookie, so that you
+can then use it to query the Cube.js API.
+
 ## Using JSON Web Key Sets (JWKS)
+
+Cube.js has out-of-the-box support for the following identity providers:
+
+- [Auth0][ref-jwt-auth0]
+- [AWS Cognito][ref-jwt-aws-cognito]
+
+[[info | ]]
+| If you don't see your identity provider listed, please let us know on under
+| the [Ideas category on our Discourse forum][link-discourse-ideas].
+
+[link-discourse-ideas]: https://forum.cube.dev/c/ideas/12
+[ref-jwt-auth0]: /security/jwt/auth0
+[ref-jwt-aws-cognito]: /security/jwt/aws-cognito
 
 ### Configuration
 
@@ -127,87 +219,43 @@ module.exports = {
 };
 ```
 
-## Generating Tokens
+## Custom authentication
 
-Authentication tokens are generated based on your API secret. Cube.js CLI
-generates an API Secret when a project is scaffolded and saves this value in the
-`.env` file as `CUBEJS_API_SECRET`.
-
-You can generate two types of tokens:
-
-- Without security context, which will mean that all users will have the same
-  data access permissions.
-- With security context, which will allow you to implement role-based security
-  models where users will have different levels of access to data.
+Cube.js also allows you to provide your own JWT verification logic by setting a
+[`checkAuth()`][ref-config-check-auth] function in the `cube.js` configuration
+file. This function is expected to verify a JWT and assigns its' claims to the
+security context.
 
 <!-- prettier-ignore-start -->
-[[info |]]
-| It is considered best practice to use an `exp` expiration claim to limit the
-| lifetime of your public tokens. [Learn more in the JWT docs][link-jwt-docs].
+[[warning | Note]]
+| Previous versions of Cube.js allowed setting a `checkAuthMiddleware()`
+| parameter, which is now deprecated. We advise [migrating to a newer version
+| of Cube.js][ref-config-migrate-cubejs].
 <!-- prettier-ignore-end -->
 
-You can find a library to generate JWTs for your programming language
-[here][link-jwt-libs].
-
-In Node.js, the following code shows how to generate a token which will expire
-in 30 days. We recommend using the `jsonwebtoken` package for this.
+As an example, if you needed to retrieve user information from an LDAP server,
+you might do the following:
 
 ```javascript
 const jwt = require('jsonwebtoken');
-const CUBE_API_SECRET = 'secret';
 
-const cubejsToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: '30d' });
-```
-
-Then, in a web server or cloud function, create a route which generates and
-returns a token. In general, you will want to protect the URL that generates
-your token using your own user authentication and authorization:
-
-```javascript
-app.use((req, res, next) => {
-  if (!req.user) {
-    res.redirect('/login');
-    return;
-  }
-  next();
-});
-
-app.get('/auth/cubejs-token', (req, res) => {
-  res.json({
-    // Take note: cubejs expects the JWT payload to contain an object!
-    token: jwt.sign(req.user, process.env.CUBEJS_API_SECRET, {
-      expiresIn: '1d',
-    }),
-  });
-});
-```
-
-Then, on the client side, (assuming the user is signed in), fetch a token from
-the web server:
-
-```javascript
-let apiTokenPromise;
-
-const cubejsApi = cubejs(
-  () => {
-    if (!apiTokenPromise) {
-      apiTokenPromise = fetch(`${API_URL}/auth/cubejs-token`)
-        .then((res) => res.json())
-        .then((r) => r.token);
+module.exports = {
+  checkAuth: async (req, auth) => {
+    try {
+      const userInfo = await getUserFromLDAP(req.get('X-LDAP-User-ID'));
+      req.securityContext = userInfo;
+    } catch {
+      throw new Error('Could not authenticate user from LDAP');
     }
-    return apiTokenPromise;
   },
-  {
-    apiUrl: `${API_URL}/cubejs-api/v1`,
-  }
-);
+};
 ```
-
-You can optionally store this token in local storage or in a cookie, so that you
-can then use it to query the Cube.js API.
 
 [link-jwt-docs]:
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
+[ref-config-check-auth]: /config#options-reference-check-auth
+[ref-config-migrate-cubejs]:
+  /configuration/overview#migration-from-express-to-docker-template
 [ref-sec-ctx]: /security/context

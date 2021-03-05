@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
@@ -195,6 +196,8 @@ export class ApiGateway {
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
 
+  protected readonly releaseListeners: (() => any)[] = [];
+
   public constructor(
     protected readonly apiSecret: string,
     protected readonly compilerApi: any,
@@ -211,7 +214,7 @@ export class ApiGateway {
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
-    
+
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
@@ -835,11 +838,21 @@ export class ApiGateway {
     let checkAuthFn: VerifyTokenFn = verifyToken;
 
     if (options?.jwkUrl) {
-      const jwks = createJWKsFetcher(options);
+      const jwks = createJWKsFetcher(options, {
+        onBackgroundException: (e) => {
+          this.logger('JWKs Background Fetching Error', {
+            error: e.message,
+          });
+        },
+      });
+
+      this.releaseListeners.push(jwks.release);
 
       // Precache JWKs response to speedup first auth
       if (options.jwkUrl && typeof options.jwkUrl === 'string') {
-        jwks.fetchOnly(options.jwkUrl);
+        jwks.fetchOnly(options.jwkUrl).catch((e) => this.logger('JWKs Prefetching Error', {
+          error: e.message,
+        }));
       }
 
       checkAuthFn = async (auth) => {
@@ -888,19 +901,19 @@ export class ApiGateway {
       }
     };
   }
-  
-  protected createCheckAuthFn(options: ApiGatewayOptions) {
+
+  protected createCheckAuthFn(options: ApiGatewayOptions): CheckAuthFn {
     const playgroundAuthSecret = getEnv('playgroundAuthSecret');
     const mainCheckAuthFn = options.checkAuth
       ? this.wrapCheckAuth(options.checkAuth)
       : this.createDefaultCheckAuth(options.jwt);
-    
+
     if (playgroundAuthSecret) {
       const playgroundCheckAuthFn = this.createDefaultCheckAuth({
         key: playgroundAuthSecret,
         algorithms: ['HS256']
       });
-        
+
       return async (ctx, authorization) => {
         try {
           await mainCheckAuthFn(ctx, authorization);
@@ -909,7 +922,7 @@ export class ApiGateway {
         }
       };
     }
-      
+
     return (ctx, authorization) => mainCheckAuthFn(ctx, authorization);
   }
 
@@ -1081,4 +1094,10 @@ export class ApiGateway {
 
     return this.healthResponse(res, health);
   };
+
+  public release() {
+    for (const releaseListener of this.releaseListeners) {
+      releaseListener();
+    }
+  }
 }
