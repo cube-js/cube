@@ -368,7 +368,7 @@ export class CubejsServerCore {
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       logger,
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
-      sqlCache: false,
+      sqlCache: true,
       ...opts,
       jwt: {
         key: getEnv('jwkKey'),
