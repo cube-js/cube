@@ -4,8 +4,9 @@
     "target": "es5",
     "sourceMap": true,
     "allowJs": true,
-    "checkJs" : true,
-    "jsx" : "react-jsx"
+    "checkJs": true,
+    "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true
   },
   "exclude": ["node_modules", "build", "dist", "charts-dist"]
 }
