@@ -144,7 +144,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#a752417505b7b9130cec567c704f766264ba66d2"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b8477af50747e3d5af1844056a16d192a5499bb9"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -166,7 +166,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#a752417505b7b9130cec567c704f766264ba66d2"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b8477af50747e3d5af1844056a16d192a5499bb9"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -373,9 +373,9 @@ checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
 
 [[package]]
 name = "async-trait"
-version = "0.1.42"
+version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d3a45e77e34375a7923b1e8febb049bb011f064714a8e17a1a616fef01da13d"
+checksum = "d3340571769500ddef1e94b45055fabed6b08a881269b7570c830b8f32ef84ef"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1136,7 +1136,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#a752417505b7b9130cec567c704f766264ba66d2"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b8477af50747e3d5af1844056a16d192a5499bb9"
 dependencies = [
  "ahash 0.6.3",
  "arrow",
@@ -2854,7 +2854,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#a752417505b7b9130cec567c704f766264ba66d2"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b8477af50747e3d5af1844056a16d192a5499bb9"
 dependencies = [
  "arrow",
  "base64 0.12.3",
