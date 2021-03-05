@@ -1,4 +1,6 @@
 node_modules
+.yarn
+.yarnrc
 /.idea
 newrelic_agent.log
 .ruby-version
