@@ -1,0 +1,14 @@
+import { ClientOptions } from "@elastic/elasticsearch";
+import { BaseDriver } from "@cubejs-backend/query-orchestrator";
+
+declare module "@cubejs-backend/elasticsearch-driver" {
+  export type ElasticSearchDriverOptions = Pick<ClientOptions, 'auth' | 'cloud'> & {
+    url?: string;
+    queryFormat?: string;
+    openDistro?: boolean;
+  }
+
+  export default class ElasticSearchDriver extends BaseDriver {
+    constructor(options?: ElasticSearchDriverOptions);
+  }
+}
