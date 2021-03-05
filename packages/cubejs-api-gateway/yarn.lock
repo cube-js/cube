@@ -278,10 +278,10 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@cubejs-backend/linter@^0.26.0":
-  version "0.26.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.26.0.tgz#bdd9b262822c377f74a03ca236c2ad78a65acfa1"
-  integrity sha512-f9DNam1VeCu/g7wC0harScInk+kq1mzrMoIvD9m+2RKQ/iEEWXUKEYMCfLP0lZAB2Axjp1CtX+Bs96Uxo9a65g==
+"@cubejs-backend/linter@^0.26.13":
+  version "0.26.13"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/linter/-/linter-0.26.13.tgz#e310080205ea184e246abc2627398141f4af2b8a"
+  integrity sha512-tpjsEEUfqBaP3dNjMRLQd79M4akjNm2/lOAEPslg3VK1IX/5BCIrYdgWufwwPYjlQ8X3X79CYLQAJ+85wnXHcQ==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.8.2"
     "@typescript-eslint/parser" "^4.8.2"
@@ -290,14 +290,13 @@
     eslint-plugin-import "^2.22.1"
     eslint-plugin-node "^9.2.0"
 
-"@cubejs-backend/shared@^0.26.2":
-  version "0.26.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.2.tgz#6b5ca90383d278cacb2e8862d06189ee3aa7fad1"
-  integrity sha512-ppWNJhJJlnwlrczf8HrMmw6cCn06w8LfWvo3ThcU8a+fYWchk1OWgOhAREiccZafr3oKGC2fzA8UhniYdxHnlw==
+"@cubejs-backend/shared@^0.26.45":
+  version "0.26.45"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.26.45.tgz#1c00f71c0b028167173e344f283c45fbc013032b"
+  integrity sha512-X4cY51h1WmnRQU0fYKxeoXMMYUfUcXO1T4n74iiDih7jLv0ndtHZGjJWbJTHC85P6c+W9LOVmmpYmT1z++ahYg==
   dependencies:
     env-var "^6.3.0"
     node-fetch "^2.6.1"
-    node-machine-id "^1.1.12"
 
 "@eslint/eslintrc@^0.3.0":
   version "0.3.0"
@@ -1319,12 +1318,12 @@ char-regex@^1.0.2:
   resolved "https://registry.yarnpkg.com/char-regex/-/char-regex-1.0.2.tgz#d744358226217f981ed58f479b1d6bcc29545dcf"
   integrity sha512-kWWXztvZ5SBQV+eRgKFeh8q5sLuZY2+8WUIzlxWVTg+oGwY14qylx1KbKzHd8P6ZYkAg0xyIDU9JMHhyJMZ1jw==
 
-chrono-node@1.4.4:
-  version "1.4.4"
-  resolved "https://registry.yarnpkg.com/chrono-node/-/chrono-node-1.4.4.tgz#a6248257d3198996ea3d023b2bd20a268545350f"
-  integrity sha512-vwsQ2Z6RhkfIsFYvcZtifa0eSQC6pl08fgXkcZXkfGAJk/OkdYAuGqM2yLhPzsuK3N+BmaKFBie/jGvLsiYMbA==
+chrono-node@2.2.1:
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/chrono-node/-/chrono-node-2.2.1.tgz#6591c95724011fd7cadd8ae394bacb5004357bf2"
+  integrity sha512-Cdw4LxAlVb3BbfoAIw50v8MhVmFGBzzvTpQUO3F5ezyo/MnZ3db3G73cHNE2aiNsAhK9qpg39RpUl6jxTIUGeA==
   dependencies:
-    dayjs "^1.8.19"
+    dayjs "^1.10.0"
 
 ci-info@^2.0.0:
   version "2.0.0"
@@ -1529,7 +1528,7 @@ data-urls@^2.0.0:
     whatwg-mimetype "^2.3.0"
     whatwg-url "^8.0.0"
 
-dayjs@^1.8.19:
+dayjs@^1.10.0:
   version "1.10.4"
   resolved "https://registry.yarnpkg.com/dayjs/-/dayjs-1.10.4.tgz#8e544a9b8683f61783f570980a8a80eaf54ab1e2"
   integrity sha512-RI/Hh4kqRc1UKLOAf/T5zdMMX5DQIlDxwUe3wSyMMnEbGunnpENCdbUgM+dW7kXidZqCttBrmw7BhN4TMddkCw==
@@ -3742,11 +3741,6 @@ node-int64@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/node-int64/-/node-int64-0.4.0.tgz#87a9065cdb355d3182d8f94ce11188b825c68a3b"
   integrity sha1-h6kGXNs1XTGC2PlM4RGIuCXGijs=
-
-node-machine-id@^1.1.12:
-  version "1.1.12"
-  resolved "https://registry.yarnpkg.com/node-machine-id/-/node-machine-id-1.1.12.tgz#37904eee1e59b320bb9c5d6c0a59f3b469cb6267"
-  integrity sha512-QNABxbrPa3qEIfrE6GOJ7BYIuignnJw7iQ2YPbc3Nla1HzRJjXzZOiikfF8m7eAMfichLt3M4VgLOetqgDmgGQ==
 
 node-modules-regexp@^1.0.0:
   version "1.0.0"
