@@ -22,7 +22,6 @@ import { ServerStatusHandler } from './server-status';
 const { version } = require('../package.json');
 
 dotenv.config({
-  override: true,
   multiline: 'line-breaks',
 });
 
