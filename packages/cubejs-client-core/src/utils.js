@@ -1,4 +1,4 @@
-import { fromPairs, indexBy, toPairs, prop, mergeDeepLeft } from 'ramda';
+import { indexBy, prop } from 'ramda';
 
 export const DEFAULT_GRANULARITY = 'day';
 
@@ -67,12 +67,12 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
         ...newQuery,
         timeDimensions: defaultTimeDimension
           ? [
-              {
-                dimension: defaultTimeDimension,
-                granularity: (td && td.granularity) || granularity,
-                dateRange: td && td.dateRange
-              },
-            ]
+            {
+              dimension: defaultTimeDimension,
+              granularity: (td && td.granularity) || granularity,
+              dateRange: td && td.dateRange
+            },
+          ]
           : [],
       };
 
@@ -181,8 +181,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
 
 export function isQueryPresent(query) {
   return (Array.isArray(query) ? query : [query]).every(
-    (q) =>
-      (q.measures && q.measures.length) ||
+    (q) => (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );
@@ -207,29 +206,6 @@ export function movePivotItem(pivotConfig, sourceIndex, destinationIndex, source
   nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
 
   return nextPivotConfig;
-}
-
-export function checkPivotItemMove(pivotConfig, { sourceAxis, destinationAxis, sourceIndex }) {
-  let maxIndexOnAxis = pivotConfig[destinationAxis].length - 1;
-
-  if (sourceAxis === destinationAxis) {
-    maxIndexOnAxis--;
-  }
-
-  // if (event.draggedContext.element === 'measures') {
-  //   if (event.draggedContext.futureIndex <= maxIndexOnAxis) {
-  //     return false;
-  //   }
-  // } else {
-  //   const { length } = this.pivotConfig[destinationAxis];
-  //   if (this.pivotConfig[destinationAxis][length - 1] === 'measures') {
-  //     if (event.draggedContext.futureIndex > maxIndexOnAxis) {
-  //       return false;
-  //     }
-  //   }
-  // }
-
-  return true;
 }
 
 export function moveItemInArray(list, sourceIndex, destinationIndex) {
