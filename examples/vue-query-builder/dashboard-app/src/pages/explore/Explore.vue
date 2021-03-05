@@ -1,6 +1,6 @@
 <template>
   <v-container fluid class="text-center background pa-0">
-    <query-builder :cubejs-api="cubejsApi" :query="query" style="width: 100%">
+    <query-builder style="width: 100%" :cubejs-api="cubejsApi" :viz-state="vizState">
       <template
         #builder="{
           validatedQuery,
@@ -231,35 +231,24 @@ export default {
           dateRange: 'This quarter',
         },
       ],
-      // filters: [],
-      order: {
-        'Orders.count': 'asc',
-        'Orders.createdAt': 'asc',
-      },
-    };
-
-    query = {
-      // filters: [
-      //   {
-      //     member: 'Orders.status',
-      //     operator: 'equals',
-      //     values: ['invalid'],
-      //   },
-      // ],
-      order: {
-        'Orders.status': 'desc',
-      },
+      order: [
+        ['Orders.count', 'asc'],
+        ['Orders.createdAt', 'asc'],
+      ],
     };
 
     return {
+      GRANULARITIES,
       selectedGranularity: {
         name: 'day',
         title: 'DAyyyy',
       },
       query,
       chartTypes: ['line', 'area', 'bar', 'pie', 'table', 'number'],
-      GRANULARITIES,
-      orderItems: ['one', 'two', 'three'],
+      vizState: {
+        query,
+        chartType: 'table'
+      }
     };
   },
   methods: {

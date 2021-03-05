@@ -13,6 +13,9 @@ import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
 
+// todo: remove
+const d = (v) => JSON.parse(JSON.stringify(v));
+
 const toOrderMember = (member) => ({
   id: member.name,
   title: member.title,
@@ -25,10 +28,15 @@ export default {
   props: {
     query: {
       type: Object,
+      default: () => ({}),
     },
     cubejsApi: {
       type: Object,
       required: true,
+    },
+    initialChartType: {
+      type: String,
+      default: () => 'line',
     },
     disableHeuristics: {
       type: Boolean,
@@ -36,13 +44,20 @@ export default {
     stateChangeHeuristics: {
       type: Function,
     },
+    vizState: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   data() {
+    const { query = this.query, chartType = this.initialChartType, pivotConfig } = this.vizState;
+
     return {
+      initialQuery: query,
       skipHeuristics: true,
       meta: undefined,
       mutex: {},
-      chartType: 'line',
+      chartType,
       measures: [],
       dimensions: [],
       segments: [],
@@ -59,7 +74,7 @@ export default {
       orderMembers: [],
       prevValidatedQuery: null,
       granularities: GRANULARITIES,
-      pivotConfig: ResultSet.getNormalizedPivotConfig(this.query),
+      pivotConfig: ResultSet.getNormalizedPivotConfig(query || {}, pivotConfig),
     };
   },
 
@@ -188,18 +203,14 @@ export default {
       // TODO: implement timezone
 
       let hasElements = false;
-      QUERY_ELEMENTS.forEach((e) => {
-        if (!this[e]) {
-          return;
-        }
-
-        if (e === 'timeDimensions') {
+      QUERY_ELEMENTS.forEach((element) => {
+        if (element === 'timeDimensions') {
           toQuery = (member) => ({
             dimension: member.dimension.name,
             granularity: member.granularity,
             dateRange: member.dateRange,
           });
-        } else if (e === 'filters') {
+        } else if (element === 'filters') {
           toQuery = (member) => ({
             member: member.member.name,
             operator: member.operator,
@@ -207,8 +218,8 @@ export default {
           });
         }
 
-        if (this[e].length > 0) {
-          validatedQuery[e] = this[e].map((x) => toQuery(x));
+        if (this[element].length > 0) {
+          validatedQuery[element] = this[element].map((x) => toQuery(x));
 
           hasElements = true;
         }
@@ -268,27 +279,33 @@ export default {
         this.copyQueryFromProps(validatedQuery);
       }
 
+      // query heuristics should only apply on query change (not applied to the initial query)
+      if (this.prevValidatedQuery !== null) {
+        this.skipHeuristics = false;
+      }
+
+      this.orderMembers = getOrderMembersFromOrder(this.getOrderMembers(), this.order || {});
+
       this.prevValidatedQuery = validatedQuery;
       return validatedQuery;
     },
   },
 
-  updated() {
-    // query heuristics should only apply on query change (not applied to the initial query)
-    this.skipHeuristics = false;
-  },
-
   async mounted() {
     this.meta = await this.cubejsApi.meta();
 
+    if (isQueryPresent(this.initialQuery)) {
+      const dryRunResponse = await this.cubejsApi.dryRun(this.initialQuery);
+      this.pivotConfig = ResultSet.getNormalizedPivotConfig(
+        dryRunResponse?.pivotQuery || {},
+        this.pivotConfig
+      );
+    }
+
     this.copyQueryFromProps();
-    this.orderMembers = this.getOrderMembers();
   },
 
   methods: {
-    getQuery() {
-      return this.validatedQuery;
-    },
     copyQueryFromProps(query) {
       const {
         measures = [],
@@ -300,7 +317,7 @@ export default {
         offset,
         renewQuery,
         order,
-      } = query || this.query;
+      } = query || this.initialQuery;
 
       this.measures = measures.map((m, index) => ({
         index,
@@ -495,11 +512,11 @@ export default {
     updateChart(chartType) {
       this.chartType = chartType;
     },
-    // todo: accept `order` as array of arrays
     setOrder(order = {}) {
       this.order = order;
     },
     getOrderMembers() {
+      const orderObject = Array.isArray(this.order) ? fromPairs(this.order) : this.order;
       return [
         ...this.measures,
         ...this.dimensions,
@@ -516,10 +533,21 @@ export default {
             index,
             id,
             title: member.title,
-            order: this.order?.[id] || 'none',
+            order: orderObject?.[id] || 'none',
           };
         })
         .filter(Boolean);
+    },
+    emitVizStateChange(partialVizState) {
+      this.$emit(
+        'vizStateChange',
+        JSON.parse(
+          JSON.stringify({
+            ...this.vizState,
+            ...partialVizState,
+          })
+        )
+      );
     },
   },
 
@@ -527,7 +555,15 @@ export default {
     validatedQuery: {
       deep: true,
       handler(query, prevQuery) {
-        if (isQueryPresent(query) && !equals(query, prevQuery)) {
+        const hasQueryChanged = equals(query, prevQuery);
+
+        if (!hasQueryChanged) {
+          this.emitVizStateChange({
+            query,
+          });
+        }
+
+        if (isQueryPresent(query) && !hasQueryChanged) {
           this.cubejsApi
             .dryRun(query, {
               mutexObj: this.mutex,
@@ -555,26 +591,35 @@ export default {
         this.copyQueryFromProps();
       },
     },
-    order: {
-      deep: true,
-      handler(order) {
-        const nextOrderMembers = getOrderMembersFromOrder(this.getOrderMembers(), order);
-
-        if (!equals(nextOrderMembers, this.getOrderMembers())) {
-          this.orderMembers = nextOrderMembers;
-        }
-      },
-    },
     orderMembers: {
       deep: true,
       handler(orderMembers) {
         const nextOrder = orderMembers
           .map(({ id, order }) => (order !== 'none' ? [id, order] : false))
           .filter(Boolean);
+
         if (!equals(Object.entries(this.order || {}), nextOrder)) {
           this.order = fromPairs(nextOrder);
+          this.emitVizStateChange({
+            query: this.validatedQuery,
+          });
         }
       },
+    },
+    pivotConfig: {
+      deep: true,
+      handler(pivotConfig, prevPivotConfig) {
+        if (!equals(pivotConfig, prevPivotConfig)) {
+          this.emitVizStateChange({
+            pivotConfig,
+          });
+        }
+      },
+    },
+    chartType(value) {
+      this.emitVizStateChange({
+        chartType: value,
+      });
     },
   },
 };

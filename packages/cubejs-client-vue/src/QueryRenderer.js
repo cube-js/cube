@@ -144,16 +144,16 @@ export default {
     query: {
       deep: true,
       handler(query, prevQuery) {
-        console.log('query has changed', JSON.stringify(query.measures), Date.now());
         const hasOrderChanged = !equals(
           Object.keys(query?.order || {}),
           Object.keys(prevQuery?.order || {})
         );
 
-        console.log({
-          query: JSON.stringify((query)),
-          prevQuery: JSON.stringify((prevQuery)),
-        })
+        // todo: remove
+        // console.log({
+        //   query: JSON.stringify((query)),
+        //   prevQuery: JSON.stringify((prevQuery)),
+        // })
 
         if (isQueryPresent(query) && (!equals(query, prevQuery) || hasOrderChanged)) {
           this.load();

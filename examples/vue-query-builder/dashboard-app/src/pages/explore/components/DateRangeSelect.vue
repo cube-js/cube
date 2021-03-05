@@ -16,9 +16,6 @@ export default {
   props: {
     timeDimensions: Array,
   },
-  mounted() {
-    console.log(this.timeDimensions);
-  },
   data() {
     return {
       dateRangeItems: [
