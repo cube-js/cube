@@ -237,9 +237,9 @@ export class ServerContainer {
     return server;
   }
 
-  public async lookupConfiguration(): Promise<CreateOptions> {
+  public async lookupConfiguration(override: boolean = false): Promise<CreateOptions> {
     dotenv.config({
-      override: true,
+      override,
       multiline: 'line-breaks'
     });
 
@@ -285,8 +285,8 @@ export class ServerContainer {
    * @param embedded Cube.js will start without https/ws/graceful shutdown + without timers
    */
   public async start(embedded: boolean = false) {
-    const makeInstance = async () => {
-      const userConfig = await this.lookupConfiguration();
+    const makeInstance = async (override: boolean) => {
+      const userConfig = await this.lookupConfiguration(override);
 
       const configuration = {
         // By default graceful shutdown is disabled, but this value is needed for reboot
@@ -303,7 +303,7 @@ export class ServerContainer {
       };
     };
 
-    let instance = await makeInstance();
+    let instance = await makeInstance(false);
 
     if (!embedded) {
       if (instance.gracefulEnabled) {
@@ -339,7 +339,7 @@ export class ServerContainer {
           restartHandler = null;
         }
 
-        instance = await makeInstance();
+        instance = await makeInstance(true);
       });
     }
   }
