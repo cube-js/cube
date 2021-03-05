@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.26.47",
+  "version": "0.26.49",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -10,7 +10,7 @@
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.26.45",
-    "@cubejs-client/react": "^0.26.46",
+    "@cubejs-client/react": "^0.26.49",
     "antd": "4.13.0",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",

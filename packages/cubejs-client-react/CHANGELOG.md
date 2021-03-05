@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.49](https://github.com/cube-js/cube.js/compare/v0.26.48...v0.26.49) (2021-03-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** error fix ([7ac72e3](https://github.com/cube-js/cube.js/commit/7ac72e39a5ee9f1a31733a6516fb99f620102cba))
+* **@cubejs-client/react:** QueryRenderer TS type fix ([7c002c9](https://github.com/cube-js/cube.js/commit/7c002c920732b7aca6a3e3f7f346447e6f5d1b4d))
+* **@cubejs-client/react:** type fixes ([#2289](https://github.com/cube-js/cube.js/issues/2289)) ([df2b24c](https://github.com/cube-js/cube.js/commit/df2b24c74958858b192292cf22e69915c66a6d26))
+
+
+### Features
+
+* **@cubejs-client/react:** Adding queryError to QueryBuilder for showing dryRun errors ([#2262](https://github.com/cube-js/cube.js/issues/2262)) ([61bac0b](https://github.com/cube-js/cube.js/commit/61bac0b0dcdd81be908143334bd726eacc7b6e49))
+
+
+
+
+
 ## [0.26.46](https://github.com/cube-js/cube.js/compare/v0.26.45...v0.26.46) (2021-03-04)
 
 
