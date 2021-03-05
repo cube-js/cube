@@ -51,6 +51,10 @@ export class ElasticSearchQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
+  unixTimestampSql() {
+    return `TIMESTAMP_DIFF('seconds', '1970-01-01T00:00:00.000Z'::datetime, CURRENT_TIMESTAMP())`;
+  }
+
   groupByClause() {
     if (this.ungrouped) {
       return '';
