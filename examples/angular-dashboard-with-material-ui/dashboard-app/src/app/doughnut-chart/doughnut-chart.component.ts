@@ -14,7 +14,7 @@ export class DoughnutChartComponent implements OnInit {
       display: false
     },
     responsive: true,
-    maintainAspectRatio: false,
+    maintainAspectRatio: true,
     cutoutPercentage: 80,
     layout: { padding: 0 },
     tooltips: {
