@@ -75,6 +75,8 @@ databases [in this guide][link-connecting-to-db].
 | `CUBEJS_DB_URL`                                 | Druid, Elasticsearch | The URL for a database                                                                                                                                                                                      | A valid database URL for Druid/Elasticsearch                     |
 | `CUBEJS_DB_ELASTIC_OPENDISTRO`                  | Elasticsearch        | If `true`, then use the Open Distro for Elasticsearch                                                                                                                                                       | `true`, `false`                                                  |
 | `CUBEJS_DB_ELASTIC_QUERY_FORMAT`                | Elasticsearch        | By default, queries return data in JDBC format, but you can also return data in standard Elasticsearch JDBC, JSON, CSV, YAML or raw formats (only JSON and JDBC are currently supported)                    | `json`, `jdbc`                                                   |
+| `CUBEJS_DB_ELASTIC_APIKEY_ID`                   | Elasticsearch        | [ID of the API key from elastic.co][link-elastic-api-keys]                                                                                                                                                  | A valid Elastic.co API key ID                                    |
+| `CUBEJS_DB_ELASTIC_APIKEY_KEY`                  | Elasticsearch        | [Value of the API key from elastic.co][link-elastic-api-keys]                                                                                                                                               | A valid Elastic.co API key value                                 |
 | `CUBEJS_EXT_DB_HOST`                            | External             | The host URL for an external pre-aggregations database                                                                                                                                                      | A valid database host URL                                        |
 | `CUBEJS_EXT_DB_NAME`                            | External             | The name of the external pre-aggregations database to connect to                                                                                                                                            | A valid database name                                            |
 | `CUBEJS_EXT_DB_PASS`                            | External             | The password used to connect to the external pre-aggregations database                                                                                                                                      | A valid database password                                        |
@@ -114,6 +116,8 @@ databases [in this guide][link-connecting-to-db].
 
 [link-aws-regions]:
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[link-elastic-api-keys]:
+  https://www.elastic.co/guide/en/kibana/master/api-keys.html#create-api-key
 [link-cubejs-databases]: /connecting-to-the-database
 [link-nodejs-tls-options]:
   https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
