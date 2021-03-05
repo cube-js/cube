@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.48](https://github.com/cube-js/cube.js/compare/v0.26.47...v0.26.48) (2021-03-04)
+
+
+### Bug Fixes
+
+* **cubestore:** publish issue ([5bd1c3b](https://github.com/cube-js/cube.js/commit/5bd1c3bb74d49a4f6c363f18c6b5bb4822a543cc))
+
+
+
+
+
+## [0.26.47](https://github.com/cube-js/cube.js/compare/v0.26.46...v0.26.47) (2021-03-04)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** missing chart renderers ([a76b39f](https://github.com/cube-js/cube.js/commit/a76b39ff76666e338d94c8d3aedd5bb3db2c8957))
+* **cubestore:** post-install - compatbility with non bash env ([4b0c9ef](https://github.com/cube-js/cube.js/commit/4b0c9ef19b20d4cbfaee63337b7a0025bb31e6e9))
+
+
+
+
+
+## [0.26.46](https://github.com/cube-js/cube.js/compare/v0.26.45...v0.26.46) (2021-03-04)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** React and Angular code generation ([#2285](https://github.com/cube-js/cube.js/issues/2285)) ([4313bc8](https://github.com/cube-js/cube.js/commit/4313bc8cbaef819b1b9fc318b0bf9bfc06c1b114))
+
+
+
+
+
+## [0.26.45](https://github.com/cube-js/cube.js/compare/v0.26.44...v0.26.45) (2021-03-04)
+
+
+### Bug Fixes
+
+* **@cubejs-client:** react, core TypeScript fixes ([#2261](https://github.com/cube-js/cube.js/issues/2261)). Thanks to @SteffeyDev! ([4db93af](https://github.com/cube-js/cube.js/commit/4db93af984e737d7a6a448facbc8227907007c5d))
+* **@cubejs-schema-compiler:** addInterval / subtractInterval for Mssql ([#2239](https://github.com/cube-js/cube.js/issues/2239)) Thanks to [@florian-fischer-swarm](https://github.com/florian-fischer-swarm)! ([0930e15](https://github.com/cube-js/cube.js/commit/0930e1526612b92db2d192e4444a2c2a1d2d15ce)), closes [#2237](https://github.com/cube-js/cube.js/issues/2237)
+* **cubestore:** attempt to exit gracefully on sigint (ctrl+c) ([#2255](https://github.com/cube-js/cube.js/issues/2255)) ([2b006f8](https://github.com/cube-js/cube.js/commit/2b006f80428a7202da06a9bded1b42c3d2753ced))
+* **schema-compiler:** Lock antlr4ts to 0.5.0-alpha.4, fix [#2264](https://github.com/cube-js/cube.js/issues/2264) ([37b3a0d](https://github.com/cube-js/cube.js/commit/37b3a0d61433ae1b3e41c1264298d1409b7f95b7))
+
+
+### Features
+
+* Fetch JWK in background only ([954ce30](https://github.com/cube-js/cube.js/commit/954ce30a8d85e51360340558468a5ea4e2e4ca68))
+* **cubestore:** Extract transport to separate service ([#2236](https://github.com/cube-js/cube.js/issues/2236)) ([921786b](https://github.com/cube-js/cube.js/commit/921786b8a80bc0b2ed3e50d798a0c5bab435ec5c))
+
+
+
+
+
 ## [0.26.44](https://github.com/cube-js/cube.js/compare/v0.26.43...v0.26.44) (2021-03-02)
 
 

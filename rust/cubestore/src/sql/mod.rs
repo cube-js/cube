@@ -1161,8 +1161,10 @@ mod tests {
 
             let result = service.exec_query("SELECT g.decimal_value, count(*) from foo.decimal_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("100".to_string()), TableValue::Int(3)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Decimal("200".to_string()), TableValue::Int(2)]));
+            assert_eq!(result.get_rows(), &vec![
+                Row::new(vec![TableValue::Decimal("100".to_string()), TableValue::Int(3)]), 
+                Row::new(vec![TableValue::Decimal("200".to_string()), TableValue::Int(2)])
+            ]);
         }).await;
     }
 

@@ -758,6 +758,10 @@ export class CubejsServerCore {
       }
     }
 
+    if (this.apiGatewayInstance) {
+      this.apiGatewayInstance.release();
+    }
+
     return this.orchestratorStorage.releaseConnections();
   }
 
