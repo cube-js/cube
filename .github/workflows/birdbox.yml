@@ -29,4 +29,27 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Create project
-        run: npx cubejs-cli@${{ github.event.inputs.version }} create new-project
+        run: npx cubejs-cli@${{ github.event.inputs.version }} create new-project -d postgres
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ['postgresql', 'postgresql-cubestore']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Birdbox
+        run: |
+          cd packages/cubejs-docker/
+          yarn install
+          yarn tsc
+          yarn run birdbox:${{ matrix.target }}
