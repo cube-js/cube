@@ -204,13 +204,13 @@ impl CompactionService for CompactionServiceImpl {
                                         ),
                                     ))
                                 } else if i == filtered_partitions.len() - 1 {
-                                    Ok(((
+                                    Ok((
                                         *c,
                                         (
                                             Some(min.clone()),
                                             partition.get_row().get_max_val().clone(),
                                         ),
-                                    )))
+                                    ))
                                 } else {
                                     Err(CubeError::internal(format!(
                                         "Unexpected state for {} new partitions: {}, {:?}",
