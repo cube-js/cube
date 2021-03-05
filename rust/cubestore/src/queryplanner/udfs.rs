@@ -9,6 +9,8 @@ use datafusion::physical_plan::udf::ScalarUDF;
 use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
+use smallvec::smallvec;
+use smallvec::SmallVec;
 use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -136,8 +138,12 @@ struct HllMergeAccumulator {
 }
 
 impl Accumulator for HllMergeAccumulator {
-    fn state(&self) -> Result<Vec<ScalarValue>, DataFusionError> {
-        return Ok(vec![self.evaluate()?]);
+    fn reset(&mut self) {
+        self.acc = None;
+    }
+
+    fn state(&self) -> Result<SmallVec<[ScalarValue; 2]>, DataFusionError> {
+        return Ok(smallvec![self.evaluate()?]);
     }
 
     fn update(&mut self, row: &Vec<ScalarValue>) -> Result<(), DataFusionError> {
