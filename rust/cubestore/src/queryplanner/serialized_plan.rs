@@ -38,7 +38,7 @@ pub struct IndexSnapshot {
     table_path: TablePath,
     index: IdRow<Index>,
     partitions: Vec<PartitionSnapshot>,
-    join_on: Option<Vec<String>>,
+    sort_on: Option<Vec<String>>,
 }
 
 impl IndexSnapshot {
@@ -58,8 +58,8 @@ impl IndexSnapshot {
         &self.partitions
     }
 
-    pub fn join_on(&self) -> Option<&Vec<String>> {
-        self.join_on.as_ref()
+    pub fn sort_on(&self) -> Option<&Vec<String>> {
+        self.sort_on.as_ref()
     }
 }
 
@@ -521,9 +521,9 @@ impl SerializedPlan {
         plan: Arc<LogicalPlan>,
         meta_store: Arc<dyn MetaStore>,
         index_snapshots: Vec<IndexSnapshot>,
-        join_on: Option<Vec<String>>,
+        sort_on: Option<(Vec<String>, bool)>,
     ) -> BoxFuture<'static, Result<Vec<IndexSnapshot>, CubeError>> {
-        async move { Self::index_snapshots_from_plan(plan, meta_store, index_snapshots, join_on).await }
+        async move { Self::index_snapshots_from_plan(plan, meta_store, index_snapshots, sort_on).await }
             .boxed()
     }
 
@@ -531,7 +531,7 @@ impl SerializedPlan {
         plan: Arc<LogicalPlan>,
         meta_store: Arc<dyn MetaStore>,
         mut index_snapshots: Vec<IndexSnapshot>,
-        join_on: Option<Vec<String>>,
+        sort_on: Option<(Vec<String>, bool)>,
     ) -> Result<Vec<IndexSnapshot>, CubeError> {
         match plan.as_ref() {
             LogicalPlan::EmptyRelation { .. } => Ok(index_snapshots),
@@ -549,14 +549,14 @@ impl SerializedPlan {
                     .get_schema_by_id(table.get_row().get_schema_id())
                     .await?;
                 let default_index = meta_store.get_default_index(table.get_id()).await?;
-                let index = if let Some(projection_column_indices) = projection {
+                let (index, sort_on) = if let Some(projection_column_indices) = projection {
                     let projection_columns =
                         CubeTable::project_to_table(&table, &projection_column_indices);
                     let indexes = meta_store.get_table_indexes(table.get_id()).await?;
                     if let Some((index, _)) = indexes
                         .into_iter()
                         .filter_map(|i| {
-                            if let Some(join_on_columns) = join_on.as_ref() {
+                            if let Some((join_on_columns, _)) = sort_on.as_ref() {
                                 let join_columns_in_index = join_on_columns
                                     .iter()
                                     .map(|c| {
@@ -594,9 +594,9 @@ impl SerializedPlan {
                         })
                         .min_by_key(|(_, s)| *s)
                     {
-                        index
+                        (index, sort_on)
                     } else {
-                        if let Some(join_on_columns) = join_on {
+                        if let Some((join_on_columns, true)) = sort_on.as_ref() {
                             return Err(CubeError::user(format!(
                                 "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
                                 name_split.join("."),
@@ -607,17 +607,17 @@ impl SerializedPlan {
                                 join_on_columns.join(", ")
                             )));
                         }
-                        default_index
+                        (default_index, None)
                     }
                 } else {
-                    if let Some(join_on_columns) = join_on {
+                    if let Some((join_on_columns, _)) = sort_on {
                         return Err(CubeError::internal(format!(
                             "Can't find index to join table {} on {} and projection push down optimization has been disabled. Invalid state.",
                             name_split.join("."),
                             join_on_columns.join(", ")
                         )));
                     }
-                    default_index
+                    (default_index, None)
                 };
 
                 let partitions = meta_store
@@ -663,7 +663,7 @@ impl SerializedPlan {
                         table,
                         schema: Arc::new(schema),
                     },
-                    join_on,
+                    sort_on: sort_on.map(|(cols, _)| cols),
                 });
 
                 Ok(index_snapshots)
@@ -673,7 +673,7 @@ impl SerializedPlan {
                     input.clone(),
                     meta_store,
                     index_snapshots,
-                    join_on,
+                    sort_on,
                 )
                 .await
             }
@@ -682,16 +682,31 @@ impl SerializedPlan {
                     input.clone(),
                     meta_store,
                     index_snapshots,
-                    join_on,
+                    sort_on,
                 )
                 .await
             }
-            LogicalPlan::Aggregate { input, .. } => {
+            LogicalPlan::Aggregate {
+                input, group_expr, ..
+            } => {
+                fn column_name(expr: &Expr) -> Option<String> {
+                    match expr {
+                        Expr::Alias(e, _) => column_name(e),
+                        Expr::Column(col, _) => Some(col.to_string()), // TODO use alias
+                        _ => None,
+                    }
+                }
+
+                let sort_on = group_expr.iter().map(column_name).collect::<Vec<_>>();
                 Self::index_snapshots_from_plan_boxed(
                     input.clone(),
                     meta_store,
                     index_snapshots,
-                    join_on,
+                    if !sort_on.is_empty() && sort_on.iter().all(|c| c.is_some()) {
+                        Some((sort_on.into_iter().map(|c| c.unwrap()).collect(), false))
+                    } else {
+                        None
+                    },
                 )
                 .await
             }
@@ -700,7 +715,7 @@ impl SerializedPlan {
                     input.clone(),
                     meta_store,
                     index_snapshots,
-                    join_on,
+                    sort_on,
                 )
                 .await
             }
@@ -709,7 +724,7 @@ impl SerializedPlan {
                     input.clone(),
                     meta_store,
                     index_snapshots,
-                    join_on,
+                    sort_on,
                 )
                 .await
             }
@@ -723,7 +738,7 @@ impl SerializedPlan {
                         i.clone(),
                         meta_store.clone(),
                         snapshots,
-                        join_on.clone(),
+                        sort_on.clone(),
                     )
                     .await?;
                 }
@@ -737,22 +752,24 @@ impl SerializedPlan {
                     left.clone(),
                     meta_store.clone(),
                     snapshots,
-                    Some(
+                    Some((
                         on.iter()
                             .map(|(l, _)| l.split(".").last().unwrap().to_string())
                             .collect(),
-                    ),
+                        true,
+                    )),
                 )
                 .await?;
                 snapshots = Self::index_snapshots_from_plan_boxed(
                     right.clone(),
                     meta_store.clone(),
                     snapshots,
-                    Some(
+                    Some((
                         on.iter()
                             .map(|(_, r)| r.split(".").last().unwrap().to_string())
                             .collect(),
-                    ),
+                        true,
+                    )),
                 )
                 .await?;
                 Ok(snapshots)
@@ -762,7 +779,7 @@ impl SerializedPlan {
                     input.clone(),
                     meta_store,
                     index_snapshots,
-                    join_on,
+                    sort_on,
                 )
                 .await
             }
