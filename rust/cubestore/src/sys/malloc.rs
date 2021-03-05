@@ -1,6 +1,7 @@
+#[cfg(all(target_os = "linux", not(target_env = "musl")))]
 use crate::util::time_span::warn_long;
+#[cfg(all(target_os = "linux", not(target_env = "musl")))]
 use std::time::Duration;
-
 /// Ask the memory allocator to returned the freed memory to the system.
 /// This only has effect when compiled for glibc, this is a no-op on other systems.
 ///

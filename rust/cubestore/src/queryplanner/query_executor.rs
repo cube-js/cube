@@ -202,7 +202,8 @@ impl QueryExecutorImpl {
                 cluster,
                 available_nodes,
                 execution_plan.schema(),
-            ));
+                None,
+            )?);
         }
         return self.build_router_split_plan(
             execution_plan,
@@ -358,7 +359,12 @@ impl QueryExecutorImpl {
                 cluster,
                 available_nodes,
                 children[0].schema(),
-            )])?,
+                if children.len() == 1 {
+                    children[0].output_sort_order()?
+                } else {
+                    None
+                },
+            )?])?,
         )
     }
 
@@ -369,20 +375,31 @@ impl QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
         available_nodes: Vec<String>,
         schema: DFSchemaRef,
-    ) -> Arc<dyn ExecutionPlan> {
+        output_sort_order: Option<Vec<usize>>,
+    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
         let union_snapshots = self.union_snapshots_from_cube_table(source);
         if !union_snapshots.is_empty() {
             let cluster_exec = Arc::new(ClusterSendExec::new(
-                schema,
+                schema.clone(),
                 cluster,
                 serialized_plan,
                 available_nodes,
                 union_snapshots,
             ));
-            Arc::new(MergeExec::new(cluster_exec))
+            if let Some(order) = output_sort_order {
+                Ok(Arc::new(MergeSortExec::try_new(
+                    cluster_exec,
+                    order
+                        .iter()
+                        .map(|i| schema.field(*i).name().to_string())
+                        .collect(),
+                )?))
+            } else {
+                Ok(Arc::new(MergeExec::new(cluster_exec)))
+            }
         } else {
             // TODO .to_schema_ref()
-            Arc::new(EmptyExec::new(false, schema.to_schema_ref()))
+            Ok(Arc::new(EmptyExec::new(false, schema.to_schema_ref())))
         }
     }
 
@@ -545,7 +562,7 @@ impl CubeTable {
             self.schema.clone()
         };
 
-        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.join_on()
+        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.sort_on()
         {
             Arc::new(MergeSortExec::try_new(
                 Arc::new(CubeTableExec {
