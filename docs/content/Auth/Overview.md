@@ -126,9 +126,11 @@ Cube.js has out-of-the-box support for the following identity providers:
 - [Auth0][ref-jwt-auth0]
 - [AWS Cognito][ref-jwt-aws-cognito]
 
+<!-- prettier-ignore-start -->
 [[info | ]]
-| If you don't see your identity provider listed, please let us know on under
-| the [Ideas category on our Discourse forum][link-discourse-ideas].
+| If you don't see your identity provider listed, please let us know with a
+| post under the [Ideas category on our Discourse forum][link-discourse-ideas].
+<!-- prettier-ignore-end -->
 
 [link-discourse-ideas]: https://forum.cube.dev/c/ideas/12
 [ref-jwt-auth0]: /security/jwt/auth0
