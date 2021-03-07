@@ -942,23 +942,23 @@
     sqlstring "^2.3.1"
     uuidv4 "^6.0.2"
 
-"@cubejs-backend/cubestore-driver@^0.26.48":
-  version "0.26.48"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore-driver/-/cubestore-driver-0.26.48.tgz#22bccc815ebdd9ea12c07a4dbbc988613e43bacc"
-  integrity sha512-ew6UkD9AxlohiVh5ZZ8kInLDuItnZjRcQKAbpsYrMq++oYRdIjcq7aWHzf1gvg2yYbHr9BZTlVoFIL+5y5BxXA==
+"@cubejs-backend/cubestore-driver@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore-driver/-/cubestore-driver-0.26.49.tgz#77933e714eab8c723377affe5bddb85f743ef972"
+  integrity sha512-5b/Rl9EoD8t7DRdz8msuqgI/5gkW4TUUa4mfBIE8Y9tzF0csC0QtFMlS93vlpPLQgYg1/cuBQyOr2A9hEpDlag==
   dependencies:
-    "@cubejs-backend/cubestore" "^0.26.48"
+    "@cubejs-backend/cubestore" "^0.26.49"
     "@cubejs-backend/query-orchestrator" "^0.26.45"
-    "@cubejs-backend/schema-compiler" "^0.26.45"
+    "@cubejs-backend/schema-compiler" "^0.26.49"
     "@cubejs-backend/shared" "^0.26.45"
     generic-pool "^3.6.0"
     moment-timezone "^0.5.31"
     mysql "^2.16.0"
 
-"@cubejs-backend/cubestore@^0.26.48":
-  version "0.26.48"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore/-/cubestore-0.26.48.tgz#2b47e368b0e21b5a49282a7ca926b87ecfa7ef38"
-  integrity sha512-rGjyHeOjQDZhMzN8k+GorTkG1Jr3fz94QXb3NShfoVieIa+AJQKn6kyWvlff/khnax8ABhrYsbfhqh4m22eBiA==
+"@cubejs-backend/cubestore@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore/-/cubestore-0.26.49.tgz#e084ddc48bf75888c589cd5aeb9fe213a51a943a"
+  integrity sha512-PXhzkLow33CLSHxOjFeHnUFvCnl9NcC7uw1K9BDeD2LsKMz4w0mHemMAYNb7BYY3noQOe+U6hyemIDJOF3r6KQ==
   dependencies:
     "@cubejs-backend/shared" "^0.26.45"
     "@oclif/color" "^0.1.2"
@@ -975,32 +975,32 @@
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
 
-"@cubejs-backend/dremio-driver@^0.26.45":
-  version "0.26.45"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/dremio-driver/-/dremio-driver-0.26.45.tgz#57e014e65fad9edfdd69993df6c30205f3cd7ce2"
-  integrity sha512-F0FWKZHp1Afcvg50W4ZMe+5zSlK8VQc2tWmYopPkPaZwJNi/BD3PezPk7a4up+SFqZI29DtU+UkILRm2hju9fQ==
+"@cubejs-backend/dremio-driver@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/dremio-driver/-/dremio-driver-0.26.49.tgz#1700450cff99b31a7b9e3514a8ef9daa1af3e976"
+  integrity sha512-DibAvo82SnPIW/tteFozkeRsBy54CdFj5I/BdQ1jjp1mpXWN+htXVfwMgKAJbYxXMm4StQWwvjzI3qUA6/anfg==
   dependencies:
     "@cubejs-backend/query-orchestrator" "^0.26.45"
-    "@cubejs-backend/schema-compiler" "^0.26.45"
+    "@cubejs-backend/schema-compiler" "^0.26.49"
     axios "^0.21.1"
     moment-timezone "^0.5.31"
     sqlstring "^2.3.1"
 
-"@cubejs-backend/druid-driver@^0.26.45":
-  version "0.26.45"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/druid-driver/-/druid-driver-0.26.45.tgz#bf2561638d05765274f33a4682c736e373affb5c"
-  integrity sha512-yqzAEZbd0LtEGIwOEhNPDpybIEP0FbpjiweC14Zl4MZeDEMwi58zAgs9Buj/biDj4/Nqbmc6+YXNtVNUIOr42A==
+"@cubejs-backend/druid-driver@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/druid-driver/-/druid-driver-0.26.49.tgz#87e74310bdfcbd11ba458136ee4da6d13aece0b9"
+  integrity sha512-DFeB51OGjpu6/yGmjnVf+CE2dt15yw0LB/PsRC82cuayBLjVslWS5OmPTiQafVuleYi0IiE2qsfg+CHj1/VPXw==
   dependencies:
     "@cubejs-backend/query-orchestrator" "^0.26.45"
-    "@cubejs-backend/schema-compiler" "^0.26.45"
+    "@cubejs-backend/schema-compiler" "^0.26.49"
     "@cubejs-backend/shared" "^0.26.45"
     axios "^0.21.1"
     moment-timezone "^0.5.31"
 
-"@cubejs-backend/elasticsearch-driver@^0.26.45":
-  version "0.26.45"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/elasticsearch-driver/-/elasticsearch-driver-0.26.45.tgz#3103a358433642d28d992e726f696384634bb9cc"
-  integrity sha512-lfiHyIWnjgMqACEhrTuR/zxVd7xRSPZ1UKe/TJCDaBatuHtqo5pRED33HTctTrp9HU2SFxhNn/QnsUYbBQbc3Q==
+"@cubejs-backend/elasticsearch-driver@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/elasticsearch-driver/-/elasticsearch-driver-0.26.49.tgz#d6582517830a7154a4ffec983dfdf09385d6fc09"
+  integrity sha512-BSk2eEeosEsOMP+zr1m5mtL31a+UarI+okYFTAgecLaB5wOkKaoIbBZsswpidZ8N+puJKSnM/0wJ2Riwl0f3kQ==
   dependencies:
     "@cubejs-backend/query-orchestrator" "^0.26.45"
     "@elastic/elasticsearch" "^7.5.0"
@@ -1086,10 +1086,10 @@
     ramda "^0.27.0"
     redis "^3.0.2"
 
-"@cubejs-backend/schema-compiler@^0.26.45":
-  version "0.26.45"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.26.45.tgz#8a632af17e0f2314c02c95f5ee44a1107542bbd6"
-  integrity sha512-nUFAppfsiW76IZzrDCjDiS4vJrQAhm8kRm+HKCG4J3hMBGUucHhtlGlB9FRGFrR4bEXcZXOUeFn8M42tsAxbkw==
+"@cubejs-backend/schema-compiler@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.26.49.tgz#64bac9f01795ce4f738d6e86f39f3b226c7cc1bf"
+  integrity sha512-FizUWGJ3I6wjCvgvfQXFzvpyunIp3G16pkTDFhsMPH5Xmgn0CW7F30kTGv43gg0N/S3hTm0EeWHt2feNJ8cnfw==
   dependencies:
     "@babel/code-frame" "^7.12.11"
     "@babel/core" "^7.12.10"
@@ -1112,14 +1112,14 @@
     ramda "^0.27.0"
     syntax-error "^1.3.0"
 
-"@cubejs-backend/server-core@^0.26.48":
-  version "0.26.48"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.26.48.tgz#ef7b6d6552a12034103b19bc965b234fd06c3a44"
-  integrity sha512-xTo+9sNkYKcr9o1EAzfFDjOGor5EzSyyZN8GWFef/zY0oTYHNGHtsGRMYtHkG6Bu/1bZnvyVLu1U/+FouFde4Q==
+"@cubejs-backend/server-core@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.26.49.tgz#a64ec926b0177c182d947c61ec2ae779b6898e0d"
+  integrity sha512-+kpmpp6xLIm39bPYQs1ucqcBb9+NYYNXNWGbYh4cH3uIve2lODZYvHOEdgKO8RGIxe8LPrbx4nPw5H5xq5K/GA==
   dependencies:
     "@cubejs-backend/api-gateway" "^0.26.45"
     "@cubejs-backend/query-orchestrator" "^0.26.45"
-    "@cubejs-backend/schema-compiler" "^0.26.45"
+    "@cubejs-backend/schema-compiler" "^0.26.49"
     "@cubejs-backend/shared" "^0.26.45"
     "@hapi/joi" "^15.1.1"
     codesandbox-import-utils "^2.1.12"
@@ -1141,13 +1141,13 @@
     sqlstring "^2.3.1"
     uuid "^3.3.3"
 
-"@cubejs-backend/server@^0.26.48":
-  version "0.26.48"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.26.48.tgz#e0c0221e4dab40e28a7c4b734180560c4e55b7a8"
-  integrity sha512-jsWbpRrb1+C2OsO0NpW0g/QM7clfCHF5vxNK40hPD/T+wR6vYb+WGnnmmeidW4Tw6dInwjITIFPp50VW9L5jLw==
+"@cubejs-backend/server@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/server/-/server-0.26.49.tgz#f203fa417e78334983230c97c522c308080c2e82"
+  integrity sha512-faOtDvj9fdTtmFYzNPfyL3nxNX/LxPdEDuZpE2tVzp5x9kOtX9qwEFNJHpxUDSNgFCS6GejYsheM8fYoi4vuUg==
   dependencies:
     "@cubejs-backend/dotenv" "^9.0.2"
-    "@cubejs-backend/server-core" "^0.26.48"
+    "@cubejs-backend/server-core" "^0.26.49"
     "@cubejs-backend/shared" "^0.26.45"
     "@oclif/color" "^0.1.2"
     "@oclif/command" "^1.8.0"
@@ -3092,10 +3092,10 @@ cssstyle@^2.2.0:
   dependencies:
     cssom "~0.3.6"
 
-cubejs-cli@^0.26.48:
-  version "0.26.48"
-  resolved "https://registry.yarnpkg.com/cubejs-cli/-/cubejs-cli-0.26.48.tgz#c56852b94991faa401532ea389da556a3572530c"
-  integrity sha512-QjfI2XCZ8p3mEAvc9Bg0WtmQFnHQAzg3NkVbJdDeqVbQhvWUDIACAiWDOSzeCDOrFZRBSMFm9Y9pV7z9VOrVbg==
+cubejs-cli@^0.26.49:
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/cubejs-cli/-/cubejs-cli-0.26.49.tgz#463a1f2ea045b5646c21befd0fb90afb42179ce6"
+  integrity sha512-5IIcpJm9pOCJ6vIKlytM2pR//6cKW+h2WHnlxhTjVjk3jSkxqmlgGZgKnzp/hErBJImGDKZODLuuS4IbfDxK/A==
   dependencies:
     "@cubejs-backend/dotenv" "^9.0.2"
     "@cubejs-backend/shared" "^0.26.45"
