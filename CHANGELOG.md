@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.50](https://github.com/cube-js/cube.js/compare/v0.26.49...v0.26.50) (2021-03-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Group by without aggregates returns empty results ([82902dd](https://github.com/cube-js/cube.js/commit/82902ddb894dc0a0d30e88bde33b0308136789b9))
+
+
+### Features
+
+* **cubestore:** Web Socket transport client ([#2228](https://github.com/cube-js/cube.js/issues/2228)) ([4a86d89](https://github.com/cube-js/cube.js/commit/4a86d896a6e815b74695e0387357abc0764bfd6c))
+
+
+
+
+
 ## [0.26.49](https://github.com/cube-js/cube.js/compare/v0.26.48...v0.26.49) (2021-03-05)
 
 
