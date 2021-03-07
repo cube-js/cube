@@ -1,9 +1,9 @@
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import genericPool, { Pool } from 'generic-pool';
+import { format as formatSql } from 'sqlstring';
 
 import { CubeStoreQuery } from './CubeStoreQuery';
-import { AsyncConnection, createConnection } from './connection';
 import { ConnectionConfig } from './types';
+import { WebSocketConnection } from './WebSocketConnection';
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
@@ -13,98 +13,31 @@ const GenericTypeToCubeStore: Record<string, string> = {
 export class CubeStoreDriver extends BaseDriver {
   protected readonly config: any;
 
-  protected readonly pool: Pool<AsyncConnection>;
+  protected readonly connection: WebSocketConnection;
 
   public constructor(config?: Partial<ConnectionConfig>) {
     super();
-    const { pool, ...restConfig } = config || {};
 
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      timezone: 'Z',
-      ...restConfig,
+      ...config,
     };
-    this.pool = genericPool.createPool<AsyncConnection>({
-      create: async () => createConnection(this.config),
-      destroy: async (connection) => connection.close(),
-      validate: async (connection) => {
-        try {
-          await connection.execute('SELECT 1');
-        } catch (e) {
-          return false;
-        }
-        return true;
-      }
-    }, {
-      min: 0,
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
-      evictionRunIntervalMillis: 10000,
-      softIdleTimeoutMillis: 30000,
-      idleTimeoutMillis: 30000,
-      testOnBorrow: true,
-      acquireTimeoutMillis: 20000,
-      ...pool
-    });
-  }
-
-  public withConnection(fn: (connection: AsyncConnection) => Promise<unknown>) {
-    const self = this;
-    const connectionPromise = this.pool.acquire();
-
-    let cancelled = false;
-    const cancelObj: any = {};
-    const promise = connectionPromise.then(async conn => {
-      const [{ connectionId }]: any = await conn.execute('select connection_id() as connectionId');
-      cancelObj.cancel = async () => {
-        cancelled = true;
-        await self.withConnection(async processConnection => {
-          await processConnection.execute(`KILL ${connectionId}`);
-        });
-      };
-      return fn(conn)
-        .then(res => this.pool.release(conn).then(() => {
-          if (cancelled) {
-            throw new Error('Query cancelled');
-          }
-          return res;
-        }))
-        .catch((err) => this.pool.release(conn).then(() => {
-          if (cancelled) {
-            throw new Error('Query cancelled');
-          }
-          throw err;
-        }));
-    });
-    (<any>promise).cancel = () => cancelObj.cancel();
-    return promise;
+    this.connection = new WebSocketConnection(this.config);
   }
 
   public async testConnection() {
-    // @ts-ignore
-    // eslint-disable-next-line no-underscore-dangle
-    const conn = await this.pool._factory.create();
-
-    try {
-      return await conn.execute('SELECT 1');
-    } finally {
-      // @ts-ignore
-      // eslint-disable-next-line no-underscore-dangle
-      await this.pool._factory.destroy(conn);
-    }
+    await this.query('SELECT 1', []);
   }
 
-  // @ts-ignore
   public async query(query, values) {
-    // @ts-ignore I am not able to resolve it quick, @todo fixit!
-    return this.withConnection(db => db.execute(query, values));
+    return this.connection.query(formatSql(query, values || []));
   }
 
   public async release() {
-    await this.pool.drain();
-    await this.pool.clear();
+    return this.connection.close();
   }
 
   public informationSchemaQuery() {
