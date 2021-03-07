@@ -16,7 +16,7 @@ interface StartProcessOptions extends CubeStoreHandlerOptions {
 
 async function startProcess(pathToExecutable: string, config: Readonly<StartProcessOptions>) {
   const env: Record<string, string> = {
-    CUBESTORE_PORT: '13306',
+    CUBESTORE_PORT: '13306', // TODO MySQL port. Remove it when it becomes optional.
     CUBESTORE_SELECT_WORKERS: '0',
   };
 

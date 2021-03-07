@@ -15,7 +15,7 @@ export class CubeStoreDevDriver extends CubeStoreDriver {
       user: undefined,
       password: undefined,
       // @todo Make random port selection when 13306 is already used?
-      port: 13306,
+      port: 3030,
     });
   }
 
