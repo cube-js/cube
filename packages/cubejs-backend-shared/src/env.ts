@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
+import { displayCLIWarning } from './cli';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -120,8 +121,40 @@ const variables = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
-  redisUrl: () => get('REDIS_URL')
-    .asString(),
+  redisUrl: () => {
+    const redisUrl = get('CUBEJS_REDIS_URL')
+      .asString();
+    if (redisUrl) {
+      return redisUrl;
+    }
+
+    const legacyRedisUrl = get('REDIS_URL')
+      .asString();
+    if (legacyRedisUrl) {
+      displayCLIWarning('REDIS_URL is deprecated and will be removed, please use CUBEJS_REDIS_URL.');
+
+      return legacyRedisUrl;
+    }
+
+    return undefined;
+  },
+  redisTls: () => {
+    const redisTls = get('CUBEJS_REDIS_TLS')
+      .asBoolStrict();
+    if (redisTls) {
+      return redisTls;
+    }
+
+    const legacyRedisTls = get('REDIS_TLS')
+      .asBoolStrict();
+    if (legacyRedisTls) {
+      displayCLIWarning('REDIS_TLS is deprecated and will be removed, please use CUBEJS_REDIS_TLS.');
+
+      return legacyRedisTls;
+    }
+
+    return false;
+  },
   dbSsl: () => get('CUBEJS_DB_SSL')
     .default('false')
     .asBoolStrict(),
@@ -134,9 +167,6 @@ const variables = {
     .asString(),
   redisPassword: () => get('REDIS_PASSWORD')
     .asString(),
-  redisTls: () => get('REDIS_TLS')
-    .default('false')
-    .asBoolStrict(),
   jwkKey: () => get('CUBEJS_JWK_KEY')
     .asUrlString(),
   jwkUrl: () => get('CUBEJS_JWK_URL')
