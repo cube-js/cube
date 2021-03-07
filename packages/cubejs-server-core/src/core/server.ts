@@ -301,6 +301,7 @@ export class CubejsServerCore {
 
     let externalDriverFactory = externalDbType && (
       () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
+        url: process.env.CUBEJS_EXT_DB_URL,
         host: process.env.CUBEJS_EXT_DB_HOST,
         database: process.env.CUBEJS_EXT_DB_NAME,
         port: process.env.CUBEJS_EXT_DB_PORT,

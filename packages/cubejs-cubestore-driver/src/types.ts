@@ -1,13 +1,15 @@
-import type { Options as PoolConfiguration } from 'generic-pool';
-
 export interface ConnectionConfig {
+  /**
+   * Cube Store web socket URL
+   */
+  url?: string;
   /**
    * The hostname of the database you are connecting to. (Default: localhost)
    */
   host?: string;
 
   /**
-   * The port number to connect to. (Default: 3306)
+   * The port number to connect to. (Default: 3030)
    */
   port?: number;
 
@@ -17,12 +19,7 @@ export interface ConnectionConfig {
   user?: string;
 
   /**
-   * The password of that MySQL user
+   * The password
    */
   password?: string;
-
-  /**
-   * Pool options
-   */
-  pool?: PoolConfiguration;
 }
