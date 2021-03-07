@@ -13,7 +13,8 @@
   },
   "files": [
     "README.md",
-    "dist/src/*"
+    "dist/src/*",
+    "dist/codegen/*"
   ],
   "main": "index.js",
   "typings": "dist/src/index.d.ts",
