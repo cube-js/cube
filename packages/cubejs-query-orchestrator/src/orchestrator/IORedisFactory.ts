@@ -51,6 +51,9 @@ export async function createIORedisClient(url: string, opts: RedisOptions): Prom
     options.name = parsedUrl.name;
     options.db = parsedUrl.db;
     options.enableOfflineQueue = false;
+    options.reconnectOnError = (err) => {
+      return true;
+    }
   } else {
     options.username = parsedUrl.username;
     options.password = parsedUrl.password;
