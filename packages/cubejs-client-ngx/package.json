@@ -27,18 +27,18 @@
     "dev:publish": "dist/*"
   },
   "scripts": {
-    "build": "yarn ng build && rm dist/package.json",
-    "ng:watch": "yarn ng build --watch && rm dist/package.json",
+    "build": "./node_modules/ng-packagr/cli/main.js -c tsconfig.json -p  ng-package.json && rm dist/package.json",
+    "ng:watch": "./node_modules/ng-packagr/cli/main.js -c tsconfig.json -p  ng-package.json --watch && rm dist/package.json",
     "dev": "yarn build && yalc publish --push"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.1000.3",
     "@angular-devkit/build-ng-packagr": "^0.1000.3",
-    "@angular/cli": "^10.0.3",
-    "@angular/compiler": "^10.0.5",
-    "@angular/compiler-cli": "^10.0.5",
-    "@angular/core": "^10.0.5",
-    "ng-packagr": "^10.0.3",
+    "@angular/cli": "^10.2.3",
+    "@angular/compiler": "^10.2.4",
+    "@angular/compiler-cli": "^10.2.4",
+    "@angular/core": "^10.2.4",
+    "ng-packagr": "^10.1.2",
     "npm-watch": "^0.7.0",
     "tsickle": "^0.39.1",
     "typescript": "^3.9.7"

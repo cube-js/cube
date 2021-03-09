@@ -24,8 +24,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "linter src/* test/* --ext .ts,.js",
-    "lint:fix": "linter --fix src/* test/* --ext .ts,.js",
+    "lint": "eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
     "unit": "jest --runInBand --coverage dist/test"
   },
@@ -56,19 +56,19 @@
   },
   "devDependencies": {
     "@cubejs-backend/cubestore-driver": "^0.26.53",
-    "@cubejs-backend/linter": "^0.24.5",
+    "@cubejs-backend/linter": "^0.26.13",
     "@types/cross-spawn": "^6.0.2",
     "@types/express": "^4.17.9",
     "@types/hapi__joi": "^15.0.4",
-    "@types/jest": "^25.2.3",
+    "@types/jest": "^26.0.20",
     "@types/jsonwebtoken": "^8.5.0",
     "@types/lru-cache": "^5.1.0",
     "@types/node": "^10.17.49",
     "@types/node-fetch": "^2.5.7",
     "@types/ramda": "^0.27.34",
     "@types/uuid": "^3.4.9",
-    "jest": "^25.5.4",
-    "typescript": "^4.1.3"
+    "jest": "^26.6.3",
+    "typescript": "~4.1.5"
   },
   "license": "Apache-2.0",
   "eslintConfig": {

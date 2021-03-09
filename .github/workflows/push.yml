@@ -61,7 +61,6 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -70,20 +69,21 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build client
+        run: yarn build
       - name: Lerna test
-        run:  yarn lerna run --concurrency 1 --stream --no-prefix unit
+        run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - uses: codecov/codecov-action@v1
         if: (matrix.node-version == '15.x')
         with:
@@ -102,7 +102,6 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -111,14 +110,13 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: NPM lint
@@ -138,7 +136,6 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -147,14 +144,13 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Check Yarn lock wasn't modified
@@ -192,7 +188,6 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -201,14 +196,13 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
@@ -270,7 +264,6 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -279,14 +272,13 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
@@ -360,7 +352,6 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -369,14 +360,13 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
@@ -443,7 +433,6 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
@@ -452,14 +441,13 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc

@@ -4,6 +4,9 @@
   "description": "Cube.js pre-aggregation storage layer.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
+  "engines": {
+    "node": ">=10.8.0"
+  },
   "bin": {
     "cubestore-dev": "bin/cubestore-dev"
   },
@@ -14,8 +17,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "linter js-wrapper/* --ext .ts,.js",
-    "lint:fix": "linter --fix js-wrapper/* --ext .ts,js",
+    "lint": "eslint js-wrapper/* --ext .ts,.js",
+    "lint:fix": "eslint --fix js-wrapper/* --ext .ts,js",
     "postinstall": "node ./bin/postinstall-skip-env.js"
   },
   "files": [

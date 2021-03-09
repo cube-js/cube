@@ -21,8 +21,8 @@
     "unit": "jest --runInBand --coverage --verbose dist/test/unit",
     "integration": "npm run integration:redis dist/test/integration",
     "integration:redis": "jest --runInBand --verbose dist/test/integration",
-    "lint": "linter src/* test/* --ext .ts,.js",
-    "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
   "files": [
     "README.md",
@@ -46,7 +46,7 @@
     "@types/ramda": "^0.27.32",
     "@types/redis": "^2.8.28",
     "jest": "^26.6.3",
-    "typescript": "~4.1.2"
+    "typescript": "~4.1.5"
   },
   "license": "Apache-2.0",
   "eslintConfig": {

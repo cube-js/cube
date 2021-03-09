@@ -9,6 +9,7 @@
   },
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
+  "module": "dist/cubejs-client-core.esm.js",
   "types": "index.d.ts",
   "author": "Cube Dev, Inc.",
   "dependencies": {
