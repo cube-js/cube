@@ -13,8 +13,8 @@
   },
   "main": "driver/SnowflakeDriver.js",
   "scripts": {
-    "lint": "linter driver/*",
-    "lint:fix": "linter --fix driver/*"
+    "lint": "eslint driver/*",
+    "lint:fix": "eslint --fix driver/*"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.45",

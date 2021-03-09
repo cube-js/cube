@@ -19,8 +19,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "linter src/* test/* --ext .ts,.js",
-    "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
   "files": [
     "README.md",

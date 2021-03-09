@@ -23,10 +23,10 @@
     "sqlstring": "^2.3.1"
   },
   "devDependencies": {
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1"
+    "@cubejs-backend/linter": "^0.26.13"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   },
   "license": "Apache-2.0"
 }

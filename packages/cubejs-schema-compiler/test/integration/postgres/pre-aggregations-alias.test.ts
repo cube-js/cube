@@ -396,7 +396,9 @@ describe('PreAggregations', () => {
       }],
       preAggregationsSchema: ''
     });
+
     try {
+      // eslint-disable-next-line no-unused-expressions
       query.preAggregations?.preAggregationsDescription();
     } catch (error) {
       expect(error).toBeInstanceOf(UserError);

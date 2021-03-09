@@ -1,5 +1,3 @@
-import { Wait } from 'testcontainers';
-
 const pgPromise = require('pg-promise');
 const { GenericContainer } = require('testcontainers');
 const { BaseDbRunner } = require('./BaseDbRunner');

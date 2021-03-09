@@ -30,8 +30,8 @@
     "integration:mysql": "TZ=UTC jest dist/test/integration/mysql",
     "integration:postgres": "TZ=UTC jest dist/test/integration/postgres",
     "integration:clickhouse": "TZ=UTC jest dist/test/integration/clickhouse",
-    "lint": "linter src/* test/* --ext .ts,.js",
-    "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
   "dependencies": {
     "@babel/code-frame": "^7.12.11",
@@ -73,7 +73,6 @@
     "@types/syntax-error": "^1.4.1",
     "@types/uuid": "^3.4.9",
     "antlr4ts-cli": "^0.5.0-alpha.4",
-    "istanbul": "^0.4.5",
     "mssql": "^6.1.0",
     "mysql": "^2.18.1",
     "pg-promise": "^10.5.2",

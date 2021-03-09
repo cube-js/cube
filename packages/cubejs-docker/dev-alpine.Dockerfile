@@ -22,20 +22,8 @@ COPY yarn.lock .
 COPY tsconfig.base.json .
 COPY packages/cubejs-linter packages/cubejs-linter
 
-# There is a problem with release process.
-# We are doing version bump without updating lock files for the docker package.
-#RUN yarn install --frozen-lockfile
-RUN yarn install
-
-# @todo https://stackoverflow.com/questions/49939960/docker-copy-files-using-glob-pattern/50010093
-#COPY packages/*/package.json ./
-#COPY packages/*/yarn.lock ./
-
-# Attention, playground/client/serverless are ignored for now!
-# ls  | awk '{ print "COPY packages/" $1 "/package.json packages/" $1 "/package.json"}'
-# ls  | awk '{ print "COPY packages/" $1 "/yarn.lock packages/" $1 "/yarn.lock"}'
-
 COPY rust/package.json rust/package.json
+COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
@@ -61,36 +49,16 @@ COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/packag
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
 
-COPY rust/yarn.lock rust/yarn.lock
-COPY packages/cubejs-backend-shared/yarn.lock packages/cubejs-backend-shared/yarn.lock
-COPY packages/cubejs-api-gateway/yarn.lock packages/cubejs-api-gateway/yarn.lock
-COPY packages/cubejs-athena-driver/yarn.lock packages/cubejs-athena-driver/yarn.lock
-COPY packages/cubejs-bigquery-driver/yarn.lock packages/cubejs-bigquery-driver/yarn.lock
-COPY packages/cubejs-cli/yarn.lock packages/cubejs-cli/yarn.lock
-COPY packages/cubejs-clickhouse-driver/yarn.lock packages/cubejs-clickhouse-driver/yarn.lock
-COPY packages/cubejs-docker/yarn.lock packages/cubejs-docker/yarn.lock
-COPY packages/cubejs-dremio-driver/yarn.lock packages/cubejs-dremio-driver/yarn.lock
-COPY packages/cubejs-druid-driver/yarn.lock packages/cubejs-druid-driver/yarn.lock
-COPY packages/cubejs-elasticsearch-driver/yarn.lock packages/cubejs-elasticsearch-driver/yarn.lock
-COPY packages/cubejs-hive-driver/yarn.lock packages/cubejs-hive-driver/yarn.lock
-COPY packages/cubejs-mongobi-driver/yarn.lock packages/cubejs-mongobi-driver/yarn.lock
-COPY packages/cubejs-mssql-driver/yarn.lock packages/cubejs-mssql-driver/yarn.lock
-COPY packages/cubejs-mysql-driver/yarn.lock packages/cubejs-mysql-driver/yarn.lock
-COPY packages/cubejs-cubestore-driver/yarn.lock packages/cubejs-cubestore-driver/yarn.lock
-COPY packages/cubejs-oracle-driver/yarn.lock packages/cubejs-oracle-driver/yarn.lock
-COPY packages/cubejs-postgres-driver/yarn.lock packages/cubejs-postgres-driver/yarn.lock
-COPY packages/cubejs-prestodb-driver/yarn.lock packages/cubejs-prestodb-driver/yarn.lock
-COPY packages/cubejs-query-orchestrator/yarn.lock packages/cubejs-query-orchestrator/yarn.lock
-COPY packages/cubejs-schema-compiler/yarn.lock packages/cubejs-schema-compiler/yarn.lock
-COPY packages/cubejs-server/yarn.lock packages/cubejs-server/yarn.lock
-COPY packages/cubejs-server-core/yarn.lock packages/cubejs-server-core/yarn.lock
-COPY packages/cubejs-snowflake-driver/yarn.lock packages/cubejs-snowflake-driver/yarn.lock
-COPY packages/cubejs-sqlite-driver/yarn.lock packages/cubejs-sqlite-driver/yarn.lock
+# There is a problem with release process.
+# We are doing version bump without updating lock files for the docker package.
+#RUN yarn install --frozen-lockfile
+RUN yarn install
 
 #  --ignore @cubejs-backend/jdbc-driver not needed, because it's ignored by .dockerignore
 RUN yarn lerna bootstrap
 
 COPY rust/ rust/
+COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
