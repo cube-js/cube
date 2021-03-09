@@ -22,7 +22,7 @@ Playground:
 
 ## Running Playground in production
 
-Developer playground is only enabled when `CUBEJS_DEV_MODE` is set to `true`. Since Playground exposes data schema and admin access to all the possible queries we do not recommend running it on production instance. You can use [Cube.js frontend SDks](/frontend-introduction) to build your own query builder and use it to query your Cube.js API in a secure way.
+Developer playground is only enabled when `CUBEJS_DEV_MODE` is set to `true`. Since Playground exposes data schema and admin access to all the possible queries we do not recommend running it on production instance. You can use [Cube.js frontend SDKs](/frontend-introduction) to build your own query builder and use it to query your Cube.js API in a secure way.
 
 You can also securely run Playground on top of the production Cube.js instance inside the Cube Cloud.
 
