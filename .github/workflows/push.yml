@@ -121,6 +121,8 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+      - name: NPM lint
+        run: yarn lint:npm
       - name: Lerna lint
         run: yarn lerna run --concurrency 1 lint
 
