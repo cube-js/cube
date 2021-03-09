@@ -1246,10 +1246,10 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.4.0.tgz#c3c5ae543c897caa9c2a68630bed355be5f9990f"
   integrity sha512-JZButFdZ1+/xAfpguQHoabIXkcqRRKpMrWKBkpEZZyxfY9C1DpADFB8PEqGSTeFr135SaTRfKqGKx5xSCLI7ZQ==
 
-"@cubejs-client/core@^0.26.19":
-  version "0.26.19"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.26.19.tgz#5460673e9fa5d057ed89dff524b26a6888829871"
-  integrity sha512-cwrImTOAbiox2eY0iGN9c61SFmcTQ2UnKalv+MeSQoTu2QNn8uB2GUrt9z0YJy0CD10IJnqOYiM2JiBLN+GCOg==
+"@cubejs-client/core@^0.26.45":
+  version "0.26.45"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.26.45.tgz#40044c526c532d95f23c5cdfa3daea9e6486f70d"
+  integrity sha512-20Qd6WsE5eJBF1X4ZKHf2EccelevP5O0sz8hFKZX07/q9Uz9ZaJZ8hxL9XmA5uLBueCVjDVTb7PSae9PnqQ0SA==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1260,13 +1260,13 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/react@^0.26.34":
-  version "0.26.34"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.26.34.tgz#8dd8383e795145a1794869e2f043053db1bc6f2f"
-  integrity sha512-AwvAto8P+PemFJ/3TKoUM7kR1Y3Dk3mGK8k/GU8v4Gzf/V7ajPA1YjiqsFA1QVqK47hs7FBbll4v7TJON6wZGg==
+"@cubejs-client/react@^0.26.49":
+  version "0.26.49"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/react/-/react-0.26.49.tgz#5779df1935c4c1b2adb8eb19296b1dfc87c2d49f"
+  integrity sha512-EbK1YGuzaKzz92aI6ji0PRSvdC0MTynTJmS8hxHfWtOM+gBEPfwvCfsr3HM8I+NpclXGXZAvbaj6l2hS2m1IGA==
   dependencies:
     "@babel/runtime" "^7.1.2"
-    "@cubejs-client/core" "^0.26.19"
+    "@cubejs-client/core" "^0.26.45"
     core-js "^3.6.5"
     ramda "^0.27.0"
 
@@ -5511,7 +5511,7 @@ fs-extra@^8.1.0:
     jsonfile "^4.0.0"
     universalify "^0.1.0"
 
-fs-extra@^9.0.1:
+fs-extra@^9.0.1, fs-extra@^9.1.0:
   version "9.1.0"
   resolved "https://registry.yarnpkg.com/fs-extra/-/fs-extra-9.1.0.tgz#5954460c764a8da2094ba3554bf839e6b9a7c86d"
   integrity sha512-hcg3ZmepS30/7BSFqRvoo3DOMQu7IjqxO5nCDt+zM9XWjb33Wg7ziNT+Qvqbuc3+gWpzO02JubVyk2G4Zvo1OQ==
