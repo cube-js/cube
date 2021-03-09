@@ -12,13 +12,13 @@
     "node": ">=10.8.0"
   },
   "main": "index.js",
-  "bin": {
-    "linter": "./node_modules/.bin/eslint"
+  "peerDependencies": {
+    "eslint": ">=7.21"
   },
   "dependencies": {
-    "@typescript-eslint/eslint-plugin": "^4.8.2",
-    "@typescript-eslint/parser": "^4.8.2",
-    "eslint": "^7.14.0",
+    "@typescript-eslint/eslint-plugin": "^4.16.1",
+    "@typescript-eslint/parser": "^4.16.1",
+    "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-node": "^9.2.0"

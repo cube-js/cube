@@ -1,8 +1,10 @@
 const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
 const { addLessLoader } = require('customize-cra');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const rewireYarnWorkspaces = require('react-app-rewire-yarn-workspaces');
+
 const VARIABLES = require('./src/variables');
-const path = require('path');
 
 const LESS_VARIABLES = {};
 
@@ -46,7 +48,9 @@ module.exports = function override(config, env) {
   };
   config.stats = 'verbose';
   config.plugins = config.plugins.concat([
-    new webpack.ProgressPlugin()
+    new webpack.ProgressPlugin(),
+    // to fix No module factory available for dependency type: CssDependency
+    new MiniCssExtractPlugin(),
   ]);
   if (env === 'production') {
     config.devtool = false;
@@ -55,5 +59,6 @@ module.exports = function override(config, env) {
     javascriptEnabled: true,
     modifyVars: LESS_VARIABLES,
   })(config);
-  return config;
+
+  return rewireYarnWorkspaces(config, env);
 };

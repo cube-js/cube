@@ -14,7 +14,8 @@
   "main": "driver/ElasticSearchDriver.js",
   "typings": "driver/index.d.ts",
   "scripts": {
-    "lint": "eslint **/*.js"
+    "lint": "eslint **/*.js",
+    "lint:fix": "eslint --fix **/*.js"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.45",
@@ -23,13 +24,13 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
+    "@cubejs-backend/linter": "^0.26.13",
     "mocha": "^8.0.1",
     "should": "^13.2.3",
     "testcontainers": "^2.4.0"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   },
   "publishConfig": {
     "access": "public"

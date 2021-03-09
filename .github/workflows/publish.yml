@@ -27,13 +27,13 @@ jobs:
             node_modules
             */node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: yarn install --frozen-lockfile
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna bootstrap
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Build Core Client libraries

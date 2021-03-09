@@ -1,4 +1,7 @@
 {
+  "version": "0.26.53",
+  "npmClient": "yarn",
+  "useWorkspaces": true,
   "packages": [
     "docs",
     "packages/*",
@@ -11,7 +14,5 @@
         "--frozen-lockfile"
       ]
     }
-  },
-  "npmClient": "yarn",
-  "version": "0.26.53"
+  }
 }

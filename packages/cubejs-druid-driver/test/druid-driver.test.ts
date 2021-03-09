@@ -1,5 +1,3 @@
-/* globals describe, before, after, it */
-
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DockerComposeEnvironment, StartedDockerComposeEnvironment, Wait } from 'testcontainers';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -7,9 +5,6 @@ import { Duration, TemporalUnit } from 'node-duration';
 import path from 'path';
 
 import { DruidDriver, DruidDriverConfiguration } from '../src/DruidDriver';
-
-// eslint-disable-next-line import/no-extraneous-dependencies
-require('should');
 
 describe('DruidDriver', () => {
   let env: StartedDockerComposeEnvironment|null = null;
@@ -22,8 +17,8 @@ describe('DruidDriver', () => {
   };
 
   // eslint-disable-next-line consistent-return
-  before(async function() {
-    this.timeout(2 * 60 * 1000);
+  beforeAll(async () => {
+    jest.setTimeout(2 * 60 * 1000);
 
     if (process.env.TEST_DRUID_HOST) {
       const host = process.env.TEST_DRUID_HOST || 'localhost';
@@ -58,22 +53,24 @@ describe('DruidDriver', () => {
   });
 
   // eslint-disable-next-line consistent-return
-  after(async function() {
-    this.timeout(30 * 1000);
+  afterAll(async () => {
+    jest.setTimeout(30 * 1000);
 
     if (env) {
       await env.down();
     }
   });
 
-  it('should construct', async function () {
-    this.timeout(10 * 1000);
+  it('should construct', async () => {
+    jest.setTimeout(10 * 1000);
 
-    return doWithDriver(async () => {});
+    return doWithDriver(async () => {
+      //
+    });
   });
 
-  it('should test connection', async function () {
-    this.timeout(10 * 1000);
+  it('should test connection', async () => {
+    jest.setTimeout(10 * 1000);
 
     return doWithDriver(async (driver) => {
       await driver.testConnection();
