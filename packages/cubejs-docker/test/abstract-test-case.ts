@@ -33,7 +33,7 @@ export function createBirdBoxTestCase(options: BirdBoxTestCaseOptions) {
       );
 
       env = await dc
-        .withEnv('CUBEJS_VERSION', 'latest')
+        .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
         .up();
 
       const host = '127.0.0.1';
