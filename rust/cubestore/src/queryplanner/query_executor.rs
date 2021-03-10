@@ -393,7 +393,7 @@ impl QueryExecutorImpl {
                     cluster_exec,
                     order
                         .iter()
-                        .map(|i| schema.field(*i).name().to_string())
+                        .map(|i| schema.field(*i).qualified_name().to_string())
                         .collect(),
                 )?))
             } else {
