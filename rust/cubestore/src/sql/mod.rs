@@ -2416,6 +2416,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn empty_crash() {
+        Config::run_test("empty_crash", async move |services| {
+            let service = services.sql_service;
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS s")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE s.Table (id int, s int)")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("INSERT INTO s.Table(id, s) VALUES (1, 10);")
+                .await
+                .unwrap();
+
+            let r = service
+                .exec_query("SELECT * from s.Table WHERE id = 1 AND s = 15")
+                .await
+                .unwrap();
+            assert_eq!(r.into_rows(), vec![]);
+
+            let r = service
+                .exec_query("SELECT id, sum(s) from s.Table WHERE id = 1 AND s = 15 GROUP BY 1")
+                .await
+                .unwrap();
+            assert_eq!(r.into_rows(), vec![]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn bytes() {
         Config::run_test("bytes", async move |services| {
             let service = services.sql_service;
