@@ -25,7 +25,7 @@ use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 use datafusion::logical_plan;
-use datafusion::logical_plan::{DFSchemaRef, Expr, ToDFSchema};
+use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, ToDFSchema};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
@@ -565,25 +565,17 @@ impl CubeTable {
         };
 
         let schema = projected_schema.to_dfschema_ref()?;
-        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.sort_on()
-        {
-            Arc::new(MergeSortExec::try_new(
-                Arc::new(CubeTableExec {
-                    schema,
-                    partition_execs,
-                    index_snapshot: self.index_snapshot.clone(),
-                }),
-                join_columns.clone(),
-            )?)
+        let sort_columns = sort_columns(&self.index_snapshot, &schema);
+        let inner = Arc::new(CubeTableExec {
+            schema,
+            partition_execs,
+            index_snapshot: self.index_snapshot.clone(),
+        });
+        if !sort_columns.is_empty() {
+            Ok(Arc::new(MergeSortExec::try_new(inner, sort_columns)?))
         } else {
-            Arc::new(MergeExec::new(Arc::new(CubeTableExec {
-                schema,
-                partition_execs,
-                index_snapshot: self.index_snapshot.clone(),
-            })))
-        };
-
-        Ok(plan)
+            Ok(Arc::new(MergeExec::new(inner)))
+        }
     }
 
     pub fn project_to_index_positions(
@@ -658,27 +650,12 @@ impl ExecutionPlan for CubeTableExec {
     }
 
     fn output_hints(&self) -> OptimizerHints {
-        let sort_order;
-        if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
-            // Note that this returns `None` if any of the columns were not found.
-            // This only happens on programming errors.
-            sort_order = snapshot_sort_on
-                .iter()
-                .map(|c| self.schema.index_of(&c).ok())
-                .collect()
-        } else {
-            let index = self.index_snapshot.index().get_row();
-            sort_order = Some(
-                index
-                    .get_columns()
-                    .iter()
-                    .take(index.sort_key_size() as usize)
-                    .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
-                    .take_while(|i| i.is_some())
-                    .map(|i| i.unwrap())
-                    .collect(),
-            )
-        }
+        // Note that this returns `None` if any of the columns were not found.
+        // This only happens on programming errors.
+        let sort_order = sort_columns(&self.index_snapshot, &self.schema)
+            .iter()
+            .map(|c| self.schema.index_of(&c).ok())
+            .collect();
 
         OptimizerHints {
             sort_order,
@@ -1090,6 +1067,22 @@ impl SerializedRecordBatchStream {
         Ok(reader.collect::<Result<Vec<_>, _>>()?)
     }
 }
+
+fn sort_columns(s: &IndexSnapshot, output_schema: &DFSchema) -> Vec<String> {
+    if let Some(snapshot_sort_on) = s.sort_on() {
+        snapshot_sort_on.clone()
+    } else {
+        s.index()
+            .get_row()
+            .get_columns()
+            .iter()
+            .take(s.index().get_row().sort_key_size() as usize)
+            .take_while(|c| output_schema.index_of(c.get_name()).is_ok())
+            .map(|c| c.get_name().clone())
+            .collect()
+    }
+}
+
 /// Note: copy of the function in 'datafusion/src/datasource/parquet.rs'.
 ///
 /// Combines an array of filter expressions into a single filter expression
