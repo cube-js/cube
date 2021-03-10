@@ -2,6 +2,7 @@ use crate::cluster::Cluster;
 use crate::config::injection::DIService;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
+use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -184,7 +185,8 @@ impl QueryExecutorImpl {
         let ctx = ExecutionContext::with_config(
             ExecutionConfig::new()
                 .with_batch_size(4096)
-                .with_concurrency(1),
+                .with_concurrency(1)
+                .with_query_planner(Arc::new(CubeQueryPlanner {})),
         );
         Ok(Arc::new(ctx))
     }
