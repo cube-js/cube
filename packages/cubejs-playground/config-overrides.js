@@ -1,16 +1,8 @@
 const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
 const { addLessLoader } = require('customize-cra');
-const VARIABLES = require('./src/variables');
-const path = require('path');
 
-const LESS_VARIABLES = {};
-
-// Create LESS variable map.
-Object.keys(VARIABLES)
-  .forEach((key) => {
-    LESS_VARIABLES[`@${key}`] = VARIABLES[key];
-  });
+const { LESS_VARIABLES } = require('./src/variables');
 
 module.exports = function override(config, env) {
   config.optimization = {
