@@ -1,4 +1,5 @@
 pub mod hll;
+mod optimizations;
 mod partition_filter;
 pub mod query_executor;
 pub mod serialized_plan;
