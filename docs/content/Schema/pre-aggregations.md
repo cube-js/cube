@@ -217,8 +217,10 @@ These queries won't use `categoryAndDate` pre-aggregation:
 
 ### Time partitioning
 
-Any rollup and auto-rollup pre-aggregations can be partitioned by time using the
-`partitionGranularity` property:
+Any `rollup` pre-aggregations can be partitioned by time using the `partitionGranularity` property:
+
+This can reduce rollup refreshing time and cost significantly. Partitioned
+rollups currently cannot be used by queries without time dimensions.
 
 ```javascript
 cube(`Orders`, {
@@ -243,9 +245,6 @@ cube(`Orders`, {
 `partitionGranularity` can be either `day`, `week` or `month`. For example, if
 the `partitionGranularity` is set to `month`, Cube.js will generate separate
 `rollup` tables for each month.
-
-This can reduce rollup refreshing time and cost significantly. Partitioned
-rollups currently cannot be used by queries without time dimensions.
 
 ### Segment Partitioning
 
@@ -275,60 +274,6 @@ cube(`Orders`, {
   },
 });
 ```
-
-## Auto Rollup
-
-**Cube Cloud Feature Only**
-
-<!-- prettier-ignore-start -->
-[[info |]]
-| [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
-| an account yet, you can [sign up to the waitlist here][link-cube-cloud].
-<!-- prettier-ignore-end -->
-
-[link-cube-cloud]: https://cube.dev/cloud
-
-Auto rollup is an extension to rollup which instructs Cube.js to select rollup
-measures and dimensions at query time. Cube.js uses the query history to select
-an optimal set of measures and dimensions for any given query.
-
-You can set it up as following:
-
-```javascript
-cube(`Orders`, {
-  sql: `select * from orders`,
-
-  preAggregations: {
-    main: {
-      type: `autoRollup`,
-    },
-  },
-});
-```
-
-You can also limit the number of rollup tables that will be created using
-`maxPreAggregations` property:
-
-```javascript
-cube(`Orders`, {
-  sql: `select * from orders`,
-
-  preAggregations: {
-    main: {
-      type: `autoRollup`,
-      maxPreAggregations: 20,
-    },
-  },
-});
-```
-
-`maxPreAggregations` sets a trade-off between initial waiting times and average
-response times. The more rollup tables you have, the more time is required to
-refresh them.
-
-On the other hand, more granular rollup tables reduce average response times. In
-some cases, the column count in a rollup can also affect its refresh
-performance.
 
 ## Original SQL
 
