@@ -375,7 +375,16 @@ export default class QueryBuilder extends React.Component {
     const { query: stateQuery, pivotConfig: statePivotConfig, meta } = this.state;
 
     const finalState = this.applyStateChangeHeuristics(state);
-    if (!finalState.query) finalState.query = { ...stateQuery };
+    if (!finalState.query) {
+      finalState.query = { ...stateQuery };
+    }
+
+    const handleVizStateChange = (currentState) => {
+      const { onVizStateChanged } = this.props;
+      if (onVizStateChanged) {
+        onVizStateChanged(pick(['chartType', 'pivotConfig', 'query'], currentState));
+      }
+    };
 
     // deprecated, setters replaced by onVizStateChanged
     const runSetters = (currentState) => {
@@ -411,6 +420,8 @@ export default class QueryBuilder extends React.Component {
       queryError: null,
     });
 
+    handleVizStateChange(finalState);
+
     if (QueryRenderer.isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
       try {
         const response = await this.cubejsApi().dryRun(finalState.query, {
@@ -439,12 +450,7 @@ export default class QueryBuilder extends React.Component {
       }
     }
 
-    this.setState(finalState, () => {
-      const { onVizStateChanged } = this.props;
-      if (onVizStateChanged) {
-        onVizStateChanged(pick(['chartType', 'pivotConfig', 'query'], this.state));
-      }
-    });
+    this.setState(finalState, () => handleVizStateChange(this.state));
   }
 
   validatedQuery(state) {
