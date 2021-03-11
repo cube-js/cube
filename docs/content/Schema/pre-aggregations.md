@@ -696,7 +696,7 @@ In Cube.js, pre-aggregations are called **external** when they are flagged with
 `external: true` which instructs Cube.js to store pre-aggregations inside its own
 storage - Cube Store.
 
-If pre-aggregations aren't flagged `extenal: true` they are considered **internal** and will be saved and
+If pre-aggregations aren't flagged `external: true` they are considered **internal** and will be saved and
 queried from the source database.
 
 <!-- prettier-ignore-start -->
