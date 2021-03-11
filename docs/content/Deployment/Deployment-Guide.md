@@ -421,7 +421,7 @@ For more details, take a look at the
 
 [link-cube-cloud]: https://cube.dev/cloud
 
-Cube Cloud is purpose-built platform to run Cube.js applications in production.
+Cube Cloud is a purpose-built platform to run Cube.js applications in production.
 It is made by the creators of Cube.js and incorporates all the best practices of
 running and scaling Cube.js applications.
 
@@ -430,7 +430,6 @@ running and scaling Cube.js applications.
 Cube Cloud can be integrated with your Github to automtically deploy from the specified production branch (master by default). It also can create staging and preview APIs based on the branches in the repository.
 
 You can learn more about [deployment with Cube Cloud](/cloud/deploys) in its documentation.
-
 
 
 
