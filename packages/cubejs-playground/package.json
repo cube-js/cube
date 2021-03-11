@@ -1,6 +1,8 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.26.47",
+  "author": "Cube Dev, Inc.",
+  "version": "0.26.53",
+  "engines": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -9,8 +11,8 @@
   "dependencies": {
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.26.45",
-    "@cubejs-client/react": "^0.26.46",
+    "@cubejs-client/core": "^0.26.53",
+    "@cubejs-client/react": "^0.26.53",
     "antd": "4.13.0",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
@@ -72,6 +74,7 @@
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
+    "react-app-rewire-yarn-workspaces": "^1.0.3",
     "react-app-rewired": "^2.1.0",
     "recursive-readdir": "^2.2.2",
     "terser-webpack-plugin": "^4.1.0"

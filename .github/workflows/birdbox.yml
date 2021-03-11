@@ -30,6 +30,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Create project
         run: npx cubejs-cli@${{ github.event.inputs.version }} create new-project -d postgres
+      - name: Slack Failure
+        if: failure()
+        uses: voxmedia/github-action-slack-notify-build@v1
+        with:
+          channel: oss-ci
+          status: FAILED
+          color: danger
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
   docker:
     runs-on: ubuntu-latest
@@ -38,6 +47,7 @@ jobs:
       fail-fast: false
       matrix:
         target: ['postgresql', 'postgresql-cubestore']
+        arch: ['', '-alpine']
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -52,4 +62,14 @@ jobs:
           cd packages/cubejs-docker/
           yarn install
           yarn tsc
+          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
           yarn run birdbox:${{ matrix.target }}
+      - name: Slack Failure
+        if: failure()
+        uses: voxmedia/github-action-slack-notify-build@v1
+        with:
+          channel: oss-ci
+          status: FAILED
+          color: danger
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

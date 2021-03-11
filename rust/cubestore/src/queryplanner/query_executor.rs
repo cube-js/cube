@@ -2,6 +2,7 @@ use crate::cluster::Cluster;
 use crate::config::injection::DIService;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
+use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -34,7 +35,9 @@ use datafusion::physical_plan::merge::{MergeExec, UnionExec};
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::sort::SortExec;
-use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, RecordBatchStream};
+use datafusion::physical_plan::{
+    collect, ExecutionPlan, OptimizerHints, Partitioning, RecordBatchStream,
+};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
@@ -62,7 +65,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
-    ) -> Result<Vec<RecordBatch>, CubeError>;
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 }
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
@@ -132,7 +135,7 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
-    ) -> Result<Vec<RecordBatch>, CubeError> {
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
         let ctx = self.execution_context()?;
         let plan_ctx = ctx.clone();
@@ -173,7 +176,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 &worker_plan
             );
         }
-        Ok(results?)
+        Ok((worker_plan.schema().to_schema_ref(), results?))
     }
 }
 
@@ -182,7 +185,8 @@ impl QueryExecutorImpl {
         let ctx = ExecutionContext::with_config(
             ExecutionConfig::new()
                 .with_batch_size(4096)
-                .with_concurrency(1),
+                .with_concurrency(1)
+                .with_query_planner(Arc::new(CubeQueryPlanner {})),
         );
         Ok(Arc::new(ctx))
     }
@@ -202,7 +206,7 @@ impl QueryExecutorImpl {
                 cluster,
                 available_nodes,
                 execution_plan.schema(),
-                None,
+                OptimizerHints::default(),
             )?);
         }
         return self.build_router_split_plan(
@@ -360,9 +364,9 @@ impl QueryExecutorImpl {
                 available_nodes,
                 children[0].schema(),
                 if children.len() == 1 {
-                    children[0].output_sort_order()?
+                    children[0].output_hints()
                 } else {
-                    None
+                    OptimizerHints::default()
                 },
             )?])?,
         )
@@ -375,7 +379,7 @@ impl QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
         available_nodes: Vec<String>,
         schema: DFSchemaRef,
-        output_sort_order: Option<Vec<usize>>,
+        output_sort_order: OptimizerHints,
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
         let union_snapshots = self.union_snapshots_from_cube_table(source);
         if !union_snapshots.is_empty() {
@@ -386,12 +390,12 @@ impl QueryExecutorImpl {
                 available_nodes,
                 union_snapshots,
             ));
-            if let Some(order) = output_sort_order {
+            if let Some(order) = output_sort_order.sort_order {
                 Ok(Arc::new(MergeSortExec::try_new(
                     cluster_exec,
                     order
                         .iter()
-                        .map(|i| schema.field(*i).name().to_string())
+                        .map(|i| schema.field(*i).qualified_name().to_string())
                         .collect(),
                 )?))
             } else {
@@ -562,11 +566,12 @@ impl CubeTable {
             self.schema.clone()
         };
 
+        let schema = projected_schema.to_dfschema_ref()?;
         let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.sort_on()
         {
             Arc::new(MergeSortExec::try_new(
                 Arc::new(CubeTableExec {
-                    schema: projected_schema.to_dfschema_ref()?,
+                    schema,
                     partition_execs,
                     index_snapshot: self.index_snapshot.clone(),
                 }),
@@ -574,7 +579,7 @@ impl CubeTable {
             )?)
         } else {
             Arc::new(MergeExec::new(Arc::new(CubeTableExec {
-                schema: projected_schema.to_dfschema_ref()?,
+                schema,
                 partition_execs,
                 index_snapshot: self.index_snapshot.clone(),
             })))
@@ -652,6 +657,35 @@ impl ExecutionPlan for CubeTableExec {
             partition_execs: children,
             index_snapshot: self.index_snapshot.clone(),
         }))
+    }
+
+    fn output_hints(&self) -> OptimizerHints {
+        let sort_order;
+        if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
+            // Note that this returns `None` if any of the columns were not found.
+            // This only happens on programming errors.
+            sort_order = snapshot_sort_on
+                .iter()
+                .map(|c| self.schema.index_of(&c).ok())
+                .collect()
+        } else {
+            let index = self.index_snapshot.index().get_row();
+            sort_order = Some(
+                index
+                    .get_columns()
+                    .iter()
+                    .take(index.sort_key_size() as usize)
+                    .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
+                    .take_while(|i| i.is_some())
+                    .map(|i| i.unwrap())
+                    .collect(),
+            )
+        }
+
+        OptimizerHints {
+            sort_order,
+            single_value_columns: Vec::new(),
+        }
     }
 
     async fn execute(
@@ -1040,9 +1074,9 @@ pub struct SerializedRecordBatchStream {
 }
 
 impl SerializedRecordBatchStream {
-    pub fn write(record_batches: Vec<RecordBatch>) -> Result<Self, CubeError> {
+    pub fn write(schema: &Schema, record_batches: Vec<RecordBatch>) -> Result<Self, CubeError> {
         let file = Vec::new();
-        let mut writer = MemStreamWriter::try_new(Cursor::new(file), &record_batches[0].schema())?;
+        let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
         for batch in record_batches.iter() {
             writer.write(batch)?;
         }

@@ -132,6 +132,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
 
       return [transformResult];
     }),
+    // @ts-ignore
     R.unnest,
     R.fromPairs
   // @ts-ignore

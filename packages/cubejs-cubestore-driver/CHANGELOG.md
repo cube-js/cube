@@ -3,6 +3,55 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.53](https://github.com/cube-js/cube.js/compare/v0.26.52...v0.26.53) (2021-03-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.26.52](https://github.com/cube-js/cube.js/compare/v0.26.51...v0.26.52) (2021-03-07)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** Error: connect ECONNREFUSED 127.0.0.1:3030 ([74f4683](https://github.com/cube-js/cube.js/commit/74f468362b34f0decac67e48f52d3756ba4dc647))
+
+
+
+
+
+## [0.26.51](https://github.com/cube-js/cube.js/compare/v0.26.50...v0.26.51) (2021-03-07)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubstore-driver:** Missing files in package.json ([487f4cc](https://github.com/cube-js/cube.js/commit/487f4ccbc74356db3d1de1644d157bae3a3c6ba6))
+
+
+
+
+
+## [0.26.50](https://github.com/cube-js/cube.js/compare/v0.26.49...v0.26.50) (2021-03-07)
+
+
+### Features
+
+* **cubestore:** Web Socket transport client ([#2228](https://github.com/cube-js/cube.js/issues/2228)) ([4a86d89](https://github.com/cube-js/cube.js/commit/4a86d896a6e815b74695e0387357abc0764bfd6c))
+
+
+
+
+
+## [0.26.49](https://github.com/cube-js/cube.js/compare/v0.26.48...v0.26.49) (2021-03-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
 ## [0.26.48](https://github.com/cube-js/cube.js/compare/v0.26.47...v0.26.48) (2021-03-04)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

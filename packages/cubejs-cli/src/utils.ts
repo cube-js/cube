@@ -77,12 +77,12 @@ export const displayError = async (text: string|string[], options = {}) => {
   process.exit(1);
 };
 
-export const logStage = async (stage: string, eventName: string, props?: any) => {
+export const logStage = async (stage: string, eventName: string, props?: Record<string, any>) => {
   console.log(`- ${stage}`);
 
   if (eventName) {
     await track({
-      name: eventName,
+      event: eventName,
       ...props
     });
   }

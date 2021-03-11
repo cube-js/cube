@@ -301,6 +301,7 @@ export class CubejsServerCore {
 
     let externalDriverFactory = externalDbType && (
       () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
+        url: process.env.CUBEJS_EXT_DB_URL,
         host: process.env.CUBEJS_EXT_DB_HOST,
         database: process.env.CUBEJS_EXT_DB_NAME,
         port: process.env.CUBEJS_EXT_DB_PORT,
@@ -323,7 +324,7 @@ export class CubejsServerCore {
       });
       if (cubeStorePackage) {
         if (cubeStorePackage.isCubeStoreSupported()) {
-          console.log(`🔥 Cube Store (${version}) is assigned to 13306 port.`);
+          console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
 
           const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
             stdout: (data) => {
@@ -368,7 +369,7 @@ export class CubejsServerCore {
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       logger,
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
-      sqlCache: false,
+      sqlCache: true,
       ...opts,
       jwt: {
         key: getEnv('jwkKey'),

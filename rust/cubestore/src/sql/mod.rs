@@ -2326,6 +2326,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn group_by_without_aggregates() {
+        Config::run_test("group_by_without_aggregates", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.sessions (id int, company_id int, location_id int, t timestamp)").await.unwrap();
+
+            service.exec_query("CREATE INDEX by_company ON foo.sessions (company_id, location_id, id)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.sessions (company_id, location_id, t, id) VALUES (1, 1, '2020-01-01T00:00:00.000Z', 1), (1, 2, '2020-01-02T00:00:00.000Z', 2), (2, 1, '2020-01-03T00:00:00.000Z', 3)"
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT `sessions`.location_id, `sessions`.id FROM foo.sessions `sessions` GROUP BY 1, 2 ORDER BY 2").await.unwrap();
+
+            assert_eq!(result.get_rows(), &vec![
+                Row::new(vec![TableValue::Int(1), TableValue::Int(1)]),
+                Row::new(vec![TableValue::Int(2), TableValue::Int(2)]),
+                Row::new(vec![TableValue::Int(1), TableValue::Int(3)]),
+            ]);
+        }).await;
+    }
+
+    #[tokio::test]
     async fn create_table_with_location() {
         Config::run_test("create_table_with_location", async move |services| {
             let service = services.sql_service;
@@ -2388,6 +2413,38 @@ mod tests {
             let result = service.exec_query("SELECT count(*) from foo.bikes").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(813)])]);
         }).await;
+    }
+
+    #[tokio::test]
+    async fn empty_crash() {
+        Config::run_test("empty_crash", async move |services| {
+            let service = services.sql_service;
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS s")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE s.Table (id int, s int)")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("INSERT INTO s.Table(id, s) VALUES (1, 10);")
+                .await
+                .unwrap();
+
+            let r = service
+                .exec_query("SELECT * from s.Table WHERE id = 1 AND s = 15")
+                .await
+                .unwrap();
+            assert_eq!(r.into_rows(), vec![]);
+
+            let r = service
+                .exec_query("SELECT id, sum(s) from s.Table WHERE id = 1 AND s = 15 GROUP BY 1")
+                .await
+                .unwrap();
+            assert_eq!(r.into_rows(), vec![]);
+        })
+        .await;
     }
 
     #[tokio::test]

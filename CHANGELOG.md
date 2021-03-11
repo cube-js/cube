@@ -3,6 +3,91 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.53](https://github.com/cube-js/cube.js/compare/v0.26.52...v0.26.53) (2021-03-11)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dremio-driver:** Use ILIKE instead of LIKE for contains operator ([fb6fa73](https://github.com/cube-js/cube.js/commit/fb6fa73944e6fd53905c2a42d0ed8bacac40de08))
+* **cubestore:** fix crash on empty results from workers ([9efb2a4](https://github.com/cube-js/cube.js/commit/9efb2a46ef57d4d3d5bef91f61ba7848568e1154))
+* **cubestore:** Malloc trim inside worker processes ([9962fa1](https://github.com/cube-js/cube.js/commit/9962fa1259c85826abe4527f47518e826a0bec94))
+* **cubestore:** Node.js 10 support, switched to cli-progress ([032a6ab](https://github.com/cube-js/cube.js/commit/032a6abe25028c09a2947e36a58ffd94d4334dca))
+* **cubestore:** update arrow, fix test merge sort over unions ([#2326](https://github.com/cube-js/cube.js/issues/2326)) ([2c02d8f](https://github.com/cube-js/cube.js/commit/2c02d8f9599e3e7131ada82bcd714d814ebd100f))
+* **cubestore:** use merge sort exec when aggregations are required ([#2330](https://github.com/cube-js/cube.js/issues/2330)) ([9a4603a](https://github.com/cube-js/cube.js/commit/9a4603a857c55b868fe20e8d45536d1f1188cf44))
+
+
+### Features
+
+* **cubestore:** Support boolean expressions in partition filters ([#2322](https://github.com/cube-js/cube.js/issues/2322)) ([6fa38d3](https://github.com/cube-js/cube.js/commit/6fa38d39caa0a65beda64c1fce4ccbbff8b101da))
+
+
+
+
+
+## [0.26.52](https://github.com/cube-js/cube.js/compare/v0.26.51...v0.26.52) (2021-03-07)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** Error: connect ECONNREFUSED 127.0.0.1:3030 ([74f4683](https://github.com/cube-js/cube.js/commit/74f468362b34f0decac67e48f52d3756ba4dc647))
+
+
+
+
+
+## [0.26.51](https://github.com/cube-js/cube.js/compare/v0.26.50...v0.26.51) (2021-03-07)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubstore-driver:** Missing files in package.json ([487f4cc](https://github.com/cube-js/cube.js/commit/487f4ccbc74356db3d1de1644d157bae3a3c6ba6))
+
+
+
+
+
+## [0.26.50](https://github.com/cube-js/cube.js/compare/v0.26.49...v0.26.50) (2021-03-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Group by without aggregates returns empty results ([82902dd](https://github.com/cube-js/cube.js/commit/82902ddb894dc0a0d30e88bde33b0308136789b9))
+
+
+### Features
+
+* **cubestore:** Web Socket transport client ([#2228](https://github.com/cube-js/cube.js/issues/2228)) ([4a86d89](https://github.com/cube-js/cube.js/commit/4a86d896a6e815b74695e0387357abc0764bfd6c))
+
+
+
+
+
+## [0.26.49](https://github.com/cube-js/cube.js/compare/v0.26.48...v0.26.49) (2021-03-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** error fix ([7ac72e3](https://github.com/cube-js/cube.js/commit/7ac72e39a5ee9f1a31733a6516fb99f620102cba))
+* **@cubejs-client/react:** QueryRenderer TS type fix ([7c002c9](https://github.com/cube-js/cube.js/commit/7c002c920732b7aca6a3e3f7f346447e6f5d1b4d))
+* **@cubejs-client/react:** type fixes ([#2289](https://github.com/cube-js/cube.js/issues/2289)) ([df2b24c](https://github.com/cube-js/cube.js/commit/df2b24c74958858b192292cf22e69915c66a6d26))
+* **cubestore:** fully execute a single-node query on a worker ([#2288](https://github.com/cube-js/cube.js/issues/2288)) ([00156d0](https://github.com/cube-js/cube.js/commit/00156d03b38becbb472f0b93bfb1617506caa941))
+* **cubestore:** Merge aggregate performance improvements ([a0dbb1a](https://github.com/cube-js/cube.js/commit/a0dbb1ab492f5da40216435b8bf9b98f1ffda5e5))
+* **cubestore:** update arrow, provide hints for default index of CubeTableExec ([#2304](https://github.com/cube-js/cube.js/issues/2304)) ([e27b8a4](https://github.com/cube-js/cube.js/commit/e27b8a4bb9b35b77625103a72a73f98ccca225e0))
+* **server:** overide env variables only on reload, fix [#2267](https://github.com/cube-js/cube.js/issues/2267) ([e1ee222](https://github.com/cube-js/cube.js/commit/e1ee2226eaa1467965963089f7a380eba5d5ef38))
+
+
+### Features
+
+* **@cubejs-client/react:** Adding queryError to QueryBuilder for showing dryRun errors ([#2262](https://github.com/cube-js/cube.js/issues/2262)) ([61bac0b](https://github.com/cube-js/cube.js/commit/61bac0b0dcdd81be908143334bd726eacc7b6e49))
+* **cubestore:** Merge aggregate ([#2297](https://github.com/cube-js/cube.js/issues/2297)) ([31ebbbc](https://github.com/cube-js/cube.js/commit/31ebbbcb8a1ca2bc145b55fac00838cdeca0ea87))
+* **elasticsearch-driver:** Introduce typings ([c0e519d](https://github.com/cube-js/cube.js/commit/c0e519d1daab5e04c11ddd1a54fe2fdb213b91f7))
+* **elasticsearch-driver:** Support for elastic.co & improve docs ([#2240](https://github.com/cube-js/cube.js/issues/2240)) ([d8557f6](https://github.com/cube-js/cube.js/commit/d8557f6487ea98c19c055cc94b94b284dd273835))
+* Enable SQL cache by default ([4b00a4f](https://github.com/cube-js/cube.js/commit/4b00a4f81f82fdbb6952a922907ce6cecadb8af7))
+
+
+
+
+
 ## [0.26.48](https://github.com/cube-js/cube.js/compare/v0.26.47...v0.26.48) (2021-03-04)
 
 
