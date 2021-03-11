@@ -162,8 +162,9 @@ class PreAggregationLoadCache {
 
   public async fetchTables(preAggregation) {
     if (preAggregation.external && !this.externalDriverFactory) {
-      throw new Error('externalDriverFactory should be set in order to use external pre-aggregations');
+      throw new Error('Please install @cubejs-backend/cubestore-driver in order to use external pre-aggregations.');
     }
+
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory();
