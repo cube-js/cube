@@ -68,8 +68,6 @@
     "@types/semver": "^7.3.4",
     "@types/ws": "^7.2.9",
     "@types/yarnpkg__lockfile": "^1.1.4",
-    "eslint": "^6.8.0",
-    "eslint-plugin-node": "^5.2.1",
     "jest": "^26.0.0",
     "should": "^13.2.3",
     "ts-jest": "^26.0.0",
