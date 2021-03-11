@@ -11,6 +11,15 @@ const GlobalStyles = createGlobalStyle`
       .join('\n    ')}
   }
 
+  body {
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: #f6f6f8;
+    overflow-x: hidden;
+  }
+
   .inline-code {
     margin: 0 1px;
     padding: 0.2em 0.4em;
@@ -85,6 +94,37 @@ const GlobalStyles = createGlobalStyle`
     -moz-hyphens: none;
     -ms-hyphens: none;
     hyphens: none;
+  }
+
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+  }
+
+  #playground-root {
+    height: 100%;
+  }
+
+  .schema-sidebar,
+  .schema-sidebar .ant-tabs,
+  .schema-sidebar .ant-tabs-content {
+    height: 100%;
+  }
+
+  .schema-sidebar {
+    background: #fff;
+    border-right: 1px solid #eee;
+    padding: 0;
+  }
+
+  .schema-sidebar .ant-tabs-tabpane {
+    /* TODO: replace with flexbox */
+    height: 85%;
+    overflow: auto;
+  }
+
+  .ant-popover-disabled-compatible-wrapper {
+    pointer-events: none;
   }
   
   pre[class*="language-"]::-moz-selection, pre[class*="language-"] ::-moz-selection,

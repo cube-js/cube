@@ -6,8 +6,7 @@
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-playground"
   },
-  "main": "dist/cubejs-playground.js",
-  "module": "dist/cubejs-playground.esm.js",
+  "module": "lib/cubejs-playground.esm.js",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.26.45",

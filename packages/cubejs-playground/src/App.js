@@ -10,7 +10,6 @@ import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
 import { event, setAnonymousId } from './events';
 import './index.less';
-import './index.css';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
@@ -72,7 +71,7 @@ class App extends Component {
     if (!showLoader) {
       return null;
     }
-    
+
     if (context == null) {
       return <CubeLoader />;
     }
