@@ -27,9 +27,9 @@ jobs:
             node_modules
             rust/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-14.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
