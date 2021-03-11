@@ -67,17 +67,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
       - name: Build client
@@ -108,17 +106,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: NPM lint
         run: yarn lint:npm
       - name: Lerna lint
@@ -142,17 +138,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Check Yarn lock wasn't modified
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: Build Core Client libraries
@@ -194,17 +188,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Redis Integration with Redis Driver
@@ -270,17 +262,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Postgres Integration with 9.6
@@ -358,17 +348,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
       - name: Run MySQL Integration with 5.6
@@ -439,17 +427,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-workspace-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
       - name: Lerna tsc
         run: yarn tsc
       - name: Run PrestoDB Integration with Postgres 12.4
