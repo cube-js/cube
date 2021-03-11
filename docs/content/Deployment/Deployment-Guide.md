@@ -415,9 +415,11 @@ For more details, take a look at the
 
 ## Cube Cloud
 
+<!-- prettier-ignore-start -->
 [[info |]]
 | [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
 | an account yet, you can [sign up to the waitlist here][link-cube-cloud].
+ <!-- prettier-ignore-end -->
 
 [link-cube-cloud]: https://cube.dev/cloud
 
@@ -430,4 +432,3 @@ running and scaling Cube.js applications.
 Cube Cloud can be integrated with your GitHub to automatically deploy from the specified production branch (`master` by default). It also can create staging and preview APIs based on the branches in the repository.
 
 You can learn more about [deployment with Cube Cloud](/cloud/deploys) in its documentation.
-
