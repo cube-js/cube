@@ -5,9 +5,9 @@ category: Caching
 menuOrder: 2
 ---
 
-Pre-aggregations is a powerfull way to speed up your Cube.js queries. There are many
-configuration options to consider. Please make sure to also check [this
-Pre-Aggregations page in the data schema section](/pre-aggregations).
+Pre-aggregations is a powerfull way to speed up your Cube.js queries. There are
+many configuration options to consider. Please make sure to also check
+[this Pre-Aggregations page in the data schema section](/pre-aggregations).
 
 ## Refresh Strategy
 
@@ -67,6 +67,9 @@ refresh all pre-aggregations marked with the
 Please consult the [Production Checklist][link-production-checklist-refresh] for
 best practices on running background refresh in production environments.
 
+[link-production-checklist-refresh]:
+  https://cube.dev/docs/deployment/production-checklist#set-up-refresh-worker
+
 ```js
 cube(`Orders`, {
   // ...
@@ -85,11 +88,11 @@ cube(`Orders`, {
 
 ## Pre-Aggregations Storage
 
-When using **external** pre-aggregations, Cube.js will
-store pre-aggregations inside its own purpose-built storage layer: Cube Store.
+When using **external** pre-aggregations, Cube.js will store pre-aggregations
+inside its own purpose-built storage layer: Cube Store.
 
-Alternatively, you can store external pre-aggregations in a different database, such MySQL or Postgres.
-In order to make this work, you should set the
+Alternatively, you can store external pre-aggregations in a different database,
+such MySQL or Postgres. In order to make this work, you should set the
 [`externalDriverFactory`][ref-config-extdriverfactory] and
 [`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
 configuration file. These properties can also be set through the environment
