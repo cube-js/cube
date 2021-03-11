@@ -161,14 +161,21 @@ declare module '@cubejs-client/react' {
      */
     cubejsApi: CubejsApi;
     /**
-     * Default query
+     * State for the QueryBuilder to start with. Pass in the value previously saved from onVizStateChanged to restore a session.
      */
-    query?: Query;
-    vizState?: VizState;
+    initialVizState?: VizState;
     /**
-     * @default defaultChartType line
+     * Called by the `QueryBuilder` when the viz state has changed. Use it to save state outside of the `QueryBuilder` component.
+     */
+    onVizStateChanged?: (vizState: VizState) => void;
+    /**
+     * @default defaultChartType line (used when initialVizState is not set or does not contain chartType)
      */
     defaultChartType?: ChartType;
+    /**
+     * Default query (used when initialVizState is not set or does not contain query)
+     */
+    defaultQuery?: Query;
     /**
      * Defaults to `false`. This means that the default heuristics will be applied. For example: when the query is empty and you select a measure that has a default time dimension it will be pushed to the query.
      * @default disableHeuristics false
@@ -181,9 +188,20 @@ declare module '@cubejs-client/react' {
      */
     stateChangeHeuristics?: (state: QueryBuilderState) => QueryBuilderState;
     /**
-     * Called by the `QueryBuilder` when the query state has changed. Use it when state is maintained outside of the `QueryBuilder` component.
+     * @ignore @deprecated Controlled query
+     */
+    query?: Query;
+    /**
+     * @ignore @deprecated Controlled query setter
      */
     setQuery?: (query: Query) => void;
+    /**
+     * @ignore @deprecated Controlled vizState
+     */
+    vizState?: VizState;
+    /**
+     * @ignore @deprecated Controlled vizState setter
+     */
     setVizState?: (vizState: VizState) => void;
   };
 
@@ -530,7 +548,7 @@ declare module '@cubejs-client/react' {
   type FilterUpdateFields = {
     member?: string;
     operator: BinaryOperator | UnaryOperator;
-    values: string[];
+    values?: string[];
     dimension: TCubeDimension | TCubeMeasure
   }
   type FilterUpdater = MemberUpdater<FilterUpdateFields>;
@@ -547,9 +565,11 @@ declare module '@cubejs-client/react' {
     sourceAxis: TSourceAxis;
     destinationAxis: TSourceAxis;
   };
-
+  type PivotConfigExtraUpdateFields = {
+    limit?: number;
+  };
   type PivotConfigUpdater = {
     moveItem: (args: PivotConfigUpdaterArgs) => void;
-    update: (pivotConfig: PivotConfig & { limit: number }) => void;
+    update: (pivotConfig: PivotConfig & PivotConfigExtraUpdateFields) => void;
   };
 }
