@@ -25,8 +25,8 @@ jobs:
         with:
           path: |
             node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+            docs/node_modules
+          key: ${{ runner.os }}-workspace-docs-${{ matrix.node-version }}
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:

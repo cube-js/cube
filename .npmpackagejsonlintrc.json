@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "require-author": "error",
+    "require-engines": "error",
+    "require-license": "error",
+    "require-name": "error"
+  }
+}

@@ -141,7 +141,8 @@ impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProc
                     .execute_worker_plan(plan_node_to_send, remote_to_local_names)
                     .await;
                 debug!("Running select in worker completed: {:?}", plan_node);
-                SerializedRecordBatchStream::write(res?)
+                let (schema, records) = res?;
+                SerializedRecordBatchStream::write(schema.as_ref(), records)
             }
         }
     }
@@ -713,12 +714,11 @@ impl ClusterImpl {
         #[cfg(target_os = "windows")]
         {
             // TODO optimize for no double conversion
-            let res = SerializedRecordBatchStream::write(
-                self.query_executor
-                    .execute_worker_plan(plan_node.clone(), remote_to_local_names)
-                    .await?,
-            );
-
+            let (schema, records) = self
+                .query_executor
+                .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                .await?;
+            let res = SerializedRecordBatchStream::write(schema.as_ref(), records);
             info!("Running select completed ({:?})", start.elapsed()?);
             res
         }
@@ -736,11 +736,11 @@ impl ClusterImpl {
                 .await
             } else {
                 // TODO optimize for no double conversion
-                SerializedRecordBatchStream::write(
-                    self.query_executor
-                        .execute_worker_plan(plan_node.clone(), remote_to_local_names)
-                        .await?,
-                )
+                let (schema, records) = self
+                    .query_executor
+                    .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                    .await?;
+                SerializedRecordBatchStream::write(schema.as_ref(), records)
             };
 
             info!("Running select completed ({:?})", start.elapsed()?);

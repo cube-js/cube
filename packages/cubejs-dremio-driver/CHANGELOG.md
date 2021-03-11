@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.53](https://github.com/cube-js/cube.js/compare/v0.26.52...v0.26.53) (2021-03-11)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dremio-driver:** Use ILIKE instead of LIKE for contains operator ([fb6fa73](https://github.com/cube-js/cube.js/commit/fb6fa73944e6fd53905c2a42d0ed8bacac40de08))
+
+
+
+
+
 ## [0.26.49](https://github.com/cube-js/cube.js/compare/v0.26.48...v0.26.49) (2021-03-05)
 
 **Note:** Version bump only for package @cubejs-backend/dremio-driver

@@ -2,6 +2,7 @@ use crate::cluster::Cluster;
 use crate::config::injection::DIService;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
+use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -64,7 +65,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
-    ) -> Result<Vec<RecordBatch>, CubeError>;
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 }
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
@@ -134,7 +135,7 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
-    ) -> Result<Vec<RecordBatch>, CubeError> {
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
         let ctx = self.execution_context()?;
         let plan_ctx = ctx.clone();
@@ -175,7 +176,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 &worker_plan
             );
         }
-        Ok(results?)
+        Ok((worker_plan.schema().to_schema_ref(), results?))
     }
 }
 
@@ -184,7 +185,8 @@ impl QueryExecutorImpl {
         let ctx = ExecutionContext::with_config(
             ExecutionConfig::new()
                 .with_batch_size(4096)
-                .with_concurrency(1),
+                .with_concurrency(1)
+                .with_query_planner(Arc::new(CubeQueryPlanner {})),
         );
         Ok(Arc::new(ctx))
     }
@@ -393,7 +395,7 @@ impl QueryExecutorImpl {
                     cluster_exec,
                     order
                         .iter()
-                        .map(|i| schema.field(*i).name().to_string())
+                        .map(|i| schema.field(*i).qualified_name().to_string())
                         .collect(),
                 )?))
             } else {
@@ -1072,9 +1074,9 @@ pub struct SerializedRecordBatchStream {
 }
 
 impl SerializedRecordBatchStream {
-    pub fn write(record_batches: Vec<RecordBatch>) -> Result<Self, CubeError> {
+    pub fn write(schema: &Schema, record_batches: Vec<RecordBatch>) -> Result<Self, CubeError> {
         let file = Vec::new();
-        let mut writer = MemStreamWriter::try_new(Cursor::new(file), &record_batches[0].schema())?;
+        let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
         for batch in record_batches.iter() {
             writer.write(batch)?;
         }

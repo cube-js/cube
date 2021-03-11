@@ -1,5 +1,5 @@
 import React from 'react';
-import { prop, uniqBy, equals } from 'ramda';
+import { prop, uniqBy, equals, pick } from 'ramda';
 import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
@@ -16,23 +16,28 @@ const granularities = [
 ];
 
 export default class QueryBuilder extends React.Component {
+  // This is an anti-pattern, only kept for backward compatibility
+  // https://reactjs.org/blog/2018/06/07/you-probably-dont-need-derived-state.html#anti-pattern-unconditionally-copying-props-to-state
   static getDerivedStateFromProps(props, state) {
-    const nextState = {
-      ...state,
-      ...(props.vizState || {}),
-    };
+    if (props.query || props.vizState) {
+      const nextState = {
+        ...state,
+        ...(props.vizState || {}),
+      };
 
-    if (Array.isArray(props.query)) {
-      throw new Error('Array of queries is not supported.');
+      if (Array.isArray(props.query)) {
+        throw new Error('Array of queries is not supported.');
+      }
+
+      return {
+        ...nextState,
+        query: {
+          ...nextState.query,
+          ...(props.query || {}),
+        },
+      };
     }
-
-    return {
-      ...nextState,
-      query: {
-        ...nextState.query,
-        ...(props.query || {}),
-      },
-    };
+    return null;
   }
 
   static resolveMember(type, { meta, query }) {
@@ -68,13 +73,13 @@ export default class QueryBuilder extends React.Component {
     super(props);
 
     this.state = {
-      query: props.query,
-      chartType: 'line',
-      pivotConfig: null,
-      validatedQuery: props.query,
+      query: props.defaultQuery || props.query,
+      chartType: props.defaultChartType,
+      validatedQuery: props.query, // deprecated, validatedQuery should not be set until after dry-run for safety
       missingMembers: [],
       isFetchingMeta: false,
-      ...props.vizState,
+      ...props.vizState, // deprecated
+      ...props.initialVizState
     };
 
     this.mutexObj = {};
@@ -107,9 +112,6 @@ export default class QueryBuilder extends React.Component {
   }
 
   fetchMeta = async () => {
-    const { query, pivotConfig } = this.state;
-    let dryRunResponse;
-    let missingMembers = [];
     let meta;
     let metaError = null;
 
@@ -120,20 +122,14 @@ export default class QueryBuilder extends React.Component {
       metaError = error;
     }
 
-    if (this.isQueryPresent()) {
-      missingMembers = this.getMissingMembers(query, meta);
-
-      if (missingMembers.length === 0) {
-        dryRunResponse = this.cubejsApi().dryRun(query);
-      }
-    }
-
     this.setState({
       meta,
       metaError,
-      pivotConfig: ResultSet.getNormalizedPivotConfig(dryRunResponse?.pivotQuery || {}, pivotConfig),
-      missingMembers,
       isFetchingMeta: false
+    }, () => {
+      // Run update query to force viz state update
+      // This will catch any new missing members, and also validate the query against the new meta
+      this.updateQuery({});
     });
   }
 
@@ -347,16 +343,13 @@ export default class QueryBuilder extends React.Component {
         update: (config) => {
           const { limit } = config;
 
-          if (limit == null) {
-            this.updateVizState({
-              pivotConfig: {
-                ...pivotConfig,
-                ...config,
-              },
-            });
-          } else {
-            this.updateQuery({ limit });
-          }
+          this.updateVizState({
+            pivotConfig: {
+              ...pivotConfig,
+              ...config,
+            },
+            ...(limit ? { query: { ...query, limit } } : null)
+          });
         },
       },
       missingMembers,
@@ -381,9 +374,19 @@ export default class QueryBuilder extends React.Component {
     const { setQuery, setVizState } = this.props;
     const { query: stateQuery, pivotConfig: statePivotConfig, meta } = this.state;
 
-    let finalState = this.applyStateChangeHeuristics(state);
-    const query = { ...(finalState.query || stateQuery) };
+    const finalState = this.applyStateChangeHeuristics(state);
+    if (!finalState.query) {
+      finalState.query = { ...stateQuery };
+    }
 
+    const handleVizStateChange = (currentState) => {
+      const { onVizStateChanged } = this.props;
+      if (onVizStateChanged) {
+        onVizStateChanged(pick(['chartType', 'pivotConfig', 'query'], currentState));
+      }
+    };
+
+    // deprecated, setters replaced by onVizStateChanged
     const runSetters = (currentState) => {
       if (setVizState) {
         const { meta: _, validatedQuery, ...toSet } = currentState;
@@ -395,55 +398,45 @@ export default class QueryBuilder extends React.Component {
     };
 
     if (finalState.shouldApplyHeuristicOrder) {
-      query.order = defaultOrder(query);
+      finalState.query.order = defaultOrder(finalState.query);
     }
 
-    const nextQuery = {
-      ...query,
-    };
-
     finalState.pivotConfig = ResultSet.getNormalizedPivotConfig(
-      nextQuery,
+      finalState.query,
       finalState.pivotConfig !== undefined ? finalState.pivotConfig : statePivotConfig
     );
 
-    const missingMembers = this.getMissingMembers(nextQuery, meta);
+    finalState.missingMembers = this.getMissingMembers(finalState.query, meta);
 
+    // deprecated
     runSetters({
       ...state,
-      query: nextQuery,
+      query: finalState.query,
     });
 
+    // Update optimistically so that UI does not stutter
     this.setState({
       ...finalState,
-      query: nextQuery,
-      missingMembers,
       queryError: null,
     });
 
-    let pivotQuery = {};
-    if (QueryRenderer.isQueryPresent(query) && missingMembers.length === 0) {
+    handleVizStateChange(finalState);
+
+    if (QueryRenderer.isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
       try {
-        const response = await this.cubejsApi().dryRun(query, {
+        const response = await this.cubejsApi().dryRun(finalState.query, {
           mutexObj: this.mutexObj,
         });
-        pivotQuery = response.pivotQuery;
 
         if (finalState.shouldApplyHeuristicOrder) {
-          nextQuery.order = (response.queryOrder || []).reduce((memo, current) => ({ ...memo, ...current }), {});
+          finalState.query.order = (response.queryOrder || []).reduce((memo, current) => ({ ...memo, ...current }), {});
         }
 
-        if (QueryRenderer.isQueryPresent(stateQuery)) {
-          finalState = {
-            ...finalState,
-            query: nextQuery,
-            pivotConfig: ResultSet.getNormalizedPivotConfig(pivotQuery, finalState.pivotConfig),
-          };
+        finalState.pivotConfig = ResultSet.getNormalizedPivotConfig(response.pivotQuery, finalState.pivotConfig);
+        finalState.validatedQuery = this.validatedQuery(finalState);
 
-          this.setState({
-            ...finalState,
-            validatedQuery: this.validatedQuery(finalState),
-          });
+        // deprecated
+        if (QueryRenderer.isQueryPresent(stateQuery)) {
           runSetters({
             ...this.state,
             ...finalState,
@@ -456,6 +449,8 @@ export default class QueryBuilder extends React.Component {
         });
       }
     }
+
+    this.setState(finalState, () => handleVizStateChange(this.state));
   }
 
   validatedQuery(state) {
@@ -468,7 +463,7 @@ export default class QueryBuilder extends React.Component {
   }
 
   defaultHeuristics(newState) {
-    const { query, sessionGranularity } = this.state;
+    const { query, sessionGranularity, meta } = this.state;
     const defaultGranularity = sessionGranularity || 'day';
 
     if (Array.isArray(query)) {
@@ -478,8 +473,6 @@ export default class QueryBuilder extends React.Component {
     if (newState.query) {
       const oldQuery = query;
       let newQuery = newState.query;
-
-      const { meta } = this.state;
 
       if (
         (oldQuery.timeDimensions || []).length === 1
@@ -654,12 +647,18 @@ QueryBuilder.contextType = CubeContext;
 
 QueryBuilder.defaultProps = {
   cubejsApi: null,
-  query: {},
-  setQuery: null,
-  setVizState: null,
   stateChangeHeuristics: null,
   disableHeuristics: false,
   render: null,
   wrapWithQueryRenderer: true,
-  vizState: {},
+  defaultChartType: 'line',
+  defaultQuery: {},
+  initialVizState: null,
+  onVizStateChanged: null,
+
+  // deprecated
+  query: null,
+  setQuery: null,
+  vizState: null,
+  setVizState: null,
 };

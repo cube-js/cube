@@ -1,6 +1,8 @@
 {
   "name": "@cubejs-client/playground",
-  "version": "0.26.49",
+  "author": "Cube Dev, Inc.",
+  "version": "0.26.53",
+  "engines": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -79,6 +81,7 @@
     "fs-extra": "^8.1.0",
     "less-loader": "^5.0.0",
     "react": "^17.0.1",
+    "react-app-rewire-yarn-workspaces": "^1.0.3",
     "react-app-rewired": "^2.1.0",
     "react-dom": "^17.0.1",
     "recursive-readdir": "^2.2.2",

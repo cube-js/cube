@@ -1,6 +1,7 @@
 module.exports = {
   extends: 'airbnb',
   plugins: ['react', 'jsx-a11y', 'import'],
+  parser: 'babel-eslint',
   rules: {
     'object-curly-newline': 0,
     'react/jsx-no-bind': 0,
