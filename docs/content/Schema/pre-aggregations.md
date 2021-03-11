@@ -403,7 +403,9 @@ cube(`Orders`, {
 For possible `every` parameter values please refer to
 [`refreshKey`][ref-cube-refreshkey] documentation.
 
-In the case of partitioned rollups, an incremental `refreshKey` can be used:
+## Incremental refresh
+
+You can incrementally refresh partitioned rollups.
 
 ```javascript
 cube(`Orders`, {
@@ -435,9 +437,7 @@ today's and the last 7 days of partitions. Partitions before the `7 day`
 interval **will not** be refreshed once they are built unless the rollup SQL is
 changed.
 
-### Original SQL with incremental refreshKey
-
-An original SQL pre-aggregation can be used with time partitioning and
+An original SQL pre-aggregation can also be used with time partitioning and
 incremental `refreshKey`. In this case, it can be used as follows:
 
 ```javascript
@@ -472,50 +472,6 @@ cube(`Orders`, {
   },
 });
 ```
-
-
-## Read Only Data Source Pre-Aggregations
-
-In some cases, it may not be possible to stage pre-aggregation query results in
-materialized tables in the source database. For example, the database driver may
-not support it, or the source database may be read-only.
-
-To fallback to a strategy where the pre-aggregation query results are downloaded
-without first being materialized, set the `readOnly` property of
-[`driverFactory`][ref-config-driverfactory] in your configuration:
-
-```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
-module.exports = {
-  driverFactory: () =>
-    new PostgresDriver({
-      readOnly: true,
-    })
-};
-```
-
-### Limitations
-
-<!-- prettier-ignore-start -->
-[[warning |]]
-| The following recommendations are only suitable for small pre-aggregations
-| since they are stored on the local Cube.js deployment. We **do not**
-| recommend using `readOnly` mode for production workloads.
-<!-- prettier-ignore-end -->
-
-By default, Cube.js uses temporary tables to extract data types from executed
-query while `readOnly` is `false`. If the driver is used in `readOnly` mode, it
-will use heuristics to extract data types from the database's response, but this
-strategy has certain limitations:
-
-- The aggregation results can be empty, and Cube.js will throw an exception
-  because it is impossible to detect types
-- Data types can be incorrectly inferred, in rare cases
-
-We highly recommend leaving `readOnly` unset or explicitly setting it to `false`
-when using drivers for external pre-aggregations.
-
 
 ## useOriginalSqlPreAggregations
 
@@ -690,7 +646,7 @@ cube(`Orders`, {
   },
 });
 ```
-## External vs Internal Pre-Aggregations
+## External vs Internal
 
 In Cube.js, pre-aggregations are called **external** when they are flagged with
 `external: true` which instructs Cube.js to store pre-aggregations inside its own
@@ -740,7 +696,7 @@ new tables in the source database. For external pre-aggregations, these source
 tables are temporary - once downloaded and uploaded to the external database,
 they are cleaned up.
 
-## Pre-aggregations Garbage Collection
+## Garbage Collection
 
 When pre-aggregations are refreshed, Cube.js will create new pre-aggregation
 tables each time a version change is detected. This allows for seamless,
