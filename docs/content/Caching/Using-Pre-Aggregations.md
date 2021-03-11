@@ -97,6 +97,7 @@ variables.
 
 [ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
+[link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
 
 ```bash
 CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
