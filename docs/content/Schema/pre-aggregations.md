@@ -110,8 +110,7 @@ pre-aggregation can be used by following algorithm:
 3. If query is **Not Additive** check if query time dimension granularity is
    set, all query filter dimensions are included in query dimensions and that
    the rollup defines exact set of dimensions and all measures used in the
-   query.
-**Explanation of terms:**
+   query. **Explanation of terms:**
 
 - A query is **Leaf Measure Additive** if all of its **Leaf Measures** are
   either `count`, `sum`, `min`, `max` or `countDistinctApprox` type.
@@ -473,7 +472,6 @@ cube(`Orders`, {
 });
 ```
 
-
 ## Read Only Data Source Pre-Aggregations
 
 In some cases, it may not be possible to stage pre-aggregation query results in
@@ -491,7 +489,7 @@ module.exports = {
   driverFactory: () =>
     new PostgresDriver({
       readOnly: true,
-    })
+    }),
 };
 ```
 
@@ -515,7 +513,6 @@ strategy has certain limitations:
 
 We highly recommend leaving `readOnly` unset or explicitly setting it to `false`
 when using drivers for external pre-aggregations.
-
 
 ## useOriginalSqlPreAggregations
 
@@ -690,28 +687,30 @@ cube(`Orders`, {
   },
 });
 ```
+
 ## External vs Internal Pre-Aggregations
 
 In Cube.js, pre-aggregations are called **external** when they are flagged with
-`external: true` which instructs Cube.js to store pre-aggregations inside its own
-storage - Cube Store.
+`external: true` which instructs Cube.js to store pre-aggregations inside its
+own storage - Cube Store.
 
-If pre-aggregations aren't flagged `extenal: true` they are considered **internal** and will be saved and
-queried from the source database.
+If pre-aggregations aren't flagged `external: true` they are considered
+**internal** and will be saved and queried from the source database.
 
 <!-- prettier-ignore-start -->
 [[info | ]]
 | We recommend always using **external** pre-aggregations for better concurrency and performance.
 <!-- prettier-ignore-end -->
 
-You should use external pre-aggregations for scenarios where you need to handle high
-throughput for a big data backend. It allows downloading rollups and original
-SQL pre-aggregations prepared in big data backends such as AWS Athena, BigQuery,
-Presto, Hive and others to Cube Store for low latency and high throughput querying.
+You should use external pre-aggregations for scenarios where you need to handle
+high throughput for a big data backend. It allows downloading rollups and
+original SQL pre-aggregations prepared in big data backends such as AWS Athena,
+BigQuery, Presto, Hive and others to Cube Store for low latency and high
+throughput querying.
 
 While big data backends aren't very suitable for handling massive amounts of
-concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage can do it
-very well.
+concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage
+can do it very well.
 
 To set it up, simply add the `external` property to your pre-aggregation:
 
