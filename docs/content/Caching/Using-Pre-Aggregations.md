@@ -5,7 +5,7 @@ category: Caching
 menuOrder: 2
 ---
 
-Pre-aggregations is a powerfull way to speed up your Cube.js queries. There are many
+Pre-aggregations is a powerful way to speed up your Cube.js queries. There are many
 configuration options to consider. Please make sure to also check [this
 Pre-Aggregations page in the data schema section](/pre-aggregations).
 
@@ -97,6 +97,7 @@ variables.
 
 [ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
+[link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
 
 ```bash
 CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
