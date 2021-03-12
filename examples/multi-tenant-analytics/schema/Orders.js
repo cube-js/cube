@@ -2,28 +2,10 @@ cube(`Orders`, {
   sql: `SELECT * FROM public.orders
     ${SECURITY_CONTEXT.role.unsafeValue() !== 'admin' ? 'WHERE id % 10 = FLOOR(RANDOM() * 10)' : ''}`,
 
-  joins: {
-    Products: {
-      sql: `${CUBE}.product_id = ${Products}.id`,
-      relationship: `belongsTo`
-    },
-    
-    Users: {
-      sql: `${CUBE}.user_id = ${Users}.id`,
-      relationship: `belongsTo`
-    }
-  },
-  
   measures: {
     count: {
       type: `count`,
-      drillMembers: [id, createdAt]
     },
-    
-    number: {
-      sql: `number`,
-      type: `sum`
-    }
   },
   
   dimensions: {
@@ -31,22 +13,6 @@ cube(`Orders`, {
       sql: `status`,
       type: `string`
     },
-    
-    id: {
-      sql: `id`,
-      type: `number`,
-      primaryKey: true
-    },
-    
-    createdAt: {
-      sql: `created_at`,
-      type: `time`
-    },
-    
-    completedAt: {
-      sql: `completed_at`,
-      type: `time`
-    }
   },
   
   dataSource: `default`
