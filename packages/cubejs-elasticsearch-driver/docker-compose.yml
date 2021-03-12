@@ -1,0 +1,16 @@
+version: '3'
+services:
+  es-distro:
+    image: amazon/opendistro-for-elasticsearch:1.13.1
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - 9200:9200
+    healthcheck:
+      test: curl -k -u admin:admin --silent --fail https://localhost:9200/_cluster/health || exit 1
+      timeout: 5s
+      interval: 2s
+      retries: 3
+      start_period: 10s
