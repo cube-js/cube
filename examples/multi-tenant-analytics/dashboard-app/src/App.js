@@ -9,11 +9,6 @@ import { CubeProvider } from '@cubejs-client/react';
 import client from './graphql/client';
 import Header from './components/Header';
 import { useAuth0 } from '@auth0/auth0-react';
-// const API_URL = "http://localhost:4000";
-// const CUBEJS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiZm9vYmFyIiwiaWF0IjoxNjE1MTk0MTIwLCJleHAiOjE2MTUxOTc3NjEsImp0aSI6ImMxYTk2NTY1LTUzNzEtNDNlOS05MDg0LTk0NWY3ZTI3ZDJlZSJ9.FSdEweetjeT9GJsqRqEebHLtoa5dVkIgWX4T03Y7Azg";
-// const cubejsApi = cubejs(CUBEJS_TOKEN, {
-//   apiUrl: `${API_URL}/cubejs-api/v1`
-// });
 
 const AppLayout = ({
   children
@@ -65,7 +60,7 @@ const App = ({ children }) => {
     console.log(accessToken);
 
     setCubejsApi(cubejs({
-      apiUrl: `http://localhost:4000/cubejs-api/v1`,
+      apiUrl: process.env.REACT_APP_API_URL,
       headers: {
         Authorization: `${accessToken}`
       },
