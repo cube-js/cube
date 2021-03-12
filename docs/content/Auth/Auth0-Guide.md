@@ -18,7 +18,7 @@ First, go to the [Auth0 dashboard][link-auth0-app], and click on the
 Applications menu option on the left and then click the Create Application
 button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -26,12 +26,12 @@ button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 In the popup, set the name of your application and select Single Page Web
 Applications.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -39,7 +39,7 @@ Applications.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Next, go to the application's settings and add the appropriate callback URLs for
 your application (`http://localhost:4000` for the Developer Playground).
@@ -100,7 +100,7 @@ API][link-auth0-api]. First, go to the [Auth0 dashboard][link-auth0-app] and
 click on the APIs menu option from the left sidebar, then click the Create API
 button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -108,12 +108,12 @@ button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 In the 'New API' popup, set a name for this API and an identifier (e.g.
 `cubejs-app`), then click the Create button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -121,7 +121,7 @@ In the 'New API' popup, set a name for this API and an identifier (e.g.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 <!-- prettier-ignore-start -->
 [[info |]]
@@ -163,7 +163,7 @@ CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
 Go to the [OpenID Playground from Auth0][link-openid-playground] to and click
 Configuration.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -171,7 +171,7 @@ Configuration.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Enter the following values:
 
@@ -183,7 +183,7 @@ Enter the following values:
 Click 'Use Auth0 Discovery Document' to auto-fill the remaining values, then
 click Save.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -191,7 +191,7 @@ click Save.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -202,7 +202,7 @@ click Save.
 Now click Start; if the login is successful, you should see the code, as well as
 a button called 'Exchange'. Click on it to exchange the code for your tokens:
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -210,7 +210,7 @@ a button called 'Exchange'. Click on it to exchange the code for your tokens:
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Copy the `access_token` from the response, and use the [JWT.IO
 Debugger][link-jwt-io-debug] to decode the token and verify any custom claims
@@ -221,7 +221,7 @@ were successfully added.
 Now open the Developer Playground (at `http://localhost:4000`) and on the Build
 page, click Add Security Context.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -229,12 +229,12 @@ page, click Add Security Context.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Click the Token tab, paste the JWT from OpenID Playground and click the Save
 button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -242,7 +242,7 @@ button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Close the popup and use the Developer Playground to make a request. Any schemas
 using the [Security Context][ref-sec-ctx] should now work as expected.

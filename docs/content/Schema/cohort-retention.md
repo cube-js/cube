@@ -19,7 +19,15 @@ Retention is a simplified one, where the **starting condition is usually the tim
 
 It’s usually visualized as a cohort grid or retention curves.
 
-<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Schema/cohort-retention1.png" width="100%" />
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/cohort-retention1.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 Cohort retention analysis is pretty hard to do in SQL. **We need to have the user-date combination**, which tells us about
 a user’s activity on that date, including dates with no activity. To do this,
