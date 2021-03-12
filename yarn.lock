@@ -21519,7 +21519,7 @@ testcontainers@^6.0.0, testcontainers@^6.4.2:
     stream-to-array "^2.3.0"
     tar-fs "^2.1.1"
 
-testcontainers@^7.4.0:
+testcontainers@^7.4.0, testcontainers@^7.5.0:
   version "7.5.0"
   resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-7.5.0.tgz#2f570ddad89dbd8ea81585562136f7e8fb4b0c7d"
   integrity sha512-cSP17iaXcy0U/wFTptjphgrd42kBRQYdizpt3bvjUe/c0MSbwEH6kXKZMXv5ZQ8LQB4OAwmlrUXxHqAi0uNmQA==

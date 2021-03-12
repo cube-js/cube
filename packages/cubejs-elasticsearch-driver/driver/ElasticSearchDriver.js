@@ -6,24 +6,47 @@ class ElasticSearchDriver extends BaseDriver {
   constructor(config) {
     super();
 
+    const auth = {
+      username: process.env.CUBEJS_DB_USER,
+      password: process.env.CUBEJS_DB_PASS,
+    };
+
+    if (process.env.CUBEJS_DB_ELASTIC_APIKEY_ID || process.env.CUBEJS_DB_ELASTIC_APIKEY_KEY) {
+      auth.apiKey = {
+        id: process.env.CUBEJS_DB_ELASTIC_APIKEY_ID,
+        api_key: process.env.CUBEJS_DB_ELASTIC_APIKEY_KEY
+      };
+    }
+
     // TODO: This config applies to AWS ES, Elastic.co ES, Native ES and OpenDistro ES
     // They have different dialects according to their respective documentation
     this.config = {
       url: process.env.CUBEJS_DB_URL,
-      auth: {
-        apiKey: {
-          id: process.env.CUBEJS_DB_ELASTIC_APIKEY_ID,
-          api_key: process.env.CUBEJS_DB_ELASTIC_APIKEY_KEY
-        }
-      },
+      ssl: this.getSslOptions(),
+      auth,
       openDistro:
         (process.env.CUBEJS_DB_ELASTIC_OPENDISTRO || 'false').toLowerCase() === 'true' ||
         process.env.CUBEJS_DB_TYPE === 'odelasticsearch',
       queryFormat: process.env.CUBEJS_DB_ELASTIC_QUERY_FORMAT || 'jdbc',
       ...config
     };
-    this.client = new Client({ node: this.config.url, cloud: this.config.cloud, auth: this.config.auth });
-    this.sqlClient = this.config.openDistro ? new Client({ node: `${this.config.url}/_opendistro` }) : this.client;
+
+    this.client = new Client({
+      node: this.config.url,
+      cloud: this.config.cloud,
+      auth: this.config.auth,
+      ssl: this.config.ssl
+    });
+
+    if (this.config.openDistro) {
+      this.sqlClient = new Client({
+        node: `${this.config.url}/_opendistro`,
+        ssl: this.config.ssl,
+        auth: this.config.auth,
+      });
+    } else {
+      this.sqlClient = this.client;
+    }
   }
 
   static driverEnvVariables() {

@@ -15,8 +15,13 @@
   "typings": "driver/index.d.ts",
   "scripts": {
     "lint": "eslint **/*.js",
-    "lint:fix": "eslint --fix **/*.js"
+    "lint:fix": "eslint --fix **/*.js",
+    "integration": "jest ./test/*.integration.js",
+    "integration:elastic": "yarn run integration"
   },
+  "files": [
+    "driver"
+  ],
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.54",
     "@elastic/elasticsearch": "^7.5.0",
@@ -25,14 +30,20 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.54",
-    "mocha": "^8.0.1",
-    "should": "^13.2.3",
-    "testcontainers": "^2.4.0"
+    "@types/jest": "^26.0.20",
+    "jest": "^26.6.3",
+    "testcontainers": "^7.5.0"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "jest": {
+    "testMatch": [
+      "**/__tests__/**/*.js?(x)",
+      "**/?(*.)+(spec|test|integration).js?(x)"
+    ]
   }
 }
