@@ -383,7 +383,10 @@ interval **will not** be refreshed once they are built unless the rollup SQL is
 changed.
 
 An original SQL pre-aggregation can also be used with time partitioning and
-incremental `refreshKey`. In this case, it can be used as follows:
+incremental `refreshKey`. It requires using `FILTER_PARAMS` inside the Cube's `sql`
+property.
+
+Below you can find an example of the partitioned `originalSql` pre-aggregation.
 
 ```javascript
 cube(`Orders`, {
