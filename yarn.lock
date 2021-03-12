@@ -4094,6 +4094,13 @@
   resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.2.1.tgz#f3f3ae4590c5386fc7c543aae9b78d4cf30ffee9"
   integrity sha512-NysN+bNqj6E0Hv4CTGWSlPzMW6vTKjDpOteycDkV4IWBsO+PU48JonrPzV9ODjiI2XrjmA05KInLgF5ivZ/YGQ==
 
+"@types/moment-range@^4.0.0":
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/@types/moment-range/-/moment-range-4.0.0.tgz#6c43631616dd6203a07157a532918cbe9c2444a9"
+  integrity sha512-tX9W3QrLS5GDBcavF2enp2mJ+AUEv311pzd6NzqDxod879l0bDkz4OhvNZpsRNiE9khwgb6OSfBzDGR0SqChng==
+  dependencies:
+    moment-range "*"
+
 "@types/mysql@^2.15.15", "@types/mysql@^2.15.17":
   version "2.15.18"
   resolved "https://registry.yarnpkg.com/@types/mysql/-/mysql-2.15.18.tgz#eea3f2845e619db0073d63d821aa99bf2079c95c"
@@ -15224,7 +15231,7 @@ modify-values@^1.0.0:
   resolved "https://registry.yarnpkg.com/modify-values/-/modify-values-1.0.1.tgz#b3939fa605546474e3e3e3c63d64bd43b4ee6022"
   integrity sha512-xV2bxeN6F7oYjZWTe/YPAy6MN2M+sL4u/Rlm2AHCIVGfo2p1yGmBHQ6vHehl4bRTZBdHu3TSkWdYgkwpYzAGSw==
 
-moment-range@^4.0.1:
+moment-range@*, moment-range@^4.0.1:
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/moment-range/-/moment-range-4.0.2.tgz#f7c3863df2a1ed7fd1822ba5a7bcf53a78701be9"
   integrity sha512-n8sceWwSTjmz++nFHzeNEUsYtDqjgXgcOBzsHi+BoXQU2FW+eU92LUaK8gqOiSu5PG57Q9sYj1Fz4LRDj4FtKA==
