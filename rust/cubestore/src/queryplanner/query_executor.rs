@@ -670,16 +670,19 @@ impl ExecutionPlan for CubeTableExec {
                 .collect()
         } else {
             let index = self.index_snapshot.index().get_row();
-            sort_order = Some(
-                index
-                    .get_columns()
-                    .iter()
-                    .take(index.sort_key_size() as usize)
-                    .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
-                    .take_while(|i| i.is_some())
-                    .map(|i| i.unwrap())
-                    .collect(),
-            )
+            let sort_cols = index
+                .get_columns()
+                .iter()
+                .take(index.sort_key_size() as usize)
+                .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
+                .take_while(|i| i.is_some())
+                .map(|i| i.unwrap())
+                .collect_vec();
+            if !sort_cols.is_empty() {
+                sort_order = Some(sort_cols)
+            } else {
+                sort_order = None
+            }
         }
 
         OptimizerHints {
