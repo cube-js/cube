@@ -487,6 +487,18 @@ impl CubeTable {
         })
     }
 
+    #[must_use]
+    pub fn to_worker_table(
+        &self,
+        remote_to_local_names: HashMap<String, String>,
+        worker_partition_ids: HashSet<u64>,
+    ) -> CubeTable {
+        let mut t = self.clone();
+        t.remote_to_local_names = remote_to_local_names;
+        t.worker_partition_ids = worker_partition_ids;
+        t
+    }
+
     fn async_scan(
         &self,
         projection: &Option<Vec<usize>>,

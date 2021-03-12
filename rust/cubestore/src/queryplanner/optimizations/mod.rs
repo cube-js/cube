@@ -6,6 +6,7 @@ use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
 use std::sync::Arc;
 
 pub mod prefer_inplace_aggregates;
+pub mod rewrite_plan;
 
 pub struct CubeQueryPlanner {}
 
