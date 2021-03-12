@@ -271,3 +271,4 @@ jobs:
           file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
+          overwrite: true
