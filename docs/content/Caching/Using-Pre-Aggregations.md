@@ -2,7 +2,7 @@
 title: Using Pre-Aggregations
 permalink: /caching/using-pre-aggregations
 category: Caching
-menuOrder: 2
+menuOrder: 3
 ---
 
 Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
