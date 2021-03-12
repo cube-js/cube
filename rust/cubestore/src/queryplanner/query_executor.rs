@@ -51,6 +51,7 @@ use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::SystemTime;
+use tracing::{instrument, Instrument};
 
 #[automock]
 #[async_trait]
@@ -76,11 +77,13 @@ crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
+    #[instrument(skip(self, plan, cluster))]
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<DataFrame, CubeError> {
+        let collect_span = tracing::span!(tracing::Level::INFO, "collect_physical_plan");
         let plan_to_move = plan.logical_plan(&HashMap::new())?;
         let ctx = self.execution_context()?;
         let plan_ctx = ctx.clone();
@@ -98,7 +101,8 @@ impl QueryExecutor for QueryExecutorImpl {
         trace!("Router Query Physical Plan: {:#?}", &split_plan);
 
         let execution_time = SystemTime::now();
-        let results = collect(split_plan.clone()).await;
+
+        let results = collect(split_plan.clone()).instrument(collect_span).await;
         debug!(
             "Query data processing time: {:?}",
             execution_time.elapsed()?
@@ -131,6 +135,7 @@ impl QueryExecutor for QueryExecutorImpl {
         Ok(data_frame)
     }
 
+    #[instrument(skip(self, plan, remote_to_local_names))]
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
@@ -147,7 +152,12 @@ impl QueryExecutor for QueryExecutorImpl {
         trace!("Partition Query Physical Plan: {:#?}", &worker_plan);
 
         let execution_time = SystemTime::now();
-        let results = collect(worker_plan.clone()).await;
+        let results = collect(worker_plan.clone())
+            .instrument(tracing::span!(
+                tracing::Level::INFO,
+                "collect_physical_plan"
+            ))
+            .await;
         debug!(
             "Partition Query data processing time: {:?}",
             execution_time.elapsed()?
@@ -772,6 +782,7 @@ impl ExecutionPlan for ClusterSendExec {
         }))
     }
 
+    #[instrument(skip(self))]
     async fn execute(
         &self,
         partition: usize,

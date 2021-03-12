@@ -52,6 +52,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
+use tracing::{instrument, Instrument};
+use tracing_futures::WithSubscriber;
 
 #[automock]
 #[async_trait]
@@ -256,6 +258,7 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
+    #[instrument(skip(self, m))]
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
         match m {
             NetworkMessage::Select(plan) => {
@@ -683,6 +686,7 @@ impl ClusterImpl {
         }
     }
 
+    #[instrument(skip(self, plan_node))]
     async fn run_local_select_serialized(
         &self,
         plan_node: SerializedPlan,
@@ -700,6 +704,8 @@ impl ClusterImpl {
             .into_iter()
             .zip(
                 join_all(file_futures)
+                    .instrument(tracing::span!(tracing::Level::INFO, "warmup_download"))
+                    .with_current_subscriber()
                     .await
                     .into_iter()
                     .collect::<Result<Vec<_>, _>>()?
@@ -732,6 +738,10 @@ impl ClusterImpl {
                 pool.process(WorkerMessage::Select(
                     serialized_plan_node,
                     remote_to_local_names,
+                ))
+                .instrument(tracing::span!(
+                    tracing::Level::INFO,
+                    "execute_worker_plan_on_pool"
                 ))
                 .await
             } else {
