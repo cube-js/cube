@@ -16,7 +16,7 @@
   "scripts": {
     "lint": "eslint **/*.js",
     "lint:fix": "eslint --fix **/*.js",
-    "integration": "jest ./test/*.integration.js",
+    "integration": "jest --ci ./test/*.integration.js",
     "integration:elastic": "yarn run integration"
   },
   "files": [
@@ -41,6 +41,7 @@
     "access": "public"
   },
   "jest": {
+    "testEnvironment": "node",
     "testMatch": [
       "**/__tests__/**/*.js?(x)",
       "**/?(*.)+(spec|test|integration).js?(x)"

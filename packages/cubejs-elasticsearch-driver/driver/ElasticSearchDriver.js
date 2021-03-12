@@ -65,6 +65,14 @@ class ElasticSearchDriver extends BaseDriver {
     });
   }
 
+  async release() {
+    await this.client.close();
+
+    if (this.config.openDistro && this.sqlClient) {
+      await this.sqlClient.close();
+    }
+  }
+
   async query(query, values) {
     try {
       const result = (await this.sqlClient.sql.query({ // TODO cursor
