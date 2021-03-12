@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
 import type { Application as ExpressApplication } from 'express';
 import jwt from 'jsonwebtoken';
+import isDocker from 'is-docker';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import AppContainer from '../dev/AppContainer';
@@ -172,12 +173,20 @@ export class DevServer {
     app.get('/playground/start-dashboard-app', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Start Dashboard App');
 
-      if (!this.dashboardAppProcess) {
-        this.dashboardAppProcess = spawn('npm', ['run', 'start'], {
+      if (!this.dashboardAppProcess || false) {
+        const { dashboardAppPort = 3000 } = options;
+        this.dashboardAppProcess = spawn('npm', [
+          'run',
+          'start',
+          '--',
+          '--port',
+          dashboardAppPort.toString(),
+          ...(isDocker() ? ['--host', '0.0.0.0'] : [])
+        ], {
           cwd: options.dashboardAppPath,
           env: <any>{
             ...process.env,
-            PORT: options.dashboardAppPort
+            PORT: dashboardAppPort
           }
         });
 
@@ -340,13 +349,13 @@ export class DevServer {
 
       res.status(200).json('ok');
     }));
-    
+
     app.post('/playground/token', catchErrors(async (req, res) => {
       const { payload = {} } = req.body;
       const jwtOptions = typeof payload.exp != null ? {} : { expiresIn: '1d' };
-      
+
       const token = jwt.sign(payload, options.apiSecret, jwtOptions);
-      
+
       res.json({ token });
     }));
   }
