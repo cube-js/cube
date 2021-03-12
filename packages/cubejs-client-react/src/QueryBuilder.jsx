@@ -1,5 +1,5 @@
 import React from 'react';
-import { prop, uniqBy, equals, pick } from 'ramda';
+import { prop, uniqBy, equals, pick, clone } from 'ramda';
 import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
@@ -379,10 +379,16 @@ export default class QueryBuilder extends React.Component {
       finalState.query = { ...stateQuery };
     }
 
+    let vizStateSent = null;
     const handleVizStateChange = (currentState) => {
       const { onVizStateChanged } = this.props;
       if (onVizStateChanged) {
-        onVizStateChanged(pick(['chartType', 'pivotConfig', 'query'], currentState));
+        const newVizState = pick(['chartType', 'pivotConfig', 'query'], currentState);
+        // Don't run callbacks more than once unless the viz state has changed since last time
+        if (!vizStateSent || !equals(vizStateSent, newVizState)) {
+          onVizStateChanged(newVizState);
+          vizStateSent = clone(newVizState); // use clone to make sure we don't save object references
+        }
       }
     };
 
