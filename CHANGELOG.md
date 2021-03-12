@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.55](https://github.com/cube-js/cube.js/compare/v0.26.54...v0.26.55) (2021-03-12)
+
+
+### Bug Fixes
+
+* **playground:** Cannot read property 'extendMoment' of undefined ([42fd694](https://github.com/cube-js/cube.js/commit/42fd694f28782413c25356530d6b07db9ea091e0))
+
+
+### Features
+
+* **elasticsearch-driver:** Ability to use USERNAME, PASSWORD and SSL_* env variables ([13c90cd](https://github.com/cube-js/cube.js/commit/13c90cd097b24c6e823dc4de76ae497ebfecc06b))
+* **elasticsearch-driver:** Implement release ([2b88ed7](https://github.com/cube-js/cube.js/commit/2b88ed7c4105f0506555bd7cec63f2634f3149f4))
+
+
+
+
+
 ## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
 
 

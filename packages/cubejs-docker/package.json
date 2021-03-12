@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/docker",
-  "version": "0.26.54",
+  "version": "0.26.55",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -24,7 +24,7 @@
     "@cubejs-backend/cubestore-driver": "^0.26.54",
     "@cubejs-backend/dremio-driver": "^0.26.54",
     "@cubejs-backend/druid-driver": "^0.26.54",
-    "@cubejs-backend/elasticsearch-driver": "^0.26.54",
+    "@cubejs-backend/elasticsearch-driver": "^0.26.55",
     "@cubejs-backend/hive-driver": "^0.26.54",
     "@cubejs-backend/mongobi-driver": "^0.26.54",
     "@cubejs-backend/mssql-driver": "^0.26.54",
@@ -39,7 +39,7 @@
     "typescript": "~4.1.5"
   },
   "devDependencies": {
-    "@cubejs-client/core": "^0.26.54",
+    "@cubejs-client/core": "^0.26.55",
     "@types/jest": "^26.0.20",
     "jest": "^26.6.3",
     "testcontainers": "^7.4.0"
