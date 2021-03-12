@@ -459,6 +459,13 @@ jobs:
           TEST_POSTGRES_VERSION: latest
           TEST_ZOOKEEPER_VERSION: 3.5
           TEST_DRUID_VERSION: 0.19.0
+      - name: Run Elastich Search Integration with Open Distro 1.13.1
+        timeout-minutes: 15
+        run: |
+          docker pull amazon/opendistro-for-elasticsearch:${TEST_ELASTIC_OPENDISTRO_VERSION}
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:elastic
+        env:
+          TEST_ELASTIC_OPENDISTRO_VERSION: 1.13.1
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
