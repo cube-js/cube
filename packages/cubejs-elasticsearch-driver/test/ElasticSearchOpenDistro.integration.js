@@ -17,8 +17,8 @@ describe('ElasticSearchDriver OpenDistro', () => {
     .withExposedPorts(9200)
     .withHealthCheck({
       test: 'curl -k -u admin:admin --silent --fail https://localhost:9200/_cluster/health || exit 1',
-      interval: 2 * 1000,
-      startPeriod: 10 * 1000,
+      interval: 3 * 1000,
+      startPeriod: 15 * 1000,
       timeout: 500,
       retries: 3
     })
@@ -48,14 +48,6 @@ describe('ElasticSearchDriver OpenDistro', () => {
     elasticSearchDriver.setLogger((msg, event) => console.log(`${msg}: ${JSON.stringify(event)}`));
   });
 
-  afterAll(async () => {
-    await elasticSearchDriver.release();
-
-    if (container) {
-      await container.stop();
-    }
-  });
-
   it('testConnection', async () => {
     await elasticSearchDriver.testConnection();
   });
@@ -64,4 +56,16 @@ describe('ElasticSearchDriver OpenDistro', () => {
   // it('SELECT 1', async () => {
   //   await elasticSearchDriver.query('SELECT 1');
   // });
+
+  afterAll(async () => {
+    await elasticSearchDriver.release();
+
+    if (container) {
+      console.log('[container] Stopping');
+
+      await container.stop();
+
+      console.log('[container] Stopped');
+    }
+  });
 });
