@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** Prevent calling onVizStateChanged twice unless needed ([#2351](https://github.com/cube-js/cube.js/issues/2351)) ([3719265](https://github.com/cube-js/cube.js/commit/371926532032bd998a8d2fc200e78883a32f172d))
+* running Angular dashboard in Docker ([#2353](https://github.com/cube-js/cube.js/issues/2353)) ([d1e2e9e](https://github.com/cube-js/cube.js/commit/d1e2e9efec1f433a5869de3377d8869683be4c94))
+* **cubestore:** fix crash on empty sort order, temporarily disable full hash aggregate optimization ([#2348](https://github.com/cube-js/cube.js/issues/2348)) ([7dfd51a](https://github.com/cube-js/cube.js/commit/7dfd51a633f1f39e95bf908164a0abc4feeab37d))
+
+
+### Features
+
+* Suggest to install cubestore-driver to get external pre-agg layer ([2059e57](https://github.com/cube-js/cube.js/commit/2059e57a2aa7caf81691c083949395e9697d2bcb))
+* Suggest to use rollUp & pre-agg for to join across data sources ([2cf1a63](https://github.com/cube-js/cube.js/commit/2cf1a630a9abaa7248526c284441e65212e82259))
+
+
+
+
+
 ## [0.26.53](https://github.com/cube-js/cube.js/compare/v0.26.52...v0.26.53) (2021-03-11)
 
 
