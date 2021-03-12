@@ -72,7 +72,7 @@ CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
 Go to the [OpenID Playground from Auth0][link-openid-playground] to and click
 Configuration.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -80,11 +80,11 @@ Configuration.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Change the Server Template to Custom, and enter the following values:
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -92,7 +92,7 @@ Change the Server Template to Custom, and enter the following values:
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 - **Discovery Document URL**:
   `https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>/.well-known/openid-configuration`
@@ -114,7 +114,7 @@ Save.
 Now click Start; and in a separate tab, go to the App Client's settings page and
 click the Launch Hosted UI button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -122,12 +122,12 @@ click the Launch Hosted UI button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 If the login is successful, you should be redirected to the OpenID Connect
 Playground. Click on the Exchange button to exchange the code for your tokens:
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -135,12 +135,12 @@ Playground. Click on the Exchange button to exchange the code for your tokens:
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Click Next, and continue on to the next section and click the Verify button to
 verify the JWT signature as well as decode the identity token:
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -148,14 +148,14 @@ verify the JWT signature as well as decode the identity token:
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 ### Set JWT in Developer Playground
 
 Now open the Developer Playground (at `http://localhost:4000`) and on the Build
 page, click Add Security Context.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -163,12 +163,12 @@ page, click Add Security Context.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Click the Token tab, paste the `id_token` from OpenID Playground and click the
 Save button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -176,7 +176,7 @@ Save button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Close the popup and use the Developer Playground to make a request. Any schemas
 using the [Security Context][ref-sec-ctx] should now work as expected.

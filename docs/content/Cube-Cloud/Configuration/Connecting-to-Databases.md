@@ -7,7 +7,16 @@ menuOrder: 1
 
 You can connect all Cube.js supported databases to your Cube Cloud deployment.
 
-![Cube Cloud Supported Databases Screen](https://cube.dev/downloads/images/cube-cloud-databases-list.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Cube Cloud Supported Databases Screen"
+  src="https://cube.dev/downloads/images/cube-cloud-databases-list.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 Below you can find guides on how to use Cube Cloud with specific database
 vendors.
