@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cubestore",
-  "version": "0.26.53",
+  "version": "0.26.54",
   "description": "Cube.js pre-aggregation storage layer.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -9,9 +9,6 @@
   },
   "bin": {
     "cubestore-dev": "bin/cubestore-dev"
-  },
-  "engines": {
-    "node": ">=10.8.0"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
@@ -28,7 +25,7 @@
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.26.13",
+    "@cubejs-backend/linter": "^0.26.54",
     "@types/bytes": "^3.1.0",
     "@types/cli-progress": "^3.9.1",
     "@types/node": "^10.17.54",
@@ -41,7 +38,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@cubejs-backend/shared": "^0.26.45",
+    "@cubejs-backend/shared": "^0.26.54",
     "@oclif/color": "^0.1.2",
     "@octokit/core": "^3.2.5",
     "bytes": "^3.1.0",
