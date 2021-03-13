@@ -177,6 +177,7 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
+    #[instrument(skip(self, plan_node))]
     async fn run_select(
         &self,
         node_name: &str,
@@ -834,6 +835,7 @@ impl ClusterImpl {
         ))
     }
 
+    #[instrument(skip(self, m))]
     async fn send_or_process_locally(
         &self,
         node_name: &str,
