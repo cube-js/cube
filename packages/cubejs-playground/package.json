@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.55",
+  "version": "0.26.57",
   "engines": {},
   "repository": {
     "type": "git",
@@ -12,7 +12,7 @@
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.26.55",
-    "@cubejs-client/react": "^0.26.55",
+    "@cubejs-client/react": "^0.26.57",
     "antd": "4.13.0",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
