@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.57](https://github.com/cube-js/cube.js/compare/v0.26.56...v0.26.57) (2021-03-14)
+
+
+### Bug Fixes
+
+* lock file conflict preventing dashboard generation, always propagate chartType to viz state ([#2369](https://github.com/cube-js/cube.js/issues/2369)) ([d372fe9](https://github.com/cube-js/cube.js/commit/d372fe9ee69542f9227a5a524e66b99cd69d5dff))
+
+
+
+
+
 ## [0.26.55](https://github.com/cube-js/cube.js/compare/v0.26.54...v0.26.55) (2021-03-12)
 
 **Note:** Version bump only for package @cubejs-client/playground
