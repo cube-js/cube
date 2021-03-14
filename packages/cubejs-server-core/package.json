@@ -59,6 +59,7 @@
     "@cubejs-backend/linter": "^0.26.54",
     "@types/cross-spawn": "^6.0.2",
     "@types/express": "^4.17.9",
+    "@types/fs-extra": "^9.0.8",
     "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^26.0.20",
     "@types/jsonwebtoken": "^8.5.0",
