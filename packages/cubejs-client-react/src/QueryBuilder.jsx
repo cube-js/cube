@@ -372,7 +372,7 @@ export default class QueryBuilder extends React.Component {
 
   async updateVizState(state) {
     const { setQuery, setVizState } = this.props;
-    const { query: stateQuery, pivotConfig: statePivotConfig, meta } = this.state;
+    const { query: stateQuery, pivotConfig: statePivotConfig, chartType, meta } = this.state;
 
     const finalState = this.applyStateChangeHeuristics(state);
     if (!finalState.query) {
@@ -395,8 +395,7 @@ export default class QueryBuilder extends React.Component {
     // deprecated, setters replaced by onVizStateChanged
     const runSetters = (currentState) => {
       if (setVizState) {
-        const { meta: _, validatedQuery, ...toSet } = currentState;
-        setVizState(toSet);
+        setVizState(pick(['chartType', 'pivotConfig', 'query'], currentState));
       }
       if (currentState.query && setQuery) {
         setQuery(currentState.query);
@@ -413,6 +412,7 @@ export default class QueryBuilder extends React.Component {
     );
 
     finalState.missingMembers = this.getMissingMembers(finalState.query, meta);
+    finalState.chartType = state.chartType || chartType;
 
     // deprecated
     runSetters({
