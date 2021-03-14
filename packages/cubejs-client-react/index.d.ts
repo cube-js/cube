@@ -203,7 +203,23 @@ declare module '@cubejs-client/react' {
      * @ignore @deprecated Controlled vizState setter
      */
     setVizState?: (vizState: VizState) => void;
+    /**
+     * @hidden
+     */
+    schemaVersion?: number;
+    /**
+     * @hidden
+     */
+    onSchemaChange: (props: SchemaChangeProps) => void
   };
+
+  /**
+   * @hidden
+   */
+  type SchemaChangeProps = {
+    schemaVersion: number;
+    refresh: () => Promise<void>
+  }
 
   type QueryBuilderState = VizState & {
     query?: Query;

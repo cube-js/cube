@@ -173,7 +173,7 @@ export class DevServer {
     app.get('/playground/start-dashboard-app', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Start Dashboard App');
 
-      if (!this.dashboardAppProcess || false) {
+      if (!this.dashboardAppProcess) {
         const { dashboardAppPort = 3000 } = options;
         this.dashboardAppProcess = spawn('npm', [
           'run',
