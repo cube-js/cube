@@ -1,10 +1,7 @@
-import { DockerComposeEnvironment, StartedDockerComposeEnvironment } from 'testcontainers';
-import * as path from 'path';
+import { expect } from '@jest/globals';
+import { StartedDockerComposeEnvironment } from 'testcontainers';
 import cubejs from '@cubejs-client/core';
-
-interface BirdBoxTestCaseOptions {
-  name: string
-}
+import { BirdBoxTestCaseOptions, startBidBoxContainer } from '../src';
 
 // eslint-disable-next-line import/prefer-default-export
 export function createBirdBoxTestCase(options: BirdBoxTestCaseOptions) {
@@ -16,32 +13,10 @@ export function createBirdBoxTestCase(options: BirdBoxTestCaseOptions) {
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
-      if (process.env.TEST_CUBE_HOST) {
-        const host = process.env.TEST_CUBE_HOST || 'localhost';
-        const port = process.env.TEST_CUBE_PORT || '8888';
+      const birdBox = await startBidBoxContainer(options);
 
-        config = {
-          apiUrl: `http://${host}:${port}`,
-        };
-
-        return;
-      }
-
-      const dc = new DockerComposeEnvironment(
-        path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
-        `${options.name}.yml`
-      );
-
-      env = await dc
-        .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
-        .up();
-
-      const host = '127.0.0.1';
-      const port = env.getContainer('birdbox-cube').getMappedPort(4000);
-
-      config = {
-        apiUrl: `http://${host}:${port}/cubejs-api/v1`,
-      };
+      env = birdBox.env;
+      config = birdBox.configuration;
     });
 
     // eslint-disable-next-line consistent-return
