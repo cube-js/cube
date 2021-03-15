@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.56](https://github.com/cube-js/cube.js/compare/v0.26.55...v0.26.56) (2021-03-13)
+
+
+### Bug Fixes
+
+* Expected one parameter but nothing found ([#2362](https://github.com/cube-js/cube.js/issues/2362)) ([ce490d2](https://github.com/cube-js/cube.js/commit/ce490d2de60c200832966824e6b0300ba91cde41))
+
+
+
+
+
+## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
+
+
+### Features
+
+* Suggest to use rollUp & pre-agg for to join across data sources ([2cf1a63](https://github.com/cube-js/cube.js/commit/2cf1a630a9abaa7248526c284441e65212e82259))
+
+
+
+
+
 ## [0.26.49](https://github.com/cube-js/cube.js/compare/v0.26.48...v0.26.49) (2021-03-05)
 
 

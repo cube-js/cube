@@ -3,6 +3,80 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.58](https://github.com/cube-js/cube.js/compare/v0.26.56...v0.26.58) (2021-03-14)
+
+
+### Bug Fixes
+
+* lock file conflict preventing dashboard generation, always propagate chartType to viz state ([#2369](https://github.com/cube-js/cube.js/issues/2369)) ([d372fe9](https://github.com/cube-js/cube.js/commit/d372fe9ee69542f9227a5a524e66b99cd69d5dff))
+
+
+
+
+
+## [0.26.57](https://github.com/cube-js/cube.js/compare/v0.26.56...v0.26.57) (2021-03-14)
+
+
+### Bug Fixes
+
+* lock file conflict preventing dashboard generation, always propagate chartType to viz state ([#2369](https://github.com/cube-js/cube.js/issues/2369)) ([d372fe9](https://github.com/cube-js/cube.js/commit/d372fe9ee69542f9227a5a524e66b99cd69d5dff))
+
+
+
+
+
+## [0.26.56](https://github.com/cube-js/cube.js/compare/v0.26.55...v0.26.56) (2021-03-13)
+
+
+### Bug Fixes
+
+* Expected one parameter but nothing found ([#2362](https://github.com/cube-js/cube.js/issues/2362)) ([ce490d2](https://github.com/cube-js/cube.js/commit/ce490d2de60c200832966824e6b0300ba91cde41))
+
+
+### Features
+
+* **cubestore:** Tracing support ([be5ab9b](https://github.com/cube-js/cube.js/commit/be5ab9b66d2bdc65962b0e04622d1db1f8608791))
+
+
+
+
+
+## [0.26.55](https://github.com/cube-js/cube.js/compare/v0.26.54...v0.26.55) (2021-03-12)
+
+
+### Bug Fixes
+
+* **playground:** Cannot read property 'extendMoment' of undefined ([42fd694](https://github.com/cube-js/cube.js/commit/42fd694f28782413c25356530d6b07db9ea091e0))
+
+
+### Features
+
+* **elasticsearch-driver:** Ability to use USERNAME, PASSWORD and SSL_* env variables ([13c90cd](https://github.com/cube-js/cube.js/commit/13c90cd097b24c6e823dc4de76ae497ebfecc06b))
+* **elasticsearch-driver:** Implement release ([2b88ed7](https://github.com/cube-js/cube.js/commit/2b88ed7c4105f0506555bd7cec63f2634f3149f4))
+
+
+
+
+
+## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** Prevent calling onVizStateChanged twice unless needed ([#2351](https://github.com/cube-js/cube.js/issues/2351)) ([3719265](https://github.com/cube-js/cube.js/commit/371926532032bd998a8d2fc200e78883a32f172d))
+* running Angular dashboard in Docker ([#2353](https://github.com/cube-js/cube.js/issues/2353)) ([d1e2e9e](https://github.com/cube-js/cube.js/commit/d1e2e9efec1f433a5869de3377d8869683be4c94))
+* **cubestore:** fix crash on empty sort order, temporarily disable full hash aggregate optimization ([#2348](https://github.com/cube-js/cube.js/issues/2348)) ([7dfd51a](https://github.com/cube-js/cube.js/commit/7dfd51a633f1f39e95bf908164a0abc4feeab37d))
+
+
+### Features
+
+* Suggest to install cubestore-driver to get external pre-agg layer ([2059e57](https://github.com/cube-js/cube.js/commit/2059e57a2aa7caf81691c083949395e9697d2bcb))
+* Suggest to use rollUp & pre-agg for to join across data sources ([2cf1a63](https://github.com/cube-js/cube.js/commit/2cf1a630a9abaa7248526c284441e65212e82259))
+
+
+
+
+
 ## [0.26.53](https://github.com/cube-js/cube.js/compare/v0.26.52...v0.26.53) (2021-03-11)
 
 

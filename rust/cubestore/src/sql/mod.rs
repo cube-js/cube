@@ -46,6 +46,8 @@ use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::from_utf8_unchecked;
+use tracing::instrument;
+use tracing_futures::WithSubscriber;
 
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
@@ -284,6 +286,7 @@ impl SqlService for SqlServiceImpl {
             .await
     }
 
+    #[instrument(skip(self))]
     async fn exec_query_with_context(
         &self,
         _context: SqlQueryContext,
@@ -457,6 +460,7 @@ impl SqlService for SqlServiceImpl {
                     QueryPlan::Select(serialized) => {
                         self.query_executor
                             .execute_router_plan(serialized, self.cluster.clone())
+                            .with_current_subscriber()
                             .await?
                     }
                 };

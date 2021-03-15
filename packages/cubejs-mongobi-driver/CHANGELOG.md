@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
+
+**Note:** Version bump only for package @cubejs-backend/mongobi-driver
+
+
+
+
+
 ## [0.26.45](https://github.com/cube-js/cube.js/compare/v0.26.44...v0.26.45) (2021-03-04)
 
 **Note:** Version bump only for package @cubejs-backend/mongobi-driver

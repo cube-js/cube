@@ -74,3 +74,5 @@ paste = "1.0.4"
 mysql_common = "0.26.0"
 flatbuffers = "0.7.0"
 http-auth-basic = "0.1.2"
+tracing = "0.1.25"
+tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
