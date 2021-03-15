@@ -52,12 +52,12 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 
 #### Development
 
-1. After cloning Cube.js repository run `$ yarn` and `$ yarn lerna bootstrap` to install dependencies.
+1. After cloning Cube.js repository run `$ yarn` to install dependencies.
 2. Use `$ docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build stable development image.
 
 ### Cube.js Client
 
-1. After cloning Cube.js repository run `$ yarn install` and `$ yarn lerna bootstrap` in root directory.
+1. After cloning Cube.js repository run `$ yarn install` in root directory.
 2. Use `$ yarn link` to add these packages to link registry.
 3. Perform required code changes.
 4. Use `$ yarn build` in the repository root to build CommonJS and UMD modules.
@@ -75,7 +75,7 @@ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/c
 
 Cube.js is written in plain JavaScript, but some parts have already been migrated to TypeScript.
 
-1. After cloning Cube.js repository run `$ yarn install` and `$ yarn lerna bootstrap` in root directory.
+1. After cloning Cube.js repository run `$ yarn install` in root directory.
 2. Use `yarn tsc:watch` to start TypeScript compiler in watch mode.
 3. Use `$ yarn link` in `packages/cubejs-<pkg>` to add these package to link registry.
 3. Create or choose an existed project for testing.
