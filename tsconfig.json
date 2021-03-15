@@ -5,6 +5,9 @@
       "path": "packages/cubejs-docker"
     },
     {
+      "path": "packages/cubejs-testing"
+    },
+    {
       "path": "packages/cubejs-backend-shared"
     },
     {
