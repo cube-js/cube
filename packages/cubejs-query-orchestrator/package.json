@@ -32,6 +32,7 @@
   ],
   "dependencies": {
     "@cubejs-backend/shared": "^0.26.54",
+    "@cubejs-backend/server-core": "^0.26.54",
     "generic-pool": "^3.7.1",
     "ioredis": "^4.19.4",
     "ramda": "^0.27.0",

@@ -45,7 +45,7 @@ export class QueryOrchestrator {
       throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
     }
 
-    const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
+    const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions, logger) : undefined;
     const { externalDriverFactory, continueWaitTimeout } = options;
 
     this.driverFactory = driverFactory;

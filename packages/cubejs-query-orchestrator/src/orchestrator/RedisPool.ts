@@ -1,13 +1,14 @@
 /* eslint-disable global-require */
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
 import { getEnv } from '@cubejs-backend/shared';
+import { LoggerFn } from '@cubejs-backend/server-core';
 import AsyncRedisClient from './AsyncRedisClient';
 import { createRedisClient as createNodeRedisClient, RedisOptions } from './RedisFactory';
 import { createIORedisClient, IORedisOptions } from './IORedisFactory';
 
-function createRedisClient(url: string, opts: RedisOptions | IORedisOptions = {}) {
+function createRedisClient(url: string, opts: RedisOptions | IORedisOptions = {}, logger: LoggerFn) {
   if (getEnv('redisUseIORedis')) {
-    return createIORedisClient(url, <IORedisOptions>opts);
+    return createIORedisClient(url, <IORedisOptions>opts, logger);
   }
 
   return createNodeRedisClient(url, <RedisOptions>opts);
@@ -33,7 +34,7 @@ export class RedisPool {
 
   protected poolErrors: number = 0;
 
-  public constructor(options: RedisPoolOptions = {}) {
+  public constructor(options: RedisPoolOptions = {}, logger: LoggerFn = undefined) {
     const min = (typeof options.poolMin !== 'undefined') ? options.poolMin : getEnv('redisPoolMin');
     const max = (typeof options.poolMax !== 'undefined') ? options.poolMax : getEnv('redisPoolMax');
 
@@ -45,7 +46,7 @@ export class RedisPool {
       evictionRunIntervalMillis: 5000
     };
 
-    const create = options.createClient || (async () => createRedisClient(getEnv('redisUrl')));
+    const create = options.createClient || (async () => createRedisClient(getEnv('redisUrl'), logger));
 
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.end(true));
