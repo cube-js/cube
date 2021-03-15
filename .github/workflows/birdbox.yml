@@ -30,6 +30,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Create project
         run: npx cubejs-cli@${{ github.event.inputs.version }} create new-project -d postgres
+      - name: Slack Failure
+        if: failure()
+        uses: voxmedia/github-action-slack-notify-build@v1
+        with:
+          channel: oss-ci
+          status: FAILED
+          color: danger
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
   docker:
     runs-on: ubuntu-latest
@@ -38,6 +47,7 @@ jobs:
       fail-fast: false
       matrix:
         target: ['postgresql', 'postgresql-cubestore']
+        arch: ['', '-alpine']
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -45,11 +55,37 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: |
+            ~/.npm
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-14.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
+      - name: Lerna tsc
+        run: yarn tsc
       - name: Birdbox
         run: |
           cd packages/cubejs-docker/
-          yarn install
-          yarn tsc
+          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
           yarn run birdbox:${{ matrix.target }}
+      - name: Slack Failure
+        if: failure()
+        uses: voxmedia/github-action-slack-notify-build@v1
+        with:
+          channel: oss-ci
+          status: FAILED
+          color: danger
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

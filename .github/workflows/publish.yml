@@ -25,17 +25,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-14.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
@@ -273,3 +271,4 @@ jobs:
           file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
+          overwrite: true

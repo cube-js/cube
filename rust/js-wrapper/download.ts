@@ -5,7 +5,7 @@ import fetch, { Headers, Request, Response } from 'node-fetch';
 import { throttle } from 'throttle-debounce';
 import { internalExceptions } from '@cubejs-backend/shared';
 import bytes from 'bytes';
-import cli from 'cli-ux';
+import { SingleBar } from 'cli-progress';
 import process from 'process';
 import { Octokit } from '@octokit/core';
 import * as path from 'path';
@@ -81,7 +81,7 @@ export async function downloadAndExtractFile(url: string) {
     throw new Error(`unexpected response ${response.statusText}`);
   }
 
-  const bar = cli.progress({
+  const bar = new SingleBar({
     format: 'Downloading from GitHub [{bar}] {percentage}% | Speed: {speed}',
   });
   bar.start(100, 0);

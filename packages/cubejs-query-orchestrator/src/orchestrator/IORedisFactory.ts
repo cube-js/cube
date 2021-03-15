@@ -60,7 +60,7 @@ export async function createIORedisClient(url: string, opts: RedisOptions): Prom
     options.reconnectOnError = (e) => {
       logger('Requesting reconnect', { error: e });
       return true;
-    }
+    };
   } else {
     options.username = parsedUrl.username;
     options.password = parsedUrl.password;

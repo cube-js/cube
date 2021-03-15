@@ -17,7 +17,7 @@ export class WebSocketConnection {
 
   protected async initWebSocket() {
     if (!this.webSocket) {
-      const webSocket = new WebSocket(
+      const webSocket: any = new WebSocket(
         this.config.url ||
         `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/ws`
       );

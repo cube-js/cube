@@ -117,7 +117,7 @@ class WebSocketTransport {
 
     ws.lastMessageTimestamp = new Date();
 
-    ws.initPromise = new Promise(resolve => {
+    ws.initPromise = new Promise<void>(resolve => {
       ws.onopen = () => {
         ws.sendMessage({ authorization: this.authorization });
       };
