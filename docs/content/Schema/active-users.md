@@ -5,6 +5,7 @@ category: Reference
 subCategory: Tutorials
 menuOrder: 14
 ---
+
 <!-- prettier-ignore-start -->
 [[info | ]]
 | This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
