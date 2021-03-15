@@ -250,7 +250,7 @@ export class BaseQuery {
   get dataSource() {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
-      throw new UserError(`Joins across data sources aren't supported in community edition. Found data sources: ${dataSources.join(', ')}`);
+      throw new UserError(`To join across data sources use rollupJoin with external pre-aggregations. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
   }
