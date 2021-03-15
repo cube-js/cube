@@ -1,8 +1,7 @@
 import Redis, { Redis as redis, RedisOptions } from 'ioredis';
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, devLogger, prodLogger } from '@cubejs-backend/shared';
 import AsyncRedisClient from './AsyncRedisClient';
 import { parseRedisUrl } from './utils';
-import { devLogger, prodLogger } from '@cubejs-backend/shared';
 
 export type IORedisOptions = RedisOptions;
 
@@ -88,12 +87,12 @@ export async function createIORedisClient(url: string, opts: RedisOptions): Prom
     ...opts,
   });
 
-  client.on('connect', () => logger('IORedis connected'))
-  client.on('error', (e) => logger('IORedis error', { error: e }))
-  client.on('ready', () => logger('IORedis is ready'))
-  client.on('close', () => logger('IORedis closed'))
-  client.on('end', () => () => logger('IORedis ended'))
-  client.on('reconnecting', (time: number) => logger('IORedis sent connect event', { warning: `IORedis reconnecting in ${time}` }))
+  client.on('connect', () => logger('IORedis connected'));
+  client.on('error', (e) => logger('IORedis error', { error: e }));
+  client.on('ready', () => logger('IORedis is ready'));
+  client.on('close', () => logger('IORedis closed'));
+  client.on('end', () => () => logger('IORedis ended'));
+  client.on('reconnecting', (time: number) => logger('IORedis sent connect event', { warning: `IORedis reconnecting in ${time}` }));
 
   await client.connect();
 
