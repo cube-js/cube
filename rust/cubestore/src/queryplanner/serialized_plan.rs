@@ -1,5 +1,6 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
+use crate::queryplanner::planning::ClusterSendNode;
 use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
@@ -129,6 +130,10 @@ pub enum SerializedLogicalPlan {
         input: Arc<SerializedLogicalPlan>,
         partitioning_scheme: SerializePartitioning,
     },
+    ClusterSend {
+        input: Arc<SerializedLogicalPlan>,
+        snapshots: Vec<Vec<IndexSnapshot>>,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -245,6 +250,11 @@ impl SerializedLogicalPlan {
                     }
                 },
             },
+            SerializedLogicalPlan::ClusterSend { input, snapshots } => ClusterSendNode {
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                snapshots: snapshots.clone(),
+            }
+            .into_plan(),
         })
     }
 }
@@ -556,7 +566,16 @@ impl SerializedPlan {
             },
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
             LogicalPlan::Explain { .. } => unimplemented!(),
-            LogicalPlan::Extension { .. } => unimplemented!(),
+            LogicalPlan::Extension { node } => {
+                let node = node
+                    .as_any()
+                    .downcast_ref::<ClusterSendNode>()
+                    .expect("unknown extension");
+                SerializedLogicalPlan::ClusterSend {
+                    input: Arc::new(Self::serialized_logical_plan(&node.input)),
+                    snapshots: node.snapshots.clone(),
+                }
+            }
             LogicalPlan::Union {
                 inputs,
                 schema,

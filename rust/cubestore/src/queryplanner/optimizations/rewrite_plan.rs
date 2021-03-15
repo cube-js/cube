@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::LogicalPlan;
+use datafusion::physical_plan::ExecutionPlan;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use std::sync::Arc;
 
 /// Recursively applies a transformation on each node and rewrites the plan. The plan is traversed
 /// bottom-up, top-down information can be propagated via context, see [PlanRewriter] for details.
@@ -49,6 +51,22 @@ pub trait PlanRewriter {
     ) -> Option<Self::Context> {
         None
     }
+}
+
+pub fn rewrite_physical_plan<F>(
+    p: &dyn ExecutionPlan,
+    rewriter: &mut F,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError>
+where
+    F: FnMut(Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>, DataFusionError>,
+{
+    let new_children = p
+        .children()
+        .into_iter()
+        .map(|c| rewrite_physical_plan(c.as_ref(), rewriter))
+        .collect::<Result<_, DataFusionError>>()?;
+    let new_plan = p.with_new_children(new_children)?;
+    rewriter(new_plan)
 }
 
 async fn rewrite_plan_impl<R: PlanRewriter>(
