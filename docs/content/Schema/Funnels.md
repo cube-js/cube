@@ -6,6 +6,12 @@ subCategory: Tutorials
 menuOrder: 13
 ---
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/funnels-a-series-of-events-that-lead-users-towards-a-defined-goal).
+<!-- prettier-ignore-end -->
+
 Funnels represent a series of events that lead users towards a defined goal. Funnel analysis is an approach commonly used in product, marketing and sales analytics.
 
 Regardless of the domain, every funnel has the following traits:
