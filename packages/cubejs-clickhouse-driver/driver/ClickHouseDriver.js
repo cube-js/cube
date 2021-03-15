@@ -79,7 +79,7 @@ class ClickHouseDriver extends BaseDriver {
   }
 
   testConnection() {
-    return this.query("SELECT 1");
+    return this.query('SELECT 1');
   }
 
   readOnly() {
@@ -120,11 +120,11 @@ class ClickHouseDriver extends BaseDriver {
           const value = row[field];
           if (value !== null) {
             const meta = res.meta.find(m => m.name === field);
-            if (meta.type.includes("DateTime")) {
+            if (meta.type.includes('DateTime')) {
               row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
-            } else if (meta.type.includes("Date")) {
+            } else if (meta.type.includes('Date')) {
               row[field] = `${value}T00:00:00.000`;
-            } else if (meta.type.includes("Int") || meta.type.includes("Float")) {
+            } else if (meta.type.includes('Int') || meta.type.includes('Float')) {
               // convert all numbers into strings
               row[field] = `${value}`;
             }

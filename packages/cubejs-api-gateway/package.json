@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.45",
+  "version": "0.26.54",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -19,15 +19,15 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "linter src/* test/* --ext .ts,.js",
-    "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
   "files": [
     "README.md",
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.26.45",
+    "@cubejs-backend/shared": "^0.26.54",
     "@hapi/joi": "^15.1.1",
     "body-parser": "^1.19.0",
     "chrono-node": "1.4.4",
@@ -41,7 +41,7 @@
     "uuid": "^3.3.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.26.13",
+    "@cubejs-backend/linter": "^0.26.54",
     "@types/express": "^4.17.9",
     "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^26.0.20",
@@ -54,7 +54,7 @@
     "jest": "^26.6.3",
     "should": "^13.2.3",
     "supertest": "^4.0.2",
-    "typescript": "^4.1.2"
+    "typescript": "~4.1.5"
   },
   "license": "Apache-2.0",
   "eslintConfig": {

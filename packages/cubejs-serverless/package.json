@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/serverless",
   "description": "Cube.js Serverless",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.52",
+  "version": "0.26.58",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,15 +13,17 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.26.52",
+    "@cubejs-backend/server-core": "^0.26.58",
     "cors": "^2.8.5",
     "serverless-express": "^2.0.11"
   },
   "devDependencies": {
-    "eslint": "^6.8.0",
-    "eslint-plugin-node": "^5.2.1",
+    "@cubejs-backend/linter": "^0.26.54",
     "mocha": "^8.0.1",
     "should": "^13.2.3"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
 }

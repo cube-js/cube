@@ -14,14 +14,14 @@ class PackageFetcher {
 
     this.repoArchivePath = `${this.tmpFolderPath}/master.tar.gz`;
   }
-  
+
   init() {
     try {
       // Folder node_modules does not exist by default inside docker in /cube/conf without sharing volume for it
       fs.mkdirpSync(this.tmpFolderPath);
     } catch (err) {
       if (err.code === 'EEXIST') {
-        fs.removeSync(this.tmpFolderPath);
+        this.cleanup();
         fs.mkdirSync(this.tmpFolderPath);
       } else {
         throw err;
@@ -57,6 +57,8 @@ class PackageFetcher {
     });
 
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
+
+    fs.removeSync(path.resolve(this.tmpFolderPath, dir, 'yarn.lock'));
     await executeCommand('npm', ['install'], { cwd: path.resolve(this.tmpFolderPath, dir) });
 
     return {

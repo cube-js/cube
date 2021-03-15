@@ -3,9 +3,9 @@ import {
   pluck, mergeAll, flatten,
 } from 'ramda';
 import Moment from 'moment';
-import momentRange from 'moment-range';
+import { extendMoment } from 'moment-range';
 
-const moment = momentRange.extendMoment(Moment);
+const moment = extendMoment(Moment);
 
 const TIME_SERIES = {
   day: (range) => Array.from(range.by('day'))
@@ -29,18 +29,18 @@ const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
 const groupByToPairs = (keyFn) => {
   const acc = new Map();
-  
+
   return (data) => {
     data.forEach((row) => {
       const key = keyFn(row);
-      
+
       if (!acc.has(key)) {
         acc.set(key, []);
       }
-  
+
       acc.get(key).push(row);
     });
-    
+
     return Array.from(acc.entries());
   };
 };
@@ -55,18 +55,18 @@ class ResultSet {
   static measureFromAxis(axisValues) {
     return axisValues[axisValues.length - 1];
   }
-     
+
   static timeDimensionMember(td) {
     return `${td.dimension}.${td.granularity}`;
   }
-   
+
   static deserialize(data, options = {}) {
     return new ResultSet(data.loadResponse, options);
   }
-  
+
   constructor(loadResponse, options = {}) {
     this.loadResponse = loadResponse;
-    
+
     if (this.loadResponse.queryType != null) {
       this.queryType = loadResponse.queryType;
       this.loadResponses = loadResponse.results;
@@ -78,17 +78,17 @@ class ResultSet {
       };
       this.loadResponses = [loadResponse];
     }
-    
+
     if (!Object.values(QUERY_TYPE).includes(this.queryType)) {
       throw new Error('Unknown query type');
     }
-    
+
     this.parseDateMeasures = options.parseDateMeasures;
     this.options = options;
-    
+
     this.backwardCompatibleData = [];
   }
-  
+
   drillDown(drillDownLocator, pivotConfig) {
     if (this.queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
       throw new Error('compareDateRange drillDown query is not currently supported');
@@ -96,7 +96,7 @@ class ResultSet {
     if (this.queryType === QUERY_TYPE.BLENDING_QUERY) {
       throw new Error('Data blending drillDown query is not currently supported');
     }
-    
+
     const { xValues = [], yValues = [] } = drillDownLocator;
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
@@ -154,7 +154,7 @@ class ResultSet {
           });
         }
       });
-    
+
     const { query } = this.loadResponses[0];
     if (
       timeDimensions.length === 0 &&
@@ -163,7 +163,7 @@ class ResultSet {
     ) {
       timeDimensions.push(query.timeDimensions[0]);
     }
-    
+
     return {
       ...measures[measureName].drillMembersGrouped,
       filters,
@@ -184,15 +184,15 @@ class ResultSet {
 
   axisValues(axis, resultIndex = 0) {
     const { query } = this.loadResponses[resultIndex];
-    
+
     return row => {
       const value = (measure) => axis.filter(d => d !== 'measures')
         .map(d => (row[d] != null ? row[d] : null)).concat(measure ? [measure] : []);
-        
+
       if (axis.find(d => d === 'measures') && (query.measures || []).length) {
         return query.measures.map(value);
       }
-      
+
       return [value()];
     };
   }
@@ -209,7 +209,7 @@ class ResultSet {
     };
     return axisValues.map(formatValue).join(delimiter || ', ');
   }
-  
+
   static getNormalizedPivotConfig(query, pivotConfig = null) {
     const defaultPivotConfig = {
       x: [],
@@ -217,14 +217,14 @@ class ResultSet {
       fillMissingDates: true,
       joinDateRange: false
     };
-    
+
     const {
       measures = [],
       dimensions = []
     } = query;
-    
+
     const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
-    
+
     pivotConfig = pivotConfig || (timeDimensions.length ? {
       x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
       y: dimensions
@@ -232,9 +232,9 @@ class ResultSet {
       x: dimensions,
       y: []
     });
-    
+
     pivotConfig = mergeDeepLeft(pivotConfig, defaultPivotConfig);
-    
+
     const substituteTimeDimensionMembers = axis => axis.map(
       subDim => (
         (
@@ -251,15 +251,15 @@ class ResultSet {
 
     const allIncludedDimensions = pivotConfig.x.concat(pivotConfig.y);
     const allDimensions = timeDimensions.map(td => ResultSet.timeDimensionMember(td)).concat(dimensions);
-    
+
     const dimensionFilter = (key) => allDimensions.includes(key) || key === 'measures';
-    
+
     pivotConfig.x = pivotConfig.x.concat(
       allDimensions.filter(d => !allIncludedDimensions.includes(d))
     )
       .filter(dimensionFilter);
     pivotConfig.y = pivotConfig.y.filter(dimensionFilter);
-    
+
     if (!pivotConfig.x.concat(pivotConfig.y).find(d => d === 'measures')) {
       pivotConfig.y.push('measures');
     }
@@ -267,10 +267,10 @@ class ResultSet {
       pivotConfig.x = pivotConfig.x.filter(d => d !== 'measures');
       pivotConfig.y = pivotConfig.y.filter(d => d !== 'measures');
     }
-    
+
     return pivotConfig;
   }
-  
+
   normalizePivotConfig(pivotConfig) {
     return ResultSet.getNormalizedPivotConfig(this.loadResponse.pivotQuery, pivotConfig);
   }
@@ -318,12 +318,12 @@ class ResultSet {
   pivot(pivotConfig) {
     pivotConfig = this.normalizePivotConfig(pivotConfig);
     const { pivotQuery: query } = this.loadResponse;
-    
+
     const pivotImpl = (resultIndex = 0) => {
       let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
-      
+
       let measureValue = (row, measure) => row[measure];
-  
+
       if (
         pivotConfig.fillMissingDates &&
         pivotConfig.x.length === 1 &&
@@ -337,7 +337,7 @@ class ResultSet {
         const series = this.loadResponses.map(
           (loadResponse) => this.timeSeries(loadResponse.query.timeDimensions[0])
         );
-        
+
         if (series[0]) {
           groupByXAxis = (rows) => {
             const byXValues = groupBy(
@@ -346,17 +346,17 @@ class ResultSet {
             );
             return series[resultIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
           };
-  
+
           measureValue = (row, measure) => row[measure] || 0;
         }
       }
-  
+
       const xGrouped = pipe(
         map(row => this.axisValues(pivotConfig.x, resultIndex)(row).map(xValues => ({ xValues, row }))),
         unnest,
         groupByXAxis
       )(this.timeDimensionBackwardCompatibleData(resultIndex));
-  
+
       const allYValues = pipe(
         map(
           ([, rows]) => unnest(
@@ -368,7 +368,7 @@ class ResultSet {
         unnest,
         uniq
       )(xGrouped);
-      
+
       return xGrouped.map(([, rows]) => {
         const { xValues } = rows[0];
         const yGrouped = pipe(
@@ -376,25 +376,25 @@ class ResultSet {
           unnest,
           groupBy(({ yValues }) => this.axisValuesString(yValues))
         )(rows);
-        
+
         return {
           xValues,
           yValuesArray: unnest(allYValues.map(yValues => {
             const measure = pivotConfig.x.find(d => d === 'measures') ?
               ResultSet.measureFromAxis(xValues) :
               ResultSet.measureFromAxis(yValues);
-              
+
             return (yGrouped[this.axisValuesString(yValues)] ||
               [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure)]);
           }))
         };
       });
     };
-    
+
     const pivots = this.loadResponses.length > 1
       ? this.loadResponses.map((_, index) => pivotImpl(index))
       : [];
-    
+
     return pivots.length
       ? this.mergePivots(pivots, pivotConfig.joinDateRange)
       : pivotImpl();
@@ -404,19 +404,19 @@ class ResultSet {
     const minLengthPivot = pivots.reduce(
       (memo, current) => (memo != null && current.length >= memo.length ? memo : current), null
     );
-    
+
     return minLengthPivot.map((_, index) => {
       const xValues = joinDateRange
         ? [pivots.map((pivot) => pivot[index] && pivot[index].xValues || []).join(', ')]
         : minLengthPivot[index].xValues;
-  
+
       return {
         xValues,
         yValuesArray: unnest(pivots.map((pivot) => pivot[index].yValuesArray))
       };
     });
   }
-  
+
   pivotedRows(pivotConfig) { // TODO
     return this.chartPivot(pivotConfig);
   }
@@ -447,7 +447,7 @@ class ResultSet {
       }
       return [yValues];
     };
-    
+
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
       category: this.axisValuesString(xValues, ','), // TODO deprecated
       x: this.axisValuesString(xValues, ','),
@@ -465,7 +465,7 @@ class ResultSet {
   tablePivot(pivotConfig) {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
-    
+
     return this.pivot(normalizedPivotConfig).map(({ xValues, yValuesArray }) => fromPairs(
       normalizedPivotConfig.x
         .map((key, index) => [key, xValues[index]])
@@ -486,10 +486,10 @@ class ResultSet {
     )(this.loadResponses);
     const flatMeta = Object.values(annotations).reduce((a, b) => ({ ...a, ...b }), {});
     const schema = {};
-    
+
     const extractFields = (key) => {
       const { title, shortTitle, type, format, meta } = flatMeta[key] || {};
-  
+
       return {
         key,
         title,
@@ -499,13 +499,13 @@ class ResultSet {
         meta
       };
     };
-    
+
     const pivot = this.pivot(normalizedPivotConfig);
-    
+
     (pivot[0] && pivot[0].yValuesArray || []).forEach(([yValues]) => {
       if (yValues.length > 0) {
         let currentItem = schema;
-    
+
         yValues.forEach((value, index) => {
           currentItem[value] = {
             key: value,
@@ -514,17 +514,17 @@ class ResultSet {
               : normalizedPivotConfig.y[index],
             children: (currentItem[value] && currentItem[value].children) || {}
           };
-    
+
           currentItem = currentItem[value].children;
         });
       }
     });
-    
+
     const toColumns = (item = {}, path = []) => {
       if (Object.keys(item).length === 0) {
         return [];
       }
-  
+
       return Object.values(item).map(({ key, ...currentItem }) => {
         const children = toColumns(currentItem.children, [
           ...path,
@@ -532,9 +532,9 @@ class ResultSet {
         ]);
 
         const { title, shortTitle, ...fields } = extractFields(currentItem.memberId);
-        
+
         const dimensionValue = key !== currentItem.memberId || title == null ? key : '';
-        
+
         if (!children.length) {
           return {
             ...fields,
@@ -544,7 +544,7 @@ class ResultSet {
             shortTitle: dimensionValue || shortTitle,
           };
         }
-  
+
         return {
           ...fields,
           key,
@@ -554,15 +554,15 @@ class ResultSet {
         };
       });
     };
-    
+
     let otherColumns = [];
-    
+
     if (!pivot.length && normalizedPivotConfig.y.includes('measures')) {
       otherColumns = (this.loadResponses[0].query.measures || []).map(
         (key) => ({ ...extractFields(key), dataIndex: key })
       );
     }
-    
+
     // Syntatic column to display the measure value
     if (!normalizedPivotConfig.y.length && normalizedPivotConfig.x.includes('measures')) {
       otherColumns.push({
@@ -573,7 +573,7 @@ class ResultSet {
         type: 'string',
       });
     }
-    
+
     return normalizedPivotConfig.x
       .map((key) => {
         if (key === 'measures') {
@@ -652,27 +652,27 @@ class ResultSet {
     if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
       throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
     }
-    
+
     return this.loadResponses[0].query;
   }
-  
+
   pivotQuery() {
     return this.loadResponse.pivotQuery || null;
   }
-  
+
   rawData() {
     if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
       throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
     }
-    
+
     return this.loadResponses[0].data;
   }
-  
+
   annotation() {
     if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
       throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
     }
-    
+
     return this.loadResponses[0].annotation;
   }
 
@@ -696,10 +696,10 @@ class ResultSet {
         }
       ));
     }
-    
+
     return this.backwardCompatibleData[resultIndex];
   }
-  
+
   decompose() {
     return this.loadResponses.map((result) => new ResultSet({
       queryType: QUERY_TYPE.REGULAR_QUERY,
@@ -710,7 +710,7 @@ class ResultSet {
       results: [result]
     }, this.options));
   }
-  
+
   serialize() {
     return {
       loadResponse: clone(this.loadResponse)

@@ -1,6 +1,7 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.26.45",
+  "version": "0.26.55",
+  "engines": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -8,6 +9,7 @@
   },
   "description": "cube.js client",
   "main": "dist/cubejs-client-core.js",
+  "module": "dist/cubejs-client-core.esm.js",
   "types": "index.d.ts",
   "author": "Cube Dev, Inc.",
   "dependencies": {
@@ -36,8 +38,9 @@
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
     "@types/jest": "^26.0.9",
+    "@types/moment-range": "^4.0.0",
     "babel-jest": "^26.0.1",
-    "eslint": "^6.8.0",
+    "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",

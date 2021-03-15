@@ -46,6 +46,8 @@ use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::from_utf8_unchecked;
+use tracing::instrument;
+use tracing_futures::WithSubscriber;
 
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
@@ -284,6 +286,7 @@ impl SqlService for SqlServiceImpl {
             .await
     }
 
+    #[instrument(skip(self))]
     async fn exec_query_with_context(
         &self,
         _context: SqlQueryContext,
@@ -457,6 +460,7 @@ impl SqlService for SqlServiceImpl {
                     QueryPlan::Select(serialized) => {
                         self.query_executor
                             .execute_router_plan(serialized, self.cluster.clone())
+                            .with_current_subscriber()
                             .await?
                     }
                 };
@@ -2413,6 +2417,38 @@ mod tests {
             let result = service.exec_query("SELECT count(*) from foo.bikes").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(813)])]);
         }).await;
+    }
+
+    #[tokio::test]
+    async fn empty_crash() {
+        Config::run_test("empty_crash", async move |services| {
+            let service = services.sql_service;
+            let _ = service
+                .exec_query("CREATE SCHEMA IF NOT EXISTS s")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("CREATE TABLE s.Table (id int, s int)")
+                .await
+                .unwrap();
+            let _ = service
+                .exec_query("INSERT INTO s.Table(id, s) VALUES (1, 10);")
+                .await
+                .unwrap();
+
+            let r = service
+                .exec_query("SELECT * from s.Table WHERE id = 1 AND s = 15")
+                .await
+                .unwrap();
+            assert_eq!(r.into_rows(), vec![]);
+
+            let r = service
+                .exec_query("SELECT id, sum(s) from s.Table WHERE id = 1 AND s = 15 GROUP BY 1")
+                .await
+                .unwrap();
+            assert_eq!(r.into_rows(), vec![]);
+        })
+        .await;
     }
 
     #[tokio::test]

@@ -61,29 +61,27 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build client
+        run: yarn build
       - name: Lerna test
-        run:  yarn lerna run --concurrency 1 --stream --no-prefix unit
+        run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - uses: codecov/codecov-action@v1
         if: (matrix.node-version == '15.x')
         with:
@@ -102,25 +100,23 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-14.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: NPM lint
+        run: yarn lint:npm
       - name: Lerna lint
         run: yarn lerna run --concurrency 1 lint
 
@@ -136,25 +132,21 @@ jobs:
         with:
           node-version: 14.x
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-14.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Check Yarn lock wasn't modified
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: Build Core Client libraries
@@ -190,25 +182,21 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Redis Integration with Redis Driver
@@ -268,25 +256,21 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Postgres Integration with 9.6
@@ -358,25 +342,21 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Run MySQL Integration with 5.6
@@ -441,25 +421,21 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        id: cache
         uses: actions/cache@v2
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
             ~/.npm
             node_modules
-            */node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-lerna-${{ matrix.node-version }}-
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Lerna bootstrap
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Run PrestoDB Integration with Postgres 12.4
@@ -483,6 +459,13 @@ jobs:
           TEST_POSTGRES_VERSION: latest
           TEST_ZOOKEEPER_VERSION: 3.5
           TEST_DRUID_VERSION: 0.19.0
+      - name: Run Elastich Search Integration with Open Distro 1.13.1
+        timeout-minutes: 15
+        run: |
+          docker pull amazon/opendistro-for-elasticsearch:${TEST_ELASTIC_OPENDISTRO_VERSION}
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:elastic
+        env:
+          TEST_ELASTIC_OPENDISTRO_VERSION: 1.13.1
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment

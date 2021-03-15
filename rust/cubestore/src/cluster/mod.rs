@@ -52,6 +52,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
+use tracing::{instrument, Instrument};
+use tracing_futures::WithSubscriber;
 
 #[automock]
 #[async_trait]
@@ -141,7 +143,8 @@ impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProc
                     .execute_worker_plan(plan_node_to_send, remote_to_local_names)
                     .await;
                 debug!("Running select in worker completed: {:?}", plan_node);
-                SerializedRecordBatchStream::write(res?)
+                let (schema, records) = res?;
+                SerializedRecordBatchStream::write(schema.as_ref(), records)
             }
         }
     }
@@ -174,6 +177,7 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
+    #[instrument(skip(self, plan_node))]
     async fn run_select(
         &self,
         node_name: &str,
@@ -255,6 +259,7 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
+    #[instrument(skip(self, m))]
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
         match m {
             NetworkMessage::Select(plan) => {
@@ -682,6 +687,7 @@ impl ClusterImpl {
         }
     }
 
+    #[instrument(skip(self, plan_node))]
     async fn run_local_select_serialized(
         &self,
         plan_node: SerializedPlan,
@@ -699,6 +705,8 @@ impl ClusterImpl {
             .into_iter()
             .zip(
                 join_all(file_futures)
+                    .instrument(tracing::span!(tracing::Level::INFO, "warmup_download"))
+                    .with_current_subscriber()
                     .await
                     .into_iter()
                     .collect::<Result<Vec<_>, _>>()?
@@ -713,12 +721,11 @@ impl ClusterImpl {
         #[cfg(target_os = "windows")]
         {
             // TODO optimize for no double conversion
-            let res = SerializedRecordBatchStream::write(
-                self.query_executor
-                    .execute_worker_plan(plan_node.clone(), remote_to_local_names)
-                    .await?,
-            );
-
+            let (schema, records) = self
+                .query_executor
+                .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                .await?;
+            let res = SerializedRecordBatchStream::write(schema.as_ref(), records);
             info!("Running select completed ({:?})", start.elapsed()?);
             res
         }
@@ -733,14 +740,18 @@ impl ClusterImpl {
                     serialized_plan_node,
                     remote_to_local_names,
                 ))
+                .instrument(tracing::span!(
+                    tracing::Level::INFO,
+                    "execute_worker_plan_on_pool"
+                ))
                 .await
             } else {
                 // TODO optimize for no double conversion
-                SerializedRecordBatchStream::write(
-                    self.query_executor
-                        .execute_worker_plan(plan_node.clone(), remote_to_local_names)
-                        .await?,
-                )
+                let (schema, records) = self
+                    .query_executor
+                    .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                    .await?;
+                SerializedRecordBatchStream::write(schema.as_ref(), records)
             };
 
             info!("Running select completed ({:?})", start.elapsed()?);
@@ -824,6 +835,7 @@ impl ClusterImpl {
         ))
     }
 
+    #[instrument(skip(self, m))]
     async fn send_or_process_locally(
         &self,
         node_name: &str,

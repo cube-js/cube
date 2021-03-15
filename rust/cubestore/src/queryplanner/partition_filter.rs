@@ -201,6 +201,27 @@ impl Builder<'_> {
                         .map(|e| self.extract_filter(e, r.clone())),
                 );
             }
+            Expr::Column(name, alias) => {
+                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(true)));
+                if let Some(cc) =
+                    self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, &true_expr)
+                {
+                    self.apply_stat(&cc, &mut r);
+                    return r;
+                }
+                r
+            }
+            // TODO: generic Not support with other expressions as children.
+            Expr::Not(box Expr::Column(name, alias)) => {
+                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(false)));
+                if let Some(cc) =
+                    self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, &true_expr)
+                {
+                    self.apply_stat(&cc, &mut r);
+                    return r;
+                }
+                r
+            }
             _ => r,
             // TODO: most important unsupported expressions are:
             //       - IsNull/IsNotNull
@@ -338,9 +359,32 @@ impl Builder<'_> {
         }
         match t {
             t if Self::is_signed_int(t) => Self::extract_signed_int(v),
+            DataType::Boolean => Self::extract_bool(v),
             DataType::Utf8 => Self::extract_string(v),
             _ => None,
             // TODO: more data types
+        }
+    }
+
+    fn extract_bool(v: &ScalarValue) -> Option<TableValue> {
+        match v {
+            ScalarValue::Boolean(v) => v.as_ref().map(|v| TableValue::Boolean(*v)),
+            ScalarValue::Utf8(s) | ScalarValue::LargeUtf8(s) => {
+                if s.is_none() {
+                    return None;
+                }
+                let s = s.as_ref().unwrap().as_str();
+                let b;
+                if s.eq_ignore_ascii_case("true") {
+                    b = true;
+                } else if s.eq_ignore_ascii_case("false") {
+                    b = false;
+                } else {
+                    b = s.parse::<i64>().ok()? != 0;
+                }
+                Some(TableValue::Boolean(b))
+            }
+            _ => return None,
         }
     }
 
@@ -556,6 +600,35 @@ mod tests {
                 max: vec![Some(TableValue::String("FOO".to_string()))],
             }]
         );
+    }
+
+    #[test]
+    fn test_bools() {
+        let s = schema(&[("a", DataType::Boolean)]);
+        let extract = |sql| PartitionFilter::extract(&s, &[parse(sql, &s)]);
+
+        let true_cond = vec![MinMaxCondition {
+            min: vec![Some(TableValue::Boolean(true))],
+            max: vec![Some(TableValue::Boolean(true))],
+        }];
+        let false_cond = vec![MinMaxCondition {
+            min: vec![Some(TableValue::Boolean(false))],
+            max: vec![Some(TableValue::Boolean(false))],
+        }];
+
+        assert_eq!(extract("a = true").min_max, true_cond);
+        assert_eq!(extract("a = false").min_max, false_cond);
+
+        assert_eq!(extract("a = 'true'").min_max, true_cond);
+        assert_eq!(extract("a = 'TRUE'").min_max, true_cond);
+        assert_eq!(extract("a = 'false'").min_max, false_cond);
+        assert_eq!(extract("a = 'FALSE'").min_max, false_cond);
+
+        assert_eq!(extract("a = '1'").min_max, true_cond);
+        assert_eq!(extract("a = '0'").min_max, false_cond);
+
+        assert_eq!(extract("a").min_max, true_cond);
+        assert_eq!(extract("NOT a").min_max, false_cond);
     }
 
     #[test]

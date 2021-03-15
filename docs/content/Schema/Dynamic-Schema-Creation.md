@@ -24,7 +24,7 @@ When creating schemas via `asyncModule()`, it is important to be aware of the
 following differences compared to statically defining schemas with `cube()`:
 
 - The `sql` and `drillMembers` properties for both dimensions and measures must
-  be of type `() => string`
+  be of type `() => string` and `() => string[]` accordingly
 
 Cube.js supports importing JavaScript logic from other files in a schema, so it
 is useful to declare utility functions for handling the above differences in a

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.45",
+  "version": "0.26.54",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -21,8 +21,8 @@
     "unit": "jest --runInBand --coverage --verbose dist/test/unit",
     "integration": "npm run integration:redis dist/test/integration",
     "integration:redis": "jest --runInBand --verbose dist/test/integration",
-    "lint": "linter src/* test/* --ext .ts,.js",
-    "lint:fix": "linter --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
   "files": [
     "README.md",
@@ -31,14 +31,14 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.26.45",
+    "@cubejs-backend/shared": "^0.26.54",
     "generic-pool": "^3.7.1",
     "ioredis": "^4.19.4",
     "ramda": "^0.27.0",
     "redis": "^3.0.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.26.13",
+    "@cubejs-backend/linter": "^0.26.54",
     "@types/generic-pool": "^3.1.9",
     "@types/ioredis": "^4.19.3",
     "@types/jest": "^26.0.15",
@@ -46,7 +46,7 @@
     "@types/ramda": "^0.27.32",
     "@types/redis": "^2.8.28",
     "jest": "^26.6.3",
-    "typescript": "~4.1.2"
+    "typescript": "~4.1.5"
   },
   "license": "Apache-2.0",
   "eslintConfig": {

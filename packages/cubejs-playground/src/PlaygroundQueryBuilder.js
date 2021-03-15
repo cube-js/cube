@@ -92,7 +92,7 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
-  
+
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
       dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
@@ -174,7 +174,7 @@ export default function PlaygroundQueryBuilder({
             </Row>
 
             <Divider style={{ margin: 0 }} />
-            
+
             <Row
               justify="space-around"
               align="top"
