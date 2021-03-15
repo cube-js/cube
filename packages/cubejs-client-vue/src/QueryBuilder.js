@@ -6,20 +6,28 @@ import {
   ResultSet,
   getOrderMembersFromOrder,
   moveItemInArray,
+  movePivotItem,
 } from '@cubejs-client/core';
-import { equals, fromPairs } from 'ramda';
+import { clone, equals } from 'ramda';
 
 import QueryRenderer from './QueryRenderer';
 
 const QUERY_ELEMENTS = ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'];
 
-// todo: remove
-const d = (v) => JSON.parse(JSON.stringify(v));
-
 const toOrderMember = (member) => ({
   id: member.name,
   title: member.title,
 });
+
+const areQueriesEqual = (query1, query2) => {
+  return (
+    equals(Object.entries(query1.order || {}), Object.entries(query2.order || {})) &&
+    equals(query1, query2)
+  );
+};
+
+const reduceOrderMembers = (array) =>
+  array.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []);
 
 export default {
   components: {
@@ -44,13 +52,17 @@ export default {
     stateChangeHeuristics: {
       type: Function,
     },
-    vizState: {
+    initialVizState: {
       type: Object,
       default: () => ({}),
     },
   },
   data() {
-    const { query = this.query, chartType = this.initialChartType, pivotConfig } = this.vizState;
+    const {
+      query = this.query,
+      chartType = this.initialChartType,
+      pivotConfig,
+    } = this.initialVizState;
 
     return {
       initialQuery: query,
@@ -71,7 +83,6 @@ export default {
       offset: null,
       renewQuery: false,
       order: null,
-      orderMembers: [],
       prevValidatedQuery: null,
       granularities: GRANULARITIES,
       pivotConfig: ResultSet.getNormalizedPivotConfig(query || {}, pivotConfig),
@@ -137,17 +148,38 @@ export default {
         setQuery: this.setQuery,
         pivotConfig: this.pivotConfig,
         updateOrder: {
-          set: (memberId, order) => {
-            this.orderMembers = this.orderMembers.map((orderMember) => ({
-              ...orderMember,
-              order: orderMember.id === memberId ? order : orderMember.order,
-            }));
+          set: (memberId, newOrder) => {
+            this.order = reduceOrderMembers(
+              orderMembers.map((orderMember) => ({
+                ...orderMember,
+                order: orderMember.id === memberId ? newOrder : orderMember.order,
+              }))
+            );
           },
           update: (newOrder) => {
             this.order = newOrder;
           },
           reorder: (sourceIndex, destinationIndex) => {
-            this.orderMembers = moveItemInArray(this.orderMembers, sourceIndex, destinationIndex);
+            this.order = reduceOrderMembers(
+              moveItemInArray(orderMembers, sourceIndex, destinationIndex)
+            );
+          },
+        },
+        updatePivotConfig: {
+          moveItem: ({ sourceIndex, destinationIndex, sourceAxis, destinationAxis }) => {
+            this.pivotConfig = movePivotItem(
+              pivotConfig,
+              sourceIndex,
+              destinationIndex,
+              sourceAxis,
+              destinationAxis
+            );
+          },
+          update: (pivotConfig) => {
+            this.pivotConfig = {
+              x: pivotConfig.x || this.pivotConfig.x,
+              y: pivotConfig.y || this.pivotConfig.y,
+            };
           },
         },
       };
@@ -196,6 +228,37 @@ export default {
       const { validatedQuery } = this;
 
       return isQueryPresent(validatedQuery);
+    },
+    orderMembers() {
+      return getOrderMembersFromOrder(
+        [
+          ...this.measures,
+          ...this.dimensions,
+          ...this.timeDimensions.map(({ dimension }) => toOrderMember(dimension)),
+        ]
+          .map((member, index) => {
+            const id = member.name || member.id;
+
+            if (!id) {
+              return false;
+            }
+
+            return {
+              index,
+              id,
+              title: member.title,
+            };
+          })
+          .filter(Boolean),
+        this.order
+      );
+    },
+    vizState() {
+      return {
+        query: this.validatedQuery,
+        chartType: this.chartType,
+        pivotConfig: this.pivotConfig,
+      };
     },
     validatedQuery() {
       let validatedQuery = {};
@@ -284,8 +347,6 @@ export default {
         this.skipHeuristics = false;
       }
 
-      this.orderMembers = getOrderMembersFromOrder(this.getOrderMembers(), this.order || {});
-
       this.prevValidatedQuery = validatedQuery;
       return validatedQuery;
     },
@@ -294,6 +355,8 @@ export default {
   async mounted() {
     this.meta = await this.cubejsApi.meta();
 
+    this.copyQueryFromProps();
+
     if (isQueryPresent(this.initialQuery)) {
       const dryRunResponse = await this.cubejsApi.dryRun(this.initialQuery);
       this.pivotConfig = ResultSet.getNormalizedPivotConfig(
@@ -301,8 +364,6 @@ export default {
         this.pivotConfig
       );
     }
-
-    this.copyQueryFromProps();
   },
 
   methods: {
@@ -506,47 +567,19 @@ export default {
     setOffset(offset) {
       this.offset = offset;
     },
-    removeOffset() {
-      this.offset = null;
-    },
     updateChart(chartType) {
       this.chartType = chartType;
     },
     setOrder(order = {}) {
       this.order = order;
     },
-    getOrderMembers() {
-      const orderObject = Array.isArray(this.order) ? fromPairs(this.order) : this.order;
-      return [
-        ...this.measures,
-        ...this.dimensions,
-        ...this.timeDimensions.map(({ dimension }) => toOrderMember(dimension)),
-      ]
-        .map((member, index) => {
-          const id = member.name || member.id;
-
-          if (!id) {
-            return false;
-          }
-
-          return {
-            index,
-            id,
-            title: member.title,
-            order: orderObject?.[id] || 'none',
-          };
-        })
-        .filter(Boolean);
-    },
     emitVizStateChange(partialVizState) {
       this.$emit(
         'vizStateChange',
-        JSON.parse(
-          JSON.stringify({
-            ...this.vizState,
-            ...partialVizState,
-          })
-        )
+        clone({
+          ...this.vizState,
+          ...partialVizState,
+        })
       );
     },
   },
@@ -555,15 +588,15 @@ export default {
     validatedQuery: {
       deep: true,
       handler(query, prevQuery) {
-        const hasQueryChanged = equals(query, prevQuery);
+        const hasQueryChanged = !areQueriesEqual(query, prevQuery);
 
-        if (!hasQueryChanged) {
+        if (hasQueryChanged) {
           this.emitVizStateChange({
             query,
           });
         }
 
-        if (isQueryPresent(query) && !hasQueryChanged) {
+        if (isQueryPresent(query) && hasQueryChanged) {
           this.cubejsApi
             .dryRun(query, {
               mutexObj: this.mutex,
@@ -589,21 +622,6 @@ export default {
           return;
         }
         this.copyQueryFromProps();
-      },
-    },
-    orderMembers: {
-      deep: true,
-      handler(orderMembers) {
-        const nextOrder = orderMembers
-          .map(({ id, order }) => (order !== 'none' ? [id, order] : false))
-          .filter(Boolean);
-
-        if (!equals(Object.entries(this.order || {}), nextOrder)) {
-          this.order = fromPairs(nextOrder);
-          this.emitVizStateChange({
-            query: this.validatedQuery,
-          });
-        }
       },
     },
     pivotConfig: {

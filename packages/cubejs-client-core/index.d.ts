@@ -8,6 +8,8 @@
  */
 
 declare module '@cubejs-client/core' {
+  import type { ChartType } from '@cubejs-client/react';
+
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -972,6 +974,7 @@ declare module '@cubejs-client/core' {
     shouldApplyHeuristicOrder: boolean;
     pivotConfig: PivotConfig | null;
     query: Query;
+    chartType?: ChartType
   };
 
   export function defaultHeuristics(
@@ -1011,15 +1014,6 @@ declare module '@cubejs-client/core' {
 
   type TGranularityMap = {
     name: TimeDimensionGranularity | undefined;
-    title: string;
-  };
-
-  /**
-   * @hidden
-   */
-  type TOrderMember = {
-    id: string;
-    order: QueryOrder;
     title: string;
   };
 

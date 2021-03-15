@@ -241,9 +241,10 @@ export function getQueryMembers(query = {}) {
 export function getOrderMembersFromOrder(orderMembers, order) {
   const ids = new Set();
   const indexedOrderMembers = indexBy(prop('id'), orderMembers);
+  const entries = Array.isArray(order) ? order : Object.entries(order || {});
   const nextOrderMembers = [];
 
-  Object.entries(order).forEach(([memberId, currentOrder]) => {
+  entries.forEach(([memberId, currentOrder]) => {
     if (currentOrder !== 'none' && indexedOrderMembers[memberId]) {
       ids.add(memberId);
       nextOrderMembers.push({
@@ -254,7 +255,10 @@ export function getOrderMembersFromOrder(orderMembers, order) {
   });
   orderMembers.forEach((member) => {
     if (!ids.has(member.id)) {
-      nextOrderMembers.push(member);
+      nextOrderMembers.push({
+        ...member,
+        order: member.order || 'none'
+      });
     }
   });
 

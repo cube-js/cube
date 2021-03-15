@@ -7,8 +7,8 @@
     <v-card>
       <v-card-title>Order</v-card-title>
       <v-card-text class="container">
-        <draggable class="list-group" :list="orderMembers">
-          <div v-for="member in orderMembers" :key="member.id" class="order-member">
+        <draggable class="list-group" v-model="list" @end="handleDragEnd">
+          <div v-for="member in list" :key="member.id" class="order-member">
             <div class="order-member-name">
               <v-icon small>mdi-arrow-all</v-icon>
 
@@ -42,13 +42,31 @@ export default {
     },
     disabled: {
       type: Boolean,
-      default: false
+      default: false,
     },
   },
+
+  computed: {
+    list: {
+      get() {
+        return this.orderMembers;
+      },
+      set(value) {
+        return value;
+      }
+    },
+  },
+
   data() {
     return {
       dialog: false,
     };
+  },
+
+  methods: {
+    handleDragEnd(event) {
+      this.$emit('reorder', event.oldIndex, event.newIndex);
+    },
   },
 };
 </script>

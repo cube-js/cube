@@ -1,6 +1,6 @@
 <template>
   <v-container fluid class="text-center background pa-0">
-    <query-builder style="width: 100%" :cubejs-api="cubejsApi" :viz-state="vizState">
+    <query-builder style="width: 100%" :cubejsApi="cubejsApi" :initialVizState="vizState">
       <template
         #builder="{
           validatedQuery,
@@ -18,6 +18,7 @@
           filters,
           setFilters,
           pivotConfig,
+          updatePivotConfig,
           limit,
           setLimit,
           orderMembers,
@@ -28,37 +29,6 @@
       >
         <v-container fluid class="pa-4 pa-md-8 pt-6 background-white">
           <div class="wrap">
-            <div class="py-6">
-              <v-btn
-                class="mx-2"
-                color="primary"
-                depressed
-                elevation="2"
-                raised
-                v-on:click="setMeasures(['Orders.count', 'Orders.number'])"
-                >add member</v-btn
-              >
-              <v-btn
-                class="mx-2"
-                color="primary"
-                depressed
-                elevation="2"
-                raised
-                v-on:click="setMeasures(['Sales.count'])"
-                >remove member</v-btn
-              >
-
-              <v-btn
-                class="mx-2"
-                color="primary"
-                depressed
-                elevation="2"
-                raised
-                v-on:click="setOrder({ 'Orders.count': 'desc' })"
-                >Click Me!</v-btn
-              >
-            </div>
-
             <v-row>
               <v-col cols="12" md="2">
                 <v-select
@@ -104,6 +74,15 @@
                   item-value="name"
                   :value="timeDimensions[0] && timeDimensions[0].granularity"
                   :items="GRANULARITIES"
+                  @change="
+                    setTimeDimensions([
+                      {
+                        dimension: timeDimensions[0]['dimension']['name'],
+                        granularity: $event,
+                        dateRange: timeDimensions[0]['dateRange'],
+                      },
+                    ])
+                  "
                 />
               </v-col>
 
@@ -126,9 +105,18 @@
 
               <v-col cols="10" class="settings-button-group">
                 Settings:
-                <PivotConfig :pivotConfig="pivotConfig" :disabled="!isQueryPresent" />
+                <PivotConfig
+                  :pivotConfig="pivotConfig"
+                  :disabled="!isQueryPresent"
+                  @move="(value) => handleMove(value, updatePivotConfig)"
+                />
 
-                <Order :orderMembers="orderMembers" :disabled="!isQueryPresent" @orderChange="updateOrder.set" />
+                <Order
+                  :orderMembers="orderMembers"
+                  :disabled="!isQueryPresent"
+                  @orderChange="updateOrder.set"
+                  @reorder="updateOrder.reorder"
+                />
 
                 <Limit :limit="Number(limit)" :disabled="!isQueryPresent" @update="setLimit" />
               </v-col>
@@ -219,22 +207,31 @@ export default {
     DateRangeSelect,
   },
   data() {
-    let query = {};
+    // const query = {
+    //   measures: ['Orders.count'],
+    //   dimensions: ['Orders.status', 'Products.name'],
+    //   timeDimensions: [
+    //     {
+    //       dimension: 'Orders.createdAt',
+    //       granularity: 'month',
+    //       dateRange: 'This quarter',
+    //     },
+    //   ],
+    //   order: [
+    //     ['Orders.count', 'asc'],
+    //     ['Orders.createdAt', 'asc'],
+    //   ],
+    // };
 
-    query = {
+    const query = {
       measures: ['Orders.count'],
-      // dimensions: ['Orders.status'],
       timeDimensions: [
         {
           dimension: 'Orders.createdAt',
           granularity: 'month',
           dateRange: 'This quarter',
         },
-      ],
-      order: [
-        ['Orders.count', 'asc'],
-        ['Orders.createdAt', 'asc'],
-      ],
+      ]
     };
 
     return {
@@ -243,15 +240,17 @@ export default {
         name: 'day',
         title: 'DAyyyy',
       },
-      query,
       chartTypes: ['line', 'area', 'bar', 'pie', 'table', 'number'],
       vizState: {
         query,
-        chartType: 'table'
-      }
+        chartType: 'line',
+      },
     };
   },
   methods: {
+    handleMove(value, updatePivotConfig) {
+      updatePivotConfig.update(value);
+    },
     async createDashboardItem({ name, query, chartType }) {
       await this.$apollo.mutate({
         mutation: gql`

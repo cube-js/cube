@@ -10,8 +10,8 @@
         <div class="container">
           <div>
             <div class="axis-name">x</div>
-            <draggable id="x" class="list-group" group="pivot" :list="pivotConfig.x" :move="checkMove">
-              <div class="list-group-item" v-for="member in pivotConfig.x" :key="member">
+            <draggable id="x" class="list-group" group="pivot" v-model="draggableX">
+              <div class="list-group-item" v-for="member in draggableX" :key="member">
                 <v-icon small>mdi-arrow-all</v-icon>
 
                 <span>{{ member }}</span>
@@ -23,10 +23,10 @@
 
           <div>
             <div class="axis-name">y</div>
-            <draggable id="y" class="list-group" group="pivot" :list="pivotConfig.y" :move="checkMove">
-              <div class="list-group-item" v-for="member in pivotConfig.y" :key="member">
+            <draggable id="y" class="list-group" group="pivot" v-model="draggableY">
+              <div class="list-group-item" v-for="member in draggableY" :key="member">
                 <v-icon small>mdi-arrow-all</v-icon>
-                
+
                 <span>{{ member }}</span>
               </div>
             </draggable>
@@ -52,17 +52,38 @@ export default {
     },
     disabled: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   data() {
     return {
       dialog: false,
     };
   },
+  computed: {
+    draggableX: {
+      get() {
+        return this.pivotConfig.x;
+      },
+      set(value) {
+        this.$emit('move', {
+          x: value,
+        });
+      },
+    },
+    draggableY: {
+      get() {
+        return this.pivotConfig.y;
+      },
+      set(value) {
+        this.$emit('move', {
+          y: value,
+        });
+      },
+    },
+  },
   methods: {
     checkMove(event) {
-      // todo: move to core utils
       // Make sure the `measures` is always the last item on axis
       const sourceAxis = event.from.id;
       const destinationAxis = event.to.id;

@@ -36,7 +36,7 @@ export default {
         {
           dimension: this.timeDimensions[0].dimension.name,
           granularity: this.timeDimensions[0].granularity,
-          dateRange: value,
+          ...(value ? { dateRange: value } : null),
         },
       ]);
     },
