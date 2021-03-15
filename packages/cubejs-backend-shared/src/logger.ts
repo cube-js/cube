@@ -5,7 +5,7 @@ interface logParams {
   error?: Error, warning?: string,
   requestId?: string, duration?: string, query?: string, values?: any[],
   msg?: string
-};
+}
 
 export function devLogger(level: string) {
   return (message: string, params: logParams = {}) => {
@@ -18,8 +18,10 @@ export function devLogger(level: string) {
     const { error, warning, ...rest } = params;
 
     const withColor = (str?: string, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
-    const format = ({ requestId, duration, allSqlLines, query, values, showRestParams, ...json }
-                    : {requestId?: string, duration?: string, allSqlLines?: boolean, query?: string, values?: any[], showRestParams?: boolean}) => {
+    const format = ({ requestId, duration, allSqlLines, query, values, showRestParams, ...json }:
+                      {requestId?: string, duration?: string,
+                       allSqlLines?: boolean, query?: string, values?: any[],
+                       showRestParams?: boolean}) => {
       const restParams = JSON.stringify(json, null, 2);
       const durationStr = duration ? `(${duration}ms)` : '';
       const prefix = `${requestId} ${durationStr}`;
@@ -88,13 +90,13 @@ export function devLogger(level: string) {
       }
     }
   };
-};
+}
 
 export function prodLogger(level: string) {
   return (message: string, params: logParams = {}) => {
     const { error, warning, ...rest } = params;
 
-    const logMessage = () => console.log(JSON.stringify({ message: message, error, warning, ...rest }));
+    const logMessage = () => console.log(JSON.stringify({ message, error, warning, ...rest }));
     // eslint-disable-next-line default-case
     switch ((level || 'warn').toLowerCase()) {
       case 'trace': {
@@ -127,4 +129,4 @@ export function prodLogger(level: string) {
       }
     }
   };
-};
+}
