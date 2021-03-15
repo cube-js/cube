@@ -26,6 +26,7 @@ export async function startBidBoxContainer(options: BirdBoxTestCaseOptions) {
   );
 
   const env = await dc
+    .withStartupTimeout(30 * 1000)
     .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
     .up();
 

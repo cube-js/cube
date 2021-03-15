@@ -2,9 +2,6 @@
   "extends": "./tsconfig.base.json",
   "references": [
     {
-      "path": "packages/cubejs-docker"
-    },
-    {
       "path": "packages/cubejs-testing"
     },
     {
