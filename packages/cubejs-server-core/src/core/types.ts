@@ -1,6 +1,7 @@
 import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import { LoggerFn } from '@cubejs-backend/shared';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -94,8 +95,6 @@ export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseD
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type DbTypeFn = (context: RequestContext) => DatabaseType;
-
-export type LoggerFn = (msg: string, params: any) => void;
 
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;

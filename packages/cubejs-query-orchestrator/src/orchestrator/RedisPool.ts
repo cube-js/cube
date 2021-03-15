@@ -1,7 +1,6 @@
 /* eslint-disable global-require */
 import genericPool, { Pool, Options as PoolOptions } from 'generic-pool';
-import { getEnv } from '@cubejs-backend/shared';
-import { LoggerFn } from '@cubejs-backend/server-core';
+import { getEnv, LoggerFn } from '@cubejs-backend/shared';
 import AsyncRedisClient from './AsyncRedisClient';
 import { createRedisClient as createNodeRedisClient, RedisOptions } from './RedisFactory';
 import { createIORedisClient, IORedisOptions } from './IORedisFactory';
@@ -46,7 +45,7 @@ export class RedisPool {
       evictionRunIntervalMillis: 5000
     };
 
-    const create = options.createClient || (async () => createRedisClient(getEnv('redisUrl'), logger));
+    const create = options.createClient || (async () => createRedisClient(getEnv('redisUrl'), {}, logger));
 
     if (max > 0) {
       const destroy = options.destroyClient || (async (client) => client.end(true));
