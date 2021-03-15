@@ -67,8 +67,7 @@ export function devLogger(level: string) {
           'Executing Load Pre Aggregation SQL',
           'Load Request Success',
           'Performing query',
-          'Performing query completed',
-          'IORedisFactory'
+          'Performing query completed'
         ].includes(message)) {
           logDetails();
           break;
