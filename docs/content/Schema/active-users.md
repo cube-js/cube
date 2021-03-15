@@ -5,6 +5,12 @@ category: Reference
 subCategory: Tutorials
 menuOrder: 14
 ---
+<!-- prettier-ignore-start -->
+[[info | ]]
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/daily-weekly-monthly-active-users).
+<!-- prettier-ignore-end -->
+
 You may be familiar with <b>Active Users metric</b>, which is commonly used to get a sense of your engagement. 
 Daily, weekly, and monthly active users are commonly referred to as <b>DAU, WAU, MAU</b>. To get these metrics, we need to use a <b>rolling time frame</b> 
 to calculate a daily count of how many users interacted with the product or website in the prior day, 7 days, or 30 days.
