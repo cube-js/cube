@@ -3,7 +3,7 @@
   "include": [
     "src",
     "test"
-  ],
+, "../cubejs-backend-shared/src/logger.js"  ],
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",

@@ -707,7 +707,7 @@ export class ApiGateway {
       this.log({
         type: e.type,
         query,
-        error: e.message,
+        error: e,
         duration: this.duration(requestStarted)
       }, context);
       res({ error: e.message }, { status: e.status });
@@ -715,7 +715,7 @@ export class ApiGateway {
       this.log({
         type: 'Continue wait',
         query,
-        error: e.message,
+        error: e,
         duration: this.duration(requestStarted)
       }, context);
       res(e, { status: 200 });
@@ -723,7 +723,7 @@ export class ApiGateway {
       this.log({
         type: 'Orchestrator error',
         query,
-        error: e.error,
+        error: e,
         duration: this.duration(requestStarted)
       }, context);
       res(e, { status: 400 });
@@ -731,13 +731,13 @@ export class ApiGateway {
       this.log({
         type: e.type,
         query,
-        error: e.message,
+        error: e,
         duration: this.duration(requestStarted)
       }, context);
       res(
         {
           type: e.type,
-          error: e.message
+          error: e
         },
         { status: 400 }
       );
@@ -745,7 +745,7 @@ export class ApiGateway {
       this.log({
         type: 'Internal Server Error',
         query,
-        error: e.stack || e.toString(),
+        error: e,
         duration: this.duration(requestStarted)
       }, context);
       res({ error: e.toString() }, { status: 500 });

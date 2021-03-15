@@ -13,6 +13,7 @@ import {
   getEnv,
   internalExceptions, isDockerImage, requireFromPackage,
   track,
+  prodLogger, devLogger
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -40,7 +41,6 @@ import { CompilerApi } from './CompilerApi';
 import { DevServer } from './DevServer';
 import agentCollect from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
-import { prodLogger, devLogger } from './logger';
 
 import DriverDependencies from './DriverDependencies';
 import optionsValidate from './optionsValidate';
