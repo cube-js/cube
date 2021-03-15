@@ -8,12 +8,14 @@ interface logParams {
 };
 
 export function devLogger(level: string) {
-  return (message: string, { error, warning, ...rest } : logParams) => {
+  return (message: string, params: logParams = {}) => {
     const colors = {
       red: '31', // ERROR
       green: '32', // INFO
       yellow: '33', // WARNING
     };
+
+    const { error, warning, ...rest } = params;
 
     const withColor = (str?: string, color = colors.green) => `\u001b[${color}m${str}\u001b[0m`;
     const format = ({ requestId, duration, allSqlLines, query, values, showRestParams, ...json }
@@ -89,7 +91,8 @@ export function devLogger(level: string) {
 };
 
 export function prodLogger(level: string) {
-  return (message: string, { error, warning, ...rest } : logParams) => {
+  return (message: string, params: logParams = {}) => {
+    const { error, warning, ...rest } = params;
 
     const logMessage = () => console.log(JSON.stringify({ message: message, error, warning, ...rest }));
     // eslint-disable-next-line default-case
