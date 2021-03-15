@@ -1,14 +1,14 @@
 import SqlString from 'sqlstring';
 import R from 'ramda';
 
-interface logParams {
+interface LogParams {
   error?: Error, warning?: string,
   requestId?: string, duration?: string, query?: string, values?: any[],
   msg?: string
 }
 
 export function devLogger(level: string) {
-  return (message: string, params: logParams = {}) => {
+  return (message: string, params: LogParams = {}) => {
     const colors = {
       red: '31', // ERROR
       green: '32', // INFO
@@ -93,7 +93,7 @@ export function devLogger(level: string) {
 }
 
 export function prodLogger(level: string) {
-  return (message: string, params: logParams = {}) => {
+  return (message: string, params: LogParams = {}) => {
     const { error, warning, ...rest } = params;
 
     const logMessage = () => console.log(JSON.stringify({ message, error, warning, ...rest }));
