@@ -161,12 +161,14 @@ server {
 }
 ```
 
-## Configure JWKS
+## Secure the deployment
 
 If you're using JWTs, you can configure Cube.js to correctly decode them and
 inject their contents into the [Security Context][ref-sec-ctx]. Add your
 authentication provider's configuration under [the `jwt` property of your
-`cube.js` configuration file][ref-config-jwt].
+`cube.js` configuration file][ref-config-jwt], or use [the corresponding
+environment variables (`CUBEJS_JWK_URL`,
+`CUBEJS_JWT_*`)][ref-config-env-vars-general].
 
 [ref-sec-ctx]: /security/context
 [ref-config-jwt]: /config#options-reference-jwt
@@ -179,6 +181,7 @@ your monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
 [`/livez`][ref-api-livez] API endpoints so you can check on the Cube.js
 deployment's health and be alerted to any issues.
 
+[ref-config-env-vars-general]: /reference/environment-variables#general
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
 [ref-api-readyz]: /rest-api#api-reference-readyz
