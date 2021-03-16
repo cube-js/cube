@@ -1,14 +1,17 @@
 import PlaygroundWrapper from '../PlaygroundWrapper';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 
-export default function QueryBuilder(props) {
+export default function QueryBuilder({ apiUrl, token, ...props }) {
   return (
-    <PlaygroundWrapper {...props}>
+    <PlaygroundWrapper apiUrl={apiUrl} token={token} getToken={props.getToken}>
       <PlaygroundQueryBuilder
-        query={props.query}
-        setQuery={props.setQuery}
-        apiUrl={props.apiUrl}
-        cubejsToken={props.token}
+        apiUrl={apiUrl}
+        cubejsToken={token}
+        initialVizState={{
+          query: props.defaultQuery,
+          ...props.initialVizState,
+        }}
+        onVizStateChanged={(vizState) => props.onVizStateChanged?.(vizState)}
       />
     </PlaygroundWrapper>
   );

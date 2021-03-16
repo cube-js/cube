@@ -48,8 +48,10 @@ module.exports = function override(config, env) {
     config.devtool = false;
   }
   config = addLessLoader({
-    javascriptEnabled: true,
-    modifyVars: LESS_VARIABLES,
+    lessOptions: {
+      modifyVars: LESS_VARIABLES,
+      javascriptEnabled: true,
+    },
   })(config);
 
   return rewireYarnWorkspaces(config, env);

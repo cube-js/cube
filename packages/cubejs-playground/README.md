@@ -26,14 +26,18 @@ const apiUrl = 'http://localhost:4000/cubejs-api/v1';
 const token = 'your.token';
 
 export default function App() {
-  const [query, setQuery] = useState({});
+  const query = {
+    measures: ['Orders.count'],
+    dimensions:  ['Orders.status']
+  };
 
   return (
     <QueryBuilder
       apiUrl={apiUrl}
       token={token}
-      query={query}
-      setQuery={setQuery}
+      initialVizState={{
+        query
+      }}
     />
   );
 }
