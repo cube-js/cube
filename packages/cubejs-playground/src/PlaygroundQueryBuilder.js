@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Col, Row, Divider } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
-import { QueryBuilder, useDryRun } from '@cubejs-client/react';
+import { QueryBuilder } from '@cubejs-client/react';
 import styled from 'styled-components';
 
 import { playgroundAction } from './events';
@@ -79,13 +79,14 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     .reduce((a, b) => ({ ...a, ...b }), {});
 
 export default function PlaygroundQueryBuilder({
-  query = {},
   apiUrl,
   cubejsToken,
-  setQuery,
+  defaultQuery,
   dashboardSource,
   schemaVersion = 0,
+  initialVizState,
   onSchemaChange,
+  onVizStateChanged
 }) {
   const ref = useRef(null);
   const [framework, setFramework] = useState('react');
@@ -102,26 +103,16 @@ export default function PlaygroundQueryBuilder({
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
 
-  const { response } = useDryRun(query, {
-    skip: typeof query.timeDimensions?.[0]?.dateRange !== 'string',
-  });
-
-  let parsedDateRange;
-  if (response) {
-    const { timeDimensions = [] } = response.pivotQuery || {};
-    parsedDateRange = timeDimensions[0]?.dateRange;
-  } else if (Array.isArray(query.timeDimensions?.[0]?.dateRange)) {
-    parsedDateRange = query.timeDimensions[0].dateRange;
-  }
-
   return (
     <QueryBuilder
-      query={query}
-      setQuery={setQuery}
+      defaultQuery={defaultQuery}
+      initialVizState={initialVizState}
       wrapWithQueryRenderer={false}
       schemaVersion={schemaVersion}
       onSchemaChange={onSchemaChange}
+      onVizStateChanged={onVizStateChanged}
       render={({
+        query,
         error,
         metaError,
         isQueryPresent,
@@ -146,8 +137,18 @@ export default function PlaygroundQueryBuilder({
         pivotConfig,
         updatePivotConfig,
         missingMembers,
-        isFetchingMeta
+        isFetchingMeta,
+        dryRunResponse
       }) => {
+        let parsedDateRange;
+
+        if (dryRunResponse) {
+          const { timeDimensions = [] } = dryRunResponse.pivotQuery || {};
+          parsedDateRange = timeDimensions[0]?.dateRange;
+        } else if (Array.isArray(query.timeDimensions?.[0]?.dateRange)) {
+          parsedDateRange = query.timeDimensions[0].dateRange;
+        }
+
         return (
           <>
             <Row>
