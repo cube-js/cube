@@ -2,6 +2,7 @@ pub mod hll;
 mod optimizations;
 mod partition_filter;
 mod planning;
+pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
 pub mod udfs;
@@ -79,7 +80,7 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             let (logical_plan, index_snapshots) =
-                choose_index(&logical_plan, self.meta_store.as_ref()).await?;
+                choose_index(&logical_plan, &self.meta_store.as_ref()).await?;
             QueryPlan::Select(SerializedPlan::try_new(logical_plan, index_snapshots).await?)
         } else {
             QueryPlan::Meta(logical_plan)

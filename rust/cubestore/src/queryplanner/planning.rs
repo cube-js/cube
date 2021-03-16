@@ -16,14 +16,10 @@
 //!
 //!       At this point we also optimize the physical plan to ensure we do as much work as possible
 //!       on the workers, see [CubeQueryPlanner] for details.
-use crate::cluster::Cluster;
-use crate::metastore::table::TablePath;
-use crate::metastore::{IdRow, Index, MetaStore};
-use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
-use crate::queryplanner::partition_filter::PartitionFilter;
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable};
-use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, SerializedPlan};
-use crate::queryplanner::CubeTableLogical;
+use std::collections::hash_map::RandomState;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
 use arrow::datatypes::Field;
 use async_trait::async_trait;
 use datafusion::error::DataFusionError;
@@ -37,13 +33,20 @@ use datafusion::physical_plan::{
 use flatbuffers::bitflags::_core::any::Any;
 use flatbuffers::bitflags::_core::fmt::Formatter;
 use itertools::Itertools;
-use std::collections::hash_map::RandomState;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+
+use crate::cluster::Cluster;
+use crate::metastore::table::{Table, TablePath};
+use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition, Schema};
+use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
+use crate::queryplanner::partition_filter::PartitionFilter;
+use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable};
+use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, SerializedPlan};
+use crate::queryplanner::CubeTableLogical;
+use crate::CubeError;
 
 pub async fn choose_index(
     p: &LogicalPlan,
-    metastore: &dyn MetaStore,
+    metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
     let mut r = ChooseIndex {
         metastore,
@@ -53,8 +56,54 @@ pub async fn choose_index(
     Ok((plan, r.collected_snapshots))
 }
 
+#[async_trait]
+pub trait PlanIndexStore: Send + Sync {
+    async fn get_table(
+        &self,
+        schema_name: String,
+        table_name: String,
+    ) -> Result<IdRow<Table>, CubeError>;
+    async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError>;
+    async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
+    async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
+    async fn get_active_partitions_and_chunks_by_index_id_for_select(
+        &self,
+        index_id: u64,
+    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
+}
+
+#[async_trait]
+impl<'a> PlanIndexStore for &'a dyn MetaStore {
+    async fn get_table(
+        &self,
+        schema_name: String,
+        table_name: String,
+    ) -> Result<IdRow<Table>, CubeError> {
+        MetaStore::get_table(*self, schema_name, table_name).await
+    }
+
+    async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError> {
+        MetaStore::get_schema_by_id(*self, schema_id).await
+    }
+
+    async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError> {
+        MetaStore::get_default_index(*self, table_id).await
+    }
+
+    async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError> {
+        MetaStore::get_table_indexes(*self, table_id).await
+    }
+
+    async fn get_active_partitions_and_chunks_by_index_id_for_select(
+        &self,
+        index_id: u64,
+    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
+        MetaStore::get_active_partitions_and_chunks_by_index_id_for_select(*self, index_id).await
+    }
+}
+
 struct ChooseIndex<'a> {
-    metastore: &'a dyn MetaStore,
+    metastore: &'a dyn PlanIndexStore,
     collected_snapshots: Vec<IndexSnapshot>,
 }
 
@@ -479,6 +528,7 @@ impl ExtensionPlanner for ClusterSendPlanner {
                 node.schema().to_schema_ref(),
             )));
         }
+        // Note that MergeExecs are added automatically when needed.
         if let Some(c) = self.cluster.as_ref() {
             Ok(Arc::new(ClusterSendExec::new(
                 node.schema().clone(),
@@ -559,6 +609,325 @@ pub fn get_worker_plan(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPl
             return None;
         } else {
             return get_worker_plan(&children[0]);
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use std::sync::Arc;
+
+    use arrow::datatypes::Schema as ArrowSchema;
+    use async_trait::async_trait;
+    use datafusion::datasource::TableProvider;
+    use datafusion::execution::context::ExecutionContext;
+    use datafusion::logical_plan::LogicalPlan;
+    use datafusion::physical_plan::udaf::AggregateUDF;
+    use datafusion::physical_plan::udf::ScalarUDF;
+    use datafusion::sql::parser::Statement as DFStatement;
+    use datafusion::sql::planner::{ContextProvider, SqlToRel};
+    use itertools::Itertools;
+    use pretty_assertions::assert_eq;
+
+    use crate::metastore::table::{Table, TablePath};
+    use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
+    use crate::queryplanner::planning::{choose_index, PlanIndexStore};
+    use crate::queryplanner::{pretty_printers, CubeTableLogical};
+    use crate::sql::parser::{CubeStoreParser, Statement};
+    use crate::CubeError;
+
+    #[tokio::test]
+    pub async fn test_choose_index() {
+        let indices = default_indices();
+        let plan = initial_plan("SELECT * FROM s.Customers WHERE customer_id = 1", &indices);
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "Filter\
+           \n  Scan s.Customers, source: CubeTableLogical, fields: *"
+        );
+
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "ClusterSend, indices: [[0]]\
+           \n  Filter\
+           \n    Scan s.Customers, source: CubeTable(index: default:0:[]), fields: *"
+        );
+
+        // Should prefer a non-default index for joins.
+        let plan = initial_plan(
+            "SELECT order_id, order_amount, customer_name \
+             FROM s.Orders \
+             JOIN s.Customers ON order_customer = customer_id",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0]]\
+                                  \n  Projection, [order_id, order_amount, customer_name]\
+                                  \n    Join on: [order_customer = customer_id]\
+                                  \n      Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_amount]\
+                                  \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]");
+
+        let plan = initial_plan(
+            "SELECT order_id, customer_name, product_name \
+             FROM s.Orders \
+             JOIN s.Customers on order_customer = customer_id \
+             JOIN s.Products ON order_product = product_id",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0], [5]]\
+        \n  Projection, [order_id, customer_name, product_name]\
+        \n    Join on: [order_product = product_id]\
+        \n      Join on: [order_customer = customer_id]\
+        \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_product]\
+        \n        Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
+        \n      Scan s.Products, source: CubeTable(index: default:5:[]:sort_on[product_id]), fields: *");
+
+        let plan = initial_plan(
+            "SELECT c2.customer_name \
+             FROM s.Orders \
+             JOIN s.Customers c1 on order_customer = c1.customer_id \
+             JOIN s.Customers c2 ON order_city = c2.customer_city \
+             WHERE c1.customer_name = 'Customer 1'",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0], [1]]\
+                                  \n  Projection, [customer_name]\
+                                  \n    Join on: [order_city = c2.customer_city]\
+                                  \n      Join on: [order_customer = c1.customer_id]\
+                                  \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
+                                  \n        Filter\
+                                  \n          Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [c1.customer_id, c1.customer_name]\
+                                  \n      Scan s.Customers, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [c2.customer_name, c2.customer_city]");
+    }
+
+    /// Most tests in this module use this schema.
+    fn default_indices() -> TestIndices {
+        const SCHEMA: u64 = 0;
+        let mut i = TestIndices::default();
+
+        let customers_cols = int_columns(&[
+            "customer_id",
+            "customer_name",
+            "customer_city",
+            "customer_registered_date",
+        ]);
+        let customers = i.add_table(Table::new(
+            "Customers".to_string(),
+            SCHEMA,
+            customers_cols.clone(),
+            None,
+            None,
+        ));
+        i.indices.push(
+            Index::try_new(
+                "by_city".to_string(),
+                customers,
+                put_first("customer_city", &customers_cols),
+                1,
+            )
+            .unwrap(),
+        );
+
+        let orders_cols = int_columns(&[
+            "order_id",
+            "order_customer",
+            "order_product",
+            "order_amount",
+            "order_city",
+        ]);
+        let orders = i.add_table(Table::new(
+            "Orders".to_string(),
+            SCHEMA,
+            orders_cols.clone(),
+            None,
+            None,
+        ));
+        i.indices.push(
+            Index::try_new(
+                "by_customer".to_string(),
+                orders,
+                put_first("order_customer", &orders_cols),
+                2,
+            )
+            .unwrap(),
+        );
+        i.indices.push(
+            Index::try_new(
+                "by_city".to_string(),
+                customers,
+                put_first("order_city", &orders_cols),
+                2,
+            )
+            .unwrap(),
+        );
+
+        i.add_table(Table::new(
+            "Products".to_string(),
+            SCHEMA,
+            int_columns(&["product_id", "product_name"]),
+            None,
+            None,
+        ));
+
+        i
+    }
+
+    fn put_first(c: &str, cols: &[Column]) -> Vec<Column> {
+        let mut cols = cols.iter().cloned().collect_vec();
+        let pos = cols.iter().position(|col| col.get_name() == c).unwrap();
+        cols.swap(0, pos);
+        cols
+    }
+
+    fn int_columns(names: &[&str]) -> Vec<Column> {
+        names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| Column::new(n.to_string(), ColumnType::Int, i))
+            .collect()
+    }
+
+    fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
+        let statement;
+        if let Statement::Statement(s) = CubeStoreParser::new(s).unwrap().parse_statement().unwrap()
+        {
+            statement = s;
+        } else {
+            panic!("not a statement")
+        }
+        let plan = SqlToRel::new(i)
+            .statement_to_plan(&DFStatement::Statement(statement))
+            .unwrap();
+        ExecutionContext::new().optimize(&plan).unwrap()
+    }
+
+    #[derive(Debug, Default)]
+    pub struct TestIndices {
+        tables: Vec<Table>,
+        indices: Vec<Index>,
+        partitions: Vec<Partition>,
+    }
+
+    impl TestIndices {
+        pub fn add_table(&mut self, t: Table) -> u64 {
+            assert_eq!(t.get_schema_id(), 0);
+            let table_id = self.tables.len() as u64;
+            self.indices.push(
+                Index::try_new(
+                    "default".to_string(),
+                    table_id,
+                    t.get_columns().clone(),
+                    t.get_columns().len() as u64,
+                )
+                .unwrap(),
+            );
+            self.tables.push(t);
+            table_id
+        }
+
+        pub fn schema(&self) -> IdRow<Schema> {
+            IdRow::new(0, Schema::new("s".to_string()))
+        }
+    }
+
+    impl ContextProvider for TestIndices {
+        fn get_table_provider(&self, name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
+            let name = name.strip_prefix("s.")?;
+            self.tables
+                .iter()
+                .find_position(|t| t.get_table_name() == name)
+                .map(|(id, t)| -> Arc<dyn TableProvider + Send + Sync> {
+                    let schema = Arc::new(ArrowSchema::new(
+                        t.get_columns()
+                            .iter()
+                            .map(|c| c.clone().into())
+                            .collect::<Vec<_>>(),
+                    ));
+                    Arc::new(CubeTableLogical {
+                        table: TablePath {
+                            table: IdRow::new(id as u64, t.clone()),
+                            schema: Arc::new(self.schema()),
+                        },
+                        schema,
+                    })
+                })
+        }
+
+        fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
+            // Note that this is missing HLL functions.
+            None
+        }
+
+        fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
+            // Note that this is missing HLL functions.
+            None
+        }
+    }
+
+    #[async_trait]
+    impl PlanIndexStore for TestIndices {
+        async fn get_table(
+            &self,
+            schema_name: String,
+            table_name: String,
+        ) -> Result<IdRow<Table>, CubeError> {
+            if schema_name != "s" {
+                return Err(CubeError::internal(
+                    "only 's' schema defined in tests".to_string(),
+                ));
+            }
+            let (pos, table) = self
+                .tables
+                .iter()
+                .find_position(|t| t.get_table_name() == &table_name)
+                .ok_or_else(|| CubeError::internal(format!("table {} not found", table_name)))?;
+            Ok(IdRow::new(pos as u64, table.clone()))
+        }
+
+        async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError> {
+            if schema_id != 0 {
+                return Err(CubeError::internal(
+                    "only 's' schema with id = 0 defined in tests".to_string(),
+                ));
+            }
+            return Ok(self.schema());
+        }
+
+        async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError> {
+            let (pos, index) = self
+                .indices
+                .iter()
+                .find_position(|i| i.table_id() == table_id)
+                .ok_or_else(|| {
+                    CubeError::internal(format!("index for table {} not found", table_id))
+                })?;
+            Ok(IdRow::new(pos as u64, index.clone()))
+        }
+
+        async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError> {
+            Ok(self
+                .indices
+                .iter()
+                .enumerate()
+                .filter(|(_, i)| i.table_id() == table_id)
+                .map(|(pos, index)| IdRow::new(pos as u64, index.clone()))
+                .collect())
+        }
+
+        async fn get_active_partitions_and_chunks_by_index_id_for_select(
+            &self,
+            index_id: u64,
+        ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
+            Ok(self
+                .partitions
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.get_index_id() == index_id)
+                .map(|(id, p)| (IdRow::new(id as u64, p.clone()), vec![]))
+                .collect())
         }
     }
 }
