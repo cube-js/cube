@@ -15,8 +15,6 @@ on:
       - 'lerna.json'
       - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-gen/**'
-      - 'docs/**'
     branches:
       - 'master'
       # feature or legacy releases
@@ -36,8 +34,6 @@ on:
       - 'lerna.json'
       - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-gen/**'
-      - 'docs/**'
 
 jobs:
   unit:

@@ -12,7 +12,15 @@ Continuous deployment works by connecting a Git repository to a Cube Cloud deplo
 
 First, make sure your deployment is configured to deploy with Git.
 
-![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Cube-Cloud/deploy-with-git.png)
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Cube-Cloud/deploy-with-git.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 Next, you can connect your Github repository to your deployment. Cube Cloud will
 automatically deploy from the specified production branch (**master** by default).
@@ -35,7 +43,7 @@ You can use the CLI to set up continuous deployment for a Git repository. You ca
 
 ### Manual Deploys
 
-You can deploy your Cube.js project manually. This method uploads data schema and configuration files directly from your local project directory. 
+You can deploy your Cube.js project manually. This method uploads data schema and configuration files directly from your local project directory.
 
 You can obtain Cube Cloud deploy token from your deployment **Settings** page.
 
