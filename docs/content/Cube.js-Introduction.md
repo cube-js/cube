@@ -12,8 +12,8 @@ Cube.js was designed to work with serverless data warehouses and query engines l
 trillions of data points. Most modern RDBMS work with Cube.js as well and can be
 further tuned for performance.
 
-With Cube.js you can create semantic API layer on top of your data,
-manage access control, cache and aggregate data. Since Cube.js is visualization agnostic,
+With Cube.js, you can create a semantic API layer on top of your data,
+manage access control, cache, and aggregate data. Since Cube.js is visualization agnostic,
 you can use any frontend library to build your own custom UI.
 
 ## Why Cube.js?
