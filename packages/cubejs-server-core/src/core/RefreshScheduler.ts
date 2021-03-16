@@ -137,7 +137,8 @@ export class RefreshScheduler {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
       const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
-      if (measuresCount === 0 && dimensionsCount === 0) {
+      const preAggregationsCount = Object.keys(cubeFromPath.preAggregations || {}).length;
+      if (preAggregationsCount || (measuresCount === 0 && dimensionsCount === 0)) {
         return;
       }
       await Promise.all(queryingOptions.timezones.map(async timezone => {
