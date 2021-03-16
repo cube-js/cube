@@ -1,23 +1,12 @@
 import babel from '@rollup/plugin-babel';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
-import replace from '@rollup/plugin-replace';
 import alias from '@rollup/plugin-alias';
 
 const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) => {
-  baseConfig = {
-    plugins: [
-      replace({
-        'process.env.CUBEJS_API_URL': `"${process.env.CUBEJS_API_URL || 'https://statsbot.co/cubejs-api/v1'}"`,
-      }),
-    ],
-    ...baseConfig,
-  };
-
   const baseUmdConfig = {
     ...(umdConfig || baseConfig),
     plugins: [
-      ...baseConfig.plugins,
       commonjs({
         extensions: ['.js'],
       }),
@@ -87,7 +76,6 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     {
       ...baseConfig,
       plugins: [
-        ...baseConfig.plugins,
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
@@ -129,7 +117,6 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     {
       ...baseConfig,
       plugins: [
-        ...baseConfig.plugins,
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',

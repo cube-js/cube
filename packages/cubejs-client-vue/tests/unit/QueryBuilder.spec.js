@@ -1,13 +1,13 @@
 import { mount } from '@vue/test-utils';
-import CubejsApi from '@cubejs-client/core';
 import flushPromises from 'flush-promises';
 
 import fetchMock, { meta, load } from './__mocks__/responses';
 import QueryBuilder from '../../src/QueryBuilder';
+import { createCubejsApi } from './utils';
 
 describe('QueryBuilder.vue', () => {
   it('renders meta information', async () => {
-    const cube = CubejsApi('token');
+    const cube = createCubejsApi();
     jest
       .spyOn(cube, 'request')
       .mockImplementation(fetchMock(meta))
@@ -29,7 +29,7 @@ describe('QueryBuilder.vue', () => {
   });
 
   it('renders meta information', async () => {
-    const cube = CubejsApi('token');
+    const cube = createCubejsApi();
     jest
       .spyOn(cube, 'request')
       .mockImplementation(fetchMock(load))
@@ -57,7 +57,7 @@ describe('QueryBuilder.vue', () => {
 
   describe('Update background query members', () => {
     it('adds members', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -79,7 +79,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('updates members', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -104,7 +104,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('removes members', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -128,7 +128,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets members', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -155,7 +155,7 @@ describe('QueryBuilder.vue', () => {
 
   describe('changes background query timeDimensions', () => {
     it('adds timeeDimensions', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -182,7 +182,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('updates timeDimensions', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -221,7 +221,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('removes timeDimensions', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -251,7 +251,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets timeDimensions', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -292,7 +292,7 @@ describe('QueryBuilder.vue', () => {
 
   describe('update background query on filters', () => {
     it('adds filters', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -318,7 +318,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('updates filters', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -357,7 +357,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('removes filters', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -388,7 +388,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets filters', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -427,7 +427,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets filters when using measure', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -456,7 +456,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets limit', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -484,7 +484,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets offset', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -512,7 +512,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets renewQuery', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -540,7 +540,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('ignore order if empty', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -567,7 +567,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('sets order', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))
@@ -598,7 +598,7 @@ describe('QueryBuilder.vue', () => {
     });
 
     it('is reactive when filter is changed', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
         .mockImplementation(fetchMock(load))

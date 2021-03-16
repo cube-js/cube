@@ -1,14 +1,14 @@
 import { shallowMount, mount } from '@vue/test-utils';
-import CubejsApi from '@cubejs-client/core';
 import flushPromises from 'flush-promises';
 
 import QueryRenderer from '../../src/QueryRenderer';
-import fetchMock, { load, single } from './__mocks__/responses';
+import fetchMock, { load } from './__mocks__/responses';
+import { createCubejsApi } from './utils';
 
 describe('QueryRenderer.vue', () => {
   describe('Loads single query from api', () => {
     it('Loads empty state', () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
       const wrapper = shallowMount(QueryRenderer, {
@@ -26,7 +26,7 @@ describe('QueryRenderer.vue', () => {
     });
 
     it('Loads error state', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock({ error: 'error message' }, 400));
 
       const wrapper = shallowMount(QueryRenderer, {
@@ -48,7 +48,7 @@ describe('QueryRenderer.vue', () => {
     });
 
     it('Loads resultSet', async () => {
-      const cube = CubejsApi('token');
+      const cube = createCubejsApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
       const wrapper = shallowMount(QueryRenderer, {
@@ -71,7 +71,7 @@ describe('QueryRenderer.vue', () => {
 
     // todo: fix
     // it('Rerender on query nested property change', async () => {
-    //   const cube = CubejsApi('token');
+    //   const cube = createCubejsApi();
     //   jest.spyOn(cube, 'request').mockImplementation(fetchMock(single));
     //
     //   const parent = mount({

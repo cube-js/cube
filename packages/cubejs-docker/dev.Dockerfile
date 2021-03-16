@@ -55,9 +55,6 @@ COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/pa
 #RUN yarn install --frozen-lockfile
 RUN yarn install
 
-#  --ignore @cubejs-backend/jdbc-driver not needed, because it's ignored by .dockerignore
-RUN yarn lerna bootstrap
-
 COPY rust/ rust/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/

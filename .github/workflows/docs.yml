@@ -1,15 +1,13 @@
-name: Documentation
+name: Documentation Build
 on:
-  push:
+  pull_request:
     paths:
       - '.github/workflows/docs.yml'
       - 'docs-gen/**'
       - 'docs/**'
-    branches:
-      - master
 jobs:
   docs:
-    name: Docs build
+    name: Build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,15 +25,7 @@ jobs:
             node_modules
             docs/node_modules
           key: ${{ runner.os }}-workspace-docs-${{ matrix.node-version }}
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.DOCS_DEPLOY_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.DOCS_DEPLOY_AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
       - name: Generate API documentation
-        run: sh ./docs-gen.sh
-      - name: Build Gatsby site
-        run: sh ./deploy-production.sh
-        env:
-          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+        run: ./docs-gen.sh
+      - name: Build website
+        run: ./build.sh

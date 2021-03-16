@@ -31,7 +31,15 @@ We’ll explore the subject using the data from [Segment.com](https://segment.co
 
 A session is defined as a group of interactions one user takes within a given time frame on your app. Usually that time frame defaults to 30 minutes, meaning that whatever a user does on your app (e.g. browses pages, downloads resources, purchases products) before they leave equals one session.
 
-<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Schema/session-schema.png" width="100%" />
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Schema/session-schema.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 ## Unify events and page views into single cube
 

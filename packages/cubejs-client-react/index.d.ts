@@ -296,8 +296,11 @@ declare module '@cubejs-client/react' {
      * Used for chart type update
      */
     updateChartType: (chartType: ChartType) => void;
+    query: Query;
     validatedQuery: Query;
     refresh: () => void;
+    missingMembers: string[];
+    dryRunResponse?: TDryRunResponse;
   };
 
   /**

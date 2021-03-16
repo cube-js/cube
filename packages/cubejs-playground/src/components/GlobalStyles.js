@@ -1,18 +1,23 @@
 import { createGlobalStyle } from 'styled-components';
-import VARIABLES from '../variables';
 
-const CSS_PROPERTIES = {};
-
-Object.keys(VARIABLES)
-  .forEach((key) => {
-    CSS_PROPERTIES[`--${key}`] = VARIABLES[key];
-  });
+import { CSS_PROPERTIES } from '../variables-esm';
 
 const GlobalStyles = createGlobalStyle`
   body {
-    ${ Object.entries(CSS_PROPERTIES).map(([key, value]) => {
-      return `${key}: ${value};`;
-    }).join('\n    ')}
+    ${Object.entries(CSS_PROPERTIES)
+      .map(([key, value]) => {
+        return `${key}: ${value};`;
+      })
+      .join('\n    ')}
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: #f6f6f8;
+    overflow-x: hidden;
   }
 
   .inline-code {
@@ -89,6 +94,37 @@ const GlobalStyles = createGlobalStyle`
     -moz-hyphens: none;
     -ms-hyphens: none;
     hyphens: none;
+  }
+
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+  }
+
+  #playground-root {
+    height: 100%;
+  }
+
+  .schema-sidebar,
+  .schema-sidebar .ant-tabs,
+  .schema-sidebar .ant-tabs-content {
+    height: 100%;
+  }
+
+  .schema-sidebar {
+    background: #fff;
+    border-right: 1px solid #eee;
+    padding: 0;
+  }
+
+  .schema-sidebar .ant-tabs-tabpane {
+    /* TODO: replace with flexbox */
+    height: 85%;
+    overflow: auto;
+  }
+
+  .ant-popover-disabled-compatible-wrapper {
+    pointer-events: none;
   }
   
   pre[class*="language-"]::-moz-selection, pre[class*="language-"] ::-moz-selection,

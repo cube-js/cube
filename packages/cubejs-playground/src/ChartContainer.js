@@ -428,8 +428,8 @@ class ChartContainer extends Component {
           <Button
             icon={<CopyOutlined />}
             size="small"
-            onClick={() => {
-              copyToClipboard(codeExample);
+            onClick={async () => {
+              await copyToClipboard(codeExample);
               playgroundAction('Copy Code to Clipboard');
             }}
             type="primary"
@@ -445,8 +445,8 @@ class ChartContainer extends Component {
           <Button
             icon={<CopyOutlined />}
             size="small"
-            onClick={() => {
-              copyToClipboard(query);
+            onClick={async () => {
+              await copyToClipboard(JSON.stringify(query, null, 2));
               playgroundAction('Copy Query to Clipboard');
             }}
             type="primary"

@@ -70,6 +70,10 @@ export default function SecurityContext() {
 
   async function handlePayloadSave() {
     if (isJsonValid) {
+      if (typeof getToken !== 'function') {
+        throw new Error('Saving token requires the `getToken` function provided to the `SecurityContext`');
+      }
+
       try {
         saveToken(await getToken(tmpPayload));
       } catch (error) {

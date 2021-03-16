@@ -19,7 +19,7 @@
   font-size: 16px;
   line-height: 26px;
   padding: 16px 24px;
-  margin: 16px 0;
+  margin: 24px 0;
   background: var(--custom-block-bg-color);
   box-shadow: 3px 0 0 var(--custom-block-text-color) inset;
 }
@@ -53,6 +53,7 @@
   position: relative;
   display: block;
   padding: 12px 16px;
+  margin: 24px 0;
   border: 1px solid #CAC9FF;
   border-radius: 4px;
   color: #7A77FF;
@@ -86,4 +87,8 @@
 
 .table-wrapper > div {
   min-width: 32px;
+}
+
+.block-video {
+  margin: 24px 0;
 }

@@ -13,7 +13,16 @@ database.
 Click Create Deployment. Then give it a name and select the cloud provider and
 region of your choice.
 
-![Cube Cloud Create Deployment Screen](https://cube.dev/downloads/images/cube-cloud-quickstart-1.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Cube Cloud Create Deployment Screen"
+  src="https://cube.dev/downloads/images/cube-cloud-quickstart-1.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 ## Step 2: Upload your Cube.js project
 
@@ -26,14 +35,32 @@ project directory.
 npx cubejs-cli deploy --token <TOKEN>
 ```
 
-![Cube Cloud Upload Project Screen](https://cube.dev/downloads/images/cube-cloud-quickstart-2.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Cube Cloud Upload Project Screen"
+  src="https://cube.dev/downloads/images/cube-cloud-quickstart-2.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 ## Step 3: Connect your Database
 
 Enter credentials to connect to your database. Consult [connecting to
 databases][link-connecting-to-databases] guide for more details.
 
-![Cube Cloud Setup Database Screen](https://cube.dev/downloads/images/cube-cloud-quickstart-3.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Cube Cloud Setup Database Screen"
+  src="https://cube.dev/downloads/images/cube-cloud-quickstart-3.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 ## Step 4: Try out Cube Cloud
 

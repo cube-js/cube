@@ -10,12 +10,15 @@ import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 export default function ExplorePage() {
   const { push, location } = useHistory();
   const { token } = useSecurityContext();
-  
+
   const [apiUrl, setApiUrl] = useState(null);
   const [playgroundContext, setPlaygroundContext] = useState(null);
 
   const dashboardSource = useMemo(() => new DashboardSource(), []);
-  const cubejsApi = useCubejsApi(apiUrl, token || playgroundContext?.cubejsToken);
+  const cubejsApi = useCubejsApi(
+    apiUrl,
+    token || playgroundContext?.cubejsToken
+  );
 
   useEffect(() => {
     (async () => {
@@ -54,11 +57,13 @@ export default function ExplorePage() {
   return (
     <CubeProvider cubejsApi={cubejsApi}>
       <PlaygroundQueryBuilder
-        query={query}
-        setQuery={(q) => push(`/build?query=${JSON.stringify(q)}`)}
+        defaultQuery={query}
         apiUrl={apiUrl}
         cubejsToken={token || playgroundContext.cubejsToken}
         dashboardSource={dashboardSource}
+        onVizStateChanged={({ query }) =>
+          push(`/build?query=${JSON.stringify(query)}`)
+        }
       />
     </CubeProvider>
   );
