@@ -22,7 +22,7 @@ class CubejsApi {
     }
     options = options || {};
 
-    if (!options.apiUrl) {
+    if (!options.transport && !options.apiUrl) {
       throw new Error('The `apiUrl` option is required');
     }
 
