@@ -3877,9 +3877,9 @@
     "@types/node" "*"
 
 "@types/connect-history-api-fallback@*":
-  version "1.3.3"
-  resolved "https://registry.yarnpkg.com/@types/connect-history-api-fallback/-/connect-history-api-fallback-1.3.3.tgz#4772b79b8b53185f0f4c9deab09236baf76ee3b4"
-  integrity sha512-7SxFCd+FLlxCfwVwbyPxbR4khL9aNikJhrorw8nUIOqeuooc9gifBuDQOJw5kzN7i6i3vLn9G8Wde/4QDihpYw==
+  version "1.3.4"
+  resolved "https://registry.yarnpkg.com/@types/connect-history-api-fallback/-/connect-history-api-fallback-1.3.4.tgz#8c0f0e6e5d8252b699f5a662f51bdf82fd9d8bb8"
+  integrity sha512-Kf8v0wljR5GSCOCF/VQWdV3ZhKOVA73drXtY3geMTQgHy9dgqQ0dLrf31M0hcuWkhFzK5sP0kkS3mJzcKVtZbw==
   dependencies:
     "@types/express-serve-static-core" "*"
     "@types/node" "*"
@@ -4105,9 +4105,9 @@
   integrity sha1-7ihweulOEdK4J7y+UnC86n8+ce4=
 
 "@types/jsonwebtoken@^8.5.0":
-  version "8.5.0"
-  resolved "https://registry.yarnpkg.com/@types/jsonwebtoken/-/jsonwebtoken-8.5.0.tgz#2531d5e300803aa63279b232c014acf780c981c5"
-  integrity sha512-9bVao7LvyorRGZCw0VmH/dr7Og+NdjYSsKAxB43OQoComFbBgsEpoR9JW6+qSq/ogwVBg8GI2MfAlk4SYI4OLg==
+  version "8.5.1"
+  resolved "https://registry.yarnpkg.com/@types/jsonwebtoken/-/jsonwebtoken-8.5.1.tgz#56958cb2d80f6d74352bd2e501a018e2506a8a84"
+  integrity sha512-rNAPdomlIUX0i0cg2+I+Q1wOUr531zHBQ+cV/28PJ39bSPKjahatZZ2LMuhiguETkCgLVzfruw/ZvNMNkKoSzw==
   dependencies:
     "@types/node" "*"
 
@@ -5930,9 +5930,9 @@ autoprefixer@^9.6.1, autoprefixer@^9.6.5, autoprefixer@^9.8.6:
     postcss-value-parser "^4.1.0"
 
 aws-sdk@^2.403.0, aws-sdk@^2.404.0, aws-sdk@^2.787.0:
-  version "2.864.0"
-  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.864.0.tgz#934d526e6de5d6e5f7c4aa9258e3be60ee149e22"
-  integrity sha512-QbxIFgJLHP/v2snYC0udrQHQcRRPZjALv2pTvdVP78BBmM4YGuuI3U6YRMfHb/a41m2JDriXaqUA5+HSYmCm3w==
+  version "2.865.0"
+  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.865.0.tgz#e80cc4a07059068d7354f9043df4ede9fbe11a41"
+  integrity sha512-JUaUlGjnJY4Nnd/xnWt8rPmTwebVvA26XfnUM3tyAPtSClwniANkaRq4UdHI0uU3R+V4N2Cuohy8XSLOzBG/4A==
   dependencies:
     buffer "4.9.2"
     events "1.1.1"
@@ -20220,9 +20220,9 @@ rollup@^1.31.1:
     acorn "^7.1.0"
 
 rollup@^2.40.0, rollup@^2.8.0:
-  version "2.41.3"
-  resolved "https://registry.yarnpkg.com/rollup/-/rollup-2.41.3.tgz#b224f3863a1660e9d5233ffd2fa0800d90f66433"
-  integrity sha512-swrSUfX3UK7LGd5exBJNUC7kykdxemUTRuyO9hUFJsmQUsUovHcki9vl5MAWFbB6oI47HpeZHtbmuzdm1SRUZw==
+  version "2.41.4"
+  resolved "https://registry.yarnpkg.com/rollup/-/rollup-2.41.4.tgz#2a674d64db4322482d440699acb060dc6dd9e65f"
+  integrity sha512-f9IHfMO8p2Y8OdisI7Oj3oKkPuaQ6cgSwYqAi0TDvP3w2p+oX1VejX/w28a1h8WTnrapzfO5d4Uqhww+gL0b0g==
   optionalDependencies:
     fsevents "~2.3.1"
 
@@ -22061,22 +22061,6 @@ testcontainers@^2.4.0:
     debug "^4.1.1"
     docker-compose "^0.23.5"
     dockerode "^3.2.0"
-    get-port "^5.1.1"
-    glob "^7.1.6"
-    node-duration "^1.0.4"
-    stream-to-array "^2.3.0"
-    tar-fs "^2.1.0"
-
-testcontainers@^3.4.11:
-  version "3.5.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-3.5.0.tgz#da8a3fa53f1c6d106ccff7e0f71bf86d358c2589"
-  integrity sha512-iigGuzBDzOmTFlxfaTo1JO7EGMs4Dgf+XHd98XeEwp8J+WzOdkJfsSL5A8fdLSGQA5GvVAdxLcUfT4a32z4rbg==
-  dependencies:
-    "@types/dockerode" "^2.5.34"
-    byline "^5.0.0"
-    debug "^4.1.1"
-    docker-compose "^0.23.5"
-    dockerode "^3.2.1"
     get-port "^5.1.1"
     glob "^7.1.6"
     node-duration "^1.0.4"

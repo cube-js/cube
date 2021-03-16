@@ -10,8 +10,8 @@ volumes:
 
 services:
   postgres:
+    image: postgres:${TEST_POSTGRES_VERSION:-13}
     container_name: postgres
-    image: postgres:latest
     volumes:
       - metadata_data:/var/lib/postgresql/data
     environment:
@@ -25,16 +25,15 @@ services:
       timeout: 5s
       retries: 5
 
-  # Need 3.5 or later for container nodes
   zookeeper:
+    image: zookeeper:${TEST_ZOOKEEPER_VERSION:-3.5}
     container_name: zookeeper
-    image: zookeeper:3.5
     environment:
       - ZOO_MY_ID=1
     restart: always
 
   coordinator:
-    image: apache/druid:0.19.0
+    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
     container_name: coordinator
     volumes:
       - ./storage:/opt/data
@@ -50,13 +49,14 @@ services:
       - environment
     restart: always
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8081/status/health || exit 1
+      test: "wget --header 'Authorization: Basic YWRtaW46cGFzc3dvcmQx' --no-verbose --tries=1 --spider http://localhost:8081/status/health || exit 1"
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 60s
 
   broker:
-    image: apache/druid:0.19.0
+    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
     container_name: broker
     volumes:
       - broker_var:/opt/druid/var
@@ -72,13 +72,14 @@ services:
       - environment
     restart: always
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8082/druid/broker/v1/loadstatus || exit 1
+      test: "wget --header 'Authorization: Basic YWRtaW46cGFzc3dvcmQx' --no-verbose --tries=1 --spider http://localhost:8082/status/health || exit 1"
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 60s
 
   historical:
-    image: apache/druid:0.19.0
+    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
     container_name: historical
     volumes:
       - ./storage:/opt/data
@@ -95,13 +96,14 @@ services:
       - environment
     restart: always
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8083/druid/historical/v1/readiness || exit 1
+      test: "wget --header 'Authorization: Basic YWRtaW46cGFzc3dvcmQx' --no-verbose --tries=1 --spider http://localhost:8083/druid/historical/v1/readiness || exit 1"
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 60s
 
   middlemanager:
-    image: apache/druid:0.19.0
+    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
     container_name: middlemanager
     volumes:
       - ./storage:/opt/data
@@ -118,13 +120,14 @@ services:
       - environment
     restart: always
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8091/status/health || exit 1
+      test: "wget --header 'Authorization: Basic YWRtaW46cGFzc3dvcmQx' --no-verbose --tries=1 --spider http://localhost:8091/status/health || exit 1"
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 60s
 
   router:
-    image: apache/druid:0.19.0
+    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
     container_name: router
     volumes:
       - router_var:/opt/druid/var
@@ -140,7 +143,8 @@ services:
       - environment
     restart: always
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8888/status/health || exit 1
+      test: "wget --header 'Authorization: Basic YWRtaW46cGFzc3dvcmQx' --no-verbose --tries=1 --spider http://localhost:8888/status/health || exit 1"
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 60s

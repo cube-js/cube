@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
+# Debug log for test containers
+export DEBUG=testcontainers
+
 export TEST_MYSQL_VERSION=5.6
 
 echo "::group::MySQL ${TEST_MYSQL_VERSION}";
