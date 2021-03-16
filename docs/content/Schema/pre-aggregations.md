@@ -8,9 +8,8 @@ menuOrder: 8
 ---
 
 <!-- prettier-ignore-start -->
-[[info | ]]
-| In order to use pre-aggregations, Cube.js requires write access to the schema
-| name as specified by [`preAggregationsSchema`][ref-config-preagg-schema].
+[[info |]]
+| To start building pre-aggregations, Cube.js requires write access to the [pre-aggregations schema][ref-config-preagg-schema] in the source database. Cube.js first builds pre-aggregations as tables in the source database and then exports them into the pre-aggregations storage. 
 <!-- prettier-ignore-end -->
 
 Pre-aggregations are materialized query results persisted as tables. Cube.js has
