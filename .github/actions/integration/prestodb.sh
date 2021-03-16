@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
+# Debug log for test containers
+export DEBUG=testcontainers
+
 export TEST_PRESTO_VERSION=341-SNAPSHOT
 export TEST_PGSQL_VERSION=12.4
 

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
+# Debug log for test containers
+export DEBUG=testcontainers
+
 export TEST_CLICKHOUSE_VERSION=21.1.2
 
 echo "::group::Clickhouse ${TEST_CLICKHOUSE_VERSION}";
