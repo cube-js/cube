@@ -11,7 +11,7 @@ Below you can find examples and tutorials to help you get started with Cube.js.
 <!-- prettier-ignore-start -->
 [[info | ]]
 | If you have any examples or tutorials that you'd like to contribute, we encourage you to create a new topic  
-| in the [Cube.js community forum](https://forum.cube.dev/) either under the Recipes or Use Cases categories.
+| in the [Cube.js community forum](https://forum.cube.dev/).
 <!-- prettier-ignore-end -->
 
 ## Examples
