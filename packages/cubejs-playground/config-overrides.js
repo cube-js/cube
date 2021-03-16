@@ -4,15 +4,7 @@ const { addLessLoader } = require('customize-cra');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const rewireYarnWorkspaces = require('react-app-rewire-yarn-workspaces');
 
-const VARIABLES = require('./src/variables');
-
-const LESS_VARIABLES = {};
-
-// Create LESS variable map.
-Object.keys(VARIABLES)
-  .forEach((key) => {
-    LESS_VARIABLES[`@${key}`] = VARIABLES[key];
-  });
+const { LESS_VARIABLES } = require('./src/variables');
 
 module.exports = function override(config, env) {
   config.optimization = {
@@ -56,8 +48,10 @@ module.exports = function override(config, env) {
     config.devtool = false;
   }
   config = addLessLoader({
-    javascriptEnabled: true,
-    modifyVars: LESS_VARIABLES,
+    lessOptions: {
+      modifyVars: LESS_VARIABLES,
+      javascriptEnabled: true,
+    },
   })(config);
 
   return rewireYarnWorkspaces(config, env);

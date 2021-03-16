@@ -6,8 +6,6 @@ import ProgressResult from './ProgressResult';
 import HttpTransport from './HttpTransport';
 import RequestError from './RequestError';
 
-const API_URL = process.env.CUBEJS_API_URL;
-
 let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
@@ -23,8 +21,13 @@ class CubejsApi {
       apiToken = undefined;
     }
     options = options || {};
+
+    if (!options.transport && !options.apiUrl) {
+      throw new Error('The `apiUrl` option is required');
+    }
+
     this.apiToken = apiToken;
-    this.apiUrl = options.apiUrl || API_URL;
+    this.apiUrl = options.apiUrl;
     this.method = options.method;
     this.headers = options.headers || {};
     this.credentials = options.credentials;
@@ -117,7 +120,7 @@ class CubejsApi {
         if (!options.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
         }
-        
+
         const error = new RequestError(body.error, body); // TODO error class
         if (callback) {
           callback(error);
@@ -198,7 +201,7 @@ class CubejsApi {
       callback
     );
   }
-  
+
   dryRun(query, options, callback) {
     return this.loadMethod(
       () => this.request('dry-run', { query }),

@@ -8,12 +8,11 @@
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-playground"
   },
+  "module": "lib/cubejs-playground.esm.js",
   "dependencies": {
-    "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.26.55",
     "@cubejs-client/react": "^0.26.58",
-    "antd": "4.13.0",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
     "customize-cra": "^1.0.0",
@@ -22,15 +21,12 @@
     "history": "^4.9.0",
     "jwt-decode": "^3.1.2",
     "less": "^3.10.3",
-    "less-loader": "^5.0.0",
     "moment": "^2.24.0",
     "prettier": "^2.0.5",
     "prismjs": "^1.21.0",
     "prop-types": "^15.7.2",
-    "react": "^17.0.1",
     "react-beautiful-dnd": "^13.0.0",
     "react-chartjs-2": "^2.7.4",
-    "react-dom": "^17.0.1",
     "react-helmet": "^6.1.0",
     "react-is": "^16.8.4",
     "react-responsive": "^8.0.1",
@@ -39,13 +35,13 @@
     "react-scripts": "4.0.1",
     "react-source-render": "4.0.0-1",
     "sql-formatter": "^2.3.2",
-    "styled-components": "5.2.0",
     "uuid": "^3.3.3",
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
     "start": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
-    "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && babel src -d dist --copy-files",
+    "watch": "rollup -c -w",
+    "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && babel src -d dist --copy-files && rollup -c",
     "eject": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-scripts eject",
     "lint": "eslint src/*.js",
     "lint:fix": "eslint --fix src/*.js"
@@ -60,23 +56,36 @@
     "src",
     "public",
     "build",
-    "dist"
+    "dist",
+    "lib"
   ],
   "homepage": ".",
   "proxy": "http://localhost:4000",
   "license": "MIT",
+  "peerDependencies" : {
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
+    "antd": "^4.13.0"
+  },
   "devDependencies": {
+    "@ant-design/compatible": "^1.0.2",
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
     "@types/react": "^17.0.0",
     "@types/react-beautiful-dnd": "^13.0.0",
+    "@types/styled-components": "^5.1.7",
+    "antd": "4.13.0",
     "eslint-config-airbnb": "^18.1.0",
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
+    "less-loader": "^5.0.0",
+    "react": "^17.0.1",
     "react-app-rewire-yarn-workspaces": "^1.0.3",
     "react-app-rewired": "^2.1.0",
+    "react-dom": "^17.0.1",
     "recursive-readdir": "^2.2.2",
-    "terser-webpack-plugin": "^4.1.0"
+    "terser-webpack-plugin": "^4.1.0",
+    "styled-components": "5.2.0"
   }
 }

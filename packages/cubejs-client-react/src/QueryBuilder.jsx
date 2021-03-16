@@ -78,6 +78,7 @@ export default class QueryBuilder extends React.Component {
       validatedQuery: props.query, // deprecated, validatedQuery should not be set until after dry-run for safety
       missingMembers: [],
       isFetchingMeta: false,
+      dryRunResponse: null,
       ...props.vizState, // deprecated
       ...props.initialVizState
     };
@@ -212,7 +213,8 @@ export default class QueryBuilder extends React.Component {
       pivotConfig,
       validatedQuery,
       missingMembers,
-      isFetchingMeta
+      isFetchingMeta,
+      dryRunResponse
     } = this.state;
 
     const flatFilters = uniqBy(
@@ -355,6 +357,7 @@ export default class QueryBuilder extends React.Component {
       missingMembers,
       refresh: this.fetchMeta,
       isFetchingMeta,
+      dryRunResponse,
       ...queryRendererProps,
     };
   }
@@ -440,6 +443,7 @@ export default class QueryBuilder extends React.Component {
 
         finalState.pivotConfig = ResultSet.getNormalizedPivotConfig(response.pivotQuery, finalState.pivotConfig);
         finalState.validatedQuery = this.validatedQuery(finalState);
+        finalState.dryRunResponse = response;
 
         // deprecated
         if (QueryRenderer.isQueryPresent(stateQuery)) {
