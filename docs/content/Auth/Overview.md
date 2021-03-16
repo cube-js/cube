@@ -9,7 +9,7 @@ In Cube.js, authorization (or access control) is based on the **security
 context**. The diagram below shows how it works during the request processing in
 Cube.js:
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -17,7 +17,7 @@ Cube.js:
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Authentication is handled outside of Cube.js. A typical use case would be:
 

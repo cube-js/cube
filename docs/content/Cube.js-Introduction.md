@@ -56,7 +56,15 @@ heavily relies on a caching and pre-aggregation layer to provide insights from
 raw data within minutes and an API with sub-second response times on up to a
 trillion data points.
 
-<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/old-was-vs-cubejs-way.png" style="border: none" />
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png"
+  style="border: none"
+  width="80%"
+  />
+</div>
 
 ## Architecture
 
@@ -70,6 +78,14 @@ database connections, as well as pre-aggregations and caching layers. The result
 is then sent back to the client. The client itself is visualization-agnostic and
 works well with any chart library.
 
-<p align="center"><img src="https://i.imgur.com/FluGFqo.png" alt="Cube.js" width="100%"></p>
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://i.imgur.com/FluGFqo.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 [ref-query-format]: https://cube.dev/docs/query-format
