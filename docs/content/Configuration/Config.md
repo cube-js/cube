@@ -296,16 +296,31 @@ there. Either `String` or `Function` could be passed. Providing a `Function`
 allows to dynamically set the pre-aggregation schema name depending on the
 user's context.
 
+Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode] and `prod_pre_aggregations` in production.
+
+
+Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| We **strongly** recommend using different pre-aggregation schemas in development and
+| production environments to avoid pre-aggregation tables clashes.
+<!-- prettier-ignore-end -->
+
 Called once per [`appId`][ref-opts-ctx-to-appid].
 
 ```javascript
+// Static usage
+module.exports = {
+  preAggregationsSchema: `my_pre_aggregations`
+};
+
+// Dynamic usage
 module.exports = {
   preAggregationsSchema: ({ securityContext }) =>
     `pre_aggregations_${securityContext.tenantId}`,
 };
 ```
-
-It is usually used in [Multitenancy Setup][ref-multitenancy].
 
 ### schemaVersion
 
@@ -649,3 +664,4 @@ the additional transpiler for check duplicates.
 [ref-sec-ctx]: /security/context
 [ref-rest-api]: /rest-api
 [ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-development-mode]: /overview#development-mode
