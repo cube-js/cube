@@ -97,7 +97,9 @@ export function prodLogger(level: string) {
   return (msg: string, params: LogParams = {}) => {
     const { error, warning, ...rest } = params;
 
-    const logMessage = () => console.log(JSON.stringify({ message: msg, error, warning, ...rest }));
+    const logMessage = () => console.log(JSON.stringify({
+      message: msg, error: error?.message, stack: error?.stack, warning, ...rest
+    }));
     // eslint-disable-next-line default-case
     switch ((level || 'warn').toLowerCase()) {
       case 'trace': {
