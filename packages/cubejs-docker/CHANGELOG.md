@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.60](https://github.com/cube-js/cube.js/compare/v0.26.59...v0.26.60) (2021-03-16)
+
+
+### Bug Fixes
+
+* **docker:** Drop lerna bootstrap, because we migrated to yarn workspaces ([d0e16ef](https://github.com/cube-js/cube.js/commit/d0e16eff2ae581cf174f0fbd9608715ad2f10cc7))
+
+
+
+
+
 ## [0.26.58](https://github.com/cube-js/cube.js/compare/v0.26.56...v0.26.58) (2021-03-14)
 
 **Note:** Version bump only for package @cubejs-backend/docker

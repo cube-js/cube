@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.60](https://github.com/cube-js/cube.js/compare/v0.26.59...v0.26.60) (2021-03-16)
+
+
+### Bug Fixes
+
+* **docker:** Drop lerna bootstrap, because we migrated to yarn workspaces ([d0e16ef](https://github.com/cube-js/cube.js/commit/d0e16eff2ae581cf174f0fbd9608715ad2f10cc7))
+
+
+### Features
+
+* **@cubejs-client/playground:** Playground components ([#2329](https://github.com/cube-js/cube.js/issues/2329)) ([489dc12](https://github.com/cube-js/cube.js/commit/489dc12d7e9bfa87bfb3c8ffabf76f238c86a2fe))
+* introduce GET /cubejs-system/v1/context ([d97858d](https://github.com/cube-js/cube.js/commit/d97858d528f6efa65400bf54b81b3a8a4039ecb0))
+* **druid-driver:** Support Basic auth via username/passwd ([#2386](https://github.com/cube-js/cube.js/issues/2386)) ([4a89635](https://github.com/cube-js/cube.js/commit/4a896358e43e39555d69f1f028a165a3e4eaed6d))
+
+
+
+
+
 ## [0.26.59](https://github.com/cube-js/cube.js/compare/v0.26.58...v0.26.59) (2021-03-15)
 
 
