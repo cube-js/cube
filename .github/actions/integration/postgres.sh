@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
+# Debug log for test containers
+export DEBUG=testcontainers
+
 export TEST_PGSQL_VERSION=9.6
 
 echo "::group::PostgreSQL ${TEST_PGSQL_VERSION}"

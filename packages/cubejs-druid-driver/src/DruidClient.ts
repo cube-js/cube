@@ -1,4 +1,4 @@
-import Axios from 'axios';
+import Axios, { AxiosRequestConfig } from 'axios';
 
 export type DruidClientBaseConfiguration = {
   user?: string,
@@ -17,14 +17,21 @@ export class DruidClient {
   }
 
   protected getClient() {
-    return Axios.create({
+    const config: AxiosRequestConfig = {
       baseURL: this.config.url,
       headers: {
         'Content-Type': 'application/json',
       }
-    });
+    };
 
-    // @todo authorization!?
+    if (this.config.user && this.config.password) {
+      config.auth = {
+        username: this.config.user,
+        password: this.config.password,
+      };
+    }
+
+    return Axios.create(config);
   }
 
   public async cancel(queryId: string) {

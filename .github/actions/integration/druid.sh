@@ -1,7 +1,10 @@
 #!/bin/bash
 set -eo pipefail
 
-export TEST_POSTGRES_VERSION=12
+# Debug log for test containers
+export DEBUG=testcontainers
+
+export TEST_POSTGRES_VERSION=13
 export TEST_ZOOKEEPER_VERSION=3.5
 export TEST_DRUID_VERSION=0.19.0
 
