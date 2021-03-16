@@ -303,7 +303,7 @@ Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
 
 <!-- prettier-ignore-start -->
 [[warning |]]
-| We recommend always use different pre-aggregations schemas in development and
+| We **strongly** recommend using different pre-aggregation schemas in development and
 | production environments to avoid pre-aggregation tables clashes.
 <!-- prettier-ignore-end -->
 
