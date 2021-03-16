@@ -6,13 +6,13 @@ menuOrder: 3
 ---
 
 Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
-many configuration options to consider. Please make sure to also check
-[this Pre-Aggregations page in the data schema section](/pre-aggregations).
+many configuration options to consider. Please make sure to also check [this
+Pre-Aggregations page in the data schema section][ref-preaggs].
 
 ## Refresh Strategy
 
 Refresh strategy can be customized by setting the
-[refreshKey](/pre-aggregations#refresh-key) property for the pre-aggregation.
+[refreshKey][ref-preaggs-refresh-key] property for the pre-aggregation.
 
 The default value of `refreshKey` is `every: '1 hour'`. It can be redefined
 either by providing SQL:
@@ -64,7 +64,7 @@ In development mode, Cube.js enables background refresh by default and will
 refresh all pre-aggregations marked with the
 [`scheduledRefresh`](/pre-aggregations#scheduled-refresh) parameter.
 
-Please consult the [Production Checklist][link-production-checklist-refresh] for
+Please consult the [Production Checklist][ref-production-checklist-refresh] for
 best practices on running background refresh in production environments.
 
 ```js
@@ -123,18 +123,30 @@ strategy has certain limitations:
 We highly recommend leaving `readOnly` unset or explicitly setting it to
 `false`.
 
+## Partitioning
+
+[Partitioning][wiki-partitioning] is an extremely effective optimization for
+improving data access. It effectively "shards" the data between multiple tables,
+splitting them by a defined attribute. An incoming query would be checked for
+this attribute, and **only** valid partitions required to satisfy it are
+selected. This results in faster refresh times due to unnecessary data not being
+scanned and processed, and possibly even reduced cost, depending on your
+database solution.
+
+Cube.js supports [both time][ref-preagg-time-part] and
+[segment-based][ref-preagg-segment-part] partitioning. However, it must first be
+enabled for each pre-aggregation.
+
+[Time-based partitioning][ref-preagg-time-part] is especially helpful for
+incremental refreshes; when configured, Cube.js will only refresh partitions as
+necessary. Without incremental refreshing, Cube.js will re-calculate the entire
+pre-aggregation whenever [the refresh key][ref-preaggs-refresh-key] changes.
+
 ## Pre-Aggregations Storage
 
 When using **external** pre-aggregations, Cube.js will store pre-aggregations
-inside its own purpose-built storage layer: Cube Store.
-
-Cube Store is writen in Rust and utilizes a set of technologies like RocksDB,
-Apache Parquet, and Arrow that have proven effectiveness in solving data access
-problems.
-
-Cube Store is
-[fully open-sourced](https://github.com/cube-js/cube.js/tree/master/rust#cube-store)
-and released under the Apache 2.0 license.
+inside its own purpose-built storage layer: [Cube
+Store][ref-caching-preaggs-cubestore].
 
 Alternatively, you can store external pre-aggregations in a different database,
 such MySQL or Postgres. In order to make this work, you should set the
@@ -143,9 +155,17 @@ such MySQL or Postgres. In order to make this work, you should set the
 configuration file. These properties can also be set through the environment
 variables.
 
+[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
+[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
+[ref-caching-preaggs-cubestore]:
+  /caching/using-pre-aggregations#pre-aggregations-storage
+[ref-preaggs]: /pre-aggregations
+[ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
+[ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
+[ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
 [ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
-[link-production-checklist-refresh]:
+[ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
 
 ```bash
