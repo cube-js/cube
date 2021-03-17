@@ -1,4 +1,17 @@
+import { indexBy, prop } from 'ramda';
+
 export const DEFAULT_GRANULARITY = 'day';
+
+export const GRANULARITIES = [
+  { name: undefined, title: 'w/o grouping' },
+  { name: 'second', title: 'Second' },
+  { name: 'minute', title: 'Minute' },
+  { name: 'hour', title: 'Hour' },
+  { name: 'day', title: 'Day' },
+  { name: 'week', title: 'Week' },
+  { name: 'month', title: 'Month' },
+  { name: 'year', title: 'Year' },
+];
 
 export function defaultOrder(query) {
   const granularity = (query.timeDimensions || []).find((d) => d.granularity);
@@ -48,6 +61,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
         (newQuery.measures || []).length === 1 &&
         oldQuery.measures[0] !== newQuery.measures[0])
     ) {
+      const [td] = newQuery.timeDimensions || [];
       const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
       newQuery = {
         ...newQuery,
@@ -55,7 +69,8 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
           ? [
             {
               dimension: defaultTimeDimension,
-              granularity,
+              granularity: (td && td.granularity) || granularity,
+              dateRange: td && td.dateRange
             },
           ]
           : [],
@@ -204,12 +219,9 @@ export function moveItemInArray(list, sourceIndex, destinationIndex) {
 export function flattenFilters(filters = []) {
   return filters.reduce((memo, filter) => {
     if (filter.or || filter.and) {
-      return [
-        ...memo,
-        ...flattenFilters(filter.or || filter.and)
-      ];
+      return [...memo, ...flattenFilters(filter.or || filter.and)];
     }
-    
+
     return [...memo, filter];
   }, []);
 }
@@ -224,4 +236,31 @@ export function getQueryMembers(query = {}) {
   flattenFilters(query.filters).forEach((filter) => members.add(filter.dimension || filter.member));
 
   return [...members];
+}
+
+export function getOrderMembersFromOrder(orderMembers, order) {
+  const ids = new Set();
+  const indexedOrderMembers = indexBy(prop('id'), orderMembers);
+  const entries = Array.isArray(order) ? order : Object.entries(order || {});
+  const nextOrderMembers = [];
+
+  entries.forEach(([memberId, currentOrder]) => {
+    if (currentOrder !== 'none' && indexedOrderMembers[memberId]) {
+      ids.add(memberId);
+      nextOrderMembers.push({
+        ...indexedOrderMembers[memberId],
+        order: currentOrder,
+      });
+    }
+  });
+  orderMembers.forEach((member) => {
+    if (!ids.has(member.id)) {
+      nextOrderMembers.push({
+        ...member,
+        order: member.order || 'none'
+      });
+    }
+  });
+
+  return nextOrderMembers;
 }

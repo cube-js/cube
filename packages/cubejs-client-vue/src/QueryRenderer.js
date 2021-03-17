@@ -1,4 +1,5 @@
-import { toPairs, fromPairs } from 'ramda';
+import { toPairs, fromPairs, equals } from 'ramda';
+import { isQueryPresent } from '@cubejs-client/core';
 
 export default {
   props: {
@@ -55,18 +56,19 @@ export default {
     }
 
     if ((!loading && resultSet && !error) || onlyDefault) {
-      const slotProps = {
+      let slotProps = {
         resultSet,
         sqlQuery,
         query: this.builderProps.query || this.query,
       };
 
       if (onlyDefault) {
-        Object.assign(slotProps, {
+        slotProps = {
           loading,
           error,
           ...this.builderProps,
-        });
+          ...slotProps,
+        };
       }
 
       slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
@@ -74,14 +76,7 @@ export default {
       slot = $scopedSlots.error ? $scopedSlots.error({ error, sqlQuery }) : slot;
     }
 
-    return createElement(
-      'div',
-      {},
-      [
-        controls,
-        slot,
-      ],
-    );
+    return createElement('div', {}, [controls, slot]);
   },
   methods: {
     async load() {
@@ -90,20 +85,32 @@ export default {
         this.loading = true;
         this.error = undefined;
 
-        if (query && Object.keys(query).length > 0) {
+        if (Object.keys(query || {}).length > 0) {
           if (this.loadSql === 'only') {
-            this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
+            this.sqlQuery = await this.cubejsApi.sql(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'sql',
+            });
           } else if (this.loadSql) {
-            this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
-            this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
+            this.sqlQuery = await this.cubejsApi.sql(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'sql',
+            });
+            this.resultSet = await this.cubejsApi.load(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'query',
+            });
           } else {
-            this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
+            this.resultSet = await this.cubejsApi.load(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: 'query',
+            });
           }
         }
 
         this.loading = false;
-      } catch (exc) {
-        this.error = exc;
+      } catch (error) {
+        this.error = error;
         this.resultSet = undefined;
         this.loading = false;
       }
@@ -114,27 +121,44 @@ export default {
         this.error = undefined;
         this.loading = true;
 
-        const resultPromises = Promise.all(toPairs(queries).map(
-          ([name, query]) =>
-          this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
-        ));
+        const resultPromises = Promise.all(
+          toPairs(queries).map(([name, query]) =>
+            this.cubejsApi
+              .load(query, {
+                mutexObj: this.mutexObj,
+                mutexKey: name,
+              })
+              .then((r) => [name, r])
+          )
+        );
 
         this.resultSet = fromPairs(await resultPromises);
         this.loading = false;
-      } catch (exc) {
-        this.error = exc;
+      } catch (error) {
+        this.error = error;
         this.loading = false;
       }
     },
   },
   watch: {
     query: {
-      handler(val) {
-        if (val) {
+      deep: true,
+      handler(query, prevQuery) {
+        const hasOrderChanged = !equals(
+          Object.keys(query?.order || {}),
+          Object.keys(prevQuery?.order || {})
+        );
+
+        // todo: remove
+        // console.log({
+        //   query: JSON.stringify((query)),
+        //   prevQuery: JSON.stringify((prevQuery)),
+        // })
+
+        if (isQueryPresent(query) && (!equals(query, prevQuery) || hasOrderChanged)) {
           this.load();
         }
       },
-      deep: true,
     },
     queries: {
       handler(val) {

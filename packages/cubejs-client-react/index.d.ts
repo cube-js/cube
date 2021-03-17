@@ -148,7 +148,7 @@ declare module '@cubejs-client/react' {
    */
   export class QueryRenderer extends React.Component<QueryRendererProps> {}
 
-  type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
+  export type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
 
   type VizState = {
     query?: Query;
