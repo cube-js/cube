@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "module": "esnext",
-    "target": "es5",
+    "target": "ES5",
+    "declaration": true,
+    "noEmitOnError": true,
     "sourceMap": true,
     "allowJs": true,
     "checkJs": true,
@@ -20,12 +22,13 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "noImplicitAny" : false
+    "noImplicitAny": false,
+    "noEmit": true
   },
   "exclude": [
     "node_modules",
     "build",
+    "lib",
     "dist",
     "charts-dist"
   ],

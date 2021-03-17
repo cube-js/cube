@@ -13,6 +13,7 @@ declare module '@cubejs-client/react' {
     CubejsApi,
     Query,
     ResultSet,
+    SqlQuery,
     Filter,
     PivotConfig,
     TCubeMeasure,
@@ -108,7 +109,7 @@ declare module '@cubejs-client/react' {
     resultSet: ResultSet | null;
     error: Error | null;
     loadingState: TLoadingState;
-    sqlQuery: string | null;
+    sqlQuery: SqlQuery | null;
   };
 
   type QueryRendererProps = {
@@ -159,7 +160,7 @@ declare module '@cubejs-client/react' {
     /**
      * `CubejsApi` instance to use
      */
-    cubejsApi: CubejsApi;
+    cubejsApi?: CubejsApi;
     /**
      * State for the QueryBuilder to start with. Pass in the value previously saved from onVizStateChanged to restore a session.
      */
