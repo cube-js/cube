@@ -1,6 +1,6 @@
 import React from 'react';
 import { prop, uniqBy, equals, pick, clone } from 'ramda';
-import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers } from '@cubejs-client/core';
+import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers, movePivotItem } from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 
@@ -321,25 +321,14 @@ export default class QueryBuilder extends React.Component {
       pivotConfig,
       updatePivotConfig: {
         moveItem: ({ sourceIndex, destinationIndex, sourceAxis, destinationAxis }) => {
-          const nextPivotConfig = {
-            ...pivotConfig,
-            x: [...pivotConfig.x],
-            y: [...pivotConfig.y],
-          };
-          const id = pivotConfig[sourceAxis][sourceIndex];
-          const lastIndex = nextPivotConfig[destinationAxis].length - 1;
-
-          if (id === 'measures') {
-            destinationIndex = lastIndex + 1;
-          } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
-            destinationIndex = lastIndex - 1;
-          }
-
-          nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
-          nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
-
           this.updateVizState({
-            pivotConfig: nextPivotConfig,
+            pivotConfig: movePivotItem(
+              pivotConfig,
+              sourceIndex,
+              destinationIndex,
+              sourceAxis,
+              destinationAxis
+            )
           });
         },
         update: (config) => {

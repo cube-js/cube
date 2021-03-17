@@ -11,10 +11,23 @@
   "dependencies": {
     "@cubejs-client/core": "^0.24.0",
     "@cubejs-client/vue": "^0.19.43",
+    "apollo-boost": "^0.4.9",
+    "apollo-cache-inmemory": "^1.6.6",
+    "apollo-client": "^2.6.10",
+    "apollo-link": "^1.2.14",
+    "apollo-link-http": "^1.5.17",
+    "apollo-link-schema": "^1.2.5",
     "chart.js": "^2.9.3",
     "core-js": "^3.6.5",
+    "graphql": "^15.5.0",
+    "graphql-tag": "^2.11.0",
+    "graphql-tools": "5.0.0",
     "vue": "^2.6.11",
+    "vue-apollo": "^3.0.5",
     "vue-chartkick": "^0.6.0",
+    "vue-grid-layout": "^2.3.12",
+    "vue-router": "^3.5.1",
+    "vuedraggable": "^2.24.3",
     "vuetify": "^2.2.11"
   },
   "devDependencies": {

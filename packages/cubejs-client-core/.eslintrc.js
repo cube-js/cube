@@ -32,5 +32,8 @@ module.exports = {
     'no-trailing-spaces': ['warn', { skipBlankLines: true }],
     'no-unused-vars': ['warn'],
     'object-curly-newline': 0
-  }
+  },
+  // env: {
+  //   'jest/globals': true
+  // }
 };

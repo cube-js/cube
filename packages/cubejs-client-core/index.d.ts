@@ -8,6 +8,8 @@
  */
 
 declare module '@cubejs-client/core' {
+  import type { ChartType } from '@cubejs-client/react';
+
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -966,7 +968,18 @@ declare module '@cubejs-client/core' {
     sessionGranularity?: TimeDimensionGranularity;
   };
 
-  export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: TDefaultHeuristicsOptions): any;
+  export type TDefaultHeuristicsResponse = {
+    shouldApplyHeuristicOrder: boolean;
+    pivotConfig: PivotConfig | null;
+    query: Query;
+    chartType?: ChartType
+  };
+
+  export function defaultHeuristics(
+    newQuery: Query,
+    oldQuery: Query,
+    options: TDefaultHeuristicsOptions
+  ): TDefaultHeuristicsResponse;
   /**
    * @hidden
    */
@@ -997,8 +1010,27 @@ declare module '@cubejs-client/core' {
    */
   export function flattenFilters(filters: Filter[]): TFlatFilter[];
 
+  type TGranularityMap = {
+    name: TimeDimensionGranularity | undefined;
+    title: string;
+  };
+
+  /**
+   * @hidden
+   */
+  export function getOrderMembersFromOrder(
+    orderMembers: any,
+    order: TQueryOrderObject | TQueryOrderArray
+  ): TOrderMember[];
+
+  export const GRANULARITIES: TGranularityMap[];
   /**
    * @hidden
    */
   export function getQueryMembers(query: Query): string[];
+
+  export type ProgressResponse = {
+    stage: string;
+    timeElapsed: number;
+  };
 }
