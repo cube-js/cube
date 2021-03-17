@@ -445,6 +445,60 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * Convert intervals as string to array of pairs
+   * It's helpful to generate multi intervals, when a database doesnt support custom intervals
+   *
+   * @param {string} trailingInterval
+   * @return {[string, string]}
+   */
+  parseIntervalToPairs(trailingInterval) {
+    const parts = trailingInterval.split(' ');
+
+    if (parts.length === 1) {
+      return [[parts[0], 'SECOND']];
+    }
+
+    const supportedGranulates = [
+      'SECOND',
+      'SECONDS',
+      'MINUTE',
+      'MINUTES',
+      'HOUR',
+      'HOURS',
+      'DAY',
+      'DAYS',
+      'MONTH',
+      'MONTHS',
+      'YEAR',
+      'YEARS'
+    ];
+
+    if (parts.length === 2) {
+      if (!supportedGranulates.includes(parts[1].toUpperCase())) {
+        throw new UserError(
+          `Unsupported granularity in interval: ${trailingInterval}`
+        );
+      }
+
+      return [parts];
+    }
+
+    const result = [];
+
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i + 1] && supportedGranulates.includes(parts[i + 1].toUpperCase())) {
+        result.push([parts[i], parts[i + 1].toUpperCase()]);
+
+        i++;
+      } else {
+        result.push([parts[i], 'SECOND']);
+      }
+    }
+
+    return result;
+  }
+
   rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
     offset = offset || 'end';
     return this.timeDimensions.map(

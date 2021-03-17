@@ -28,6 +28,30 @@ describe('SQL Generation', () => {
     }) 
     `);
 
+  it('Test for parseIntervalToPairs', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.count'
+      ],
+      timeDimensions: [],
+      filters: [],
+      timezone: 'America/Los_Angeles'
+    });
+
+    expect(query.parseIntervalToPairs('1')).toEqual([['1', 'SECOND']]);
+    expect(query.parseIntervalToPairs('1 minute 12')).toEqual([['1', 'MINUTE'], ['12', 'SECOND']]);
+    expect(query.parseIntervalToPairs('1 HOUR')).toEqual([['1', 'HOUR']]);
+    expect(query.parseIntervalToPairs('1 hour')).toEqual([['1', 'hour']]);
+    expect(query.parseIntervalToPairs('1 DAY 12 HOUR')).toEqual([['1', 'DAY'], ['12', 'HOUR']]);
+    expect(query.parseIntervalToPairs('1 day 12 hour')).toEqual([['1', 'DAY'], ['12', 'HOUR']]);
+
+    expect(() => query.parseIntervalToPairs('1 HEH')).toThrow(
+      `Unsupported granularity in interval: 1 HEH`
+    );
+  });
+
   it('Test for everyRefreshKeySql', async () => {
     await compiler.compile();
 

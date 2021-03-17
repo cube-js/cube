@@ -19,6 +19,10 @@ class HiveFilter extends BaseFilter {
   }
 }
 
+/**
+ * More information about Hive Operators and User-Defined Functions (UDFs)
+ * @link https://cwiki.apache.org/confluence/display/Hive/LanguageManual+UDF#LanguageManualUDF-DateFunctions
+ */
 export class HiveQuery extends BaseQuery {
   newFilter(filter) {
     return new HiveFilter(this, filter);
@@ -36,13 +40,17 @@ export class HiveQuery extends BaseQuery {
     return `from_utc_timestamp(${value}, 'UTC')`; // TODO
   }
 
-  // subtractInterval(date, interval) {
-  //   return `DATE_SUB(${date}, INTERVAL ${interval})`; // TODO
-  // }
+  subtractInterval(date, interval) {
+    const intervals = this.parseIntervalToPairs(interval);
 
-  // addInterval(date, interval) {
-  //   return `DATE_ADD(${date}, INTERVAL ${interval})`; // TODO
-  // }
+    return date + intervals.map(([value, granularity]) => `- INTERVAL '${value}' ${granularity}`).join(' ');
+  }
+
+  addInterval(date, interval) {
+    const intervals = this.parseIntervalToPairs(interval);
+
+    return date + intervals.map(([value, granularity]) => `+ INTERVAL '${value}' ${granularity}`).join(' ');
+  }
 
   timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
