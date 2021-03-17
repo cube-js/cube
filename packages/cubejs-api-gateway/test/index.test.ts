@@ -4,6 +4,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
 import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import { generateAuthToken } from './utils';
 
 export const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
@@ -478,6 +479,57 @@ describe('API Gateway', () => {
         },
         data: [{ 'Foo.bar': 42 }],
       });
+    });
+  });
+
+  describe('/cubejs-system/v1/context', () => {
+    test('success', async () => {
+      const playgroundAuthSecret = 'test12345';
+
+      const { app } = createApiGateway(
+        new AdapterApiMock(),
+        new DataSourceStorageMock(),
+        {
+          basePath: 'awesomepathtotest',
+          playgroundAuthSecret,
+        }
+      );
+
+      const playgroundToken = generateAuthToken({ uid: 5, }, {}, playgroundAuthSecret);
+
+      const res = await request(app)
+        .get('/cubejs-system/v1/context')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${playgroundToken}`)
+        .expect(200);
+
+      expect(res.body).toMatchObject({ basePath: 'awesomepathtotest' });
+    });
+
+    test('not allowed', async () => {
+      const playgroundAuthSecret = 'test12345';
+
+      const { app } = createApiGateway(
+        new AdapterApiMock(),
+        new DataSourceStorageMock(),
+        {
+          playgroundAuthSecret,
+        }
+      );
+
+      return request(app)
+        .get('/cubejs-system/v1/context')
+        .set('Content-type', 'application/json')
+        .expect(403);
+    });
+
+    test('not route (works only with playgroundAuthSecret)', async () => {
+      const { app } = createApiGateway();
+
+      return request(app)
+        .get('/cubejs-system/v1/context')
+        .set('Content-type', 'application/json')
+        .expect(404);
     });
   });
 

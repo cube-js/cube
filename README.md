@@ -8,9 +8,9 @@
 
 __Cube.js is an open-source analytical API platform.__ It is primarily used to build internal business intelligence tools or add customer-facing analytics to existing applications.
 
-Cube.js was designed to work with Serverless Query Engines like AWS Athena and Google BigQuery. Multi-stage querying approach makes it suitable for handling trillions of data points. Most modern RDBMS work with Cube.js as well and can be tuned for adequate performance.
-
-Unlike others, it is not a monolith application, but a set of modules, which does one thing well. Cube.js provides modules to run transformations and modeling in data warehouse, querying and caching, managing API gateway and building UI on top of that.
+Cube.js was designed to work with serverless data warehouses and query engines like Google BigQuery and AWS Athena. A multi-stage querying approach makes it suitable for handling
+trillions of data points. Most modern RDBMS work with Cube.js as well and can be
+further tuned for performance.
 
 For more details, see the [Cube.js introduction](https://cube.dev/docs/cubejs-introduction) page in our documentation. 
 
@@ -24,7 +24,7 @@ If you are building your own business intelligence tool or customer-facing analy
 
 Cube.js has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
 
-![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/old-was-vs-cubejs-way.png)
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png)
 
 ## Getting Started 🚀
 

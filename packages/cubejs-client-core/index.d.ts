@@ -131,6 +131,7 @@ declare module '@cubejs-client/core' {
     queryType: QueryType;
     results: LoadResponseResult<T>[];
     pivotQuery: PivotQuery;
+    [key: string]: any;
   };
 
   /**
@@ -252,6 +253,10 @@ declare module '@cubejs-client/core' {
     yValuesArray: Array<[string[], number]>;
   };
 
+  export type SerializedResult<T = any> = {
+    loadResponse: LoadResponse<T>
+  };
+
   /**
    * Provides a convenient interface for data manipulation.
    */
@@ -279,7 +284,7 @@ declare module '@cubejs-client/core' {
     /**
      * Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
      */
-    serialize(): Object;
+    serialize(): SerializedResult;
 
     /**
      * Can be used when you need access to the methods that can't be used with some query types (eg `compareDateRangeQuery` or `blendingQuery`)
@@ -738,11 +743,6 @@ declare module '@cubejs-client/core' {
     ungrouped?: boolean;
   };
 
-  export type ProgressResponse = {
-    stage: string;
-    timeElapsed: number;
-  };
-
   export class ProgressResult {
     stage(): string;
     timeElapsed(): string;
@@ -758,10 +758,8 @@ declare module '@cubejs-client/core' {
     dataSource: boolean;
     external: boolean;
     sql: SqlQueryTuple;
-  };
-
-  export type SqlApiResponse = {
-    sql: SqlData;
+    preAggregations: any[];
+    rollupMatchResults: any[];
   };
 
   export class SqlQuery {
@@ -1026,7 +1024,6 @@ declare module '@cubejs-client/core' {
   ): TOrderMember[];
 
   export const GRANULARITIES: TGranularityMap[];
-
   /**
    * @hidden
    */
