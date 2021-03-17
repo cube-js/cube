@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.60](https://github.com/cube-js/cube.js/compare/v0.26.59...v0.26.60) (2021-03-16)
+
+
+### Features
+
+* **druid-driver:** Support Basic auth via username/passwd ([#2386](https://github.com/cube-js/cube.js/issues/2386)) ([4a89635](https://github.com/cube-js/cube.js/commit/4a896358e43e39555d69f1f028a165a3e4eaed6d))
+
+
+
+
+
 ## [0.26.56](https://github.com/cube-js/cube.js/compare/v0.26.55...v0.26.56) (2021-03-13)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver

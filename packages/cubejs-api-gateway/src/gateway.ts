@@ -3,7 +3,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
-import { getEnv, getRealType } from '@cubejs-backend/shared';
+import { getRealType } from '@cubejs-backend/shared';
 
 import type {
   Response, NextFunction,
@@ -170,6 +170,7 @@ export interface ApiGatewayOptions {
   queryTransformer?: QueryTransformerFn;
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
+  playgroundAuthSecret?: string;
 }
 
 export class ApiGateway {
@@ -199,6 +200,8 @@ export class ApiGateway {
 
   protected readonly releaseListeners: (() => any)[] = [];
 
+  protected readonly playgroundAuthSecret?: string;
+
   public constructor(
     protected readonly apiSecret: string,
     protected readonly compilerApi: any,
@@ -210,6 +213,7 @@ export class ApiGateway {
     this.refreshScheduler = options.refreshScheduler;
     this.standalone = options.standalone;
     this.basePath = options.basePath;
+    this.playgroundAuthSecret = options.playgroundAuthSecret;
 
     this.queryTransformer = options.queryTransformer || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
@@ -300,6 +304,10 @@ export class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+
+    if (this.playgroundAuthSecret) {
+      app.get('/cubejs-system/v1/context', userMiddlewares, this.createSystemContextHandler(this.basePath));
+    }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
@@ -904,14 +912,13 @@ export class ApiGateway {
   }
 
   protected createCheckAuthFn(options: ApiGatewayOptions): CheckAuthFn {
-    const playgroundAuthSecret = getEnv('playgroundAuthSecret');
     const mainCheckAuthFn = options.checkAuth
       ? this.wrapCheckAuth(options.checkAuth)
       : this.createDefaultCheckAuth(options.jwt);
 
-    if (playgroundAuthSecret) {
+    if (this.playgroundAuthSecret) {
       const playgroundCheckAuthFn = this.createDefaultCheckAuth({
-        key: playgroundAuthSecret,
+        key: this.playgroundAuthSecret,
         algorithms: ['HS256']
       });
 
@@ -1032,6 +1039,16 @@ export class ApiGateway {
       health,
     });
   }
+
+  protected createSystemContextHandler = (basePath: string): RequestHandler => {
+    const body: Readonly<Record<string, any>> = {
+      basePath,
+    };
+
+    return (req, res) => {
+      res.status(200).json(body);
+    };
+  };
 
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
