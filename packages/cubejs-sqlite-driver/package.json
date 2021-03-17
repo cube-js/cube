@@ -25,7 +25,7 @@
     "@cubejs-backend/linter": "^0.26.54",
     "mocha": "^8.0.1",
     "should": "^13.2.3",
-    "testcontainers": "^2.4.0"
+    "testcontainers": "^7.6.0"
   },
   "publishConfig": {
     "access": "public"
