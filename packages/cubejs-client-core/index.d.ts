@@ -8,8 +8,6 @@
  */
 
 declare module '@cubejs-client/core' {
-  import type { SqlQuery } from './src/SqlQuery'
-
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
