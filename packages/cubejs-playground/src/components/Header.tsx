@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FileFilled, MenuOutlined, SlackOutlined } from '@ant-design/icons';
+import { FileFilled, MenuOutlined, SlackOutlined, UsergroupAddOutlined } from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';
 import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
@@ -128,6 +128,15 @@ const Header = ({ selectedKeys }) => {
             <SlackOutlined />
             Slack
           </StyledMenuButton>
+          <StyledMenuButton
+            noMargin
+            key="discourse"
+            href="https://forum.cube.dev/"
+            target="_blank"
+          >
+            <UsergroupAddOutlined />
+            Discourse
+          </StyledMenuButton>          
           <StyledMenuButton
             key="docs"
             href="https://cube.dev/docs"
