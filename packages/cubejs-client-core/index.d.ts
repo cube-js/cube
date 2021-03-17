@@ -1028,4 +1028,9 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function getQueryMembers(query: Query): string[];
+
+  export type ProgressResponse = {
+    stage: string;
+    timeElapsed: number;
+  };
 }

@@ -20,7 +20,7 @@
   },
   "peerDependencies": {
     "@angular/core": "^10.0.5",
-    "@cubejs-client/core": "^0.20.3",
+    "@cubejs-client/core": "^0.26.60",
     "rxjs": "^6.6.0"
   },
   "watch": {
