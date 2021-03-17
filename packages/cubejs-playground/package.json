@@ -39,13 +39,10 @@
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
-    "start": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
+    "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
     "tsc": "rm -rf dist && tsc --noEmit false --outDir dist",
-    "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && yarn tsc && rollup -c",
-    "eject": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-scripts eject",
-    "lint": "eslint src/*.js",
-    "lint:fix": "eslint --fix src/*.js"
+    "build": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && npm run tsc && rollup -c"
   },
   "browserslist": [
     ">0.2%",
