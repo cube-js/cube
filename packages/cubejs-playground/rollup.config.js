@@ -1,6 +1,8 @@
-import babel from '@rollup/plugin-babel';
+import commonjs from '@rollup/plugin-commonjs';
 import localResolve from 'rollup-plugin-local-resolve';
 import postcss from 'rollup-plugin-postcss';
+import typescript from 'rollup-plugin-typescript2';
+import { uglify } from 'rollup-plugin-uglify';
 
 import { LESS_VARIABLES } from './src/variables-esm';
 
@@ -21,42 +23,16 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }) => {
             ],
           ],
           extract: 'antd.min.css',
-          minimize: true
+          minimize: true,
         }),
-        babel({
-          extensions: ['.js', '.jsx', '.ts', '.tsx'],
-          exclude: 'node_modules/**',
-          babelHelpers: 'runtime',
-          presets: [
-            [
-              '@babel/preset-react',
-              {
-                runtime: 'automatic',
-              },
-            ],
-            '@babel/preset-typescript',
-            [
-              '@babel/preset-env',
-              {
-                shippedProposals: true,
-                useBuiltIns: 'usage',
-                corejs: 3,
-              },
-            ],
-          ],
-          plugins: [
-            [
-              '@babel/plugin-transform-runtime',
-              {
-                corejs: false,
-                helpers: true,
-                regenerator: true,
-                useESModules: false,
-              },
-            ],
-          ],
+        commonjs(),
+        typescript({
+          tsconfigOverride: {
+            include: ['src/playground/**/*'],
+          },
         }),
         localResolve(),
+        uglify()
       ],
       output: {
         file: `./lib/${name}.esm.js`,
@@ -69,7 +45,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }) => {
 };
 
 export default bundle('cubejs-playground', 'cubejsPlayground', {
-  input: './src/playground/public_api.js',
+  input: './src/playground/index.ts',
   external: [
     'react',
     'react-dom',

@@ -9,6 +9,7 @@
     "directory": "packages/cubejs-playground"
   },
   "module": "lib/cubejs-playground.esm.js",
+  "types": "lib/playground/index.d.ts",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.26.60",
@@ -24,7 +25,6 @@
     "moment": "^2.24.0",
     "prettier": "^2.0.5",
     "prismjs": "^1.21.0",
-    "prop-types": "^15.7.2",
     "react-beautiful-dnd": "^13.0.0",
     "react-chartjs-2": "^2.7.4",
     "react-helmet": "^6.1.0",
@@ -39,12 +39,10 @@
     "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
-    "start": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true PORT=3080 react-app-rewired start",
+    "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
-    "build": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && babel src -d dist --copy-files && rollup -c",
-    "eject": "SKIP_PREFLIGHT_CHECK=true EXTEND_ESLINT=true react-scripts eject",
-    "lint": "eslint src/*.js",
-    "lint:fix": "eslint --fix src/*.js"
+    "tsc": "rm -rf dist && tsc --noEmit false --outDir dist",
+    "build": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && npm run tsc && rollup -c"
   },
   "browserslist": [
     ">0.2%",
@@ -53,7 +51,6 @@
     "not op_mini all"
   ],
   "files": [
-    "src",
     "public",
     "build",
     "dist",
@@ -71,8 +68,13 @@
     "@ant-design/compatible": "^1.0.2",
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
-    "@types/react": "^17.0.0",
+    "@types/jest": "^26.0.20",
+    "@types/node": "^14.14.35",
+    "@types/react": "^17.0.3",
     "@types/react-beautiful-dnd": "^13.0.0",
+    "@types/react-dom": "^17.0.2",
+    "@types/react-router": "^5.1.12",
+    "@types/react-router-dom": "^5.1.7",
     "@types/styled-components": "^5.1.7",
     "antd": "4.13.0",
     "eslint-config-airbnb": "^18.1.0",
@@ -85,6 +87,7 @@
     "react-app-rewired": "^2.1.0",
     "react-dom": "^17.0.1",
     "recursive-readdir": "^2.2.2",
+    "rollup-plugin-typescript2": "^0.30.0",
     "styled-components": "5.2.0",
     "terser-webpack-plugin": "^4.1.0"
   }
