@@ -168,7 +168,7 @@ export default {
         updatePivotConfig: {
           moveItem: ({ sourceIndex, destinationIndex, sourceAxis, destinationAxis }) => {
             this.pivotConfig = movePivotItem(
-              pivotConfig,
+              this.pivotConfig,
               sourceIndex,
               destinationIndex,
               sourceAxis,
