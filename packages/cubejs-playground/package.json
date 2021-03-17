@@ -54,7 +54,6 @@
     "not op_mini all"
   ],
   "files": [
-    "src",
     "public",
     "build",
     "dist",
