@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.62](https://github.com/cube-js/cube.js/compare/v0.26.61...v0.26.62) (2021-03-18)
+
+
+### Features
+
+* **cubejs-cli:** Create - ability to select a specific JDBC driver ([#1149](https://github.com/cube-js/cube.js/issues/1149)) ([33dc144](https://github.com/cube-js/cube.js/commit/33dc1440e628855e51b1a383d8fe64b39763a19f))
+
+
+
+
+
 ## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver
