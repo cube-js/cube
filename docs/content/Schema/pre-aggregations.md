@@ -9,7 +9,10 @@ menuOrder: 8
 
 <!-- prettier-ignore-start -->
 [[info |]]
-| To start building pre-aggregations, Cube.js requires write access to the [pre-aggregations schema][ref-config-preagg-schema] in the source database. Cube.js first builds pre-aggregations as tables in the source database and then exports them into the pre-aggregations storage. 
+| To start building pre-aggregations, Cube.js requires write access to the
+| [pre-aggregations schema][ref-config-preagg-schema] in the source database.
+| Cube.js first builds pre-aggregations as tables in the source database and
+| then exports them into the pre-aggregations storage.
 <!-- prettier-ignore-end -->
 
 Pre-aggregations are materialized query results persisted as tables. Cube.js has
@@ -110,6 +113,7 @@ pre-aggregation can be used by following algorithm:
    set, all query filter dimensions are included in query dimensions and that
    the rollup defines exact set of dimensions and all measures used in the
    query.
+
 **Explanation of terms:**
 
 - A query is **Leaf Measure Additive** if all of its **Leaf Measures** are
@@ -216,7 +220,8 @@ These queries won't use `categoryAndDate` pre-aggregation:
 
 ### Time partitioning
 
-Any `rollup` pre-aggregations can be partitioned by time using the `partitionGranularity` property:
+Any `rollup` pre-aggregations can be partitioned by time using the
+`partitionGranularity` property:
 
 This can reduce rollup refreshing time and cost significantly. Partitioned
 rollups currently cannot be used by queries without time dimensions.
@@ -382,8 +387,8 @@ interval **will not** be refreshed once they are built unless the rollup SQL is
 changed.
 
 An original SQL pre-aggregation can also be used with time partitioning and
-incremental `refreshKey`. It requires using `FILTER_PARAMS` inside the Cube's `sql`
-property.
+incremental `refreshKey`. It requires using `FILTER_PARAMS` inside the Cube's
+`sql` property.
 
 Below you can find an example of the partitioned `originalSql` pre-aggregation.
 
@@ -593,28 +598,30 @@ cube(`Orders`, {
   },
 });
 ```
+
 ## External vs Internal
 
 In Cube.js, pre-aggregations are called **external** when they are flagged with
-`external: true` which instructs Cube.js to store pre-aggregations inside its own
-storage - Cube Store.
+`external: true` which instructs Cube.js to store pre-aggregations inside its
+own storage - Cube Store.
 
-If pre-aggregations aren't flagged `external: true` they are considered **internal** and will be saved and
-queried from the source database.
+If pre-aggregations aren't flagged `external: true` they are considered
+**internal** and will be saved and queried from the source database.
 
 <!-- prettier-ignore-start -->
 [[info | ]]
 | We recommend always using **external** pre-aggregations for better concurrency and performance.
 <!-- prettier-ignore-end -->
 
-You should use external pre-aggregations for scenarios where you need to handle high
-throughput for a big data backend. It allows downloading rollups and original
-SQL pre-aggregations prepared in big data backends such as AWS Athena, BigQuery,
-Presto, Hive and others to Cube Store for low latency and high throughput querying.
+You should use external pre-aggregations for scenarios where you need to handle
+high throughput for a big data backend. It allows downloading rollups and
+original SQL pre-aggregations prepared in big data backends such as AWS Athena,
+BigQuery, Presto, Hive and others to Cube Store for low latency and high
+throughput querying.
 
 While big data backends aren't very suitable for handling massive amounts of
-concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage can do it
-very well.
+concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage
+can do it very well.
 
 To set it up, simply add the `external` property to your pre-aggregation:
 
@@ -643,6 +650,25 @@ new tables in the source database. For external pre-aggregations, these source
 tables are temporary - once downloaded and uploaded to the external database,
 they are cleaned up.
 
+### Known limitations of internal pre-aggregations
+
+Internal pre-aggregations are not considered production-ready due to several
+shortcomings, as noted below.
+
+**Concurrency:** Databases (especially RDBMs) generally cannot handle high
+concurrency without special configuration. Application databases such as MySQL
+and Postgres do support concurrency, but often cannot cope with the demands of
+analytical queries without significant tuning. On the other hand, data
+warehousing solutions such as Athena and BigQuery often limit the number of
+concurrent connections too.
+
+**Latency:** Data warehousing solutions (such as BigQuery or Redshift) are often
+slow to return results.
+
+**Cost:** Some databases charge by the amount of data scanned for each query
+(such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
+rack up costs.
+
 ## Garbage Collection
 
 When pre-aggregations are refreshed, Cube.js will create new pre-aggregation
@@ -650,7 +676,7 @@ tables each time a version change is detected. This allows for seamless,
 transparent hot swapping of tables for users of any database, even for those
 without DDL transactions support.
 
-However, it does leads to orphaned tables which need to be collected over time.
+However, it does lead to orphaned tables which need to be collected over time.
 By default, Cube.js will store all content versions for 10 minutes and all
 structure versions for 7 days. Then it will retain only the most recent ones and
 orphaned tables are dropped from the database.
