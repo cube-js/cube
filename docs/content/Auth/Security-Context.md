@@ -156,6 +156,13 @@ To generate pre-aggregations that are security context dependent, [configure
 `scheduledRefreshContexts` in your `cube.js` configuration
 file][ref-config-sched-refresh].
 
+## Testing during development
+
+During development, it is often useful to be able to edit the security context
+to test access control rules. The [Developer
+Playground][ref-devtools-playground] allows you to set your own JWTs, or you can
+build one from a JSON object.
+
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
 [link-multitenancy]: /multitenancy-setup
@@ -166,3 +173,5 @@ file][ref-config-sched-refresh].
   https://cube.dev/docs/cube#context-variables-compile-context
 [ref-sec-ctx-vs-compile-ctx]:
   /multitenancy-setup#security-context-vs-multitenant-compile-context
+[ref-devtools-playground]:
+  /dev-tools/dev-playground#editing-the-security-context
