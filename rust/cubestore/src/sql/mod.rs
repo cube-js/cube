@@ -2802,6 +2802,187 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn planning_hints() {
+        Config::run_test("planning_hints", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data(id1 int, id2 int, id3 int)")
+                .await
+                .unwrap();
+
+            let mut show_hints = PPOptions::default();
+            show_hints.show_output_hints = true;
+
+            // Merge produces a sort order because there is only single partition.
+            let p = service
+                .plan_query("SELECT id1, id2 FROM s.Data")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "Worker, sort_order: [0, 1]\
+              \n  Projection, [id1, id2], sort_order: [0, 1]\
+              \n    Merge, sort_order: [0, 1]\
+              \n      Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
+              \n        Empty"
+            );
+
+            let p = service
+                .plan_query("SELECT id2, id1 FROM s.Data")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "Worker, sort_order: [1, 0]\
+                \n  Projection, [id2, id1], sort_order: [1, 0]\
+                \n    Merge, sort_order: [0, 1]\
+                \n      Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
+                \n        Empty"
+            );
+
+            // Unsorted when skips columns from sort prefix.
+            let p = service
+                .plan_query("SELECT id2, id3 FROM s.Data")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "Worker\
+              \n  Projection, [id2, id3]\
+              \n    Merge\
+              \n      Scan, index: default:1:[1], fields: [id2, id3]\
+              \n        Empty"
+            );
+
+            // The prefix columns are still sorted.
+            let p = service
+                .plan_query("SELECT id1, id3 FROM s.Data")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "Worker, sort_order: [0]\
+               \n  Projection, [id1, id3], sort_order: [0]\
+               \n    Merge, sort_order: [0]\
+               \n      Scan, index: default:1:[1], fields: [id1, id3], sort_order: [0]\
+               \n        Empty"
+            );
+
+            // Single value hints.
+            let p = service
+                .plan_query("SELECT id3, id2 FROM s.Data WHERE id2 = 234")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "Worker, single_vals: [1]\
+               \n  Projection, [id3, id2], single_vals: [1]\
+               \n    Filter, single_vals: [0]\
+               \n      Merge\
+               \n        Scan, index: default:1:[1], fields: [id2, id3]\
+               \n          Empty"
+            );
+
+            // Removing single value columns should keep the sort order of the rest.
+            let p = service
+                .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "Worker, sort_order: [0]\
+               \n  Projection, [id3], sort_order: [0]\
+               \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+               \n      Merge, sort_order: [0, 1, 2]\
+               \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+               \n          Empty"
+            );
+            let p = service
+                .plan_query("SELECT id1, id3 FROM s.Data WHERE id2 = 234")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "Worker, sort_order: [0, 1]\
+               \n  Projection, [id1, id3], sort_order: [0, 1]\
+               \n    Filter, single_vals: [1], sort_order: [0, 1, 2]\
+               \n      Merge, sort_order: [0, 1, 2]\
+               \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+               \n          Empty"
+            );
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn planning_inplace_aggregate2() {
+        Config::run_test("planning_inplace_aggregate2", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data1(allowed boolean, site_id int, url text, day timestamp, hits int)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data2(allowed boolean, site_id int, url text, day timestamp, hits int)")
+                .await
+                .unwrap();
+
+            let p = service
+                .plan_query("SELECT `url` `url`, SUM(`hits`) `hits` \
+                             FROM (SELECT * FROM s.Data1 \
+                                   UNION ALL \
+                                   SELECT * FROM s.Data2) AS `Data` \
+                             WHERE (`allowed` = 'true') AND (`site_id` = '1') \
+                                   AND (`day` >= to_timestamp('2021-01-01T00:00:00.000') \
+                                    AND `day` <= to_timestamp('2021-01-02T23:59:59.999')) \
+                             GROUP BY 1 \
+                             ORDER BY 2 DESC \
+                             LIMIT 10")
+                .await
+                .unwrap();
+
+            let mut show_hints = PPOptions::default();
+            show_hints.show_output_hints = true;
+            assert_eq!(
+                pp_phys_plan_ext(p.router.as_ref(), &show_hints),
+                "GlobalLimit, n: 10\
+                \n  Sort\
+                \n    Projection, [url, SUM(hits):hits], sort_order: [0]\
+                \n      FinalInplaceAggregate, sort_order: [0]\
+                \n        MergeSort, sort_order: [0]\
+                \n          ClusterSend, partitions: [[1], [2]], sort_order: [0]"
+            );
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+                "GlobalLimit, n: 10\
+                \n  Sort\
+                \n    Projection, [url, SUM(hits):hits], sort_order: [0]\
+                \n      FinalInplaceAggregate, sort_order: [0]\
+                \n        Worker, sort_order: [0]\
+                \n          PartialInplaceAggregate, sort_order: [0]\
+                \n            Alias, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+                \n              MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+                \n                Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+                \n                  Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+                \n                    Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+                \n                      MergeSort, sort_order: [0, 1, 2, 3, 4]\
+                \n                        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+                \n                          Empty\
+                \n                  Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+                \n                    Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+                \n                      MergeSort, sort_order: [0, 1, 2, 3, 4]\
+                \n                        Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+                \n                          Empty"
+            );
+        })
+            .await;
+    }
+
+    #[tokio::test]
     async fn planning_simple() {
         Config::run_test("planning_simple", async move |services| {
             let service = services.sql_service;

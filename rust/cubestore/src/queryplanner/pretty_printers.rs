@@ -23,16 +23,11 @@ use datafusion::physical_plan::expressions::AliasedSchemaExec;
 use datafusion::physical_plan::merge::{MergeExec, UnionExec};
 use datafusion::physical_plan::projection::ProjectionExec;
 
+#[derive(Default)]
 pub struct PPOptions {
     pub show_filters: bool,
-}
-
-impl Default for PPOptions {
-    fn default() -> Self {
-        PPOptions {
-            show_filters: false,
-        }
-    }
+    // Applies only to physical plan.
+    pub show_output_hints: bool,
 }
 
 pub fn pp_phys_plan(p: &dyn ExecutionPlan) -> String {
@@ -298,6 +293,16 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "Alias";
         } else {
             panic!("unhandled ExecutionPlan: {:?}", p);
+        }
+
+        if o.show_output_hints {
+            let hints = p.output_hints();
+            if !hints.single_value_columns.is_empty() {
+                *out += &format!(", single_vals: {:?}", hints.single_value_columns);
+            }
+            if let Some(so) = hints.sort_order {
+                *out += &format!(", sort_order: {:?}", so);
+            }
         }
     }
 }
