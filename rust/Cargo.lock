@@ -124,6 +124,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_term"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
+dependencies = [
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -144,7 +153,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#07cd2a47a03660f5b89182369dd5346ebbfe6431"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b125fe0efaa558fd6c7db884d65a3d8b09866ed9"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -166,7 +175,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#07cd2a47a03660f5b89182369dd5346ebbfe6431"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b125fe0efaa558fd6c7db884d65a3d8b09866ed9"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -753,7 +762,7 @@ version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37e58ac78573c40708d45522f0d80fa2f01cc4f9b4e2bf749807255454312002"
 dependencies = [
- "ansi_term",
+ "ansi_term 0.11.0",
  "atty",
  "bitflags",
  "strsim",
@@ -1113,6 +1122,7 @@ dependencies = [
  "parquet-format",
  "paste",
  "pin-project-lite 0.2.6",
+ "pretty_assertions",
  "procspawn",
  "rand 0.8.3",
  "regex",
@@ -1148,7 +1158,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#07cd2a47a03660f5b89182369dd5346ebbfe6431"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b125fe0efaa558fd6c7db884d65a3d8b09866ed9"
 dependencies = [
  "ahash 0.6.3",
  "arrow",
@@ -1208,6 +1218,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "diff"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e25ea47919b1560c4e3b7fe0aaab9becf5b84a10325ddf7db0f0ba5e1026499"
 
 [[package]]
 name = "difference"
@@ -2850,6 +2866,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "output_vt100"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53cdc5b785b7a58c5aad8216b3dfa114df64b0b06ae6e1501cef91df2fbdf8f9"
+dependencies = [
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "parking"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2909,7 +2934,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#07cd2a47a03660f5b89182369dd5346ebbfe6431"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-01-27#b125fe0efaa558fd6c7db884d65a3d8b09866ed9"
 dependencies = [
  "arrow",
  "base64 0.12.3",
@@ -3063,6 +3088,18 @@ checksum = "15f553275e5721409451eb85e15fd9a860a6e5ab4496eb215987502b5f5391f2"
 dependencies = [
  "predicates-core",
  "treeline",
+]
+
+[[package]]
+name = "pretty_assertions"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f297542c27a7df8d45de2b0e620308ab883ad232d06c14b76ac3e144bda50184"
+dependencies = [
+ "ansi_term 0.12.1",
+ "ctor",
+ "diff",
+ "output_vt100",
 ]
 
 [[package]]

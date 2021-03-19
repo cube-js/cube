@@ -38,6 +38,7 @@ use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
+use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
 use hex::FromHex;
@@ -58,6 +59,14 @@ pub trait SqlService: DIService + Send + Sync {
         context: SqlQueryContext,
         query: &str,
     ) -> Result<DataFrame, CubeError>;
+
+    /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
+    async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
+}
+
+pub struct QueryPlans {
+    pub router: Arc<dyn ExecutionPlan>,
+    pub worker: Arc<dyn ExecutionPlan>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -469,6 +478,62 @@ impl SqlService for SqlServiceImpl {
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", q))),
         }
     }
+
+    async fn plan_query(&self, q: &str) -> Result<QueryPlans, CubeError> {
+        let ast = {
+            let replaced_quote = q.replace("\\'", "''");
+            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            parser.parse_statement()?
+        };
+        match ast {
+            CubeStoreStatement::Statement(Statement::Query(q)) => {
+                scopeguard::defer!(trim_allocs());
+                let logical_plan = self
+                    .query_planner
+                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .await?;
+                match logical_plan {
+                    QueryPlan::Select(router_plan) => {
+                        // For tests, pretend we have all partitions on the same worker.
+                        let worker_plan = router_plan.with_partition_id_to_execute(
+                            router_plan
+                                .index_snapshots()
+                                .iter()
+                                .flat_map(|i| i.partitions.iter().map(|p| p.partition.get_id()))
+                                .collect(),
+                        );
+                        let mocked_names = worker_plan
+                            .files_to_download()
+                            .iter()
+                            .map(|f| (f.clone(), f.clone()))
+                            .collect();
+                        return Ok(QueryPlans {
+                            router: self
+                                .query_executor
+                                .router_plan(router_plan, self.cluster.clone())
+                                .await?
+                                .0,
+                            worker: self
+                                .query_executor
+                                .worker_plan(worker_plan, mocked_names)
+                                .await?
+                                .0,
+                        });
+                    }
+                    QueryPlan::Meta(_) => {
+                        return Err(CubeError::internal(
+                            "plan_query only works for data selects".to_string(),
+                        ))
+                    }
+                };
+            }
+            _ => {
+                return Err(CubeError::internal(
+                    "plan_query only works for data selects".to_string(),
+                ))
+            }
+        }
+    }
 }
 
 fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeError> {
@@ -785,6 +850,7 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
     use crate::metastore::RocksMetaStore;
+    use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
@@ -792,6 +858,7 @@ mod tests {
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
+    use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
@@ -2679,6 +2746,394 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(20)]));
         }).await;
+    }
+
+    #[tokio::test]
+    async fn planning_inplace_aggregate() {
+        Config::run_test("planning_inplace_aggregate", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data(url text, day int, hits int)")
+                .await
+                .unwrap();
+
+            let p = service
+                .plan_query("SELECT url, SUM(hits) FROM s.Data GROUP BY 1")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "FinalInplaceAggregate\
+              \n  ClusterSend, partitions: [[1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "FinalInplaceAggregate\
+               \n  Worker\
+               \n    PartialInplaceAggregate\
+               \n      MergeSort\
+               \n        Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+               \n          Empty"
+            );
+
+            // When there is no index, we fallback to inplace aggregates.
+            let p = service
+                .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "FinalHashAggregate\
+              \n  ClusterSend, partitions: [[1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "FinalHashAggregate\
+               \n  Worker\
+               \n    PartialHashAggregate\
+               \n      Merge\
+               \n        Scan, index: default:1:[1], fields: [day, hits]\
+               \n          Empty"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn planning_simple() {
+        Config::run_test("planning_simple", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Orders(id int, customer_id int, city text, amount int)")
+                .await
+                .unwrap();
+
+            let p = service
+                .plan_query("SELECT id, amount FROM s.Orders")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "ClusterSend, partitions: [[1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "Worker\
+               \n  Projection, [id, amount]\
+               \n    Merge\
+               \n      Scan, index: default:1:[1], fields: [id, amount]\
+               \n        Empty"
+            );
+
+            let p = service
+                .plan_query("SELECT id, amount FROM s.Orders WHERE id > 10")
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "ClusterSend, partitions: [[1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "Worker\
+               \n  Projection, [id, amount]\
+               \n    Filter\
+               \n      Merge\
+               \n        Scan, index: default:1:[1], fields: [id, amount]\
+               \n          Empty"
+            );
+
+            let p = service
+                .plan_query(
+                    "SELECT id, amount \
+                     FROM s.Orders \
+                     WHERE id > 10\
+                     ORDER BY 2",
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "Sort\
+               \n  ClusterSend, partitions: [[1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "Sort\
+               \n  Worker\
+               \n    Projection, [id, amount]\
+               \n      Filter\
+               \n        Merge\
+               \n          Scan, index: default:1:[1], fields: [id, amount]\
+               \n            Empty"
+            );
+
+            let p = service
+                .plan_query(
+                    "SELECT id, amount \
+                     FROM s.Orders \
+                     WHERE id > 10\
+                     LIMIT 10",
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "GlobalLimit, n: 10\
+               \n  ClusterSend, partitions: [[1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "GlobalLimit, n: 10\
+               \n  Worker\
+               \n    Projection, [id, amount]\
+               \n      Filter\
+               \n        Merge\
+               \n          Scan, index: default:1:[1], fields: [id, amount]\
+               \n            Empty"
+            );
+
+            let p = service
+                .plan_query(
+                    "SELECT id, SUM(amount) \
+                                        FROM s.Orders \
+                                        GROUP BY 1",
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "FinalInplaceAggregate\
+               \n  ClusterSend, partitions: [[1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "FinalInplaceAggregate\
+               \n  Worker\
+               \n    PartialInplaceAggregate\
+               \n      MergeSort\
+               \n        Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+               \n          Empty"
+            );
+
+            let p = service
+                .plan_query(
+                    "SELECT id, SUM(amount) \
+                     FROM (SELECT * FROM s.Orders \
+                           UNION ALL \
+                           SELECT * FROM s.Orders)\
+                     GROUP BY 1",
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "FinalInplaceAggregate\
+               \n  MergeSort\
+               \n    ClusterSend, partitions: [[1], [1]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "FinalInplaceAggregate\
+               \n  Worker\
+               \n    PartialInplaceAggregate\
+               \n      MergeSort\
+               \n        Union\
+               \n          Projection, [id, amount]\
+               \n            MergeSort\
+               \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+               \n                Empty\
+               \n          Projection, [id, amount]\
+               \n            MergeSort\
+               \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+               \n                Empty"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn planning_joins() {
+        Config::run_test("planning_joins", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Orders(order_id int, customer_id int, amount int)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE INDEX by_customer ON s.Orders(customer_id)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE TABLE s.Customers(customer_id int, customer_name text)")
+                .await
+                .unwrap();
+
+            let p = service
+                .plan_query(
+                    "SELECT order_id, customer_name \
+                     FROM s.Orders `o`\
+                     JOIN s.Customers `c` ON o.customer_id = c.customer_id",
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "ClusterSend, partitions: [[2, 3]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "Worker\
+                      \n  Projection, [order_id, customer_name]\
+                      \n    MergeJoin, on: [o.customer_id = c.customer_id]\
+                      \n      Alias\
+                      \n        MergeSort\
+                      \n          Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id]\
+                      \n            Empty\
+                      \n      Alias\
+                      \n        MergeSort\
+                      \n          Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+                      \n            Empty"
+            );
+
+            let p = service
+                .plan_query(
+                    "SELECT order_id, customer_name, SUM(amount) \
+                                        FROM s.Orders `o` \
+                                        JOIN s.Customers `c` ON o.customer_id = c.customer_id \
+                                        GROUP BY 1, 2 \
+                                        ORDER BY 3 DESC",
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "Sort\
+                      \n  FinalHashAggregate\
+                      \n    ClusterSend, partitions: [[2, 3]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "Sort\
+                      \n  FinalHashAggregate\
+                      \n    Worker\
+                      \n      PartialHashAggregate\
+                      \n        MergeJoin, on: [o.customer_id = c.customer_id]\
+                      \n          Alias\
+                      \n            MergeSort\
+                      \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: *\
+                      \n                Empty\
+                      \n          Alias\
+                      \n            MergeSort\
+                      \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+                      \n                Empty"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn planning_3_table_joins() {
+        Config::run_test("planning_3_table_joins", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Orders(order_id int, customer_id int, product_id int, amount int)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE INDEX by_customer ON s.Orders(customer_id)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE TABLE s.Customers(customer_id int, customer_name text)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE TABLE s.Products(product_id int, product_name text)")
+                .await
+                .unwrap();
+
+            let p = service
+                .plan_query(
+                    "SELECT order_id, customer_name, product_name \
+                     FROM s.Orders `o`\
+                     JOIN s.Customers `c` ON o.customer_id = c.customer_id \
+                     JOIN s.Products `p` ON o.product_id = p.product_id",
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                pp_phys_plan(p.router.as_ref()),
+                "ClusterSend, partitions: [[2, 3, 4]]"
+            );
+            assert_eq!(
+                pp_phys_plan(p.worker.as_ref()),
+                "Worker\
+               \n  Projection, [order_id, customer_name, product_name]\
+               \n    MergeJoin, on: [o.product_id = p.product_id]\
+               \n      MergeResort\
+               \n        MergeJoin, on: [o.customer_id = c.customer_id]\
+               \n          Alias\
+               \n            MergeSort\
+               \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id, product_id]\
+               \n                Empty\
+               \n          Alias\
+               \n            MergeSort\
+               \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+               \n                Empty\
+               \n      Alias\
+               \n        MergeSort\
+               \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *\
+               \n            Empty",
+            );
+
+
+            let p = service
+                .plan_query(
+                    "SELECT order_id, customer_name, product_name \
+                     FROM s.Orders `o`\
+                     JOIN s.Customers `c` ON o.customer_id = c.customer_id \
+                     JOIN s.Products `p` ON o.product_id = p.product_id \
+                     WHERE p.product_id = 125",
+                )
+                .await
+                .unwrap();
+
+            // Check filter pushdown properly mirrors the filters on joins.
+            let mut show_filters = PPOptions::default();
+            show_filters.show_filters = true;
+            assert_eq!(
+                pp_phys_plan_ext(p.worker.as_ref(), &show_filters),
+                "Worker\
+               \n  Projection, [order_id, customer_name, product_name]\
+               \n    MergeJoin, on: [o.product_id = p.product_id]\
+               \n      MergeResort\
+               \n        MergeJoin, on: [o.customer_id = c.customer_id]\
+               \n          Filter, predicate: product_id = 125\
+               \n            Alias\
+               \n              MergeSort\
+               \n                Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id, product_id], predicate: #product_id Eq Int64(125)\
+               \n                  Empty\
+               \n          Alias\
+               \n            MergeSort\
+               \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+               \n                Empty\
+               \n      Filter, predicate: product_id = 125\
+               \n        Alias\
+               \n          MergeSort\
+               \n            Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
+               \n              Empty",
+            );
+        })
+            .await;
     }
 
     fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

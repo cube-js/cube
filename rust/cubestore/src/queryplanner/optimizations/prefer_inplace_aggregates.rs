@@ -1,3 +1,4 @@
+use datafusion::error::DataFusionError;
 use datafusion::physical_plan::expressions::AliasedSchemaExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::{AggregateStrategy, HashAggregateExec};
@@ -7,35 +8,27 @@ use datafusion::physical_plan::planner::compute_aggregation_strategy;
 use datafusion::physical_plan::ExecutionPlan;
 use std::sync::Arc;
 
+/// Attempts to replace hash aggregate with sorted aggregate.
+/// TODO: we should pick the right index.
 pub fn try_switch_to_inplace_aggregates(
-    p: &dyn ExecutionPlan,
-) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
-    let delegate_to_children = || {
-        let children: datafusion::error::Result<Vec<_>> = p
-            .children()
-            .into_iter()
-            .map(|c| try_switch_to_inplace_aggregates(c.as_ref()))
-            .collect();
-        p.with_new_children(children?)
-    };
-
+    p: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let agg;
     if let Some(a) = p.as_any().downcast_ref::<HashAggregateExec>() {
         agg = a;
     } else {
-        return delegate_to_children();
+        return Ok(p);
     }
     if agg.strategy() != AggregateStrategy::Hash || agg.group_expr().len() == 0 {
-        return delegate_to_children();
+        return Ok(p);
     }
-
     // Try to cheaply rearrange the plan so that it produces sorted inputs.
     let new_input = try_regroup_columns(agg.input().clone())?;
 
     if compute_aggregation_strategy(new_input.as_ref(), agg.group_expr())
         != AggregateStrategy::InplaceSorted
     {
-        return delegate_to_children();
+        return Ok(p);
     }
     Ok(Arc::new(HashAggregateExec::try_new(
         AggregateStrategy::InplaceSorted,
@@ -51,7 +44,7 @@ fn try_regroup_columns(
     p: Arc<dyn ExecutionPlan>,
 ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
     if p.as_any().is::<HashAggregateExec>() {
-        return try_switch_to_inplace_aggregates(p.as_ref());
+        return Ok(p);
     }
     if p.as_any().is::<AliasedSchemaExec>() || p.as_any().is::<FilterExec>() {
         let children: datafusion::error::Result<Vec<_>> = p

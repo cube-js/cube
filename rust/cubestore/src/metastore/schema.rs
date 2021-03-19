@@ -5,6 +5,10 @@ use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
 
 impl Schema {
+    pub fn new(name: String) -> Schema {
+        Schema { name }
+    }
+
     pub fn get_name(&self) -> &String {
         &self.name
     }

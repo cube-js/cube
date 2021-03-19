@@ -1,6 +1,8 @@
 pub mod hll;
 mod optimizations;
 mod partition_filter;
+mod planning;
+pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
 pub mod udfs;
@@ -8,6 +10,7 @@ pub mod udfs;
 use crate::config::injection::DIService;
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStore, MetaStoreTable};
+use crate::queryplanner::planning::choose_index;
 use crate::queryplanner::query_executor::batch_to_dataframe;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -73,11 +76,12 @@ impl QueryPlanner for QueryPlannerImpl {
         let mut logical_plan = query_planner.statement_to_plan(&statement)?;
 
         logical_plan = ctx.optimize(&logical_plan)?;
-
         trace!("Logical Plan: {:#?}", &logical_plan);
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
-            QueryPlan::Select(SerializedPlan::try_new(logical_plan, self.meta_store.clone()).await?)
+            let (logical_plan, index_snapshots) =
+                choose_index(&logical_plan, &self.meta_store.as_ref()).await?;
+            QueryPlan::Select(SerializedPlan::try_new(logical_plan, index_snapshots).await?)
         } else {
             QueryPlan::Meta(logical_plan)
         };

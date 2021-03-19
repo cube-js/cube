@@ -1,21 +1,19 @@
 use crate::metastore::table::{Table, TablePath};
-use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition};
-use crate::queryplanner::partition_filter::PartitionFilter;
+use crate::metastore::{Chunk, IdRow, Index, Partition};
+use crate::queryplanner::planning::ClusterSendNode;
 use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
-use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
-use arrow::datatypes::{DataType, Field};
-use datafusion::logical_plan::{DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning};
+use arrow::datatypes::DataType;
+use datafusion::logical_plan::{
+    DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning, PlanVisitor,
+};
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
-use futures::future::BoxFuture;
-use futures::FutureExt;
-use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -35,10 +33,10 @@ pub struct SchemaSnapshot {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct IndexSnapshot {
-    table_path: TablePath,
-    index: IdRow<Index>,
-    partitions: Vec<PartitionSnapshot>,
-    sort_on: Option<Vec<String>>,
+    pub table_path: TablePath,
+    pub index: IdRow<Index>,
+    pub partitions: Vec<PartitionSnapshot>,
+    pub sort_on: Option<Vec<String>>,
 }
 
 impl IndexSnapshot {
@@ -65,8 +63,8 @@ impl IndexSnapshot {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PartitionSnapshot {
-    partition: IdRow<Partition>,
-    chunks: Vec<IdRow<Chunk>>,
+    pub partition: IdRow<Partition>,
+    pub chunks: Vec<IdRow<Chunk>>,
 }
 
 impl PartitionSnapshot {
@@ -132,6 +130,10 @@ pub enum SerializedLogicalPlan {
         input: Arc<SerializedLogicalPlan>,
         partitioning_scheme: SerializePartitioning,
     },
+    ClusterSend {
+        input: Arc<SerializedLogicalPlan>,
+        snapshots: Vec<Vec<IndexSnapshot>>,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -143,7 +145,6 @@ pub enum SerializePartitioning {
 impl SerializedLogicalPlan {
     fn logical_plan(
         &self,
-        index_snapshots: &Vec<IndexSnapshot>,
         remote_to_local_names: &HashMap<String, String>,
         worker_partition_ids: &HashSet<u64>,
     ) -> Result<LogicalPlan, CubeError> {
@@ -154,20 +155,12 @@ impl SerializedLogicalPlan {
                 schema,
             } => LogicalPlan::Projection {
                 expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Filter { predicate, input } => LogicalPlan::Filter {
                 predicate: predicate.expr(),
-                input: Arc::new(input.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
             },
             SerializedLogicalPlan::Aggregate {
                 input,
@@ -177,20 +170,12 @@ impl SerializedLogicalPlan {
             } => LogicalPlan::Aggregate {
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggr_expr: aggr_expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Sort { expr, input } => LogicalPlan::Sort {
                 expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
             },
             SerializedLogicalPlan::Union {
                 inputs,
@@ -201,7 +186,6 @@ impl SerializedLogicalPlan {
                     .iter()
                     .map(|p| -> Result<Arc<LogicalPlan>, CubeError> {
                         Ok(Arc::new(p.logical_plan(
-                            index_snapshots,
                             remote_to_local_names,
                             worker_partition_ids,
                         )?))
@@ -220,20 +204,10 @@ impl SerializedLogicalPlan {
             } => LogicalPlan::TableScan {
                 table_name: table_name.clone(),
                 source: match source {
-                    SerializedTableSource::CubeTable(v) => Arc::new(CubeTable::try_new(
-                        index_snapshots
-                            .iter()
-                            .find(|i| i.table_path.table_name() == v.table.table_name())
-                            .ok_or_else(|| {
-                                CubeError::internal(format!(
-                                    "Logical table {:?} not found in index snapshots: {:?}",
-                                    v, index_snapshots
-                                ))
-                            })?
-                            .clone(),
+                    SerializedTableSource::CubeTable(v) => Arc::new(v.to_worker_table(
                         remote_to_local_names.clone(),
                         worker_partition_ids.clone(),
-                    )?),
+                    )),
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
@@ -249,11 +223,7 @@ impl SerializedLogicalPlan {
             },
             SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
                 n: *n,
-                input: Arc::new(input.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
             },
             SerializedLogicalPlan::Join {
                 left,
@@ -262,16 +232,8 @@ impl SerializedLogicalPlan {
                 join_type,
                 schema,
             } => LogicalPlan::Join {
-                left: Arc::new(left.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
-                right: Arc::new(right.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
+                left: Arc::new(left.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                right: Arc::new(right.logical_plan(remote_to_local_names, worker_partition_ids)?),
                 on: on.clone(),
                 join_type: join_type.clone(),
                 schema: schema.clone(),
@@ -280,11 +242,7 @@ impl SerializedLogicalPlan {
                 input,
                 partitioning_scheme,
             } => LogicalPlan::Repartition {
-                input: Arc::new(input.logical_plan(
-                    index_snapshots,
-                    remote_to_local_names,
-                    worker_partition_ids,
-                )?),
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
                 partitioning_scheme: match partitioning_scheme {
                     SerializePartitioning::RoundRobinBatch(s) => Partitioning::RoundRobinBatch(*s),
                     SerializePartitioning::Hash(e, s) => {
@@ -292,6 +250,11 @@ impl SerializedLogicalPlan {
                     }
                 },
             },
+            SerializedLogicalPlan::ClusterSend { input, snapshots } => ClusterSendNode {
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                snapshots: snapshots.clone(),
+            }
+            .into_plan(),
         })
     }
 }
@@ -448,17 +411,15 @@ impl SerializedExpr {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedTableSource {
-    CubeTable(CubeTableLogical),
+    CubeTable(CubeTable),
 }
 
 impl SerializedPlan {
     pub async fn try_new(
         plan: LogicalPlan,
-        meta_store: Arc<dyn MetaStore>,
+        index_snapshots: Vec<IndexSnapshot>,
     ) -> Result<Self, CubeError> {
         let serialized_logical_plan = Self::serialized_logical_plan(&plan);
-        let index_snapshots =
-            Self::index_snapshots_from_plan(Arc::new(plan), meta_store, Vec::new(), None).await?;
         Ok(SerializedPlan {
             logical_plan: Arc::new(serialized_logical_plan),
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
@@ -482,11 +443,8 @@ impl SerializedPlan {
         &self,
         remote_to_local_names: &HashMap<String, String>,
     ) -> Result<LogicalPlan, CubeError> {
-        self.logical_plan.logical_plan(
-            self.index_snapshots(),
-            remote_to_local_names,
-            &self.partition_ids_to_execute(),
-        )
+        self.logical_plan
+            .logical_plan(remote_to_local_names, &self.partition_ids_to_execute())
     }
 
     pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
@@ -517,302 +475,30 @@ impl SerializedPlan {
         files
     }
 
-    fn index_snapshots_from_plan_boxed(
-        plan: Arc<LogicalPlan>,
-        meta_store: Arc<dyn MetaStore>,
-        index_snapshots: Vec<IndexSnapshot>,
-        sort_on: Option<(Vec<String>, bool)>,
-    ) -> BoxFuture<'static, Result<Vec<IndexSnapshot>, CubeError>> {
-        async move { Self::index_snapshots_from_plan(plan, meta_store, index_snapshots, sort_on).await }
-            .boxed()
-    }
-
-    async fn index_snapshots_from_plan(
-        plan: Arc<LogicalPlan>,
-        meta_store: Arc<dyn MetaStore>,
-        mut index_snapshots: Vec<IndexSnapshot>,
-        sort_on: Option<(Vec<String>, bool)>,
-    ) -> Result<Vec<IndexSnapshot>, CubeError> {
-        match plan.as_ref() {
-            LogicalPlan::EmptyRelation { .. } => Ok(index_snapshots),
-            LogicalPlan::TableScan {
-                table_name,
-                projection,
-                filters,
-                ..
-            } => {
-                let name_split = table_name.split(".").collect::<Vec<_>>();
-                let table = meta_store
-                    .get_table(name_split[0].to_string(), name_split[1].to_string())
-                    .await?;
-                let schema = meta_store
-                    .get_schema_by_id(table.get_row().get_schema_id())
-                    .await?;
-                let default_index = meta_store.get_default_index(table.get_id()).await?;
-                let (index, sort_on) = if let Some(projection_column_indices) = projection {
-                    let projection_columns =
-                        CubeTable::project_to_table(&table, &projection_column_indices);
-                    let indexes = meta_store.get_table_indexes(table.get_id()).await?;
-                    if let Some((index, _)) = indexes
-                        .into_iter()
-                        .filter_map(|i| {
-                            if let Some((join_on_columns, _)) = sort_on.as_ref() {
-                                let join_columns_in_index = join_on_columns
-                                    .iter()
-                                    .map(|c| {
-                                        i.get_row()
-                                            .get_columns()
-                                            .iter()
-                                            .find(|ic| ic.get_name().as_str() == c.as_str())
-                                            .clone()
-                                    })
-                                    .collect::<Vec<_>>();
-                                if join_columns_in_index.iter().any(|c| c.is_none()) {
-                                    return None;
-                                }
-                                let join_columns_indices = CubeTable::project_to_index_positions(
-                                    &join_columns_in_index
-                                        .into_iter()
-                                        .map(|c| c.unwrap().clone())
-                                        .collect(),
-                                    &i,
-                                );
-                                if (0..join_columns_indices.len())
-                                    .map(|i| Some(i))
-                                    .collect::<HashSet<_>>()
-                                    != join_columns_indices.into_iter().collect::<HashSet<_>>()
-                                {
-                                    return None;
-                                }
-                            }
-                            let projected_index_positions =
-                                CubeTable::project_to_index_positions(&projection_columns, &i);
-                            let score = projected_index_positions
-                                .into_iter()
-                                .fold_options(0, |a, b| a + b);
-                            score.map(|s| (i, s))
-                        })
-                        .min_by_key(|(_, s)| *s)
-                    {
-                        (index, sort_on)
-                    } else {
-                        if let Some((join_on_columns, true)) = sort_on.as_ref() {
-                            return Err(CubeError::user(format!(
-                                "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
-                                name_split.join("."),
-                                join_on_columns.join(", "),
-                                &name_split[1],
-                                join_on_columns.join("_"),
-                                name_split.join("."),
-                                join_on_columns.join(", ")
-                            )));
-                        }
-                        (default_index, None)
-                    }
-                } else {
-                    if let Some((join_on_columns, _)) = sort_on {
-                        return Err(CubeError::internal(format!(
-                            "Can't find index to join table {} on {} and projection push down optimization has been disabled. Invalid state.",
-                            name_split.join("."),
-                            join_on_columns.join(", ")
-                        )));
-                    }
-                    (default_index, None)
-                };
-
-                let partitions = meta_store
-                    .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
-                    .await?;
-
-                let partition_filter =
-                    PartitionFilter::extract(&partition_filter_schema(&index), filters);
-                log::trace!("Extracted partition filter is {:?}", partition_filter);
-                let candidate_partitions = partitions.len();
-                let mut pruned_partitions = 0;
-
-                let mut partition_snapshots = Vec::new();
-                for (partition, chunks) in partitions.into_iter() {
-                    let min_row = partition
-                        .get_row()
-                        .get_min_val()
-                        .as_ref()
-                        .map(|r| r.values().as_slice());
-                    let max_row = partition
-                        .get_row()
-                        .get_max_val()
-                        .as_ref()
-                        .map(|r| r.values().as_slice());
-
-                    if !partition_filter.can_match(min_row, max_row) {
-                        pruned_partitions += 1;
-                        continue;
-                    }
-
-                    partition_snapshots.push(PartitionSnapshot { chunks, partition });
-                }
-                log::trace!(
-                    "Pruned {} of {} partitions",
-                    pruned_partitions,
-                    candidate_partitions
-                );
-
-                index_snapshots.push(IndexSnapshot {
-                    index,
-                    partitions: partition_snapshots,
-                    table_path: TablePath {
-                        table,
-                        schema: Arc::new(schema),
-                    },
-                    sort_on: sort_on.map(|(cols, _)| cols),
-                });
-
-                Ok(index_snapshots)
-            }
-            LogicalPlan::Projection { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(
-                    input.clone(),
-                    meta_store,
-                    index_snapshots,
-                    sort_on,
-                )
-                .await
-            }
-            LogicalPlan::Filter { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(
-                    input.clone(),
-                    meta_store,
-                    index_snapshots,
-                    sort_on,
-                )
-                .await
-            }
-            LogicalPlan::Aggregate {
-                input, group_expr, ..
-            } => {
-                fn column_name(expr: &Expr) -> Option<String> {
-                    match expr {
-                        Expr::Alias(e, _) => column_name(e),
-                        Expr::Column(col, _) => Some(col.to_string()), // TODO use alias
-                        _ => None,
-                    }
-                }
-
-                let sort_on = group_expr.iter().map(column_name).collect::<Vec<_>>();
-                Self::index_snapshots_from_plan_boxed(
-                    input.clone(),
-                    meta_store,
-                    index_snapshots,
-                    if !sort_on.is_empty() && sort_on.iter().all(|c| c.is_some()) {
-                        Some((sort_on.into_iter().map(|c| c.unwrap()).collect(), false))
-                    } else {
-                        None
-                    },
-                )
-                .await
-            }
-            LogicalPlan::Sort { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(
-                    input.clone(),
-                    meta_store,
-                    index_snapshots,
-                    sort_on,
-                )
-                .await
-            }
-            LogicalPlan::Limit { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(
-                    input.clone(),
-                    meta_store,
-                    index_snapshots,
-                    sort_on,
-                )
-                .await
-            }
-            LogicalPlan::CreateExternalTable { .. } => Ok(index_snapshots),
-            LogicalPlan::Explain { .. } => Ok(index_snapshots),
-            LogicalPlan::Extension { .. } => Ok(index_snapshots),
-            LogicalPlan::Union { inputs, .. } => {
-                let mut snapshots = index_snapshots;
-                for i in inputs.iter() {
-                    snapshots = Self::index_snapshots_from_plan_boxed(
-                        i.clone(),
-                        meta_store.clone(),
-                        snapshots,
-                        sort_on.clone(),
-                    )
-                    .await?;
-                }
-                Ok(snapshots)
-            }
-            LogicalPlan::Join {
-                left, right, on, ..
-            } => {
-                let mut snapshots = index_snapshots;
-                snapshots = Self::index_snapshots_from_plan_boxed(
-                    left.clone(),
-                    meta_store.clone(),
-                    snapshots,
-                    Some((
-                        on.iter()
-                            .map(|(l, _)| l.split(".").last().unwrap().to_string())
-                            .collect(),
-                        true,
-                    )),
-                )
-                .await?;
-                snapshots = Self::index_snapshots_from_plan_boxed(
-                    right.clone(),
-                    meta_store.clone(),
-                    snapshots,
-                    Some((
-                        on.iter()
-                            .map(|(_, r)| r.split(".").last().unwrap().to_string())
-                            .collect(),
-                        true,
-                    )),
-                )
-                .await?;
-                Ok(snapshots)
-            }
-            LogicalPlan::Repartition { input, .. } => {
-                Self::index_snapshots_from_plan_boxed(
-                    input.clone(),
-                    meta_store,
-                    index_snapshots,
-                    sort_on,
-                )
-                .await
-            }
-        }
-    }
-
     pub fn is_data_select_query(plan: &LogicalPlan) -> bool {
-        match plan {
-            LogicalPlan::EmptyRelation { .. } => false,
-            LogicalPlan::TableScan { table_name, .. } => {
-                let name_split = table_name.split(".").collect::<Vec<_>>();
-                name_split[0].to_string() != "information_schema"
-            }
-            LogicalPlan::Projection { input, .. } => Self::is_data_select_query(input),
-            LogicalPlan::Filter { input, .. } => Self::is_data_select_query(input),
-            LogicalPlan::Aggregate { input, .. } => Self::is_data_select_query(input),
-            LogicalPlan::Sort { input, .. } => Self::is_data_select_query(input),
-            LogicalPlan::Limit { input, .. } => Self::is_data_select_query(input),
-            LogicalPlan::CreateExternalTable { .. } => false,
-            LogicalPlan::Explain { .. } => false,
-            LogicalPlan::Extension { .. } => false,
-            LogicalPlan::Union { inputs, .. } => {
-                let mut snapshots = false;
-                for i in inputs.iter() {
-                    snapshots = snapshots || Self::is_data_select_query(i);
-                }
-                snapshots
-            }
-            LogicalPlan::Join { left, right, .. } => {
-                Self::is_data_select_query(left) || Self::is_data_select_query(right)
-            }
-            LogicalPlan::Repartition { input, .. } => Self::is_data_select_query(input),
+        struct Visitor {
+            seen_data_scans: bool,
         }
+        impl PlanVisitor for Visitor {
+            type Error = ();
+
+            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+                if let LogicalPlan::TableScan { table_name, .. } = plan {
+                    let name_split = table_name.split(".").collect::<Vec<_>>();
+                    if name_split[0].to_string() != "information_schema" {
+                        self.seen_data_scans = true;
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+        }
+
+        let mut v = Visitor {
+            seen_data_scans: false,
+        };
+        plan.accept(&mut v).expect("no failures possible");
+        return v.seen_data_scans;
     }
 
     fn serialized_logical_plan(plan: &LogicalPlan) -> SerializedLogicalPlan {
@@ -833,8 +519,7 @@ impl SerializedPlan {
                 filters,
             } => SerializedLogicalPlan::TableScan {
                 table_name: table_name.clone(),
-                source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTableLogical>()
-                {
+                source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTable>() {
                     SerializedTableSource::CubeTable(cube_table.clone())
                 } else {
                     panic!("Unexpected table source");
@@ -881,7 +566,16 @@ impl SerializedPlan {
             },
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
             LogicalPlan::Explain { .. } => unimplemented!(),
-            LogicalPlan::Extension { .. } => unimplemented!(),
+            LogicalPlan::Extension { node } => {
+                let node = node
+                    .as_any()
+                    .downcast_ref::<ClusterSendNode>()
+                    .expect("unknown extension");
+                SerializedLogicalPlan::ClusterSend {
+                    input: Arc::new(Self::serialized_logical_plan(&node.input)),
+                    snapshots: node.snapshots.clone(),
+                }
+            }
             LogicalPlan::Union {
                 inputs,
                 schema,
@@ -1018,16 +712,4 @@ impl SerializedPlan {
             },
         }
     }
-}
-
-fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
-    let schema_fields: Vec<Field>;
-    schema_fields = index
-        .get_row()
-        .columns()
-        .iter()
-        .map(|c| c.clone().into())
-        .take(index.get_row().sort_key_size() as usize)
-        .collect();
-    arrow::datatypes::Schema::new(schema_fields)
 }
