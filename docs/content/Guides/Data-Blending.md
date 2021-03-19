@@ -7,8 +7,11 @@ subCategory: Tutorials
 menuOrder: 24
 ---
 
-[[info | ]] | This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). | We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/data-blending-cube/).
-
+<!-- prettier-ignore-start -->
+[[info | ]]
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/data-blending-cube/).
+<!-- prettier-ignore-end -->
 In case you want to plot two measures from different cubes on one chart or
 create a calculated measure based on it you need to create a join between these two cubes.
 If there's no way to join two cubes other than by time dimension you need to use Data Blending approach.
