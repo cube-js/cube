@@ -882,8 +882,8 @@ mod tests {
 
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
-                PathBuf::from(remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
@@ -929,8 +929,8 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
-                PathBuf::from(remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
@@ -1871,9 +1871,9 @@ mod tests {
                 config.server_name = "127.0.0.1:14306".to_string();
                 config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                 config.store_provider = FileStoreProvider::Filesystem {
-                    remote_dir: env::current_dir()
+                    remote_dir: Some(env::current_dir()
                         .unwrap()
-                        .join("cluster_router-upstream".to_string()),
+                        .join("cluster_router-upstream".to_string())),
                 };
                 config.compaction_chunks_count_threshold = 0;
                 config
@@ -1883,9 +1883,9 @@ mod tests {
                     config.server_name = "127.0.0.1:14307".to_string();
                     config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                     config.store_provider = FileStoreProvider::Filesystem {
-                        remote_dir: env::current_dir()
+                        remote_dir: Some(env::current_dir()
                             .unwrap()
-                            .join("cluster_router-upstream".to_string()),
+                            .join("cluster_router-upstream".to_string())),
                     };
                     config.compaction_chunks_count_threshold = 0;
                     config

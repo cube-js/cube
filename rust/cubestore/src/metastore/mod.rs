@@ -1902,7 +1902,7 @@ impl RocksMetaStore {
             .join(format!("test-{}-remote", test_name));
         let _ = std::fs::remove_dir_all(store_path.clone());
         let _ = std::fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         let meta_store = RocksMetaStore::new(
             store_path.clone().join("metastore").as_path(),
             remote_fs.clone(),
@@ -3024,7 +3024,7 @@ mod tests {
         let remote_store_path = env::current_dir().unwrap().join("test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
 
         {
             let meta_store = RocksMetaStore::new(
@@ -3212,7 +3212,7 @@ mod tests {
         let remote_store_path = env::current_dir().unwrap().join("index_repair_test-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
 
         {
             let meta_store = RocksMetaStore::new(
@@ -3255,7 +3255,7 @@ mod tests {
         let remote_store_path = env::current_dir().unwrap().join("test-table-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(store_path.clone(), remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),

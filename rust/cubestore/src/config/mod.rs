@@ -149,7 +149,7 @@ impl CubeServices {
 pub enum FileStoreProvider {
     Local,
     Filesystem {
-        remote_dir: PathBuf,
+        remote_dir: Option<PathBuf>,
     },
     S3 {
         region: String,
@@ -356,12 +356,10 @@ impl Config {
                         }
                     } else if let Ok(remote_dir) = env::var("CUBESTORE_REMOTE_DIR") {
                         FileStoreProvider::Filesystem {
-                            remote_dir: PathBuf::from(remote_dir),
+                            remote_dir: Some(PathBuf::from(remote_dir)),
                         }
                     } else {
-                        FileStoreProvider::Filesystem {
-                            remote_dir: env::current_dir().unwrap().join("upstream"),
-                        }
+                        FileStoreProvider::Filesystem { remote_dir: None }
                     }
                 },
                 select_worker_pool_size: env::var("CUBESTORE_SELECT_WORKERS")
@@ -428,9 +426,11 @@ impl Config {
                 compaction_chunks_count_threshold: 1,
                 compaction_chunks_total_size_threshold: 10,
                 store_provider: FileStoreProvider::Filesystem {
-                    remote_dir: env::current_dir()
-                        .unwrap()
-                        .join(format!("{}-upstream", name)),
+                    remote_dir: Some(
+                        env::current_dir()
+                            .unwrap()
+                            .join(format!("{}-upstream", name)),
+                    ),
                 },
                 select_worker_pool_size: 0,
                 job_runners_count: 4,
@@ -548,7 +548,7 @@ impl Config {
 
     pub fn remote_dir(&self) -> &PathBuf {
         match &self.config_obj.store_provider {
-            FileStoreProvider::Filesystem { remote_dir } => remote_dir,
+            FileStoreProvider::Filesystem { remote_dir } => remote_dir.as_ref().unwrap(),
             x => panic!("Remote dir called on {:?}", x),
         }
     }

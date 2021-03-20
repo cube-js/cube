@@ -445,8 +445,8 @@ mod tests {
 
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
-                PathBuf::from(remote_store_path.clone()),
             );
             let store = WALStore::new(
                 RocksMetaStore::new(path, remote_fs.clone(), config.config_obj()),
@@ -525,8 +525,8 @@ mod tests {
         let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
                 PathBuf::from(chunk_store_path.clone()),
-                PathBuf::from(chunk_remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
