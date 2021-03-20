@@ -162,6 +162,7 @@ pub enum FileStoreProvider {
     },
 }
 
+#[derive(Clone)]
 pub struct Config {
     config_obj: Arc<ConfigObjImpl>,
     injector: Arc<Injector>,
