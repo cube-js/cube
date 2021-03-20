@@ -24,8 +24,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "^0.27.0",
     "mocha": "^8.0.1",
-    "should": "^13.2.3",
-    "testcontainers": "^2.4.0"
+    "should": "^13.2.3"
   },
   "publishConfig": {
     "access": "public"

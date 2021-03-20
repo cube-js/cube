@@ -88,7 +88,7 @@ export class MSSqlDbRunner extends BaseDbRunner {
   async containerLazyInit() {
     const version = process.env.TEST_MSSQL_VERSION || '2017-latest';
 
-    return new GenericContainer('mcr.microsoft.com/mssql/server', version)
+    return new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
       .withEnv('ACCEPT_EULA', 'Y')
       .withEnv('MSSQL_PID', 'Developer')
       .withEnv('MSSQL_SA_PASSWORD', this.password())
