@@ -1692,6 +1692,8 @@ impl RocksMetaStore {
     }
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
+        let time = SystemTime::now();
+        info!("Persisting meta store snapshot");
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = tokio::time::timeout(Duration::from_secs(10), self.db.read())
             .map_err(|e| CubeError::internal(format!("Meta store upload: {}", e)))
@@ -1738,11 +1740,17 @@ impl RocksMetaStore {
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
         if last_checkpoint_time + time::Duration::from_secs(300) < SystemTime::now() {
+            info!("Uploading meta store check point");
             self.upload_check_point().await?;
         }
 
         let mut check_seq = self.last_check_seq.write().await;
         *check_seq = last_db_seq;
+
+        info!(
+            "Persisting meta store snapshot: done ({:?})",
+            time.elapsed()?
+        );
 
         Ok(())
     }
