@@ -404,7 +404,7 @@ export default class QueryBuilder extends React.Component {
     );
 
     finalState.missingMembers = this.getMissingMembers(finalState.query, meta);
-    finalState.chartType = state.chartType || chartType;
+    finalState.chartType = finalState.chartType || state.chartType || chartType;
 
     // deprecated
     runSetters({

@@ -187,7 +187,7 @@ declare module '@cubejs-client/react' {
     /**
      * A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way.
      */
-    stateChangeHeuristics?: (state: QueryBuilderState) => QueryBuilderState;
+    stateChangeHeuristics?: (state: QueryBuilderState, newState: QueryBuilderState) => QueryBuilderState;
     /**
      * @ignore @deprecated Controlled query
      */
@@ -211,7 +211,7 @@ declare module '@cubejs-client/react' {
     /**
      * @hidden
      */
-    onSchemaChange: (props: SchemaChangeProps) => void
+    onSchemaChange?: (props: SchemaChangeProps) => void
   };
 
   /**
