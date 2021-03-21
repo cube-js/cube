@@ -1750,12 +1750,17 @@ impl RocksMetaStore {
     async fn upload_check_point(&self) -> Result<(), CubeError> {
         let mut check_point_time = self.last_checkpoint_time.write().await;
         let remote_fs = self.remote_fs.clone();
-        let db = tokio::time::timeout(Duration::from_secs(10), self.db.write())
-            .map_err(|e| CubeError::internal(format!("Meta store upload checkpoint: {}", e)))
-            .await?
-            .clone();
-        *check_point_time = SystemTime::now();
-        RocksMetaStore::upload_checkpoint(db, remote_fs, &check_point_time).await?;
+
+        let (remote_path, checkpoint_path) = {
+            let db = tokio::time::timeout(Duration::from_secs(10), self.db.write())
+                .map_err(|e| CubeError::internal(format!("Meta store upload checkpoint: {}", e)))
+                .await?
+                .clone();
+            *check_point_time = SystemTime::now();
+            RocksMetaStore::prepare_checkpoint(db, &check_point_time).await?
+        };
+
+        RocksMetaStore::upload_checkpoint(remote_fs, remote_path, checkpoint_path).await?;
         self.write_completed_notify.notify_waiters();
         Ok(())
     }
@@ -1769,20 +1774,10 @@ impl RocksMetaStore {
     }
 
     async fn upload_checkpoint(
-        db: Arc<DB>,
         remote_fs: Arc<dyn RemoteFs>,
-        checkpoint_time: &SystemTime,
+        remote_path: String,
+        checkpoint_path: PathBuf,
     ) -> Result<(), CubeError> {
-        let remote_path = RocksMetaStore::meta_store_path(checkpoint_time);
-        let checkpoint_path = db.path().join("..").join(remote_path.clone());
-        let path_to_move = checkpoint_path.clone();
-        tokio::task::spawn_blocking(move || -> Result<(), CubeError> {
-            let checkpoint = Checkpoint::new(db.as_ref())?;
-            checkpoint.create_checkpoint(path_to_move.as_path())?;
-            Ok(())
-        })
-        .await??;
-
         let mut dir = fs::read_dir(checkpoint_path).await?;
 
         let mut files_to_upload = Vec::new();
@@ -1854,6 +1849,22 @@ impl RocksMetaStore {
             .await?;
 
         Ok(())
+    }
+
+    async fn prepare_checkpoint(
+        db: Arc<DB>,
+        checkpoint_time: &SystemTime,
+    ) -> Result<(String, PathBuf), CubeError> {
+        let remote_path = RocksMetaStore::meta_store_path(checkpoint_time);
+        let checkpoint_path = db.path().join("..").join(remote_path.clone());
+        let path_to_move = checkpoint_path.clone();
+        tokio::task::spawn_blocking(move || -> Result<(), CubeError> {
+            let checkpoint = Checkpoint::new(db.as_ref())?;
+            checkpoint.create_checkpoint(path_to_move.as_path())?;
+            Ok(())
+        })
+        .await??;
+        Ok((remote_path, checkpoint_path))
     }
 
     fn meta_store_path(checkpoint_time: &SystemTime) -> String {
