@@ -209,6 +209,8 @@ pub trait ConfigObj: DIService {
     fn server_name(&self) -> &String;
 
     fn max_ingestion_data_frames(&self) -> usize;
+
+    fn upload_to_remote(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -233,6 +235,7 @@ pub struct ConfigObjImpl {
     pub connection_timeout: u64,
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
+    pub upload_to_remote: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -317,6 +320,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn max_ingestion_data_frames(&self) -> usize {
         self.max_ingestion_data_frames
+    }
+
+    fn upload_to_remote(&self) -> bool {
+        self.upload_to_remote
     }
 }
 
@@ -411,6 +418,7 @@ impl Config {
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
                     .unwrap_or("localhost".to_string()),
+                upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
             }),
         }
     }
@@ -447,6 +455,7 @@ impl Config {
                 wal_split_threshold: 262144,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
+                upload_to_remote: true,
             }),
         }
     }
