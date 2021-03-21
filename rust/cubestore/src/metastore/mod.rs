@@ -1700,6 +1700,7 @@ impl RocksMetaStore {
             .await?
             .latest_sequence_number();
         if last_check_seq == last_db_seq {
+            info!("Persisting meta store snapshot: nothing to update");
             return Ok(());
         }
         let last_upload_seq = self.last_upload_seq().await;
