@@ -8,8 +8,6 @@
  */
 
 declare module '@cubejs-client/core' {
-  import type { ChartType } from '@cubejs-client/react';
-
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -962,6 +960,8 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export type TSourceAxis = 'x' | 'y';
+
+  export type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
 
   export type TDefaultHeuristicsOptions = {
     meta: Meta;
