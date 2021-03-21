@@ -56,7 +56,7 @@ class AppContainer {
 
       const scaffoldingPath = path.join(this.packagesPath, child.package.name, 'scaffolding');
       // eslint-disable-next-line
-      const instance = require(path.join(this.packagesPath, child.package.name))({
+      child.packageInstance = require(path.join(this.packagesPath, child.package.name))({
         appContainer: this,
         package: {
           ...child.package,
@@ -64,8 +64,6 @@ class AppContainer {
         },
         playgroundContext: this.playgroundContext,
       });
-
-      child.packageInstance = instance;
 
       child.children.forEach((currentChild) => {
         stack.push(currentChild);
@@ -109,7 +107,7 @@ class AppContainer {
     const toInstall = R.toPairs(dependencies)
       .filter(([dependency]) => !packageJson.dependencies[dependency])
       .map(([dependency, version]) => (version !== 'latest' ? `${dependency}@${version}` : dependency));
-      
+
     if (toInstall.length) {
       await this.executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(this.appPath) });
     }
