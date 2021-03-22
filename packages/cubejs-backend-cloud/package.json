@@ -9,8 +9,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "eslint --debug src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts",
-    "unit": "jest --coverage dist/test"
+    "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "files": [
     "README.md",
