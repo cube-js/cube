@@ -137,7 +137,7 @@ export class Config {
     throw 'Malformed Cube Cloud token';
   }
 
-  protected async deployAuthForCurrentDir() {
+  public async deployAuthForCurrentDir() {
     const dotCubeCloud = await this.loadDotCubeCloud();
     if (dotCubeCloud.url && dotCubeCloud.deploymentId) {
       const deployAuth = await this.deployAuth(dotCubeCloud.url);

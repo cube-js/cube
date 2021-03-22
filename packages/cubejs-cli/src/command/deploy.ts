@@ -27,6 +27,8 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   }
 
   const config = new Config();
+  if (!auth) auth = await config.deployAuthForCurrentDir();
+
   const cubeCloudClient = new CubeCloudClient();
 
   const bar = new cliProgress.SingleBar({
