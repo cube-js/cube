@@ -18,6 +18,7 @@ use hex::ToHex;
 use http_auth_basic::Credentials;
 use log::error;
 use log::info;
+use log::trace;
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -59,7 +60,7 @@ impl HttpServer {
 
     pub async fn run_server(&self) -> Result<(), CubeError> {
         let (tx, mut rx) =
-            mpsc::channel::<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>(10000);
+            mpsc::channel::<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>(100000);
         let auth_service = self.auth.clone();
         let tx_to_move_filter = warp::any().map(move || tx.clone());
 
@@ -83,10 +84,11 @@ impl HttpServer {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
                 Result::<_, Rejection>::Ok(ws.on_upgrade(async move |mut web_socket| {
-                    let (response_tx, mut response_rx) = mpsc::channel::<HttpMessage>(1000);
+                    let (response_tx, mut response_rx) = mpsc::channel::<HttpMessage>(10000);
                     loop {
                         tokio::select! {
                             Some(res) = response_rx.recv() => {
+                                trace!("Sending web socket response");
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
                                     error!("Websocket message send error: {:?}", e)
@@ -103,8 +105,17 @@ impl HttpServer {
                                             match HttpMessage::read(msg.into_bytes()) {
                                                 Err(e) => error!("Websocket message read error: {:?}", e),
                                                 Ok(msg) => {
-                                                    if let Err(e) = tx_to_move.send((response_tx.clone(), sql_query_context.clone(), msg)).await {
+                                                    trace!("Received web socket message");
+                                                    let message_id = msg.message_id;
+                                                    // TODO use timeout instead of try send for burst control however try_send is safer for now
+                                                    if let Err(e) = tx_to_move.try_send((response_tx.clone(), sql_query_context.clone(), msg)) {
                                                         error!("Websocket channel error: {:?}", e);
+                                                        let send_res = web_socket.send(
+                                                            Message::binary(HttpMessage { message_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
+                                                        ).await;
+                                                        if let Err(e) = send_res {
+                                                            error!("Websocket message send error: {:?}", e)
+                                                        }
                                                         break;
                                                     }
                                                 }
@@ -153,24 +164,26 @@ impl HttpServer {
                     command,
                 },
             )| {
-                let res =
-                    HttpServer::process_command(sql_service, sql_query_context, command).await;
-                let message = match res {
-                    Ok(command) => HttpMessage {
-                        message_id,
-                        command,
-                    },
-                    Err(e) => HttpMessage {
-                        message_id,
-                        command: HttpCommand::Error {
-                            error: e.to_string(),
+                tokio::spawn(async move {
+                    let res =
+                        HttpServer::process_command(sql_service, sql_query_context, command).await;
+                    let message = match res {
+                        Ok(command) => HttpMessage {
+                            message_id,
+                            command,
                         },
-                    },
-                };
-                sender
-                    .send(message)
-                    .await
-                    .map_err(|e| CubeError::from_error(e))
+                        Err(e) => HttpMessage {
+                            message_id,
+                            command: HttpCommand::Error {
+                                error: e.to_string(),
+                            },
+                        },
+                    };
+                    if let Err(e) = sender.send(message).await {
+                        error!("Send result channel error: {:?}", e);
+                    }
+                });
+                Ok(())
             },
         );
         let cancel_token = self.cancel_token.clone();
