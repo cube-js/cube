@@ -17,6 +17,8 @@ use std::time::Duration;
 use tokio::runtime::Builder;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Notify, RwLock};
+use tracing::{instrument, Instrument};
+use tracing_futures::WithSubscriber;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -35,6 +37,8 @@ pub struct Message<
 > {
     message: T,
     sender: Sender<Result<R, CubeError>>,
+    span: tracing::Span,
+    dispatcher: tracing::dispatcher::Dispatch,
 }
 
 #[async_trait]
@@ -89,6 +93,8 @@ impl<
         self.queue.push(Message {
             message,
             sender: tx,
+            span: tracing::Span::current(),
+            dispatcher: tracing::dispatcher::get_default(|d| d.clone()),
         });
         Ok(rx.await??)
     }
@@ -140,7 +146,12 @@ impl<
                     scopeguard::defer!(<WorkerProcess<T, R, P>>::kill(&mut handle));
                     loop {
                         let mut stopped_rx = self.stopped_rx.write().await;
-                        let Message { message, sender } = tokio::select! {
+                        let Message {
+                            message,
+                            sender,
+                            span,
+                            dispatcher,
+                        } = tokio::select! {
                             res = stopped_rx.changed() => {
                                 if res.is_err() || *stopped_rx.borrow() {
                                     self.finished_notify.notify_waiters();
@@ -156,6 +167,8 @@ impl<
                             self.timeout,
                             self.process_message(message, args_tx, res_rx),
                         )
+                        .instrument(span)
+                        .with_subscriber(dispatcher)
                         .await;
                         let process_message_res = match process_message_res_timeout {
                             Ok(r) => r,
@@ -195,6 +208,7 @@ impl<
         }
     }
 
+    #[instrument(skip(self, message, args_tx, res_rx))]
     async fn process_message(
         &self,
         message: T,
