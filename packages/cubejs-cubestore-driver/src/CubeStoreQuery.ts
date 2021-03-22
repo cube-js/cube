@@ -77,14 +77,6 @@ export class CubeStoreQuery extends BaseQuery {
     return `IF(${sql}, 1, 0)`;
   }
 
-  public preAggregationTableName(cube, preAggregationName, skipSchema) {
-    const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
-    if (name.length > 64) {
-      throw new UserError(`MySQL can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
-    }
-    return name;
-  }
-
   public hllMerge(sql) {
     return `cardinality(merge(${sql}))`;
   }
