@@ -12,7 +12,7 @@ export class DeployDirectory {
   ) { }
 
   public async fileHashes(directory: string = this.options.directory) {
-    let result = {};
+    let result: Record<string, any> = {};
 
     const files = await fs.readdir(directory);
     // eslint-disable-next-line no-restricted-syntax
