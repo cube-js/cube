@@ -2,8 +2,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import cliProgress from 'cli-progress';
 import { CommanderStatic } from 'commander';
-import { CubeCloudClient, DeployDirectory } from '@cubejs-backend/cloud';
 
+import { DeployDirectory } from '../deploy';
 import { logStage, displayError, event } from '../utils';
 import { Config } from '../config';
 
@@ -26,10 +26,6 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   }
 
   const config = new Config();
-  if (!auth) auth = await config.deployAuthForCurrentDir();
-
-  const cubeCloudClient = new CubeCloudClient();
-
   const bar = new cliProgress.SingleBar({
     format: '- Uploading files | {bar} | {percentage}% || {value} / {total} | {file}',
     barCompleteChar: '\u2588',
@@ -40,12 +36,28 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   const deployDir = new DeployDirectory({ directory });
   const fileHashes: any = await deployDir.fileHashes();
 
-  const upstreamHashes = await cubeCloudClient.getUpstreamHashes({ auth });
-  const { transaction, deploymentName } = await cubeCloudClient.startUpload({ auth });
+  const upstreamHashes = await config.cloudReq({
+    url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
+    method: 'GET',
+    auth
+  });
+
+  const { transaction, deploymentName } = await config.cloudReq({
+    url: (deploymentId: string) => `build/deploy/${deploymentId}/start-upload`,
+    method: 'POST',
+    auth
+  });
 
   if (uploadEnv) {
     const envVariables = await config.envFile(`${directory}/.env`);
-    await cubeCloudClient.setEnvVars({ auth, envVariables });
+    await config.cloudReq({
+      url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
+      method: 'POST',
+      body: {
+        envVariables: JSON.stringify(envVariables),
+      },
+      auth
+    });
   }
 
   await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
@@ -66,18 +78,32 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
       fileHashesPosix[filePosix] = fileHashes[file];
 
       if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
-        await cubeCloudClient.uploadFile({
-          transaction,
-          fileName: filePosix,
-          data: fs.createReadStream(path.join(directory, file)),
+        await config.cloudReq({
+          url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
+          method: 'POST',
+          formData: {
+            transaction: JSON.stringify(transaction),
+            fileName: filePosix,
+            file: {
+              value: fs.createReadStream(path.join(directory, file)),
+              options: {
+                filename: path.basename(file),
+                contentType: 'application/octet-stream'
+              }
+            }
+          },
           auth
         });
       }
     }
     bar.update(files.length, { file: 'Post processing...' });
-    await cubeCloudClient.finishUpload({
-      transaction,
-      files: fileHashesPosix,
+    await config.cloudReq({
+      url: (deploymentId: string) => `build/deploy/${deploymentId}/finish-upload`,
+      method: 'POST',
+      body: {
+        transaction,
+        files: fileHashesPosix
+      },
       auth
     });
   } finally {

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import path from 'path';
 import fs from 'fs-extra';
+import path from 'path';
 
 type DeployDirectoryOptions = {
   directory: string,
