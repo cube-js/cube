@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.64](https://github.com/cube-js/cube.js/compare/v0.26.63...v0.26.64) (2021-03-22)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Drop limit for table names ([9e1317c](https://github.com/cube-js/cube.js/commit/9e1317c4bfd051a384d7dd2f6ce6df011ae795af))
+
+
+
+
+
 ## [0.26.63](https://github.com/cube-js/cube.js/compare/v0.26.62...v0.26.63) (2021-03-22)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver
