@@ -2,11 +2,10 @@ import fs from 'fs-extra';
 import path from 'path';
 import cliProgress from 'cli-progress';
 import { CommanderStatic } from 'commander';
+import { CubeCloudClient, DeployDirectory } from '@cubejs-backend/cloud';
 
-import { DeployDirectory } from '../deploy';
 import { logStage, displayError, event } from '../utils';
 import { Config } from '../config';
-import { CubeCloudClient } from '../cloud';
 
 const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {

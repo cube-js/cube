@@ -2,7 +2,11 @@ import rp, { RequestPromiseOptions } from 'request-promise';
 import { ReadStream } from 'node:fs';
 import path from 'path';
 
-type AuthObject = { auth: string, deploymentId?: string, url?: string };
+type AuthObject = {
+  auth: string,
+  deploymentId?: string,
+  url?: string,
+};
 
 export class CubeCloudClient {
   private async request(options: {
@@ -11,7 +15,6 @@ export class CubeCloudClient {
   } & RequestPromiseOptions) {
     const { url, auth, ...restOptions } = options;
 
-    console.log('options', options.url('1'));
     const authorization = auth;
     if (!authorization) {
       throw new Error('Auth isn\'t set');

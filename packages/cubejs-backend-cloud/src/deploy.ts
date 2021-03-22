@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import fs from 'fs-extra';
 import path from 'path';
+import fs from 'fs-extra';
 
 type DeployDirectoryOptions = {
   directory: string,
@@ -43,7 +43,7 @@ export class DeployDirectory {
     }
 
     // blacklist
-    if (['dashboard-app', 'node_modules'].includes(baseName)) {
+    if (['.git', 'dashboard-app', 'node_modules'].includes(baseName)) {
       return false;
     }
 

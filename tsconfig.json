@@ -8,6 +8,9 @@
       "path": "packages/cubejs-backend-shared"
     },
     {
+      "path": "packages/cubejs-backend-cloud"
+    },
+    {
       "path": "packages/cubejs-api-gateway"
     },
     {

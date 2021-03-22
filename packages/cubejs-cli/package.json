@@ -32,6 +32,7 @@
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/shared": "^0.26.54",
+    "@cubejs-backend/cloud": "^0.26.62",
     "chalk": "^2.4.2",
     "cli-progress": "^3.8.2",
     "commander": "^2.19.0",

@@ -5,8 +5,8 @@ import path from 'path';
 import os from 'os';
 import dotenv from '@cubejs-backend/dotenv';
 import { isFilePath } from '@cubejs-backend/shared';
+import { CubeCloudClient } from '@cubejs-backend/cloud';
 import { displayWarning } from './utils';
-import { CubeCloudClient } from './cloud';
 
 type ConfigurationFull = {
   auth: {
