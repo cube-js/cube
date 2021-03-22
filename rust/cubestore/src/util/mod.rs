@@ -1,3 +1,4 @@
+pub mod lock;
 pub mod maybe_owned;
 pub mod ordfloat;
 pub mod time_span;

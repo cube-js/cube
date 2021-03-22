@@ -4,6 +4,7 @@ pub mod s3;
 
 use crate::config::injection::DIService;
 use crate::di_service;
+use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -162,7 +163,7 @@ impl RemoteFs for LocalDirRemoteFs {
             }
         }
 
-        let _local_guard = self.dir_delete_mut.lock().await;
+        let _local_guard = acquire_lock("delete file", self.dir_delete_mut.lock()).await?;
         let local = self.dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;

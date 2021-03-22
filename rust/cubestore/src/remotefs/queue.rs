@@ -1,6 +1,7 @@
 use crate::config::ConfigObj;
 use crate::di_service;
 use crate::remotefs::{RemoteFile, RemoteFs};
+use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use core::fmt;
@@ -146,7 +147,10 @@ impl QueueRemoteFs {
                 temp_upload_path,
                 remote_path,
             } => {
-                if !self.deleted.read().await.contains(remote_path.as_str()) {
+                if !acquire_lock("upload loop deleted", self.deleted.read())
+                    .await?
+                    .contains(remote_path.as_str())
+                {
                     let res = self
                         .remote_fs
                         .upload_file(&temp_upload_path, &remote_path)
@@ -170,7 +174,8 @@ impl QueueRemoteFs {
         match to_process {
             RemoteFsOp::Download(file) => {
                 let result = self.remote_fs.download_file(file.as_str()).await;
-                let mut downloading = self.downloading.write().await;
+                let mut downloading =
+                    acquire_lock("download loop downloading", self.downloading.write()).await?;
                 self.result_sender
                     .send(RemoteFsOpResult::Download(file.to_string(), result))?;
                 downloading.remove(&file);
@@ -310,7 +315,8 @@ impl RemoteFs for QueueRemoteFs {
         }
         let mut receiver = self.result_sender.subscribe();
         {
-            let mut downloading = self.downloading.write().await;
+            let mut downloading =
+                acquire_lock("download file downloading", self.downloading.write()).await?;
             if !downloading.contains(remote_path) {
                 self.download_queue
                     .push(RemoteFsOp::Download(remote_path.to_string()));

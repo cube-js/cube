@@ -1,5 +1,6 @@
 use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -131,7 +132,7 @@ impl RemoteFs for S3RemoteFs {
             )));
         }
 
-        let _guard = self.delete_mut.lock().await;
+        let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
         let local = self.dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;

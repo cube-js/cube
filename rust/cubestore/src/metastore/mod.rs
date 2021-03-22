@@ -31,6 +31,7 @@ use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
+use crate::util::lock::acquire_lock;
 use crate::util::time_span::{warn_long, warn_long_fut};
 use crate::util::WorkerLoop;
 use crate::CubeError;
@@ -42,7 +43,6 @@ use core::{fmt, mem};
 use cubehll::HllSketch;
 use cubezetasketch::HyperLogLogPlusPlus;
 use futures::future::join_all;
-use futures::TryFutureExt;
 use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
@@ -1589,14 +1589,9 @@ impl RocksMetaStore {
                         let path_to_log = remote_fs.local_file(log_file).await?;
                         let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
                         if let Ok(batch) = batch {
-                            let db = tokio::time::timeout(
-                                Duration::from_secs(10),
-                                meta_store.db.write(),
-                            )
-                            .map_err(|e| {
-                                CubeError::internal(format!("Meta store load from remote: {}", e))
-                            })
-                            .await?;
+                            let db =
+                                acquire_lock("meta store load from remote", meta_store.db.write())
+                                    .await?;
                             db.write(batch.write_batch())?;
                         } else if let Err(e) = batch {
                             error!(
@@ -1637,9 +1632,7 @@ impl RocksMetaStore {
             + 'static,
         R: Send + 'static,
     {
-        let db = tokio::time::timeout(Duration::from_secs(10), self.db.write())
-            .map_err(|e| CubeError::internal(format!("Meta store write: {}", e)))
-            .await?;
+        let db = acquire_lock("meta store write", self.db.write()).await?;
         let db_span = warn_long("metastore write operation", Duration::from_millis(100));
         let mem_seq = MemorySequence {
             seq_store: self.seq_store.clone(),
@@ -1695,8 +1688,7 @@ impl RocksMetaStore {
         let time = SystemTime::now();
         info!("Persisting meta store snapshot");
         let last_check_seq = self.last_check_seq().await;
-        let last_db_seq = tokio::time::timeout(Duration::from_secs(10), self.db.read())
-            .map_err(|e| CubeError::internal(format!("Meta store upload: {}", e)))
+        let last_db_seq = acquire_lock("meta store upload", self.db.read())
             .await?
             .latest_sequence_number();
         if last_check_seq == last_db_seq {
@@ -1705,8 +1697,7 @@ impl RocksMetaStore {
         }
         let last_upload_seq = self.last_upload_seq().await;
         let (serializer, min, max) = {
-            let updates = tokio::time::timeout(Duration::from_secs(10), self.db.write())
-                .map_err(|e| CubeError::internal(format!("Meta store upload: {}", e)))
+            let updates = acquire_lock("meta store upload", self.db.write())
                 .await?
                 .get_updates_since(last_upload_seq)?;
             let mut serializer = WriteBatchContainer::new();
@@ -1761,8 +1752,7 @@ impl RocksMetaStore {
         let remote_fs = self.remote_fs.clone();
 
         let (remote_path, checkpoint_path) = {
-            let db = tokio::time::timeout(Duration::from_secs(10), self.db.write())
-                .map_err(|e| CubeError::internal(format!("Meta store upload checkpoint: {}", e)))
+            let db = acquire_lock("meta store upload checkpoint", self.db.write())
                 .await?
                 .clone();
             *check_point_time = SystemTime::now();
@@ -1891,15 +1881,14 @@ impl RocksMetaStore {
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + 'static,
         R: Send + 'static,
     {
-        let db = tokio::time::timeout(
-            Duration::from_secs(10),
+        let db = acquire_lock(
+            "meta store read",
             warn_long_fut(
                 "metastore acquire read lock",
                 Duration::from_millis(50),
                 self.db.read(),
             ),
         )
-        .map_err(|e| CubeError::internal(format!("Meta store read: {}", e)))
         .await?;
         let mem_seq = MemorySequence {
             seq_store: self.seq_store.clone(),
@@ -1965,9 +1954,7 @@ impl RocksMetaStore {
     }
 
     async fn has_pending_changes(&self) -> Result<bool, CubeError> {
-        let db = tokio::time::timeout(Duration::from_secs(10), self.db.read())
-            .map_err(|e| CubeError::internal(format!("Meta store has pending changes: {}", e)))
-            .await?;
+        let db = acquire_lock("meta store has pending changes", self.db.read()).await?;
         Ok(db
             .get_updates_since(self.last_upload_seq().await)?
             .next()
