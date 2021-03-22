@@ -11,7 +11,7 @@ import { Octokit } from '@octokit/core';
 import * as path from 'path';
 import { mkdirpSync } from 'fs-extra';
 
-import { detectLibc } from './utils';
+import { getTarget } from './utils';
 
 type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
 
@@ -106,27 +106,6 @@ export async function downloadAndExtractFile(url: string) {
   });
 
   bar.stop();
-}
-
-export function getTarget(): string {
-  if (process.arch !== 'x64') {
-    throw new Error(
-      `You are using ${process.arch} architecture which is not supported by Cube Store`,
-    );
-  }
-
-  switch (process.platform) {
-    case 'win32':
-      return 'x86_64-pc-windows-gnu';
-    case 'linux':
-      return `x86_64-unknown-linux-${detectLibc()}`;
-    case 'darwin':
-      return 'x86_64-apple-darwin';
-    default:
-      throw new Error(
-        `You are using ${process.env} which is not supported by Cube Store`,
-      );
-  }
 }
 
 async function fetchRelease(version: string) {

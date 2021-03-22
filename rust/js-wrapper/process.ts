@@ -87,14 +87,6 @@ async function startProcess(pathToExecutable: string, config: Readonly<StartProc
   });
 }
 
-export function isCubeStoreSupported(): boolean {
-  if (process.arch !== 'x64') {
-    return false;
-  }
-
-  return ['win32', 'darwin', 'linux'].includes(process.platform);
-}
-
 export class CubeStoreHandler {
   protected cubeStore: ChildProcess | null = null;
 
