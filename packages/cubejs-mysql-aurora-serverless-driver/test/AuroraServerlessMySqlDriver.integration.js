@@ -1,5 +1,7 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
-const { GenericContainer } = require('testcontainers');
+const path = require('path');
+
+const { DockerComposeEnvironment, Wait } = require('testcontainers');
 const AWS = require('aws-sdk');
 const AuroraServerlessMySqlDriver = require('../driver/AuroraServerlessMySqlDriver');
 
@@ -7,51 +9,41 @@ const DUMMY_SECRET_ARN = 'arn:aws:secretsmanager:us-east-1:123456789012:secret:d
 const DUMMY_RESOURCE_ARN = 'arn:aws:rds:us-east-1:123456789012:cluster:dummy';
 
 describe('AuroraServerlessMySqlDriver', () => {
-  let mysqlContainer;
-  let container;
+  let env;
   let driver;
 
-  jest.setTimeout(120000);
-
-  // Aurora Serverless doesn't support mysql 8.0 && We want to bypass the ssl defauls
-  const mysqlVersion = process.env.TEST_MYSQL_VERSION || '5.6.50';
-  const localDataApiVersion = process.env.TEST_LOCAL_DATA_API_VERSION || 'latest';
+  jest.setTimeout(60 * 2 * 1000);
 
   beforeAll(async () => {
-    const mysqlRootPassword = process.env.TEST_DB_PASSWORD || 'Test1test';
+    const dc = new DockerComposeEnvironment(
+      path.resolve(path.dirname(__filename), '../'),
+      'docker-compose.yml'
+    );
 
-    mysqlContainer = await new GenericContainer('mysql', mysqlVersion)
-      .withEnv('MYSQL_ROOT_PASSWORD', mysqlRootPassword)
-      .withExposedPorts(3306)
-      .start();
-
-    const mappedSqlPort = mysqlContainer && mysqlContainer.getMappedPort(3306) || 3306;
-
-    container = await new GenericContainer('koxudaxi/local-data-api', localDataApiVersion)
-      .withEnv('MYSQL_HOST', 'host.docker.internal')
-      .withEnv('MYSQL_PORT', mappedSqlPort)
-      .withEnv('MYSQL_USER', 'root')
-      .withEnv('MYSQL_PASSWORD', mysqlRootPassword)
-      .withEnv('SECRET_ARN', DUMMY_SECRET_ARN)
-      .withEnv('RESOURCE_ARN', DUMMY_RESOURCE_ARN)
-      .withExposedPorts(80)
-      .start();
-
-    const mappedPort = container.getMappedPort(80);
-    const host = container.getHost();
-
-    const endpoint = `http://${host}:${mappedPort}`;
+    env = await dc
+      .withEnv('TEST_MYSQL_VERSION', process.env.TEST_MYSQL_VERSION || '5.6.50')
+      .withEnv('TEST_LOCAL_DATA_API_VERSION', process.env.TEST_LOCAL_DATA_API_VERSION || '0.6.4')
+      .withWaitStrategy('mysql', Wait.forHealthCheck())
+      .up();
 
     // Configure the AWS SDK so that it doesn't get mad
     // AWS.config.credentials = new AWS.Credentials({ accessKeyId: 'awstest', secretAccessKey: 'awstest' });
+    AWS.config.accessKeyId = 'awstest';
+    AWS.config.secretAccessKey = 'awstest';
     AWS.config.region = 'us-east-1';
-    AWS.config.endpoint = new AWS.Endpoint(endpoint);
+    AWS.config.sslEnabled = false;
 
     driver = new AuroraServerlessMySqlDriver({
       secretArn: DUMMY_SECRET_ARN,
       resourceArn: DUMMY_RESOURCE_ARN,
-      database: 'mysql'
+      database: 'mysql',
+      options: {
+        sslEnabled: false,
+        endpoint: `http://${env.getContainer('router').getHost()}:${env.getContainer('router').getMappedPort(80)}`,
+      }
     });
+
+    await driver.testConnection();
 
     await driver.createSchemaIfNotExists('test');
     await driver.query('DROP SCHEMA test');
@@ -59,8 +51,9 @@ describe('AuroraServerlessMySqlDriver', () => {
   });
 
   afterAll(async () => {
-    if (container) await container.stop();
-    if (mysqlContainer) await mysqlContainer.stop();
+    if (env) {
+      await env.stop();
+    }
   });
 
   test('basic query', async () => {
