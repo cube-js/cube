@@ -85,9 +85,8 @@ impl CubeServices {
                 ClusterImpl::listen_on_metastore_port(cluster).await
             }));
             let scheduler = self.scheduler.clone();
-            futures.push(tokio::spawn(async move {
-                SchedulerImpl::run_scheduler(scheduler).await
-            }));
+            futures.extend(SchedulerImpl::spawn_processing_loops(scheduler));
+
             if self.injector.has_service_typed::<MySqlServer>().await {
                 let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
                 futures.push(tokio::spawn(
@@ -226,6 +225,8 @@ pub struct ConfigObjImpl {
     pub bind_address: Option<String>,
     pub http_bind_address: Option<String>,
     pub query_timeout: u64,
+    /// Must be set to 2*query_timeout in prod, only for overrides in tests.
+    pub not_used_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
@@ -279,7 +280,7 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn not_used_timeout(&self) -> u64 {
-        self.query_timeout * 2
+        self.not_used_timeout
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -339,6 +340,10 @@ lazy_static! {
 
 impl Config {
     pub fn default() -> Config {
+        let query_timeout = env::var("CUBESTORE_QUERY_TIMEOUT")
+            .ok()
+            .map(|v| v.parse::<u64>().unwrap())
+            .unwrap_or(120);
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -385,10 +390,8 @@ impl Config {
                         .map(|v| v.parse::<u16>().unwrap())
                         .unwrap_or(3030u16)),
                 )),
-                query_timeout: env::var("CUBESTORE_QUERY_TIMEOUT")
-                    .ok()
-                    .map(|v| v.parse::<u64>().unwrap())
-                    .unwrap_or(120),
+                query_timeout,
+                not_used_timeout: 2 * query_timeout,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -424,6 +427,7 @@ impl Config {
     }
 
     pub fn test(name: &str) -> Config {
+        let query_timeout = 15;
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -444,7 +448,8 @@ impl Config {
                 job_runners_count: 4,
                 bind_address: None,
                 http_bind_address: None,
-                query_timeout: 15,
+                query_timeout,
+                not_used_timeout: 2 * query_timeout,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,
