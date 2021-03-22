@@ -1,12 +1,12 @@
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
-import rp, { RequestPromiseOptions } from 'request-promise';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import os from 'os';
 import dotenv from '@cubejs-backend/dotenv';
 import { isFilePath } from '@cubejs-backend/shared';
 import { displayWarning } from './utils';
+import { CubeCloudClient } from './cloud';
 
 type ConfigurationFull = {
   auth: {
@@ -19,6 +19,8 @@ type ConfigurationFull = {
 type Configuration = Partial<ConfigurationFull>;
 
 export class Config {
+  private cubeCloudClient = new CubeCloudClient();
+
   protected async loadConfig(): Promise<Configuration> {
     const { configFile } = this.configFile();
 
@@ -126,7 +128,7 @@ export class Config {
       return <ConfigurationFull>config;
     }
 
-    const answer = await this.cloudTokenReq(authToken);
+    const answer = await this.cubeCloudClient.getDeploymentToken(authToken);
     if (answer) {
       return this.addAuthToken(answer, config);
     }
@@ -163,11 +165,7 @@ export class Config {
     }
 
     const authToken = auth[url];
-    const deployments = await this.cloudReq({
-      url: () => 'build/deploy/deployments',
-      method: 'GET',
-      auth: { ...authToken, url }
-    });
+    const deployments = await this.cubeCloudClient.getDeploymentsList({ auth: { ...authToken, url } });
 
     if (!Array.isArray(deployments)) {
       throw new Error(deployments.toString());
@@ -215,46 +213,5 @@ export class Config {
 
   protected async writeDotCubeCloud(config) {
     await fs.writeJson(this.dotCubeCloudFile(), config);
-  }
-
-  public async cloudReq(options: {
-    url: (deploymentId: string) => string,
-    auth: { auth: string, deploymentId?: string, url?: string },
-  } & RequestPromiseOptions) {
-    const { url, auth, ...restOptions } = options;
-
-    const authorization = auth || await this.deployAuthForCurrentDir();
-    if (!authorization) {
-      throw new Error('Auth isn\'t set');
-    }
-
-    return rp({
-      headers: {
-        authorization: authorization.auth
-      },
-      ...restOptions,
-      url: `${authorization.url}/${url(authorization.deploymentId)}`,
-      json: true
-    });
-  }
-
-  protected async cloudTokenReq(authToken: string) {
-    const res = await rp({
-      url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
-      method: 'POST',
-      headers: {
-        'Content-type': 'application/json'
-      },
-      json: true,
-      body: {
-        token: authToken
-      }
-    });
-
-    if (res && res.error) {
-      throw res.error;
-    }
-
-    return res.jwt;
   }
 }
