@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/dremio-driver",
   "description": "Cube.js Dremio driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.56",
+  "version": "0.26.63",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",

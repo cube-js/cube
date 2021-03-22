@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.63](https://github.com/cube-js/cube.js/compare/v0.26.62...v0.26.63) (2021-03-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** stateChangeHeuristics type definition ([b983344](https://github.com/cube-js/cube.js/commit/b9833441c74ad8901d3115a8dbf409d5eb9fb620))
+
+
+
+
+
 ## [0.26.61](https://github.com/cube-js/cube.js/compare/v0.26.60...v0.26.61) (2021-03-18)
 
 
