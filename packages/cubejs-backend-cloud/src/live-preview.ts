@@ -1,9 +1,8 @@
 import chokidar from 'chokidar';
-import { FSWatcher, createReadStream } from 'fs';
-import path from 'path';
+import { FSWatcher } from 'fs';
 
 import { CubeCloudClient, AuthObject } from './cloud';
-import { DeployDirectory } from './deploy';
+import { DeployController } from './deploy';
 
 export class LivePreviewWatcher {
   private watcher: FSWatcher | null = null;
@@ -101,31 +100,10 @@ export class LivePreviewWatcher {
     const { auth } = this;
     const directory = process.cwd();
 
-    const deployDir = new DeployDirectory({ directory });
-    const fileHashes: any = await deployDir.fileHashes();
+    const cubeCloudClient = new CubeCloudClient(auth);
+    const deployController = new DeployController(cubeCloudClient);
 
-    const upstreamHashes = await this.cubeCloudClient.getUpstreamHashes({ auth });
-    const { transaction } = await this.cubeCloudClient.startUpload({ auth });
-
-    const files = Object.keys(fileHashes);
-    const fileHashesPosix: Record<string, any> = {};
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      const filePosix = file.split(path.sep).join(path.posix.sep);
-      fileHashesPosix[filePosix] = fileHashes[file];
-
-      if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
-        await this.cubeCloudClient.uploadFile({
-          auth,
-          transaction,
-          fileName: filePosix,
-          data: createReadStream(path.join(directory, file))
-        });
-      }
-    }
-    await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix, auth });
+    deployController.deploy(directory);
     console.log('End upload files for live-preview');
 
     return true;
