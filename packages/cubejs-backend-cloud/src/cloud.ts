@@ -120,4 +120,15 @@ export class CubeCloudClient {
       auth
     });
   }
+
+  public getStatusLivePreview({ auth }: { auth: AuthObject }) {
+    const { deploymentUrl } = auth || {};
+    if (!deploymentUrl) throw new Error('Auth isn\'t set');
+
+    return rp({
+      method: 'GET',
+      url: `${deploymentUrl}/status`,
+      json: true
+    });
+  }
 }

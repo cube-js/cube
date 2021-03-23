@@ -1,7 +1,6 @@
 import chokidar from 'chokidar';
 import { FSWatcher, createReadStream } from 'fs';
 import path from 'path';
-import rp from 'request-promise';
 
 import { CubeCloudClient, AuthObject } from './cloud';
 import { DeployDirectory } from './deploy';
@@ -61,6 +60,26 @@ export class LivePreviewWatcher {
     }
   }
 
+  public stopWatch(): void {
+    if (this.watcher) {
+      this.watcher.close();
+      this.watcher = null;
+    }
+
+    if (this.handleQueueTimeout) clearTimeout(this.handleQueueTimeout);
+  }
+
+  public async getStatus() {
+    const { auth } = this;
+    if (!auth) throw new Error('Auth isn\'t set');
+    const statusProps = await await this.cubeCloudClient.getStatusLivePreview({ auth });
+
+    return {
+      ...statusProps,
+      enabled: !!this.watcher
+    };
+  }
+
   private async handleQueue() {
     try {
       const [job] = this.queue;
@@ -75,16 +94,7 @@ export class LivePreviewWatcher {
     }
   }
 
-  public stopWatch(): void {
-    if (this.watcher) {
-      this.watcher.close();
-      this.watcher = null;
-    }
-
-    if (this.handleQueueTimeout) clearTimeout(this.handleQueueTimeout);
-  }
-
-  public async deploy(): Promise<Boolean> {
+  private async deploy(): Promise<Boolean> {
     if (!this.auth) throw new Error('Auth isn\'t set');
     const { auth } = this;
     const directory = process.cwd();
@@ -117,20 +127,5 @@ export class LivePreviewWatcher {
     await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix, auth });
 
     return true;
-  }
-
-  public async getStatus() {
-    if (!this.auth) throw new Error('Auth isn\'t set');
-    const { deploymentUrl } = this.auth;
-    const statusProps = await rp({
-      method: 'GET',
-      url: `${deploymentUrl}/status`,
-      json: true
-    });
-
-    return {
-      ...statusProps,
-      enabled: !!this.watcher
-    };
   }
 }
