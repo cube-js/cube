@@ -15,9 +15,9 @@ async function fileContentsRecursive(dir, rootPath, includeNodeModules) {
   if ((dir.includes('node_modules') && !includeNodeModules) || dir.includes('.git')) {
     return [];
   }
-  
+
   const files = fs.readdirSync(dir);
-  
+
   return (
     await Promise.all(
       files.map(async (file) => {
@@ -25,7 +25,7 @@ async function fileContentsRecursive(dir, rootPath, includeNodeModules) {
         const stats = await fs.lstat(fileName);
         if (!stats.isDirectory()) {
           const content = fs.readFileSync(fileName, 'utf-8');
-          
+
           return [
             {
               fileName: fileName.replace(rootPath, '').replace(/\\/g, '/'),
@@ -44,7 +44,7 @@ async function fileContentsRecursive(dir, rootPath, includeNodeModules) {
   ).reduce((a, b) => a.concat(b), []);
 }
 
-function executeCommand(command, args, options = {}) {
+async function executeCommand(command, args, options = {}) {
   const child = spawn(command, args, { stdio: 'inherit', ...options });
 
   return new Promise((resolve, reject) => {

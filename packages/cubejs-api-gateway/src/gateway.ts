@@ -654,7 +654,7 @@ export class ApiGateway {
       });
     }
   }
-  stateChangeHeuristicsstateChangeHeuristics
+
   protected resToResultFn(res: Response) {
     // @ts-ignore
     return (message, { status } = {}) => (status ? res.status(status).json(message) : res.json(message));
