@@ -36,7 +36,6 @@
     "@cubejs-backend/shared": "^0.26.54",
     "@cubejs-backend/cloud": "^0.26.62",
     "@hapi/joi": "^15.1.1",
-    "chokidar": "^3.5.1",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
     "decompress": "^4.2.1",

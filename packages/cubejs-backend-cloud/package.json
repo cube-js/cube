@@ -29,7 +29,8 @@
   "dependencies": {
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",
-    "request-promise": "^4.2.5"
+    "request-promise": "^4.2.5",
+    "chokidar": "^3.5.1"
   },
   "publishConfig": {
     "access": "public"

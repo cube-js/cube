@@ -1,10 +1,12 @@
 import chokidar from 'chokidar';
 import { FSWatcher, createReadStream } from 'fs';
 import path from 'path';
+import rp from 'request-promise';
 
-import { CubeCloudClient, DeployDirectory } from '@cubejs-backend/cloud';
+import { CubeCloudClient } from './cloud';
+import { DeployDirectory } from './deploy';
 
-// TODO: use AuthObject from @cubejs-backend/cloud
+// TODO: use AuthObject from cloud
 type AuthObject = {
   auth: string,
   url?: string,
@@ -13,13 +15,13 @@ type AuthObject = {
 };
 
 export class LivePreviewWatcher {
-  private watcher: FSWatcher;
+  private watcher: FSWatcher | null = null;
 
-  private handleQueueTimeout: any;
+  private handleQueueTimeout: NodeJS.Timeout | null = null;
 
   private cubeCloudClient = new CubeCloudClient();
 
-  private auth: AuthObject;
+  private auth: AuthObject | null = null;
 
   private queue: {}[] = [];
 
@@ -84,7 +86,7 @@ export class LivePreviewWatcher {
   public stopWatch(): void {
     if (this.watcher) {
       this.watcher.close();
-      delete this.watcher;
+      this.watcher = null;
     }
 
     if (this.handleQueueTimeout) clearTimeout(this.handleQueueTimeout);
@@ -102,7 +104,7 @@ export class LivePreviewWatcher {
     const { transaction } = await this.cubeCloudClient.startUpload({ auth });
 
     const files = Object.keys(fileHashes);
-    const fileHashesPosix = {};
+    const fileHashesPosix: Record<string, any> = {};
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -126,8 +128,16 @@ export class LivePreviewWatcher {
   }
 
   public async getStatus() {
+    if (!this.auth) throw new Error('Auth isn\'t set');
+    const { deploymentUrl } = this.auth;
+    const statusProps = await rp({
+      method: 'GET',
+      url: `${deploymentUrl}/status`,
+      json: true
+    });
+
     return {
-      // TODO: add http request, get status from dev-mode api
+      ...statusProps,
       enabled: !!this.watcher
     };
   }

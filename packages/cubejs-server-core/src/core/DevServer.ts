@@ -8,9 +8,9 @@ import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
 import type { Application as ExpressApplication } from 'express';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
+import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
-import { LivePreviewWatcher } from './LivePreviewWatcher';
 import AppContainer from '../dev/AppContainer';
 import DependencyTree from '../dev/DependencyTree';
 import PackageFetcher from '../dev/PackageFetcher';
