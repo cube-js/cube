@@ -48,83 +48,129 @@ pub async fn choose_index(
     p: &LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
+    // Prepare information to choose the index.
+    let mut collector = CollectConstraints::default();
+    rewrite_plan(p, &None, &mut collector)?;
+
+    // Consult metastore to choose the index.
+    let tables = metastore
+        .get_tables_with_indexes(
+            collector
+                .constraints
+                .iter()
+                .map(|c| {
+                    let mut parts = c.table_name.splitn(2, ".");
+                    let schema = parts.next().unwrap();
+                    let table = parts.next().unwrap();
+                    (schema.to_string(), table.to_string())
+                })
+                .collect_vec(),
+        )
+        .await?;
+    assert_eq!(tables.len(), collector.constraints.len());
+    let mut indices = Vec::new();
+    for (c, inputs) in collector.constraints.iter().zip(tables) {
+        indices.push(pick_index(c, inputs.0, inputs.1, inputs.2).await?)
+    }
+    let partitions = metastore
+        .get_active_partitions_and_chunks_by_index_id_for_select(
+            indices.iter().map(|i| i.index.get_id()).collect_vec(),
+        )
+        .await?;
+    assert_eq!(partitions.len(), indices.len());
+    for ((i, c), ps) in indices
+        .iter_mut()
+        .zip(collector.constraints.iter())
+        .zip(partitions)
+    {
+        i.partitions = pick_partitions(i, c, ps)?
+    }
+
+    // We have enough information to finalize the logical plan.
     let mut r = ChooseIndex {
-        metastore,
-        collected_snapshots: Vec::new(),
+        chosen_indices: &indices,
+        next_index: 0,
     };
-    let plan = rewrite_plan(p, &None, &mut r).await?;
-    Ok((plan, r.collected_snapshots))
+    let plan = rewrite_plan(p, &(), &mut r)?;
+    assert_eq!(r.next_index, indices.len());
+
+    Ok((plan, indices))
 }
 
 #[async_trait]
 pub trait PlanIndexStore: Send + Sync {
-    async fn get_table(
+    async fn get_tables_with_indexes(
         &self,
-        schema_name: String,
-        table_name: String,
-    ) -> Result<IdRow<Table>, CubeError>;
-    async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError>;
-    async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
-    async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
+        inputs: Vec<(String, String)>,
+    ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError>;
     async fn get_active_partitions_and_chunks_by_index_id_for_select(
         &self,
-        index_id: u64,
-    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
+        index_id: Vec<u64>,
+    ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError>;
 }
 
 #[async_trait]
 impl<'a> PlanIndexStore for &'a dyn MetaStore {
-    async fn get_table(
+    async fn get_tables_with_indexes(
         &self,
-        schema_name: String,
-        table_name: String,
-    ) -> Result<IdRow<Table>, CubeError> {
-        MetaStore::get_table(*self, schema_name, table_name).await
-    }
-
-    async fn get_schema_by_id(&self, schema_id: u64) -> Result<IdRow<Schema>, CubeError> {
-        MetaStore::get_schema_by_id(*self, schema_id).await
-    }
-
-    async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError> {
-        MetaStore::get_default_index(*self, table_id).await
-    }
-
-    async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError> {
-        MetaStore::get_table_indexes(*self, table_id).await
+        inputs: Vec<(String, String)>,
+    ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError> {
+        MetaStore::get_tables_with_indexes(*self, inputs).await
     }
 
     async fn get_active_partitions_and_chunks_by_index_id_for_select(
         &self,
-        index_id: u64,
-    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
+        index_id: Vec<u64>,
+    ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
         MetaStore::get_active_partitions_and_chunks_by_index_id_for_select(*self, index_id).await
     }
 }
 
-struct ChooseIndex<'a> {
-    metastore: &'a dyn PlanIndexStore,
-    collected_snapshots: Vec<IndexSnapshot>,
-}
-
+#[derive(Clone)]
 struct SortColumns {
     sort_on: Vec<String>,
     required: bool,
 }
 
-#[async_trait]
-impl PlanRewriter for ChooseIndex<'_> {
+struct IndexConstraints {
+    sort_on: Option<SortColumns>,
+    table_name: String,
+    projection: Option<Vec<usize>>,
+    filters: Vec<Expr>,
+}
+
+#[derive(Default)]
+struct CollectConstraints {
+    constraints: Vec<IndexConstraints>,
+}
+
+impl PlanRewriter for CollectConstraints {
     type Context = Option<SortColumns>;
 
-    async fn rewrite(
+    fn rewrite(
         &mut self,
         n: LogicalPlan,
         c: &Self::Context,
     ) -> Result<LogicalPlan, DataFusionError> {
-        let p = self
-            .choose_table_index(n, c.as_ref().map(|sc| (&sc.sort_on, sc.required)))
-            .await?;
-        pull_up_cluster_send(p)
+        match &n {
+            LogicalPlan::TableScan {
+                table_name,
+                projection,
+                filters,
+                source,
+                ..
+            } => {
+                assert!(source.as_any().is::<CubeTableLogical>());
+                self.constraints.push(IndexConstraints {
+                    sort_on: c.clone(),
+                    table_name: table_name.clone(),
+                    projection: projection.clone(),
+                    filters: filters.clone(),
+                })
+            }
+            _ => {}
+        }
+        Ok(n)
     }
 
     fn enter_node(
@@ -196,6 +242,24 @@ impl PlanRewriter for ChooseIndex<'_> {
     }
 }
 
+struct ChooseIndex<'a> {
+    next_index: usize,
+    chosen_indices: &'a [IndexSnapshot],
+}
+
+impl PlanRewriter for ChooseIndex<'_> {
+    type Context = ();
+
+    fn rewrite(
+        &mut self,
+        n: LogicalPlan,
+        _: &Self::Context,
+    ) -> Result<LogicalPlan, DataFusionError> {
+        let p = self.choose_table_index(n)?;
+        pull_up_cluster_send(p)
+    }
+}
+
 fn try_extract_cluster_send(p: &LogicalPlan) -> Option<&ClusterSendNode> {
     if let LogicalPlan::Extension { node } = p {
         return node.as_any().downcast_ref::<ClusterSendNode>();
@@ -204,146 +268,23 @@ fn try_extract_cluster_send(p: &LogicalPlan) -> Option<&ClusterSendNode> {
 }
 
 impl ChooseIndex<'_> {
-    async fn choose_table_index(
-        &mut self,
-        mut p: LogicalPlan,
-        sort_on: Option<(&Vec<String>, bool)>,
-    ) -> Result<LogicalPlan, DataFusionError> {
-        let meta_store = self.metastore;
+    fn choose_table_index(&mut self, mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
         match &mut p {
             LogicalPlan::TableScan {
-                table_name,
-                projection,
-                filters,
-                source,
-                ..
+                table_name, source, ..
             } => {
-                let name_split = table_name.split(".").collect::<Vec<_>>();
-                let table = meta_store
-                    .get_table(name_split[0].to_string(), name_split[1].to_string())
-                    .await?;
-                let schema = meta_store
-                    .get_schema_by_id(table.get_row().get_schema_id())
-                    .await?;
-                let default_index = meta_store.get_default_index(table.get_id()).await?;
-                let (index, sort_on) = if let Some(projection_column_indices) = projection {
-                    let projection_columns =
-                        CubeTable::project_to_table(&table, &projection_column_indices);
-                    let indexes = meta_store.get_table_indexes(table.get_id()).await?;
-                    if let Some((index, _)) = indexes
-                        .into_iter()
-                        .filter_map(|i| {
-                            if let Some((join_on_columns, _)) = sort_on.as_ref() {
-                                let join_columns_in_index = join_on_columns
-                                    .iter()
-                                    .map(|c| {
-                                        i.get_row()
-                                            .get_columns()
-                                            .iter()
-                                            .find(|ic| ic.get_name().as_str() == c.as_str())
-                                            .clone()
-                                    })
-                                    .collect::<Vec<_>>();
-                                if join_columns_in_index.iter().any(|c| c.is_none()) {
-                                    return None;
-                                }
-                                let join_columns_indices = CubeTable::project_to_index_positions(
-                                    &join_columns_in_index
-                                        .into_iter()
-                                        .map(|c| c.unwrap().clone())
-                                        .collect(),
-                                    &i,
-                                );
-                                if (0..join_columns_indices.len())
-                                    .map(|i| Some(i))
-                                    .collect::<HashSet<_>>()
-                                    != join_columns_indices.into_iter().collect::<HashSet<_>>()
-                                {
-                                    return None;
-                                }
-                            }
-                            let projected_index_positions =
-                                CubeTable::project_to_index_positions(&projection_columns, &i);
-                            let score = projected_index_positions
-                                .into_iter()
-                                .fold_options(0, |a, b| a + b);
-                            score.map(|s| (i, s))
-                        })
-                        .min_by_key(|(_, s)| *s)
-                    {
-                        (index, sort_on)
-                    } else {
-                        if let Some((join_on_columns, true)) = sort_on.as_ref() {
-                            return Err(DataFusionError::Plan(format!(
-                                "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
-                                name_split.join("."),
-                                join_on_columns.join(", "),
-                                &name_split[1],
-                                join_on_columns.join("_"),
-                                name_split.join("."),
-                                join_on_columns.join(", ")
-                            )));
-                        }
-                        (default_index, None)
-                    }
-                } else {
-                    if let Some((join_on_columns, _)) = sort_on {
-                        return Err(DataFusionError::Plan(format!(
-                            "Can't find index to join table {} on {} and projection push down optimization has been disabled. Invalid state.",
-                            name_split.join("."),
-                            join_on_columns.join(", ")
-                        )));
-                    }
-                    (default_index, None)
-                };
-
-                let partitions = meta_store
-                    .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
-                    .await?;
-
-                let partition_filter =
-                    PartitionFilter::extract(&partition_filter_schema(&index), filters);
-                log::trace!("Extracted partition filter is {:?}", partition_filter);
-                let candidate_partitions = partitions.len();
-                let mut pruned_partitions = 0;
-
-                let mut partition_snapshots = Vec::new();
-                for (partition, chunks) in partitions.into_iter() {
-                    let min_row = partition
-                        .get_row()
-                        .get_min_val()
-                        .as_ref()
-                        .map(|r| r.values().as_slice());
-                    let max_row = partition
-                        .get_row()
-                        .get_max_val()
-                        .as_ref()
-                        .map(|r| r.values().as_slice());
-
-                    if !partition_filter.can_match(min_row, max_row) {
-                        pruned_partitions += 1;
-                        continue;
-                    }
-
-                    partition_snapshots.push(PartitionSnapshot { chunks, partition });
-                }
-                log::trace!(
-                    "Pruned {} of {} partitions",
-                    pruned_partitions,
-                    candidate_partitions
+                assert!(
+                    self.next_index < self.chosen_indices.len(),
+                    "inconsistent state"
+                );
+                assert_eq!(
+                    table_name,
+                    &self.chosen_indices[self.next_index].table_name()
                 );
 
-                assert!(source.as_any().is::<CubeTableLogical>());
-                let snapshot = IndexSnapshot {
-                    index,
-                    partitions: partition_snapshots,
-                    table_path: TablePath {
-                        table,
-                        schema: Arc::new(schema),
-                    },
-                    sort_on: sort_on.map(|(cols, _)| cols.clone()),
-                };
-                self.collected_snapshots.push(snapshot.clone());
+                let snapshot = self.chosen_indices[self.next_index].clone();
+                self.next_index += 1;
+
                 *source = Arc::new(CubeTable::try_new(
                     snapshot.clone(),
                     // Filled by workers
@@ -360,6 +301,135 @@ impl ChooseIndex<'_> {
             _ => return Ok(p),
         }
     }
+}
+
+// Picks the index, but not partitions snapshots.
+async fn pick_index(
+    c: &IndexConstraints,
+    schema: IdRow<Schema>,
+    table: IdRow<Table>,
+    indices: Vec<IdRow<Index>>,
+) -> Result<IndexSnapshot, DataFusionError> {
+    let sort_on = c.sort_on.as_ref().map(|sc| (&sc.sort_on, sc.required));
+
+    let mut indices = indices.into_iter();
+    let default_index = indices.next().expect("no default index");
+    let (index, sort_on) = if let Some(projection_column_indices) = &c.projection {
+        let projection_columns = CubeTable::project_to_table(&table, &projection_column_indices);
+        if let Some((index, _)) = indices
+            .filter_map(|i| {
+                if let Some((join_on_columns, _)) = sort_on.as_ref() {
+                    let join_columns_in_index = join_on_columns
+                        .iter()
+                        .map(|c| {
+                            i.get_row()
+                                .get_columns()
+                                .iter()
+                                .find(|ic| ic.get_name().as_str() == c.as_str())
+                                .clone()
+                        })
+                        .collect::<Vec<_>>();
+                    if join_columns_in_index.iter().any(|c| c.is_none()) {
+                        return None;
+                    }
+                    let join_columns_indices = CubeTable::project_to_index_positions(
+                        &join_columns_in_index
+                            .into_iter()
+                            .map(|c| c.unwrap().clone())
+                            .collect(),
+                        &i,
+                    );
+                    if (0..join_columns_indices.len())
+                        .map(|i| Some(i))
+                        .collect::<HashSet<_>>()
+                        != join_columns_indices.into_iter().collect::<HashSet<_>>()
+                    {
+                        return None;
+                    }
+                }
+                let projected_index_positions =
+                    CubeTable::project_to_index_positions(&projection_columns, &i);
+                let score = projected_index_positions
+                    .into_iter()
+                    .fold_options(0, |a, b| a + b);
+                score.map(|s| (i, s))
+            })
+            .min_by_key(|(_, s)| *s)
+        {
+            (index, sort_on)
+        } else {
+            if let Some((join_on_columns, true)) = sort_on.as_ref() {
+                return Err(DataFusionError::Plan(format!(
+                    "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
+                    c.table_name,
+                    join_on_columns.join(", "),
+                    table.get_row().get_table_name(),
+                    join_on_columns.join("_"),
+                    c.table_name,
+                    join_on_columns.join(", ")
+                )));
+            }
+            (default_index, None)
+        }
+    } else {
+        if let Some((join_on_columns, _)) = sort_on {
+            return Err(DataFusionError::Plan(format!(
+                "Can't find index to join table {} on {} and projection push down optimization has been disabled. Invalid state.",
+                c.table_name,
+                join_on_columns.join(", ")
+            )));
+        }
+        (default_index, None)
+    };
+
+    Ok(IndexSnapshot {
+        index,
+        partitions: Vec::new(), // filled with results of `pick_partitions` later.
+        table_path: TablePath {
+            table,
+            schema: Arc::new(schema),
+        },
+        sort_on: sort_on.map(|(cols, _)| cols.clone()),
+    })
+}
+
+fn pick_partitions(
+    i: &IndexSnapshot,
+    c: &IndexConstraints,
+    partitions: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
+) -> Result<Vec<PartitionSnapshot>, DataFusionError> {
+    let partition_filter = PartitionFilter::extract(&partition_filter_schema(&i.index), &c.filters);
+    log::trace!("Extracted partition filter is {:?}", partition_filter);
+    let candidate_partitions = partitions.len();
+    let mut pruned_partitions = 0;
+
+    let mut partition_snapshots = Vec::new();
+    for (partition, chunks) in partitions.into_iter() {
+        let min_row = partition
+            .get_row()
+            .get_min_val()
+            .as_ref()
+            .map(|r| r.values().as_slice());
+        let max_row = partition
+            .get_row()
+            .get_max_val()
+            .as_ref()
+            .map(|r| r.values().as_slice());
+
+        if !partition_filter.can_match(min_row, max_row) {
+            pruned_partitions += 1;
+            continue;
+        }
+
+        partition_snapshots.push(PartitionSnapshot { chunks, partition });
+    }
+    log::trace!(
+        "Pruned {} of {} partitions",
+        pruned_partitions,
+        candidate_partitions
+    );
+
+    Ok(partition_snapshots)
 }
 
 fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
@@ -867,6 +937,45 @@ pub mod tests {
 
     #[async_trait]
     impl PlanIndexStore for TestIndices {
+        async fn get_tables_with_indexes(
+            &self,
+            inputs: Vec<(String, String)>,
+        ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError> {
+            let mut r = Vec::with_capacity(inputs.len());
+            for (schema, table) in inputs {
+                let table = self.get_table(schema, table).await?;
+                let schema = self
+                    .get_schema_by_id(table.get_row().get_schema_id())
+                    .await?;
+
+                let mut indexes;
+                indexes = self.get_table_indexes(table.get_id()).await?;
+                indexes.insert(0, self.get_default_index(table.get_id()).await?);
+
+                r.push((schema, table, indexes))
+            }
+            Ok(r)
+        }
+
+        async fn get_active_partitions_and_chunks_by_index_id_for_select(
+            &self,
+            index_id: Vec<u64>,
+        ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
+            Ok(index_id
+                .iter()
+                .map(|index_id| {
+                    self.partitions
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, p)| p.get_index_id() == *index_id)
+                        .map(|(id, p)| (IdRow::new(id as u64, p.clone()), vec![]))
+                        .collect()
+                })
+                .collect())
+        }
+    }
+
+    impl TestIndices {
         async fn get_table(
             &self,
             schema_name: String,
@@ -912,19 +1021,6 @@ pub mod tests {
                 .enumerate()
                 .filter(|(_, i)| i.table_id() == table_id)
                 .map(|(pos, index)| IdRow::new(pos as u64, index.clone()))
-                .collect())
-        }
-
-        async fn get_active_partitions_and_chunks_by_index_id_for_select(
-            &self,
-            index_id: u64,
-        ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
-            Ok(self
-                .partitions
-                .iter()
-                .enumerate()
-                .filter(|(_, p)| p.get_index_id() == index_id)
-                .map(|(id, p)| (IdRow::new(id as u64, p.clone()), vec![]))
                 .collect())
         }
     }
