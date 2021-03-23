@@ -187,7 +187,7 @@ We decided to take another approach and write our own materialized OLAP cache st
 | `x86_64-win32`                       |   ✓    |
 | `x86-win32`                          |  N/A   |
 
-[1] It can be launched by Rosseta 2 via `x86_64-apple` binary.
+[1] It can be launched by Rosseta 2 via the `x86_64-apple` binary.
 
 ### Installation
 
