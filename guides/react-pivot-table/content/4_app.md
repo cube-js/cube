@@ -9,7 +9,7 @@ Let's go to the "Dashboard App" tab where you can generate the code for a front-
 
 ![Alt Text](https://dev-to-uploads.s3.amazonaws.com/i/43ljijihw21cpknz4i22.png)
 
-Let's choose "React", "React Antd Dynamic", "Bizcharts", and click "OK". Just in a few seconds you'll have a newly created front-end app in the `dashboard-app` folder. Click "Start dashboard app" to run it, or do the same by navigating to `dashboard-app` and running:
+Let's choose "React", "React Antd Dynamic", "Bizcharts", and click "OK". In just a few seconds you'll have a newly created front-end app in the `dashboard-app` folder. Click "Start dashboard app" to run it, or do the same by navigating to `dashboard-app` and running:
 
 ```bash
 npm run start
