@@ -262,7 +262,8 @@ export class DevServer {
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
 
-        fetcher.cleanup();
+        // todo: uncomment
+        // fetcher.cleanup();
       };
 
       if (this.applyTemplatePackagesPromise) {

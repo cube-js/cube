@@ -145,21 +145,7 @@
           </div>
 
           <div class="border-light pa-4 pa-md-12">
-            <line-chart legend="bottom" v-if="chartType === 'line'" :data="series(resultSet)"></line-chart>
-
-            <area-chart legend="bottom" v-if="chartType === 'area'" :data="series(resultSet)"></area-chart>
-
-            <pie-chart v-if="chartType === 'pie'" :data="pairs(resultSet)"></pie-chart>
-
-            <column-chart v-if="chartType === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
-
-            <Table v-if="chartType === 'table'" :data="resultSet"></Table>
-
-            <div v-if="chartType === 'number'">
-              <div v-for="item in resultSet.series()" :key="item.key">
-                {{ item.series[0].value }}
-              </div>
-            </div>
+            <ChartRenderer :chart-type="chartType" :result-set="resultSet"></ChartRenderer>
           </div>
         </div>
       </template>
@@ -171,7 +157,6 @@
 import { QueryBuilder, GRANULARITIES } from '@cubejs-client/vue';
 import gql from 'graphql-tag';
 
-import Table from './components/Table';
 import FilterComponent from './components/FilterComponent.vue';
 import PivotConfig from './components/dialogs/PivotConfig';
 import Order from './components/dialogs/Order';
@@ -179,6 +164,7 @@ import Limit from './components/dialogs/Limit';
 import AddToDashboard from './components/dialogs/AddToDashboard';
 import TimeDimensionSelect from './components/TimeDimensionSelect';
 import DateRangeSelect from './components/DateRangeSelect';
+import ChartRenderer from '@/components/ChartRenderer';
 
 // const API_URL = 'http://localhost:4000';
 // const CUBEJS_TOKEN =
@@ -201,10 +187,10 @@ export default {
     Limit,
     QueryBuilder,
     FilterComponent,
-    Table,
     AddToDashboard,
     TimeDimensionSelect,
     DateRangeSelect,
+    ChartRenderer,
   },
   data() {
     // const query = {
@@ -231,7 +217,7 @@ export default {
           granularity: 'month',
           dateRange: 'This quarter',
         },
-      ]
+      ],
     };
 
     return {
@@ -272,26 +258,6 @@ export default {
           },
         },
       });
-    },
-    series(resultSet) {
-      const seriesNames = resultSet.seriesNames();
-      const pivot = resultSet.chartPivot();
-      const series = [];
-
-      seriesNames.forEach((e) => {
-        const data = pivot.map((p) => [p.x, p[e.key]]);
-        series.push({ name: e.key, data });
-      });
-      return series;
-    },
-    pairs(resultSet) {
-      return resultSet.series()[0].series.map((item) => [item.x, item.value]);
-    },
-    seriesPairs(resultSet) {
-      return resultSet.series().map((seriesItem) => ({
-        name: seriesItem.title,
-        data: seriesItem.series.map((item) => [item.x, item.value]),
-      }));
     },
   },
 };

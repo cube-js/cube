@@ -11,7 +11,7 @@ export default {
   computed: {
     headers() {
       const data = this.data.tablePivot();
-      const headers = Object.keys(data[0]).map((key) => {
+      return Object.keys(data[0]).map((key) => {
         return {
           text: key,
           align: 'start',
@@ -19,14 +19,12 @@ export default {
           value: key,
         };
       });
-      return headers;
     },
     items() {
       const data = this.data.tablePivot();
-      const items = data.map((key) => {
+      return data.map((key) => {
         return key;
       });
-      return items;
     },
   },
 };
