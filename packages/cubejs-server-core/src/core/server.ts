@@ -342,6 +342,13 @@ export class CubejsServerCore {
           externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
           externalDialectFactory = () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
         }
+      } else {
+        this.logger('Cube Store is not supported on your system', {
+          warning: (
+            `You are using ${process.platform} platform with ${process.arch} architecture, ` +
+            'which is not supported by Cube Store.'
+          ),
+        });
       }
     }
 
