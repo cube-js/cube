@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs-extra';
+import cliProgress from 'cli-progress';
+import { CubeCloudClient } from './cloud';
 
 type DeployDirectoryOptions = {
   directory: string,
@@ -59,5 +61,58 @@ export class DeployDirectory {
       stream.on('data', chunk => hash.update(chunk));
       stream.on('end', () => resolve(hash.digest('hex')));
     });
+  }
+}
+
+export class DeployController {
+  public constructor(
+    protected readonly cubeCloudClient: CubeCloudClient
+  ) {
+  }
+
+  public async deploy(directory: string) {
+    const bar = new cliProgress.SingleBar({
+      format: '- Uploading files | {bar} | {percentage}% || {value} / {total} | {file}',
+      barCompleteChar: '\u2588',
+      barIncompleteChar: '\u2591',
+      hideCursor: true
+    });
+
+    console.log('Start upload files for live-preview');
+    const deployDir = new DeployDirectory({ directory });
+    const fileHashes: any = await deployDir.fileHashes();
+
+    const upstreamHashes = await this.cubeCloudClient.getUpstreamHashes();
+    const { transaction } = await this.cubeCloudClient.startUpload();
+
+    const files = Object.keys(fileHashes);
+    const fileHashesPosix: Record<string, any> = {};
+    bar.start(files.length, 0, {
+      file: ''
+    });
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        bar.update(i, { file });
+
+        const filePosix = file.split(path.sep).join(path.posix.sep);
+        fileHashesPosix[filePosix] = fileHashes[file];
+
+        if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
+          bar.update(files.length, { file: 'Post processing...' });
+          await this.cubeCloudClient.uploadFile({
+            transaction,
+            fileName: filePosix,
+            data: fs.createReadStream(path.join(directory, file))
+          });
+        }
+      }
+      await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix });
+    } finally {
+      bar.stop();
+    }
+
+    return true;
   }
 }
