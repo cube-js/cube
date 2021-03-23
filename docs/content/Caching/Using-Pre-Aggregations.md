@@ -147,3 +147,117 @@ CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
 CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 ```
+
+## Cube Store
+
+Cube Store is an open-source aggregation layer.
+
+### Motivation
+
+Over the past year, we've accumulated feedback around various use-cases with pre-aggregations and how to store them. We've learned that there are a set of problems where relational databases as a storage layer has significant performance and functionality issues.
+
+These problems include:
+
+- Performance issues with high cardinality rollups (1B and more)
+- Lack of HyperLogLog support
+- Degraded performance for big `UNION ALL` queries
+- Poor `JOIN` performance across rolled up tables
+- Table/schema name length issues across different database types
+- SQL type differences between source and external database
+
+Over time, we realized that if we try to fix these issues with existing database engines, we'd end up modifying these databases' codebases in one way or another.
+
+We decided to take another approach and write our own materialized OLAP cache store, designed solely to store and serve rollup tables at scale.
+
+### Supported platforms
+
+<!-- prettier-ignore-start -->
+[[info | ]]
+| If your platform and architecture is not supported, you can launch Cube Store by Docker.
+<!-- prettier-ignore-end -->
+
+| Target                               | Status |
+|--------------------------------------|-------:|
+| `x86_64-linux-gnu`                   |   ✓    |
+| `x86_64-linux-musl`                  |   ✓    |
+| `x86-linux-gnu`                      |  N/A   |
+| `x86-linux-musl`                     |  N/A   |
+| `x86_64-darwin`                      |   ✓    |
+| `arm64-darwin` [1]                   |   ✓    |
+| `x86_64-win32`                       |   ✓    |
+| `x86-win32`                          |  N/A   |
+
+[1] It can be launched by Rosseta 2 via `x86_64-apple` binary.
+
+### Installation
+
+#### Automatically provisioning in Development mode
+
+<!-- prettier-ignore-start -->
+[[info | ]]
+| You should use CUBEJS_DEV_MODE=true and EXTERNAL_DB variables should not be defined.
+<!-- prettier-ignore-end -->
+
+Starting from `v0.26.48` version, Cube.js ships with automatically provisioning for Cube Store in `CUBEJS_DEV_MODE`. You don't need to set up
+any `EXTERNAL_DB` variables or `externalDriverFactory` inside your `cube.js` configuration file.
+
+For versions before `v0.26.48`, You should upgrade your project to latest version and install a driver for Cube Store:
+
+```bash
+$ npm add --save-dev @cubejs-backend/cubestore-driver
+```
+
+After starting up, Cube.js will print a message:
+
+``
+🔥 Cube Store (0.26.64) is assigned to 3030 port.
+``
+
+#### Inside Docker
+
+Start Cube Store in a docker container and bind port `3030` to `127.0.0.1`:
+
+```bash
+docker run -d -p 3030:3030 cubejs/cubestore:edge
+```
+
+Setup connection for external database via `.env` file:
+
+```
+CUBEJS_EXT_DB_TYPE=cubestore
+CUBEJS_EXT_DB_HOST=127.0.0.1
+```
+
+#### Inside Docker via docker-compose
+
+Create a `docker-compose.yml` file with the following content.
+
+```yml
+version: '2.2'
+services:
+  cubestore:
+    image: cubejs/cubestore:edge
+
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      # 4000 is a port for Cube.js API
+      - 4000:4000
+      # 3000 is a port for Playground web server
+      # it is available only in dev mode
+      - 3000:3000
+    env_file: .env
+    depends_on:
+      - cubestore
+    links:
+      - cubestore
+    volumes:
+      - ./schema:/cube/conf/schema
+```
+
+Setup connection for external database via `.env` file:
+
+```
+CUBEJS_EXT_DB_TYPE=cubestore
+CUBEJS_EXT_DB_HOST=cubestore
+```
