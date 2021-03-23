@@ -3,16 +3,8 @@ import { FSWatcher, createReadStream } from 'fs';
 import path from 'path';
 import rp from 'request-promise';
 
-import { CubeCloudClient } from './cloud';
+import { CubeCloudClient, AuthObject } from './cloud';
 import { DeployDirectory } from './deploy';
-
-// TODO: use AuthObject from cloud
-type AuthObject = {
-  auth: string,
-  url?: string,
-  deploymentId?: string,
-  deploymentUrl: string
-};
 
 export class LivePreviewWatcher {
   private watcher: FSWatcher | null = null;

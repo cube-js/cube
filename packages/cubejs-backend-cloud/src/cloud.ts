@@ -2,10 +2,11 @@ import rp, { RequestPromiseOptions } from 'request-promise';
 import { ReadStream } from 'node:fs';
 import path from 'path';
 
-type AuthObject = {
+export type AuthObject = {
   auth: string,
-  deploymentId?: string,
   url?: string,
+  deploymentId?: string,
+  deploymentUrl?: string
 };
 
 export class CubeCloudClient {
