@@ -48,12 +48,11 @@ export class LivePreviewWatcher {
       );
 
       let preSaveTimeout: NodeJS.Timeout;
-      this.watcher.on('all', (event, p) => {
-        console.log('LivePreviewWatcher:', event, p.replace(process.cwd(), ''));
+      this.watcher.on('all', (/* event, p */) => {
         if (preSaveTimeout) clearTimeout(preSaveTimeout);
 
         preSaveTimeout = setTimeout(() => {
-          this.queue.push({ time: new Date().getTime() });
+          this.queue.push({ time: new Date() });
         }, 1000);
       });
 
@@ -68,6 +67,7 @@ export class LivePreviewWatcher {
     }
 
     if (this.handleQueueTimeout) clearTimeout(this.handleQueueTimeout);
+    console.log('☁️  Stop live-preview');
   }
 
   public async getStatus() {
@@ -97,6 +97,7 @@ export class LivePreviewWatcher {
 
   private async deploy(): Promise<Boolean> {
     if (!this.auth) throw new Error('Auth isn\'t set');
+    console.log('Start upload files for live-preview');
     const { auth } = this;
     const directory = process.cwd();
 
@@ -126,6 +127,7 @@ export class LivePreviewWatcher {
       }
     }
     await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix, auth });
+    console.log('End upload files for live-preview');
 
     return true;
   }
