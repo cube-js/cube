@@ -337,6 +337,20 @@ CUBEJS_EXT_DB_TYPE=cubestore
 CUBEJS_EXT_DB_HOST=cubestore
 ```
 
+## Inspecting Pre-Aggregations
+
+Cube Store partially supports the MySQL protocol. This allows you to execute
+simple queries using a familiar SQL syntax. To check which pre-aggregations are
+managed by Cube Store, for example, you could run the following query:
+
+```sql
+SELECT * FROM information_schema.tables;
+```
+
+These pre-aggregations are stored as Parquet files under the `.cubestore/`
+folder in the project root during development.
+
+
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
 [ref-preaggs]: /pre-aggregations
