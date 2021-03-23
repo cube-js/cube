@@ -117,7 +117,6 @@ export class LivePreviewWatcher {
       fileHashesPosix[filePosix] = fileHashes[file];
 
       if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
-        console.log('Upload file', filePosix);
         await this.cubeCloudClient.uploadFile({
           auth,
           transaction,
