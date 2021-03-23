@@ -840,7 +840,7 @@ export class BaseQuery {
   }
 
   joinQuery(join, subQueryDimensions) {
-    const subQueryDimensionsByCube = R.groupBy(d => this.cubeEvaluator.cubeNameFromPath(d), subQueryDimensions)
+    const subQueryDimensionsByCube = R.groupBy(d => this.cubeEvaluator.cubeNameFromPath(d), subQueryDimensions);
     const joins = join.joins.map(
       j => {
         const [cubeSql, cubeAlias, conditions] = this.rewriteInlineCubeSql(j.originalTo, true);
@@ -848,6 +848,7 @@ export class BaseQuery {
           sql: cubeSql,
           alias: cubeAlias,
           on: `${this.evaluateSql(j.originalFrom, j.join.sql)}${conditions ? ` AND (${conditions})` : ''}`
+          // TODO handle the case when sub query referenced by a foreign cube on other side of a join
         }].concat((subQueryDimensionsByCube[j.originalTo] || []).map(d => this.subQueryJoin(d)));
       }
     ).reduce((a, b) => a.concat(b), []);

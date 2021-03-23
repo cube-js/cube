@@ -142,9 +142,9 @@ cube(\`C\`, {
     c__important_value: null,
   }, {
     b__id: 103,
-    c__important_value: "11.2",
+    c__important_value: '11.2',
   }, {
     b__id: 104,
-    c__important_value: "81.5",
+    c__important_value: '81.5',
   }]));
 });
