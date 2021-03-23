@@ -201,7 +201,7 @@ We decided to take another approach and write our own materialized OLAP cache st
 Starting from `v0.26.48` version, Cube.js ships with automatically provisioning for Cube Store in `CUBEJS_DEV_MODE`. You don't need to set up
 any `EXTERNAL_DB` variables or `externalDriverFactory` inside your `cube.js` configuration file.
 
-For versions before `v0.26.48`, You should upgrade your project to latest version and install a driver for Cube Store:
+For versions before `v0.26.48`, You should upgrade your project to the latest version and install a driver for Cube Store:
 
 ```bash
 $ npm add --save-dev @cubejs-backend/cubestore-driver
