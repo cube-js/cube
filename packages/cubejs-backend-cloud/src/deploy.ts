@@ -78,7 +78,6 @@ export class DeployController {
       hideCursor: true
     });
 
-    console.log('Start upload files for live-preview');
     const deployDir = new DeployDirectory({ directory });
     const fileHashes: any = await deployDir.fileHashes();
 
