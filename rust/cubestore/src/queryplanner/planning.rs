@@ -507,7 +507,6 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
 
 pub struct ClusterSendPlanner {
     pub cluster: Option<Arc<dyn Cluster>>,
-    pub available_nodes: Vec<String>,
     pub serialized_plan: Arc<SerializedPlan>,
 }
 
@@ -534,7 +533,6 @@ impl ExtensionPlanner for ClusterSendPlanner {
                 node.schema().clone(),
                 c.clone(),
                 self.serialized_plan.clone(),
-                self.available_nodes.clone(),
                 node.snapshots.clone(),
                 input,
             )))
