@@ -27,6 +27,7 @@ export class LivePreviewWatcher {
       };
     } catch (error) {
       console.error(error);
+      throw new Error('Live-preview token is invalid');
     }
   }
 
@@ -38,7 +39,7 @@ export class LivePreviewWatcher {
       this.watcher = chokidar.watch(
         process.cwd(),
         {
-          ignoreInitial: true,
+          ignoreInitial: false,
           ignored: [
             '**/node_modules/**',
             '**/.*'
