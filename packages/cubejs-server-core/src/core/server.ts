@@ -446,6 +446,7 @@ export class CubejsServerCore {
 
   public async initApp(app: ExpressApplication) {
     checkEnvForPlaceholders();
+
     const apiGateway = this.apiGateway();
     apiGateway.initApp(app);
 
