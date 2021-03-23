@@ -5,7 +5,7 @@ title: "How to Explore the Data"
 
 Before we can tinker with the data, we need to describe it with a data schema. The [data schema](https://cube.dev/docs/getting-started-cubejs-schema?utm_source=dev-to&utm_medium=post&utm_campaign=react-pivot-table) is a high-level domain-specific description of your data. It allows you to skip writing SQL queries and rely on Cube.js to generate them for you.
 
-As the console output suggests, please navigate to [localhost:4000](http://localhost:4000) — this application is Cube.js Developer Playground. It's able to generate an initial version of the data schema automatically. Go to the "Schema" tab, select all tables under "public", and click the "Generate Schema" button.
+As the console output suggests, please navigate to [localhost:4000](http://localhost:4000) — this application is the Cube.js Developer Playground. It's able to generate an initial version of the data schema automatically. Go to the "Schema" tab, select all tables under "public", and click the "Generate Schema" button.
 
 ![Alt Text](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ppnwb0pr2gjmlernv2u5.png)
 
@@ -28,7 +28,7 @@ As the result, you should get a complex, lengthy table with the data about our e
 
 Looks interesting, right? Definitely feel free to experiment and try your own queries, measures, dimensions, time dimensions, granularities, and filters.
 
-Take note that, at any time, you can click the "JSON Query" button and see the query being sent to Cube.js API in JSON format which, essentially, lists the measures and dimensions you were selecting in the UI.
+Take note that, at any time, you can click the "JSON Query" button and see the query being sent to Cube.js API in JSON format which, essentially lists the measures and dimensions you were selecting in the UI.
 
 ![Alt Text](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/6gqza5fniv7uqaxwk9pb.png)
 
