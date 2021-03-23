@@ -102,9 +102,6 @@ export class LivePreviewWatcher {
     const cubeCloudClient = new CubeCloudClient(auth);
     const deployController = new DeployController(cubeCloudClient);
 
-    deployController.deploy(directory);
-    console.log('End upload files for live-preview');
-
-    return true;
+    return deployController.deploy(directory);
   }
 }
