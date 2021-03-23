@@ -2945,38 +2945,35 @@ mod tests {
                 .await
                 .unwrap();
 
-            let mut show_hints = PPOptions::default();
-            show_hints.show_output_hints = true;
+            let mut verbose = PPOptions::default();
+            verbose.show_output_hints = true;
+            verbose.show_sort_by = true;
             assert_eq!(
-                pp_phys_plan_ext(p.router.as_ref(), &show_hints),
-                "GlobalLimit, n: 10\
-                \n  Sort\
-                \n    Projection, [url, SUM(hits):hits], sort_order: [0]\
-                \n      FinalInplaceAggregate, sort_order: [0]\
-                \n        MergeSort, sort_order: [0]\
-                \n          ClusterSend, partitions: [[1], [2]], sort_order: [0]"
+                pp_phys_plan_ext(p.router.as_ref(), &verbose),
+                "Projection, [url, SUM(hits):hits]\
+               \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
+               \n    ClusterSend, partitions: [[1], [2]]"
             );
             assert_eq!(
-                pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-                "GlobalLimit, n: 10\
-                \n  Sort\
-                \n    Projection, [url, SUM(hits):hits], sort_order: [0]\
-                \n      FinalInplaceAggregate, sort_order: [0]\
-                \n        Worker, sort_order: [0]\
-                \n          PartialInplaceAggregate, sort_order: [0]\
-                \n            Alias, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-                \n              MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-                \n                Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-                \n                  Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-                \n                    Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-                \n                      MergeSort, sort_order: [0, 1, 2, 3, 4]\
-                \n                        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
-                \n                          Empty\
-                \n                  Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-                \n                    Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-                \n                      MergeSort, sort_order: [0, 1, 2, 3, 4]\
-                \n                        Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
-                \n                          Empty"
+                pp_phys_plan_ext(p.worker.as_ref(), &verbose),
+                "Projection, [url, SUM(hits):hits]\
+               \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
+               \n    Worker\
+               \n      Sort, by: [SUM(hits) desc]\
+               \n        FullInplaceAggregate, sort_order: [0]\
+               \n          Alias, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+               \n            MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+               \n              Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+               \n                Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+               \n                  Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+               \n                    MergeSort, sort_order: [0, 1, 2, 3, 4]\
+               \n                      Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+               \n                        Empty\
+               \n                Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+               \n                  Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+               \n                    MergeSort, sort_order: [0, 1, 2, 3, 4]\
+               \n                      Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+               \n                        Empty"
             );
         })
             .await;
@@ -3315,6 +3312,117 @@ mod tests {
             );
         })
             .await;
+    }
+
+    #[tokio::test]
+    async fn topk_query() {
+        Config::run_test("topk_query", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+                .await
+                .unwrap();
+            service
+                .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+                .await
+                .unwrap();
+            service
+                .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+                .await
+                .unwrap();
+
+
+            // A typical top-k query.
+            let r = service
+                .exec_query("SELECT `url` `url`, SUM(`hits`) `hits` \
+                             FROM (SELECT * FROM s.Data1 \
+                                   UNION ALL \
+                                   SELECT * FROM s.Data2) AS `Data` \
+                             GROUP BY 1 \
+                             ORDER BY 2 DESC \
+                             LIMIT 3")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&r), rows(&[("z", 100), ("y", 80), ("b", 52)]));
+
+            // Same query, ascending order.
+            let r = service
+                .exec_query("SELECT `url` `url`, SUM(`hits`) `hits` \
+                             FROM (SELECT * FROM s.Data1 \
+                                   UNION ALL \
+                                   SELECT * FROM s.Data2) AS `Data` \
+                             GROUP BY 1 \
+                             ORDER BY 2 ASC \
+                             LIMIT 3")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 40), ("d", 44)]));
+
+            // Min, descending.
+            let r = service
+                .exec_query("SELECT `url` `url`, MIN(`hits`) `hits` \
+                             FROM (SELECT * FROM s.Data1 \
+                                   UNION ALL \
+                                   SELECT * FROM s.Data2) AS `Data` \
+                             GROUP BY 1 \
+                             ORDER BY 2 DESC \
+                             LIMIT 3")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&r), rows(&[("z", 100), ("y", 80), ("e", 5)]));
+
+            // Min, ascending.
+            let r = service
+                .exec_query("SELECT `url` `url`, MIN(`hits`) `hits` \
+                             FROM (SELECT * FROM s.Data1 \
+                                   UNION ALL \
+                                   SELECT * FROM s.Data2) AS `Data` \
+                             GROUP BY 1 \
+                             ORDER BY 2 ASC \
+                             LIMIT 3")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&r), rows(&[("a", 1), ("b", 2), ("c", 3)]));
+
+            // Max, descending.
+            let r = service
+                .exec_query("SELECT `url` `url`, MAX(`hits`) `hits` \
+                             FROM (SELECT * FROM s.Data1 \
+                                   UNION ALL \
+                                   SELECT * FROM s.Data2) AS `Data` \
+                             GROUP BY 1 \
+                             ORDER BY 2 DESC \
+                             LIMIT 3")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&r), rows(&[("z", 100), ("y", 80), ("b", 50)]));
+
+            // Max, ascending.
+            let r = service
+                .exec_query("SELECT `url` `url`, MAX(`hits`) `hits` \
+                             FROM (SELECT * FROM s.Data1 \
+                                   UNION ALL \
+                                   SELECT * FROM s.Data2) AS `Data` \
+                             GROUP BY 1 \
+                             ORDER BY 2 ASC \
+                             LIMIT 3")
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
+        })
+            .await;
+
+        fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
+            a.iter()
+                .map(|(s, i)| vec![TableValue::String(s.to_string()), TableValue::Int(*i)])
+                .collect_vec()
+        }
     }
 
     fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

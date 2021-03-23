@@ -2,6 +2,7 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::planning::ClusterSendNode;
 use crate::queryplanner::query_executor::CubeTable;
+use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
@@ -134,6 +135,15 @@ pub enum SerializedLogicalPlan {
         input: Arc<SerializedLogicalPlan>,
         snapshots: Vec<Vec<IndexSnapshot>>,
     },
+    ClusterAggregateTopK {
+        limit: usize,
+        input: Arc<SerializedLogicalPlan>,
+        group_expr: Vec<SerializedExpr>,
+        aggregate_expr: Vec<SerializedExpr>,
+        sort_columns: Vec<SortColumn>,
+        schema: DFSchemaRef,
+        snapshots: Vec<Vec<IndexSnapshot>>,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -252,6 +262,24 @@ impl SerializedLogicalPlan {
             },
             SerializedLogicalPlan::ClusterSend { input, snapshots } => ClusterSendNode {
                 input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                snapshots: snapshots.clone(),
+            }
+            .into_plan(),
+            SerializedLogicalPlan::ClusterAggregateTopK {
+                limit,
+                input,
+                group_expr,
+                aggregate_expr,
+                sort_columns,
+                schema,
+                snapshots,
+            } => ClusterAggregateTopK {
+                limit: *limit,
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                group_expr: group_expr.iter().map(|e| e.expr()).collect(),
+                aggregate_expr: aggregate_expr.iter().map(|e| e.expr()).collect(),
+                order_by: sort_columns.clone(),
+                schema: schema.clone(),
                 snapshots: snapshots.clone(),
             }
             .into_plan(),
@@ -567,13 +595,31 @@ impl SerializedPlan {
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
             LogicalPlan::Explain { .. } => unimplemented!(),
             LogicalPlan::Extension { node } => {
-                let node = node
-                    .as_any()
-                    .downcast_ref::<ClusterSendNode>()
-                    .expect("unknown extension");
-                SerializedLogicalPlan::ClusterSend {
-                    input: Arc::new(Self::serialized_logical_plan(&node.input)),
-                    snapshots: node.snapshots.clone(),
+                if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
+                    SerializedLogicalPlan::ClusterSend {
+                        input: Arc::new(Self::serialized_logical_plan(&cs.input)),
+                        snapshots: cs.snapshots.clone(),
+                    }
+                } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+                    SerializedLogicalPlan::ClusterAggregateTopK {
+                        limit: topk.limit,
+                        input: Arc::new(Self::serialized_logical_plan(&topk.input)),
+                        group_expr: topk
+                            .group_expr
+                            .iter()
+                            .map(|e| Self::serialized_expr(e))
+                            .collect(),
+                        aggregate_expr: topk
+                            .aggregate_expr
+                            .iter()
+                            .map(|e| Self::serialized_expr(e))
+                            .collect(),
+                        sort_columns: topk.order_by.clone(),
+                        schema: topk.schema.clone(),
+                        snapshots: topk.snapshots.clone(),
+                    }
+                } else {
+                    panic!("unknown extension");
                 }
             }
             LogicalPlan::Union {
