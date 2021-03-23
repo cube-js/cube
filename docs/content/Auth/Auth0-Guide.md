@@ -48,29 +48,9 @@ your application (`http://localhost:4000` for the Developer Playground).
 
 You can also configure custom claims for your JWT token. Auth0 has two SDKs
 available; [Auth0.js][link-auth0-js] and the [Auth0 SPA
-SDK][link-auth0-spa-sdk]. In either case, you’ll want to open the Auth0
+SDK][link-auth0-spa-sdk]. We recommend using the SPA SDK wherever possible, [as
+per Auth0's own developer advice][gh-auth0-spa-sdk-issue34]. Open the Auth0
 dashboard, click on 'Rules' and add a rule to add any custom claims to the JWT.
-
-#### Auth0.js
-
-<!-- prettier-ignore-start -->
-[[info |]]
-| Take note of the value of `namespace` here, you will need it later to
-| [configure Cube.js][ref-config-auth0].
-<!-- prettier-ignore-end -->
-
-```javascript
-function (user, context, callback) {
-  const namespace = "http://localhost:4000/";
-  context.idToken[namespace] =
-    {
-      'company_id': 'company1',
-      'user_id': user.user_id,
-      'roles': ['user'],
-    };
-  callback(null, user, context);
-}
-```
 
 #### Auth0 SPA SDK
 
@@ -253,6 +233,8 @@ To help you get up and running, we have [an example project which is configured
 to use Auth0][gh-cubejs-auth0-example]. You can use it as a starting point for
 your own Cube.js application.
 
+[gh-auth0-spa-sdk-issue34]:
+  https://github.com/auth0/auth0-spa-js/issues/34#issuecomment-505420895
 [link-auth0-app]: https://manage.auth0.com/
 [link-auth0-js]: https://auth0.com/docs/libraries/auth0js
 [link-auth0-spa-sdk]: https://auth0.com/docs/libraries/auth0-spa-js
