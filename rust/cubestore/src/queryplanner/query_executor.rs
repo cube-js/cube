@@ -197,13 +197,8 @@ impl QueryExecutor for QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
         let plan_to_move = plan.logical_plan(&HashMap::new())?;
-        let available_nodes = cluster.available_nodes().await?;
         let serialized_plan = Arc::new(plan);
-        let ctx = self.router_context(
-            cluster.clone(),
-            serialized_plan.clone(),
-            available_nodes.clone(),
-        )?;
+        let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
             ctx.clone().create_physical_plan(&plan_to_move.clone())?,
             plan_to_move,
@@ -231,7 +226,6 @@ impl QueryExecutorImpl {
         &self,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        available_nodes: Vec<String>,
     ) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
@@ -240,7 +234,6 @@ impl QueryExecutorImpl {
                 .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
                     cluster,
                     serialized_plan,
-                    available_nodes,
                 ))),
         )))
     }
@@ -527,7 +520,6 @@ pub struct ClusterSendExec {
     pub input_for_optimizations: Arc<dyn ExecutionPlan>,
     pub partitions: Vec<Vec<IdRow<Partition>>>,
     pub cluster: Arc<dyn Cluster>,
-    pub available_nodes: Vec<String>,
     pub serialized_plan: Arc<SerializedPlan>,
 }
 
@@ -536,7 +528,6 @@ impl ClusterSendExec {
         schema: DFSchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        available_nodes: Vec<String>,
         union_snapshots: Vec<Vec<IndexSnapshot>>,
         input_for_optimizations: Arc<dyn ExecutionPlan>,
     ) -> Self {
@@ -557,7 +548,6 @@ impl ClusterSendExec {
             schema,
             partitions,
             cluster,
-            available_nodes,
             serialized_plan,
             input_for_optimizations,
         }
@@ -572,7 +562,6 @@ impl ClusterSendExec {
             schema,
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
-            available_nodes: self.available_nodes.clone(),
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
         }
@@ -609,7 +598,6 @@ impl ExecutionPlan for ClusterSendExec {
             schema: self.schema.clone(),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
-            available_nodes: self.available_nodes.clone(),
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
         }))
