@@ -1,31 +1,37 @@
 import { spawnSync } from 'child_process';
 import process from 'process';
-import { displayCLIWarning } from '@cubejs-backend/shared';
+import { displayCLIWarning, internalExceptions } from '@cubejs-backend/shared';
 
 export function detectLibc() {
   if (process.platform !== 'linux') {
     throw new Error('Unable to detect libc on not linux os');
   }
 
-  {
-    const { status } = spawnSync('ldd', ['--version'], {
+  try {
+    const { status } = spawnSync('getconf', ['GNU_LIBC_VERSION'], {
       encoding: 'utf8',
+      // Using pipe to protect unexpect STDERR output
+      stdio: 'pipe'
     });
     if (status === 0) {
       return 'gnu';
     }
+  } catch (e) {
+    internalExceptions(e);
   }
 
   {
     const { status, stdout, stderr } = spawnSync('ldd', ['--version'], {
       encoding: 'utf8',
+      // Using pipe to protect unexpect STDERR output
+      stdio: 'pipe',
     });
     if (status === 0) {
       if (stdout.includes('musl')) {
         return 'musl';
       }
 
-      if (stdout.includes('musl')) {
+      if (stdout.includes('gnu')) {
         return 'gnu';
       }
     } else {
