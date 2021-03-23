@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
+import { LivePreviewWatcher } from './LivePreviewWatcher';
 import AppContainer from '../dev/AppContainer';
 import DependencyTree from '../dev/DependencyTree';
 import PackageFetcher from '../dev/PackageFetcher';
@@ -24,6 +25,8 @@ export class DevServer {
   protected applyTemplatePackagesPromise: Promise<any>|null = null;
 
   protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> }|null = null;
+
+  protected livePreviewWatcher = new LivePreviewWatcher();
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
@@ -289,6 +292,17 @@ export class DevServer {
     app.get('/playground/manifest', catchErrors(async (_, res) => {
       const fetcher = process.env.TEST_TEMPLATES ? new DevPackageFetcher(repo) : new PackageFetcher(repo);
       res.json(await fetcher.manifestJSON());
+    }));
+
+    app.get('/playground/live-preview/start/:token', catchErrors(async (req, res) => {
+      // TODO: set token and start watcher
+      this.livePreviewWatcher.setAuth(req.params.token);
+      this.livePreviewWatcher.startWatch();
+      res.json(true);
+    }));
+
+    app.get('/playground/live-preview/status', catchErrors(async (req, res) => {
+      res.json(await this.livePreviewWatcher.getStatus());
     }));
 
     app.use(serveStatic(path.join(__dirname, '../../../playground'), {
