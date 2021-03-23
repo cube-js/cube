@@ -96,7 +96,6 @@ export class LivePreviewWatcher {
 
   private async deploy(): Promise<Boolean> {
     if (!this.auth) throw new Error('Auth isn\'t set');
-    console.log('Start upload files for live-preview');
     const { auth } = this;
     const directory = process.cwd();
 
