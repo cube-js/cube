@@ -20,10 +20,12 @@ export class LivePreviewWatcher {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
       this.auth = {
         auth: token,
-        deploymentId: payload.d,
+        deploymentId: payload.dId,
         deploymentUrl: payload.dUrl,
         url: payload.url,
       };
+
+      return this.auth;
     } catch (error) {
       console.error(error);
       throw new Error('Live-preview token is invalid');
