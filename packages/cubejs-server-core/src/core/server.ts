@@ -289,15 +289,26 @@ export class CubejsServerCore {
     }
   }
 
+  protected requireCubeStoreDriver = () => requireFromPackage<{
+    isCubeStoreSupported: typeof isCubeStoreSupported,
+    CubeStoreHandler: typeof CubeStoreHandler,
+    CubeStoreDevDriver: typeof CubeStoreDevDriver,
+  }>('@cubejs-backend/cubestore-driver', {
+    relative: isDockerImage(),
+    silent: true,
+  });
+
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     optionsValidate(opts);
 
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
     const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
-    const logger: LoggerFn = opts.logger || process.env.NODE_ENV !== 'production'
-      ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-      : prodLogger(process.env.CUBEJS_LOG_LEVEL);
+    const logger: LoggerFn = opts.logger || (
+      process.env.NODE_ENV !== 'production'
+        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
+        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
+    );
 
     let externalDriverFactory = externalDbType && (
       () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
@@ -314,14 +325,7 @@ export class CubejsServerCore {
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
 
     if (!externalDbType && getEnv('devMode')) {
-      const cubeStorePackage = requireFromPackage<{
-        isCubeStoreSupported: typeof isCubeStoreSupported,
-        CubeStoreHandler: typeof CubeStoreHandler,
-        CubeStoreDevDriver: typeof CubeStoreDevDriver,
-      }>('@cubejs-backend/cubestore-driver', {
-        relative: isDockerImage(),
-        silent: true,
-      });
+      const cubeStorePackage = this.requireCubeStoreDriver();
       if (cubeStorePackage) {
         if (cubeStorePackage.isCubeStoreSupported()) {
           console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
@@ -341,14 +345,14 @@ export class CubejsServerCore {
           // Lazy loading for Cube Store
           externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
           externalDialectFactory = () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
+        } else {
+          logger('Cube Store is not supported on your system', {
+            warning: (
+              `You are using ${process.platform} platform with ${process.arch} architecture, ` +
+              'which is not supported by Cube Store.'
+            ),
+          });
         }
-      } else {
-        this.logger('Cube Store is not supported on your system', {
-          warning: (
-            `You are using ${process.platform} platform with ${process.arch} architecture, ` +
-            'which is not supported by Cube Store.'
-          ),
-        });
       }
     }
 
