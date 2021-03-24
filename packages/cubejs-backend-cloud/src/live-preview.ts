@@ -79,13 +79,18 @@ export class LivePreviewWatcher {
 
   public async getStatus() {
     const { auth } = this;
-    if (!auth) throw new Error('Auth isn\'t set');
-    const statusProps = await await this.cubeCloudClient.getStatusLivePreview({ auth });
-
-    return {
-      ...statusProps,
+    let result = {
       enabled: !!this.watcher
     };
+
+    if (auth) {
+      result = {
+        ...result,
+        ...(await this.cubeCloudClient.getStatusLivePreview({ auth }))
+      };
+    }
+
+    return result;
   }
 
   private async handleQueue() {
