@@ -289,7 +289,7 @@ export class CubejsServerCore {
     }
   }
 
-  protected requireCubeStoreDriver = () => requireFromPackage<{
+  private requireCubeStoreDriver = () => requireFromPackage<{
     isCubeStoreSupported: typeof isCubeStoreSupported,
     CubeStoreHandler: typeof CubeStoreHandler,
     CubeStoreDevDriver: typeof CubeStoreDevDriver,
