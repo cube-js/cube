@@ -5,7 +5,8 @@ import { fetch } from 'whatwg-fetch';
 export default function useLivePreview() {
   const [status, setStatus] = useState({
     loading: true,
-    enabled: false
+    enabled: false,
+    deploymentUrl: null
   });
 
   useEffect(() => {
