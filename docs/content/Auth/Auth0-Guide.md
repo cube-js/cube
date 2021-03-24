@@ -12,6 +12,11 @@ In this guide, you'll learn how to integrate Auth0 authentication with a Cube.js
 deployment. If you already have a pre-existing application on Auth0 that you'd
 like to re-use, please skip ahead to [Configure Cube.js][ref-config-auth0].
 
+We'll be creating an Auth0 [application][link-auth0-docs-app] and
+[API][link-auth0-docs-api], configuring a [rule on Auth0][link-auth0-docs-rules]
+to add custom claims to vended JWTs, and finally configuring Cube.js to use
+Auth0.
+
 ## Create an application
 
 First, go to the [Auth0 dashboard][link-auth0-app], and click on the
@@ -49,8 +54,12 @@ your application (`http://localhost:4000` for the Developer Playground).
 You can also configure custom claims for your JWT token. Auth0 has two SDKs
 available; [Auth0.js][link-auth0-js] and the [Auth0 SPA
 SDK][link-auth0-spa-sdk]. We recommend using the SPA SDK wherever possible, [as
-per Auth0's own developer advice][gh-auth0-spa-sdk-issue34]. Open the Auth0
-dashboard, click on 'Rules' and add a rule to add any custom claims to the JWT.
+per Auth0's own developer advice][gh-auth0-spa-sdk-issue34]. If you're using
+`@auth0/auth0-angular` or `@auth0/auth0-react`, then the SPA SDK is
+automatically included.
+
+Open the Auth0 dashboard, click on 'Rules' and add a rule to add any custom
+claims to the JWT.
 
 #### Auth0 SPA SDK
 
@@ -110,7 +119,8 @@ In the 'New API' popup, set a name for this API and an identifier (e.g.
 <!-- prettier-ignore-end -->
 
 In your application code, configure your API identifier as the audience when
-initializing Auth0:
+initializing Auth0. If you're using the `@auth0/auth-react` package for your
+application front-end, this might look something like this:
 
 ```typescript jsx
 <Auth0Provider
@@ -121,6 +131,9 @@ initializing Auth0:
   audience="cubejs"
 >
 ```
+
+Refer to Auth0's documentation for instructions on configuring
+[Angular][link-auth0-angular] or [Vue][link-auth0-vue] applications.
 
 ## Configure Cube.js
 
@@ -231,8 +244,15 @@ using the [Security Context][ref-sec-ctx] should now work as expected.
 
 To help you get up and running, we have [an example project which is configured
 to use Auth0][gh-cubejs-auth0-example]. You can use it as a starting point for
-your own Cube.js application.
+your own Cube.js application. You can also use our [Multi-Tenant Analytics with
+Auth0 and Cube.js guide][link-multitenant-auth0-guide] for a more detailed
+walkthrough.
 
+[link-auth0-angular]: https://auth0.com/docs/quickstart/spa/angular/01-login
+[link-auth0-vue]: https://auth0.com/docs/quickstart/spa/vuejs/01-login
+[link-auth0-docs-app]: https://auth0.com/docs/applications
+[link-auth0-docs-api]: https://auth0.com/docs/get-started/set-up-apis
+[link-auth0-docs-rules]: https://auth0.com/docs/rules
 [gh-auth0-spa-sdk-issue34]:
   https://github.com/auth0/auth0-spa-js/issues/34#issuecomment-505420895
 [link-auth0-app]: https://manage.auth0.com/
@@ -246,3 +266,4 @@ your own Cube.js application.
 [ref-sec-ctx]: /security/context
 [gh-cubejs-auth0-example]:
   https://github.com/cube-js/cube.js/tree/master/examples/auth0
+[link-multitenant-auth0-guide]: https://multi-tenant-analytics.cube.dev/
