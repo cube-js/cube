@@ -1,6 +1,8 @@
 import chokidar from 'chokidar';
 import { FSWatcher } from 'fs';
 
+import { internalExceptions } from '@cubejs-backend/shared';
+
 import { CubeCloudClient, AuthObject } from './cloud';
 import { DeployController } from './deploy';
 
@@ -15,7 +17,7 @@ export class LivePreviewWatcher {
 
   private queue: {}[] = [];
 
-  public setAuth(token: string) {
+  public setAuth(token: string): AuthObject {
     try {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
       this.auth = {
@@ -26,8 +28,8 @@ export class LivePreviewWatcher {
       };
 
       return this.auth;
-    } catch (error) {
-      console.error(error);
+    } catch (e) {
+      internalExceptions(e);
       throw new Error('Live-preview token is invalid');
     }
   }
@@ -89,8 +91,8 @@ export class LivePreviewWatcher {
         this.queue = [];
         await this.deploy();
       }
-    } catch (error) {
-      console.error(error);
+    } catch (e) {
+      internalExceptions(e);
     } finally {
       this.handleQueueTimeout = setTimeout(async () => this.handleQueue(), 1000);
     }
