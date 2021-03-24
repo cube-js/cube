@@ -86,6 +86,7 @@ export class LivePreviewWatcher {
     if (auth) {
       result = {
         ...result,
+        deploymentUrl: auth.deploymentUrl,
         ...(await this.cubeCloudClient.getStatusLivePreview({ auth }))
       };
     }
