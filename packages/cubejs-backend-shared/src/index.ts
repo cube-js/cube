@@ -7,3 +7,5 @@ export * from './convert';
 export * from './helpers';
 export * from './machine-id';
 export * from './type-helpers';
+export * from './http-utils';
+export * from './cli';
