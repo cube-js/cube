@@ -1675,6 +1675,10 @@ impl RocksMetaStore {
     }
 
     pub async fn wait_upload_loop(meta_store: Arc<Self>) {
+        if !meta_store.config.upload_to_remote() {
+            log::info!("Not running metastore upload loop");
+            return;
+        }
         meta_store
             .upload_loop
             .process(
@@ -2088,6 +2092,11 @@ impl RocksMetaStore {
 #[async_trait]
 impl MetaStore for RocksMetaStore {
     async fn wait_for_current_seq_to_sync(&self) -> Result<(), CubeError> {
+        if !self.config.upload_to_remote() {
+            return Err(CubeError::internal(
+                "waiting for metastore to upload in noupload mode".to_string(),
+            ));
+        }
         while self.has_pending_changes().await? {
             tokio::time::timeout(
                 Duration::from_secs(30),
