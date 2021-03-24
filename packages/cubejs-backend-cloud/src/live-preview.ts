@@ -17,6 +17,10 @@ export class LivePreviewWatcher {
 
   private queue: {}[] = [];
 
+  private log(message: string) {
+    console.log('☁️  Live-preview:', message);
+  }
+
   public setAuth(token: string): AuthObject {
     try {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -38,7 +42,7 @@ export class LivePreviewWatcher {
     if (!this.auth) throw new Error('Auth isn\'t set');
     if (!this.watcher) {
       const { deploymentUrl } = this.auth;
-      console.log(`☁️  Start live-preview with Cube Cloud. Url: ${deploymentUrl}`);
+      this.log(`start with Cube Cloud, url ${deploymentUrl}`);
       this.watcher = chokidar.watch(
         process.cwd(),
         {
@@ -63,14 +67,14 @@ export class LivePreviewWatcher {
     }
   }
 
-  public stopWatch(): void {
+  public stopWatch(message?: string): void {
     if (this.watcher) {
       this.watcher.close();
       this.watcher = null;
     }
 
     if (this.handleQueueTimeout) clearTimeout(this.handleQueueTimeout);
-    console.log('☁️  Stop live-preview');
+    this.log(`stop wathcer, ${message}`);
   }
 
   public async getStatus() {
@@ -92,7 +96,12 @@ export class LivePreviewWatcher {
         await this.deploy();
       }
     } catch (e) {
-      internalExceptions(e);
+      if (e.response && e.response.statusCode === 302) {
+        this.auth = null;
+        this.stopWatch('token expired or invalid, please re-run live-preview mode');
+      } else {
+        internalExceptions(e);
+      }
     } finally {
       this.handleQueueTimeout = setTimeout(async () => this.handleQueue(), 1000);
     }
@@ -100,12 +109,15 @@ export class LivePreviewWatcher {
 
   private async deploy(): Promise<Boolean> {
     if (!this.auth) throw new Error('Auth isn\'t set');
+    this.log('files upload start');
     const { auth } = this;
     const directory = process.cwd();
 
     const cubeCloudClient = new CubeCloudClient(auth);
     const deployController = new DeployController(cubeCloudClient);
 
-    return deployController.deploy(directory);
+    await deployController.deploy(directory);
+    this.log('files upload end, success');
+    return true;
   }
 }
