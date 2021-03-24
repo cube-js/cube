@@ -295,7 +295,6 @@ export class DevServer {
     }));
 
     app.get('/playground/live-preview/start/:token', catchErrors(async (req, res) => {
-      // TODO: set token and start watcher
       this.livePreviewWatcher.setAuth(req.params.token);
       this.livePreviewWatcher.startWatch();
       res.json(true);
