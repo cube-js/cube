@@ -93,7 +93,7 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
-  const { startLivePreview, statusLivePreview } = useLivePreview();
+  const { startLivePreview, stopLivePreview, statusLivePreview } = useLivePreview();
 
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
@@ -177,7 +177,7 @@ export default function PlaygroundQueryBuilder({
                         icon={<CloudOutlined />}
                         size="small"
                         type={ statusLivePreview.enabled ? 'primary' : 'default'}
-                        onClick={() => startLivePreview()}
+                        onClick={() => statusLivePreview.enabled ? stopLivePreview() : startLivePreview()}
                       >
                         { statusLivePreview.enabled ? 'Stop' : 'Start'} Live preview
                       </Button>
