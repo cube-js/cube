@@ -1,7 +1,8 @@
 import { useContext, useEffect, useState, useRef } from 'react';
 import { equals } from 'ramda';
+import { isQueryPresent } from '@cubejs-client/core';
+
 import CubeContext from '../CubeContext';
-import isQueryPresent from '../isQueryPresent';
 import useDeepCompareMemoize from './deep-compare-memoize';
 
 export default function useCubeQuery(query, options = {}) {

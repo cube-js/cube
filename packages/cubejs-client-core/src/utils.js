@@ -180,12 +180,18 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
 }
 
 export function isQueryPresent(query) {
+  if (!query) {
+    return false;
+  }
+
   return (Array.isArray(query) ? query : [query]).every(
-    (q) => (q.measures && q.measures.length) ||
+    (q) =>
+      (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );
 }
+
 
 export function movePivotItem(pivotConfig, sourceIndex, destinationIndex, sourceAxis, destinationAxis) {
   const nextPivotConfig = {

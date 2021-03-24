@@ -24,6 +24,7 @@
     "graphql-tools": "5.0.0",
     "vue": "^2.6.11",
     "vue-apollo": "^3.0.5",
+    "vue-chartjs": "^3.5.1",
     "vue-chartkick": "^0.6.0",
     "vue-grid-layout": "^2.3.12",
     "vue-router": "^3.5.1",

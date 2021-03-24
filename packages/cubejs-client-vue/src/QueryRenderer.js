@@ -36,11 +36,9 @@ export default {
   async mounted() {
     const { query, queries } = this;
 
-    if (query) {
+    if (isQueryPresent(query)) {
       await this.load();
-    }
-
-    if (queries) {
+    } else if (isQueryPresent(queries)) {
       await this.loadQueries(queries);
     }
   },
@@ -81,31 +79,34 @@ export default {
   methods: {
     async load() {
       const { query } = this;
+
+      if (!isQueryPresent(query)) {
+        return;
+      }
+
       try {
         this.loading = true;
         this.error = undefined;
 
-        if (Object.keys(query || {}).length > 0) {
-          if (this.loadSql === 'only') {
-            this.sqlQuery = await this.cubejsApi.sql(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'sql',
-            });
-          } else if (this.loadSql) {
-            this.sqlQuery = await this.cubejsApi.sql(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'sql',
-            });
-            this.resultSet = await this.cubejsApi.load(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'query',
-            });
-          } else {
-            this.resultSet = await this.cubejsApi.load(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'query',
-            });
-          }
+        if (this.loadSql === 'only') {
+          this.sqlQuery = await this.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql',
+          });
+        } else if (this.loadSql) {
+          this.sqlQuery = await this.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql',
+          });
+          this.resultSet = await this.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query',
+          });
+        } else {
+          this.resultSet = await this.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query',
+          });
         }
 
         this.loading = false;
@@ -141,6 +142,9 @@ export default {
     },
   },
   watch: {
+    cubejsApi() {
+      this.load();
+    },
     query: {
       deep: true,
       handler(query, prevQuery) {
@@ -149,13 +153,7 @@ export default {
           Object.keys(prevQuery?.order || {})
         );
 
-        // todo: remove
-        // console.log({
-        //   query: JSON.stringify((query)),
-        //   prevQuery: JSON.stringify((prevQuery)),
-        // })
-
-        if (isQueryPresent(query) && (!equals(query, prevQuery) || hasOrderChanged)) {
+        if ((!equals(query, prevQuery) || hasOrderChanged)) {
           this.load();
         }
       },

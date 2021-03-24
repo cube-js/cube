@@ -1,16 +1,23 @@
 <template>
-  <v-data-table :headers="headers" :items="items" :items-per-page="50" class="elevation-1"></v-data-table>
+  <v-data-table v-if="resultSet" :headers="headers" :items="items" :items-per-page="50" class="elevation-1"></v-data-table>
 </template>
 
 <script>
+import { ResultSet } from '@cubejs-client/core';
+
 export default {
   name: 'Table',
-  props: ['data'],
+  props: {
+    resultSet: {
+      type: ResultSet,
+      required: true,
+    },
+  },
   mounted() {},
   data: () => ({}),
   computed: {
     headers() {
-      const data = this.data.tablePivot();
+      const data = this.resultSet.tablePivot();
       return Object.keys(data[0]).map((key) => {
         return {
           text: key,
@@ -21,7 +28,7 @@ export default {
       });
     },
     items() {
-      const data = this.data.tablePivot();
+      const data = this.resultSet.tablePivot();
       return data.map((key) => {
         return key;
       });

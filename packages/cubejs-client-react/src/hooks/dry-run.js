@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState, useRef } from 'react';
+import { isQueryPresent } from '@cubejs-client/core';
+
 import CubeContext from '../CubeContext';
-import isQueryPresent from '../isQueryPresent';
 import useDeepCompareMemoize from './deep-compare-memoize';
 
 export default function useDryRun(query, options = {}) {

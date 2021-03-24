@@ -1,27 +1,12 @@
 <template>
   <div class="chart-renderer" v-if="resultSet">
-    <line-chart legend="bottom" v-if="chartType === 'line'" :data="series(resultSet)"></line-chart>
-
-    <area-chart legend="bottom" v-if="chartType === 'area'" :data="series(resultSet)"></area-chart>
-
-    <pie-chart v-if="chartType === 'pie'" :data="pairs(resultSet)"></pie-chart>
-
-    <column-chart v-if="chartType === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
-
-    <Table v-if="chartType === 'table'" :result-set="resultSet"></Table>
-
-    <div v-if="chartType === 'number'">
-      <div v-for="item in resultSet.series()" :key="item.key">
-        {{ item.series[0].value }}
-      </div>
-    </div>
+    <line-chart legend="bottom" v-if="chartType === 'line'" :data="data(resultSet)"></line-chart>
   </div>
 </template>
 
 <script>
 import { ResultSet } from '@cubejs-client/core';
-
-import Table from './Table';
+import LineChart from './LineChart';
 
 export default {
   name: 'ChartRenderer',
@@ -37,9 +22,20 @@ export default {
     },
   },
   components: {
-    Table
+    LineChart,
   },
   methods: {
+    data(resultSet) {
+      // const seriesNames = resultSet.seriesNames();
+      // const pivot = resultSet.chartPivot();
+      // const series = [];
+      //
+      // seriesNames.forEach((e) => {
+      //   const data = pivot.map((p) => [p.x, p[e.key]]);
+      //   series.push({ name: e.key, label: e.key, data });
+      // });
+      // return series;
+    },
     series(resultSet) {
       const seriesNames = resultSet.seriesNames();
       const pivot = resultSet.chartPivot();
@@ -47,7 +43,7 @@ export default {
 
       seriesNames.forEach((e) => {
         const data = pivot.map((p) => [p.x, p[e.key]]);
-        series.push({ name: e.key, data });
+        series.push({ name: e.key, label: e.key, data });
       });
       return series;
     },
@@ -67,5 +63,7 @@ export default {
 <style scoped>
 .chart-renderer {
   width: 100%;
+  height: 400px;
+  max-height: 400px;
 }
 </style>
