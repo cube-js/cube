@@ -3,6 +3,7 @@ import * as process from 'process';
 import color from '@oclif/color';
 
 import { downloadBinaryFromRelease } from './download';
+import { displayWarning, isCubeStoreSupported } from './utils';
 
 const displayError = async (text: string) => {
   console.error('');
@@ -24,7 +25,14 @@ const displayError = async (text: string) => {
 
 (async () => {
   try {
-    await downloadBinaryFromRelease();
+    if (isCubeStoreSupported()) {
+      await downloadBinaryFromRelease();
+    } else {
+      displayWarning(
+        `You are using ${process.platform} platform with ${process.arch} architecture, ` +
+        `which is not supported by Cube Store. Installation will be skipped.`
+      );
+    }
   } catch (e) {
     await displayError(e);
   }

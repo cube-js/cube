@@ -716,8 +716,8 @@ pub trait MetaStore: DIService + Send + Sync {
 
     async fn get_active_partitions_and_chunks_by_index_id_for_select(
         &self,
-        index_id: u64,
-    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
+        index_id: Vec<u64>,
+    ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError>;
 
     fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
@@ -767,6 +767,11 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn update_status(&self, job_id: u64, status: JobStatus) -> Result<IdRow<Job>, CubeError>;
     async fn update_heart_beat(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
+
+    async fn get_tables_with_indexes(
+        &self,
+        table_name: Vec<(String, String)>,
+    ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError>;
 }
 
 crate::di_service!(RocksMetaStore, [MetaStore]);
@@ -2295,18 +2300,8 @@ impl MetaStore for RocksMetaStore {
         schema_name: String,
         table_name: String,
     ) -> Result<IdRow<Table>, CubeError> {
-        self.read_operation(move |db_ref| {
-            let rocks_table = TableRocksTable::new(db_ref.clone());
-            let rocks_schema = SchemaRocksTable::new(db_ref);
-            let table = RocksMetaStore::get_table_by_name(
-                schema_name,
-                table_name,
-                rocks_table,
-                rocks_schema,
-            )?;
-            Ok(table)
-        })
-        .await
+        self.read_operation(move |db_ref| get_table_impl(db_ref, schema_name, table_name))
+            .await
     }
 
     async fn get_table_by_id(&self, table_id: u64) -> Result<IdRow<Table>, CubeError> {
@@ -2589,21 +2584,8 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError> {
-        self.read_operation(move |db_ref| {
-            let index = IndexRocksTable::new(db_ref);
-            let indexes = index.get_rows_by_index(
-                &IndexIndexKey::Name(table_id, "default".to_string()),
-                &IndexRocksIndex::Name,
-            )?;
-            indexes
-                .into_iter()
-                .nth(0)
-                .ok_or(CubeError::internal(format!(
-                    "Missing default index for table {}",
-                    table_id
-                )))
-        })
-        .await
+        self.read_operation(move |db_ref| get_default_index_impl(db_ref, table_id))
+            .await
     }
 
     async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError> {
@@ -2643,46 +2625,50 @@ impl MetaStore for RocksMetaStore {
 
     async fn get_active_partitions_and_chunks_by_index_id_for_select(
         &self,
-        index_id: u64,
-    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
+        index_id: Vec<u64>,
+    ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
             let rocks_partition = PartitionRocksTable::new(db_ref);
-            // TODO iterate over range
-            let result = rocks_partition
-                .get_rows_by_index(
-                    &PartitionIndexKey::ByIndexId(index_id),
-                    &PartitionRocksIndex::IndexId,
-                )?
-                .into_iter()
-                .filter(|r| r.get_row().active)
-                .map(|p| -> Result<_, CubeError> {
-                    let chunks = Self::chunks_by_partitioned_with_non_repartitioned(
-                        p.get_id(),
-                        &rocks_chunk,
-                        &rocks_partition,
-                    )?;
-                    Ok((p, chunks))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
 
-            // update last used
-            for (partition, chunks) in result.iter() {
-                rocks_partition.update_with_fn(
-                    partition.get_id(),
-                    |p| p.update_last_used(),
-                    batch_pipe,
-                )?;
-                for chunk in chunks.iter() {
-                    rocks_chunk.update_with_fn(
-                        chunk.get_id(),
-                        |c| c.update_last_used(),
+            let mut results = Vec::with_capacity(index_id.len());
+            for index_id in index_id {
+                // TODO iterate over range
+                let result = rocks_partition
+                    .get_rows_by_index(
+                        &PartitionIndexKey::ByIndexId(index_id),
+                        &PartitionRocksIndex::IndexId,
+                    )?
+                    .into_iter()
+                    .filter(|r| r.get_row().active)
+                    .map(|p| -> Result<_, CubeError> {
+                        let chunks = Self::chunks_by_partitioned_with_non_repartitioned(
+                            p.get_id(),
+                            &rocks_chunk,
+                            &rocks_partition,
+                        )?;
+                        Ok((p, chunks))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                // update last used
+                for (partition, chunks) in result.iter() {
+                    rocks_partition.update_with_fn(
+                        partition.get_id(),
+                        |p| p.update_last_used(),
                         batch_pipe,
                     )?;
+                    for chunk in chunks.iter() {
+                        rocks_chunk.update_with_fn(
+                            chunk.get_id(),
+                            |c| c.update_last_used(),
+                            batch_pipe,
+                        )?;
+                    }
                 }
+                results.push(result)
             }
-
-            Ok(result)
+            Ok(results)
         })
         .await
     }
@@ -3028,6 +3014,58 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
+
+    async fn get_tables_with_indexes(
+        &self,
+        table_name: Vec<(String, String)>,
+    ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError> {
+        self.read_operation(|db| {
+            let mut r = Vec::with_capacity(table_name.len());
+            for (schema, table) in table_name {
+                let table = get_table_impl(db.clone(), schema, table)?;
+                let schema = SchemaRocksTable::new(db.clone())
+                    .get_row_or_not_found(table.get_row().get_schema_id())?;
+
+                let mut indexes;
+                indexes = IndexRocksTable::new(db.clone()).get_rows_by_index(
+                    &IndexIndexKey::TableId(table.get_id()),
+                    &IndexRocksIndex::TableID,
+                )?;
+                indexes.insert(0, get_default_index_impl(db.clone(), table.get_id())?);
+
+                r.push((schema, table, indexes))
+            }
+            Ok(r)
+        })
+        .await
+    }
+}
+
+fn get_table_impl(
+    db_ref: DbTableRef,
+    schema_name: String,
+    table_name: String,
+) -> Result<IdRow<Table>, CubeError> {
+    let rocks_table = TableRocksTable::new(db_ref.clone());
+    let rocks_schema = SchemaRocksTable::new(db_ref);
+    let table =
+        RocksMetaStore::get_table_by_name(schema_name, table_name, rocks_table, rocks_schema)?;
+    Ok(table)
+}
+
+fn get_default_index_impl(db_ref: DbTableRef, table_id: u64) -> Result<IdRow<Index>, CubeError> {
+    let index = IndexRocksTable::new(db_ref);
+    let indexes = index.get_rows_by_index(
+        &IndexIndexKey::Name(table_id, "default".to_string()),
+        &IndexRocksIndex::Name,
+    )?;
+    indexes
+        .into_iter()
+        .nth(0)
+        .ok_or(CubeError::internal(format!(
+            "Missing default index for table {}",
+            table_id
+        )))
 }
 
 #[cfg(test)]

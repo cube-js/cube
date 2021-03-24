@@ -171,15 +171,15 @@ impl SqlServiceImpl {
 
             let mut futures = Vec::new();
             let indexes = self.db.get_table_indexes(table.get_id()).await?;
-            for index in indexes.into_iter() {
-                // TODO it may be too much to mark those as last used in a light of it can be still compacted
-                let partitions = self
-                    .db
-                    .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
-                    .await?;
-                for (partition, chunks) in partitions.into_iter() {
-                    futures.push(self.cluster.warmup_partition(partition, chunks));
-                }
+            // TODO it may be too much to mark those as last used in a light of it can be still compacted
+            let partitions = self
+                .db
+                .get_active_partitions_and_chunks_by_index_id_for_select(
+                    indexes.iter().map(|i| i.get_id()).collect(),
+                )
+                .await?;
+            for (partition, chunks) in partitions.into_iter().flatten() {
+                futures.push(self.cluster.warmup_partition(partition, chunks));
             }
             join_all(futures)
                 .await

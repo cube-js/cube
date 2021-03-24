@@ -69,10 +69,11 @@ type DeployHooks = {
   onUpload?: Function,
   onFinally?: Function
 };
+
 export class DeployController {
   public constructor(
     protected readonly cubeCloudClient: CubeCloudClient,
-    protected hooks: DeployHooks = {}
+    protected readonly hooks: DeployHooks = {}
   ) {
   }
 
