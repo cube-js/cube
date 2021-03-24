@@ -139,6 +139,50 @@ describe('index.test', () => {
       .toBeInstanceOf(CubejsServerCore);
   });
 
+  test('Should create instance of CubejsServerCore, on unsupported platform for Cube Store', async () => {
+    const originalPlatform = process.platform;
+
+    const logger = jest.fn(() => {
+      //
+    });
+
+    class CubejsServerCoreLocalMock extends CubejsServerCore {
+      // Just return true to emulate that package exists
+      protected isCubeStoreDriverInstalled = () => <any>true;
+    }
+
+    try {
+      delete process.env.CUBEJS_EXT_DB_TYPE;
+
+      process.env.CUBEJS_DB_TYPE = 'mysql';
+      process.env.CUBEJS_DEV_MODE = 'true';
+
+      Object.defineProperty(process, 'platform', {
+        value: 'MockOS'
+      });
+
+      const cubejsServerCore = new CubejsServerCoreLocalMock({ logger });
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    } finally {
+      delete process.env.CUBEJS_DEV_MODE;
+      delete process.env.CUBEJS_DB_TYPE;
+
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform
+      });
+    }
+
+    expect(logger.mock.calls).toEqual([
+      [
+        'Cube Store is not supported on your system',
+        {
+          warning: 'You are using MockOS platform with x64 architecture, which is not supported by Cube Store.'
+        }
+      ]
+    ]);
+  });
+
   test('Should throw error, dbType is required', () => {
     delete process.env.CUBEJS_DB_TYPE;
 
