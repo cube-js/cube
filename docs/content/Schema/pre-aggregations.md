@@ -299,6 +299,94 @@ cube(`CompletedOrders`, {
 });
 ```
 
+## rollupJoin
+
+<!-- prettier-ignore-start -->
+[[warning | 🐣 &nbsp;&nbsp; Preview]]
+| `rollupJoin` is currently in Preview, and is API may change in a
+| future version.
+<!-- prettier-ignore-end -->
+
+Cube.js is capable of performing joins between separate pre-aggregations,
+thereby avoiding a call to the source database. This functionality also allows
+for cross-database joins; you can have a data schema for a MySQL database,
+another for Postgres, and then use `rollupJoin` to join their pre-aggregations:
+
+```javascript
+// A schema representing all companies, retrieved from MySQL
+cube(`Companies`, {
+  dataSource: 'mysql',
+  sql: `SELECT * from ecom.companies`,
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  dimensions: {
+    name: {
+      sql: `name`,
+      type: `string`,
+      primaryKey: true,
+      shown: true
+    }
+  },
+
+  preAggregations: {
+    companiesRollup: {
+      type: `rollup`,
+      dimensionReferences: [Companies.name],
+      external: true,
+    },
+  },
+});
+
+// A schema representing all users, retrieved from Postgres
+cube('Users', {
+  dataSource: 'postgres',
+  sql: `select * from users`,
+  joins: {
+    Companies: {
+      relationship: `belongsTo`,
+      sql: `${CUBE}.company = ${Companies.name}`,
+    },
+  },
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primaryKey: true,
+    },
+    company: {
+      sql: `company`,
+      type: `string`,
+    },
+  },
+  preAggregations: {
+    usersRollup: {
+      type: `rollup`,
+      measureReferences: [Users.count],
+      dimensionReferences: [Users.company],
+      external: true,
+    },
+    // Here we add a new pre-aggregation of type `rollupJoin`
+    joinedWithCompaniesRollup: {
+      type: `rollupJoin`,
+      measureReferences: [Users.count],
+      dimensionReferences: [Companies.name],
+      rollupReferences: [Companies.companiesRollup, Users.usersRollup],
+      external: true,
+    },
+  },
+});
+```
+
 ## refreshKey
 
 Cube.js can also take care of keeping pre-aggregations up to date with the
