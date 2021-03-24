@@ -17,8 +17,6 @@ pub mod rewrite_plan;
 
 pub struct CubeQueryPlanner {
     cluster: Option<Arc<dyn Cluster>>,
-    // TODO: remove available nodes.
-    available_nodes: Vec<String>,
     serialized_plan: Arc<SerializedPlan>,
 }
 
@@ -26,11 +24,9 @@ impl CubeQueryPlanner {
     pub fn new_on_router(
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        available_nodes: Vec<String>,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             cluster: Some(cluster),
-            available_nodes,
             serialized_plan,
         }
     }
@@ -39,7 +35,6 @@ impl CubeQueryPlanner {
         CubeQueryPlanner {
             serialized_plan,
             cluster: None,
-            available_nodes: vec![],
         }
     }
 }
@@ -52,7 +47,6 @@ impl QueryPlanner for CubeQueryPlanner {
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
         let p = DefaultPhysicalPlanner::with_extension_planner(Arc::new(ClusterSendPlanner {
             cluster: self.cluster.clone(),
-            available_nodes: self.available_nodes.clone(),
             serialized_plan: self.serialized_plan.clone(),
         }))
         .create_physical_plan(logical_plan, ctx_state)?;
