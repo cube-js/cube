@@ -5,9 +5,9 @@ category: Caching
 menuOrder: 2
 ---
 
-Pre-aggregations is a powerful way to speed up your Cube.js queries. There are many
-configuration options to consider. Please make sure to also check [this
-Pre-Aggregations page in the data schema section](/pre-aggregations).
+Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
+many configuration options to consider. Please make sure to also check
+[this Pre-Aggregations page in the data schema section](/pre-aggregations).
 
 ## Refresh Strategy
 
@@ -100,7 +100,7 @@ module.exports = {
   driverFactory: () =>
     new PostgresDriver({
       readOnly: true,
-    })
+    }),
 };
 ```
 
@@ -125,11 +125,19 @@ We highly recommend leaving `readOnly` unset or explicitly setting it to
 
 ## Pre-Aggregations Storage
 
-When using **external** pre-aggregations, Cube.js will
-store pre-aggregations inside its own purpose-built storage layer: Cube Store.
+When using **external** pre-aggregations, Cube.js will store pre-aggregations
+inside its own purpose-built storage layer: Cube Store.
 
-Alternatively, you can store external pre-aggregations in a different database, such MySQL or Postgres.
-In order to make this work, you should set the
+Cube Store is writen in Rust and utilizes a set of technologies like RocksDB,
+Apache Parquet, and Arrow that have proven effectiveness in solving data access
+problems.
+
+Cube Store is
+[fully open-sourced](https://github.com/cube-js/cube.js/tree/master/rust#cube-store)
+and released under the Apache 2.0 license.
+
+Alternatively, you can store external pre-aggregations in a different database,
+such MySQL or Postgres. In order to make this work, you should set the
 [`externalDriverFactory`][ref-config-extdriverfactory] and
 [`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
 configuration file. These properties can also be set through the environment
@@ -137,7 +145,8 @@ variables.
 
 [ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
-[link-production-checklist-refresh]: /deployment/production-checklist#set-up-refresh-worker
+[link-production-checklist-refresh]:
+  /deployment/production-checklist#set-up-refresh-worker
 
 ```bash
 CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
@@ -147,3 +156,39 @@ CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
 CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
 CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 ```
+
+### Known limitations of MySQL/Postgres as external database
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| Please be aware of the limitations when using MySQL/Postgres as an external
+| database for pre-aggregations.
+<!-- prettier-ignore-end -->
+
+Some known limitations are listed below.
+
+**Performance issues with high cardinality rollups:** Queries over billions of
+datapoints or higher start exhibiting severe latency issues, negatively
+impacting end-user experience.
+
+**Lack of HyperLogLog support:** The HyperLogLog algorithm makes fast work of
+distinct counts in queries, a common analytical operation. Unfortunately,
+support between database vendors varies greatly, and therefore cannot be
+guaranteed.
+
+**Degraded performance for big `UNION ALL` queries:** A practical example of
+this would be when querying over a date range using a pre-aggregation with a
+`partitionGranularity`. The query would use several partitioned tables to
+deliver the result set, and therefore needs to join all valid partitions.
+
+**Poor JOIN performance across rolled up tables:** This often affects workloads
+which require cross database joins.
+
+**Table/schema name length mismatches:** A common issue when working across
+different database types is that different databases have different length
+limits on table names. Cube.js allows working around the issue with `sqlAlias`
+but this becomes cumbersome with lots of pre-aggregations.
+
+**SQL type differences between source and external database:** Different
+databases often specify types differently, which can cause type mismatch issues.
+This is also a common issue and source of frustration which Cube Store resolves.
