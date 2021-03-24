@@ -560,6 +560,7 @@ declare module '@cubejs-client/core' {
      * @returns An array of columns
      */
     tableColumns(pivotConfig?: PivotConfig): TableColumn[];
+    totalRow(pivotConfig?: PivotConfig):{ [key: string]: number };
 
     query(): Query;
     rawData(): T[];
