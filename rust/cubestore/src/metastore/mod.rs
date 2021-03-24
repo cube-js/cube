@@ -486,6 +486,7 @@ pub struct Partition {
     #[serde(default)]
     warmed_up: bool,
     main_table_row_count: u64,
+    /// Not used or updated anymore.
     #[serde(default)]
     last_used: Option<DateTime<Utc>>
 }
@@ -498,6 +499,7 @@ pub struct Chunk {
     row_count: u64,
     uploaded: bool,
     active: bool,
+    /// Not used or updated anymore.
     #[serde(default)]
     last_used: Option<DateTime<Utc>>
 }
@@ -695,7 +697,6 @@ pub trait MetaStore: DIService + Send + Sync {
         compacted_chunk_ids: Vec<u64>,
         new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError>;
-    async fn is_partition_used(&self, partition_id: u64) -> Result<bool, CubeError>;
     async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
     async fn mark_partition_warmed_up(&self, partition_id: u64) -> Result<(), CubeError>;
 
@@ -749,7 +750,6 @@ pub trait MetaStore: DIService + Send + Sync {
         table_id: u64,
         uploaded_chunk_ids: Vec<u64>,
     ) -> Result<(), CubeError>;
-    async fn is_chunk_used(&self, chunk_id: u64) -> Result<bool, CubeError>;
     async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
@@ -2515,16 +2515,6 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn is_partition_used(&self, partition_id: u64) -> Result<bool, CubeError> {
-        let timeout = self.config.not_used_timeout();
-        self.read_operation(move |db_ref| {
-            let table = PartitionRocksTable::new(db_ref);
-            let partition = table.get_row_or_not_found(partition_id)?;
-            Ok(partition.get_row().is_used(timeout))
-        })
-        .await
-    }
-
     async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             PartitionRocksTable::new(db_ref).delete(partition_id, batch_pipe)
@@ -2636,7 +2626,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
-        self.write_operation(move |db_ref, batch_pipe| {
+        self.read_operation(move |db_ref| {
             let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
             let rocks_partition = PartitionRocksTable::new(db_ref);
 
@@ -2659,22 +2649,6 @@ impl MetaStore for RocksMetaStore {
                         Ok((p, chunks))
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-
-                // update last used
-                for (partition, chunks) in result.iter() {
-                    rocks_partition.update_with_fn(
-                        partition.get_id(),
-                        |p| p.update_last_used(),
-                        batch_pipe,
-                    )?;
-                    for chunk in chunks.iter() {
-                        rocks_chunk.update_with_fn(
-                            chunk.get_id(),
-                            |c| c.update_last_used(),
-                            batch_pipe,
-                        )?;
-                    }
-                }
                 results.push(result)
             }
             Ok(results)
@@ -2843,28 +2817,10 @@ impl MetaStore for RocksMetaStore {
             .await
     }
 
-    async fn is_chunk_used(&self, chunk_id: u64) -> Result<bool, CubeError> {
-        let timeout = self.config.not_used_timeout();
-        self.read_operation(move |db_ref| {
-            let table = ChunkRocksTable::new(db_ref);
-            let chunk = table.get_row_or_not_found(chunk_id)?;
-            Ok(chunk.get_row().is_used(timeout))
-        })
-        .await
-    }
-
     async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {
-        let timeout = self.config.not_used_timeout();
         self.write_operation(move |db_ref, batch_pipe| {
             let chunks = ChunkRocksTable::new(db_ref.clone());
             let chunk = chunks.get_row_or_not_found(chunk_id)?;
-
-            if chunk.get_row().is_used(timeout) {
-                return Err(CubeError::internal(format!(
-                    "Can't remove used in select chunk #{}",
-                    chunk_id
-                )));
-            }
 
             if chunk.get_row().active() {
                 return Err(CubeError::internal(format!(

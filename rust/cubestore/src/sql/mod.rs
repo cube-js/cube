@@ -171,7 +171,6 @@ impl SqlServiceImpl {
 
             let mut futures = Vec::new();
             let indexes = self.db.get_table_indexes(table.get_id()).await?;
-            // TODO it may be too much to mark those as last used in a light of it can be still compacted
             let partitions = self
                 .db
                 .get_active_partitions_and_chunks_by_index_id_for_select(
@@ -1576,6 +1575,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
                 c.compaction_chunks_count_threshold = 0;
+                c.not_used_timeout = 0;
                 c
             })
             .start_test(async move |services| {
