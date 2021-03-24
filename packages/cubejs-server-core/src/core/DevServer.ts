@@ -22,9 +22,9 @@ const repo = {
 };
 
 export class DevServer {
-  protected applyTemplatePackagesPromise: Promise<any>|null = null;
+  protected applyTemplatePackagesPromise: Promise<any> | null = null;
 
-  protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> }|null = null;
+  protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> } | null = null;
 
   protected livePreviewWatcher = new LivePreviewWatcher();
 
@@ -297,7 +297,17 @@ export class DevServer {
     app.get('/playground/live-preview/start/:token', catchErrors(async (req, res) => {
       this.livePreviewWatcher.setAuth(req.params.token);
       this.livePreviewWatcher.startWatch();
-      res.json(true);
+
+      res.setHeader('Content-Type', 'text/html');
+      res.write('<html><head><script>window.close();</script></body></html>');
+      res.end();
+    }));
+
+    app.get('/playground/live-preview/stop', catchErrors(async (req, res) => {
+      this.livePreviewWatcher.stopWatch();
+      res.json({
+        enabled: false
+      });
     }));
 
     app.get('/playground/live-preview/status', catchErrors(async (req, res) => {

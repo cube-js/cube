@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Col, Row, Divider } from 'antd';
-import { LockOutlined } from '@ant-design/icons';
+import { LockOutlined, CloudOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
 import styled from 'styled-components';
 
@@ -14,7 +14,7 @@ import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { Card, SectionHeader, SectionRow, Button } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
-import { useSecurityContext } from './hooks';
+import { useSecurityContext, useLivePreview } from './hooks';
 import { FatalError } from './atoms';
 
 const Section = styled.div`
@@ -93,6 +93,7 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
+  const { startLivePreview, statusLivePreview } = useLivePreview();
 
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
@@ -170,6 +171,18 @@ export default function PlaygroundQueryBuilder({
                     >
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
+                    {
+                      !statusLivePreview.loading && 
+                      <Button
+                        icon={<CloudOutlined />}
+                        size="small"
+                        type={ statusLivePreview.enabled ? 'primary' : 'default'}
+                        onClick={() => startLivePreview()}
+                      >
+                        { statusLivePreview.enabled ? 'Stop' : 'Start'} Live preview
+                      </Button>
+                    }
+
                   </Button.Group>
                 </Card>
               </Col>
