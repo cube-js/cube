@@ -592,8 +592,8 @@ class ResultSet {
       .concat(otherColumns);
   }
 
-  totalRow() {
-    return this.chartPivot()[0];
+  totalRow(pivotConfig) {
+    return this.chartPivot(pivotConfig)[0];
   }
 
   categories(pivotConfig) { // TODO
