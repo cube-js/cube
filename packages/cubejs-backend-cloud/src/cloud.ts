@@ -126,9 +126,10 @@ export class CubeCloudClient {
     });
   }
 
-  public getStatusDevMode({ auth }: { auth?: AuthObject } = {}) {
+  public getStatusDevMode({ auth, lashHash }: { auth?: AuthObject, lashHash?: string } = {}) {
     return this.request({
       url: (deploymentId) => `devmode/${deploymentId}/status`,
+      qsParseOptions: { lashHash },
       method: 'GET',
       auth
     });

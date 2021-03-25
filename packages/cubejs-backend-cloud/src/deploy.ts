@@ -78,6 +78,7 @@ export class DeployController {
   }
 
   public async deploy(directory: string) {
+    let result;
     const deployDir = new DeployDirectory({ directory });
     const fileHashes: any = await deployDir.fileHashes();
 
@@ -105,11 +106,12 @@ export class DeployController {
           });
         }
       }
-      await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix });
+      
+      result = await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix });
     } finally {
       if (this.hooks.onFinally) this.hooks.onFinally();
     }
 
-    return true;
+    return result || {};
   }
 }

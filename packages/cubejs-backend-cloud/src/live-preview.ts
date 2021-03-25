@@ -19,6 +19,8 @@ export class LivePreviewWatcher {
 
   private uploading: Boolean = false;
 
+  private lastHash: string | undefined;
+
   private log(message: string) {
     console.log('☁️  Live-preview:', message);
   }
@@ -82,6 +84,7 @@ export class LivePreviewWatcher {
   public async getStatus() {
     const { auth } = this;
     let result = {
+      lastHashTarget: this.lastHash,
       uploading: this.uploading,
       enabled: !!this.watcher
     };
@@ -90,7 +93,10 @@ export class LivePreviewWatcher {
       result = {
         ...result,
         deploymentUrl: auth.deploymentUrl,
-        ...(await this.cubeCloudClient.getStatusDevMode({ auth }))
+        ...(await this.cubeCloudClient.getStatusDevMode({
+          auth,
+          lashHash: this.lastHash
+        }))
       };
     }
 
@@ -128,7 +134,7 @@ export class LivePreviewWatcher {
     }
   }
 
-  private async deploy(): Promise<Boolean> {
+  private async deploy(): Promise<any> {
     if (!this.auth) throw new Error('Auth isn\'t set');
     this.log('files upload start');
     const { auth } = this;
@@ -137,8 +143,10 @@ export class LivePreviewWatcher {
     const cubeCloudClient = new CubeCloudClient(auth);
     const deployController = new DeployController(cubeCloudClient);
 
-    await deployController.deploy(directory);
+    const result = await deployController.deploy(directory);
+    if (result && result.lastHash) this.lastHash = result.lastHash;
+
     this.log('files upload end, success');
-    return true;
+    return result;
   }
 }
