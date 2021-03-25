@@ -316,7 +316,7 @@ export class DevServer {
     }));
 
     app.post('/playground/live-preview/token', catchErrors(async (req, res) => {
-      const token = await await this.livePreviewWatcher.createTokenWithPayload(req.body);
+      const token = await this.livePreviewWatcher.createTokenWithPayload(req.body);
       res.json({ token });
     }));
 

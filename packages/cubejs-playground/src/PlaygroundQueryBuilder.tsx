@@ -10,11 +10,12 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
+import LivePreviewBar from './components/LivePreviewContext/LivePreviewBar';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { Card, SectionHeader, SectionRow, Button } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
-import { useSecurityContext, useLivePreview } from './hooks';
+import { useSecurityContext, useLivePreviewContext } from './hooks';
 import { FatalError } from './atoms';
 
 const Section = styled.div`
@@ -93,7 +94,7 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
-  const { startLivePreview, stopLivePreview, statusLivePreview } = useLivePreview();
+  const { startLivePreview, stopLivePreview, statusLivePreview } = useLivePreviewContext();
 
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
@@ -179,7 +180,7 @@ export default function PlaygroundQueryBuilder({
                         type={ statusLivePreview.enabled ? 'primary' : 'default'}
                         onClick={() => statusLivePreview.enabled ? stopLivePreview() : startLivePreview()}
                       >
-                        { statusLivePreview.enabled ? 'Stop' : 'Start'} Live preview
+                        { statusLivePreview.enabled ? 'Stop' : 'Start'} Live Preview
                       </Button>
                     }
 
@@ -187,6 +188,16 @@ export default function PlaygroundQueryBuilder({
                 </Card>
               </Col>
             </Row>
+
+            {
+              statusLivePreview && 
+              statusLivePreview.enabled &&
+              <Row>
+                <Col span={24}>
+                  <LivePreviewBar />
+                </Col>
+              </Row>
+            }
 
             <Divider style={{ margin: 0 }} />
 

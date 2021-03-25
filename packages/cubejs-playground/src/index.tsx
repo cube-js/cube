@@ -13,6 +13,7 @@ import {
   IndexPage,
 } from './pages';
 import SecurityContextProvider from './components/SecurityContext/SecurityContextProvider';
+import LivePreviewContextProvider from './components/LivePreviewContext/LivePreviewContextProvider';
 
 const history = createHashHistory();
 history.listen((location) => {
@@ -42,9 +43,11 @@ ReactDOM.render(
         path="/build"
         component={(props) => {
           return (
-            <SecurityContextProvider getToken={getToken}>
-              <ExplorePage {...props} />
-            </SecurityContextProvider>
+            <LivePreviewContextProvider>
+              <SecurityContextProvider getToken={getToken}>
+                <ExplorePage {...props} />
+              </SecurityContextProvider>
+            </LivePreviewContextProvider>
           );
         }}
       />

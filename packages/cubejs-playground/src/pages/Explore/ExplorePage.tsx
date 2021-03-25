@@ -4,12 +4,13 @@ import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
 import DashboardSource from '../../DashboardSource';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
+import { useCubejsApi, useSecurityContext, useLivePreviewContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 
 export default function ExplorePage() {
   const { push, location } = useHistory();
   const { token } = useSecurityContext();
+  const { statusLivePreview, createTokenWithPayload } = useLivePreviewContext();
 
   const [apiUrl, setApiUrl] = useState(null);
   const [playgroundContext, setPlaygroundContext] = useState<any>(null);
@@ -20,14 +21,31 @@ export default function ExplorePage() {
     token || playgroundContext?.cubejsToken
   );
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetch('/playground/context');
-      const result = await res.json();
+  const fetchPlaygroundContext = async () => {
+    const res = await fetch('/playground/context');
+    const result = await res.json();
+    setPlaygroundContext(result);
+  };
 
-      setPlaygroundContext(result);
-    })();
+  useEffect(() => {
+    fetchPlaygroundContext();
   }, []);
+
+  useEffect(() => {
+    if (statusLivePreview && statusLivePreview.enabled) {
+      console.log(statusLivePreview);
+      createTokenWithPayload({})
+        .then(({ token }) => {
+          setPlaygroundContext({
+            ...playgroundContext,
+            apiUrl: statusLivePreview.deploymentUrl,
+            cubejsToken: token.token
+          });
+        })
+    } else {
+      fetchPlaygroundContext();
+    }
+  }, [statusLivePreview && statusLivePreview.enabled]);
 
   useLayoutEffect(() => {
     if (playgroundContext) {

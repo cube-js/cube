@@ -1,8 +1,17 @@
-import { useEffect, useState } from 'react';
-import { fetch } from 'whatwg-fetch';
+import { createContext, useState, useEffect } from 'react';
 
+type TLivePreviewContextProps = {
+  statusLivePreview: any;
+  createTokenWithPayload: (payload) => Promise<any>; 
+  stopLivePreview: () => Promise<Boolean>;
+  startLivePreview: () => Promise<Boolean>;
+};
 
-export default function useLivePreview() {
+export const LivePreviewContextContext = createContext<TLivePreviewContextProps>(
+  {} as TLivePreviewContextProps
+);
+
+const useLivePreview = () => {
   const [status, setStatus] = useState({
     loading: true,
     enabled: false,
@@ -11,7 +20,7 @@ export default function useLivePreview() {
 
   useEffect(() => {
     fetchStatus();
-    const statusPoolingInterval = setInterval(()=>{
+    const statusPoolingInterval = setInterval(() => {
       fetchStatus();
     }, 5000);
     return () => {
@@ -29,11 +38,21 @@ export default function useLivePreview() {
   }
 
   useEffect(() => {
-    
+
   }, []);
 
   return {
     statusLivePreview: status,
+    createTokenWithPayload: async (payload): Promise<Boolean> => {
+      const res = await fetch('/playground/live-preview/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+      return res.json();
+    },
     stopLivePreview: async (): Promise<Boolean> => {
       await fetch('/playground/live-preview/stop');
       fetchStatus();
@@ -62,4 +81,14 @@ export default function useLivePreview() {
       });
     }
   };
+};
+
+export default function LivePreviewContextProvider({ children }) {
+  const devModeHooks = useLivePreview();
+
+  return (
+    <LivePreviewContextContext.Provider value={devModeHooks}>
+      {children}
+    </LivePreviewContextContext.Provider>
+  );
 }
