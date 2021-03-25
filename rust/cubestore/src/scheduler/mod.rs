@@ -5,10 +5,14 @@ use crate::metastore::{MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
 use crate::CubeError;
+use flatbuffers::bitflags::_core::time::Duration;
 use log::error;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::{watch, Mutex};
+use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 pub struct SchedulerImpl {
     meta_store: Arc<dyn MetaStore>,
@@ -17,6 +21,8 @@ pub struct SchedulerImpl {
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
     stop_sender: watch::Sender<bool>,
     stop_receiver: Mutex<watch::Receiver<bool>>,
+    gc_loop: Mutex<DataGCLoop>,
+    gc_sender: UnboundedSender<GCTimedTask>,
     config: Arc<dyn ConfigObj>,
 }
 
@@ -31,6 +37,8 @@ impl SchedulerImpl {
         config: Arc<dyn ConfigObj>,
     ) -> SchedulerImpl {
         let (tx, rx) = watch::channel(false);
+        let (gc_loop, gc_sender) =
+            DataGCLoop::new(meta_store.clone(), remote_fs.clone(), rx.clone());
         SchedulerImpl {
             meta_store,
             cluster,
@@ -38,11 +46,30 @@ impl SchedulerImpl {
             event_receiver: Mutex::new(event_receiver),
             stop_sender: tx,
             stop_receiver: Mutex::new(rx),
+            gc_loop: Mutex::new(gc_loop),
+            gc_sender,
             config,
         }
     }
 
-    pub async fn run_scheduler(scheduler: Arc<SchedulerImpl>) -> Result<(), CubeError> {
+    pub fn spawn_processing_loops(
+        scheduler: Arc<SchedulerImpl>,
+    ) -> Vec<JoinHandle<Result<(), CubeError>>> {
+        let scheduler2 = scheduler.clone();
+        vec![
+            tokio::spawn(async move {
+                let mut gc_loop = scheduler
+                    .gc_loop
+                    .try_lock()
+                    .expect("Trying to spawn loops multiple times");
+                gc_loop.run().await;
+                Ok(())
+            }),
+            tokio::spawn(async move { Self::run_scheduler(scheduler2).await }),
+        ]
+    }
+
+    async fn run_scheduler(scheduler: Arc<SchedulerImpl>) -> Result<(), CubeError> {
         loop {
             let mut stop_receiver = scheduler.stop_receiver.lock().await;
             let mut event_receiver = scheduler.event_receiver.lock().await;
@@ -124,9 +151,10 @@ impl SchedulerImpl {
                             .await?;
                     }
                 } else {
-                    if !self.meta_store.is_chunk_used(chunk.get_id()).await? {
-                        self.meta_store.delete_chunk(chunk.get_id()).await?;
-                    }
+                    let deadline =
+                        Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+                    self.gc_sender
+                        .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
                 }
             }
         }
@@ -160,14 +188,12 @@ impl SchedulerImpl {
             let partition = self.meta_store.get_partition(row_id).await?;
             if !partition.get_row().is_active() {
                 self.schedule_repartition(row_id).await?;
-                if partition.get_row().main_table_row_count() > 0
-                    && !self
-                        .meta_store
-                        .is_partition_used(partition.get_id())
-                        .await?
-                {
+                if partition.get_row().main_table_row_count() > 0 {
                     if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
-                        self.remote_fs.delete_file(file_name.as_str()).await?;
+                        let deadline =
+                            Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+                        self.gc_sender
+                            .send(GCTimedTask(deadline, GCTask::RemoveRemoteFile(file_name)))?;
                     }
                 }
             }
@@ -280,5 +306,94 @@ impl SchedulerImpl {
             .node_name_by_partitions(&[partition_id])
             .await?;
         self.cluster.warmup_download(&node_name, path).await
+    }
+}
+
+#[derive(Debug)]
+struct GCTimedTask(/*deadline*/ Instant, GCTask);
+#[derive(Debug)]
+enum GCTask {
+    RemoveRemoteFile(/*remote_path*/ String),
+    DeleteChunk(/*chunk_id*/ u64),
+}
+
+/// Cleans up deactivated partitions and chunks on remote fs.
+/// Ensures enough time has passed that queries over those files finish.
+struct DataGCLoop {
+    metastore: Arc<dyn MetaStore>,
+    remote_fs: Arc<dyn RemoteFs>,
+    stop: watch::Receiver<bool>,
+    to_delete: UnboundedReceiver<GCTimedTask>,
+}
+
+impl DataGCLoop {
+    fn new(
+        metastore: Arc<dyn MetaStore>,
+        remote_fs: Arc<dyn RemoteFs>,
+        stop: watch::Receiver<bool>,
+    ) -> (DataGCLoop, UnboundedSender<GCTimedTask>) {
+        let (sender, receiver) = unbounded_channel();
+        (
+            DataGCLoop {
+                metastore,
+                remote_fs,
+                stop,
+                to_delete: receiver,
+            },
+            sender,
+        )
+    }
+
+    async fn run(&mut self) {
+        loop {
+            let GCTimedTask(deadline, task) = tokio::select! {
+                res = self.stop.changed() => {
+                    if res.is_err() || *self.stop.borrow() {
+                        return;
+                    } else {
+                        continue;
+                    }
+                }
+                event = self.to_delete.recv() => {
+                    match event {
+                        None => return, // channel closed.
+                        Some(e) => e,
+                    }
+                }
+            };
+
+            // Sleep until the deadline or cancellation.
+            loop {
+                tokio::select! {
+                    res = self.stop.changed() => {
+                        if res.is_err() || *self.stop.borrow() {
+                            return;
+                        } else {
+                            continue;
+                        }
+                    }
+                    () = tokio::time::sleep_until(deadline) => {break;}
+                }
+            }
+
+            match task {
+                GCTask::RemoveRemoteFile(remote_path) => {
+                    log::trace!("Removing deactivated data file: {}", remote_path);
+                    if let Err(e) = self.remote_fs.delete_file(&remote_path).await {
+                        log::error!(
+                            "Could not remove deactivated data file({}): {}",
+                            remote_path,
+                            e
+                        );
+                    }
+                }
+                GCTask::DeleteChunk(chunk_id) => {
+                    log::trace!("Removing deactivated chunk {}", chunk_id);
+                    if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
+                        log::error!("Could not remove deactivated chunk ({}): {}", chunk_id, e);
+                    }
+                }
+            }
+        }
     }
 }
