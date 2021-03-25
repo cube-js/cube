@@ -219,6 +219,11 @@ export default {
           builderProps,
         },
         scopedSlots: this.$scopedSlots,
+        on: {
+          queryLoad: (event) => {
+            this.$emit('queryLoad', event);
+          }
+        }
       },
       children
     );

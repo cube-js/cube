@@ -29,7 +29,7 @@ export default {
       mutexObj: {},
       error: undefined,
       resultSet: undefined,
-      loading: true,
+      loading: false,
       sqlQuery: undefined,
     };
   },
@@ -141,6 +141,15 @@ export default {
     },
   },
   watch: {
+    loading(loading) {
+      console.log(loading, Date.now())
+      if (loading === false) {
+        this.$emit('queryLoad', {
+          error: this.error,
+          resultSet: this.resultSet
+        });
+      }
+    },
     query: {
       deep: true,
       handler(query, prevQuery) {
