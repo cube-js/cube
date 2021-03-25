@@ -311,7 +311,13 @@ export class DevServer {
     }));
 
     app.get('/playground/live-preview/status', catchErrors(async (req, res) => {
-      res.json(await this.livePreviewWatcher.getStatus());
+      const statusObj = await this.livePreviewWatcher.getStatus();
+      res.json(statusObj);
+    }));
+
+    app.post('/playground/live-preview/token', catchErrors(async (req, res) => {
+      const token = await await this.livePreviewWatcher.createTokenWithPayload(req.body);
+      res.json({ token });
     }));
 
     app.use(serveStatic(path.join(__dirname, '../../../playground'), {
