@@ -90,11 +90,21 @@ export class LivePreviewWatcher {
       result = {
         ...result,
         deploymentUrl: auth.deploymentUrl,
-        ...(await this.cubeCloudClient.getStatusLivePreview({ auth }))
+        ...(await this.cubeCloudClient.getStatusDevMode({ auth }))
       };
     }
 
     return result;
+  }
+
+  public async createTokenWithPayload(payload: Record<string, any>) {
+    let token;
+    const { auth } = this;
+    if (auth) {
+      token = await this.cubeCloudClient.createTokenDevMode({ auth, payload });
+    }
+
+    return token;
   }
 
   private async handleQueue() {
