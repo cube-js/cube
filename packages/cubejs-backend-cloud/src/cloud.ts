@@ -126,7 +126,7 @@ export class CubeCloudClient {
     });
   }
 
-  public getStatusLivePreview({ auth }: { auth?: AuthObject } = {}) {
+  public getStatusDevMode({ auth }: { auth?: AuthObject } = {}) {
     return this.request({
       url: (deploymentId) => `devmode/${deploymentId}/status`,
       method: 'GET',
@@ -134,7 +134,7 @@ export class CubeCloudClient {
     });
   }
 
-  public createTokenForLivePreview({ auth, payload }: { auth?: AuthObject, payload?: Record<string, any> } = {}) {
+  public createTokenDevMode({ auth, payload }: { auth?: AuthObject, payload?: Record<string, any> } = {}) {
     return this.request({
       url: (deploymentId) => `devmode/${deploymentId}/token`,
       method: 'POST',
