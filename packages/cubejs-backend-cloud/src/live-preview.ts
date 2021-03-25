@@ -95,7 +95,7 @@ export class LivePreviewWatcher {
         deploymentUrl: auth.deploymentUrl,
         ...(await this.cubeCloudClient.getStatusDevMode({
           auth,
-          lashHash: this.lastHash
+          lastHash: this.lastHash
         }))
       };
     }
