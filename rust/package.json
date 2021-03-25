@@ -26,12 +26,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.54",
-    "@types/bytes": "^3.1.0",
-    "@types/cli-progress": "^3.9.1",
     "@types/node": "^10.17.54",
-    "@types/node-fetch": "^2.5.8",
-    "@types/tar": "^4.0.4",
-    "@types/throttle-debounce": "^2.1.0",
     "typescript": "~4.1.5"
   },
   "publishConfig": {
@@ -39,14 +34,8 @@
   },
   "dependencies": {
     "@cubejs-backend/shared": "^0.26.65",
-    "@oclif/color": "^0.1.2",
     "@octokit/core": "^3.2.5",
-    "bytes": "^3.1.0",
-    "cli-progress": "^3.9.0",
-    "fs-extra": "^9.1.0",
-    "node-fetch": "^2.6.1",
-    "tar": "^6.1.0",
-    "throttle-debounce": "^3.0.1"
+    "source-map-support": "^0.5.19"
   },
   "eslintConfig": {
     "extends": "../packages/cubejs-linter"

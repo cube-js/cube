@@ -11,6 +11,9 @@
       "path": "packages/cubejs-backend-cloud"
     },
     {
+      "path": "packages/cubejs-backend-maven"
+    },
+    {
       "path": "packages/cubejs-api-gateway"
     },
     {

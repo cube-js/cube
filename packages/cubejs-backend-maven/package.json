@@ -1,8 +1,8 @@
 {
-  "name": "@cubejs-backend/druid-driver",
-  "description": "Cube.js Druid database driver",
+  "name": "@cubejs-backend/maven",
+  "description": "Cube.js Maven Wrapper for java dependencies downloading",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.67",
+  "version": "0.26.65",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -12,35 +12,34 @@
   "engines": {
     "node": ">=10.8.0"
   },
+  "bin": {
+    "maven-resolve": "bin/maven-resolve"
+  },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "jest dist/test/*.js",
-    "integration:druid": "jest dist/test/*.js",
+    "unit": "jest dist/test/*.js",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "files": [
     "README.md",
+    "bin",
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.26.65",
-    "@cubejs-backend/schema-compiler": "^0.26.67",
     "@cubejs-backend/shared": "^0.26.65",
-    "axios": "^0.21.1",
-    "moment-timezone": "^0.5.31"
+    "source-map-support": "^0.5.19",
+    "xmlbuilder2": "^2.4.0"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.54",
-    "@types/generic-pool": "^3.1.9",
     "@types/jest": "^26.0.20",
     "@types/node": "^10.17.55",
     "jest": "^26.6.3",
-    "testcontainers": "^7.5.0",
     "typescript": "~4.1.5"
   },
   "publishConfig": {

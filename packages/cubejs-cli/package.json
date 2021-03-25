@@ -54,7 +54,7 @@
     "@types/inquirer": "^7.3.1",
     "@types/jest": "^26.0.20",
     "@types/jsonwebtoken": "^8.5.0",
-    "@types/node": "^14.11.10",
+    "@types/node": "^10.17.55",
     "@types/request-promise": "^4.1.46",
     "@types/semver": "^7.3.4",
     "husky": "^4.2.3",
