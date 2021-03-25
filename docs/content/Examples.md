@@ -19,7 +19,7 @@ Below you can find examples and tutorials to help you get started with Cube.js.
 
 | Demo | Code | Description |
 |:------|:----------:|:-------------|
-|[Web Analytics][link-web-analytics]|[web-analytics][code-aws-web-analytics]|Web Analytics with AWS Athena, Snowplow, Cube.js backed by Cube Store|
+|[Web Analytics][link-web-analytics]|[web-analytics][code-web-analytics]|Web Analytics with AWS Athena, Snowplow, Cube.js backed by Cube Store|
 |[Real-Time Dashboard][link-real-time-dashboard]|[real-time-dashboard][code-real-time-dashboard]|Real-Time Dashboard Demo using WebSockets transport|
 |[React Dashboard][link-react-dashboard]|[react-dashboard][code-react-dashboard]|Dynamic dashboard with React, GraphQL, and Cube.js|
 |[D3 Dashboard][link-d3-dashboard]|[d3-dashboard][code-d3-dashboard]|Dashboard with Cube.js, D3, and Material UI|
