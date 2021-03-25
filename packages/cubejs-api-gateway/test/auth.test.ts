@@ -1,6 +1,6 @@
 import express, { Application as ExpressApplication, RequestHandler } from 'express';
 import request from 'supertest';
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { pausePromise } from '@cubejs-backend/shared';
 
 import { ApiGateway, ApiGatewayOptions, Request } from '../src';
@@ -136,6 +136,57 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
 
+  test('playground auth token', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const expectSecurityContext = (securityContext) => {
+      expect(securityContext.uid).toEqual(5);
+      expect(securityContext.iat).toBeDefined();
+      expect(securityContext.exp).toBeDefined();
+    };
+
+    const handlerMock = jest.fn((req, res) => {
+      expectSecurityContext(req.context.authInfo);
+      expectSecurityContext(req.context.securityContext);
+
+      res.status(200).end();
+    });
+
+    const playgroundAuthSecret = 'playgroundSecret';
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      playgroundAuthSecret
+    });
+
+    const token = generateAuthToken({ uid: 5, }, {});
+    const playgroundToken = generateAuthToken({ uid: 5, }, {}, playgroundAuthSecret);
+    const badToken = generateAuthToken({ uid: 5, }, {}, 'bad');
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(200);
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${playgroundToken}`)
+      .expect(200);
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${badToken}`)
+      .expect(403);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    expect(handlerMock.mock.calls.length).toEqual(2);
+
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
+    // authInfo was deprecated, but should exists as computability
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
+  });
+
   test('default authorization with JWT token and securityContext in u', async () => {
     const loggerMock = jest.fn(() => {
       //
@@ -167,6 +218,155 @@ describe('test authorization', () => {
 
     expect(loggerMock.mock.calls.length).toEqual(0);
     expect(handlerMock.mock.calls.length).toEqual(1);
+  });
+
+  test('invalid configuration with both jwkUrl, jwkKeys', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const handlerMock = jest.fn(() => {
+      //
+    });
+
+    expect(() => {
+      createApiGateway(handlerMock, loggerMock, {
+        jwt: {
+          jwkKeys: [
+            {
+              kty: 'RSA',
+              n: 'wIcfXbNWwJfdJltJP_Qp9ChcbyWmDDCz1lJp2x1p-q6NIYzf_3ViBLFulexhpWsHIVFKXp7lcdDXTuSurs5Eww',
+              e: 'AQAB',
+              alg: 'RS256',
+              kid: 'test1',
+              use: 'sig'
+            }
+          ],
+          jwkUrl: 'https://google.com/'
+        },
+      });
+    }).toThrowError(
+      'You are using both options for JWK validation: jwkUrl and jwkKeys, which is not allowed. You should use only one one of options.'
+    );
+  });
+
+  test('default authorization with JWT token via jwkKeys and securityContext in u', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const expectSecurityContext = (securityContext) => {
+      expect(securityContext.u).toEqual({
+        uid: 5,
+      });
+      expect(securityContext.iat).toBeDefined();
+      expect(securityContext.exp).toBeDefined();
+    };
+
+    const handlerMock = jest.fn((req, res) => {
+      expectSecurityContext(req.context.securityContext);
+      expectSecurityContext(req.context.authInfo);
+
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      jwt: {
+        jwkKeys: [
+          {
+            kty: 'RSA',
+            n: 'wIcfXbNWwJfdJltJP_Qp9ChcbyWmDDCz1lJp2x1p-q6NIYzf_3ViBLFulexhpWsHIVFKXp7lcdDXTuSurs5Eww',
+            e: 'AQAB',
+            alg: 'RS256',
+            kid: 'test1',
+            use: 'sig'
+          }
+        ]
+      }
+    });
+
+    const validPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
+MIIBPAIBAAJBAMCHH12zVsCX3SZbST/0KfQoXG8lpgwws9ZSadsdafqujSGM3/91
+YgSxbpXsYaVrByFRSl6e5XHQ107krq7ORMMCAwEAAQJBAKlj+V/akyBePTArLvZ6
+35K3FCSibkbZbtDJr+MeLQllkhLw0zZ+k22nir5Oe9Uve0Nd2H+OVb/CLZQ8RU0J
+BRkCIQD9ytsftNK4PO8duANfDsc+hn7LQDcMPxVyWefOt5IAdQIhAMIz18JT9bV8
+pKb2hw4yBT9OcMB06QxLdQ73WbP7/AlXAiAUIBsCR6eSHprjo2z5A8X/ClFRstTq
+rrH3sHN2bA4y5QIhAK0+UlupSqh8aOYJRrIDLWssLqmBoeS169dOEVfekxhBAiEA
+shWat9hElp5jatgPnV2+klFo1pwCtH07iJWN7vdqEBw=
+-----END RSA PRIVATE KEY-----`;
+
+    {
+      const validToken = generateAuthToken({ u: { uid: 5, } }, {
+        header: {
+          kid: 'test1',
+        },
+        algorithm: 'RS256'
+      }, validPrivateKey);
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${validToken}`)
+        .expect(200);
+
+      expect(loggerMock.mock.calls.length).toEqual(0);
+      expect(handlerMock.mock.calls.length).toEqual(1);
+    }
+
+    {
+      const validTokenWithUnknownKid = generateAuthToken({ u: { uid: 5, } }, {
+        header: {
+          kid: 'unknown-kid',
+        },
+        algorithm: 'RS256'
+      }, validPrivateKey);
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${validTokenWithUnknownKid}`)
+        .expect(403);
+
+      expect(loggerMock.mock.calls.length).toEqual(0);
+      expect(handlerMock.mock.calls.length).toEqual(1);
+    }
+
+    {
+      const validTokenWithoutKid = generateAuthToken({ u: { uid: 5, } }, {
+        algorithm: 'RS256'
+      }, validPrivateKey);
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${validTokenWithoutKid}`)
+        .expect(403);
+
+      expect(loggerMock.mock.calls.length).toEqual(0);
+      expect(handlerMock.mock.calls.length).toEqual(1);
+    }
+
+    {
+      const invalidToken = generateAuthToken({ u: { uid: 5, } }, {
+        header: {
+          kid: 'test1',
+        },
+        algorithm: 'RS256'
+      }, `-----BEGIN RSA PRIVATE KEY-----
+MIIBPAIBAAJBAPBcYhx4Gfi+NarrJ1DoMEDnwnLs4mKWGmIdROeGZvKXzC7NeeJF
+yCMpjOKXoolVR21lDZfbpFIvSDaV9ucckO0CAwEAAQJBAJnGAN7F15fT2PHoT9br
+NTPREg4EjzETZv2uTA7zZZl9VqDmoSWZhTd5XZgumjI1wcftDqc9URnumuxkPnZn
+zuECIQD9vSP06hf8ETbx2vf/MS6W4cdtaF9UvIHF5GWuew/uuwIhAPKAuS+1Pnwz
+j+gMxo2zZSOKyt2O593s6vngeyVVsEh3AiEAyYGBoqidr5LEPcIVnNYkF7LqO5rd
+yl+B9/RwQ+Z7Oq0CIQC3vE4TVpikVBDpuZxKyqyLtGImYltNq28RqkLDs9vf2wIg
+Szj005EEcSi2UrNrh5ZxrZzZ16mIw3ua7mF4OmbBoWg=
+-----END RSA PRIVATE KEY-----`);
+
+      await request(app)
+        .get('/test-auth-fake')
+        .set('Authorization', `Authorization: ${invalidToken}`)
+        .expect(403);
+
+      expect(loggerMock.mock.calls.length).toEqual(0);
+      expect(handlerMock.mock.calls.length).toEqual(1);
+    }
   });
 
   test('custom checkAuth with async flow', async () => {

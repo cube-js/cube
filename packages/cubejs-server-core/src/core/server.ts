@@ -383,12 +383,13 @@ export class CubejsServerCore {
       sqlCache: true,
       ...opts,
       jwt: {
-        key: getEnv('jwkKey'),
+        key: getEnv('jwtKey'),
         algorithms: getEnv('jwtAlgorithms'),
         issuer: getEnv('jwtIssuer'),
         audience: getEnv('jwtAudience'),
         subject: getEnv('jwtSubject'),
         jwkUrl: getEnv('jwkUrl'),
+        jwkKeys: getEnv('jwkKeys'),
         claimsNamespace: getEnv('jwtClaimsNamespace'),
         ...opts.jwt,
       }

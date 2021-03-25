@@ -4,6 +4,7 @@ import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
 import { getRealType } from '@cubejs-backend/shared';
+import jwkToPem from 'jwk-to-pem';
 
 import type {
   Response, NextFunction,
@@ -845,6 +846,42 @@ export class ApiGateway {
     });
 
     let checkAuthFn: VerifyTokenFn = verifyToken;
+
+    if (options?.jwkUrl && options?.jwkKeys) {
+      throw new UserError('You are using both options for JWK validation: jwkUrl and jwkKeys, which is not allowed. You should use only one one of options.');
+    }
+
+    if (options?.jwkKeys) {
+      const jwks = new Map();
+
+      for (const jwk of options.jwkKeys) {
+        if (!jwk.kid) {
+          throw new Error('Unable to find kid inside JWK from jwkKeys');
+        }
+
+        jwks.set(jwk.kid, jwkToPem(jwk));
+      }
+
+      checkAuthFn = async (auth) => {
+        const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
+        if (!decoded) {
+          throw new UserError('Unable to decode JWT key');
+        }
+
+        if (!decoded.header || !decoded.header.kid) {
+          throw new UserError('JWT without kid inside headers');
+        }
+
+        const jwk = jwks.get(decoded.header.kid);
+        if (!jwk) {
+          throw new UserError(
+            `Unable to verify, JWK with kid: "${decoded.header.kid}" not found`,
+          );
+        }
+
+        return verifyToken(auth, jwk);
+      };
+    }
 
     if (options?.jwkUrl) {
       const jwks = createJWKsFetcher(options, {

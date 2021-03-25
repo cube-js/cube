@@ -80,7 +80,10 @@ export interface JWTOptions {
   jwkRetry?: number,
   jwkDefaultExpire?: number,
   jwkUrl?: ((payload: any) => string) | string,
+  // Array of JWT keys as objects
+  jwkKeys?: any[],
   jwkRefetchWindow?: number,
+  // Secret to decode payload
   key?: string,
   algorithms?: string[],
   issuer?: string[],
