@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs-extra';
+import { CubeCloudClient } from './cloud';
 
 type DeployDirectoryOptions = {
   directory: string,
@@ -59,5 +60,58 @@ export class DeployDirectory {
       stream.on('data', chunk => hash.update(chunk));
       stream.on('end', () => resolve(hash.digest('hex')));
     });
+  }
+}
+
+type DeployHooks = {
+  onStart?: Function,
+  onUpdate?: Function,
+  onUpload?: Function,
+  onFinally?: Function
+};
+
+export class DeployController {
+  public constructor(
+    protected readonly cubeCloudClient: CubeCloudClient,
+    protected readonly hooks: DeployHooks = {}
+  ) {
+  }
+
+  public async deploy(directory: string) {
+    let result;
+    const deployDir = new DeployDirectory({ directory });
+    const fileHashes: any = await deployDir.fileHashes();
+
+    const upstreamHashes = await this.cubeCloudClient.getUpstreamHashes();
+    const { transaction } = await this.cubeCloudClient.startUpload();
+
+    const files = Object.keys(fileHashes);
+    const fileHashesPosix: Record<string, any> = {};
+    if (this.hooks.onStart) this.hooks.onStart(files);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (this.hooks.onUpdate) this.hooks.onUpdate(i, { file });
+
+        const filePosix = file.split(path.sep).join(path.posix.sep);
+        fileHashesPosix[filePosix] = fileHashes[file];
+
+        if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
+          if (this.hooks.onUpload) this.hooks.onUpload(files, file);
+          await this.cubeCloudClient.uploadFile({
+            transaction,
+            fileName: filePosix,
+            data: fs.createReadStream(path.join(directory, file))
+          });
+        }
+      }
+      
+      result = await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix });
+    } finally {
+      if (this.hooks.onFinally) this.hooks.onFinally();
+    }
+
+    return result || {};
   }
 }

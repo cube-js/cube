@@ -1,2 +1,3 @@
 storage
 dist
+test/.*

@@ -1,10 +1,13 @@
+use crate::queryplanner::planning::WorkerExec;
+use crate::queryplanner::query_executor::ClusterSendExec;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::expressions::AliasedSchemaExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::{AggregateStrategy, HashAggregateExec};
-use datafusion::physical_plan::merge::MergeExec;
+use datafusion::physical_plan::merge::{MergeExec, UnionExec};
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::planner::compute_aggregation_strategy;
+use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::ExecutionPlan;
 use std::sync::Arc;
 
@@ -46,14 +49,21 @@ fn try_regroup_columns(
     if p.as_any().is::<HashAggregateExec>() {
         return Ok(p);
     }
-    if p.as_any().is::<AliasedSchemaExec>() || p.as_any().is::<FilterExec>() {
-        let children: datafusion::error::Result<Vec<_>> = p
-            .children()
-            .into_iter()
-            .map(|c| try_regroup_columns(c))
-            .collect();
-        return p.with_new_children(children?);
+    if p.as_any().is::<UnionExec>()
+        || p.as_any().is::<ProjectionExec>()
+        || p.as_any().is::<AliasedSchemaExec>()
+        || p.as_any().is::<FilterExec>()
+        || p.as_any().is::<WorkerExec>()
+        || p.as_any().is::<ClusterSendExec>()
+    {
+        return p.with_new_children(
+            p.children()
+                .into_iter()
+                .map(|c| try_regroup_columns(c))
+                .collect::<Result<_, DataFusionError>>()?,
+        );
     }
+
     let merge;
     if let Some(m) = p.as_any().downcast_ref::<MergeExec>() {
         merge = m;
@@ -61,9 +71,11 @@ fn try_regroup_columns(
         return Ok(p);
     }
 
+    let input = try_regroup_columns(merge.input().clone())?;
+
     // Try to replace `MergeExec` with `MergeSortExec`.
     let sort_order;
-    if let Some(o) = merge.input().output_hints().sort_order {
+    if let Some(o) = input.output_hints().sort_order {
         sort_order = o;
     } else {
         return Ok(p);
@@ -73,10 +85,7 @@ fn try_regroup_columns(
     }
     let sort_columns = sort_order
         .into_iter()
-        .map(|i| merge.input().schema().field(i).qualified_name())
+        .map(|i| input.schema().field(i).qualified_name())
         .collect();
-    Ok(Arc::new(MergeSortExec::try_new(
-        merge.input().clone(),
-        sort_columns,
-    )?))
+    Ok(Arc::new(MergeSortExec::try_new(input, sort_columns)?))
 }

@@ -2,20 +2,26 @@ import rp, { RequestPromiseOptions } from 'request-promise';
 import { ReadStream } from 'node:fs';
 import path from 'path';
 
-type AuthObject = {
+export type AuthObject = {
   auth: string,
-  deploymentId?: string,
   url?: string,
+  deploymentId?: string,
+  deploymentUrl?: string
 };
 
 export class CubeCloudClient {
+  public constructor(
+    protected readonly auth?: AuthObject
+  ) {
+  }
+
   private async request(options: {
     url: (deploymentId: string) => string,
-    auth: AuthObject,
+    auth?: AuthObject,
   } & RequestPromiseOptions) {
     const { url, auth, ...restOptions } = options;
 
-    const authorization = auth;
+    const authorization = auth || this.auth;
     if (!authorization) {
       throw new Error('Auth isn\'t set');
     }
@@ -30,7 +36,7 @@ export class CubeCloudClient {
     });
   }
 
-  public getDeploymentsList({ auth }: { auth: AuthObject }) {
+  public getDeploymentsList({ auth }: { auth?: AuthObject } = {}) {
     return this.request({
       url: () => 'build/deploy/deployments',
       method: 'GET',
@@ -58,7 +64,7 @@ export class CubeCloudClient {
     return res.jwt;
   }
 
-  public getUpstreamHashes({ auth }: { auth: AuthObject }) {
+  public getUpstreamHashes({ auth }: { auth?: AuthObject } = {}) {
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
       method: 'GET',
@@ -66,7 +72,7 @@ export class CubeCloudClient {
     });
   }
 
-  public startUpload({ auth }: { auth: AuthObject }) {
+  public startUpload({ auth }: { auth?: AuthObject } = {}) {
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/start-upload`,
       method: 'POST',
@@ -76,7 +82,7 @@ export class CubeCloudClient {
 
   public uploadFile(
     { transaction, fileName, data, auth }:
-      { transaction: any, fileName: string, data: ReadStream, auth: AuthObject }
+      { transaction: any, fileName: string, data: ReadStream, auth?: AuthObject }
   ) {
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
@@ -97,7 +103,7 @@ export class CubeCloudClient {
   }
 
   public finishUpload({ transaction, files, auth }:
-    { transaction: any, files: any, auth: AuthObject }) {
+    { transaction: any, files: any, auth?: AuthObject }) {
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/finish-upload`,
       method: 'POST',
@@ -109,13 +115,31 @@ export class CubeCloudClient {
     });
   }
 
-  public setEnvVars({ envVariables, auth }: { envVariables: any, auth: AuthObject }) {
+  public setEnvVars({ envVariables, auth }: { envVariables: any, auth?: AuthObject }) {
     return this.request({
       url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
       method: 'POST',
       body: {
         envVariables: JSON.stringify(envVariables),
       },
+      auth
+    });
+  }
+
+  public getStatusDevMode({ auth, lastHash }: { auth?: AuthObject, lastHash?: string } = {}) {
+    return this.request({
+      url: (deploymentId) => `devmode/${deploymentId}/status`,
+      qs: { lastHash },
+      method: 'GET',
+      auth
+    });
+  }
+
+  public createTokenDevMode({ auth, payload }: { auth?: AuthObject, payload?: Record<string, any> } = {}) {
+    return this.request({
+      url: (deploymentId) => `devmode/${deploymentId}/token`,
+      method: 'POST',
+      body: payload,
       auth
     });
   }

@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.68](https://github.com/cube-js/cube.js/compare/v0.26.67...v0.26.68) (2021-03-25)
+
+
+### Bug Fixes
+
+* **cubestore:** make get active partitions a read operation ([#2416](https://github.com/cube-js/cube.js/issues/2416)) ([a1981f3](https://github.com/cube-js/cube.js/commit/a1981f3eadeb7359ab5cabdedf7ee2e5cfe9cc00))
+
+
+### Features
+
+* **@cubejs-client/vue:** query load event ([6045e8f](https://github.com/cube-js/cube.js/commit/6045e8f060b3702512f138b5c571db5deb6448f2))
+* Live preview watcher, refactor cube cloud package ([#2418](https://github.com/cube-js/cube.js/issues/2418)) ([a311843](https://github.com/cube-js/cube.js/commit/a3118439afa5b04d658f79a94d9021f4c7f09472))
+
+
+
+
+
+## [0.26.67](https://github.com/cube-js/cube.js/compare/v0.26.66...v0.26.67) (2021-03-24)
+
+
+### Bug Fixes
+
+* Make requireCubeStoreDriver private (to make it internal in d.ts) ([c0e6fb5](https://github.com/cube-js/cube.js/commit/c0e6fb569c5fea65146da9dfcf52e75800a22392))
+
+
+
+
+
+## [0.26.66](https://github.com/cube-js/cube.js/compare/v0.26.65...v0.26.66) (2021-03-24)
+
+
+### Bug Fixes
+
+* **cubestore:** choose inplace aggregate in more cases ([#2402](https://github.com/cube-js/cube.js/issues/2402)) ([9ab6559](https://github.com/cube-js/cube.js/commit/9ab65599ea2a900bf63c4cb5e0a2544e5766822f))
+* this.logger is not a function. fix [#2431](https://github.com/cube-js/cube.js/issues/2431) ([d715dc0](https://github.com/cube-js/cube.js/commit/d715dc0929673dbd0e7d9694e6f6d09b61f8c090))
+
+
+### Features
+
+* **cubestore:** add 'no upload' mode ([#2405](https://github.com/cube-js/cube.js/issues/2405)) ([38999b0](https://github.com/cube-js/cube.js/commit/38999b05a41849cae690b8900319340a99177fdb))
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+
+### Bug Fixes
+
+* Warning/skip Cube Store on unsupported platforms ([c187e11](https://github.com/cube-js/cube.js/commit/c187e119b8747e1f6bb3fe2bd84f66ae3822ac7d))
+* **cubestore:** use less read and write locks during planning ([#2420](https://github.com/cube-js/cube.js/issues/2420)) ([2d5d963](https://github.com/cube-js/cube.js/commit/2d5d96343dd2ef9204cb68c7a3e897dd28fa0d52))
+* Allow using sub query dimensions in join conditions ([#2419](https://github.com/cube-js/cube.js/issues/2419)) ([496a075](https://github.com/cube-js/cube.js/commit/496a0755308f376666e732ea09a4c7816682cfb0))
+
+
+
+
+
 ## [0.26.64](https://github.com/cube-js/cube.js/compare/v0.26.63...v0.26.64) (2021-03-22)
 
 

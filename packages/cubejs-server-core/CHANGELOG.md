@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.68](https://github.com/cube-js/cube.js/compare/v0.26.67...v0.26.68) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.67](https://github.com/cube-js/cube.js/compare/v0.26.66...v0.26.67) (2021-03-24)
+
+
+### Bug Fixes
+
+* Make requireCubeStoreDriver private (to make it internal in d.ts) ([c0e6fb5](https://github.com/cube-js/cube.js/commit/c0e6fb569c5fea65146da9dfcf52e75800a22392))
+
+
+
+
+
+## [0.26.66](https://github.com/cube-js/cube.js/compare/v0.26.65...v0.26.66) (2021-03-24)
+
+
+### Bug Fixes
+
+* this.logger is not a function. fix [#2431](https://github.com/cube-js/cube.js/issues/2431) ([d715dc0](https://github.com/cube-js/cube.js/commit/d715dc0929673dbd0e7d9694e6f6d09b61f8c090))
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+
+### Bug Fixes
+
+* Warning/skip Cube Store on unsupported platforms ([c187e11](https://github.com/cube-js/cube.js/commit/c187e119b8747e1f6bb3fe2bd84f66ae3822ac7d))
+
+
+
+
+
 ## [0.26.64](https://github.com/cube-js/cube.js/compare/v0.26.63...v0.26.64) (2021-03-22)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

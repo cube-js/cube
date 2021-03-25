@@ -29,7 +29,7 @@ export default {
       mutexObj: {},
       error: undefined,
       resultSet: undefined,
-      loading: true,
+      loading: false,
       sqlQuery: undefined,
     };
   },
@@ -142,6 +142,14 @@ export default {
     },
   },
   watch: {
+    loading(loading) {
+      if (loading === false) {
+        this.$emit('queryLoad', {
+          error: this.error,
+          resultSet: this.resultSet
+        });
+      }
+    },
     cubejsApi() {
       this.load();
     },
