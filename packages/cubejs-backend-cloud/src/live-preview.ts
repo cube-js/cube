@@ -17,6 +17,8 @@ export class LivePreviewWatcher {
 
   private queue: {}[] = [];
 
+  private uploading: Boolean = false;
+
   private log(message: string) {
     console.log('☁️  Live-preview:', message);
   }
@@ -80,6 +82,7 @@ export class LivePreviewWatcher {
   public async getStatus() {
     const { auth } = this;
     let result = {
+      uploading: this.uploading,
       enabled: !!this.watcher
     };
 
@@ -99,6 +102,7 @@ export class LivePreviewWatcher {
       const [job] = this.queue;
       if (job) {
         this.queue = [];
+        this.uploading = true;
         await this.deploy();
       }
     } catch (e) {
@@ -109,6 +113,7 @@ export class LivePreviewWatcher {
         internalExceptions(e);
       }
     } finally {
+      this.uploading = false;
       this.handleQueueTimeout = setTimeout(async () => this.handleQueue(), 1000);
     }
   }
