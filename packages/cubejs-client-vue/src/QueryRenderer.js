@@ -142,7 +142,6 @@ export default {
   },
   watch: {
     loading(loading) {
-      console.log(loading, Date.now())
       if (loading === false) {
         this.$emit('queryLoad', {
           error: this.error,
@@ -157,12 +156,6 @@ export default {
           Object.keys(query?.order || {}),
           Object.keys(prevQuery?.order || {})
         );
-
-        // todo: remove
-        // console.log({
-        //   query: JSON.stringify((query)),
-        //   prevQuery: JSON.stringify((prevQuery)),
-        // })
 
         if (isQueryPresent(query) && (!equals(query, prevQuery) || hasOrderChanged)) {
           this.load();
