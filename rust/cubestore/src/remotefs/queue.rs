@@ -291,6 +291,12 @@ impl RemoteFs for QueueRemoteFs {
         local_upload_path: &str,
         remote_path: &str,
     ) -> Result<(), CubeError> {
+        if !self.config.upload_to_remote() {
+            return Err(CubeError::internal(format!(
+                "Refusing to upload {}",
+                remote_path
+            )));
+        }
         let mut receiver = self.result_sender.subscribe();
         self.upload_queue.push(RemoteFsOp::Upload {
             temp_upload_path: local_upload_path.to_string(),
@@ -334,6 +340,12 @@ impl RemoteFs for QueueRemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        if !self.config.upload_to_remote() {
+            return Err(CubeError::internal(format!(
+                "Refusing to delete {}",
+                remote_path
+            )));
+        }
         let mut receiver = self.result_sender.subscribe();
         self.upload_queue
             .push(RemoteFsOp::Delete(remote_path.to_string()));

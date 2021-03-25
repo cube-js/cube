@@ -141,8 +141,11 @@ impl From<tokio::task::JoinError> for CubeError {
     }
 }
 
-impl From<SendError<metastore::MetaStoreEvent>> for CubeError {
-    fn from(v: SendError<metastore::MetaStoreEvent>) -> Self {
+impl<T> From<SendError<T>> for CubeError
+where
+    T: Debug,
+{
+    fn from(v: SendError<T>) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }
