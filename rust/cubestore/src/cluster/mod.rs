@@ -177,7 +177,7 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
-    #[instrument(skip(self, plan_node))]
+    #[instrument(level = "trace", skip(self, plan_node))]
     async fn run_select(
         &self,
         node_name: &str,
@@ -259,7 +259,7 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
-    #[instrument(skip(self, m))]
+    #[instrument(level = "trace", skip(self, m))]
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
         match m {
             NetworkMessage::Select(plan) => {
@@ -687,7 +687,7 @@ impl ClusterImpl {
         }
     }
 
-    #[instrument(skip(self, plan_node))]
+    #[instrument(level = "trace", skip(self, plan_node))]
     async fn run_local_select_serialized(
         &self,
         plan_node: SerializedPlan,
@@ -705,7 +705,7 @@ impl ClusterImpl {
             .into_iter()
             .zip(
                 join_all(file_futures)
-                    .instrument(tracing::span!(tracing::Level::INFO, "warmup_download"))
+                    .instrument(tracing::span!(tracing::Level::TRACE, "warmup_download"))
                     .with_current_subscriber()
                     .await
                     .into_iter()
@@ -741,7 +741,7 @@ impl ClusterImpl {
                     remote_to_local_names,
                 ))
                 .instrument(tracing::span!(
-                    tracing::Level::INFO,
+                    tracing::Level::TRACE,
                     "execute_worker_plan_on_pool"
                 ))
                 .await
@@ -835,7 +835,7 @@ impl ClusterImpl {
         ))
     }
 
-    #[instrument(skip(self, m))]
+    #[instrument(level = "trace", skip(self, m))]
     async fn send_or_process_locally(
         &self,
         node_name: &str,

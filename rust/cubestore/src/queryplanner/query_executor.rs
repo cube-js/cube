@@ -86,13 +86,13 @@ crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
-    #[instrument(skip(self, plan, cluster))]
+    #[instrument(level = "trace", skip(self, plan, cluster))]
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<DataFrame, CubeError> {
-        let collect_span = tracing::span!(tracing::Level::INFO, "collect_physical_plan");
+        let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
 
@@ -133,7 +133,7 @@ impl QueryExecutor for QueryExecutorImpl {
         Ok(data_frame)
     }
 
-    #[instrument(skip(self, plan, remote_to_local_names))]
+    #[instrument(level = "trace", skip(self, plan, remote_to_local_names))]
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
@@ -156,7 +156,7 @@ impl QueryExecutor for QueryExecutorImpl {
         let execution_time = SystemTime::now();
         let results = collect(worker_plan.clone())
             .instrument(tracing::span!(
-                tracing::Level::INFO,
+                tracing::Level::TRACE,
                 "collect_physical_plan"
             ))
             .await;
@@ -607,7 +607,7 @@ impl ExecutionPlan for ClusterSendExec {
         self.input_for_optimizations.output_hints()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn execute(
         &self,
         partition: usize,

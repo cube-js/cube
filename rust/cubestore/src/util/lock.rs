@@ -14,7 +14,7 @@ pub async fn acquire_lock_duration<F: Future>(
     duration: Duration,
 ) -> Result<F::Output, CubeError> {
     tokio::time::timeout(duration, lock)
-        .instrument(tracing::span!(tracing::Level::INFO, "Wait for lock", name))
+        .instrument(tracing::span!(tracing::Level::TRACE, "Wait for lock", name))
         .map_err(|e| CubeError::internal(format!("Can't acquire {} lock: {}", name, e)))
         .await
 }
