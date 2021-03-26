@@ -1,5 +1,5 @@
-import { toPairs, fromPairs, equals } from 'ramda';
-import { isQueryPresent } from '@cubejs-client/core';
+import { toPairs, fromPairs } from 'ramda';
+import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 
 export default {
   props: {
@@ -23,6 +23,10 @@ export default {
       required: false,
       default: () => ({}),
     },
+    chartType: {
+      type: String,
+      required: false,
+    },
   },
   data() {
     return {
@@ -36,11 +40,9 @@ export default {
   async mounted() {
     const { query, queries } = this;
 
-    if (query) {
+    if (isQueryPresent(query)) {
       await this.load();
-    }
-
-    if (queries) {
+    } else if (isQueryPresent(queries)) {
       await this.loadQueries(queries);
     }
   },
@@ -81,31 +83,35 @@ export default {
   methods: {
     async load() {
       const { query } = this;
+
+      if (!isQueryPresent(query)) {
+        return;
+      }
+
       try {
         this.loading = true;
-        this.error = undefined;
+        this.error = null;
+        this.resultSet = null;
 
-        if (Object.keys(query || {}).length > 0) {
-          if (this.loadSql === 'only') {
-            this.sqlQuery = await this.cubejsApi.sql(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'sql',
-            });
-          } else if (this.loadSql) {
-            this.sqlQuery = await this.cubejsApi.sql(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'sql',
-            });
-            this.resultSet = await this.cubejsApi.load(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'query',
-            });
-          } else {
-            this.resultSet = await this.cubejsApi.load(query, {
-              mutexObj: this.mutexObj,
-              mutexKey: 'query',
-            });
-          }
+        if (this.loadSql === 'only') {
+          this.sqlQuery = await this.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql',
+          });
+        } else if (this.loadSql) {
+          this.sqlQuery = await this.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql',
+          });
+          this.resultSet = await this.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query',
+          });
+        } else {
+          this.resultSet = await this.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query',
+          });
         }
 
         this.loading = false;
@@ -145,19 +151,20 @@ export default {
       if (loading === false) {
         this.$emit('queryLoad', {
           error: this.error,
-          resultSet: this.resultSet
+          resultSet: this.resultSet,
         });
       }
+    },
+    cubejsApi() {
+      this.load();
+    },
+    chartType() {
+      this.load();
     },
     query: {
       deep: true,
       handler(query, prevQuery) {
-        const hasOrderChanged = !equals(
-          Object.keys(query?.order || {}),
-          Object.keys(prevQuery?.order || {})
-        );
-
-        if (isQueryPresent(query) && (!equals(query, prevQuery) || hasOrderChanged)) {
+        if (!areQueriesEqual(query, prevQuery)) {
           this.load();
         }
       },

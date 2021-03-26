@@ -9,8 +9,8 @@
     "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist"
   },
   "dependencies": {
-    "@cubejs-client/core": "^0.24.0",
-    "@cubejs-client/vue": "^0.19.43",
+    "@cubejs-client/core": "^0.26.61",
+    "@cubejs-client/vue": "^0.26.61",
     "apollo-boost": "^0.4.9",
     "apollo-cache-inmemory": "^1.6.6",
     "apollo-client": "^2.6.10",
@@ -24,6 +24,7 @@
     "graphql-tools": "5.0.0",
     "vue": "^2.6.11",
     "vue-apollo": "^3.0.5",
+    "vue-chartjs": "^3.5.1",
     "vue-chartkick": "^0.6.0",
     "vue-grid-layout": "^2.3.12",
     "vue-router": "^3.5.1",
@@ -31,6 +32,7 @@
     "vuetify": "^2.2.11"
   },
   "devDependencies": {
+    "@types/vue-chartkick": "^0.5.1",
     "@vue/cli-plugin-babel": "~4.4.0",
     "@vue/cli-plugin-eslint": "~4.4.0",
     "@vue/cli-service": "~4.4.0",

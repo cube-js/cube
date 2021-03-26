@@ -53,6 +53,12 @@ export const frameworkChartLibraries = {
       title: 'ng2',
     },
   ],
+  vue: [
+    {
+      value: 'chartkick',
+      title: 'Chartkick',
+    },
+  ],
 };
 
 const playgroundActionUpdateMethods = (updateMethods, memberName) =>

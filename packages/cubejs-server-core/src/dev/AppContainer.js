@@ -80,6 +80,20 @@ class AppContainer {
   async persistSources(sourceContainer, packageVersions) {
     const sources = sourceContainer.outputSources();
     await Promise.all(sources.map((file) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
+
+    await Promise.all(
+      Object.entries(sourceContainer.filesToMove).map(async ([from, to]) => {
+        try {
+          await this.executeCommand(`cp ${from} ${path.join('.', to)}`, [], {
+            shell: true,
+            cwd: path.resolve(this.appPath),
+          });
+        } catch (error) {
+          console.log(`Unable to copy file: ${from} -> ${to}`);
+        }
+      })
+    );
+
     const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
     packageJson.cubejsTemplates = {
       ...packageJson.cubejsTemplates,
@@ -90,7 +104,7 @@ class AppContainer {
     });
   }
 
-  executeCommand(command, args, options) {
+  async executeCommand(command, args, options) {
     return executeCommand(command, args, options);
   }
 
@@ -104,11 +118,11 @@ class AppContainer {
 
     const toInstall = R.toPairs(dependencies)
       .map(([dependency, version]) => {
-        const currentDependency = (version !== 'latest' ? `${dependency}@${version}` : dependency);
+        const currentDependency = version !== 'latest' ? `${dependency}@${version}` : dependency;
         if (!packageJson.dependencies[dependency] || version !== 'latest') {
           return currentDependency;
         }
-      
+
         return false;
       })
       .filter(Boolean);

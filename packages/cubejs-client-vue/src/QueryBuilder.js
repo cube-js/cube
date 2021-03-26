@@ -7,6 +7,7 @@ import {
   getOrderMembersFromOrder,
   moveItemInArray,
   movePivotItem,
+  areQueriesEqual
 } from '@cubejs-client/core';
 import { clone, equals } from 'ramda';
 
@@ -18,13 +19,6 @@ const toOrderMember = (member) => ({
   id: member.name,
   title: member.title,
 });
-
-const areQueriesEqual = (query1, query2) => {
-  return (
-    equals(Object.entries(query1.order || {}), Object.entries(query2.order || {})) &&
-    equals(query1, query2)
-  );
-};
 
 const reduceOrderMembers = (array) =>
   array.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []);
@@ -325,7 +319,10 @@ export default {
       ) {
         const heuristicsFn = this.stateChangeHeuristics || defaultHeuristics;
         const { query, chartType, shouldApplyHeuristicOrder, pivotConfig } = heuristicsFn(
-          validatedQuery,
+          {
+            query: validatedQuery,
+            chartType: this.chartType
+          },
           this.prevValidatedQuery,
           {
             meta: this.meta,
@@ -358,6 +355,7 @@ export default {
   },
 
   async mounted() {
+    console.log('Local Dep', Date.now());
     this.meta = await this.cubejsApi.meta();
 
     this.copyQueryFromProps();
