@@ -188,7 +188,7 @@ export class CubejsServerCore {
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
-        this.handleScheduledRefreshInterval,
+        () => this.handleScheduledRefreshInterval({}),
         {
           interval: scheduledRefreshTimer,
           onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
