@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.70](https://github.com/cube-js/cube.js/compare/v0.26.69...v0.26.70) (2021-03-26)
+
+
+### Features
+
+* Vue chart renderers ([#2428](https://github.com/cube-js/cube.js/issues/2428)) ([bc2cbab](https://github.com/cube-js/cube.js/commit/bc2cbab22fee860cfc846d1207f6a83899198dd8))
+
+
+
+
+
 ## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
 
 **Note:** Version bump only for package @cubejs-client/vue
