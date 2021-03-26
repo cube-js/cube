@@ -22,7 +22,8 @@ class DremioDriver extends BaseDriver {
       user: config.user || process.env.CUBEJS_DB_USER,
       password: config.password || process.env.CUBEJS_DB_PASS,
       database: config.database || process.env.CUBEJS_DB_NAME,
-      ssl: config.ssl || process.env.CUBEJS_DB_SSL
+      ssl: config.ssl || process.env.CUBEJS_DB_SSL,
+      ...config
     };
 
     const protocol = (this.config.ssl === true || this.config.ssl === 'true') ? 'https' : 'http';

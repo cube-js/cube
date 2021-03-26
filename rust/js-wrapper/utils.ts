@@ -1,10 +1,6 @@
-import colors from '@oclif/color';
 import { spawnSync } from 'child_process';
 import process from 'process';
-
-export const displayWarning = (message: string) => {
-  console.log(`${colors.yellow('Warning.')} ${message}`);
-};
+import { displayCLIWarning } from '@cubejs-backend/shared';
 
 export function detectLibc() {
   if (process.platform !== 'linux') {
@@ -43,7 +39,7 @@ export function detectLibc() {
     }
   }
 
-  displayWarning('Unable to detect what host library is used as libc, continue with gnu');
+  displayCLIWarning('Unable to detect what host library is used as libc, continue with gnu');
 
   return 'gnu';
 }
