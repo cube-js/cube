@@ -1,10 +1,13 @@
-import tar from 'tar';
-import fs, { WriteStream } from 'fs';
+import decompress from 'decompress';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
 import { SingleBar } from 'cli-progress';
 import { mkdirpSync } from 'fs-extra';
+import fs from 'fs';
+import * as os from 'os';
+import crypto from 'crypto';
+import * as path from 'path';
 
 import { internalExceptions } from './errors';
 
@@ -12,9 +15,8 @@ type ByteProgressCallback = (info: { progress: number, eta: number, speed: strin
 
 export async function streamWithProgress(
   response: Response,
-  writer: fs.WriteStream,
   progressCallback: ByteProgressCallback
-): Promise<void> {
+): Promise<string> {
   const total = parseInt(response.headers.get('Content-Length') || '0', 10);
   const startedAt = Date.now();
 
@@ -38,17 +40,22 @@ export async function streamWithProgress(
     },
   );
 
+  const saveFilePath = path.join(os.tmpdir(), crypto.randomBytes(16).toString('hex'));
+  const writer = fs.createWriteStream(
+    saveFilePath,
+  );
+
   response.body.pipe(writer);
   response.body.on('data', (chunk) => {
     done += chunk.length;
     throttled();
   });
 
-  return new Promise(
+  return new Promise<string>(
     (resolve) => {
       // Wait before writer will finish, because response can be done earlier then extracting
       writer.on('finish', () => {
-        resolve();
+        resolve(saveFilePath);
       });
     }
   );
@@ -72,7 +79,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   }
 
   const bar = new SingleBar({
-    format: 'Downloading from GitHub [{bar}] {percentage}% | Speed: {speed}',
+    format: 'Downloading [{bar}] {percentage}% | Speed: {speed}',
   });
   bar.start(100, 0);
 
@@ -82,16 +89,22 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
     internalExceptions(e);
   }
 
-  const writer = tar.x({
-    cwd,
-  });
-
-  await streamWithProgress(response, <WriteStream>writer, ({ progress, speed, eta }) => {
+  const savedFilePath = await streamWithProgress(response, ({ progress, speed, eta }) => {
     bar.update(progress, {
       speed,
       eta
     });
   });
+
+  await decompress(savedFilePath, cwd, {
+    strip: 1,
+  });
+
+  try {
+    fs.unlinkSync(savedFilePath);
+  } catch (e) {
+    internalExceptions(e);
+  }
 
   bar.stop();
 }

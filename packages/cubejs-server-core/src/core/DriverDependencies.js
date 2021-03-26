@@ -19,4 +19,6 @@ module.exports = {
   dremio: '@cubejs-backend/dremio-driver',
   druid: '@cubejs-backend/druid-driver',
   cubestore: '@cubejs-backend/cubestore-driver',
+  // List for JDBC drivers
+  'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
 };
