@@ -13,6 +13,13 @@ export const GRANULARITIES = [
   { name: 'year', title: 'Year' },
 ];
 
+export function areQueriesEqual(query1 = {}, query2 = {}) {
+  return (
+    equals(Object.entries(query1.order || {}), Object.entries(query2.order || {})) &&
+    equals(query1, query2)
+  );
+}
+
 export function defaultOrder(query) {
   const granularity = (query.timeDimensions || []).find((d) => d.granularity);
 
@@ -195,8 +202,7 @@ export function isQueryPresent(query) {
   }
 
   return (Array.isArray(query) ? query : [query]).every(
-    (q) =>
-      (q.measures && q.measures.length) ||
+    (q) => (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );
@@ -279,11 +285,4 @@ export function getOrderMembersFromOrder(orderMembers, order) {
   });
 
   return nextOrderMembers;
-}
-
-export function areQueriesEqual(query1 = {}, query2 = {}) {
-  return (
-    equals(Object.entries(query1.order || {}), Object.entries(query2.order || {})) &&
-    equals(query1, query2)
-  );
 }
