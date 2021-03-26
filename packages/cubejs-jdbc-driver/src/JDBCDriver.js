@@ -1,12 +1,8 @@
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
-const SqlString = require('sqlstring');
+import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import * as SqlString from 'sqlstring';
+import { promisify } from 'util';
+import genericPool from 'generic-pool';
 
-const applyParams = (query, params) => {
-  return SqlString.format(query, params);
-};
-
-const { promisify } = require('util');
-const genericPool = require('generic-pool');
 const DriverManager = require('jdbc/lib/drivermanager');
 const Connection = require('jdbc/lib/connection');
 const jinst = require('jdbc/lib/jinst');
@@ -18,7 +14,7 @@ const initMvn = (customClassPath) => {
   if (!mvnPromise) {
     mvnPromise = mvn().then((mvnResults) => {
       if (!jinst.isJvmCreated()) {
-        jinst.addOption("-Xrs");
+        jinst.addOption('-Xrs');
         const classPath = mvnResults.classpath.concat(customClassPath || []);
         jinst.setupClasspath(classPath);
       }
@@ -27,14 +23,16 @@ const initMvn = (customClassPath) => {
   return mvnPromise;
 };
 
+const applyParams = (query, params) => SqlString.format(query, params);
+
 const DbTypes = {
   mysql: {
-    driverClass: "com.mysql.jdbc.Driver",
-    prepareConnectionQueries: [`SET time_zone = '+00:00'`],
+    driverClass: 'com.mysql.jdbc.Driver',
+    prepareConnectionQueries: ['SET time_zone = \'+00:00\''],
     mavenDependency: {
-      "groupId": "mysql",
-      "artifactId": "mysql-connector-java",
-      "version": "8.0.13"
+      groupId: 'mysql',
+      artifactId: 'mysql-connector-java',
+      version: '8.0.13'
     },
     properties: {
       user: process.env.CUBEJS_DB_USER,
@@ -43,12 +41,12 @@ const DbTypes = {
     jdbcUrl: () => `jdbc:mysql://${process.env.CUBEJS_DB_HOST}:3306/${process.env.CUBEJS_DB_NAME}`
   },
   athena: {
-    driverClass: "com.qubole.jdbc.jdbc41.core.QDriver",
+    driverClass: 'com.qubole.jdbc.jdbc41.core.QDriver',
     prepareConnectionQueries: [],
     mavenDependency: {
-      "groupId": "com.syncron.amazonaws",
-      "artifactId": "simba-athena-jdbc-driver",
-      "version": "2.0.2"
+      groupId: 'com.syncron.amazonaws',
+      artifactId: 'simba-athena-jdbc-driver',
+      version: '2.0.2'
     },
     jdbcUrl: () => `jdbc:awsathena://AwsRegion=${process.env.CUBEJS_AWS_REGION}`,
     properties: {
@@ -58,28 +56,28 @@ const DbTypes = {
     }
   },
   sparksql: {
-    driverClass: "org.apache.hive.jdbc.HiveDriver",
+    driverClass: 'org.apache.hive.jdbc.HiveDriver',
     prepareConnectionQueries: [],
     mavenDependency: {
-      "groupId": "org.apache.hive",
-      "artifactId": "hive-jdbc",
-      "version": "2.3.5"
+      groupId: 'org.apache.hive',
+      artifactId: 'hive-jdbc',
+      version: '2.3.5'
     },
-    jdbcUrl: () => `jdbc:hive2://${process.env.CUBEJS_DB_HOST}:${process.env.CUBEJS_DB_PORT || "10000"}/${process.env.CUBEJS_DB_NAME}`,
+    jdbcUrl: () => `jdbc:hive2://${process.env.CUBEJS_DB_HOST}:${process.env.CUBEJS_DB_PORT || '10000'}/${process.env.CUBEJS_DB_NAME}`,
     properties: {
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
     }
   },
   hive: {
-    driverClass: "org.apache.hive.jdbc.HiveDriver",
+    driverClass: 'org.apache.hive.jdbc.HiveDriver',
     prepareConnectionQueries: [],
     mavenDependency: {
-      "groupId": "org.apache.hive",
-      "artifactId": "hive-jdbc",
-      "version": "2.3.5"
+      groupId: 'org.apache.hive',
+      artifactId: 'hive-jdbc',
+      version: '2.3.5'
     },
-    jdbcUrl: () => `jdbc:hive2://${process.env.CUBEJS_DB_HOST}:${process.env.CUBEJS_DB_PORT || "10000"}/${process.env.CUBEJS_DB_NAME}`,
+    jdbcUrl: () => `jdbc:hive2://${process.env.CUBEJS_DB_HOST}:${process.env.CUBEJS_DB_PORT || '10000'}/${process.env.CUBEJS_DB_NAME}`,
     properties: {
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
@@ -87,7 +85,7 @@ const DbTypes = {
   }
 };
 
-class JDBCDriver extends BaseDriver {
+export class JDBCDriver extends BaseDriver {
   constructor(config) {
     super();
     config = config || {};
@@ -117,9 +115,7 @@ class JDBCDriver extends BaseDriver {
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
         return new Connection(await getConnection(this.config.url, this.jdbcProps));
       },
-      destroy: async (connection) => {
-        return promisify(connection.close.bind(connection));
-      },
+      destroy: async (connection) => promisify(connection.close.bind(connection)),
       validate: (connection) => {
         const isValid = promisify(connection.isValid.bind(connection));
         try {
@@ -144,7 +140,8 @@ class JDBCDriver extends BaseDriver {
     const Properties = java.import('java.util.Properties');
     const properties = new Properties();
 
-    for(let name in this.config.properties) {
+    // eslint-disable-next-line guard-for-in,no-restricted-syntax
+    for (const name in this.config.properties) {
       properties.putSync(name, this.config.properties[name]);
     }
 
@@ -152,11 +149,11 @@ class JDBCDriver extends BaseDriver {
   }
 
   testConnection() {
-    return this.query(`SELECT 1`, []);
+    return this.query('SELECT 1', []);
   }
 
   prepareConnectionQueries() {
-    let dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
+    const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
     return this.config.prepareConnectionQueries ||
       dbTypeDescription && dbTypeDescription.prepareConnectionQueries ||
       [];
@@ -184,7 +181,7 @@ class JDBCDriver extends BaseDriver {
       } finally {
         await this.pool.release(conn);
       }
-    } catch(ex) {
+    } catch (ex) {
       if (ex.cause) {
         throw new Error(ex.cause.getMessageSync());
       } else {
@@ -206,7 +203,8 @@ class JDBCDriver extends BaseDriver {
     const toObjArrayAsync =
       resultSet.toObjArray && promisify(resultSet.toObjArray.bind(resultSet)) ||
       (() => Promise.resolve(resultSet));
-    return await toObjArrayAsync();
+
+    return toObjArrayAsync();
   }
 
   async release() {
@@ -222,5 +220,3 @@ class JDBCDriver extends BaseDriver {
     return DbTypes[dbType];
   }
 }
-
-module.exports = JDBCDriver;
