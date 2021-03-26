@@ -168,8 +168,8 @@ export class BaseDriver {
   /**
    * @abstract
    * @param {string} query
-   * @param {Array<unknown>} values
-   * @return {Promise<Array<unknown>>}
+   * @param {Array<unknown>} [values]
+   * @return {Promise<Array<any>>}
    */
   async query(query, values) {
     throw new Error('Not implemented');

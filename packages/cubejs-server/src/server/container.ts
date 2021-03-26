@@ -166,10 +166,14 @@ export class ServerContainer {
       return;
     }
 
+    const deepsToIgnore = [
+      '@cubejs-backend/databricks-jdbc-driver',
+    ];
+
     if (manifest.dependencies) {
       // eslint-disable-next-line no-restricted-syntax
       for (const [pkgName] of Object.entries(manifest.dependencies)) {
-        if (isDevPackage(pkgName)) {
+        if (isDevPackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
           throw new Error(
             `"${pkgName}" package must be installed in devDependencies`
           );

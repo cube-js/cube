@@ -8,7 +8,5 @@
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",
-    "allowJs": true,
-    "resolveJsonModule": true
   }
 }
