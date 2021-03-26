@@ -11,7 +11,19 @@
   "engines": {
     "node": ">=10.8.0"
   },
-  "main": "driver/JDBCDriver.js",
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.79",
     "generic-pool": "^3.1.7",
@@ -21,5 +33,18 @@
     "jdbc": "^0.7.2",
     "node-java-maven": "^0.1.1"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  },
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.26.74",
+    "@types/generic-pool": "^3.1.9",
+    "@types/node": "^10.17.55",
+    "@types/sqlstring": "^2.3.0",
+    "typescript": "~4.1.5"
+  }
 }
