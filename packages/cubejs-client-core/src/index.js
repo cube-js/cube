@@ -228,6 +228,7 @@ export default (apiToken, options) => new CubejsApi(apiToken, options);
 
 export { HttpTransport, ResultSet };
 export {
+  areQueriesEqual,
   defaultHeuristics,
   movePivotItem,
   isQueryPresent,

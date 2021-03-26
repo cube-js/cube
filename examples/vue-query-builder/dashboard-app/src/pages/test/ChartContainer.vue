@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <div v-if="cubejsApi && chartingLibrary">
-      <query-renderer :cubejsApi="cubejsApi" :query="query">
+      <query-renderer :cubejsApi="cubejsApi" :query="query" @queryLoad="handleQueryLoad">
         <template #default="{ resultSet }">
           <chart-renderer
             v-if="resultSet"
@@ -81,6 +81,13 @@ export default {
   },
 
   methods: {
+    handleQueryLoad({ resultSet, error }) {
+      const { onQueryLoad } = window.parent.window['__cubejsPlayground'] || {};
+      if (typeof onQueryLoad === 'function') {
+        onQueryLoad({ resultSet, error })
+      }
+    },
+
     changeQuery() {
       this.query = {
         measures: ['Sales.count'],

@@ -1,5 +1,5 @@
-import { toPairs, fromPairs, equals } from 'ramda';
-import { isQueryPresent } from '@cubejs-client/core';
+import { toPairs, fromPairs } from 'ramda';
+import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 
 export default {
   props: {
@@ -22,6 +22,10 @@ export default {
       type: Object,
       required: false,
       default: () => ({}),
+    },
+    chartType: {
+      type: String,
+      required: false,
     },
   },
   data() {
@@ -86,7 +90,8 @@ export default {
 
       try {
         this.loading = true;
-        this.error = undefined;
+        this.error = null;
+        this.resultSet = null;
 
         if (this.loadSql === 'only') {
           this.sqlQuery = await this.cubejsApi.sql(query, {
@@ -146,22 +151,20 @@ export default {
       if (loading === false) {
         this.$emit('queryLoad', {
           error: this.error,
-          resultSet: this.resultSet
+          resultSet: this.resultSet,
         });
       }
     },
     cubejsApi() {
       this.load();
     },
+    chartType() {
+      this.load();
+    },
     query: {
       deep: true,
       handler(query, prevQuery) {
-        const hasOrderChanged = !equals(
-          Object.keys(query?.order || {}),
-          Object.keys(prevQuery?.order || {})
-        );
-
-        if ((!equals(query, prevQuery) || hasOrderChanged)) {
+        if (!areQueriesEqual(query, prevQuery)) {
           this.load();
         }
       },

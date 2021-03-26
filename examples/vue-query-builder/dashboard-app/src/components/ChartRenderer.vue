@@ -1,16 +1,10 @@
 <template>
   <div class="chart-renderer" v-if="resultSet">
-    <line-chart legend="bottom" v-if="chartType === 'line'" :data="series(resultSet)"></line-chart>
-
-    <area-chart legend="bottom" v-if="chartType === 'area'" :data="series(resultSet)"></area-chart>
-
-    <pie-chart v-if="chartType === 'pie'" :data="pairs(resultSet)"></pie-chart>
-
-    <column-chart v-if="chartType === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
+    <component :is="componentType" :data="data" height="400px"></component>
 
     <Table v-if="chartType === 'table'" :result-set="resultSet"></Table>
 
-    <div v-if="chartType === 'number'">
+    <div v-if="chartType === 'number'" class="number-container">
       <div v-for="item in resultSet.series()" :key="item.key">
         {{ item.series[0].value }}
       </div>
@@ -36,9 +30,31 @@ export default {
       required: true,
     },
   },
+
   components: {
-    Table
+    Table,
   },
+
+  computed: {
+    componentType() {
+      return `${this.chartType === 'bar' ? 'column' : this.chartType}-chart`;
+    },
+
+    data() {
+      if (['line', 'area'].includes(this.chartType)) {
+        return this.series(this.resultSet);
+      }
+
+      if (this.chartType === 'pie') {
+        return this.pairs(this.resultSet);
+      }
+
+      if (this.chartType === 'bar') {
+        return this.seriesPairs(this.resultSet);
+      }
+    },
+  },
+
   methods: {
     series(resultSet) {
       const seriesNames = resultSet.seriesNames();
@@ -64,8 +80,16 @@ export default {
 };
 </script>
 
-<style scoped>
+<style>
 .chart-renderer {
   width: 100%;
+  height: 400px;
+}
+
+.number-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
 }
 </style>

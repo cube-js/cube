@@ -1,4 +1,4 @@
-import { indexBy, prop } from 'ramda';
+import { indexBy, prop, clone, equals } from 'ramda';
 
 export const DEFAULT_GRANULARITY = 'day';
 
@@ -33,10 +33,20 @@ export function defaultOrder(query) {
   return {};
 }
 
-export function defaultHeuristics(newQuery, oldQuery = {}, options) {
+export function defaultHeuristics(newState, oldQuery = {}, options) {
+  const { query, ...props } = clone(newState);
   const { meta, sessionGranularity } = options;
   const granularity = sessionGranularity || DEFAULT_GRANULARITY;
-  let newState = {};
+
+  let state = {
+    query,
+    ...props
+  };
+
+  let newQuery = null;
+  if (!areQueriesEqual(query, oldQuery)) {
+    newQuery = query;
+  }
 
   if (Array.isArray(newQuery) || Array.isArray(oldQuery)) {
     return newQuery;
@@ -49,8 +59,8 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
       newQuery.timeDimensions[0].granularity &&
       oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
     ) {
-      newState = {
-        ...newState,
+      state = {
+        ...state,
         sessionGranularity: newQuery.timeDimensions[0].granularity,
       };
     }
@@ -77,7 +87,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
       };
 
       return {
-        ...newState,
+        ...state,
         pivotConfig: null,
         shouldApplyHeuristicOrder: true,
         query: newQuery,
@@ -92,7 +102,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
       };
 
       return {
-        ...newState,
+        ...state,
         pivotConfig: null,
         shouldApplyHeuristicOrder: true,
         query: newQuery,
@@ -110,7 +120,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
       };
 
       return {
-        ...newState,
+        ...state,
         pivotConfig: null,
         shouldApplyHeuristicOrder: true,
         query: newQuery,
@@ -130,18 +140,18 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
       };
 
       return {
-        ...newState,
+        ...state,
         pivotConfig: null,
         shouldApplyHeuristicOrder: true,
         query: newQuery,
         sessionGranularity: null,
       };
     }
-    return newState;
+    return state;
   }
 
-  if (newState.chartType) {
-    const newChartType = newState.chartType;
+  if (state.chartType) {
+    const newChartType = state.chartType;
     if (
       (newChartType === 'line' || newChartType === 'area') &&
       (oldQuery.timeDimensions || []).length === 1 &&
@@ -149,7 +159,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
     ) {
       const [td] = oldQuery.timeDimensions;
       return {
-        ...newState,
+        ...state,
         pivotConfig: null,
         query: {
           ...oldQuery,
@@ -165,7 +175,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
     ) {
       const [td] = oldQuery.timeDimensions;
       return {
-        ...newState,
+        ...state,
         pivotConfig: null,
         shouldApplyHeuristicOrder: true,
         query: {
@@ -176,7 +186,7 @@ export function defaultHeuristics(newQuery, oldQuery = {}, options) {
     }
   }
 
-  return newState;
+  return state;
 }
 
 export function isQueryPresent(query) {
@@ -269,4 +279,11 @@ export function getOrderMembersFromOrder(orderMembers, order) {
   });
 
   return nextOrderMembers;
+}
+
+export function areQueriesEqual(query1 = {}, query2 = {}) {
+  return (
+    equals(Object.entries(query1.order || {}), Object.entries(query2.order || {})) &&
+    equals(query1, query2)
+  );
 }

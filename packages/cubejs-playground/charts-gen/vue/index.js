@@ -2,12 +2,7 @@ const t = require('@babel/types');
 const generator = require('@babel/generator').default;
 const traverse = require('@babel/traverse').default;
 const fs = require('fs-extra');
-const {
-  SourceSnippet,
-  VueMainSnippet,
-  TargetSource,
-  utils,
-} = require('@cubejs-templates/core');
+const { SourceSnippet, VueMainSnippet } = require('@cubejs-templates/core');
 const { pascalCase } = require('change-case');
 const path = require('path');
 
@@ -16,8 +11,12 @@ const AppContainer = require('../dev/AppContainer');
 const DevPackageFetcher = require('../dev/DevPackageFetcher');
 const { executeCommand } = require('../dev/utils');
 const { REPOSITORY } = require('../env');
+const { generateCodeChunks } = require('./code-chunks-gen');
 
-const chartingLibraryTemplates = ['vue-chartkick-charts', 'vue-chartjs-charts'];
+const chartingLibraryTemplates = [
+  'vue-chartkick-charts',
+  //  'vue-chartjs-charts'
+];
 const packages = ['dev-cva', 'vue-charts'];
 
 const rootPath = path.resolve(`${__dirname}/../..`);
@@ -42,8 +41,10 @@ function astToCode(ast) {
 
   let dependencies = [['chart.js', '2.9.4']];
 
+  const chartLibrarySourceContainers = [];
   await Promise.all(
     chartingLibraryTemplates.map(async (key) => {
+      const name = key.split('-')[1];
       const dashboardAppPath = `${distPath}/${key}`;
       const dt = new DependencyTree(manifest, ['vue-charting-library', key]);
 
@@ -60,6 +61,7 @@ function astToCode(ast) {
       dependencies = dependencies.concat(
         Object.entries(appContainer.sourceContainer.importDependencies)
       );
+      chartLibrarySourceContainers.push([name, appContainer.sourceContainer]);
     })
   );
 
@@ -72,10 +74,6 @@ function astToCode(ast) {
 
   await appContainer.applyTemplates();
 
-  // let code = '';
-  // const imports = [];
-  // const libNames = [];
-  //
   const chartRenderers = [];
 
   await Promise.all(
@@ -87,33 +85,10 @@ function astToCode(ast) {
       const className = pascalCase(`vue-${name}-renderer`);
       chartRenderers.push([name, className, key]);
 
-      // const fileContents = await utils.fileContentsRecursive(
-      //   `${distPath}/${key}`
-      // );
-      //
-      // const chartRendererContent = fileContents.find(
-      //   ({ fileName }) => fileName === '/src/components/ChartRenderer.js'
-      // );
-      //
-      // const codeChunksContent = generateCodeChunks(
-      //   chartRendererContent.content
-      // );
-
       await executeCommand('mv', [
         `${distPath}/${key}/src`,
         `${vueChartsPath}/src/${name}`,
       ]);
-      // fs.writeFileSync(
-      //   `${vueChartsPath}/src/${key}/src/code-chunks.js`,
-      //   codeChunksContent
-      // );
-      //
-      // libNames.push(`${key.replace(/-([^-]+)/, '')}: ${pascalCase(key)}`);
-      // imports.push(
-      //   `import ${pascalCase(
-      //     key
-      //   )} from './${key}/src/components/ChartRenderer';`
-      // );
     })
   );
 
@@ -133,7 +108,7 @@ function astToCode(ast) {
       ) {
         chartRenderers.forEach(([key, value]) => {
           path.node.value.properties.push(
-            t.objectProperty(t.identifier(key), t.stringLiteral(value))
+            t.objectProperty(t.identifier(key), t.identifier(value))
           );
         });
       }
@@ -165,6 +140,11 @@ function astToCode(ast) {
     `${vueChartsPath}/src/main.js`,
     mainTargetSource.formattedCode()
   );
+
+  // update imports
+  chartRendererTargetSource.findAllImports();
+  mainTargetSource.findAllImports();
+
   await executeCommand(
     'rm ./src/App.vue && mv ./src/ChartContainer.vue src/App.vue',
     [],
@@ -174,21 +154,32 @@ function astToCode(ast) {
     }
   );
 
-  console.log('>>', appContainer.sourceContainer.importDependencies);
+  const codeChunks = generateCodeChunks(chartLibrarySourceContainers);
+  fs.writeFileSync(`${vueChartsPath}/src/code-chunks.js`, codeChunks);
 
-  // const libsSnippet = new SourceSnippet(code);
-  // const appTarget = new TargetSource(
-  //   'app.js',
-  //   fs.readFileSync(path.join(vueChartsPath, 'src/App.js'), 'utf-8')
-  // );
-  //
-  // libsSnippet.mergeTo(appTarget);
-  // fs.writeFileSync(path.join(vueChartsPath, 'src/App.js'), appTarget.code());
-  //
-  // appContainer.sourceContainer.addImportDependencies(
-  //   dependencies
-  //     .map(([d, v]) => ({ [d]: v }))
-  //     .reduce((a, b) => ({ ...a, ...b }))
-  // );
+  appContainer.sourceContainer.addImportDependencies(
+    dependencies.reduce((memo, d) => {
+      const [key, version] = Array.isArray(d) ? d : [d, 'latest'];
+      if (!memo[key] || memo[key] === 'latest') {
+        memo[key] = version;
+      }
+      return memo;
+    }, {})
+  );
   await appContainer.ensureDependencies();
+  try {
+    await executeCommand(
+      'npm link @cubejs-client/core && npm link @cubejs-client/vue',
+      [],
+      {
+        shell: true,
+        cwd: vueChartsPath,
+      }
+    );
+  } catch (error) {
+    console.log(
+      'Error trying to link local core dependencies',
+      error.toString()
+    );
+  }
 })();

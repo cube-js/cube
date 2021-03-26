@@ -1,6 +1,6 @@
 <template>
   <v-container fluid class="text-center background pa-0">
-    <query-builder style="width: 100%" :cubejsApi="cubejsApi" :initialVizState="vizState">
+    <query-builder style="width: 100%" :cubejsApi="cubejsApi" :initialVizState="vizState" @queryLoad="handle">
       <template
         #builder="{
           validatedQuery,
@@ -166,13 +166,6 @@ import TimeDimensionSelect from './components/TimeDimensionSelect';
 import DateRangeSelect from './components/DateRangeSelect';
 import ChartRenderer from '@/components/ChartRenderer';
 
-// const API_URL = 'http://localhost:4000';
-// const CUBEJS_TOKEN =
-//   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjA3NDQwMTQ0LCJleHAiOjE2MTAwMzIxNDR9.Za52BRvDvtgzqgy44QC5C35Li2RZ1RZAGy2mDdIWY70';
-// const cubejsApi = cubejs(CUBEJS_TOKEN, {
-//   apiUrl: `${API_URL}/cubejs-api/v1`,
-// });
-
 export default {
   name: 'Explore',
   props: {
@@ -181,6 +174,7 @@ export default {
       required: true,
     },
   },
+
   components: {
     PivotConfig,
     Order,
@@ -192,23 +186,8 @@ export default {
     DateRangeSelect,
     ChartRenderer,
   },
-  data() {
-    // const query = {
-    //   measures: ['Orders.count'],
-    //   dimensions: ['Orders.status', 'Products.name'],
-    //   timeDimensions: [
-    //     {
-    //       dimension: 'Orders.createdAt',
-    //       granularity: 'month',
-    //       dateRange: 'This quarter',
-    //     },
-    //   ],
-    //   order: [
-    //     ['Orders.count', 'asc'],
-    //     ['Orders.createdAt', 'asc'],
-    //   ],
-    // };
 
+  data() {
     const query = {
       measures: ['Orders.count'],
       timeDimensions: [
@@ -234,6 +213,10 @@ export default {
     };
   },
   methods: {
+    handle() {
+      console.log('@load', Date.now());
+    },
+
     handleMove(value, updatePivotConfig) {
       updatePivotConfig.update(value);
     },
