@@ -89,7 +89,7 @@ class AppContainer {
             cwd: path.resolve(this.appPath),
           });
         } catch (error) {
-         console.log(`Unable to copy file: ${from} -> ${to}`);
+          console.log(`Unable to copy file: ${from} -> ${to}`);
         }
       })
     );
