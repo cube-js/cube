@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.71](https://github.com/cube-js/cube.js/compare/v0.26.70...v0.26.71) (2021-03-26)
+
+
+### Bug Fixes
+
+* **cubestore:** Remove tracing from logs ([10a264c](https://github.com/cube-js/cube.js/commit/10a264c1261bad9ae3f04753ac8c49dfe30efa63))
+
+
+### Features
+
+* Allow saving state of a scheduled refresh for warmup operations ([#2445](https://github.com/cube-js/cube.js/issues/2445)) ([0c637b8](https://github.com/cube-js/cube.js/commit/0c637b882b655652214f8ee543aa1a0fc74089bc))
+
+
+
+
+
 ## [0.26.70](https://github.com/cube-js/cube.js/compare/v0.26.69...v0.26.70) (2021-03-26)
 
 
