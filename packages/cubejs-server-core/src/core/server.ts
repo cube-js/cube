@@ -188,7 +188,7 @@ export class CubejsServerCore {
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
-        this.handleScheduledRefreshInterval,
+        () => this.handleScheduledRefreshInterval({}),
         {
           interval: scheduledRefreshTimer,
           onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
@@ -529,7 +529,7 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
-  public getOrchestratorApi(context: DriverContext): OrchestratorApi {
+  public getOrchestratorApi(context: RequestContext): OrchestratorApi {
     const orchestratorId = this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
@@ -604,7 +604,7 @@ export class CubejsServerCore {
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public handleScheduledRefreshInterval = async () => {
+  public handleScheduledRefreshInterval = async (options) => {
     const contexts = await this.options.scheduledRefreshContexts();
     if (contexts.length < 1) {
       this.logger('Refresh Scheduler Error', {
@@ -613,13 +613,13 @@ export class CubejsServerCore {
     }
 
     return Promise.all(contexts.map(async context => {
-      const queryingOptions: any = { concurrency: this.options.scheduledRefreshConcurrency };
+      const queryingOptions: any = { ...options, concurrency: this.options.scheduledRefreshConcurrency };
 
       if (this.options.scheduledRefreshTimeZones) {
         queryingOptions.timezones = this.options.scheduledRefreshTimeZones;
       }
 
-      await this.runScheduledRefresh(context, queryingOptions);
+      return this.runScheduledRefresh(context, queryingOptions);
     }));
   };
 

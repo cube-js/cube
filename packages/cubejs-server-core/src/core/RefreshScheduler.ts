@@ -130,7 +130,7 @@ export class RefreshScheduler {
     return { finished: false };
   }
 
-  protected async refreshCubesRefreshKey(context, compilerApi: CompilerApi, queryingOptions) {
+  protected async refreshCubesRefreshKey(context: RequestContext, compilerApi: CompilerApi, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
@@ -157,6 +157,7 @@ export class RefreshScheduler {
         const orchestratorApi = this.serverCore.getOrchestratorApi(context);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
+          sql: null,
           preAggregations: [],
           continueWait: true,
           renewQuery: true,
@@ -242,16 +243,23 @@ export class RefreshScheduler {
     };
   }
 
-  protected async refreshPreAggregations(context, compilerApi: CompilerApi, queryingOptions) {
+  protected async refreshPreAggregations(context: RequestContext, compilerApi: CompilerApi, queryingOptions) {
+    const { securityContext } = context;
+    const { queryIteratorState } = queryingOptions;
     let { concurrency, workerIndices } = queryingOptions;
     concurrency = concurrency || 1;
     workerIndices = workerIndices || R.range(0, concurrency);
     return Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
-        const queryIterator = await this.roundRobinRefreshPreAggregationsQueryIterator(
-          context, compilerApi, queryingOptions
-        );
+        const queryIteratorStateKey = JSON.stringify({ ...securityContext, workerIndex });
+        const queryIterator = queryIteratorState && queryIteratorState[queryIteratorStateKey] ||
+          (await this.roundRobinRefreshPreAggregationsQueryIterator(
+            context, compilerApi, queryingOptions
+          ));
+        if (queryIteratorState) {
+          queryIteratorState[queryIteratorStateKey] = queryIterator;
+        }
         for (;;) {
           for (let i = 0; i < concurrency; i++) {
             const nextQuery = await queryIterator.next();
