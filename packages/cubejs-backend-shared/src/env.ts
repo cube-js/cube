@@ -68,7 +68,7 @@ function asBoolOrTime(input: string, envName: string): number|boolean {
   );
 }
 
-const variables = {
+const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
@@ -107,8 +107,19 @@ const variables = {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
   },
+  // Common db options
+  dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
+    .required(required)
+    .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
+    .asString(),
+  // Databricks
+  databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
+    .required()
+    .asString(),
+  databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
+    .required()
     .asString(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
@@ -160,8 +171,12 @@ const variables = {
 
 type Vars = typeof variables;
 
-export function getEnv<T extends keyof Vars>(key: T): ReturnType<Vars[T]> {
+export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
+    if (opts) {
+      return <any>variables[key](opts);
+    }
+
     return <any>variables[key]();
   }
 

@@ -13,9 +13,9 @@
     "node": ">=10.8.0"
   },
   "main": "index.js",
-  "typings": "dist/index.d.ts",
+  "typings": "dist/src/index.d.ts",
   "files": [
-    "dist",
+    "dist/src",
     "bin",
     "index.js",
     "/oclif.manifest.json"
@@ -35,7 +35,7 @@
     "lint": "eslint src/* test/ --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/ --ext .ts,js",
     "unit": "jest",
-    "unit:debug": "jest --runInBand test",
+    "unit:debug": "jest --runInBand",
     "jest:shapshot": "jest --updateSnapshot test"
   },
   "dependencies": {
@@ -69,8 +69,6 @@
     "@types/ws": "^7.2.9",
     "@types/yarnpkg__lockfile": "^1.1.4",
     "jest": "^26.0.0",
-    "should": "^13.2.3",
-    "ts-jest": "^26.0.0",
     "typescript": "~4.1.5"
   },
   "license": "Apache-2.0",
@@ -78,21 +76,13 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
-    "moduleFileExtensions": [
-      "ts",
-      "js"
-    ],
-    "transform": {
-      "^.+\\.ts$": "ts-jest",
-      "^.+\\.js$": "ts-jest"
-    },
     "testMatch": [
-      "<rootDir>/test/*.(test|spec).(ts|js)"
+      "<rootDir>/dist/test/*.(test|spec).(ts|js)"
     ],
     "testEnvironment": "node"
   },
   "oclif": {
-    "commands": "./dist/command",
+    "commands": "./dist/src/command",
     "bin": "cubejs-server",
     "plugins": [
       "@oclif/plugin-help"

@@ -5,6 +5,7 @@ module.exports = {
   mssql: '@cubejs-backend/mssql-driver',
   athena: '@cubejs-backend/athena-driver',
   jdbc: '@cubejs-backend/jdbc-driver',
+  databricks: '@cubejs-backend/databricks-driver',
   mongobi: '@cubejs-backend/mongobi-driver',
   bigquery: '@cubejs-backend/bigquery-driver',
   redshift: '@cubejs-backend/postgres-driver',
