@@ -9,8 +9,8 @@
     "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist"
   },
   "dependencies": {
-    "@cubejs-client/core": "^0.26.61",
-    "@cubejs-client/vue": "^0.26.61",
+    "@cubejs-client/core": "^0.26.70",
+    "@cubejs-client/vue": "^0.26.70",
     "apollo-boost": "^0.4.9",
     "apollo-cache-inmemory": "^1.6.6",
     "apollo-client": "^2.6.10",
