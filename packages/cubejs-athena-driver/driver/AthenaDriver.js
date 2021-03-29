@@ -1,19 +1,48 @@
 const AWS = require('aws-sdk');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
-const { getEnv } = require('@cubejs-backend/shared');
+const { getEnv, pausePromise } = require('@cubejs-backend/shared');
 const SqlString = require('sqlstring');
+const url = require('url');
 
-function pause(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function applyParams(query, params) {
+  return SqlString.format(query, params);
 }
 
-const applyParams = (query, params) => SqlString.format(query, params);
+function parseS3Url(path) {
+  const { protocol, host, pathname } = url.parse(path);
+
+  if (!protocol) {
+    throw new Error(
+      `Unsupported S3 URI: Empty protocol for "${path}" url`
+    );
+  }
+
+  if (protocol !== 's3:') {
+    throw new Error(
+      `Unsupported S3 URI: Unsupported protocol "${this.uri.protocol}" for "${path}" url`
+    );
+  }
+
+  if (!host) {
+    throw new Error(
+      `Unsupported S3 URI: Empty bucket "${host}" for "${path}" url`
+    );
+  }
+
+  return {
+    Bucket: host,
+    Key: pathname.substring(1),
+  };
+}
 
 class AthenaDriver extends BaseDriver {
   constructor(config = {}) {
     super();
 
+    /**
+     * @protected
+     */
     this.config = {
       accessKeyId: process.env.CUBEJS_AWS_KEY,
       secretAccessKey: process.env.CUBEJS_AWS_SECRET,
@@ -24,11 +53,22 @@ class AthenaDriver extends BaseDriver {
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
+    /**
+     * @protected
+     * @type {AWS.Athena}
+     */
     this.athena = new AWS.Athena(this.config);
     this.athena.startQueryExecutionAsync = promisify(this.athena.startQueryExecution.bind(this.athena));
     this.athena.stopQueryExecutionAsync = promisify(this.athena.stopQueryExecution.bind(this.athena));
     this.athena.getQueryResultsAsync = promisify(this.athena.getQueryResults.bind(this.athena));
     this.athena.getQueryExecutionAsync = promisify(this.athena.getQueryExecution.bind(this.athena));
+
+    /**
+     * @protected
+     * @type {AWS.S3}
+     */
+    this.s3 = new AWS.S3(this.config);
+    this.s3.deleteObjectAsync = promisify(this.s3.deleteObject.bind(this.s3));
   }
 
   readOnly() {
@@ -39,17 +79,41 @@ class AthenaDriver extends BaseDriver {
     return this.query('SELECT 1', []);
   }
 
+  async clearQueryExecutionResults(queryExecution) {
+    try {
+      if (queryExecution.ResultConfiguration && queryExecution.ResultConfiguration.OutputLocation) {
+        const fileRequest = parseS3Url(queryExecution.ResultConfiguration.OutputLocation);
+
+        await this.s3.deleteObjectAsync(fileRequest);
+      }
+    } catch (e) {
+      this.logger('Unable to delete query execution results', {
+        error: e.message,
+      });
+    }
+  }
+
   async awaitForJobStatus(QueryExecutionId, query, options) {
-    const queryExecution = await this.athena.getQueryExecutionAsync({
+    const response = await this.athena.getQueryExecutionAsync({
       QueryExecutionId
     });
+    if (!response.QueryExecution) {
+      return null;
+    }
 
-    const status = queryExecution.QueryExecution.Status.State;
+    const { QueryExecution } = response;
+
+    const status = QueryExecution.Status.State;
+
     if (status === 'FAILED') {
-      throw new Error(queryExecution.QueryExecution.Status.StateChangeReason);
+      await this.clearQueryExecutionResults(QueryExecution);
+
+      throw new Error(QueryExecution.Status.StateChangeReason);
     }
 
     if (status === 'CANCELLED') {
+      await this.clearQueryExecutionResults(QueryExecution);
+
       throw new Error('Query has been cancelled');
     }
 
@@ -60,7 +124,7 @@ class AthenaDriver extends BaseDriver {
       let columnInfo;
 
       this.reportQueryUsage({
-        dataScannedInBytes: queryExecution.QueryExecution.Statistics.DataScannedInBytes
+        dataScannedInBytes: QueryExecution.Statistics.DataScannedInBytes
       }, options);
 
       for (
@@ -78,6 +142,8 @@ class AthenaDriver extends BaseDriver {
             : results.ResultSet.ResultSetMetadata.ColumnInfo;
         }
       }
+
+      await this.clearQueryExecutionResults(QueryExecution);
 
       return allRows.map(r => columnInfo
         .map((c, i) => ({ [c.Name]: r.Data[i].VarCharValue }))
@@ -110,7 +176,7 @@ class AthenaDriver extends BaseDriver {
         return result;
       }
 
-      await pause(
+      await pausePromise(
         Math.min(this.config.pollMaxInterval, 500 * i)
       );
     }
