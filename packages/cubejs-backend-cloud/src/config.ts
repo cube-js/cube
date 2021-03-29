@@ -12,47 +12,33 @@ type ConfigurationFull = {
     [organizationUrl: string]: {
       auth: string,
     }
+  },
+  live: {
+    [organizationUrl: string]: {
+      [deploymentBranchKey: string]: {
+        auth: string,
+      }
+    }
   }
 };
 
 type ConfigOptions = {
-  directory: string,
+  directory?: string,
+  home?: string
 };
 
 type Configuration = Partial<ConfigurationFull>;
 
 export class Config {
-  private directory: string = process.cwd();
+  protected directory: string = process.cwd();
 
-  public constructor(
-    protected readonly options: ConfigOptions
-  ) {
+  protected home: string = os.homedir();
+
+  protected readonly cubeCloudClient = new CubeCloudClient();
+
+  public constructor(options: ConfigOptions = {}) {
     this.directory = options.directory || this.directory;
-  }
-
-  private readonly cubeCloudClient = new CubeCloudClient();
-
-  protected async loadConfig(): Promise<Configuration> {
-    const { configFile } = this.configFile();
-
-    if (await fs.pathExists(configFile)) {
-      return fs.readJson(configFile);
-    }
-
-    return {};
-  }
-
-  protected async writeConfig(config: any) {
-    const { cubeCloudConfigPath, configFile } = this.configFile();
-    await fs.mkdirp(cubeCloudConfigPath);
-    await fs.writeJson(configFile, config);
-  }
-
-  protected configFile() {
-    const cubeCloudConfigPath = this.cubeCloudConfigPath();
-    const configFile = path.join(cubeCloudConfigPath, 'config.json');
-
-    return { cubeCloudConfigPath, configFile };
+    this.home = options.home || this.home;
   }
 
   public async envFile(envFile: string) {
@@ -89,10 +75,6 @@ export class Config {
     return {};
   }
 
-  protected cubeCloudConfigPath() {
-    return path.join(os.homedir(), '.cubecloud');
-  }
-
   public async addAuthToken(authToken: string, config?: Configuration): Promise<ConfigurationFull> {
     if (!config) {
       config = await this.loadConfig();
@@ -125,8 +107,71 @@ export class Config {
     throw 'Malformed Cube Cloud token';
   }
 
+  public async addLivePreviewToken(authToken: string, config?: Configuration): Promise<ConfigurationFull> {
+    if (!config) {
+      config = await this.loadConfig();
+    }
+
+    const payload = jwt.decode(authToken);
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      payload.url &&
+      payload.dId &&
+      payload.branch &&
+      payload.dUrl
+    ) {
+      // Set to home config
+      const deploymentBranchKey = [payload.dId, payload.branch].join('/');
+      config.live = config.live || {};
+      config.live[payload.url] = config.live[payload.url] || {};
+      config.live[payload.url][deploymentBranchKey] = {
+        auth: authToken
+      };
+
+      // Set to project config
+      const dotCubeCloud = await this.loadDotCubeCloud();
+      dotCubeCloud.live = dotCubeCloud.live || [];
+      dotCubeCloud.live.push(deploymentBranchKey);
+
+      await this.writeDotCubeCloud(dotCubeCloud);
+      await this.writeConfig(config);
+      return <ConfigurationFull>config;
+    }
+
+    // eslint-disable-next-line no-throw-literal
+    throw 'Malformed Cube Cloud live token';
+  }
+
+  public async loadConfig(): Promise<Configuration> {
+    const { configFile } = this.configFile();
+
+    if (await fs.pathExists(configFile)) {
+      return fs.readJson(configFile);
+    }
+
+    return {};
+  }
+
+  protected async writeConfig(config: any) {
+    const { cubeCloudConfigPath, configFile } = this.configFile();
+    await fs.mkdirp(cubeCloudConfigPath);
+    await fs.writeJson(configFile, config);
+  }
+
+  protected configFile() {
+    const cubeCloudConfigPath = this.cubeCloudConfigPath();
+    const configFile = path.join(cubeCloudConfigPath, 'config.json');
+
+    return { cubeCloudConfigPath, configFile };
+  }
+
+  protected cubeCloudConfigPath() {
+    return path.join(this.home, '.cubecloud');
+  }
+
   protected dotCubeCloudFile() {
-    return path.join(this.options.directory, '.cubecloud');
+    return path.join(this.directory, '.cubecloud');
   }
 
   protected async loadDotCubeCloud() {

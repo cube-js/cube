@@ -18,7 +18,7 @@ afterAll(async () => {
   await fs.remove(directory);
 });
 
-test('constuctor', async () => {
+test('LivePreviewWatcher: constuctor', async () => {
   const livePreviewWatcher = new LivePreviewWatcher();
   expect(livePreviewWatcher).not.toBeUndefined();
 });
