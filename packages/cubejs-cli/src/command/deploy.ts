@@ -2,12 +2,11 @@ import fs from 'fs-extra';
 import path from 'path';
 import cliProgress from 'cli-progress';
 import { CommanderStatic } from 'commander';
+import { Config, CubeCloudClient, DeployController } from '@cubejs-backend/cloud';
 
-import { DeployDirectory } from '../deploy';
 import { logStage, displayError, event } from '../utils';
-import { Config } from '../config';
 
-const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
+const deploy = async ({ directory, auth, token }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
     await displayError(
       '@cubejs-backend/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
@@ -25,7 +24,6 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     console.log('Token successfully added!');
   }
 
-  const config = new Config();
   const bar = new cliProgress.SingleBar({
     format: '- Uploading files | {bar} | {percentage}% || {value} / {total} | {file}',
     barCompleteChar: '\u2588',
@@ -33,83 +31,26 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     hideCursor: true
   });
 
-  const deployDir = new DeployDirectory({ directory });
-  const fileHashes: any = await deployDir.fileHashes();
-
-  const upstreamHashes = await config.cloudReq({
-    url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
-    method: 'GET',
-    auth
-  });
-
-  const { transaction, deploymentName } = await config.cloudReq({
-    url: (deploymentId: string) => `build/deploy/${deploymentId}/start-upload`,
-    method: 'POST',
-    auth
-  });
-
-  if (uploadEnv) {
-    const envVariables = await config.envFile(`${directory}/.env`);
-    await config.cloudReq({
-      url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
-      method: 'POST',
-      body: {
-        envVariables: JSON.stringify(envVariables),
-      },
-      auth
-    });
-  }
-
-  await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
-
-  const files = Object.keys(fileHashes);
-  const fileHashesPosix = {};
-
-  bar.start(files.length, 0, {
-    file: ''
-  });
-
-  try {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+  const cubeCloudClient = new CubeCloudClient(auth);
+  const deployController = new DeployController(cubeCloudClient, {
+    onStart: async (deploymentName, files) => {
+      await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
+      bar.start(files.length, 0, {
+        file: ''
+      });
+    },
+    onUpdate: (i, { file }) => {
       bar.update(i, { file });
-
-      const filePosix = file.split(path.sep).join(path.posix.sep);
-      fileHashesPosix[filePosix] = fileHashes[file];
-
-      if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
-        await config.cloudReq({
-          url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
-          method: 'POST',
-          formData: {
-            transaction: JSON.stringify(transaction),
-            fileName: filePosix,
-            file: {
-              value: fs.createReadStream(path.join(directory, file)),
-              options: {
-                filename: path.basename(file),
-                contentType: 'application/octet-stream'
-              }
-            }
-          },
-          auth
-        });
-      }
+    },
+    onUpload: (files) => {
+      bar.update(files.length, { file: 'Post processing...' });
+    },
+    onFinally: () => {
+      bar.stop();
     }
-    bar.update(files.length, { file: 'Post processing...' });
-    await config.cloudReq({
-      url: (deploymentId: string) => `build/deploy/${deploymentId}/finish-upload`,
-      method: 'POST',
-      body: {
-        transaction,
-        files: fileHashesPosix
-      },
-      auth
-    });
-  } finally {
-    bar.stop();
-  }
+  });
 
+  await deployController.deploy(directory);
   await logStage('Done 🎉', 'Cube Cloud CLI Deploy Success');
 };
 
