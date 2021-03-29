@@ -36,9 +36,7 @@ export class Config {
 
   private readonly cubeCloudClient = new CubeCloudClient();
 
-  public constructor(
-    protected readonly options: ConfigOptions
-  ) {
+  public constructor(options: ConfigOptions = {}) {
     this.directory = options.directory || this.directory;
     this.home = options.home || this.home;
   }
@@ -173,7 +171,7 @@ export class Config {
   }
 
   protected dotCubeCloudFile() {
-    return path.join(this.options.directory, '.cubecloud');
+    return path.join(this.directory, '.cubecloud');
   }
 
   protected async loadDotCubeCloud() {
