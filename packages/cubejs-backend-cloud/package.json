@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cloud",
-  "version": "0.26.69",
+  "version": "0.26.72",
   "description": "Cube Cloud package",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
