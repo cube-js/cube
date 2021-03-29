@@ -1,6 +1,6 @@
 import { CubeCloudClient } from '../src/cloud';
 
-test('constuctor', async () => {
+test('CubeCloudClient: constuctor', async () => {
   const cubeCloudClient = new CubeCloudClient({
     auth: '',
     url: '',

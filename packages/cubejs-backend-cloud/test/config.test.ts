@@ -21,7 +21,7 @@ afterAll(async () => {
   await fs.remove(home);
 });
 
-test('constuctor', async () => {
+test('Config: constuctor', async () => {
   const config = new Config({ directory, home });
   expect(config).not.toBeUndefined();
 });
