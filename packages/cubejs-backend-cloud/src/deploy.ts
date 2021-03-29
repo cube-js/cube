@@ -83,11 +83,11 @@ export class DeployController {
     const fileHashes: any = await deployDir.fileHashes();
 
     const upstreamHashes = await this.cubeCloudClient.getUpstreamHashes();
-    const { transaction } = await this.cubeCloudClient.startUpload();
+    const { transaction, deploymentName } = await this.cubeCloudClient.startUpload();
 
     const files = Object.keys(fileHashes);
     const fileHashesPosix: Record<string, any> = {};
-    if (this.hooks.onStart) this.hooks.onStart(files);
+    if (this.hooks.onStart) this.hooks.onStart(deploymentName, files);
 
     try {
       for (let i = 0; i < files.length; i++) {
