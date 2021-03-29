@@ -30,11 +30,11 @@ type ConfigOptions = {
 type Configuration = Partial<ConfigurationFull>;
 
 export class Config {
-  private directory: string = process.cwd();
+  protected directory: string = process.cwd();
 
-  private home: string = os.homedir();
+  protected home: string = os.homedir();
 
-  private readonly cubeCloudClient = new CubeCloudClient();
+  protected readonly cubeCloudClient = new CubeCloudClient();
 
   public constructor(options: ConfigOptions = {}) {
     this.directory = options.directory || this.directory;
