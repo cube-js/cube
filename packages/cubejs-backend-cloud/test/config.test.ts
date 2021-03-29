@@ -4,20 +4,21 @@ import jwt from 'jsonwebtoken';
 import { Config } from '../src/config';
 
 const directory = path.join(__dirname, '.config');
-const home = path.join(__dirname, '.config');
+const home = path.join(__dirname, '.home');
 
 beforeAll(async () => {
   await fs.mkdir(directory);
+  await fs.mkdir(home);
 });
 
 beforeEach(async () => {
-  // await fs.writeFile(path.join(directory, '.cubecloud'), JSON.stringify({}));
   await fs.writeFile(path.join(directory, 'config.json'), JSON.stringify({}));
   await fs.writeFile(path.join(directory, '.env'), 'SOME_ENV_NAME=value');
 });
 
 afterAll(async () => {
   await fs.remove(directory);
+  await fs.remove(home);
 });
 
 test('constuctor', async () => {
@@ -52,7 +53,7 @@ test('addLivePreviewToken', async () => {
   const data = await config.loadConfig();
 
   const deploymentBranchKey = [payload.dId, payload.branch].join('/');
-  expect(data).toBeUndefined();
+  expect(data).not.toBeUndefined();
   expect(data.live).toEqual({
     'http://localhost:4200': {
       [deploymentBranchKey]: {
