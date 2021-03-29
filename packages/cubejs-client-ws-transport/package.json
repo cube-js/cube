@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.1.2",
+    "@cubejs-client/core": "^0.26.70",
     "@types/ws": "^7.2.9",
     "core-js": "^3.6.5",
     "isomorphic-ws": "^4.0.1",
