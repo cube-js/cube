@@ -2,7 +2,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import cliProgress from 'cli-progress';
 import { CommanderStatic } from 'commander';
-import { Config, CubeCloudClient, DeployController } from '@cubejs-backend/cloud';
+import { CubeCloudClient, DeployController } from '@cubejs-backend/cloud';
+import { ConfigCli } from '../config';
 
 import { logStage, displayError, event } from '../utils';
 
@@ -13,14 +14,10 @@ const deploy = async ({ directory, auth, token }: any) => {
     );
   }
 
+  const config = new ConfigCli();
   if (token) {
-    const config = new Config();
     await config.addAuthToken(token);
-
-    await event({
-      event: 'Cube Cloud CLI Authenticate'
-    });
-
+    await event({ event: 'Cube Cloud CLI Authenticate' });
     console.log('Token successfully added!');
   }
 
@@ -31,7 +28,7 @@ const deploy = async ({ directory, auth, token }: any) => {
     hideCursor: true
   });
 
-  const cubeCloudClient = new CubeCloudClient(auth);
+  const cubeCloudClient = new CubeCloudClient(auth || (await config.deployAuthForCurrentDir()));
   const deployController = new DeployController(cubeCloudClient, {
     onStart: async (deploymentName, files) => {
       await logStage(`Deploying ${deploymentName}...`, 'Cube Cloud CLI Deploy');
