@@ -303,7 +303,7 @@ cube(`CompletedOrders`, {
 
 <!-- prettier-ignore-start -->
 [[warning | 🐣 &nbsp;&nbsp; Preview]]
-| `rollupJoin` is currently in Preview, and is API may change in a
+| `rollupJoin` is currently in Preview, and the API may change in a
 | future version.
 <!-- prettier-ignore-end -->
 
