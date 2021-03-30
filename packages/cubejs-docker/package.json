@@ -18,6 +18,7 @@
     "@cubejs-backend/druid-driver": "^0.26.69",
     "@cubejs-backend/elasticsearch-driver": "^0.26.69",
     "@cubejs-backend/hive-driver": "^0.26.69",
+    "@cubejs-backend/jdbc-driver": "^0.26.69",
     "@cubejs-backend/mongobi-driver": "^0.26.69",
     "@cubejs-backend/mssql-driver": "^0.26.69",
     "@cubejs-backend/mysql-driver": "^0.26.69",

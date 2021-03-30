@@ -6,7 +6,7 @@ ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
 ENV CI=0
 
-RUN apk add rxvt-unicode
+RUN apk add rxvt-unicode openjdk8-jre openjdk8
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
@@ -48,6 +48,11 @@ COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
 COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/package.json
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
+COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
+COPY packages/cubejs-databricks-driver/package.json packages/cubejs-databricks-driver/package.json
+# It's needed for postinstall
+COPY packages/cubejs-databricks-driver/bin packages/cubejs-databricks-driver/bin
+COPY packages/cubejs-databricks-driver/tsconfig.json packages/cubejs-databricks-driver/tsconfig.json
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
@@ -80,6 +85,8 @@ COPY packages/cubejs-server/ packages/cubejs-server/
 COPY packages/cubejs-server-core/ packages/cubejs-server-core/
 COPY packages/cubejs-snowflake-driver/ packages/cubejs-snowflake-driver/
 COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
+COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
+COPY packages/cubejs-databricks-driver/ packages/cubejs-databricks-driver/
 
 RUN yarn lerna run build
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs

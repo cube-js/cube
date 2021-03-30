@@ -3,7 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
-if (!fs.existsSync(path.join(__dirname, '..', 'dist', 'src', 'post-install.js')) && fs.existsSync(path.join(__dirname, '..', 'tsconfig.json'))) {
+const isDev = fs.existsSync(path.join(__dirname, '..', 'tsconfig.json'));
+const hasSrc = fs.existsSync(path.join(__dirname, '..', 'dist', 'src', 'post-install.js'));
+
+if (!hasSrc && isDev) {
   console.log('Skipping post-install because it was not compiled');
   return;
 }
