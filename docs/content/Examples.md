@@ -10,7 +10,7 @@ Below you can find examples and tutorials to help you get started with Cube.js.
 
 <!-- prettier-ignore-start -->
 [[info | ]]
-| If you have any examples or tutorials that you'd like to contribute, we encourage you to create a new topic  
+| If you have any examples or tutorials that you'd like to contribute, we encourage you to create a new topic
 | in the [Cube.js community forum](https://forum.cube.dev/).
 <!-- prettier-ignore-end -->
 
@@ -25,7 +25,6 @@ Below you can find examples and tutorials to help you get started with Cube.js.
 | [Stripe Dashboard][link-stripe-dashboard]       |    [stripe-dashboard][code-stripe-dashboard]    | Stripe Demo Dashboard built with Cube.js and Recharts                                     |
 | [Event Analytics][link-event-analytics]         |     [event-analytics][code-event-analytics]     | Mixpanel like Event Analytics App built with Cube.js and Snowplow                         |
 | [External Rollups][link-external-rollups]       |    [external-rollups][code-external-rollups]    | Compare performance of direct BigQuery querying vs MySQL cached version for the same data |
-| [AWS Web Analytics][link-aws-web-analytics]     |   [aws-web-analytics][code-aws-web-analytics]   | Web Analytics with AWS Lambda, Athena, Kinesis and Cube.js                                |
 | Simple Dynamic Schema Creation                  | [async-module-simple][code-simple-asyncmodule]  | A simple example of using `asyncModule` to generate schemas                               |
 | Auth0                                           |               [auth0][code-auth0]               | Cube.js deployment configured with Auth0 JWK/JWT integration                              |
 | Cognito                                         |             [cognito][code-cognito]             | Cube.js deployment configured with AWS Cognito JWK/JWT integration                        |
