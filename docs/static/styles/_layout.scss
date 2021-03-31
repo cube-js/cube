@@ -384,7 +384,7 @@ span.group-header {
   width: inherit;
   background: $sidebar-bg;
   padding: 16px 24px;
-  overflow-y: auto;
+  overflow-y: scroll;
   overflow-x: hidden;
   position: fixed;
   //padding-left: calc(9999px + 24px);
