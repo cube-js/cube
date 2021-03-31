@@ -47,6 +47,8 @@ use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::from_utf8_unchecked;
+use std::time::Duration;
+use tokio::time::timeout;
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
 
@@ -82,6 +84,7 @@ pub struct SqlServiceImpl {
     query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
+    query_timeout: Duration,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -95,6 +98,7 @@ impl SqlServiceImpl {
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
         rows_per_chunk: usize,
+        query_timeout: Duration,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
@@ -104,6 +108,7 @@ impl SqlServiceImpl {
             query_executor,
             cluster,
             rows_per_chunk,
+            query_timeout,
         })
     }
 
@@ -466,10 +471,13 @@ impl SqlService for SqlServiceImpl {
                         self.query_planner.execute_meta_plan(logical_plan).await?
                     }
                     QueryPlan::Select(serialized) => {
-                        self.query_executor
-                            .execute_router_plan(serialized, self.cluster.clone())
-                            .with_current_subscriber()
-                            .await?
+                        timeout(
+                            self.query_timeout,
+                            self.query_executor
+                                .execute_router_plan(serialized, self.cluster.clone())
+                                .with_current_subscriber(),
+                        )
+                        .await??
                     }
                 };
                 Ok(res)
@@ -886,6 +894,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
+            let query_timeout = Duration::from_secs(30);
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let store = ChunkStore::new(
                 meta_store.clone(),
@@ -902,6 +911,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 rows_per_chunk,
+                query_timeout,
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -933,6 +943,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
+            let query_timeout = Duration::from_secs(30);
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
@@ -949,6 +960,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 rows_per_chunk,
+                query_timeout,
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
