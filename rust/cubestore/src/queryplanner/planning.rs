@@ -625,6 +625,7 @@ impl CubeExtensionPlanner {
                 self.serialized_plan.clone(),
                 snapshots.clone(),
                 input,
+                false,
             )))
         } else {
             Ok(Arc::new(WorkerExec { input, schema }))

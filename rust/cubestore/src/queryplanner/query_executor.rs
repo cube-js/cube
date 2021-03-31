@@ -35,6 +35,7 @@ use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::{
     collect, ExecutionPlan, OptimizerHints, Partitioning, RecordBatchStream,
+    SendableRecordBatchStream,
 };
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
@@ -521,6 +522,7 @@ pub struct ClusterSendExec {
     pub partitions: Vec<Vec<IdRow<Partition>>>,
     pub cluster: Arc<dyn Cluster>,
     pub serialized_plan: Arc<SerializedPlan>,
+    pub use_streaming: bool,
 }
 
 impl ClusterSendExec {
@@ -530,6 +532,7 @@ impl ClusterSendExec {
         serialized_plan: Arc<SerializedPlan>,
         union_snapshots: Vec<Vec<IndexSnapshot>>,
         input_for_optimizations: Arc<dyn ExecutionPlan>,
+        use_streaming: bool,
     ) -> Self {
         let to_multiply = union_snapshots
             .into_iter()
@@ -550,6 +553,7 @@ impl ClusterSendExec {
             cluster,
             serialized_plan,
             input_for_optimizations,
+            use_streaming,
         }
     }
 
@@ -564,6 +568,7 @@ impl ClusterSendExec {
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
+            use_streaming: self.use_streaming,
         }
     }
 }
@@ -600,6 +605,7 @@ impl ExecutionPlan for ClusterSendExec {
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
+            use_streaming: self.use_streaming,
         }))
     }
 
@@ -611,31 +617,31 @@ impl ExecutionPlan for ClusterSendExec {
     async fn execute(
         &self,
         partition: usize,
-    ) -> Result<Pin<Box<dyn RecordBatchStream + Send>>, DataFusionError> {
-        let record_batches = self
+    ) -> Result<SendableRecordBatchStream, DataFusionError> {
+        let node_name = &self
             .cluster
-            .run_select(
-                &self
-                    .cluster
-                    .node_name_by_partitions(
-                        &self.partitions[partition]
-                            .iter()
-                            .map(|p| p.get_id())
-                            .collect_vec(),
-                    )
-                    .await?,
-                self.serialized_plan.with_partition_id_to_execute(
-                    self.partitions[partition]
-                        .iter()
-                        .map(|p| p.get_id())
-                        .collect(),
-                ),
+            .node_name_by_partitions(
+                &self.partitions[partition]
+                    .iter()
+                    .map(|p| p.get_id())
+                    .collect_vec(),
             )
             .await?;
-        // TODO .to_schema_ref()
-        let memory_exec =
-            MemoryExec::try_new(&vec![record_batches], self.schema.to_schema_ref(), None)?;
-        memory_exec.execute(0).await
+        let plan = self.serialized_plan.with_partition_id_to_execute(
+            self.partitions[partition]
+                .iter()
+                .map(|p| p.get_id())
+                .collect(),
+        );
+        if self.use_streaming {
+            Ok(self.cluster.run_select_stream(node_name, plan).await?)
+        } else {
+            let record_batches = self.cluster.run_select(node_name, plan).await?;
+            // TODO .to_schema_ref()
+            let memory_exec =
+                MemoryExec::try_new(&vec![record_batches], self.schema.to_schema_ref(), None)?;
+            memory_exec.execute(0).await
+        }
     }
 }
 
@@ -914,22 +920,37 @@ pub struct SerializedRecordBatchStream {
 }
 
 impl SerializedRecordBatchStream {
-    pub fn write(schema: &Schema, record_batches: Vec<RecordBatch>) -> Result<Self, CubeError> {
-        let file = Vec::new();
-        let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
-        for batch in record_batches.iter() {
-            writer.write(batch)?;
+    pub fn write(
+        schema: &Schema,
+        record_batches: Vec<RecordBatch>,
+    ) -> Result<Vec<Self>, CubeError> {
+        let mut results = Vec::with_capacity(record_batches.len());
+        for batch in record_batches {
+            let file = Vec::new();
+            let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
+            writer.write(&batch)?;
+            let cursor = writer.finish()?;
+            results.push(Self {
+                record_batch_file: cursor.into_inner(),
+            })
         }
-        let cursor = writer.finish()?;
-        Ok(Self {
-            record_batch_file: cursor.into_inner(),
-        })
+        Ok(results)
     }
 
-    pub fn read(self) -> Result<Vec<RecordBatch>, CubeError> {
+    pub fn read(self) -> Result<RecordBatch, CubeError> {
         let cursor = Cursor::new(self.record_batch_file);
-        let reader = StreamReader::try_new(cursor)?;
-        Ok(reader.collect::<Result<Vec<_>, _>>()?)
+        let mut reader = StreamReader::try_new(cursor)?;
+        let batch = reader.next();
+        if batch.is_none() {
+            return Err(CubeError::internal("zero batches deserialized".to_string()));
+        }
+        let batch = batch.unwrap()?;
+        if !reader.next().is_none() {
+            return Err(CubeError::internal(
+                "more than one batch deserialized".to_string(),
+            ));
+        }
+        Ok(batch)
     }
 }
 /// Note: copy of the function in 'datafusion/src/datasource/parquet.rs'.

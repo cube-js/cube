@@ -8,7 +8,7 @@ pub mod worker_pool;
 use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
 
 use crate::cluster::message::NetworkMessage;
-use crate::cluster::transport::{ClusterTransport, MetaStoreTransport};
+use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::DIService;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
@@ -26,12 +26,17 @@ use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
 use crate::CubeError;
+use arrow::datatypes::SchemaRef;
+use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use chrono::Utc;
 use core::mem;
+use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
+use flatbuffers::bitflags::_core::pin::Pin;
 use futures::future::join_all;
-use futures::Future;
+use futures::task::{Context, Poll};
+use futures::{Future, Stream};
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
@@ -43,6 +48,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::Weak;
 use std::time::Duration;
 use std::time::SystemTime;
 use tokio::fs;
@@ -63,8 +69,16 @@ pub trait Cluster: DIService + Send + Sync {
     async fn run_select(
         &self,
         node_name: &str,
-        plan_node: SerializedPlan,
+        plan: SerializedPlan,
     ) -> Result<Vec<RecordBatch>, CubeError>;
+
+    /// Like [run_select], but streams results as they are requested.
+    /// This allows to send only a limited number of results, if the caller does not need all.
+    async fn run_select_stream(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<SendableRecordBatchStream, CubeError>;
 
     async fn available_nodes(&self) -> Result<Vec<String>, CubeError>;
 
@@ -99,6 +113,7 @@ pub enum JobEvent {
 }
 
 pub struct ClusterImpl {
+    this: Weak<ClusterImpl>,
     remote_fs: Arc<dyn RemoteFs>,
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
@@ -113,7 +128,15 @@ pub struct ClusterImpl {
     jobs_enabled: Arc<RwLock<bool>>,
     #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
-        Option<Arc<WorkerPool<WorkerMessage, SerializedRecordBatchStream, WorkerProcessor>>>,
+        Option<
+            Arc<
+                WorkerPool<
+                    WorkerMessage,
+                    (SchemaRef, Vec<SerializedRecordBatchStream>),
+                    WorkerProcessor,
+                >,
+            >,
+        >,
     >,
     config_obj: Arc<dyn ConfigObj>,
     query_executor: Arc<dyn QueryExecutor>,
@@ -132,8 +155,12 @@ pub struct WorkerProcessor;
 
 #[cfg(not(target_os = "windows"))]
 #[async_trait]
-impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProcessor {
-    async fn process(args: WorkerMessage) -> Result<SerializedRecordBatchStream, CubeError> {
+impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>)>
+    for WorkerProcessor
+{
+    async fn process(
+        args: WorkerMessage,
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
             WorkerMessage::Select(plan_node, remote_to_local_names) => {
                 debug!("Running select in worker started: {:?}", plan_node);
@@ -144,7 +171,8 @@ impl MessageProcessor<WorkerMessage, SerializedRecordBatchStream> for WorkerProc
                     .await;
                 debug!("Running select in worker completed: {:?}", plan_node);
                 let (schema, records) = res?;
-                SerializedRecordBatchStream::write(schema.as_ref(), records)
+                let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
+                Ok((schema, records))
             }
         }
     }
@@ -187,9 +215,23 @@ impl Cluster for ClusterImpl {
             .send_or_process_locally(node_name, NetworkMessage::Select(plan_node))
             .await?;
         match response {
-            NetworkMessage::SelectResult(r) => r.and_then(|x| x.read()),
+            NetworkMessage::SelectResult(r) => {
+                r.and_then(|batches| batches.into_iter().map(|b| b.read()).collect())
+            }
             _ => panic!("unexpected response for select"),
         }
+    }
+
+    async fn run_select_stream(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<SendableRecordBatchStream, CubeError> {
+        self.this
+            .upgrade()
+            .unwrap()
+            .run_select_stream_impl(node_name, plan)
+            .await
     }
 
     async fn available_nodes(&self) -> Result<Vec<String>, CubeError> {
@@ -264,7 +306,7 @@ impl Cluster for ClusterImpl {
         match m {
             NetworkMessage::Select(plan) => {
                 let res = self.run_local_select_serialized(plan).await;
-                NetworkMessage::SelectResult(res)
+                NetworkMessage::SelectResult(res.map(|r| r.1))
             }
             NetworkMessage::WarmupDownload(remote_path) => {
                 let res = self.remote_fs.download_file(&remote_path).await;
@@ -283,6 +325,12 @@ impl Cluster for ClusterImpl {
             NetworkMessage::NotifyJobListenersSuccess => {
                 panic!("NotifyJobListenersSuccess sent to worker")
             }
+            NetworkMessage::SelectStart(..)
+            | NetworkMessage::SelectResultSchema(..)
+            | NetworkMessage::SelectNextBatch
+            | NetworkMessage::SelectResultBatch(..) => {
+                panic!("streaming request passed to process_message")
+            }
         }
     }
 
@@ -296,6 +344,11 @@ impl Cluster for ClusterImpl {
             x => panic!("Unexpected message: {:?}", x),
         }
     }
+}
+
+#[async_trait]
+pub trait MessageStreamProcessor: Send {
+    async fn process(&mut self, m: NetworkMessage) -> (NetworkMessage, /*finished*/ bool);
 }
 
 pub struct JobResultListener {
@@ -511,7 +564,8 @@ impl ClusterImpl {
         cluster_transport: Arc<dyn ClusterTransport>,
     ) -> Arc<ClusterImpl> {
         let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
-        Arc::new(ClusterImpl {
+        Arc::new_cyclic(|this| ClusterImpl {
+            this: this.clone(),
             server_name,
             server_addresses,
             remote_fs,
@@ -615,9 +669,49 @@ impl ClusterImpl {
 
     pub async fn listen_on_worker_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
         if let Some(address) = cluster.config_obj.worker_bind_address() {
-            ClusterImpl::listen_on_port("Worker", address, cluster.clone(), async move |c, m| {
-                c.process_message_on_worker(m).await
-            })
+            ClusterImpl::listen_on_port(
+                "Worker",
+                address,
+                cluster.clone(),
+                async move |c, mut socket| {
+                    let m = match NetworkMessage::receive(&mut socket).await {
+                        Ok(m) => m,
+                        Err(e) => {
+                            error!("Network error: {}", e);
+                            return;
+                        }
+                    };
+
+                    if !m.is_streaming_request() {
+                        let response = c.process_message_on_worker(m).await;
+                        if let Err(e) = response.send(&mut socket).await {
+                            error!("Network error: {}", e);
+                            return;
+                        }
+                    } else {
+                        let mut p = c.start_stream_on_worker(&m);
+                        let mut request = m;
+                        loop {
+                            let (response, finished) = p.process(request).await;
+                            if let Err(e) = response.send(&mut socket).await {
+                                error!("Network error: {}", e);
+                                return;
+                            }
+                            if finished {
+                                break;
+                            }
+                            match NetworkMessage::maybe_receive(&mut socket).await {
+                                Ok(Some(m)) => request = m,
+                                Ok(None) => break, // server closed connection.
+                                Err(e) => {
+                                    error!("Network error: {}", e);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                },
+            )
             .await?;
         }
         Ok(())
@@ -625,7 +719,7 @@ impl ClusterImpl {
 
     pub async fn listen_on_metastore_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
         if let Some(address) = cluster.config_obj.metastore_bind_address() {
-            ClusterImpl::listen_on_port(
+            ClusterImpl::process_on_port(
                 "Meta store",
                 address,
                 cluster.clone(),
@@ -636,11 +730,11 @@ impl ClusterImpl {
         Ok(())
     }
 
-    pub async fn listen_on_port<F: Future<Output = NetworkMessage> + Send + 'static>(
+    pub async fn listen_on_port<F: Future<Output = ()> + Send>(
         name: &str,
         address: &str,
         cluster: Arc<ClusterImpl>,
-        process_fn: impl Fn(Arc<ClusterImpl>, NetworkMessage) -> F + Send + Sync + Clone + 'static,
+        process_fn: impl Fn(Arc<ClusterImpl>, TcpStream) -> F + Send + Sync + Clone + 'static,
     ) -> Result<(), CubeError> {
         let listener = TcpListener::bind(address.clone()).await?;
 
@@ -648,7 +742,7 @@ impl ClusterImpl {
 
         loop {
             let mut stop_receiver = cluster.close_worker_socket_rx.write().await;
-            let (mut socket, _) = tokio::select! {
+            let (socket, _) = tokio::select! {
                 res = stop_receiver.changed() => {
                     if res.is_err() || *stop_receiver.borrow() {
                         return Ok(());
@@ -670,10 +764,25 @@ impl ClusterImpl {
             let process_fn_to_move = process_fn.clone();
 
             tokio::spawn(async move {
+                process_fn_to_move(cluster_to_move, socket).await;
+            });
+        }
+    }
+
+    pub async fn process_on_port<F: Future<Output = NetworkMessage> + Send>(
+        name: &str,
+        address: &str,
+        cluster: Arc<ClusterImpl>,
+        process_fn: impl Fn(Arc<ClusterImpl>, NetworkMessage) -> F + Send + Sync + Clone + 'static,
+    ) -> Result<(), CubeError> {
+        Self::listen_on_port(name, address, cluster, move |c, mut socket| {
+            let cluster = c.clone();
+            let process_fn = process_fn.clone();
+            async move {
                 let request = NetworkMessage::receive(&mut socket).await;
                 let response;
                 match request {
-                    Ok(m) => response = process_fn_to_move(cluster_to_move, m).await,
+                    Ok(m) => response = process_fn(cluster.clone(), m).await,
                     Err(e) => {
                         error!("Network error: {}", e);
                         return;
@@ -683,15 +792,16 @@ impl ClusterImpl {
                 if let Err(e) = response.send(&mut socket).await {
                     error!("Network error: {}", e)
                 }
-            });
-        }
+            }
+        })
+        .await
     }
 
     #[instrument(level = "trace", skip(self, plan_node))]
     async fn run_local_select_serialized(
         &self,
         plan_node: SerializedPlan,
-    ) -> Result<SerializedRecordBatchStream, CubeError> {
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         scopeguard::defer!(trim_allocs());
         let start = SystemTime::now();
         debug!("Running select: {:?}", plan_node);
@@ -725,9 +835,9 @@ impl ClusterImpl {
                 .query_executor
                 .execute_worker_plan(plan_node.clone(), remote_to_local_names)
                 .await?;
-            let res = SerializedRecordBatchStream::write(schema.as_ref(), records);
+            let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
             info!("Running select completed ({:?})", start.elapsed()?);
-            res
+            Ok((schema, records?))
         }
 
         #[cfg(not(target_os = "windows"))]
@@ -751,7 +861,8 @@ impl ClusterImpl {
                     .query_executor
                     .execute_worker_plan(plan_node.clone(), remote_to_local_names)
                     .await?;
-                SerializedRecordBatchStream::write(schema.as_ref(), records)
+                let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
+                Ok((schema, records?))
             };
 
             info!("Running select completed ({:?})", start.elapsed()?);
@@ -856,6 +967,186 @@ impl ClusterImpl {
             )
             .await?
         }
+    }
+
+    #[instrument(level = "trace", skip(self, m))]
+    async fn connect_or_loopback(
+        self: &Arc<Self>,
+        node_name: &str,
+        m: &NetworkMessage,
+    ) -> Result<Box<dyn WorkerConnection>, CubeError> {
+        if self.server_name == node_name {
+            let b: Box<dyn WorkerConnection> = Box::new(LoopbackConnection {
+                processor: ClusterImpl::start_stream_on_worker(self.clone(), &m),
+            });
+            Ok(b)
+        } else {
+            timeout(
+                Duration::from_secs(self.config_obj.query_timeout()),
+                self.cluster_transport
+                    .connect_to_worker(node_name.to_string()),
+            )
+            .await?
+        }
+    }
+
+    fn start_stream_on_worker(
+        self: Arc<Self>,
+        m: &NetworkMessage,
+    ) -> Box<dyn MessageStreamProcessor> {
+        match m {
+            NetworkMessage::SelectStart(_) => {
+                return Box::new(QueryStreamer {
+                    cluster: self,
+                    results: Vec::new(),
+                });
+
+                struct QueryStreamer {
+                    cluster: Arc<ClusterImpl>,
+                    results: Vec<SerializedRecordBatchStream>,
+                }
+
+                impl QueryStreamer {
+                    fn poll_next_results(&mut self) -> Option<SerializedRecordBatchStream> {
+                        if self.results.is_empty() {
+                            return None;
+                        }
+                        let last = self.results.len() - 1;
+                        self.results.swap(0, last);
+                        self.results.pop()
+                    }
+                }
+
+                #[async_trait]
+                impl MessageStreamProcessor for QueryStreamer {
+                    async fn process(&mut self, m: NetworkMessage) -> (NetworkMessage, bool) {
+                        match m {
+                            NetworkMessage::SelectStart(plan) => {
+                                let (schema, results) = match self
+                                    .cluster
+                                    .run_local_select_serialized(plan)
+                                    .await
+                                {
+                                    Ok(results) => results,
+                                    Err(e) => {
+                                        return (NetworkMessage::SelectResultSchema(Err(e)), true)
+                                    }
+                                };
+                                self.results = results;
+                                (NetworkMessage::SelectResultSchema(Ok(schema)), false)
+                            }
+                            NetworkMessage::SelectNextBatch => {
+                                let batch = self.poll_next_results();
+                                let finished = batch.is_none();
+                                (NetworkMessage::SelectResultBatch(Ok(batch)), finished)
+                            }
+                            _ => panic!("unexpected message in select stream"),
+                        }
+                    }
+                }
+            }
+            _ => panic!("non-streaming request passed to start_stream"),
+        }
+    }
+
+    async fn run_select_stream_impl(
+        self: &Arc<Self>,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<SendableRecordBatchStream, CubeError> {
+        let init_message = NetworkMessage::SelectStart(plan);
+        let mut c = self.connect_or_loopback(node_name, &init_message).await?;
+        let schema = match c.call(init_message).await? {
+            NetworkMessage::SelectResultSchema(s) => s,
+            _ => panic!("unexpected response to select stream"),
+        }?;
+        return Ok(Box::pin(SelectStream {
+            schema,
+            connection: Some(c),
+            pending: None,
+            finished: false,
+        }));
+
+        type ConnPtr = Box<dyn WorkerConnection>;
+        struct SelectStream {
+            schema: SchemaRef,
+            connection: Option<ConnPtr>,
+            pending: Option<
+                Pin<Box<dyn Future<Output = (Result<NetworkMessage, CubeError>, ConnPtr)> + Send>>,
+            >,
+            finished: bool,
+        }
+
+        impl Stream for SelectStream {
+            type Item = Result<RecordBatch, ArrowError>;
+
+            fn poll_next(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+            ) -> Poll<Option<Self::Item>> {
+                if self.finished {
+                    return Poll::Ready(None);
+                }
+
+                if self.pending.is_none() {
+                    let mut connection = self.as_mut().connection.take().unwrap();
+                    self.pending = Some(Box::pin(async move {
+                        let res = connection.call(NetworkMessage::SelectNextBatch).await;
+                        (res, connection)
+                    }));
+                }
+                let (message, connection) = match self.pending.as_mut().unwrap().as_mut().poll(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(r) => r,
+                };
+                self.pending = None;
+                self.connection = Some(connection);
+
+                let r = match message {
+                    Err(e) => return self.on_error(e.into()),
+                    Ok(NetworkMessage::SelectResultBatch(r)) => r,
+                    _ => panic!("invalid result message for select"),
+                };
+                match r {
+                    Ok(Some(batch)) => match batch.read() {
+                        Ok(batch) => Poll::Ready(Some(Ok(batch))),
+                        Err(e) => return self.on_error(e.into()),
+                    },
+                    Ok(None) => {
+                        self.finished = true;
+                        Poll::Ready(None)
+                    }
+                    Err(e) => return self.on_error(e.into()),
+                }
+            }
+        }
+
+        impl SelectStream {
+            fn on_error<T>(
+                mut self: Pin<&mut Self>,
+                e: ArrowError,
+            ) -> Poll<Option<Result<T, ArrowError>>> {
+                self.as_mut().finished = true;
+                return Poll::Ready(Some(Err(e)));
+            }
+        }
+
+        impl RecordBatchStream for SelectStream {
+            fn schema(&self) -> SchemaRef {
+                self.schema.clone()
+            }
+        }
+    }
+}
+
+struct LoopbackConnection {
+    processor: Box<dyn MessageStreamProcessor>,
+}
+
+#[async_trait]
+impl WorkerConnection for LoopbackConnection {
+    async fn call(&mut self, m: NetworkMessage) -> Result<NetworkMessage, CubeError> {
+        Ok(self.processor.process(m).await.0)
     }
 }
 
