@@ -169,7 +169,7 @@ function astToCode(ast) {
   await appContainer.ensureDependencies();
   try {
     await executeCommand(
-      'npm link @cubejs-client/core && npm link @cubejs-client/vue',
+      'npm link @cubejs-client/vue',
       [],
       {
         shell: true,

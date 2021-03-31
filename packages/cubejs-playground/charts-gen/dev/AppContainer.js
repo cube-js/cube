@@ -8,7 +8,10 @@ const { fileContentsRecursive, executeCommand } = require('./utils');
 class AppContainer {
   static getPackageVersions(appPath) {
     try {
-      return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};
+      return (
+        fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates ||
+        {}
+      );
     } catch (error) {
       return {};
     }
@@ -44,7 +47,9 @@ class AppContainer {
       if (!node.packageInstance.children[installsTo]) {
         node.packageInstance.children[installsTo] = [];
       }
-      node.packageInstance.children[installsTo].push(currentNode.packageInstance);
+      node.packageInstance.children[installsTo].push(
+        currentNode.packageInstance
+      );
     });
   }
 
@@ -54,9 +59,16 @@ class AppContainer {
     while (stack.length) {
       const child = stack.pop();
 
-      const scaffoldingPath = path.join(this.packagesPath, child.package.name, 'scaffolding');
+      const scaffoldingPath = path.join(
+        this.packagesPath,
+        child.package.name,
+        'scaffolding'
+      );
       // eslint-disable-next-line
-      child.packageInstance = require(path.join(this.packagesPath, child.package.name))({
+      child.packageInstance = require(path.join(
+        this.packagesPath,
+        child.package.name
+      ))({
         appContainer: this,
         package: {
           ...child.package,
@@ -78,8 +90,14 @@ class AppContainer {
   async persistSources(sourceContainer, packageVersions) {
     try {
       const sources = sourceContainer.outputSources();
-      await Promise.all(sources.map((file) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
-      const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+      await Promise.all(
+        sources.map((file) =>
+          fs.outputFile(path.join(this.appPath, file.fileName), file.content)
+        )
+      );
+      const packageJson = fs.readJsonSync(
+        path.join(this.appPath, 'package.json')
+      );
       packageJson.cubejsTemplates = {
         ...packageJson.cubejsTemplates,
         ...packageVersions,
@@ -87,8 +105,8 @@ class AppContainer {
       await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
         spaces: 2,
       });
-    } catch (error) {
-      console.warn('Error persisting sources');
+    } catch (_) {
+      // allowed to fail
     }
   }
 
@@ -98,7 +116,9 @@ class AppContainer {
 
   async ensureDependencies() {
     const dependencies = this.sourceContainer.importDependencies;
-    const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+    const packageJson = fs.readJsonSync(
+      path.join(this.appPath, 'package.json')
+    );
 
     if (!packageJson || !packageJson.dependencies) {
       return [];
@@ -106,10 +126,16 @@ class AppContainer {
 
     const toInstall = R.toPairs(dependencies)
       .filter(([dependency]) => !packageJson.dependencies[dependency])
-      .map(([dependency, version]) => (version !== 'latest' ? `${dependency}@${version}` : dependency));
+      .map(([dependency, version]) =>
+        version !== 'latest' ? `${dependency}@${version}` : dependency
+      );
 
     if (toInstall.length) {
-      await this.executeCommand('npm', ['install', '--save'].concat(toInstall), { cwd: path.resolve(this.appPath) });
+      await this.executeCommand(
+        'npm',
+        ['install', '--save'].concat(toInstall),
+        { cwd: path.resolve(this.appPath) }
+      );
     }
     return toInstall;
   }

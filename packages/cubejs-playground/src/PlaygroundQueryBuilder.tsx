@@ -1,7 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Col, Row, Divider } from 'antd';
-import { LockOutlined } from '@ant-design/icons';
+import { LockOutlined, PlaySquareOutlined } from '@ant-design/icons';
 import { QueryBuilder } from '@cubejs-client/react';
+import {
+  areQueriesEqual,
+  PivotConfig,
+  Query,
+  ChartType,
+} from '@cubejs-client/core';
 import styled from 'styled-components';
 
 import { playgroundAction } from './events';
@@ -16,6 +22,7 @@ import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
 import { useSecurityContext } from './hooks';
 import { FatalError } from './atoms';
+import { UIFramework } from './types';
 
 const Section = styled.div`
   display: flex;
@@ -28,7 +35,10 @@ const Section = styled.div`
   }
 `;
 
-export const frameworkChartLibraries = {
+export const frameworkChartLibraries: Record<
+  UIFramework,
+  Array<{ value: string; title: string }>
+> = {
   react: [
     {
       value: 'bizcharts',
@@ -84,6 +94,12 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
+type THandleRunButtonClickProps = {
+  query: Query;
+  pivotConfig?: PivotConfig;
+  chartType: ChartType;
+};
+
 export default function PlaygroundQueryBuilder({
   apiUrl,
   cubejsToken,
@@ -92,12 +108,15 @@ export default function PlaygroundQueryBuilder({
   schemaVersion = 0,
   initialVizState,
   onSchemaChange,
-  onVizStateChanged
+  onVizStateChanged,
 }: any) {
-  const ref = useRef<any>(null);
+  const ref = useRef<HTMLIFrameElement>(null);
+  const queryRef = useRef<Query | null>(null);
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
+  const [isQueryLoading, setQueryLoading] = useState(false);
+  const [queryError, setQueryError] = useState<Error | null>(null);
   const { token, setIsModalOpen } = useSecurityContext();
 
   useEffect(() => {
@@ -108,6 +127,34 @@ export default function PlaygroundQueryBuilder({
       });
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
+
+  function handleRunButtonClick({
+    query,
+    pivotConfig,
+    chartType,
+  }: THandleRunButtonClickProps) {
+    if (ref.current) {
+      if (areQueriesEqual(query, queryRef.current)) {
+        dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
+          pivotConfig,
+          query,
+          chartType,
+          chartingLibrary,
+        });
+        dispatchPlaygroundEvent(ref.current.contentDocument, 'refetch', {});
+      } else {
+        dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
+          pivotConfig,
+          query,
+          chartType,
+          chartingLibrary,
+        });
+      }
+    }
+
+    setQueryError(null);
+    queryRef.current = query;
+  }
 
   return (
     <QueryBuilder
@@ -144,7 +191,7 @@ export default function PlaygroundQueryBuilder({
         updatePivotConfig,
         missingMembers,
         isFetchingMeta,
-        dryRunResponse
+        dryRunResponse,
       }) => {
         let parsedDateRange;
 
@@ -269,15 +316,56 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
+
+                    <Section>
+                      <SectionHeader>Execute</SectionHeader>
+
+                      <Button
+                        type="primary"
+                        loading={isQueryLoading}
+                        icon={<PlaySquareOutlined />}
+                        onClick={() => {
+                          if (
+                            isChartRendererReady &&
+                            ref.current &&
+                            missingMembers.length === 0
+                          ) {
+                            handleRunButtonClick({
+                              query,
+                              pivotConfig,
+                              chartType: chartType || 'line',
+                            });
+                          }
+                        }}
+                      >
+                        Run
+                      </Button>
+                    </Section>
                   </Row>
                 </Card>
 
-                <SectionRow style={{ marginTop: 16, marginLeft: 16 }}>
+                <SectionRow
+                  style={{
+                    marginTop: 16,
+                    marginLeft: 16,
+                  }}
+                >
                   <SelectChartType
-                    chartType={chartType}
+                    chartType={chartType || 'line'}
                     updateChartType={(type) => {
                       playgroundAction('Change Chart Type');
                       updateChartType(type);
+
+                      if (ref.current) {
+                        dispatchPlaygroundEvent(
+                          ref.current.contentDocument,
+                          'chart',
+                          {
+                            chartType: type,
+                            chartingLibrary
+                          }
+                        );
+                      }
                     }}
                   />
 
@@ -359,14 +447,31 @@ export default function PlaygroundQueryBuilder({
 
                       return (
                         <ChartRenderer
-                          isChartRendererReady={isChartRendererReady && !isFetchingMeta}
+                          isQueryLoading={isQueryLoading}
+                          isChartRendererReady={
+                            isChartRendererReady && !isFetchingMeta
+                          }
+                          queryError={queryError}
                           framework={framework}
-                          chartingLibrary={chartingLibrary}
-                          chartType={chartType}
+                          chartType={chartType || 'line'}
                           query={query}
                           pivotConfig={pivotConfig}
                           iframeRef={ref}
                           queryHasMissingMembers={missingMembers.length > 0}
+                          onQueryStatusChange={({
+                            isLoading,
+                            resultSet,
+                            error,
+                          }) => {
+                            if (resultSet) {
+                              setQueryError(null);
+                            }
+                            if (error) {
+                              setQueryError(error);
+                            }
+
+                            setQueryLoading(isLoading);
+                          }}
                           onChartRendererReadyChange={setChartRendererReady}
                         />
                       );

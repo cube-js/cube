@@ -1030,7 +1030,7 @@ declare module '@cubejs-client/core' {
    */
   export function getQueryMembers(query: Query): string[];
 
-  export function areQueriesEqual(query1: Query, query2: Query): boolean;
+  export function areQueriesEqual(query1: Query | null, query2: Query | null): boolean;
 
   export type ProgressResponse = {
     stage: string;

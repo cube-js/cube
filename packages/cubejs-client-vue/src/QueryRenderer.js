@@ -68,6 +68,7 @@ export default {
         slotProps = {
           loading,
           error,
+          refetch: this.load,
           ...this.builderProps,
           ...slotProps,
         };
@@ -149,10 +150,13 @@ export default {
   watch: {
     loading(loading) {
       if (loading === false) {
-        this.$emit('queryLoad', {
+        this.$emit('queryStatus', {
+          isLoading: false,
           error: this.error,
           resultSet: this.resultSet,
         });
+      } else {
+        this.$emit('queryStatus', { isLoading: true });
       }
     },
     cubejsApi() {

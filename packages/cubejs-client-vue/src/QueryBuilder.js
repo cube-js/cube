@@ -214,8 +214,8 @@ export default {
         },
         scopedSlots: this.$scopedSlots,
         on: {
-          queryLoad: (event) => {
-            this.$emit('queryLoad', event);
+          queryStatus: (event) => {
+            this.$emit('queryStatus', event);
           }
         }
       },
@@ -355,7 +355,6 @@ export default {
   },
 
   async mounted() {
-    console.log('Local Dep', Date.now());
     this.meta = await this.cubejsApi.meta();
 
     this.copyQueryFromProps();

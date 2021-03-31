@@ -12,7 +12,7 @@ const AppContainer = require('../dev/AppContainer');
 const DevPackageFetcher = require('../dev/DevPackageFetcher');
 const { executeCommand } = require('../dev/utils');
 const { generateCodeChunks } = require('./code-chunks-gen');
-import { REPOSITORY } from '../env';
+const { REPOSITORY } = require('../env');
 
 const chartingLibraryTemplates = [
   'recharts-charts',
@@ -131,4 +131,20 @@ const packages = [
       .reduce((a, b) => ({ ...a, ...b }))
   );
   await appContainer.ensureDependencies();
+
+  // try {
+  //   await executeCommand(
+  //     'npm link @cubejs-client/react',
+  //     [],
+  //     {
+  //       shell: true,
+  //       cwd: reactChartsPath,
+  //     }
+  //   );
+  // } catch (error) {
+  //   console.log(
+  //     'Error trying to link local core dependencies',
+  //     error.toString()
+  //   );
+  // }
 })();

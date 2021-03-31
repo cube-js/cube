@@ -39,7 +39,6 @@ const track = async (event) => {
       if (result.status !== 200 && retries > 0) {
         return flush(toFlush, retries - 1);
       }
-      // console.log(await result.json());
     } catch (e) {
       if (retries > 0) {
         return flush(toFlush, retries - 1);

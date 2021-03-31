@@ -1,12 +1,12 @@
 import { useContext, useEffect, useState, useRef } from 'react';
-import { equals } from 'ramda';
-import { isQueryPresent } from '@cubejs-client/core';
+import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
 
 export default function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
+  const isMounted = useRef(true);
   const [currentQuery, setCurrentQuery] = useState(null);
   const [isLoading, setLoading] = useState(false);
   const [resultSet, setResultSet] = useState(null);
@@ -18,24 +18,63 @@ export default function useCubeQuery(query, options = {}) {
 
   const progressCallback = ({ progressResponse }) => setProgress(progressResponse);
 
+  async function fetch() {
+    const { resetResultSetOnChange } = options;
+    const cubejsApi = options.cubejsApi || context?.cubejsApi;
+
+    if (!cubejsApi) {
+      throw new Error('Cube.js API client is not provided');
+    }
+
+    if (resetResultSetOnChange) {
+      setResultSet(null);
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await cubejsApi.load(query, {
+        mutexObj: mutexRef.current,
+        mutexKey: 'query',
+        progressCallback,
+      });
+
+      if (isMounted.current) {
+        setResultSet(response);
+        setProgress(null);
+      }
+    } catch (error) {
+      if (isMounted.current) {
+        setError(error);
+        setResultSet(null);
+        setProgress(null);
+      }
+    }
+
+    if (isMounted.current) {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    let isMounted = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
 
-    const cubejsApi = options.cubejsApi || (context && context.cubejsApi);
+    const cubejsApi = options.cubejsApi || context?.cubejsApi;
 
     if (!cubejsApi) {
       throw new Error('Cube.js API client is not provided');
     }
 
     async function loadQuery() {
-      if (!skip && query && isQueryPresent(query)) {
-        const hasOrderChanged = !equals(
-          Object.keys((currentQuery && currentQuery.order) || {}),
-          Object.keys(query.order || {})
-        );
-
-        if (hasOrderChanged || !equals(currentQuery, query)) {
+      if (!skip && isQueryPresent(query)) {
+        if (!areQueriesEqual(currentQuery, query)) {
           if (resetResultSetOnChange == null || resetResultSetOnChange) {
             setResultSet(null);
           }
@@ -60,7 +99,7 @@ export default function useCubeQuery(query, options = {}) {
                 progressCallback,
               },
               (e, result) => {
-                if (isMounted) {
+                if (isMounted.current) {
                   if (e) {
                     setError(e);
                   } else {
@@ -72,20 +111,10 @@ export default function useCubeQuery(query, options = {}) {
               }
             );
           } else {
-            const response = await cubejsApi.load(query, {
-              mutexObj: mutexRef.current,
-              mutexKey: 'query',
-              progressCallback,
-            });
-
-            if (isMounted) {
-              setResultSet(response);
-              setLoading(false);
-              setProgress(null);
-            }
+            await fetch();
           }
         } catch (e) {
-          if (isMounted) {
+          if (isMounted.current) {
             setError(e);
             setResultSet(null);
             setLoading(false);
@@ -98,8 +127,6 @@ export default function useCubeQuery(query, options = {}) {
     loadQuery();
 
     return () => {
-      isMounted = false;
-
       if (subscribeRequest) {
         subscribeRequest.unsubscribe();
         subscribeRequest = null;
@@ -112,5 +139,7 @@ export default function useCubeQuery(query, options = {}) {
     resultSet,
     error,
     progress,
+    previousQuery: currentQuery,
+    refetch: fetch
   };
 }
