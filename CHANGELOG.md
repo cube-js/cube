@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.73](https://github.com/cube-js/cube.js/compare/v0.26.72...v0.26.73) (2021-04-01)
+
+
+### Bug Fixes
+
+* Pre-aggregation warmup should wait for partitions to build ([#2474](https://github.com/cube-js/cube.js/issues/2474)) ([3f05d94](https://github.com/cube-js/cube.js/commit/3f05d94eacdd3d5cdb7d1a5edbf647e3c767fb60))
+
+
+### Features
+
+* Introduce ITransportResponse for HttpTransport/WSTransport, fix [#2439](https://github.com/cube-js/cube.js/issues/2439) ([756bcb8](https://github.com/cube-js/cube.js/commit/756bcb8ae9cd6075382c01a88e46415dd7d024b3))
+
+
+
+
+
 ## [0.26.72](https://github.com/cube-js/cube.js/compare/v0.26.71...v0.26.72) (2021-03-29)
 
 
