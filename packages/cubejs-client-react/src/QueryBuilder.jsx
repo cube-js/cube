@@ -55,13 +55,12 @@ export default class QueryBuilder extends React.Component {
 
     if (Array.isArray(query)) {
       return query.reduce(
-        (memo, currentQuery) =>
-          memo.concat(
-            QueryBuilder.resolveMember(type, {
-              meta,
-              query: currentQuery,
-            })
-          ),
+        (memo, currentQuery) => memo.concat(
+          QueryBuilder.resolveMember(type, {
+            meta,
+            query: currentQuery,
+          })
+        ),
         []
       );
     }
