@@ -132,14 +132,17 @@ class OrchestratorApiMock {
     }
 
     if (query.preAggregations) {
-      query.preAggregations.forEach(p => {
+      await Promise.all(query.preAggregations.map(async p => {
         const timezone = p.loadSql[0].match(/AT TIME ZONE '(.*?)'/)[1];
         if (!this.createdTables.find(t => t.tableName === p.tableName && t.timezone === timezone)) {
-          this.createdTables.push({ tableName: p.tableName, timezone });
+          await new Promise((resolve) => setTimeout(() => resolve(null), 200));
+          if (!this.createdTables.find(t => t.tableName === p.tableName && t.timezone === timezone)) {
+            this.createdTables.push({ tableName: p.tableName, timezone });
+          }
           // eslint-disable-next-line no-throw-literal
           throw { error: 'Continue wait' };
         }
-      });
+      }));
     }
 
     return {
@@ -157,6 +160,7 @@ class OrchestratorApiMock {
 }
 
 describe('Refresh Scheduler', () => {
+  jest.setTimeout(60000);
   const setupScheduler = () => {
     const serverCore = new CubejsServerCore({
       dbType: 'postgres',
@@ -284,5 +288,42 @@ describe('Refresh Scheduler', () => {
     );
 
     expect(refreshResult.finished).toEqual(true);
+  });
+
+  test('Iterator waits before advance', async () => {
+    const { refreshScheduler, orchestratorApi } = setupScheduler();
+    const result = [
+      { tableName: 'stb_pre_aggregations.foo_first20201231', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_second20201231', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_first20201230', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_second20201230', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_first20201229', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_second20201229', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_first20201228', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_second20201228', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC' },
+      { tableName: 'stb_pre_aggregations.foo_second20201227', timezone: 'UTC' },
+    ];
+
+    const queryIteratorState = {};
+
+    for (let i = 0; i < 5; i++) {
+      refreshScheduler.runScheduledRefresh(null, { concurrency: 2, workerIndices: [0], queryIteratorState });
+    }
+
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(null, {
+        concurrency: 2,
+        workerIndices: [0],
+        queryIteratorState
+      });
+      expect(orchestratorApi.createdTables).toEqual(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 0));
+      if (refreshResult.finished) {
+        break;
+      }
+    }
   });
 });
