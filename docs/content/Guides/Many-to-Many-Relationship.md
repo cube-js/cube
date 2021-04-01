@@ -22,7 +22,7 @@ You can <a href="many-to-many-relationship#many-to-many-relationship-without-an-
 
 The diagram below shows the tables `posts`, `topics`, `post_topics`, and their relationship.
 
-![many-to-many-1.png](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Guides/many-to-many-1.png)
+![many-to-many-1.png](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Guides/many-to-many-1.png)
 
 In the same way the `PostTopics` table was specifically created to handle this association in DB, we need to create an associative cube `PostTopics`, and declare the relationships from it to `Topics` cube and from `Posts` to `PostTopics`.
 Please note, we’re using the `hasMany` relationship on the `PostTopics` cube and direction of joins is selected to be `Posts -> PostTopics -> Topics`.
@@ -142,7 +142,7 @@ cube(`Campaigns`, {
 
 The following diagram shows our data schema with the `Campaigns` cube.
 
-![many-to-many-1.png](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Guides/many-to-many-2.png)
+![many-to-many-1.png](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Guides/many-to-many-2.png)
 
 The last piece is to finally declare a many-to-many relationship. This should be done by declaring a `hasMany` relationship on the associative cube, `Campaigns` in our case.
 

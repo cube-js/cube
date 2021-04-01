@@ -13,7 +13,7 @@ Cube.js:
   style="text-align: center"
 >
   <img
-  src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/authentication-overview.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/authentication-overview.png"
   style="border: none"
   width="80%"
   />
