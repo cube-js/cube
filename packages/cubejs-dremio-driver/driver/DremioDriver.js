@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const SqlString = require('sqlstring');
+const { getEnv } = require('@cubejs-backend/shared');
 const DremioQuery = require('./DremioQuery');
 
 // limit - Determines how many rows are returned (maximum of 500). Default: 100
@@ -8,6 +9,7 @@ const DremioQuery = require('./DremioQuery');
 const dremioJobLimit = 500;
 
 const applyParams = (query, params) => SqlString.format(query, params);
+
 class DremioDriver extends BaseDriver {
   static dialectClass() {
     return DremioQuery;
@@ -23,7 +25,9 @@ class DremioDriver extends BaseDriver {
       password: config.password || process.env.CUBEJS_DB_PASS,
       database: config.database || process.env.CUBEJS_DB_NAME,
       ssl: config.ssl || process.env.CUBEJS_DB_SSL,
-      ...config
+      ...config,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
     const protocol = (this.config.ssl === true || this.config.ssl === 'true') ? 'https' : 'http';
@@ -98,7 +102,9 @@ class DremioDriver extends BaseDriver {
     await this.getToken();
     const jobId = await this.executeQuery(queryString);
 
-    for (;;) {
+    const startedTime = Date.now();
+
+    for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
       const { data } = await this.getJobStatus(jobId);
 
       if (data.jobState === 'FAILED') {
@@ -109,8 +115,8 @@ class DremioDriver extends BaseDriver {
         let rows = [];
         const querys = [];
 
-        for (let i = 0; i < data.rowCount; i += dremioJobLimit) {
-          querys.push(this.getJobResults(jobId, dremioJobLimit, i));
+        for (let j = 0; j < data.rowCount; j += dremioJobLimit) {
+          querys.push(this.getJobResults(jobId, dremioJobLimit, j));
         }
 
         const parts = await Promise.all(querys);
@@ -121,8 +127,13 @@ class DremioDriver extends BaseDriver {
         return rows;
       }
 
-      await this.sleep(1000);
+      await this.sleep(
+        Math.min(this.config.pollMaxInterval, 200 * i),
+      );
     }
+    throw new Error(
+      `DremioQuery job timeout reached ${this.config.pollTimeout}ms`,
+    );
   }
 
   async refreshTablesSchema(path) {
