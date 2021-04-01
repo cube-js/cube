@@ -14,12 +14,12 @@ class WebSocketTransportResult {
 
   protected readonly result: unknown;
 
-  constructor({ status, message }: { status: unknown, message: unknown }) {
+  public constructor({ status, message }: { status: unknown, message: unknown }) {
     this.status = status;
     this.result = message;
   }
 
-  async json() {
+  public async json() {
     return this.result;
   }
 }

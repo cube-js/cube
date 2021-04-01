@@ -6,7 +6,7 @@ import { executeCommand, fileContentsRecursive } from './utils';
 import SourceContainer from './SourceContainer';
 
 export default class AppContainer {
-  static getPackageVersions(appPath) {
+  public static getPackageVersions(appPath) {
     try {
       return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};
     } catch (error) {
@@ -22,7 +22,7 @@ export default class AppContainer {
 
   protected packagesPath: string;
 
-  constructor(protected rootNode, { appPath, packagesPath }, playgroundContext) {
+  public constructor(protected rootNode, { appPath, packagesPath }, playgroundContext) {
     this.playgroundContext = playgroundContext;
     this.appPath = appPath;
     this.packagesPath = packagesPath;
@@ -30,17 +30,17 @@ export default class AppContainer {
     this.initDependencyTree();
   }
 
-  async applyTemplates() {
+  public async applyTemplates() {
     this.sourceContainer = await this.loadSources();
     await this.rootNode.packageInstance.applyPackage(this.sourceContainer);
   }
 
-  initDependencyTree() {
+  protected initDependencyTree() {
     this.createInstances(this.rootNode);
     this.setChildren(this.rootNode);
   }
 
-  setChildren(node) {
+  protected setChildren(node) {
     if (!node) {
       return;
     }
@@ -55,7 +55,7 @@ export default class AppContainer {
     });
   }
 
-  createInstances(node) {
+  protected createInstances(node) {
     const stack = [node];
 
     while (stack.length) {
@@ -80,11 +80,11 @@ export default class AppContainer {
     }
   }
 
-  async loadSources() {
+  protected async loadSources() {
     return new SourceContainer(await fileContentsRecursive(this.appPath));
   }
 
-  async persistSources(sourceContainer, packageVersions) {
+  public async persistSources(sourceContainer, packageVersions) {
     const sources = sourceContainer.outputSources();
     await Promise.all(sources.map((file) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
 
@@ -111,11 +111,11 @@ export default class AppContainer {
     });
   }
 
-  async executeCommand(command, args, options) {
+  public async executeCommand(command, args, options) {
     return executeCommand(command, args, options);
   }
 
-  async ensureDependencies() {
+  public async ensureDependencies() {
     const dependencies = this.sourceContainer?.importDependencies || [];
     const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
 
@@ -140,7 +140,7 @@ export default class AppContainer {
     return toInstall;
   }
 
-  getPackageVersions() {
+  public getPackageVersions() {
     return AppContainer.getPackageVersions(this.appPath);
   }
 }

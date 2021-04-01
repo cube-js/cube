@@ -82,9 +82,9 @@ export async function proxyFetch(url) {
     url,
     proxy
       ? {
-          // @ts-ignore
-          agent: new HttpsProxyAgent(proxy),
-        }
+        // @ts-ignore
+        agent: new HttpsProxyAgent(proxy),
+      }
       : {}
   );
 }

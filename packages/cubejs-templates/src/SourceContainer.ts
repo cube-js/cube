@@ -12,7 +12,7 @@ export default class SourceContainer {
 
   protected filesToMove: Record<string, string> = {};
 
-  constructor(sourceFiles: File[]) {
+  public constructor(sourceFiles: File[]) {
     this.fileContent = fromPairs(sourceFiles.map(({ fileName, content }) => [fileName, content]));
   }
 

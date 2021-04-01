@@ -1,13 +1,13 @@
 import R from 'ramda';
 
-const indexByName = (packages: Package[]) => R.indexBy(R.prop('name'), packages);
-
 export type Package = {
   name: string;
   version: string;
   installsTo: string[] | null;
   receives: Record<string, string>;
 };
+
+const indexByName = (packages: Package[]) => R.indexBy(R.prop('name'), packages);
 
 export default class DependencyTree {
   protected rootNode: any = null;
@@ -24,10 +24,10 @@ export default class DependencyTree {
   }
 
   protected packages() {
-    return <Package[]>this.manifest.packages;
+    return <Package[]> this.manifest.packages;
   }
 
-  getRootNode() {
+  protected getRootNode() {
     if (this.rootNode) {
       return this.rootNode;
     }
@@ -49,7 +49,7 @@ export default class DependencyTree {
     return this.rootNode;
   }
 
-  packagesInstalledTo(name): Record<string, unknown> {
+  protected packagesInstalledTo(name): Record<string, unknown> {
     return indexByName(this.packages().filter((pkg) => (pkg.installsTo || {})[name]));
   }
 
@@ -71,7 +71,7 @@ export default class DependencyTree {
     return children;
   }
 
-  build(node) {
+  protected build(node) {
     if (!node) {
       return;
     }

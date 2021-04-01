@@ -84,7 +84,7 @@ module.exports = {
         'prefer-spread': 'error', // ts transpiles spread to apply, so no need for manual apply
         'valid-typeof': 'off', // ts(2367)
         // TypeScript Additional
-        '@typescript-eslint/explicit-member-accessibility': 'warn',
+        '@typescript-eslint/explicit-member-accessibility': 'error',
         'no-shadow': 'off',
         '@typescript-eslint/no-shadow': ['error', { ignoreTypeValueShadow: true }],
         //

@@ -3,18 +3,21 @@ import path from 'path';
 import PackageFetcher from './PackageFetcher';
 
 export default class DevPackageFetcher extends PackageFetcher {
-  init() {}
+  protected init() {
+    //
+  }
 
-  async manifestJSON() {
+  public async manifestJSON() {
     return JSON.parse(
       fs.readFileSync(path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'manifest.json'), 'utf-8')
     );
   }
 
-  async downloadRepo() {
+  public async downloadRepo() {
+    //
   }
 
-  async downloadPackages() {
+  public async downloadPackages() {
     return {
       packagesPath: path.join(this.tmpFolderPath, 'cubejs-playground-templates', 'packages'),
     };
