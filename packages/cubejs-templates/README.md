@@ -2,15 +2,15 @@
 
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
 
-[![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
+[![npm version](https://badge.fury.io/js/%40cubejs-backend%2Ftemplates.svg)](https://badge.fury.io/js/%40cubejs-backend%2Ftemplates)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
-# Cube.js Testing
+# Cube.js Templates Installer
 
-Internal package for testing.
+Helpers for installing Cube.js templates.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 
-Cube.js Client Core is [MIT licensed](./LICENSE).
+Cube.js Templates is [Apache-2.0 licensed](./LICENSE).
