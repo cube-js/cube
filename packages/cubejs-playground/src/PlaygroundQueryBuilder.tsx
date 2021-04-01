@@ -9,6 +9,7 @@ import {
   ChartType,
 } from '@cubejs-client/core';
 import styled from 'styled-components';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
@@ -112,6 +113,8 @@ export default function PlaygroundQueryBuilder({
 }: any) {
   const ref = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
+  const runButtonRef = useRef<HTMLButtonElement>(null);
+
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
@@ -128,6 +131,11 @@ export default function PlaygroundQueryBuilder({
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
 
+  // for you, ovr :)
+  useHotkeys('cmd+enter', () => {
+    runButtonRef.current?.click();
+  });
+
   function handleRunButtonClick({
     query,
     pivotConfig,
@@ -141,7 +149,7 @@ export default function PlaygroundQueryBuilder({
           chartType,
           chartingLibrary,
         });
-        dispatchPlaygroundEvent(ref.current.contentDocument, 'refetch', {});
+        dispatchPlaygroundEvent(ref.current.contentDocument, 'refetch');
       } else {
         dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
           pivotConfig,
@@ -321,8 +329,11 @@ export default function PlaygroundQueryBuilder({
                       <SectionHeader>Execute</SectionHeader>
 
                       <Button
+                        ref={runButtonRef}
+                        disabled={isFetchingMeta}
                         type="primary"
                         loading={isQueryLoading}
+                        ghost={areQueriesEqual(query, queryRef.current)}
                         icon={<PlaySquareOutlined />}
                         onClick={() => {
                           if (

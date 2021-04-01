@@ -84,12 +84,12 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
         ...newQuery,
         timeDimensions: defaultTimeDimension
           ? [
-              {
-                dimension: defaultTimeDimension,
-                granularity: (td && td.granularity) || granularity,
-                dateRange: td && td.dateRange,
-              },
-            ]
+            {
+              dimension: defaultTimeDimension,
+              granularity: (td && td.granularity) || granularity,
+              dateRange: td && td.dateRange,
+            },
+          ]
           : [],
       };
 
@@ -202,8 +202,7 @@ export function isQueryPresent(query) {
   }
 
   return (Array.isArray(query) ? query : [query]).every(
-    (q) =>
-      (q.measures && q.measures.length) ||
+    (q) => (q.measures && q.measures.length) ||
       (q.dimensions && q.dimensions.length) ||
       (q.timeDimensions && q.timeDimensions.length)
   );
