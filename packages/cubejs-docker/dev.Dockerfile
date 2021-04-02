@@ -49,7 +49,7 @@ COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
 COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/package.json
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
-COPY packages/cubejs-templates/ packages/cubejs-templates/
+COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
