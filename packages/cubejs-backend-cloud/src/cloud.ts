@@ -5,13 +5,13 @@ import { ReadStream } from 'node:fs';
 export type AuthObject = {
   auth: string,
   url?: string,
-  deploymentId?: string,
-  deploymentUrl?: string
+  deploymentId?: string
 };
 
 export class CubeCloudClient {
   public constructor(
-    protected readonly auth?: AuthObject
+    protected readonly auth?: AuthObject,
+    protected readonly livePreview?: Boolean
   ) {
   }
 
@@ -64,11 +64,16 @@ export class CubeCloudClient {
     return res.jwt;
   }
 
+  private extendRequestByLivePreview() {
+    return this.livePreview ? { qs: { live: 'true' } } : {};
+  }
+
   public getUpstreamHashes({ auth }: { auth?: AuthObject } = {}) {
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
       method: 'GET',
-      auth
+      auth,
+      ...this.extendRequestByLivePreview()
     });
   }
 
@@ -76,7 +81,8 @@ export class CubeCloudClient {
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/start-upload`,
       method: 'POST',
-      auth
+      auth,
+      ...this.extendRequestByLivePreview()
     });
   }
 
@@ -98,7 +104,8 @@ export class CubeCloudClient {
           }
         }
       },
-      auth
+      auth,
+      ...this.extendRequestByLivePreview()
     });
   }
 
@@ -111,7 +118,8 @@ export class CubeCloudClient {
         transaction,
         files
       },
-      auth
+      auth,
+      ...this.extendRequestByLivePreview()
     });
   }
 

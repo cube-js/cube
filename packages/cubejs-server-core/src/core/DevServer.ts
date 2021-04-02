@@ -295,8 +295,8 @@ export class DevServer {
       res.json(await fetcher.manifestJSON());
     }));
 
-    app.get('/playground/live-preview/start/:token', catchErrors(async (req, res) => {
-      this.livePreviewWatcher.setAuth(req.params.token);
+    app.get('/playground/live-preview/start/:token/:deploymentId', catchErrors(async (req, res) => {
+      this.livePreviewWatcher.setAuth(req.params.token, req.params.deploymentId);
       this.livePreviewWatcher.startWatch();
 
       res.setHeader('Content-Type', 'text/html');

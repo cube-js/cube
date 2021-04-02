@@ -38,27 +38,3 @@ test('addAuthToken', async () => {
   const data = await config.addAuthToken(auth);
   expect(data.auth['http://localhost:4200']).toEqual({ auth });
 });
-
-test('addLivePreviewToken', async () => {
-  const config = new Config({ directory, home });
-  const payload = {
-    url: 'http://localhost:4200',
-    dId: 1,
-    dUrl: 'http://localhost:4200/',
-    branch: 'dev-admin-ew1ffm1v'
-  };
-  const auth = jwt.sign(payload, 'secret');
-
-  await config.addLivePreviewToken(auth);
-  const data = await config.loadConfig();
-
-  const deploymentBranchKey = [payload.dId, payload.branch].join('/');
-  expect(data).not.toBeUndefined();
-  expect(data.live).toEqual({
-    'http://localhost:4200': {
-      [deploymentBranchKey]: {
-        auth
-      }
-    }
-  });
-});
