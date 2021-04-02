@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.75](https://github.com/cube-js/cube.js/compare/v0.26.74...v0.26.75) (2021-04-02)
+
+
+### Bug Fixes
+
+* **cli:** Use binary instead of path in templates (Windows issue) ([#2483](https://github.com/cube-js/cube.js/issues/2483)) ([5ec7af7](https://github.com/cube-js/cube.js/commit/5ec7af74d0e144c967d15e465f2c63adaa370137))
+
+
+
+
+
 ## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
 
 
