@@ -11,11 +11,11 @@ import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
-import { Card, SectionHeader, SectionRow, Button } from './components';
+import { SectionHeader, SectionRow } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
 import { useSecurityContext } from './hooks';
-import { FatalError } from './atoms';
+import { Button, Card, FatalError } from './atoms';
 
 const Section = styled.div`
   display: flex;

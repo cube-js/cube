@@ -137,7 +137,7 @@ const Centered = styled.div`
   height: 100%;
 `;
 
-function CubeLoader({ size = 80, full = true }) {
+export function CubeLoader({ size = 80, full = true }) {
   const img = (
     <div
       key="loader"
@@ -165,5 +165,3 @@ function CubeLoader({ size = 80, full = true }) {
 
   return img;
 }
-
-export default CubeLoader;

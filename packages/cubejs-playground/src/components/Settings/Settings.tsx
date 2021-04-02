@@ -1,10 +1,11 @@
 import { Divider, Spin } from 'antd';
+import Text from 'antd/lib/typography/Text';
+
 import Axes from '../Pivot/Axes';
 import Options from '../Pivot/Options';
 import OrderGroup from '../Order/OrderGroup';
 import Limit from './Limit';
-import { Button, Popover } from '../../components';
-import Text from 'antd/lib/typography/Text';
+import { Button, Popover } from '../../atoms';
 
 export default function Settings({
   pivotConfig,

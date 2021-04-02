@@ -88,4 +88,4 @@ StyledButton.Group = styled(Button.Group)`
   }
 `;
 
-export default StyledButton;
+export { StyledButton as Button };
