@@ -11,7 +11,7 @@ type Repository = {
 };
 
 export class PackageFetcher {
-  tmpFolderPath: string;
+  protected readonly tmpFolderPath: string;
 
   protected repoArchivePath: string;
 
