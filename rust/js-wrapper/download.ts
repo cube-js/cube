@@ -1,63 +1,10 @@
 /* eslint-disable no-restricted-syntax */
-import tar from 'tar';
-import fs, { WriteStream } from 'fs';
-import fetch, { Headers, Request, Response } from 'node-fetch';
-import { throttle } from 'throttle-debounce';
-import { internalExceptions } from '@cubejs-backend/shared';
-import bytes from 'bytes';
-import { SingleBar } from 'cli-progress';
+import { downloadAndExtractFile } from '@cubejs-backend/shared';
 import process from 'process';
 import { Octokit } from '@octokit/core';
 import * as path from 'path';
-import { mkdirpSync } from 'fs-extra';
 
 import { getTarget } from './utils';
-
-type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
-
-export async function streamWithProgress(
-  response: Response,
-  writer: fs.WriteStream,
-  progressCallback: ByteProgressCallback
-): Promise<void> {
-  const total = parseInt(response.headers.get('Content-Length') || '0', 10);
-  const startedAt = Date.now();
-
-  let done = 0;
-
-  const throttled = throttle(
-    10,
-    () => {
-      const elapsed = (Date.now() - startedAt) / 1000;
-      const rate = done / elapsed;
-      const speed = `${bytes(rate)}/s`;
-      const estimated = total / rate;
-      const progress = parseInt(<any>((done / total) * 100), 10);
-      const eta = estimated - elapsed;
-
-      progressCallback({
-        progress,
-        eta,
-        speed
-      });
-    },
-  );
-
-  response.body.pipe(writer);
-  response.body.on('data', (chunk) => {
-    done += chunk.length;
-    throttled();
-  });
-
-  return new Promise(
-    (resolve) => {
-      // Wait before writer will finish, because response can be done earlier then extracting
-      writer.on('finish', () => {
-        resolve();
-      });
-    }
-  );
-}
 
 export function getCubeStorePath() {
   return path.join(path.resolve(__dirname, '..'), 'downloaded', 'latest');
@@ -67,45 +14,6 @@ export function getBinaryPath() {
   const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored';
 
   return path.join(getCubeStorePath(), 'bin', binaryName);
-}
-
-export async function downloadAndExtractFile(url: string) {
-  const request = new Request(url, {
-    headers: new Headers({
-      'Content-Type': 'application/octet-stream'
-    })
-  });
-
-  const response = await fetch(request);
-  if (!response.ok) {
-    throw new Error(`unexpected response ${response.statusText}`);
-  }
-
-  const bar = new SingleBar({
-    format: 'Downloading from GitHub [{bar}] {percentage}% | Speed: {speed}',
-  });
-  bar.start(100, 0);
-
-  const cubestorePath = getCubeStorePath();
-
-  try {
-    mkdirpSync(cubestorePath);
-  } catch (e) {
-    internalExceptions(e);
-  }
-
-  const writer = tar.x({
-    cwd: cubestorePath,
-  });
-
-  await streamWithProgress(response, <WriteStream>writer, ({ progress, speed, eta }) => {
-    bar.update(progress, {
-      speed,
-      eta
-    });
-  });
-
-  bar.stop();
 }
 
 async function fetchRelease(version: string) {
@@ -163,7 +71,12 @@ export async function downloadBinaryFromRelease() {
       if (assetInfo && assetInfo.target === currentTarget
         && assetInfo.type === 'static' && assetInfo.format === 'tar.gz'
       ) {
-        return downloadAndExtractFile(asset.browser_download_url);
+        const cubestorePath = getCubeStorePath();
+
+        return downloadAndExtractFile(asset.browser_download_url, {
+          cwd: cubestorePath,
+          showProgress: true,
+        });
       }
     }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { equals, toPairs, fromPairs } from 'ramda';
-import isQueryPresent from './isQueryPresent';
+import { isQueryPresent } from '@cubejs-client/core';
+
 import CubeContext from './CubeContext';
 
 export default class QueryRenderer extends React.Component {

@@ -294,7 +294,7 @@ impl SqlService for SqlServiceImpl {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn exec_query_with_context(
         &self,
         _context: SqlQueryContext,

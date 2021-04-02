@@ -666,6 +666,7 @@ declare module '@cubejs-client/core' {
      * @returns An array of columns
      */
     tableColumns(pivotConfig?: PivotConfig): TableColumn[];
+    totalRow(pivotConfig?: PivotConfig): ChartPivotRow;
 
     tableRow(): ChartPivotRow;
     query(): Query;
@@ -1028,6 +1029,8 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function getQueryMembers(query: Query): string[];
+
+  export function areQueriesEqual(query1: Query, query2: Query): boolean;
 
   export type ProgressResponse = {
     stage: string;

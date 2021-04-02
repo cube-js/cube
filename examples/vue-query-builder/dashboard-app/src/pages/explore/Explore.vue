@@ -1,6 +1,6 @@
 <template>
   <v-container fluid class="text-center background pa-0">
-    <query-builder style="width: 100%" :cubejsApi="cubejsApi" :initialVizState="vizState">
+    <query-builder style="width: 100%" :cubejsApi="cubejsApi" :initialVizState="vizState" @queryLoad="handle">
       <template
         #builder="{
           validatedQuery,
@@ -145,21 +145,7 @@
           </div>
 
           <div class="border-light pa-4 pa-md-12">
-            <line-chart legend="bottom" v-if="chartType === 'line'" :data="series(resultSet)"></line-chart>
-
-            <area-chart legend="bottom" v-if="chartType === 'area'" :data="series(resultSet)"></area-chart>
-
-            <pie-chart v-if="chartType === 'pie'" :data="pairs(resultSet)"></pie-chart>
-
-            <column-chart v-if="chartType === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
-
-            <Table v-if="chartType === 'table'" :data="resultSet"></Table>
-
-            <div v-if="chartType === 'number'">
-              <div v-for="item in resultSet.series()" :key="item.key">
-                {{ item.series[0].value }}
-              </div>
-            </div>
+            <ChartRenderer :chart-type="chartType" :result-set="resultSet"></ChartRenderer>
           </div>
         </div>
       </template>
@@ -171,7 +157,6 @@
 import { QueryBuilder, GRANULARITIES } from '@cubejs-client/vue';
 import gql from 'graphql-tag';
 
-import Table from './components/Table';
 import FilterComponent from './components/FilterComponent.vue';
 import PivotConfig from './components/dialogs/PivotConfig';
 import Order from './components/dialogs/Order';
@@ -179,13 +164,7 @@ import Limit from './components/dialogs/Limit';
 import AddToDashboard from './components/dialogs/AddToDashboard';
 import TimeDimensionSelect from './components/TimeDimensionSelect';
 import DateRangeSelect from './components/DateRangeSelect';
-
-// const API_URL = 'http://localhost:4000';
-// const CUBEJS_TOKEN =
-//   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7fSwiaWF0IjoxNjA3NDQwMTQ0LCJleHAiOjE2MTAwMzIxNDR9.Za52BRvDvtgzqgy44QC5C35Li2RZ1RZAGy2mDdIWY70';
-// const cubejsApi = cubejs(CUBEJS_TOKEN, {
-//   apiUrl: `${API_URL}/cubejs-api/v1`,
-// });
+import ChartRenderer from '@/components/ChartRenderer';
 
 export default {
   name: 'Explore',
@@ -195,34 +174,20 @@ export default {
       required: true,
     },
   },
+
   components: {
     PivotConfig,
     Order,
     Limit,
     QueryBuilder,
     FilterComponent,
-    Table,
     AddToDashboard,
     TimeDimensionSelect,
     DateRangeSelect,
+    ChartRenderer,
   },
-  data() {
-    // const query = {
-    //   measures: ['Orders.count'],
-    //   dimensions: ['Orders.status', 'Products.name'],
-    //   timeDimensions: [
-    //     {
-    //       dimension: 'Orders.createdAt',
-    //       granularity: 'month',
-    //       dateRange: 'This quarter',
-    //     },
-    //   ],
-    //   order: [
-    //     ['Orders.count', 'asc'],
-    //     ['Orders.createdAt', 'asc'],
-    //   ],
-    // };
 
+  data() {
     const query = {
       measures: ['Orders.count'],
       timeDimensions: [
@@ -231,7 +196,7 @@ export default {
           granularity: 'month',
           dateRange: 'This quarter',
         },
-      ]
+      ],
     };
 
     return {
@@ -248,6 +213,10 @@ export default {
     };
   },
   methods: {
+    handle() {
+      console.log('@load', Date.now());
+    },
+
     handleMove(value, updatePivotConfig) {
       updatePivotConfig.update(value);
     },
@@ -272,26 +241,6 @@ export default {
           },
         },
       });
-    },
-    series(resultSet) {
-      const seriesNames = resultSet.seriesNames();
-      const pivot = resultSet.chartPivot();
-      const series = [];
-
-      seriesNames.forEach((e) => {
-        const data = pivot.map((p) => [p.x, p[e.key]]);
-        series.push({ name: e.key, data });
-      });
-      return series;
-    },
-    pairs(resultSet) {
-      return resultSet.series()[0].series.map((item) => [item.x, item.value]);
-    },
-    seriesPairs(resultSet) {
-      return resultSet.series().map((seriesItem) => ({
-        name: seriesItem.title,
-        data: seriesItem.series.map((item) => [item.x, item.value]),
-      }));
     },
   },
 };

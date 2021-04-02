@@ -3,6 +3,71 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.71](https://github.com/cube-js/cube.js/compare/v0.26.70...v0.26.71) (2021-03-26)
+
+
+### Bug Fixes
+
+* **cubestore:** Remove tracing from logs ([10a264c](https://github.com/cube-js/cube.js/commit/10a264c1261bad9ae3f04753ac8c49dfe30efa63))
+
+
+### Features
+
+* Allow saving state of a scheduled refresh for warmup operations ([#2445](https://github.com/cube-js/cube.js/issues/2445)) ([0c637b8](https://github.com/cube-js/cube.js/commit/0c637b882b655652214f8ee543aa1a0fc74089bc))
+
+
+
+
+
+## [0.26.70](https://github.com/cube-js/cube.js/compare/v0.26.69...v0.26.70) (2021-03-26)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dremio-driver:** readOnly external pre-aggregations is not working ([#2443](https://github.com/cube-js/cube.js/issues/2443)) Thanks to [@rongfengliang](https://github.com/rongfengliang) ! ([eee9d95](https://github.com/cube-js/cube.js/commit/eee9d95e56b8ac14c628d539a55cf94308128644))
+
+
+### Features
+
+* Vue chart renderers ([#2428](https://github.com/cube-js/cube.js/issues/2428)) ([bc2cbab](https://github.com/cube-js/cube.js/commit/bc2cbab22fee860cfc846d1207f6a83899198dd8))
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Updated totalRow within ResultSet ([#2410](https://github.com/cube-js/cube.js/issues/2410)) ([91e51be](https://github.com/cube-js/cube.js/commit/91e51be6e5690dfe6ba294f75e768406fcc9d4a1))
+
+
+### Features
+
+* Introduce @cubejs-backend/maven ([#2432](https://github.com/cube-js/cube.js/issues/2432)) ([6dc6034](https://github.com/cube-js/cube.js/commit/6dc6034c3cdcc8e2c2b0568c218228a18b64f44b))
+
+
+
+
+
+## [0.26.68](https://github.com/cube-js/cube.js/compare/v0.26.67...v0.26.68) (2021-03-25)
+
+
+### Bug Fixes
+
+* **cubestore:** make get active partitions a read operation ([#2416](https://github.com/cube-js/cube.js/issues/2416)) ([a1981f3](https://github.com/cube-js/cube.js/commit/a1981f3eadeb7359ab5cabdedf7ee2e5cfe9cc00))
+
+
+### Features
+
+* **@cubejs-client/vue:** query load event ([6045e8f](https://github.com/cube-js/cube.js/commit/6045e8f060b3702512f138b5c571db5deb6448f2))
+* Live preview watcher, refactor cube cloud package ([#2418](https://github.com/cube-js/cube.js/issues/2418)) ([a311843](https://github.com/cube-js/cube.js/commit/a3118439afa5b04d658f79a94d9021f4c7f09472))
+
+
+
+
+
 ## [0.26.67](https://github.com/cube-js/cube.js/compare/v0.26.66...v0.26.67) (2021-03-24)
 
 

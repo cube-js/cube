@@ -6,8 +6,8 @@ class SourceContainer {
     this.fileContent = fromPairs(
       sourceFiles.map(({ fileName, content }) => [fileName, content])
     );
-    
     this.importDependencies = {};
+    this.filesToMove = {};
   }
 
   getTargetSource(fileName) {
@@ -48,6 +48,10 @@ class SourceContainer {
       ...importDependencies,
       ...specificDependencies,
     };
+  }
+
+  addFileToMove(from, to) {
+    this.filesToMove[from] = to;
   }
 
   outputSources() {

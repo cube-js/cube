@@ -260,10 +260,12 @@ describe('Refresh Scheduler', () => {
       }
     }
 
+    const queryIteratorState = {};
+
     for (let i = 0; i < 1000; i++) {
       const refreshResult = await refreshScheduler.runScheduledRefresh(
         null,
-        { concurrency: 2, workerIndices: [1], timezones: ['UTC', 'America/Los_Angeles'] }
+        { concurrency: 2, workerIndices: [1], timezones: ['UTC', 'America/Los_Angeles'], queryIteratorState }
       );
       const prevWorkerResult = result.filter((x, qi) => qi % 2 === 0);
       expect(orchestratorApi.createdTables).toEqual(
@@ -273,5 +275,14 @@ describe('Refresh Scheduler', () => {
         break;
       }
     }
+
+    console.log('Running refresh on existing queryIteratorSate');
+
+    const refreshResult = await refreshScheduler.runScheduledRefresh(
+      null,
+      { concurrency: 2, workerIndices: [1], timezones: ['UTC', 'America/Los_Angeles'], queryIteratorState }
+    );
+
+    expect(refreshResult.finished).toEqual(true);
   });
 });

@@ -208,7 +208,7 @@ impl<
         }
     }
 
-    #[instrument(skip(self, message, args_tx, res_rx))]
+    #[instrument(level = "trace", skip(self, message, args_tx, res_rx))]
     async fn process_message(
         &self,
         message: T,

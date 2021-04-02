@@ -13,17 +13,9 @@
         <template #default="{ resultSet }">
           <v-card :loading="!resultSet" class="px-4 py-2" height="100%">
             <v-card-title>{{ item.value.name }}</v-card-title>
+
             <template v-if="resultSet">
-              <line-chart v-if="item.value.type === 'line'" legend="bottom" :data="series(resultSet)"></line-chart>
-              <area-chart v-else-if="item.value.type === 'area'" legend="bottom" :data="series(resultSet)"></area-chart>
-              <pie-chart v-else-if="item.value.type === 'pie'" :data="pairs(resultSet)"></pie-chart>
-              <column-chart v-else-if="item.value.type === 'bar'" :data="seriesPairs(resultSet)"></column-chart>
-              <div v-else-if="item.value.type === 'number'">
-                <div v-for="item in resultSet.series()" :key="item.key">
-                  {{ item.series[0].value }}
-                </div>
-              </div>
-              <Table v-else :data="resultSet"></Table>
+              <ChartRenderer :result-set="resultSet" :chart-type="item.value.type"></ChartRenderer>
             </template>
 
             <v-card-actions>
@@ -43,8 +35,9 @@
 <script>
 import { UPDATE_DASHBOARD_ITEM, DELETE_DASHBOARD_ITEM } from '@/graphql/mutations';
 import { QueryRenderer } from '@cubejs-client/vue';
-import Table from '../../explore/components/Table';
 import VueGridLayout from 'vue-grid-layout';
+
+import ChartRenderer from '@/components/ChartRenderer';
 
 export default {
   name: 'Grid',
@@ -60,8 +53,8 @@ export default {
   },
 
   components: {
+    ChartRenderer,
     QueryRenderer,
-    Table,
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
   },
@@ -100,41 +93,20 @@ export default {
         return { ...layout, i: +item.id, value: item };
       });
     },
-    series(resultSet) {
-      const seriesNames = resultSet.seriesNames();
-      const pivot = resultSet.chartPivot();
-      const series = [];
-
-      seriesNames.forEach((e) => {
-        const data = pivot.map((p) => [p.x, p[e.key]]);
-        series.push({ name: e.key, data });
-      });
-      return series;
-    },
-    pairs(resultSet) {
-      return resultSet.series()[0].series.map((item) => [item.x, item.value]);
-    },
-    seriesPairs(resultSet) {
-      return resultSet.series().map((seriesItem) => ({
-        name: seriesItem.title,
-        data: seriesItem.series.map((item) => [item.x, item.value]),
-      }));
-    },
     getQueryById(id) {
       let item = this.dashboardItems.filter((item) => +item.id === id);
-      return JSON.parse(item[0].vizState)['query'];
+      return JSON.parse(item[0].vizState).query;
     },
     async deleteDashboardItem(id) {
-      const response = await this.$apollo.mutate({
+      await this.$apollo.mutate({
         mutation: DELETE_DASHBOARD_ITEM,
         variables: {
           id: id.toString(),
         },
       });
-      console.log('>', response);
     },
     layoutUpdatedEvent(newLayout) {
-      newLayout.forEach((l) => {
+      newLayout.forEach(async (l) => {
         const item = this.dashboardItems.find((i) => {
           return +i.id === l.i;
         });
@@ -144,30 +116,21 @@ export default {
           w: l.w,
           h: l.h,
         });
+
         if (item && toUpdate !== item.layout) {
           const newItem = { ...item };
           const id = newItem.id;
           delete newItem['id'];
           delete newItem['__typename'];
           newItem.layout = toUpdate;
-          this.$apollo
-            .mutate({
-              // Query
-              mutation: UPDATE_DASHBOARD_ITEM,
-              // Parameters
-              variables: {
-                id,
-                input: newItem,
-              },
-            })
-            .then((data) => {
-              // Result
-              console.log(data);
-            })
-            .catch((error) => {
-              // Error
-              console.error(error);
-            });
+
+          await this.$apollo.mutate({
+            mutation: UPDATE_DASHBOARD_ITEM,
+            variables: {
+              id,
+              input: newItem,
+            },
+          });
         }
       });
     },

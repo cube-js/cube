@@ -10,12 +10,13 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Menu, Modal } from 'antd';
-import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from 'sql-formatter';
+
+import { Button, Card, SectionRow } from './components';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
@@ -42,12 +43,15 @@ const StyledCard: any = styled(Card)`
   }
 `;
 
-export const frameworks = [
-  {
-    id: 'vanilla',
-    title: 'Vanilla JavaScript',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-core',
-  },
+type FrameworkDescriptor = {
+  id: string;
+  title: string;
+  docsLink?: string;
+  supported?: boolean;
+  scaffoldingSupported?: boolean;
+};
+
+export const frameworks: FrameworkDescriptor[] = [
   {
     id: 'react',
     title: 'React',
@@ -62,8 +66,14 @@ export const frameworks = [
   },
   {
     id: 'vue',
-    title: 'Vue.js',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-vue',
+    title: 'Vue',
+    supported: true,
+    scaffoldingSupported: true,
+  },
+  {
+    id: 'vanilla',
+    title: 'Vanilla JavaScript',
+    docsLink: 'https://cube.dev/docs/@cubejs-client-core',
   },
 ];
 
@@ -111,6 +121,8 @@ class ChartContainer extends Component<any, any> {
           codesandboxFiles[
             'src/app/query-renderer/query-renderer.component.ts'
           ];
+      } else if (props.framework === 'vue') {
+        codeExample = codesandboxFiles['src/components/ChartRenderer.vue'];
       }
 
       return {
@@ -187,9 +199,7 @@ class ChartContainer extends Component<any, any> {
           }}
         >
           {(chartLibraries[framework] || []).map((library) => (
-            <Menu.Item key={library.value}>
-              {library.title}
-            </Menu.Item>
+            <Menu.Item key={library.value}>{library.title}</Menu.Item>
           ))}
         </Menu>
       ) : null;
