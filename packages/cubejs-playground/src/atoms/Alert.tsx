@@ -31,4 +31,4 @@ const StyledAlert: any = styled(AntdAlert)`
   }
 `;
 
-export default StyledAlert;
+export { StyledAlert as Alert };

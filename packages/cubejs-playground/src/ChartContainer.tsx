@@ -16,7 +16,8 @@ import { Redirect, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
 import sqlFormatter from 'sql-formatter';
 
-import { Button, Card, SectionRow } from './components';
+import { SectionRow } from './components';
+import { Button, Card } from './atoms';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';

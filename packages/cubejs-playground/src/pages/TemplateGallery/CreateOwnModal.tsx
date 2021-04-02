@@ -5,7 +5,7 @@ import { Switch, Menu, Dropdown, Modal, Alert } from 'antd';
 import styled from 'styled-components';
 
 import { playgroundAction } from '../../events';
-import Button from '../../components/Button';
+import { Button } from '../../atoms';
 
 const StyledModal = styled(Modal)`
   && {
@@ -165,7 +165,7 @@ const CreateOwnModal = ({
             }
           />
         )}
-        
+
         <StyledFormItem label="Main Template">
           <Dropdown
             overlay={templatePackagesMenu}
@@ -177,7 +177,7 @@ const CreateOwnModal = ({
             </Button>
           </Dropdown>
         </StyledFormItem>
-        
+
         <StyledFormItem label="Charting Library">
           <Dropdown
             overlay={chartLibrariesMenu}
@@ -189,7 +189,7 @@ const CreateOwnModal = ({
             </Button>
           </Dropdown>
         </StyledFormItem>
-        
+
         <StyledFormItem label="Web Socket Transport (Real-time)">
           <Switch
             disabled={framework.toLowerCase() === 'angular'}
