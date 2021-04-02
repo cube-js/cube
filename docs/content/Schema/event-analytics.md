@@ -9,7 +9,7 @@ menuOrder: 12
 
 <!-- prettier-ignore-start -->
 [[info | ]]
-| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/).
 | We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/event-analytics-transforming-raw-event-data-into-sessions).
 <!-- prettier-ignore-end -->
 
@@ -35,7 +35,7 @@ A session is defined as a group of interactions one user takes within a given ti
   style="text-align: center"
 >
   <img
-  src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Schema/session-schema.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/session-schema.png"
   style="border: none"
   width="100%"
   />

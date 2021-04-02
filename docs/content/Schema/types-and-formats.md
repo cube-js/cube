@@ -38,12 +38,12 @@ ratio: {
 ### count
 
 Performs a table count, similar to SQL’s `COUNT` function. However, unlike
-writing raw SQL, Statsbot will properly calculate counts even if your query’s
+writing raw SQL, Cube.js will properly calculate counts even if your query’s
 joins will produce row multiplication.
 You do not need to include a `sql` parameter for this type.
 
 `drillMembers` parameter is commonly used with type `count`. It allows users to
-click on the measure in the UI and inspect individual records that make up a count.  
+click on the measure in the UI and inspect individual records that make up a count.
 [Learn more about Drill Downs.](drill-downs)
 
 ```javascript

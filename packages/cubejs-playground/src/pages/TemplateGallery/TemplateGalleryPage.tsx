@@ -7,10 +7,9 @@ import '@ant-design/compatible/assets/index.css';
 
 import DashboardSource from '../../DashboardSource';
 import { frameworks } from '../../ChartContainer';
-import { Button, Card } from '../../components';
 import CreateOwnModal from './CreateOwnModal';
 import { frameworkChartLibraries } from '../../PlaygroundQueryBuilder';
-import { CubeLoader } from '../../atoms';
+import { Button, Card, CubeLoader } from '../../atoms';
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>
@@ -28,7 +27,11 @@ const Image = styled.div<any>`
   background-image: ${(props) => `url("${props.src}")`};
 `;
 
-const RecipeCard: any = styled<any>(Card)`
+type TRecipeCardProps = {
+  createYourOwn?: boolean;
+}
+
+const RecipeCard = styled(Card)<TRecipeCardProps>`
   && {
     border: none;
     border-radius: 8px;

@@ -33,7 +33,7 @@ You can use Cube Cloud IDE to develop and run Cube.js applications. By connectin
 
 Cube Cloud provides on-demand scalable infrastructure and pre-aggregations storage. Cube Cloud runs hundreds of Cube Store instances to ingest and query pre-aggregations with low latency and high concurrency. It is available to all users on the Standard plan and higher.
 
-## Live preview your feature branchs
+## Live preview your feature branches
 
 Cube Cloud can spin up Cube.js API instances to test changes to the data schema
 in feature branches. You can use branch-based development API URLs in your

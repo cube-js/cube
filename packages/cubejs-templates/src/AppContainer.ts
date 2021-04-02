@@ -1,12 +1,12 @@
-const R = require('ramda');
-const fs = require('fs-extra');
-const path = require('path');
+import R from 'ramda';
+import fs from 'fs-extra';
+import path from 'path';
 
-const SourceContainer = require('./SourceContainer');
-const { fileContentsRecursive, executeCommand } = require('./utils');
+import { executeCommand, fileContentsRecursive } from './utils';
+import { SourceContainer } from './SourceContainer';
 
-class AppContainer {
-  static getPackageVersions(appPath) {
+export class AppContainer {
+  public static getPackageVersions(appPath) {
     try {
       return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};
     } catch (error) {
@@ -14,8 +14,15 @@ class AppContainer {
     }
   }
 
-  constructor(rootNode, { appPath, packagesPath }, playgroundContext) {
-    this.rootNode = rootNode;
+  protected sourceContainer: SourceContainer | null = null;
+
+  protected playgroundContext: Record<string, unknown>;
+
+  protected appPath: string;
+
+  protected packagesPath: string;
+
+  public constructor(protected rootNode, { appPath, packagesPath }, playgroundContext) {
     this.playgroundContext = playgroundContext;
     this.appPath = appPath;
     this.packagesPath = packagesPath;
@@ -23,17 +30,17 @@ class AppContainer {
     this.initDependencyTree();
   }
 
-  async applyTemplates() {
+  public async applyTemplates() {
     this.sourceContainer = await this.loadSources();
     await this.rootNode.packageInstance.applyPackage(this.sourceContainer);
   }
 
-  initDependencyTree() {
+  protected initDependencyTree() {
     this.createInstances(this.rootNode);
     this.setChildren(this.rootNode);
   }
 
-  setChildren(node) {
+  protected setChildren(node) {
     if (!node) {
       return;
     }
@@ -48,7 +55,7 @@ class AppContainer {
     });
   }
 
-  createInstances(node) {
+  protected createInstances(node) {
     const stack = [node];
 
     while (stack.length) {
@@ -73,16 +80,16 @@ class AppContainer {
     }
   }
 
-  async loadSources() {
+  protected async loadSources() {
     return new SourceContainer(await fileContentsRecursive(this.appPath));
   }
 
-  async persistSources(sourceContainer, packageVersions) {
+  public async persistSources(sourceContainer, packageVersions) {
     const sources = sourceContainer.outputSources();
     await Promise.all(sources.map((file) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
 
     await Promise.all(
-      Object.entries(sourceContainer.filesToMove).map(async ([from, to]) => {
+      Object.entries<string>(sourceContainer.filesToMove).map(async ([from, to]) => {
         try {
           await this.executeCommand(`cp ${from} ${path.join('.', to)}`, [], {
             shell: true,
@@ -104,19 +111,19 @@ class AppContainer {
     });
   }
 
-  async executeCommand(command, args, options) {
+  public async executeCommand(command, args, options) {
     return executeCommand(command, args, options);
   }
 
-  async ensureDependencies() {
-    const dependencies = this.sourceContainer.importDependencies;
+  public async ensureDependencies() {
+    const dependencies = this.sourceContainer?.importDependencies || [];
     const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
 
     if (!packageJson || !packageJson.dependencies) {
       return [];
     }
 
-    const toInstall = R.toPairs(dependencies)
+    const toInstall = <string[]>R.toPairs(dependencies)
       .map(([dependency, version]) => {
         const currentDependency = version !== 'latest' ? `${dependency}@${version}` : dependency;
         if (!packageJson.dependencies[dependency] || version !== 'latest') {
@@ -133,9 +140,7 @@ class AppContainer {
     return toInstall;
   }
 
-  getPackageVersions() {
+  public getPackageVersions() {
     return AppContainer.getPackageVersions(this.appPath);
   }
 }
-
-module.exports = AppContainer;

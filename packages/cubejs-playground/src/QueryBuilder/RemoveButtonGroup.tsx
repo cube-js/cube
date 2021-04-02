@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { CloseOutlined } from '@ant-design/icons';
 
-import { Button } from '../components';
+import { Button } from '../atoms';
 
 const UnstyledRemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
   <Button.Group {...props}>

@@ -1,14 +1,20 @@
-const R = require('ramda');
+import R from 'ramda';
 
-const indexByName = (packages) => R.indexBy(R.prop('name'), packages);
+export type Package = {
+  name: string;
+  version: string;
+  installsTo: string[] | null;
+  receives: Record<string, string>;
+};
 
-class DependencyTree {
-  constructor(manifest, templatePackages) {
-    this.manifest = manifest;
-    this.templatePackages = templatePackages;
-    this.rootNode = null;
-    this.resolved = [];
+const indexByName = (packages: Package[]) => R.indexBy(R.prop('name'), packages);
 
+export class DependencyTree {
+  protected rootNode: any = null;
+
+  protected resolved: any[] = [];
+
+  public constructor(private manifest: Record<string, unknown>, private templatePackages: string[]) {
     this.build(this.getRootNode());
 
     const diff = R.difference(templatePackages, this.resolved);
@@ -17,17 +23,21 @@ class DependencyTree {
     }
   }
 
-  packages() {
-    return this.manifest.packages;
+  protected packages() {
+    return <Package[]> this.manifest.packages;
   }
 
-  getRootNode() {
+  public getRootNode() {
     if (this.rootNode) {
       return this.rootNode;
     }
 
     const rootPackages = this.packages().filter((pkg) => pkg.installsTo == null);
     const root = rootPackages.find((pkg) => this.templatePackages.includes(pkg.name));
+
+    if (!root) {
+      throw new Error('root package not found');
+    }
 
     this.resolved.push(root.name);
 
@@ -39,12 +49,12 @@ class DependencyTree {
     return this.rootNode;
   }
 
-  packagesInstalledTo(name) {
+  protected packagesInstalledTo(name): Record<string, unknown> {
     return indexByName(this.packages().filter((pkg) => (pkg.installsTo || {})[name]));
   }
 
-  getChildren(pkg) {
-    const children = [];
+  protected getChildren(pkg): any[] {
+    const children: any[] = [];
 
     Object.keys(pkg.receives || {}).forEach((receive) => {
       const currentPackages = this.packagesInstalledTo(receive);
@@ -61,7 +71,7 @@ class DependencyTree {
     return children;
   }
 
-  build(node) {
+  protected build(node) {
     if (!node) {
       return;
     }
@@ -77,5 +87,3 @@ class DependencyTree {
     });
   }
 }
-
-module.exports = DependencyTree;

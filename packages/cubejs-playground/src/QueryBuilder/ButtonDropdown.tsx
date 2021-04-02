@@ -1,6 +1,6 @@
 import { Dropdown } from 'antd';
 
-import { Button } from '../components';
+import { Button } from '../atoms';
 
 const ButtonDropdown = ({ overlay, disabled = false, ...buttonProps }: any) => {
   return (

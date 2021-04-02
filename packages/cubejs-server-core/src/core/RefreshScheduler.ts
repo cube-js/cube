@@ -173,9 +173,10 @@ export class RefreshScheduler {
     const { timezones } = queryingOptions;
     const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
 
-    let preAggregationCursor = null;
+    let preAggregationCursor = 0;
     let timezoneCursor = 0;
     let partitionCursor = 0;
+    let partitionCounter = 0;
 
     const queriesCache = {};
     const finishedPartitions = {};
@@ -196,7 +197,7 @@ export class RefreshScheduler {
     };
 
     const advance = async () => {
-      preAggregationCursor = preAggregationCursor != null ? preAggregationCursor + 1 : 0;
+      preAggregationCursor += 1;
       if (preAggregationCursor >= scheduledPreAggregations.length) {
         preAggregationCursor = 0;
         timezoneCursor += 1;
@@ -209,36 +210,44 @@ export class RefreshScheduler {
 
       const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
       if (partitionCursor < queries.length) {
-        const queryCursor = queries.length - 1 - partitionCursor;
-        const query = queries[queryCursor];
-        const sqlQuery = await compilerApi.getSql(query);
-        return {
-          ...sqlQuery,
-          preAggregations: sqlQuery.preAggregations.map(
-            (p) => ({ ...p, priority: queryCursor - queries.length })
-          ),
-          continueWait: true,
-          renewQuery: true,
-          requestId: context.requestId,
-          timezone: timezones[timezoneCursor],
-          scheduledRefresh: true,
-        };
+        partitionCounter += 1;
+        return true;
       } else {
         finishedPartitions[`${preAggregationCursor}_${timezoneCursor}`] = true;
-        return null;
+        return false;
       }
     };
 
     return {
-      next: async () => {
-        let next;
+      partitionCounter: () => partitionCounter,
+      advance: async () => {
         while (Object.keys(finishedPartitions).find(k => !finishedPartitions[k])) {
-          next = await advance();
-          if (next) {
-            return next;
+          if (await advance()) {
+            return true;
           }
         }
-        return null;
+        return false;
+      },
+      current: async () => {
+        const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
+        if (partitionCursor < queries.length) {
+          const queryCursor = queries.length - 1 - partitionCursor;
+          const query = queries[queryCursor];
+          const sqlQuery = await compilerApi.getSql(query);
+          return {
+            ...sqlQuery,
+            preAggregations: sqlQuery.preAggregations.map(
+              (p) => ({ ...p, priority: queryCursor - queries.length })
+            ),
+            continueWait: true,
+            renewQuery: true,
+            requestId: context.requestId,
+            timezone: timezones[timezoneCursor],
+            scheduledRefresh: true,
+          };
+        } else {
+          return null;
+        }
       }
     };
   }
@@ -261,15 +270,14 @@ export class RefreshScheduler {
           queryIteratorState[queryIteratorStateKey] = queryIterator;
         }
         for (;;) {
-          for (let i = 0; i < concurrency; i++) {
-            const nextQuery = await queryIterator.next();
-            if (!nextQuery) {
-              return;
-            }
-            if (i === workerIndex) {
-              const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-              await orchestratorApi.executeQuery(nextQuery);
-            }
+          const currentQuery = await queryIterator.current();
+          if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
+            const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+            await orchestratorApi.executeQuery(currentQuery);
+          }
+          const hasNext = await queryIterator.advance();
+          if (!hasNext) {
+            return;
           }
         }
       }));
