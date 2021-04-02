@@ -3,7 +3,7 @@ import { File } from './utils';
 
 type Dependency = [string, string];
 
-export default class SourceContainer {
+export class SourceContainer {
   protected fileToTargetSource: Record<string, any> = {};
 
   protected fileContent: Record<string, string>;

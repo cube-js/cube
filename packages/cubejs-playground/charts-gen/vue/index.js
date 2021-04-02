@@ -5,11 +5,13 @@ const fs = require('fs-extra');
 const { SourceSnippet, VueMainSnippet } = require('@cubejs-templates/core');
 const { pascalCase } = require('change-case');
 const path = require('path');
+const {
+  AppContainer,
+  DependencyTree,
+  DevPackageFetcher,
+  executeCommand
+} = require('@cubejs-backend/templates');
 
-const DependencyTree = require('../dev/DependencyTree');
-const AppContainer = require('../dev/AppContainer');
-const DevPackageFetcher = require('../dev/DevPackageFetcher');
-const { executeCommand } = require('../dev/utils');
 const { REPOSITORY } = require('../env');
 const { generateCodeChunks } = require('./code-chunks-gen');
 

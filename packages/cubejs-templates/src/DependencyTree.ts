@@ -9,7 +9,7 @@ export type Package = {
 
 const indexByName = (packages: Package[]) => R.indexBy(R.prop('name'), packages);
 
-export default class DependencyTree {
+export class DependencyTree {
   protected rootNode: any = null;
 
   protected resolved: any[] = [];
@@ -27,7 +27,7 @@ export default class DependencyTree {
     return <Package[]> this.manifest.packages;
   }
 
-  protected getRootNode() {
+  public getRootNode() {
     if (this.rootNode) {
       return this.rootNode;
     }

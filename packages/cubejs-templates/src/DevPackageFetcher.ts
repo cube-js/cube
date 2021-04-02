@@ -1,8 +1,8 @@
 import fs from 'fs-extra';
 import path from 'path';
-import PackageFetcher from './PackageFetcher';
+import { PackageFetcher } from './PackageFetcher';
 
-export default class DevPackageFetcher extends PackageFetcher {
+export class DevPackageFetcher extends PackageFetcher {
   protected init() {
     //
   }
