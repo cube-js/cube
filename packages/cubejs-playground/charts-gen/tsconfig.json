@@ -1,0 +1,21 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "include": [
+    "angular",
+    "react",
+    "vue",
+    "env.js"
+  ],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "allowJs": true,
+    "checkJs": true,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+  }
+}

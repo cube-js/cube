@@ -3,9 +3,9 @@ import fs from 'fs-extra';
 import path from 'path';
 
 import { executeCommand, fileContentsRecursive } from './utils';
-import SourceContainer from './SourceContainer';
+import { SourceContainer } from './SourceContainer';
 
-export default class AppContainer {
+export class AppContainer {
   public static getPackageVersions(appPath) {
     try {
       return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};

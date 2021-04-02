@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import decompress from 'decompress';
 import decompressTargz from 'decompress-targz';
 import path from 'path';
+
 import { executeCommand, proxyFetch } from './utils';
 
 type Repository = {
@@ -9,8 +10,8 @@ type Repository = {
   owner: string;
 };
 
-export default class PackageFetcher {
-  protected tmpFolderPath: string;
+export class PackageFetcher {
+  protected readonly tmpFolderPath: string;
 
   protected repoArchivePath: string;
 
@@ -56,7 +57,7 @@ export default class PackageFetcher {
     });
   }
 
-  protected async downloadPackages() {
+  public async downloadPackages() {
     await this.downloadRepo();
 
     await decompress(this.repoArchivePath, this.tmpFolderPath, {
