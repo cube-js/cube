@@ -34,6 +34,7 @@
     "@cubejs-backend/shared": "^0.26.74",
     "generic-pool": "^3.7.1",
     "ioredis": "^4.19.4",
+    "lru-cache": "^6.0.0",
     "ramda": "^0.27.0",
     "redis": "^3.0.2"
   },
