@@ -568,4 +568,44 @@ describe('QueryOrchestrator', () => {
 
     expect(firstResolve).toBe('query');
   });
+
+  test('in memory cache', async () => {
+    const query = {
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        refreshKeyRenewalThresholds: [21600, 120],
+        queries: [
+          ['SELECT NOW()', []],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', []]
+        ]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d20201103',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT NOW() as now', []]],
+        refreshKeyRenewalThresholds: [86400]
+      }],
+      requestId: 'in memory cache',
+    };
+    await queryOrchestrator.fetchQuery(query);
+    await queryOrchestrator.fetchQuery(query);
+    await queryOrchestrator.fetchQuery(query);
+    expect(
+      queryOrchestrator.queryCache.memoryCache.has(
+        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[0])
+      )
+    ).toBe(true);
+    expect(
+      queryOrchestrator.queryCache.memoryCache.has(
+        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[1])
+      )
+    ).toBe(false);
+    expect(
+      queryOrchestrator.queryCache.memoryCache.has(
+        queryOrchestrator.queryCache.queryRedisKey(query.preAggregations[0].invalidateKeyQueries[0])
+      )
+    ).toBe(true);
+  });
 });

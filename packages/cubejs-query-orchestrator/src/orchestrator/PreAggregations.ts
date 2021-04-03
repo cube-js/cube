@@ -244,7 +244,8 @@ class PreAggregationLoadCache {
           waitForRenew,
           priority,
           requestId: this.requestId,
-          dataSource: this.dataSource
+          dataSource: this.dataSource,
+          useInMemory: true
         }
       );
     }
