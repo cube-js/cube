@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.74",
+  "version": "0.26.76",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -17,7 +17,7 @@
     "lint:fix": "eslint --fix driver/*"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.26.74",
+    "@cubejs-backend/query-orchestrator": "^0.26.76",
     "date-fns-timezone": "^0.1.4",
     "snowflake-sdk": "^1.1.15"
   },
