@@ -258,6 +258,7 @@ export class RefreshScheduler {
     let { concurrency, workerIndices } = queryingOptions;
     concurrency = concurrency || 1;
     workerIndices = workerIndices || R.range(0, concurrency);
+    const preAggregationsLoadCacheByDataSource = {};
     return Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
@@ -273,7 +274,7 @@ export class RefreshScheduler {
           const currentQuery = await queryIterator.current();
           if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
             const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-            await orchestratorApi.executeQuery(currentQuery);
+            await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
           }
           const hasNext = await queryIterator.advance();
           if (!hasNext) {
