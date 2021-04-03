@@ -134,7 +134,7 @@ const Header = ({ selectedKeys }) => {
             href="https://forum.cube.dev/"
             target="_blank"
           >
-            <DiscourseIcon />
+            <component={DiscourseIcon} />
             Discourse
           </StyledMenuButton>          
           <StyledMenuButton
