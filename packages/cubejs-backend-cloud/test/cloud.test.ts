@@ -4,8 +4,7 @@ test('CubeCloudClient: constuctor', async () => {
   const cubeCloudClient = new CubeCloudClient({
     auth: '',
     url: '',
-    deploymentId: '',
-    deploymentUrl: ''
+    deploymentId: ''
   });
   expect(cubeCloudClient).not.toBeUndefined();
 });
