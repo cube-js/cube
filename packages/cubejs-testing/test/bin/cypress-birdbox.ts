@@ -1,5 +1,5 @@
 import cypress from 'cypress';
-import { startBidBoxContainer } from '../../src';
+import { startBirdBoxFromContainer } from '../../src';
 
 (async () => {
   let birdbox;
@@ -7,7 +7,7 @@ import { startBidBoxContainer } from '../../src';
   console.log('[Birdbox] Starting');
 
   try {
-    birdbox = await startBidBoxContainer({
+    birdbox = await startBirdBoxFromContainer({
       name: 'postgresql-cubestore',
     });
   } catch (e) {
@@ -28,7 +28,7 @@ import { startBidBoxContainer } from '../../src';
         baseUrl: birdbox.configuration.playgroundUrl,
         video: true,
       }
-    })
+    });
   } catch (e) {
     cypressFailed = true;
 
@@ -40,9 +40,7 @@ import { startBidBoxContainer } from '../../src';
   console.log('[Birdbox] Cleaning');
 
   try {
-    if (birdbox.env) {
-      await birdbox.env.down();
-    }
+    await birdbox.stop();
   } catch (e) {
     console.log(e);
     process.exit(1);

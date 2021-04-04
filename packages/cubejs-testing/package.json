@@ -19,6 +19,7 @@
     "birdbox": "jest dist/test",
     "birdbox:postgresql": "jest -i dist/test/birdbox-postgresql.test.js",
     "birdbox:postgresql-cubestore": "jest -i dist/test/birdbox-postgresql-cubestore.test.js",
+    "birdbox:cli:postgresql": "jest -i dist/test/birdbox-postgresql-cubestore.test.js",
     "cypress:install": "cypress install",
     "cypress:birdbox": "node dist/test/bin/cypress-birdbox.js"
   },
@@ -27,6 +28,7 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
+    "@cubejs-backend/shared": "^0.26.74",
     "testcontainers": "^7.5.0"
   },
   "devDependencies": {
