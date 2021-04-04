@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect } from 'react';
 
 type TLivePreviewContextProps = {
+  livePreviewDisabled: Boolean;
   statusLivePreview: any;
   createTokenWithPayload: (payload) => Promise<any>; 
   stopLivePreview: () => Promise<Boolean>;
@@ -11,7 +12,7 @@ export const LivePreviewContextContext = createContext<TLivePreviewContextProps>
   {} as TLivePreviewContextProps
 );
 
-const useLivePreview = () => {
+const useLivePreview = (disabled = false) => {
   const [status, setStatus] = useState({
     loading: true,
     enabled: false,
@@ -19,6 +20,7 @@ const useLivePreview = () => {
   });
 
   useEffect(() => {
+    if(disabled) return;
     fetchStatus();
     const statusPoolingInterval = setInterval(() => {
       fetchStatus();
@@ -36,10 +38,6 @@ const useLivePreview = () => {
         ...status
       }));
   }
-
-  useEffect(() => {
-
-  }, []);
 
   return {
     statusLivePreview: status,
@@ -83,11 +81,11 @@ const useLivePreview = () => {
   };
 };
 
-export default function LivePreviewContextProvider({ children }) {
-  const devModeHooks = useLivePreview();
+export default function LivePreviewContextProvider({ disabled = false, children }) {
+  const devModeHooks = useLivePreview(disabled);
 
   return (
-    <LivePreviewContextContext.Provider value={devModeHooks}>
+    <LivePreviewContextContext.Provider value={{...devModeHooks, livePreviewDisabled: disabled}}>
       {children}
     </LivePreviewContextContext.Provider>
   );

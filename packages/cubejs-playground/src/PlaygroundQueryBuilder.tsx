@@ -100,7 +100,7 @@ export default function PlaygroundQueryBuilder({
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
   const { token, setIsModalOpen } = useSecurityContext();
-  const { startLivePreview, stopLivePreview, statusLivePreview } = useLivePreviewContext();
+  const { livePreviewDisabled, startLivePreview, stopLivePreview, statusLivePreview } = useLivePreviewContext();
 
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
@@ -179,7 +179,7 @@ export default function PlaygroundQueryBuilder({
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
                     {
-                      !statusLivePreview.loading && 
+                      !livePreviewDisabled && !statusLivePreview.loading && 
                       <Button
                         icon={<CloudOutlined />}
                         size="small"
