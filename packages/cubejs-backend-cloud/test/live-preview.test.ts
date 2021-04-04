@@ -26,17 +26,16 @@ test('LivePreviewWatcher: constuctor', async () => {
 test('setAuth', async () => {
   const livePreviewWatcher = new LivePreviewWatcher();
   const payload = {
-    url: 'http://localhost:4200',
-    dId: '1',
-    dUrl: 'http://app.localhost:4200/',
+    userId: 1,
+    url: 'http://localhost:4200'
   };
+  const deploymentId = '1';
 
   const token = jwt.sign(payload, 'secret');
-  const auth = livePreviewWatcher.setAuth(token);
+  const auth = livePreviewWatcher.setAuth(token, deploymentId);
   expect(auth).toEqual({
     auth: token,
-    deploymentId: payload.dId,
-    deploymentUrl: payload.dUrl,
-    url: payload.url
+    url: payload.url,
+    deploymentId
   });
 });

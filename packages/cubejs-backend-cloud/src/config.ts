@@ -107,42 +107,6 @@ export class Config {
     throw 'Malformed Cube Cloud token';
   }
 
-  public async addLivePreviewToken(authToken: string, config?: Configuration): Promise<ConfigurationFull> {
-    if (!config) {
-      config = await this.loadConfig();
-    }
-
-    const payload = jwt.decode(authToken);
-    if (
-      payload &&
-      typeof payload === 'object' &&
-      payload.url &&
-      payload.dId &&
-      payload.branch &&
-      payload.dUrl
-    ) {
-      // Set to home config
-      const deploymentBranchKey = [payload.dId, payload.branch].join('/');
-      config.live = config.live || {};
-      config.live[payload.url] = config.live[payload.url] || {};
-      config.live[payload.url][deploymentBranchKey] = {
-        auth: authToken
-      };
-
-      // Set to project config
-      const dotCubeCloud = await this.loadDotCubeCloud();
-      dotCubeCloud.live = dotCubeCloud.live || [];
-      dotCubeCloud.live.push(deploymentBranchKey);
-
-      await this.writeDotCubeCloud(dotCubeCloud);
-      await this.writeConfig(config);
-      return <ConfigurationFull>config;
-    }
-
-    // eslint-disable-next-line no-throw-literal
-    throw 'Malformed Cube Cloud live token';
-  }
-
   public async loadConfig(): Promise<Configuration> {
     const { configFile } = this.configFile();
 

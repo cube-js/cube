@@ -25,13 +25,12 @@ export class LivePreviewWatcher {
     console.log('☁️  Live-preview:', message);
   }
 
-  public setAuth(token: string): AuthObject {
+  public setAuth(token: string, deploymentId: string): AuthObject {
     try {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
       this.auth = {
         auth: token,
-        deploymentId: payload.dId,
-        deploymentUrl: payload.dUrl,
+        deploymentId,
         url: payload.url,
       };
 
@@ -45,8 +44,7 @@ export class LivePreviewWatcher {
   public startWatch(): void {
     if (!this.auth) throw new Error('Auth isn\'t set');
     if (!this.watcher) {
-      const { deploymentUrl } = this.auth;
-      this.log(`start with Cube Cloud, url ${deploymentUrl}`);
+      this.log('Start with Cube Cloud');
       this.watcher = chokidar.watch(
         process.cwd(),
         {
@@ -92,7 +90,6 @@ export class LivePreviewWatcher {
     if (auth) {
       result = {
         ...result,
-        deploymentUrl: auth.deploymentUrl,
         ...(await this.cubeCloudClient.getStatusDevMode({
           auth,
           lastHash: this.lastHash
@@ -140,7 +137,7 @@ export class LivePreviewWatcher {
     const { auth } = this;
     const directory = process.cwd();
 
-    const cubeCloudClient = new CubeCloudClient(auth);
+    const cubeCloudClient = new CubeCloudClient(auth, true);
     const deployController = new DeployController(cubeCloudClient);
 
     const result = await deployController.deploy(directory);
