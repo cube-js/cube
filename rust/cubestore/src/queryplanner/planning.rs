@@ -41,6 +41,7 @@ use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewrite
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, SerializedPlan};
+use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
 
@@ -256,7 +257,9 @@ impl PlanRewriter for ChooseIndex<'_> {
         _: &Self::Context,
     ) -> Result<LogicalPlan, DataFusionError> {
         let p = self.choose_table_index(n)?;
-        pull_up_cluster_send(p)
+        let p = pull_up_cluster_send(p)?;
+        let p = materialize_topk(p)?;
+        Ok(p)
     }
 }
 
@@ -575,42 +578,56 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
     .into_plan())
 }
 
-pub struct ClusterSendPlanner {
+pub struct CubeExtensionPlanner {
     pub cluster: Option<Arc<dyn Cluster>>,
     pub serialized_plan: Arc<SerializedPlan>,
 }
 
-impl ExtensionPlanner for ClusterSendPlanner {
+impl ExtensionPlanner for CubeExtensionPlanner {
     fn plan_extension(
         &self,
         node: &dyn UserDefinedLogicalNode,
         inputs: Vec<Arc<dyn ExecutionPlan>>,
-        _state: &ExecutionContextState,
+        state: &ExecutionContextState,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        assert_eq!(inputs.len(), 1);
-        let input = inputs.into_iter().next().unwrap();
+        if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
+            assert_eq!(inputs.len(), 1);
+            let input = inputs.into_iter().next().unwrap();
+            self.plan_cluster_send(input, &cs.snapshots, cs.schema().clone())
+        } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+            assert_eq!(inputs.len(), 1);
+            let input = inputs.into_iter().next().unwrap();
+            plan_topk(self, topk, input, state)
+        } else {
+            Err(DataFusionError::Plan(format!(
+                "unknown extension node {:?}",
+                node
+            )))
+        }
+    }
+}
 
-        let node = node.as_any().downcast_ref::<ClusterSendNode>().unwrap();
-        if node.snapshots.is_empty() {
-            return Ok(Arc::new(EmptyExec::new(
-                false,
-                node.schema().to_schema_ref(),
-            )));
+impl CubeExtensionPlanner {
+    pub fn plan_cluster_send(
+        &self,
+        input: Arc<dyn ExecutionPlan>,
+        snapshots: &Vec<Vec<IndexSnapshot>>,
+        schema: DFSchemaRef,
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        if snapshots.is_empty() {
+            return Ok(Arc::new(EmptyExec::new(false, schema.to_schema_ref())));
         }
         // Note that MergeExecs are added automatically when needed.
         if let Some(c) = self.cluster.as_ref() {
             Ok(Arc::new(ClusterSendExec::new(
-                node.schema().clone(),
+                schema,
                 c.clone(),
                 self.serialized_plan.clone(),
-                node.snapshots.clone(),
+                snapshots.clone(),
                 input,
             )))
         } else {
-            Ok(Arc::new(WorkerExec {
-                input,
-                schema: node.schema().clone(),
-            }))
+            Ok(Arc::new(WorkerExec { input, schema }))
         }
     }
 }
@@ -700,6 +717,7 @@ pub mod tests {
     use crate::metastore::table::{Table, TablePath};
     use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
     use crate::queryplanner::planning::{choose_index, PlanIndexStore};
+    use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::{pretty_printers, CubeTableLogical};
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::CubeError;
@@ -769,6 +787,145 @@ pub mod tests {
                                   \n        Filter\
                                   \n          Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [c1.customer_id, c1.customer_name]\
                                   \n      Scan s.Customers, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [c2.customer_name, c2.customer_city]");
+    }
+
+    #[tokio::test]
+    pub async fn test_materialize_topk() {
+        let indices = default_indices();
+        let plan = initial_plan(
+            "SELECT order_customer, SUM(order_amount) FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "ClusterAggregateTopK, limit: 10\
+           \n  Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+        );
+
+        // Projections should be handled properly.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "Projection, [customer, amount]\
+           \n  ClusterAggregateTopK, limit: 10\
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+        );
+
+        let plan = initial_plan(
+            "SELECT SUM(order_amount) `amount`, order_customer `customer` FROM s.Orders \
+             GROUP BY 2 ORDER BY 1 DESC LIMIT 10",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let mut with_sort_by = PPOptions::default();
+        with_sort_by.show_sort_by = true;
+        assert_eq!(
+            pretty_printers::pp_plan_ext(&plan, &with_sort_by),
+            "Projection, [amount, customer]\
+           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 desc]\
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+        );
+
+        // Ascending order is also ok.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 ASC LIMIT 10",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(
+            pretty_printers::pp_plan_ext(&plan, &with_sort_by),
+            "Projection, [customer, amount]\
+           \n  ClusterAggregateTopK, limit: 10, sortBy: [2]\
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+        );
+
+        // MAX and MIN are ok, as well as multiple aggregation.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(order_amount) `amount`, \
+                    MIN(order_amount) `min_amount`, MAX(order_amount) `max_amount` \
+             FROM s.Orders \
+             GROUP BY 1 ORDER BY 3 DESC, 2 ASC LIMIT 10",
+            &indices,
+        );
+        let mut verbose = with_sort_by;
+        verbose.show_aggregations = true;
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(
+            pretty_printers::pp_plan_ext(&plan, &verbose),
+            "Projection, [customer, amount, min_amount, max_amount]\
+           \n  ClusterAggregateTopK, limit: 10, aggs: [SUM(#order_amount), MIN(#order_amount), MAX(#order_amount)], sortBy: [3 desc, 2]\
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+        );
+
+        // Should not introduce TopK by mistake in unsupported cases.
+        // No 'order by'.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 LIMIT 10",
+            &indices,
+        );
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
+
+        // No limit.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 DESC",
+            &indices,
+        );
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
+
+        // Sort by group key, not the aggregation result.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY 1 DESC LIMIT 10",
+            &indices,
+        );
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
+
+        // Unsupported aggregation function.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, AVG(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+            &indices,
+        );
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, COUNT(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+            &indices,
+        );
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
+
+        // Distinct aggregations.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(DISTINCT order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+            &indices,
+        );
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
+
+        // Complicated sort expressions.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
+             GROUP BY 1 ORDER BY amount * amount  DESC LIMIT 10",
+            &indices,
+        );
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
     }
 
     /// Most tests in this module use this schema.

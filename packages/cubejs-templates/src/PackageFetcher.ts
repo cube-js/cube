@@ -1,13 +1,21 @@
-const fs = require('fs-extra');
-const decompress = require('decompress');
-const decompressTargz = require('decompress-targz');
-const path = require('path');
+import fs from 'fs-extra';
+import decompress from 'decompress';
+import decompressTargz from 'decompress-targz';
+import path from 'path';
 
-const { executeCommand, proxyFetch } = require('./utils');
+import { executeCommand, proxyFetch } from './utils';
 
-class PackageFetcher {
-  constructor(repo) {
-    this.repo = repo;
+type Repository = {
+  name: string;
+  owner: string;
+};
+
+export class PackageFetcher {
+  protected readonly tmpFolderPath: string;
+
+  protected repoArchivePath: string;
+
+  public constructor(private repo: Repository) {
     this.tmpFolderPath = path.resolve('.', 'node_modules', '.tmp');
 
     this.init();
@@ -15,7 +23,7 @@ class PackageFetcher {
     this.repoArchivePath = `${this.tmpFolderPath}/master.tar.gz`;
   }
 
-  init() {
+  protected init() {
     try {
       // Folder node_modules does not exist by default inside docker in /cube/conf without sharing volume for it
       fs.mkdirpSync(this.tmpFolderPath);
@@ -29,7 +37,7 @@ class PackageFetcher {
     }
   }
 
-  async manifestJSON() {
+  public async manifestJSON() {
     const response = await proxyFetch(
       `https://api.github.com/repos/${this.repo.owner}/${this.repo.name}/contents/manifest.json`
     );
@@ -37,7 +45,7 @@ class PackageFetcher {
     return JSON.parse(Buffer.from((await response.json()).content, 'base64').toString());
   }
 
-  async downloadRepo() {
+  protected async downloadRepo() {
     const url = `https://github.com/${this.repo.owner}/${this.repo.name}/archive/master.tar.gz`;
     const writer = fs.createWriteStream(this.repoArchivePath);
 
@@ -49,7 +57,7 @@ class PackageFetcher {
     });
   }
 
-  async downloadPackages() {
+  public async downloadPackages() {
     await this.downloadRepo();
 
     await decompress(this.repoArchivePath, this.tmpFolderPath, {
@@ -57,6 +65,10 @@ class PackageFetcher {
     });
 
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));
+
+    if (!dir) {
+      throw new Error('No directory found');
+    }
 
     fs.removeSync(path.resolve(this.tmpFolderPath, dir, 'yarn.lock'));
     await executeCommand('npm', ['install'], { cwd: path.resolve(this.tmpFolderPath, dir) });
@@ -66,9 +78,7 @@ class PackageFetcher {
     };
   }
 
-  cleanup() {
+  public cleanup() {
     fs.removeSync(this.tmpFolderPath);
   }
 }
-
-module.exports = PackageFetcher;

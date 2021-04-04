@@ -8,6 +8,8 @@
 #![feature(raw)]
 #![feature(total_cmp)]
 #![feature(vec_into_raw_parts)]
+#![feature(hash_set_entry)]
+#![feature(map_first_last)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);

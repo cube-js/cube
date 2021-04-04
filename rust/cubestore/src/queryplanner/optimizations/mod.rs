@@ -1,7 +1,7 @@
 use crate::cluster::Cluster;
 use crate::queryplanner::optimizations::distributed_partial_aggregate::push_aggregate_to_workers;
 use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_switch_to_inplace_aggregates;
-use crate::queryplanner::planning::ClusterSendPlanner;
+use crate::queryplanner::planning::CubeExtensionPlanner;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::{ExecutionContextState, QueryPlanner};
@@ -45,7 +45,7 @@ impl QueryPlanner for CubeQueryPlanner {
         logical_plan: &LogicalPlan,
         ctx_state: &ExecutionContextState,
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
-        let p = DefaultPhysicalPlanner::with_extension_planner(Arc::new(ClusterSendPlanner {
+        let p = DefaultPhysicalPlanner::with_extension_planner(Arc::new(CubeExtensionPlanner {
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
         }))

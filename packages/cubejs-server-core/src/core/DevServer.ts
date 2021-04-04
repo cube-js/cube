@@ -5,16 +5,13 @@ import path from 'path';
 import fs from 'fs-extra';
 import crypto from 'crypto';
 import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
+import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
 import type { Application as ExpressApplication } from 'express';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
-import AppContainer from '../dev/AppContainer';
-import DependencyTree from '../dev/DependencyTree';
-import PackageFetcher from '../dev/PackageFetcher';
-import DevPackageFetcher from '../dev/DevPackageFetcher';
 
 const repo = {
   owner: 'cube-js',

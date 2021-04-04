@@ -17,15 +17,19 @@ use itertools::{repeat_n, Itertools};
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
 use crate::queryplanner::serialized_plan::IndexSnapshot;
+use crate::queryplanner::topk::ClusterAggregateTopK;
+use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::AliasedSchemaExec;
 use datafusion::physical_plan::merge::{MergeExec, UnionExec};
 use datafusion::physical_plan::projection::ProjectionExec;
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct PPOptions {
     pub show_filters: bool,
+    pub show_sort_by: bool,
+    pub show_aggregations: bool,
     // Applies only to physical plan.
     pub show_output_hints: bool,
 }
@@ -95,8 +99,18 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                         self.output += &format!(", predicate: {:?}", predicate)
                     }
                 }
-                LogicalPlan::Aggregate { .. } => self.output += "Aggregate",
-                LogicalPlan::Sort { .. } => self.output += "Sort",
+                LogicalPlan::Aggregate { aggr_expr, .. } => {
+                    self.output += "Aggregate";
+                    if self.opts.show_aggregations {
+                        self.output += &format!(", aggs: {:?}", aggr_expr)
+                    }
+                }
+                LogicalPlan::Sort { expr, .. } => {
+                    self.output += "Sort";
+                    if self.opts.show_sort_by {
+                        self.output += &format!(", by: {:?}", expr)
+                    }
+                }
                 LogicalPlan::Union { .. } => self.output += "Union",
                 LogicalPlan::Join { on, .. } => {
                     self.output += &format!(
@@ -139,14 +153,29 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 LogicalPlan::CreateExternalTable { .. } => self.output += "CreateExternalTable",
                 LogicalPlan::Explain { .. } => self.output += "Explain",
                 LogicalPlan::Extension { node } => {
-                    let cs = node.as_any().downcast_ref::<ClusterSendNode>().unwrap();
-                    self.output += &format!(
-                        "ClusterSend, indices: {:?}",
-                        cs.snapshots
-                            .iter()
-                            .map(|is| is.iter().map(|i| i.index.get_id()).collect_vec())
-                            .collect_vec()
-                    )
+                    if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
+                        self.output += &format!(
+                            "ClusterSend, indices: {:?}",
+                            cs.snapshots
+                                .iter()
+                                .map(|is| is.iter().map(|i| i.index.get_id()).collect_vec())
+                                .collect_vec()
+                        )
+                    } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>()
+                    {
+                        self.output += &format!("ClusterAggregateTopK, limit: {}", topk.limit);
+                        if self.opts.show_aggregations {
+                            self.output += &format!(", aggs: {:?}", topk.aggregate_expr)
+                        }
+                        if self.opts.show_sort_by {
+                            self.output += &format!(
+                                ", sortBy: {}",
+                                pp_sort_columns(topk.group_expr.len(), &topk.order_by)
+                            );
+                        }
+                    } else {
+                        panic!("unknown extension node");
+                    }
                 }
             }
 
@@ -186,6 +215,24 @@ fn pp_source(t: &dyn TableProvider) -> String {
     } else {
         panic!("unknown table provider");
     }
+}
+
+fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
+    format!(
+        "[{}]",
+        cs.iter()
+            .map(|c| {
+                let mut r = (first_agg + c.agg_index + 1).to_string();
+                if !c.asc {
+                    r += " desc";
+                }
+                if !c.nulls_first {
+                    r += "null last";
+                }
+                r
+            })
+            .join(", ")
+    )
 }
 
 fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
@@ -250,6 +297,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 AggregateMode::Full => "Full",
             };
             *out += &format!("{}{}Aggregate", mode, strat);
+            if o.show_aggregations {
+                *out += &format!(", agg")
+            }
         } else if let Some(l) = a.downcast_ref::<LocalLimitExec>() {
             *out += &format!("LocalLimit, n: {}", l.limit());
         } else if let Some(l) = a.downcast_ref::<GlobalLimitExec>() {
@@ -259,8 +309,26 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             if o.show_filters {
                 *out += &format!(", predicate: {}", f.predicate())
             }
-        } else if let Some(_) = a.downcast_ref::<SortExec>() {
+        } else if let Some(s) = a.downcast_ref::<SortExec>() {
             *out += "Sort";
+            if o.show_sort_by {
+                *out += &format!(
+                    ", by: [{}]",
+                    s.expr()
+                        .iter()
+                        .map(|e| {
+                            let mut r = format!("{}", e.expr);
+                            if e.options.descending {
+                                r += " desc";
+                            }
+                            if !e.options.nulls_first {
+                                r += " nulls last";
+                            }
+                            r
+                        })
+                        .join(", ")
+                );
+            }
         } else if let Some(_) = a.downcast_ref::<HashJoinExec>() {
             *out += "HashJoin";
         } else if let Some(cs) = a.downcast_ref::<ClusterSendExec>() {
@@ -271,6 +339,17 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     .map(|ps| ps.iter().map(|p| p.get_id()).collect_vec())
                     .collect_vec()
             );
+        } else if let Some(topk) = a.downcast_ref::<AggregateTopKExec>() {
+            *out += &format!("AggregateTopK, limit: {:?}", topk.limit);
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", topk.agg_expr);
+            }
+            if o.show_sort_by {
+                *out += &format!(
+                    ", sortBy: {}",
+                    pp_sort_columns(topk.key_len, &topk.order_by)
+                );
+            }
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += "Worker";
         } else if let Some(_) = a.downcast_ref::<MergeExec>() {

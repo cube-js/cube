@@ -256,7 +256,7 @@ services:
 const templates: Record<string, Template> = {
   docker: {
     scripts: {
-      dev: './node_modules/.bin/cubejs-server',
+      dev: 'cubejs-server',
     },
     files: {
       'cube.js': () => cubeJs,
@@ -279,7 +279,7 @@ const templates: Record<string, Template> = {
   },
   serverless: {
     scripts: {
-      dev: './node_modules/.bin/cubejs-dev-server',
+      dev: 'cubejs-dev-server',
     },
     files: {
       'index.js': () => handlerJs,
@@ -292,7 +292,7 @@ const templates: Record<string, Template> = {
   },
   'serverless-google': {
     scripts: {
-      dev: './node_modules/.bin/cubejs-dev-server',
+      dev: 'cubejs-dev-server',
     },
     files: {
       'index.js': () => handlerJs,

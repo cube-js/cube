@@ -16,7 +16,7 @@ in [development mode][link-dev-mode]
 Here's an example of building a query and plotting the results in Developer
 Playground:
 
-![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Developer-Tools/playground.gif)
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Developer-Tools/playground.gif)
 
 [link-dev-mode]: /configuration/overview
 
@@ -49,6 +49,6 @@ inside the Cube Cloud.
 | an account yet, you can [sign up to the waitlist here][link-cube-cloud].
 <!-- prettier-ignore-end -->
 
-![](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Developer-Tools/cube-cloud-playground.png)
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Developer-Tools/cube-cloud-playground.png)
 
 [link-cube-cloud]: https://cube.dev/cloud

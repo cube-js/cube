@@ -12,11 +12,11 @@ import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
 import LivePreviewBar from './components/LivePreviewContext/LivePreviewBar';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
-import { Card, SectionHeader, SectionRow, Button } from './components';
+import { SectionHeader, SectionRow } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
 import { useSecurityContext, useLivePreviewContext } from './hooks';
-import { FatalError } from './atoms';
+import { Button, Card, FatalError } from './atoms';
 
 const Section = styled.div`
   display: flex;

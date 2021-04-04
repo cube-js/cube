@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { Card as AntdCard } from 'antd';
 
-const StyledCard: any = styled<any>(AntdCard)`
+const StyledCard = styled(AntdCard)`
   && {
     border-radius: 8px;
     border: none;
@@ -36,4 +36,4 @@ const StyledCard: any = styled<any>(AntdCard)`
   }
 `;
 
-export default StyledCard;
+export { StyledCard as Card };

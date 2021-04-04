@@ -164,6 +164,7 @@ variables.
 [ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
 [ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
 [ref-config-extdbtype]: /config#options-reference-external-db-type
+[ref-config-driverfactory]: /config#options-reference-driver-factory
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
