@@ -8,7 +8,7 @@ import isDocker from 'is-docker';
 import { ApiGateway } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
-  createCancelableInterval, formatDuration,
+  createCancelableInterval, displayCLIWarning, formatDuration,
   getAnonymousId,
   getEnv,
   internalExceptions, isDockerImage, requireFromPackage,
@@ -136,18 +136,6 @@ export class CubejsServerCore {
 
   public constructor(opts: CreateOptions = {}) {
     this.options = this.handleConfiguration(opts);
-
-    if (
-      !this.options.devServer || (this.options.devServer && this.configFileExists())
-    ) {
-      if (
-        !this.options.driverFactory ||
-        !this.options.apiSecret ||
-        !this.options.dbType
-      ) {
-        throw new Error('driverFactory, apiSecret, dbType are required options');
-      }
-    }
 
     this.logger = this.options.logger;
     this.repository = new FileRepository(this.options.schemaPath);
@@ -402,6 +390,35 @@ export class CubejsServerCore {
           'https://cube.dev/docs/config#options-reference-scheduled-refresh-contexts'
         ),
       });
+    }
+
+    if (options.devServer && !options.apiSecret) {
+      options.apiSecret = crypto.randomBytes(16).toString('hex');
+
+      displayCLIWarning(
+        `Option apiSecret is required in dev mode. Cube.js has generated it as ${options.apiSecret}`
+      );
+    }
+
+    if (
+      !options.devServer || (options.devServer && this.configFileExists())
+    ) {
+      const fieldsForValidation: (keyof ServerCoreInitializedOptions)[] = [
+        'driverFactory',
+        'dbType'
+      ];
+
+      if (!options.jwt?.jwkUrl) {
+        // apiSecret is required only for auth by JWT, for JWK it's not needed
+        fieldsForValidation.push('apiSecret');
+      }
+
+      const invalidFields = fieldsForValidation.filter((field) => options[field] === undefined);
+      if (invalidFields.length) {
+        throw new Error(
+          `${invalidFields.join(', ')} ${invalidFields.length === 1 ? 'is' : 'are'} required option(s)`
+        );
+      }
     }
 
     return options;
