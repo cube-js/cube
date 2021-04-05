@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.78](https://github.com/cube-js/cube.js/compare/v0.26.77...v0.26.78) (2021-04-05)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Cube.js doesn't see pre-aggregations ([c9279bf](https://github.com/cube-js/cube.js/commit/c9279bfcb04230684676d1db87c18ebdc6a0f9d2)), closes [#2487](https://github.com/cube-js/cube.js/issues/2487)
+* **athena-driver:** Wrong escape, Use " for column names, ` for table/schema ([62d8fcf](https://github.com/cube-js/cube.js/commit/62d8fcfb145ac04de72086b354bd583279617481))
+
+
+
+
+
 ## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
 
 

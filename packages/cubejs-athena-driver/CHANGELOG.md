@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.78](https://github.com/cube-js/cube.js/compare/v0.26.77...v0.26.78) (2021-04-05)
+
+
+### Bug Fixes
+
+* **athena-driver:** Wrong escape, Use " for column names, ` for table/schema ([62d8fcf](https://github.com/cube-js/cube.js/commit/62d8fcfb145ac04de72086b354bd583279617481))
+
+
+
+
+
 ## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver
