@@ -144,9 +144,11 @@ pre-aggregation whenever [the refresh key][ref-preaggs-refresh-key] changes.
 
 ## Pre-Aggregations Storage
 
+Cube.js can store pre-aggregations on the source database or on a separate,
+**external** database.
+
 When using **external** pre-aggregations, Cube.js will store pre-aggregations
-inside its own purpose-built storage layer: [Cube
-Store][ref-caching-preaggs-cubestore].
+inside its own purpose-built storage layer: Cube Store.
 
 Alternatively, you can store external pre-aggregations in a different database,
 such MySQL or Postgres. In order to make this work, you should set the
@@ -154,20 +156,6 @@ such MySQL or Postgres. In order to make this work, you should set the
 [`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
 configuration file. These properties can also be set through the environment
 variables.
-
-[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
-[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
-[ref-caching-preaggs-cubestore]:
-  /caching/using-pre-aggregations#pre-aggregations-storage
-[ref-preaggs]: /pre-aggregations
-[ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
-[ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
-[ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
-[ref-config-extdbtype]: /config#options-reference-external-db-type
-[ref-config-driverfactory]: /config#options-reference-driver-factory
-[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
-[ref-production-checklist-refresh]:
-  /deployment/production-checklist#set-up-refresh-worker
 
 ```bash
 CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
@@ -213,6 +201,88 @@ but this becomes cumbersome with lots of pre-aggregations.
 **SQL type differences between source and external database:** Different
 databases often specify types differently, which can cause type mismatch issues.
 This is also a common issue and source of frustration which Cube Store resolves.
+
+## External vs Internal
+
+In Cube.js, pre-aggregations are called **external** when they are flagged with
+`external: true` which instructs Cube.js to store pre-aggregations inside its
+own storage - Cube Store.
+
+If pre-aggregations aren't flagged `external: true` they are considered
+**internal** and will be saved to and queried from the source database.
+
+<!-- prettier-ignore-start -->
+[[info | ]]
+| We recommend always using **external** pre-aggregations for better concurrency and performance.
+<!-- prettier-ignore-end -->
+
+You should use external pre-aggregations for scenarios where you need
+high throughput for a big data backend. It allows downloading rollups and
+original SQL pre-aggregations prepared in big data backends such as AWS Athena,
+BigQuery, Presto, Hive and others to Cube Store for low latency and high
+throughput querying.
+
+While big data backends aren't very suitable for handling massive amounts of
+concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage
+can do it very well.
+
+To set it up, simply add the `external` property to your pre-aggregation:
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  //...
+
+  preAggregations: {
+    categoryAndDate: {
+      type: `rollup`,
+      measureReferences: [Orders.count, revenue],
+      dimensionReferences: [category],
+      timeDimensionReference: createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+      external: true,
+    },
+  },
+});
+```
+
+Note that by default, Cube.js materializes the pre-aggregation query results as
+new tables in the source database. For external pre-aggregations, these source
+tables are temporary - once downloaded and uploaded to the external database,
+they are cleaned up.
+
+### Known limitations of internal pre-aggregations
+
+Internal pre-aggregations are not considered production-ready due to several
+shortcomings, as noted below.
+
+**Concurrency:** Databases (especially RDBMs) generally cannot handle high
+concurrency without special configuration. Application databases such as MySQL
+and Postgres do support concurrency, but often cannot cope with the demands of
+analytical queries without significant tuning. On the other hand, data
+warehousing solutions such as Athena and BigQuery often limit the number of
+concurrent connections too.
+
+**Latency:** Data warehousing solutions (such as BigQuery or Redshift) are often
+slow to return results.
+
+**Cost:** Some databases charge by the amount of data scanned for each query
+(such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
+rack up costs.
+
+## Garbage Collection
+
+When pre-aggregations are refreshed, Cube.js will create new pre-aggregation
+tables each time a version change is detected. This allows for seamless,
+transparent hot swapping of tables for users of any database, even for those
+without DDL transactions support.
+
+However, it does lead to orphaned tables which need to be collected over time.
+By default, Cube.js will store all content versions for 10 minutes and all
+structure versions for 7 days. Then it will retain only the most recent ones and
+orphaned tables are dropped from the database.
 
 ## Running Cube Store in production
 
@@ -266,3 +336,15 @@ Configure Cube.js to use the above connection for an external database via the
 CUBEJS_EXT_DB_TYPE=cubestore
 CUBEJS_EXT_DB_HOST=cubestore
 ```
+
+[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
+[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
+[ref-preaggs]: /pre-aggregations
+[ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
+[ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
+[ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
+[ref-config-extdbtype]: /config#options-reference-external-db-type
+[ref-config-driverfactory]: /config#options-reference-driver-factory
+[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
+[ref-production-checklist-refresh]:
+  /deployment/production-checklist#set-up-refresh-worker
