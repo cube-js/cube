@@ -1,4 +1,4 @@
-import { Card } from '../';
+import { Card } from '../../atoms';
 import { useLivePreviewContext } from '../../hooks';
 import { Space, Typography } from 'antd';
 import { LoadingOutlined, CheckCircleOutlined } from '@ant-design/icons';
