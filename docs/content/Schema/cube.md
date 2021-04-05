@@ -286,9 +286,7 @@ cube(`OrderFacts`, {
 
 
 `every` - can be set as an interval with granularities `second`, `minute`, `hour`, `day`, and `week` or accept CRON string with some limitations.
-If you set `every` as CRON string, you can use the `timezone` property.
-
-For example:
+If you set `every` as CRON string, you can use the `timezone` property:
 
 ```javascript
 cube(`OrderFacts`, {
@@ -299,6 +297,13 @@ cube(`OrderFacts`, {
   }
 });
 ```
+
+<!-- prettier-ignore-start -->
+[[warning | ]]
+| When using CRON syntax for the `every` parameter, keep in mind that Cube.js
+| uses the value to generate an interval. For example, `30 5 * * *` would
+| check the refresh key every 5 hours and 30 minutes.
+<!-- prettier-ignore-end -->
 
 `every` can accept only equal time intervals - so  "Day of month" and "month" intervals in CRON expressions are not supported.
 
