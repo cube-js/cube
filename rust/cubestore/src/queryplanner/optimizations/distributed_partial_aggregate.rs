@@ -39,6 +39,7 @@ pub fn push_aggregate_to_workers(
         Ok(Arc::new(WorkerExec {
             input: agg.with_new_children(vec![w.input.clone()])?,
             schema: agg.schema().clone(),
+            max_batch_rows: w.max_batch_rows,
         }))
     } else {
         Ok(p)
