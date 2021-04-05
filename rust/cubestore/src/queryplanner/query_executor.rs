@@ -909,6 +909,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SerializedRecordBatchStream {
+    #[serde(with = "serde_bytes")] // serde_bytes makes serialization efficient.
     record_batch_file: Vec<u8>,
 }
 
