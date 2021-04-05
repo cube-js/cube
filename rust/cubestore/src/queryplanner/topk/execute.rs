@@ -150,7 +150,6 @@ impl ExecutionPlan for AggregateTopKExec {
         let nodes = self.cluster.output_partitioning().partition_count();
         let mut tasks = Vec::with_capacity(nodes);
         for p in 0..nodes {
-            // TODO: actual streaming of results.
             let cluster = self.cluster.clone();
             tasks.push(tokio::spawn(async move {
                 // fuse the streams to simplify further code.

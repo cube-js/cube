@@ -859,7 +859,7 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::queryplanner::query_executor::MockQueryExecutor;
-    use crate::queryplanner::MockQueryPlanner;
+    use crate::queryplanner::{MockQueryPlanner, MIN_TOPK_STREAM_ROWS};
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use crate::store::{ChunkStore, WALStore};
     use async_compression::tokio::write::GzipEncoder;
@@ -2989,6 +2989,73 @@ mod tests {
             );
         })
             .await;
+    }
+
+    #[tokio::test]
+    async fn topk_large_inputs() {
+        Config::run_test("topk_large_inputs", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+                .await
+                .unwrap();
+
+            const NUM_ROWS: i64 = 5 + MIN_TOPK_STREAM_ROWS as i64;
+
+            let insert_data = |table, compute_hits: fn(i64) -> i64| {
+                let service = service.clone();
+                return async move {
+                    let mut values = String::new();
+                    for i in 0..NUM_ROWS {
+                        if !values.is_empty() {
+                            values += ", "
+                        }
+                        values += &format!("('url{}', {})", i, compute_hits(i as i64));
+                    }
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO s.{}(url, hits) VALUES {}",
+                            table, values
+                        ))
+                        .await
+                        .unwrap();
+                };
+            };
+
+            // Arrange so that top-k fully downloads both tables.
+            insert_data("Data1", |i| i).await;
+            insert_data("Data2", |i| NUM_ROWS - 2 * i).await;
+
+            let query = "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 10";
+
+            let rows = service.exec_query(query).await.unwrap().into_rows();
+            assert_eq!(rows.len(), 10);
+            for i in 0..10 {
+                match &rows[i].values()[0] {
+                    TableValue::String(s) => assert_eq!(s, &format!("url{}", i)),
+                    v => panic!("invalid value in row {}: {:?}", i, v),
+                }
+                assert_eq!(
+                    rows[i].values()[1],
+                    TableValue::Int(NUM_ROWS - i as i64),
+                    "row {}",
+                    i
+                );
+            }
+        })
+        .await;
     }
 
     #[tokio::test]

@@ -1,6 +1,6 @@
 use crate::queryplanner::planning::{ClusterSendNode, CubeExtensionPlanner};
 use crate::queryplanner::topk::execute::AggregateTopKExec;
-use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
+use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn, MIN_TOPK_STREAM_ROWS};
 use arrow::datatypes::DataType;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
@@ -11,6 +11,7 @@ use datafusion::physical_plan::planner::{compute_aggregation_strategy, DefaultPh
 use datafusion::physical_plan::sort::{SortExec, SortOptions};
 use datafusion::physical_plan::ExecutionPlan;
 use itertools::Itertools;
+use std::cmp::max;
 use std::sync::Arc;
 
 /// Replaces `Limit(Sort(Aggregate(ClusterSend)))` with [ClusterAggregateTopK] when possible.
@@ -302,7 +303,13 @@ pub fn plan_topk(
 
     // Send results to router.
     let schema = sort_schema.clone();
-    let cluster = ext_planner.plan_cluster_send(sort, &node.snapshots, schema.clone())?;
+    let cluster = ext_planner.plan_cluster_send(
+        sort,
+        &node.snapshots,
+        schema.clone(),
+        /*use_streaming*/ true,
+        /*max_batch_rows*/ max(2 * node.limit, MIN_TOPK_STREAM_ROWS),
+    )?;
     let agg_fun = node
         .aggregate_expr
         .iter()

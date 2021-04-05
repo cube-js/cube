@@ -15,6 +15,9 @@ use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
+/// Workers will split their local results into batches of at least this size.
+pub const MIN_TOPK_STREAM_ROWS: usize = 1024;
+
 /// Aggregates input by [group_expr], sorts with [order_by] and returns [limit] first elements.
 /// The output schema must have exactly columns for results of [group_expr] followed by results
 /// of [aggregate_expr].

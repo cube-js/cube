@@ -9,11 +9,12 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use arrow::array::{
-    Array, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
+    Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
     Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
     Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
     TimestampNanosecondArray, UInt64Array,
 };
+use arrow::compute::take;
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
 use arrow::ipc::writer::MemStreamWriter;
@@ -44,6 +45,7 @@ use num::BigInt;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
+use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
@@ -143,8 +145,10 @@ impl QueryExecutor for QueryExecutorImpl {
         let (physical_plan, logical_plan) = self.worker_plan(plan, remote_to_local_names).await?;
 
         let worker_plan;
-        if let Some(p) = get_worker_plan(&physical_plan) {
+        let max_batch_rows;
+        if let Some((p, s)) = get_worker_plan(&physical_plan) {
             worker_plan = p;
+            max_batch_rows = s;
         } else {
             error!("No worker marker in physical plan: {:?}", physical_plan);
             return Err(CubeError::internal(
@@ -189,7 +193,9 @@ impl QueryExecutor for QueryExecutorImpl {
                 &worker_plan
             );
         }
-        Ok((worker_plan.schema().to_schema_ref(), results?))
+        // TODO: stream results as they become available.
+        let results = regroup_batches(results.unwrap(), max_batch_rows)?;
+        Ok((worker_plan.schema().to_schema_ref(), results))
     }
 
     async fn router_plan(
@@ -969,4 +975,35 @@ fn combine_filters(filters: &[Expr]) -> Option<Expr> {
             logical_plan::and(acc, filter.clone())
         });
     Some(combined_filter)
+}
+
+fn regroup_batches(
+    batches: Vec<RecordBatch>,
+    max_rows: usize,
+) -> Result<Vec<RecordBatch>, CubeError> {
+    let mut r = Vec::with_capacity(batches.len());
+    for b in batches {
+        let mut row = 0;
+        while row != b.num_rows() {
+            let slice_len = min(b.num_rows() - row, max_rows);
+            r.push(RecordBatch::try_new(
+                b.schema(),
+                b.columns()
+                    .iter()
+                    .map(|c| slice_copy(c.as_ref(), row, slice_len))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?);
+            row += slice_len
+        }
+    }
+    Ok(r)
+}
+
+fn slice_copy(a: &dyn Array, start: usize, len: usize) -> Result<ArrayRef, CubeError> {
+    // If we use [Array::slice], serialization will still copy the whole contents.
+    Ok(take(
+        a,
+        &UInt64Array::from_iter_values(start as u64..(start + len) as u64),
+        None,
+    )?)
 }
