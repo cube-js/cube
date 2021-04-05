@@ -1,6 +1,4 @@
-#!/usr/bin/env node
-
-require('source-map-support/register');
+import 'source-map-support/register';
 
 const argv = process.argv.slice(2);
 

@@ -152,14 +152,10 @@ class AthenaDriver extends BaseDriver {
     return data;
   }
 
-  quoteIdentifier(identifier) {
-    return `\`${identifier}\``;
-  }
-
   // eslint-disable-next-line camelcase
   async getColumns({ table_schema, table_name } = {}) {
     // eslint-disable-next-line camelcase
-    const data = await this.query(`SHOW COLUMNS IN ${this.quoteIdentifier(table_schema)}.${this.quoteIdentifier(table_name)}`);
+    const data = await this.query(`SHOW COLUMNS IN \`${table_schema}\`.\`${table_name}\``);
 
     return {
       [table_schema]: {

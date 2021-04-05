@@ -244,7 +244,8 @@ class PreAggregationLoadCache {
           waitForRenew,
           priority,
           requestId: this.requestId,
-          dataSource: this.dataSource
+          dataSource: this.dataSource,
+          useInMemory: true
         }
       );
     }
@@ -856,7 +857,7 @@ export class PreAggregations {
   public loadAllPreAggregationsIfNeeded(queryBody) {
     const preAggregations = queryBody.preAggregations || [];
 
-    const loadCacheByDataSource = {};
+    const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
     const getLoadCacheByDataSource = (dataSource) => {
       if (!loadCacheByDataSource[dataSource]) {
         dataSource = dataSource || 'default';

@@ -153,6 +153,11 @@ class SnowflakeDriver extends BaseDriver {
       (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
     ));
   }
+
+  async getTablesQuery(schemaName) {
+    const tables = await super.getTablesQuery(schemaName.toUpperCase());
+    return tables.map(t => ({ table_name: t.TABLE_NAME && t.TABLE_NAME.toLowerCase() }));
+  }
 }
 
 module.exports = SnowflakeDriver;

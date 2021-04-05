@@ -5,10 +5,10 @@
       "path": "packages/cubejs-templates"
     },
     {
-      "path": "packages/cubejs-testing"
+      "path": "packages/cubejs-backend-shared"
     },
     {
-      "path": "packages/cubejs-backend-shared"
+      "path": "packages/cubejs-testing"
     },
     {
       "path": "packages/cubejs-backend-cloud"
