@@ -1,8 +1,6 @@
-#!/usr/bin/env node
+import 'source-map-support/register';
 
-require('source-map-support/register');
-
-const { CubejsServer } = require('../dist/server');
+import { CubejsServer } from '../server';
 
 const server = new CubejsServer({});
 
