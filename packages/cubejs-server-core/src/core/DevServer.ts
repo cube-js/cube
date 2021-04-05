@@ -330,8 +330,9 @@ export class DevServer {
       let { variables = {} } = req.body || {};
 
       if (!variables.CUBEJS_API_SECRET) {
-        variables.CUBEJS_API_SECRET = crypto.randomBytes(64).toString('hex');
+        variables.CUBEJS_API_SECRET = options.apiSecret;
       }
+
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
       if (fs.existsSync('./.env')) {
