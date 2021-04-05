@@ -324,32 +324,41 @@ export class CubejsServerCore {
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
 
-    if (!externalDbType && getEnv('devMode')) {
+    if (!externalDbType) {
       const cubeStorePackage = this.requireCubeStoreDriver();
       if (cubeStorePackage) {
-        if (cubeStorePackage.isCubeStoreSupported()) {
-          console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
+        if (getEnv('devMode')) {
+          if (cubeStorePackage.isCubeStoreSupported()) {
+            console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
 
-          const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
-            stdout: (data) => {
-              console.log(data.toString().trim());
-            },
-            stderr: (data) => {
-              console.log(data.toString().trim());
-            },
-            onRestart: (code) => logger('Cube Store Restarting', {
-              warning: `Instance exit with ${code}, restarting`,
-            }),
-          });
+            const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
+              stdout: (data) => {
+                console.log(data.toString().trim());
+              },
+              stderr: (data) => {
+                console.log(data.toString().trim());
+              },
+              onRestart: (code) => logger('Cube Store Restarting', {
+                warning: `Instance exit with ${code}, restarting`,
+              }),
+            });
 
-          // Lazy loading for Cube Store
-          externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
-          externalDialectFactory = () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
+            // Lazy loading for Cube Store
+            externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
+            externalDialectFactory = () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
+          } else {
+            logger('Cube Store is not supported on your system', {
+              warning: (
+                `You are using ${process.platform} platform with ${process.arch} architecture, ` +
+                'which is not supported by Cube Store.'
+              ),
+            });
+          }
         } else {
-          logger('Cube Store is not supported on your system', {
+          logger('Cube Store automatically provisioning is disabled in production mode', {
             warning: (
-              `You are using ${process.platform} platform with ${process.arch} architecture, ` +
-              'which is not supported by Cube Store.'
+              `You are using Cube Store driver in production mode where automatically provisioning for Cube Store is disabled, please setup Cube Store and ` +
+              'specify connection configuration for it.'
             ),
           });
         }
