@@ -381,6 +381,7 @@ export class CubejsServerCore {
       logger,
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
       sqlCache: true,
+      livePreview: process.env.CUBEJS_LIVE_PREVIEW === 'true',
       ...opts,
       jwt: {
         key: getEnv('jwkKey'),
