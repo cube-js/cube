@@ -213,3 +213,56 @@ but this becomes cumbersome with lots of pre-aggregations.
 **SQL type differences between source and external database:** Different
 databases often specify types differently, which can cause type mismatch issues.
 This is also a common issue and source of frustration which Cube Store resolves.
+
+## Running Cube Store in production
+
+### With Docker
+
+Start Cube Store in a Docker container and bind port `3030` to `127.0.0.1`:
+
+```bash
+docker run -d -p 3030:3030 cubejs/cubestore:edge
+```
+
+Configure Cube.js to use the above connection for an external database via the
+`.env` file:
+
+```dotenv
+CUBEJS_EXT_DB_TYPE=cubestore
+CUBEJS_EXT_DB_HOST=127.0.0.1
+```
+
+### With Docker Compose
+
+Create a `docker-compose.yml` file with the following content:
+
+```yml
+version: '2.2'
+services:
+  cubestore:
+    image: cubejs/cubestore:edge
+
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      # 4000 is a port for Cube.js API
+      - 4000:4000
+      # 3000 is a port for Playground web server
+      # it is available only in dev mode
+      - 3000:3000
+    env_file: .env
+    depends_on:
+      - cubestore
+    links:
+      - cubestore
+    volumes:
+      - ./schema:/cube/conf/schema
+```
+
+Configure Cube.js to use the above connection for an external database via the
+`.env` file:
+
+```dotenv
+CUBEJS_EXT_DB_TYPE=cubestore
+CUBEJS_EXT_DB_HOST=cubestore
+```
