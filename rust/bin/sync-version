@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+const cratePath = path.resolve(__dirname, '../cubestore/Cargo.toml');
+
+if (!fs.existsSync(cratePath)) {
+  console.log(
+    `[Error] sync-version: Unable to find Cargo.toml for Cube Store crate: ${cratePath}`
+  );
+  process.exit(1);
+}
+
+const fileContent = fs.readFileSync(cratePath, {
+  encoding: 'utf8'
+}).split('\n');
+
+const { version } = require('../package.json');
+
+let versionUpdated = true;
+
+for (const [i, line] of Object.entries(fileContent)) {
+  if (line.startsWith('version')) {
+    versionUpdated = true;
+    fileContent[i] = `version = "${version}"`;
+
+    break;
+  }
+}
+
+if (!versionUpdated) {
+  console.log(
+    `[Error] sync-version: Unable to find version field in Cargo.toml for Cube Store crate: ${cratePath}`
+  );
+  process.exit(1);
+}
+
+fs.writeFileSync(cratePath, fileContent.join('\n'));
