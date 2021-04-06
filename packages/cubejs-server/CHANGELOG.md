@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+
+### Features
+
+* Check Node.js version in dev-server/server ([d20e9c2](https://github.com/cube-js/cube.js/commit/d20e9c217e0acd894ecbfbf91e24c3d12cfba1c1))
+
+
+
+
+
 ## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
 
 **Note:** Version bump only for package @cubejs-backend/server

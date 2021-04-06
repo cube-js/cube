@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+
+### Features
+
+* Make apiSecret optional, when JWK_URL is specified ([1a94590](https://github.com/cube-js/cube.js/commit/1a94590292baa6984a049b1b1634b9a04ea9d99a))
+
+
+
+
+
 ## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
 
 
