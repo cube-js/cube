@@ -15,7 +15,6 @@ const StatusIcon = ({ status, uploading }) => {
 
 const LivePreviewBar = () => {
   const { statusLivePreview } = useLivePreviewContext();
-  console.log(statusLivePreview);
   return (
     <Card
       bordered={false}

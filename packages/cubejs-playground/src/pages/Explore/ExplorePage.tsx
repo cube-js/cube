@@ -33,7 +33,6 @@ export default function ExplorePage() {
 
   useEffect(() => {
     if (statusLivePreview && statusLivePreview.enabled) {
-      console.log(statusLivePreview);
       createTokenWithPayload({})
         .then(({ token }) => {
           setPlaygroundContext({
