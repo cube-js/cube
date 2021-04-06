@@ -13,13 +13,6 @@ import apolloClient from './graphql/client';
 
 Vue.use(VueApollo);
 
-window.parent = {};
-window.parent.window = {};
-window.parent.window['__cubejsPlayground'] = {
-  apiUrl: 'http://localhost:4000/cubejs-api/v1',
-  token: 'secret'
-}
-
 const apolloProvider = new VueApollo({
   defaultClient: apolloClient
 });

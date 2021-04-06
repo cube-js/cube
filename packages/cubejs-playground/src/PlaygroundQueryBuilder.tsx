@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Col, Row, Divider } from 'antd';
-import { LockOutlined, PlaySquareOutlined } from '@ant-design/icons';
-import { QueryBuilder } from '@cubejs-client/react';
+import { LockOutlined } from '@ant-design/icons';
+import { QueryBuilder, SchemaChangeProps, VizState } from '@cubejs-client/react';
 import {
   areQueriesEqual,
   PivotConfig,
@@ -9,7 +9,6 @@ import {
   ChartType,
 } from '@cubejs-client/core';
 import styled from 'styled-components';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
@@ -24,6 +23,7 @@ import { dispatchPlaygroundEvent } from './utils';
 import { useSecurityContext } from './hooks';
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
+import DashboardSource from './DashboardSource';
 
 const Section = styled.div`
   display: flex;
@@ -80,13 +80,13 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
           .split('')
           .map((c, i) => (i === 0 ? c.toUpperCase() : c))
           .join('')} Member`;
-        if (values && values.values) {
+        if (values?.values) {
           actionName = 'Update Filter Values';
         }
-        if (values && values.dateRange) {
+        if (values?.dateRange) {
           actionName = 'Update Date Range';
         }
-        if (values && values.granularity) {
+        if (values?.granularity) {
           actionName = 'Update Granularity';
         }
         playgroundAction(actionName, { memberName });
@@ -101,6 +101,17 @@ type THandleRunButtonClickProps = {
   chartType: ChartType;
 };
 
+type TPlaygroundQueryBuilderProps = {
+  apiUrl: string;
+  cubejsToken: string;
+  defaultQuery?: Query;
+  dashboardSource?: DashboardSource;
+  schemaVersion?: number;
+  initialVizState?: VizState;
+  onVizStateChanged?: (vizState: VizState) => void;
+  onSchemaChange?: (props: SchemaChangeProps) => void;
+}
+
 export default function PlaygroundQueryBuilder({
   apiUrl,
   cubejsToken,
@@ -110,10 +121,9 @@ export default function PlaygroundQueryBuilder({
   initialVizState,
   onSchemaChange,
   onVizStateChanged,
-}: any) {
+}: TPlaygroundQueryBuilderProps) {
   const ref = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
-  const runButtonRef = useRef<HTMLButtonElement>(null);
 
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
@@ -130,11 +140,6 @@ export default function PlaygroundQueryBuilder({
       });
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
-
-  // for you, ovr :)
-  useHotkeys('cmd+enter', () => {
-    runButtonRef.current?.click();
-  });
 
   function handleRunButtonClick({
     query,
@@ -324,34 +329,6 @@ export default function PlaygroundQueryBuilder({
                         )}
                       />
                     </Section>
-
-                    <Section>
-                      <SectionHeader>Execute</SectionHeader>
-
-                      <Button
-                        ref={runButtonRef}
-                        disabled={isFetchingMeta}
-                        type="primary"
-                        loading={isQueryLoading}
-                        ghost={areQueriesEqual(query, queryRef.current)}
-                        icon={<PlaySquareOutlined />}
-                        onClick={() => {
-                          if (
-                            isChartRendererReady &&
-                            ref.current &&
-                            missingMembers.length === 0
-                          ) {
-                            handleRunButtonClick({
-                              query,
-                              pivotConfig,
-                              chartType: chartType || 'line',
-                            });
-                          }
-                        }}
-                      >
-                        Run
-                      </Button>
-                    </Section>
                   </Row>
                 </Card>
 
@@ -458,6 +435,7 @@ export default function PlaygroundQueryBuilder({
 
                       return (
                         <ChartRenderer
+                          areQueriesEqual={areQueriesEqual(query, queryRef.current)}
                           isQueryLoading={isQueryLoading}
                           isChartRendererReady={
                             isChartRendererReady && !isFetchingMeta
@@ -484,6 +462,19 @@ export default function PlaygroundQueryBuilder({
                             setQueryLoading(isLoading);
                           }}
                           onChartRendererReadyChange={setChartRendererReady}
+                          onRunButtonClick={() => {
+                            if (
+                              isChartRendererReady &&
+                              ref.current &&
+                              missingMembers.length === 0
+                            ) {
+                              handleRunButtonClick({
+                                query,
+                                pivotConfig,
+                                chartType: chartType || 'line',
+                              });
+                            }
+                          }}
                         />
                       );
                     }}

@@ -101,14 +101,18 @@ export class AppContainer {
       })
     );
 
-    const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
-    packageJson.cubejsTemplates = {
-      ...packageJson.cubejsTemplates,
-      ...packageVersions,
-    };
-    await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
-      spaces: 2,
-    });
+    try {
+      const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+      packageJson.cubejsTemplates = {
+        ...packageJson.cubejsTemplates,
+        ...packageVersions,
+      };
+      await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
+        spaces: 2,
+      });
+    } catch (_) {
+      //
+    }
   }
 
   public async executeCommand(command, args, options) {

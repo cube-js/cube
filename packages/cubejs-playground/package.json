@@ -35,7 +35,7 @@
     "react-router-dom": "^5.1.2",
     "react-scripts": "4.0.1",
     "react-source-render": "4.0.0-1",
-    "sql-formatter": "^2.3.2",
+    "sql-formatter": "^4.0.2",
     "uuid": "^3.3.3",
     "whatwg-fetch": "^3.0.0"
   },

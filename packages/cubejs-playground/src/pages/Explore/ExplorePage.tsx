@@ -11,7 +11,7 @@ export default function ExplorePage() {
   const { push, location } = useHistory();
   const { token } = useSecurityContext();
 
-  const [apiUrl, setApiUrl] = useState(null);
+  const [apiUrl, setApiUrl] = useState<string | null>(null);
   const [playgroundContext, setPlaygroundContext] = useState<any>(null);
 
   const dashboardSource = useMemo(() => new DashboardSource(), []);
@@ -47,7 +47,7 @@ export default function ExplorePage() {
     }
   }, [token, playgroundContext]);
 
-  if (!cubejsApi) {
+  if (!cubejsApi || !apiUrl) {
     return null;
   }
 

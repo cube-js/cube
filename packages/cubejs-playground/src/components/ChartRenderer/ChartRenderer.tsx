@@ -1,10 +1,12 @@
-import { RefObject, useEffect, useLayoutEffect, useState } from 'react';
+import { RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Typography } from 'antd';
+import { PlaySquareOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
 import { ResultSet } from '@cubejs-client/core';
+import { useHotkeys } from 'react-hotkeys-hook';
 import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 
-import { CubeLoader } from '../../atoms';
+import { Button, CubeLoader } from '../../atoms';
 import { UIFramework } from '../../types';
 
 const { Text } = Typography;
@@ -72,6 +74,7 @@ type TChartRendererProps = {
   query: Query;
   queryError: Error | null;
   isQueryLoading: boolean;
+  areQueriesEqual: boolean;
   isChartRendererReady: boolean;
   queryHasMissingMembers: boolean;
   chartType: ChartType;
@@ -80,9 +83,11 @@ type TChartRendererProps = {
   framework: UIFramework;
   onQueryStatusChange: (result: TQueryLoadResult) => void;
   onChartRendererReadyChange: (isReady: boolean) => void;
+  onRunButtonClick: () => void;
 };
 
 export default function ChartRenderer({
+  areQueriesEqual,
   queryError,
   iframeRef,
   framework,
@@ -91,11 +96,18 @@ export default function ChartRenderer({
   isQueryLoading,
   onChartRendererReadyChange,
   onQueryStatusChange,
+  onRunButtonClick
 }: TChartRendererProps) {
+  const runButtonRef = useRef<HTMLButtonElement>(null);
   const [slowQuery, setSlowQuery] = useState(false);
   const [resultSetExists, setResultSet] = useState(false);
   const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
+
+  // for you, ovr :)
+  useHotkeys('cmd+enter', () => {
+    runButtonRef.current?.click();
+  });
 
   useEffect(() => {
     return () => {
@@ -143,19 +155,22 @@ export default function ChartRenderer({
         onChartRendererReadyChange(true);
       },
     };
-  }, [onChartRendererReadyChange]);
+  }, [framework, onChartRendererReadyChange]);
 
   const loading: boolean =
     !isChartRendererReady ||
     queryHasMissingMembers ||
     isQueryLoading ||
     isPreAggregationBuildInProgress;
+
   const invisible: boolean =
     !isChartRendererReady ||
     isPreAggregationBuildInProgress ||
     Boolean(queryError) ||
     queryHasMissingMembers ||
-    loading;
+    loading ||
+    !areQueriesEqual ||
+    !resultSetExists;
 
   const renderExtras = () => {
     if (queryError) {
@@ -191,13 +206,20 @@ export default function ChartRenderer({
       );
     }
 
-    if (!resultSetExists) {
+    if (!areQueriesEqual || !resultSetExists) {
       return (
         <Positioner>
           <Centered>
-            <Text strong style={{ fontSize: 18 }}>
-              Press the Run button to execute the query
-            </Text>
+            <Button
+              ref={runButtonRef}
+              size="large"
+              type="primary"
+              loading={isQueryLoading}
+              icon={<PlaySquareOutlined />}
+              onClick={onRunButtonClick}
+            >
+              Run
+            </Button>
           </Centered>
         </Positioner>
       );
