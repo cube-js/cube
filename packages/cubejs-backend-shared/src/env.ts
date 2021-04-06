@@ -156,6 +156,9 @@ const variables = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  livePreview: () => get('CUBEJS_LIVE_PREVIEW')
+    .default('false')
+    .asBoolStrict(),
 };
 
 type Vars = typeof variables;
