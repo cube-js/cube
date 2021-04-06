@@ -6,6 +6,7 @@ import { fetch } from 'whatwg-fetch';
 import DashboardSource from '../../DashboardSource';
 import { useCubejsApi, useSecurityContext, useLivePreviewContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
+import LivePreviewContextProvider from '../../components/LivePreviewContext/LivePreviewContextProvider';
 
 export default function ExplorePage() {
   const { push, location } = useHistory();
@@ -72,16 +73,18 @@ export default function ExplorePage() {
   const query = (params.get('query') && JSON.parse(params.get('query') || '')) || {};
 
   return (
-    <CubeProvider cubejsApi={cubejsApi}>
-      <PlaygroundQueryBuilder
-        defaultQuery={query}
-        apiUrl={apiUrl}
-        cubejsToken={token || playgroundContext.cubejsToken}
-        dashboardSource={dashboardSource}
-        onVizStateChanged={({ query }) =>
-          push(`/build?query=${JSON.stringify(query)}`)
-        }
-      />
-    </CubeProvider>
+    <LivePreviewContextProvider disabled={!playgroundContext.livePreview}>
+      <CubeProvider cubejsApi={cubejsApi}>
+        <PlaygroundQueryBuilder
+          defaultQuery={query}
+          apiUrl={apiUrl}
+          cubejsToken={token || playgroundContext.cubejsToken}
+          dashboardSource={dashboardSource}
+          onVizStateChanged={({ query }) =>
+            push(`/build?query=${JSON.stringify(query)}`)
+          }
+        />
+      </CubeProvider>
+    </LivePreviewContextProvider>
   );
 }

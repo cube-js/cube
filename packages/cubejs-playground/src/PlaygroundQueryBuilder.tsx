@@ -111,6 +111,8 @@ export default function PlaygroundQueryBuilder({
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
 
+  const showLivePreview = !livePreviewDisabled && !statusLivePreview.loading;
+
   return (
     <QueryBuilder
       defaultQuery={defaultQuery}
@@ -179,7 +181,7 @@ export default function PlaygroundQueryBuilder({
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
                     {
-                      !livePreviewDisabled && !statusLivePreview.loading && 
+                      showLivePreview && 
                       <Button
                         icon={<CloudOutlined />}
                         size="small"

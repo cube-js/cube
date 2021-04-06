@@ -20,18 +20,16 @@ const useLivePreview = (disabled = false) => {
   });
 
   useEffect(() => {
-    if(disabled) return;
+    if (disabled) return;
+    const statusPoolingInterval = setInterval(() => { fetchStatus(); }, 5000);
     fetchStatus();
-    const statusPoolingInterval = setInterval(() => {
-      fetchStatus();
-    }, 5000);
     return () => {
       clearInterval(statusPoolingInterval);
     }
   }, [])
 
   const fetchStatus = () => {
-    fetch('/playground/live-preview/status')
+    return fetch('/playground/live-preview/status')
       .then(res => res.json())
       .then((status) => setStatus({
         loading: false,

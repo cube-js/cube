@@ -65,7 +65,8 @@ export class DevServer {
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         projectFingerprint: this.cubejsServer.projectFingerprint,
-        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists()
+        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
+        livePreview: options.livePreview
       });
     }));
 
