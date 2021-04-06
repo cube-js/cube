@@ -56,7 +56,13 @@ const useLivePreview = (disabled = false) => {
     },
     startLivePreview: (): Promise<Boolean> => {
       return new Promise((resolve, reject) => {
-        const wn = window.open('https://cubecloud.dev/auth/live-preview', '', `width=640,height=720`);
+        const callbackUrl = encodeURIComponent(window.location.origin);
+        const params: any = window.location.origin !== 'http://localhost:4000' && new URLSearchParams({ callbackUrl }).toString();
+        const wn = window.open(
+          `https://cubecloud.dev/auth/live-preview${params ? `?${params}` : ''}`, 
+          '', 
+          `width=640,height=720`
+        );
 
         if (!wn) {
           console.error('The popup was blocked by the browser');
