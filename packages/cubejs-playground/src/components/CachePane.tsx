@@ -1,7 +1,7 @@
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Table, Tabs } from 'antd';
 import { QueryRenderer } from '@cubejs-client/react';
-import sqlFormatter from 'sql-formatter';
+import { format } from 'sql-formatter';
 
 import PrismCode from '../PrismCode';
 
@@ -33,7 +33,7 @@ const CachePane = ({ query }) => (
                   title: 'Refresh Key SQL',
                   key: 'refreshKey',
                   render: (text, record) => (
-                    <PrismCode code={sqlFormatter.format(record[0])} />
+                    <PrismCode code={format(record[0])} />
                   ),
                 },
                 {
@@ -77,7 +77,7 @@ const CachePane = ({ query }) => (
                   dataIndex: 'invalidateKeyQueries',
                   render: (refreshKeyQueries) =>
                     refreshKeyQueries.map((q) => (
-                      <PrismCode key={q[0]} code={sqlFormatter.format(q[0])} />
+                      <PrismCode key={q[0]} code={format(q[0])} />
                     )),
                 },
                 {
