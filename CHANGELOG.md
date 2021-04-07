@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.80](https://github.com/cube-js/cube.js/compare/v0.26.79...v0.26.80) (2021-04-07)
+
+
+### Bug Fixes
+
+* TypeError: Cannot read property 'preAggregation' of undefined on empty pre-aggregations ([91ba03e](https://github.com/cube-js/cube.js/commit/91ba03e91545f31b498aa0fa47090ccd35085ae6)), closes [#2505](https://github.com/cube-js/cube.js/issues/2505)
+
+
+
+
+
 ## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
 
 

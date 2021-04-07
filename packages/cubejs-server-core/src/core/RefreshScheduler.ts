@@ -229,6 +229,9 @@ export class RefreshScheduler {
         return false;
       },
       current: async () => {
+        if (!scheduledPreAggregations[preAggregationCursor]) {
+          return null;
+        }
         const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
         if (partitionCursor < queries.length) {
           const queryCursor = queries.length - 1 - partitionCursor;
