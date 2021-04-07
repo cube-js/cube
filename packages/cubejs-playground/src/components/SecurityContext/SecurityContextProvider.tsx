@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import jwtDecode from 'jwt-decode';
 
-import SecurityContext from './SecurityContext';
+import { SecurityContext } from './SecurityContext';
 
 type TSecurityContextContextProps = {
   payload: string;
@@ -17,7 +17,7 @@ export const SecurityContextContext = createContext<TSecurityContextContextProps
   {} as TSecurityContextContextProps
 );
 
-export default function SecurityContextProvider({
+export function SecurityContextProvider({
   children,
   getToken,
   tokenKey = null,

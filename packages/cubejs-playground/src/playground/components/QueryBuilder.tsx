@@ -1,5 +1,5 @@
 import { Query } from '@cubejs-client/core';
-import { VizState } from '@cubejs-client/react';
+import { SchemaChangeProps, VizState } from '@cubejs-client/react';
 
 import PlaygroundWrapper from '../PlaygroundWrapper';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
@@ -10,10 +10,12 @@ type TQueryBuilderProps = {
   defaultQuery?: Query;
   initialVizState?: VizState;
   getToken?: (payload: string) => Promise<string>;
+  schemaVersion?: number;
   onVizStateChanged?: (vizState: VizState) => void;
+  onSchemaChange?: (props: SchemaChangeProps) => void;
 };
 
-export default function QueryBuilder({
+export function QueryBuilder({
   apiUrl,
   token,
   ...props
@@ -27,7 +29,9 @@ export default function QueryBuilder({
           query: props.defaultQuery,
           ...props.initialVizState,
         }}
+        schemaVersion={props.schemaVersion}
         onVizStateChanged={(vizState) => props.onVizStateChanged?.(vizState)}
+        onSchemaChange={props.onSchemaChange}
       />
     </PlaygroundWrapper>
   );

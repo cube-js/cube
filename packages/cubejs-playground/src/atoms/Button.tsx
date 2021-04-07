@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { Button } from 'antd';
 
-const StyledButton: any = styled(Button)`
+const StyledButton: typeof Button = styled(Button)`
   && {
     padding: 5px 12px;
     height: auto;
@@ -30,6 +30,10 @@ const StyledButton: any = styled(Button)`
       color: white;
       border-color: var(--primary-color);
       place-self: center;
+    }
+    
+    &.ant-btn-background-ghost:not([disabled]) {
+      color: var(--primary-color);
     }
     
     &.ant-btn-icon-only {

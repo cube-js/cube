@@ -37,12 +37,6 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-.chart-renderer {
-  width: 100%;
-}
-</style>
 `;
 
 const mainJs = `
@@ -66,6 +60,7 @@ const varMap = [
 
 const versionedDeps = {
   'vue-chartkick': '^0.6.0',
+  'chart.js': '^2.9.4',
 };
 
 function generateCodeChunks(sourceContainers) {

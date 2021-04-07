@@ -1,10 +1,13 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Typography } from 'antd';
+import { PlaySquareOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
+import { ResultSet } from '@cubejs-client/core';
+import { useHotkeys } from 'react-hotkeys-hook';
+import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 
-import { CubeLoader } from '../../atoms';
-import { dispatchPlaygroundEvent } from '../../utils';
-import { useDeepCompareMemoize } from '../../hooks';
+import { Button, CubeLoader } from '../../atoms';
+import { UIFramework } from '../../types';
 
 const { Text } = Typography;
 
@@ -18,7 +21,7 @@ const Positioner = styled.div`
 
 type TChartContainerProps = {
   invisible: boolean;
-}
+};
 
 const ChartContainer = styled.div<TChartContainerProps>`
   visibility: ${(props) => (props.invisible ? 'hidden' : 'visible')};
@@ -33,7 +36,6 @@ const ChartContainer = styled.div<TChartContainerProps>`
 
 const RequestMessage = styled.div`
   position: absolute;
-  bottom: 24px;
   width: 100%;
   bottom: -4em;
   animation: fadeIn 0.3s;
@@ -62,22 +64,50 @@ const Wrapper = styled.div`
   text-align: center;
 `;
 
+export type TQueryLoadResult = {
+  isLoading: boolean;
+  resultSet?: ResultSet;
+  error?: Error | null;
+};
+
+type TChartRendererProps = {
+  query: Query;
+  queryError: Error | null;
+  isQueryLoading: boolean;
+  areQueriesEqual: boolean;
+  isChartRendererReady: boolean;
+  queryHasMissingMembers: boolean;
+  chartType: ChartType;
+  pivotConfig?: PivotConfig;
+  iframeRef: RefObject<HTMLIFrameElement>;
+  framework: UIFramework;
+  onQueryStatusChange: (result: TQueryLoadResult) => void;
+  onChartRendererReadyChange: (isReady: boolean) => void;
+  onRunButtonClick: () => void;
+};
+
 export default function ChartRenderer({
+  areQueriesEqual,
+  queryError,
   iframeRef,
   framework,
   isChartRendererReady,
-  chartingLibrary,
-  chartType,
-  query,
-  pivotConfig,
   queryHasMissingMembers,
+  isQueryLoading,
   onChartRendererReadyChange,
-}) {
+  onQueryStatusChange,
+  onRunButtonClick
+}: TChartRendererProps) {
+  const runButtonRef = useRef<HTMLButtonElement>(null);
   const [slowQuery, setSlowQuery] = useState(false);
+  const [resultSetExists, setResultSet] = useState(false);
   const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
-  const [isQueryLoading, setQueryLoading] = useState(true);
-  const [queryError, setQueryError] = useState<Error | null>(null);
+
+  // for you, ovr :)
+  useHotkeys('cmd+enter', () => {
+    runButtonRef.current?.click();
+  });
 
   useEffect(() => {
     return () => {
@@ -87,44 +117,26 @@ export default function ChartRenderer({
   }, []);
 
   useEffect(() => {
-    if (isChartRendererReady && iframeRef.current && !queryHasMissingMembers) {
-      dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
-        pivotConfig,
-        query,
-        chartType,
-        chartingLibrary,
-      });
-      setQueryLoading(true);
-      setQueryError(null);
-    }
-    // eslint-disable-next-line
-  }, useDeepCompareMemoize([iframeRef, isChartRendererReady, pivotConfig, query, chartType, queryHasMissingMembers]));
+    setResultSet(false);
+  }, [framework]);
 
   useLayoutEffect(() => {
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
-      onQueryLoad: (data) => {
-        let resultSet;
-        let error = null;
-
-        if (data?.resultSet !== undefined) {
-          resultSet = data.resultSet;
-          error = data.error;
-        } else {
-          resultSet = data;
-        }
-
+      onQueryStart: () => {
+        onQueryStatusChange({ isLoading: true });
+      },
+      onQueryLoad: ({ resultSet, error }: TQueryLoadResult) => {
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
 
           setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
           Boolean(loadResponse.slowQuery) && setSlowQuery(false);
-          setQueryLoading(false);
-          setQueryError(null);
+          setResultSet(true);
         }
-        if (error) {
-          setQueryLoading(false);
-          setQueryError(error);
+
+        if (resultSet || error) {
+          onQueryStatusChange({ resultSet, error, isLoading: false });
         }
       },
       onQueryProgress: (progress) => {
@@ -143,18 +155,22 @@ export default function ChartRenderer({
         onChartRendererReadyChange(true);
       },
     };
-  }, [onChartRendererReadyChange]);
+  }, [framework, onChartRendererReadyChange]);
 
-  const invisible =
-    !isChartRendererReady ||
-    isPreAggregationBuildInProgress ||
-    queryError ||
-    queryHasMissingMembers;
-  const loading =
+  const loading: boolean =
     !isChartRendererReady ||
     queryHasMissingMembers ||
     isQueryLoading ||
     isPreAggregationBuildInProgress;
+
+  const invisible: boolean =
+    !isChartRendererReady ||
+    isPreAggregationBuildInProgress ||
+    Boolean(queryError) ||
+    queryHasMissingMembers ||
+    loading ||
+    !areQueriesEqual ||
+    !resultSetExists;
 
   const renderExtras = () => {
     if (queryError) {
@@ -164,8 +180,8 @@ export default function ChartRenderer({
     if (queryHasMissingMembers) {
       return (
         <div>
-          At least of the query members is missing from your data schema. Please
-          update your query or data schema.
+          At least one of the query members is missing from your data schema.
+          Please update your query or data schema.
         </div>
       );
     }
@@ -190,13 +206,32 @@ export default function ChartRenderer({
       );
     }
 
+    if (!areQueriesEqual || !resultSetExists) {
+      return (
+        <Positioner>
+          <Centered>
+            <Button
+              ref={runButtonRef}
+              size="large"
+              type="primary"
+              loading={isQueryLoading}
+              icon={<PlaySquareOutlined />}
+              onClick={onRunButtonClick}
+            >
+              Run
+            </Button>
+          </Centered>
+        </Positioner>
+      );
+    }
+
     return null;
   };
 
   const slowQueryMsg = slowQuery
     ? 'This query takes more than 5 seconds to execute. Please consider using pre-aggregations to improve its performance. '
     : slowQueryFromCache
-    ? 'This query takes more than 5 seconds to execute. It was served from the cache because Cube.js wasn\'t able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. '
+    ? "This query takes more than 5 seconds to execute. It was served from the cache because Cube.js wasn't able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. "
     : '';
 
   return (

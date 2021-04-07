@@ -1,3 +1,5 @@
+import 'source-map-support/register';
+
 export * from './AppContainer';
 export * from './DependencyTree';
 export * from './PackageFetcher';

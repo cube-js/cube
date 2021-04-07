@@ -1,6 +1,6 @@
 <template>
   <v-container fluid class="text-center background pa-0">
-    <query-builder style="width: 100%" :cubejsApi="cubejsApi" :initialVizState="vizState" @queryLoad="handle">
+    <query-builder style="width: 100%" :cubejsApi="cubejsApi" :initialVizState="vizState">
       <template
         #builder="{
           validatedQuery,
@@ -213,10 +213,6 @@ export default {
     };
   },
   methods: {
-    handle() {
-      console.log('@load', Date.now());
-    },
-
     handleMove(value, updatePivotConfig) {
       updatePivotConfig.update(value);
     },

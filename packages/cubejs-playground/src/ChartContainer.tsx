@@ -12,9 +12,10 @@ import {
 import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
-import { Redirect, withRouter } from 'react-router-dom';
+import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
-import sqlFormatter from 'sql-formatter';
+import { Query, ResultSet } from '@cubejs-client/core';
+import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
 import { Button, Card } from './atoms';
@@ -22,6 +23,7 @@ import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
+import DashboardSource from './DashboardSource';
 
 const frameworkToTemplate = {
   react: 'create-react-app',
@@ -78,14 +80,19 @@ export const frameworks: FrameworkDescriptor[] = [
   },
 ];
 
-class ChartContainer extends Component<any, any> {
+type TChartContainerProps = {
+  query: Query;
+  hideActions: boolean;
+  dashboardSource?: DashboardSource;
+  error?: Error;
+  resultSet?: ResultSet;
+  [k: string]: any;
+}
+
+class ChartContainer extends Component<TChartContainerProps & RouteComponentProps, any> {
   static defaultProps = {
     query: {},
-    hideActions: null,
-    dashboardSource: null,
-    codeSandboxSource: null,
-    error: null,
-    resultSet: null,
+    hideActions: false,
   };
 
   static getDerivedStateFromProps(props, state) {
@@ -427,7 +434,7 @@ class ChartContainer extends Component<any, any> {
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
               return (
-                <PrismCode code={query && sqlFormatter.format(query.sql())} />
+                <PrismCode code={query && format(query.sql())} />
               );
             }}
           />

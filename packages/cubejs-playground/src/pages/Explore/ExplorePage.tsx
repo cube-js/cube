@@ -13,7 +13,7 @@ export default function ExplorePage() {
   const { token } = useSecurityContext();
   const { statusLivePreview, createTokenWithPayload } = useLivePreviewContext();
 
-  const [apiUrl, setApiUrl] = useState(null);
+  const [apiUrl, setApiUrl] = useState<string | null>(null);
   const [playgroundContext, setPlaygroundContext] = useState<any>(null);
 
   const dashboardSource = useMemo(() => new DashboardSource(), []);
@@ -62,7 +62,7 @@ export default function ExplorePage() {
     }
   }, [token, playgroundContext]);
 
-  if (!cubejsApi) {
+  if (!cubejsApi || !apiUrl) {
     return null;
   }
 
