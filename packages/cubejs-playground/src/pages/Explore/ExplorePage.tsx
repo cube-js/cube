@@ -28,24 +28,21 @@ export default function ExplorePage() {
     setPlaygroundContext(result);
   };
 
-  useEffect(() => {
-    fetchPlaygroundContext();
-  }, []);
-
-  useEffect(() => {
-    if (statusLivePreview && statusLivePreview.enabled) {
-      createTokenWithPayload({})
-        .then(({ token }) => {
-          setPlaygroundContext({
-            ...playgroundContext,
-            apiUrl: statusLivePreview.deploymentUrl,
-            cubejsToken: token.token
-          });
-        })
+  const handleChangeLivePreview = ({ token, apiUrl }) => {
+    if (token && apiUrl) {
+      setPlaygroundContext({
+        ...playgroundContext,
+        apiUrl,
+        cubejsToken: token.token
+      });
     } else {
       fetchPlaygroundContext();
     }
-  }, [statusLivePreview && statusLivePreview.enabled]);
+  }
+
+  useEffect(() => {
+    fetchPlaygroundContext();
+  }, []);
 
   useLayoutEffect(() => {
     if (playgroundContext) {
@@ -73,7 +70,7 @@ export default function ExplorePage() {
   const query = (params.get('query') && JSON.parse(params.get('query') || '')) || {};
 
   return (
-    <LivePreviewContextProvider disabled={!playgroundContext.livePreview}>
+    <LivePreviewContextProvider disabled={!playgroundContext.livePreview} onChange={handleChangeLivePreview}>
       <CubeProvider cubejsApi={cubejsApi}>
         <PlaygroundQueryBuilder
           defaultQuery={query}

@@ -12,7 +12,7 @@ export const LivePreviewContextContext = createContext<TLivePreviewContextProps>
   {} as TLivePreviewContextProps
 );
 
-const useLivePreview = (disabled = false) => {
+const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
   const [status, setStatus] = useState({
     loading: true,
     enabled: false,
@@ -28,6 +28,10 @@ const useLivePreview = (disabled = false) => {
     }
   }, [])
 
+  useEffect(()=> {
+    if (!status.loading) handleChange();
+  }, [status.enabled])
+
   const fetchStatus = () => {
     return fetch('/playground/live-preview/status')
       .then(res => res.json())
@@ -37,18 +41,32 @@ const useLivePreview = (disabled = false) => {
       }));
   }
 
+  const createTokenWithPayload = async (payload): Promise<any> => {
+    const res = await fetch('/playground/live-preview/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  };
+
+  const handleChange = async () => {
+    if(status && status.enabled) {
+      const { token } = await createTokenWithPayload({});
+      onChange({
+        token,
+        apiUrl: status && status.deploymentUrl
+      })
+    } else {
+      onChange({});
+    }
+  };
+
   return {
     statusLivePreview: status,
-    createTokenWithPayload: async (payload): Promise<Boolean> => {
-      const res = await fetch('/playground/live-preview/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-      return res.json();
-    },
+    createTokenWithPayload,
     stopLivePreview: async (): Promise<Boolean> => {
       await fetch('/playground/live-preview/stop');
       fetchStatus();
@@ -82,8 +100,8 @@ const useLivePreview = (disabled = false) => {
   };
 };
 
-export default function LivePreviewContextProvider({ disabled = false, children }) {
-  const devModeHooks = useLivePreview(disabled);
+export default function LivePreviewContextProvider({ disabled = false, onChange, children }) {
+  const devModeHooks = useLivePreview(disabled, onChange);
 
   return (
     <LivePreviewContextContext.Provider value={{...devModeHooks, livePreviewDisabled: disabled}}>
