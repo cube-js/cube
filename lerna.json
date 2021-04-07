@@ -5,6 +5,7 @@
   "packages": [
     "docs",
     "packages/*",
+    "js/*/*",
     "rust"
   ],
   "command": {

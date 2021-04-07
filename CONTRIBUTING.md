@@ -73,7 +73,21 @@ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/c
 
 ### Cube.js Server
 
+# Pre requirements
+
+Java with JDK for it, you can install it on OSX by running:
+
+```sh
+$ brew install openjdk@8
+$ sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
+```
+
+# Installation
+
 Cube.js is written in plain JavaScript, but some parts have already been migrated to TypeScript.
+
+> Attention: TypeScript is configured in incremental mode, which uses cache to speedup compilation,  
+> but in some cases you can get a problem. To fix it, we recommend running `$ yarn clean`.
 
 1. After cloning Cube.js repository run `$ yarn install` in root directory.
 2. Use `yarn tsc:watch` to start TypeScript compiler in watch mode.
