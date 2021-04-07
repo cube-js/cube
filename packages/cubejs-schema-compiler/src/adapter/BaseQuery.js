@@ -1986,16 +1986,29 @@ export class BaseQuery {
     return 'second'; // TODO return 'millisecond';
   }
 
-  parseSecondDuration(interval) {
+  /**
+   * @protected
+   * @param {string} interval
+   * @return {(number|*)[]}
+   */
+  parseInterval(interval) {
     const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }
+
     const duration = parseInt(intervalMatch[1], 10);
     if (duration < 1) {
       throw new UserError(`Duration should be positive: ${interval}`);
     }
-    const secondsInInterval = SecondsDurations[intervalMatch[2]];
+
+    return [duration, intervalMatch[2]];
+  }
+
+  parseSecondDuration(interval) {
+    const [duration, type] = this.parseInterval(interval);
+
+    const secondsInInterval = SecondsDurations[type];
     return secondsInInterval * duration;
   }
 

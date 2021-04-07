@@ -25,12 +25,12 @@ export class LivePreviewWatcher {
     console.log('☁️  Live-preview:', message);
   }
 
-  public setAuth(token: string, deploymentId: string): AuthObject {
+  public setAuth(token: string): AuthObject {
     try {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
       this.auth = {
         auth: token,
-        deploymentId,
+        deploymentId: payload.deploymentId,
         url: payload.url,
       };
 

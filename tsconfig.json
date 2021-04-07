@@ -29,6 +29,12 @@
       "path": "packages/cubejs-druid-driver"
     },
     {
+      "path": "packages/cubejs-jdbc-driver"
+    },
+    {
+      "path": "packages/cubejs-databricks-jdbc-driver"
+    },
+    {
       "path": "rust/"
     },
     {

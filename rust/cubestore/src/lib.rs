@@ -10,6 +10,7 @@
 #![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
 #![feature(map_first_last)]
+#![feature(arc_new_cyclic)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
@@ -57,6 +58,8 @@ pub struct CubeError {
     message: String,
     cause: CubeErrorCauseType,
 }
+
+impl std::error::Error for CubeError {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CubeErrorCauseType {
@@ -365,5 +368,11 @@ impl From<tempfile::PathPersistError> for CubeError {
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
         return CubeError::from_error(v);
+    }
+}
+
+impl Into<ArrowError> for CubeError {
+    fn into(self) -> ArrowError {
+        ArrowError::ExternalError(Box::new(self))
     }
 }

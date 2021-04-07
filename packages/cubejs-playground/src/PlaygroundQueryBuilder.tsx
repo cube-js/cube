@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, RefObject } from 'react';
 import { Col, Row, Divider } from 'antd';
-import { LockOutlined } from '@ant-design/icons';
+import { LockOutlined, CloudOutlined } from '@ant-design/icons';
 import {
   QueryBuilder,
   SchemaChangeProps,
@@ -20,11 +20,12 @@ import FilterGroup from './QueryBuilder/FilterGroup';
 import TimeGroup from './QueryBuilder/TimeGroup';
 import SelectChartType from './QueryBuilder/SelectChartType';
 import Settings from './components/Settings/Settings';
+import LivePreviewBar from './components/LivePreviewContext/LivePreviewBar';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { SectionHeader, SectionRow } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
-import { useDeepCompareMemoize, useSecurityContext } from './hooks';
+import { useDeepCompareMemoize, useSecurityContext, useLivePreviewContext } from './hooks';
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
 import DashboardSource from './DashboardSource';
@@ -155,6 +156,7 @@ export default function PlaygroundQueryBuilder({
   const [isQueryLoading, setQueryLoading] = useState(false);
   const [queryError, setQueryError] = useState<Error | null>(null);
   const { token, setIsModalOpen } = useSecurityContext();
+  const { livePreviewDisabled, startLivePreview, stopLivePreview, statusLivePreview } = useLivePreviewContext();
 
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
@@ -164,6 +166,8 @@ export default function PlaygroundQueryBuilder({
       });
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
+
+  const showLivePreview = !livePreviewDisabled && !statusLivePreview.loading;
 
   function handleRunButtonClick({
     query,
@@ -260,10 +264,32 @@ export default function PlaygroundQueryBuilder({
                     >
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
+                    {
+                      showLivePreview &&
+                      <Button
+                        icon={<CloudOutlined />}
+                        size="small"
+                        type={ statusLivePreview.enabled ? 'primary' : 'default'}
+                        onClick={() => statusLivePreview.enabled ? stopLivePreview() : startLivePreview()}
+                      >
+                        { statusLivePreview.enabled ? 'Stop' : 'Start'} Live Preview
+                      </Button>
+                    }
+
                   </Button.Group>
                 </Card>
               </Col>
             </Row>
+
+            {
+              statusLivePreview &&
+              statusLivePreview.enabled &&
+              <Row>
+                <Col span={24}>
+                  <LivePreviewBar />
+                </Col>
+              </Row>
+            }
 
             <Divider style={{ margin: 0 }} />
 

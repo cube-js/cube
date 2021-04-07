@@ -96,6 +96,30 @@ const repository = {
   ]),
 };
 
+const noPreAggregationsRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    { fileName: 'main.js', content: `
+cube('Bar', {
+  sql: 'select * from bar',
+  
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+  
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  }
+});
+` },
+  ]),
+};
+
 class OrchestratorApiMock {
   public createdTables: any = [];
 
@@ -167,6 +191,27 @@ describe('Refresh Scheduler', () => {
       apiSecret: 'foo',
     });
     const compilerApi = new CompilerApi(repository, 'postgres', {
+      compileContext: {},
+      logger: (msg, params) => {
+        console.log(msg, params);
+      },
+    });
+
+    const orchestratorApi = new OrchestratorApiMock();
+
+    jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(() => compilerApi);
+    jest.spyOn(serverCore, 'getOrchestratorApi').mockImplementation(() => <any>orchestratorApi);
+
+    const refreshScheduler = new RefreshScheduler(serverCore);
+    return { refreshScheduler, orchestratorApi };
+  };
+
+  const setupNoPreAggsScheduler = () => {
+    const serverCore = new CubejsServerCore({
+      dbType: 'postgres',
+      apiSecret: 'foo',
+    });
+    const compilerApi = new CompilerApi(noPreAggregationsRepository, 'postgres', {
       compileContext: {},
       logger: (msg, params) => {
         console.log(msg, params);
@@ -319,6 +364,26 @@ describe('Refresh Scheduler', () => {
         concurrency: 2,
         workerIndices: [0],
         queryIteratorState
+      });
+      expect(orchestratorApi.createdTables).toEqual(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 0));
+      if (refreshResult.finished) {
+        break;
+      }
+    }
+  });
+
+  test('Empty pre-aggregations', async () => {
+    const { refreshScheduler, orchestratorApi } = setupNoPreAggsScheduler();
+    const result = [];
+
+    const queryIteratorState = {};
+
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(null, {
+        concurrency: 1,
+        workerIndices: [0],
+        queryIteratorState,
+        throwErrors: true
       });
       expect(orchestratorApi.createdTables).toEqual(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 0));
       if (refreshResult.finished) {

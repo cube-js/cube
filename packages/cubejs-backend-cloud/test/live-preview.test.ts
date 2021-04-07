@@ -27,15 +27,15 @@ test('setAuth', async () => {
   const livePreviewWatcher = new LivePreviewWatcher();
   const payload = {
     userId: 1,
+    deploymentId: '1',
     url: 'http://localhost:4200'
   };
-  const deploymentId = '1';
 
   const token = jwt.sign(payload, 'secret');
-  const auth = livePreviewWatcher.setAuth(token, deploymentId);
+  const auth = livePreviewWatcher.setAuth(token);
   expect(auth).toEqual({
     auth: token,
     url: payload.url,
-    deploymentId
+    deploymentId: payload.deploymentId
   });
 });

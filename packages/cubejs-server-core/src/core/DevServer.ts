@@ -9,6 +9,7 @@ import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from 
 import type { Application as ExpressApplication } from 'express';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
+import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 
@@ -18,9 +19,11 @@ const repo = {
 };
 
 export class DevServer {
-  protected applyTemplatePackagesPromise: Promise<any>|null = null;
+  protected applyTemplatePackagesPromise: Promise<any> | null = null;
 
-  protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> }|null = null;
+  protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> } | null = null;
+
+  protected livePreviewWatcher = new LivePreviewWatcher();
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
@@ -62,7 +65,8 @@ export class DevServer {
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         projectFingerprint: this.cubejsServer.projectFingerprint,
-        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists()
+        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
+        livePreview: options.livePreview
       });
     }));
 
@@ -289,6 +293,32 @@ export class DevServer {
       res.json(await fetcher.manifestJSON());
     }));
 
+    app.get('/playground/live-preview/start/:token', catchErrors(async (req, res) => {
+      this.livePreviewWatcher.setAuth(req.params.token);
+      this.livePreviewWatcher.startWatch();
+
+      res.setHeader('Content-Type', 'text/html');
+      res.write('<html><head><script>window.close();</script></body></html>');
+      res.end();
+    }));
+
+    app.get('/playground/live-preview/stop', catchErrors(async (req, res) => {
+      this.livePreviewWatcher.stopWatch();
+      res.json({
+        enabled: false
+      });
+    }));
+
+    app.get('/playground/live-preview/status', catchErrors(async (req, res) => {
+      const statusObj = await this.livePreviewWatcher.getStatus();
+      res.json(statusObj);
+    }));
+
+    app.post('/playground/live-preview/token', catchErrors(async (req, res) => {
+      const token = await this.livePreviewWatcher.createTokenWithPayload(req.body);
+      res.json({ token });
+    }));
+
     app.use(serveStatic(path.join(__dirname, '../../../playground'), {
       lastModified: false,
       etag: false,
@@ -330,8 +360,9 @@ export class DevServer {
       let { variables = {} } = req.body || {};
 
       if (!variables.CUBEJS_API_SECRET) {
-        variables.CUBEJS_API_SECRET = crypto.randomBytes(64).toString('hex');
+        variables.CUBEJS_API_SECRET = options.apiSecret;
       }
+
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
       if (fs.existsSync('./.env')) {

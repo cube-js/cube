@@ -275,12 +275,11 @@ where needed.
 ```javascript
 module.exports = {
   queryTransformer: (query, { securityContext }) => {
-    const user = securityContext.u;
-    if (user.filterByRegion) {
+    if (securityContext.filterByRegion) {
       query.filters.push({
         member: 'Regions.id',
         operator: 'equals',
-        values: [user.regionId],
+        values: [securityContext.regionId],
       });
     }
     return query;

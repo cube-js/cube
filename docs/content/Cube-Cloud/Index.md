@@ -23,7 +23,9 @@ monitoring and tracing.
 
 ## Develop Cube.js projects
 
-You can use Cube Cloud IDE to develop and run Cube.js applications. By connecting your GitHub account, you can keep your data schema under version control.
+You can use Cube Cloud IDE to develop and run Cube.js applications. By
+connecting your GitHub account, you can keep your data schema under version
+control.
 
 <div class="block-video" style="position: relative; padding-bottom: 60.504201680672274%; height: 0;">
   <iframe src="https://www.loom.com/embed/101b6291b0ba4d1d8982faa3b8c5bd55" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
@@ -31,7 +33,10 @@ You can use Cube Cloud IDE to develop and run Cube.js applications. By connectin
 
 ## Run and Scale Cube.js applications
 
-Cube Cloud provides on-demand scalable infrastructure and pre-aggregations storage. Cube Cloud runs hundreds of Cube Store instances to ingest and query pre-aggregations with low latency and high concurrency. It is available to all users on the Standard plan and higher.
+Cube Cloud provides on-demand scalable infrastructure and pre-aggregations
+storage. Cube Cloud runs hundreds of [Cube Store][ref-cubestore] instances to
+ingest and query pre-aggregations with low latency and high concurrency. It is
+available to all users on the Standard plan and higher.
 
 ## Live preview your feature branches
 
@@ -39,9 +44,10 @@ Cube Cloud can spin up Cube.js API instances to test changes to the data schema
 in feature branches. You can use branch-based development API URLs in your
 frontend application to test changes before shipping them to production.
 
-
 ## Inspect Cube.js queries
 
 You can trace and inspect your Cube.js queries to find performance flaws and
 apply optimizations. Cube Cloud also provides tips and suggestions on what
 pre-aggregation should be used.
+
+[ref-cubestore]: /caching/using-pre-aggregations#pre-aggregations-storage

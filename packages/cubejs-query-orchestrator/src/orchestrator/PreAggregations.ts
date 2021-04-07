@@ -858,6 +858,7 @@ export class PreAggregations {
     const preAggregations = queryBody.preAggregations || [];
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
+
     const getLoadCacheByDataSource = (dataSource) => {
       if (!loadCacheByDataSource[dataSource]) {
         dataSource = dataSource || 'default';
@@ -869,6 +870,7 @@ export class PreAggregations {
       }
       return loadCacheByDataSource[dataSource];
     };
+
     return preAggregations.map(p => (preAggregationsTablesToTempTables) => {
       const loader = new PreAggregationLoader(
         this.redisPrefix,

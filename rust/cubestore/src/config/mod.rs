@@ -798,6 +798,9 @@ impl Config {
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
+                    Duration::from_secs(
+                        i.get_service_typed::<dyn ConfigObj>().await.query_timeout(),
+                    ),
                 )
             })
             .await;

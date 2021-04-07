@@ -174,6 +174,89 @@ describe('PreAggregations', () => {
         sqlAlias: 'rollupalias',
         type: 'rollup',
         timeDimensionReference: createdAt, 
+        granularity: 'day', 
+        measureReferences: [count, revenue],
+        dimensionReferences: [source],
+      },
+    }
+  })
+
+  cube(\`rollup_partition_month_visitors\`, {
+    sql: \`
+    select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
+    \`,
+    sqlAlias: 'rvis',
+    
+    joins: {
+      visitor_checkins: {
+        relationship: 'hasMany',
+        sql: \`\${CUBE}.id = \${visitor_checkins}.visitor_id\`
+      }
+    },
+
+    measures: { 
+      count: {
+        type: 'count'
+      },
+      revenue: {
+        sql: 'id',
+        type: 'sum'
+      },
+      
+      checkinsTotal: {
+        sql: \`\${checkinsCount}\`,
+        type: 'sum'
+      },
+      
+      uniqueSourceCount: {
+        sql: 'source',
+        type: 'countDistinct'
+      },
+      
+      countDistinctApprox: {
+        sql: 'id',
+        type: 'countDistinctApprox'
+      },
+      
+      ratio: {
+        sql: \`\${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
+        type: 'number'
+      }
+    },
+
+    dimensions: {
+      id: {
+        type: 'number',
+        sql: 'id',
+        primaryKey: true
+      },
+      source: {
+        type: 'string',
+        sql: 'source'
+      },
+      createdAt: {
+        type: 'time',
+        sql: 'created_at'
+      },
+      checkinsCount: {
+        type: 'number',
+        sql: \`\${visitor_checkins.count}\`,
+        subQuery: true,
+        propagateFiltersToSubQuery: true
+      }
+    },
+    
+    segments: {
+      google: {
+        sql: \`source = 'google'\`
+      }
+    },
+    
+    preAggregations: { 
+      veryVeryLongTableNameForPreAggregation: {
+        sqlAlias: 'rollupalias',
+        type: 'rollup',
+        timeDimensionReference: createdAt, 
         partitionGranularity: 'month',
         granularity: 'day', 
         measureReferences: [count, revenue],
@@ -285,7 +368,43 @@ describe('PreAggregations', () => {
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    expect(preAggregationsDescription[0].tableName).toEqual('rvis_rollupalias');
+    expect(query.buildSqlAndParams()[0]).toContain('rvis_rollupalias');
+
+    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
+      query.buildSqlAndParams()
+    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
+      expect(res).toEqual(
+        [
+          { rvis__created_at_day: '2017-01-02T00:00:00.000Z', rvis__count: '1' },
+          { rvis__created_at_day: '2017-01-04T00:00:00.000Z', rvis__count: '1' },
+          { rvis__created_at_day: '2017-01-05T00:00:00.000Z', rvis__count: '1' },
+          { rvis__created_at_day: '2017-01-06T00:00:00.000Z', rvis__count: '2' }
+        ]
+      );
+    });
+  }));
+
+  it('rollup time (partition by month) pre-aggregation with sqlAlias', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'rollup_partition_month_visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'rollup_partition_month_visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'rollup_partition_month_visitors.createdAt'
+      }],
+      preAggregationsSchema: ''
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     expect(preAggregationsDescription[0].tableName).toEqual('rvis_rollupalias20170101');
+    expect(query.buildSqlAndParams()[0]).toContain('rvis_rollupalias20170101');
 
     return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
       query.buildSqlAndParams()
