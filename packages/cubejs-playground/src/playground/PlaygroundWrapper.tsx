@@ -5,7 +5,7 @@ import styled from 'styled-components';
 
 import { useCubejsApi } from '../hooks';
 import GlobalStyles from '../components/GlobalStyles';
-import SecurityContextProvider from '../components/SecurityContext/SecurityContextProvider';
+import { SecurityContextProvider } from '../components/SecurityContext/SecurityContextProvider';
 
 const StyledWrapper = styled.div`
   background-color: #f3f3fc;

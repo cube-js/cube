@@ -1,7 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, RefObject } from 'react';
 import { Col, Row, Divider } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
-import { QueryBuilder, SchemaChangeProps, VizState } from '@cubejs-client/react';
+import {
+  QueryBuilder,
+  SchemaChangeProps,
+  VizState,
+} from '@cubejs-client/react';
 import {
   areQueriesEqual,
   PivotConfig,
@@ -20,7 +24,7 @@ import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { SectionHeader, SectionRow } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
-import { useSecurityContext } from './hooks';
+import { useDeepCompareMemoize, useSecurityContext } from './hooks';
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
 import DashboardSource from './DashboardSource';
@@ -95,6 +99,26 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
+type TPivotChangeEmitterProps = {
+  iframeRef: RefObject<HTMLIFrameElement> | null;
+  pivotConfig?: PivotConfig;
+};
+
+function PivotChangeEmitter({
+  iframeRef,
+  pivotConfig,
+}: TPivotChangeEmitterProps) {
+  useEffect(() => {
+    if (iframeRef?.current) {
+      dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
+        pivotConfig,
+      });
+    }
+  }, useDeepCompareMemoize([iframeRef, pivotConfig]));
+
+  return null;
+}
+
 type THandleRunButtonClickProps = {
   query: Query;
   pivotConfig?: PivotConfig;
@@ -110,7 +134,7 @@ type TPlaygroundQueryBuilderProps = {
   initialVizState?: VizState;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
-}
+};
 
 export default function PlaygroundQueryBuilder({
   apiUrl,
@@ -350,7 +374,7 @@ export default function PlaygroundQueryBuilder({
                           'chart',
                           {
                             chartType: type,
-                            chartingLibrary
+                            chartingLibrary,
                           }
                         );
                       }
@@ -435,7 +459,10 @@ export default function PlaygroundQueryBuilder({
 
                       return (
                         <ChartRenderer
-                          areQueriesEqual={areQueriesEqual(query, queryRef.current)}
+                          areQueriesEqual={areQueriesEqual(
+                            query,
+                            queryRef.current
+                          )}
                           isQueryLoading={isQueryLoading}
                           isChartRendererReady={
                             isChartRendererReady && !isFetchingMeta
@@ -483,6 +510,8 @@ export default function PlaygroundQueryBuilder({
                 )}
               </Col>
             </Row>
+
+            <PivotChangeEmitter iframeRef={ref} pivotConfig={pivotConfig} />
           </>
         );
       }}

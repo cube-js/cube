@@ -14,7 +14,7 @@ export async function fileContentsRecursive(dir: string, rootPath?: string, incl
   if (!rootPath) {
     rootPath = dir;
   }
-  if (!(await fs.pathExists(dir))) {
+  if (!fs.pathExistsSync(dir)) {
     return [];
   }
   if ((dir.includes('node_modules') && !includeNodeModules) || dir.includes('.git')) {

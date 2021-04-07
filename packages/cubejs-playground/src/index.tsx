@@ -12,7 +12,7 @@ import {
   SchemaPage,
   IndexPage,
 } from './pages';
-import SecurityContextProvider from './components/SecurityContext/SecurityContextProvider';
+import { SecurityContextProvider } from './components/SecurityContext/SecurityContextProvider';
 
 const history = createHashHistory();
 history.listen((location) => {

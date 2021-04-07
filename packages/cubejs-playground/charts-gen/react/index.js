@@ -134,19 +134,19 @@ const packages = [
   );
   await appContainer.ensureDependencies();
 
-  try {
-    await executeCommand(
-      'npm link @cubejs-client/react',
-      [],
-      {
-        shell: true,
-        cwd: reactChartsPath,
-      }
-    );
-  } catch (error) {
-    console.log(
-      'Error trying to link local core dependencies',
-      error.toString()
-    );
-  }
+  // try {
+  //   await executeCommand(
+  //     'npm link @cubejs-client/react',
+  //     [],
+  //     {
+  //       shell: true,
+  //       cwd: reactChartsPath,
+  //     }
+  //   );
+  // } catch (error) {
+  //   console.log(
+  //     'Error trying to link local core dependencies',
+  //     error.toString()
+  //   );
+  // }
 })();

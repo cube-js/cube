@@ -2,7 +2,6 @@ import commonjs from '@rollup/plugin-commonjs';
 import localResolve from 'rollup-plugin-local-resolve';
 import postcss from 'rollup-plugin-postcss';
 import typescript from 'rollup-plugin-typescript2';
-import { uglify } from 'rollup-plugin-uglify';
 
 import { LESS_VARIABLES } from './src/variables-esm';
 
@@ -32,7 +31,6 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }) => {
           },
         }),
         localResolve(),
-        uglify()
       ],
       output: {
         file: `./lib/${name}.esm.js`,

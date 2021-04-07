@@ -23,7 +23,7 @@ const FlexBox = styled.div<TFlexBoxProps>`
   }
 `;
 
-export default function SecurityContext() {
+export function SecurityContext() {
   const {
     payload,
     token,

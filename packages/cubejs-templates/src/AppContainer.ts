@@ -121,7 +121,13 @@ export class AppContainer {
 
   public async ensureDependencies() {
     const dependencies = this.sourceContainer?.importDependencies || [];
-    const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+    let packageJson;
+
+    try {
+      packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+    } catch (_) {
+      //
+    }
 
     if (!packageJson || !packageJson.dependencies) {
       return [];
