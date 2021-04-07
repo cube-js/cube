@@ -6,6 +6,7 @@ pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
 mod topk;
+pub use topk::MIN_TOPK_STREAM_ROWS;
 pub mod udfs;
 
 use crate::config::injection::DIService;

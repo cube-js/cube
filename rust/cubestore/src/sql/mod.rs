@@ -47,6 +47,8 @@ use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::from_utf8_unchecked;
+use std::time::Duration;
+use tokio::time::timeout;
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
 
@@ -82,6 +84,7 @@ pub struct SqlServiceImpl {
     query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
+    query_timeout: Duration,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -95,6 +98,7 @@ impl SqlServiceImpl {
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
         rows_per_chunk: usize,
+        query_timeout: Duration,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
@@ -104,6 +108,7 @@ impl SqlServiceImpl {
             query_executor,
             cluster,
             rows_per_chunk,
+            query_timeout,
         })
     }
 
@@ -466,10 +471,13 @@ impl SqlService for SqlServiceImpl {
                         self.query_planner.execute_meta_plan(logical_plan).await?
                     }
                     QueryPlan::Select(serialized) => {
-                        self.query_executor
-                            .execute_router_plan(serialized, self.cluster.clone())
-                            .with_current_subscriber()
-                            .await?
+                        timeout(
+                            self.query_timeout,
+                            self.query_executor
+                                .execute_router_plan(serialized, self.cluster.clone())
+                                .with_current_subscriber(),
+                        )
+                        .await??
                     }
                 };
                 Ok(res)
@@ -851,7 +859,7 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::queryplanner::query_executor::MockQueryExecutor;
-    use crate::queryplanner::MockQueryPlanner;
+    use crate::queryplanner::{MockQueryPlanner, MIN_TOPK_STREAM_ROWS};
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use crate::store::{ChunkStore, WALStore};
     use async_compression::tokio::write::GzipEncoder;
@@ -886,6 +894,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
+            let query_timeout = Duration::from_secs(30);
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let store = ChunkStore::new(
                 meta_store.clone(),
@@ -902,6 +911,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 rows_per_chunk,
+                query_timeout,
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -933,6 +943,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
+            let query_timeout = Duration::from_secs(30);
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
@@ -949,6 +960,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 rows_per_chunk,
+                query_timeout,
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2977,6 +2989,73 @@ mod tests {
             );
         })
             .await;
+    }
+
+    #[tokio::test]
+    async fn topk_large_inputs() {
+        Config::run_test("topk_large_inputs", async move |services| {
+            let service = services.sql_service;
+
+            service.exec_query("CREATE SCHEMA s").await.unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+                .await
+                .unwrap();
+            service
+                .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+                .await
+                .unwrap();
+
+            const NUM_ROWS: i64 = 5 + MIN_TOPK_STREAM_ROWS as i64;
+
+            let insert_data = |table, compute_hits: fn(i64) -> i64| {
+                let service = service.clone();
+                return async move {
+                    let mut values = String::new();
+                    for i in 0..NUM_ROWS {
+                        if !values.is_empty() {
+                            values += ", "
+                        }
+                        values += &format!("('url{}', {})", i, compute_hits(i as i64));
+                    }
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO s.{}(url, hits) VALUES {}",
+                            table, values
+                        ))
+                        .await
+                        .unwrap();
+                };
+            };
+
+            // Arrange so that top-k fully downloads both tables.
+            insert_data("Data1", |i| i).await;
+            insert_data("Data2", |i| NUM_ROWS - 2 * i).await;
+
+            let query = "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 10";
+
+            let rows = service.exec_query(query).await.unwrap().into_rows();
+            assert_eq!(rows.len(), 10);
+            for i in 0..10 {
+                match &rows[i].values()[0] {
+                    TableValue::String(s) => assert_eq!(s, &format!("url{}", i)),
+                    v => panic!("invalid value in row {}: {:?}", i, v),
+                }
+                assert_eq!(
+                    rows[i].values()[1],
+                    TableValue::Int(NUM_ROWS - i as i64),
+                    "row {}",
+                    i
+                );
+            }
+        })
+        .await;
     }
 
     #[tokio::test]

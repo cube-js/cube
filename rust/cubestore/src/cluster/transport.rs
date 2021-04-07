@@ -8,12 +8,26 @@ use std::time::Duration;
 use tokio::net::TcpStream;
 
 #[async_trait]
+pub trait WorkerConnection: Send {
+    async fn call(&mut self, m: NetworkMessage) -> Result<NetworkMessage, CubeError>;
+}
+
+#[async_trait]
 pub trait ClusterTransport: DIService {
-    async fn send_to_worker(
+    async fn connect_to_worker(
+        &self,
+        worker_node: String,
+    ) -> Result<Box<dyn WorkerConnection>, CubeError>;
+}
+
+impl dyn ClusterTransport {
+    pub async fn send_to_worker(
         &self,
         worker_node: String,
         m: NetworkMessage,
-    ) -> Result<NetworkMessage, CubeError>;
+    ) -> Result<NetworkMessage, CubeError> {
+        self.connect_to_worker(worker_node).await?.call(m).await
+    }
 }
 
 pub struct ClusterTransportImpl {
@@ -28,20 +42,30 @@ impl ClusterTransportImpl {
     }
 }
 
+struct Connection {
+    stream: TcpStream,
+}
+
+#[async_trait]
+impl WorkerConnection for Connection {
+    async fn call(&mut self, m: NetworkMessage) -> Result<NetworkMessage, CubeError> {
+        m.send(&mut self.stream).await?;
+        return Ok(NetworkMessage::receive(&mut self.stream).await?);
+    }
+}
+
 #[async_trait]
 impl ClusterTransport for ClusterTransportImpl {
-    async fn send_to_worker(
+    async fn connect_to_worker(
         &self,
         worker_node: String,
-        m: NetworkMessage,
-    ) -> Result<NetworkMessage, CubeError> {
-        let mut stream = tokio::time::timeout(
+    ) -> Result<Box<dyn WorkerConnection>, CubeError> {
+        let stream = tokio::time::timeout(
             Duration::from_secs(self.config.connection_timeout()),
             TcpStream::connect(worker_node),
         )
         .await??;
-        m.send(&mut stream).await?;
-        return Ok(NetworkMessage::receive(&mut stream).await?);
+        Ok(Box::new(Connection { stream }))
     }
 }
 

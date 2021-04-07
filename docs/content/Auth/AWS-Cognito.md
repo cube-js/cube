@@ -25,8 +25,19 @@ To add custom claims to the JWT, you will need to associate [a Lambda
 function][link-aws-lambda] to the [Pre Token Generation event
 trigger][link-aws-cognito-pre-token] available on your User Pool.
 
-First, create a Lambda function in the AWS Lambda Console using the snippet
-below:
+First, go to the AWS Lambda Console and create new a Lambda function:
+
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/cognito-01-create-lambda-01.png"
+  style="border: none"
+  width="80%"
+  />
+</div>
+
+Add the following code to the Lambda function:
 
 ```javascript
 exports.handler = (event, context, callback) => {
@@ -45,8 +56,18 @@ exports.handler = (event, context, callback) => {
 };
 ```
 
-Then navigate to the Amazon Cognito Console and select Triggers from the left
-sidebar, then associate the Lambda function you created previously.
+Then navigate to the Amazon Cognito User Pools Console, select Triggers from the
+left sidebar and associate the Lambda function you created previously:
+
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/cognito-01-create-lambda-02.png"
+  style="border: none"
+  width="80%"
+  />
+</div>
 
 You can find more examples of [modifying claims in JWTs
 here][link-aws-cognito-pretoken-example].
@@ -96,10 +117,10 @@ Change the Server Template to Custom, and enter the following values:
 
 - **Discovery Document URL**:
   `https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>/.well-known/openid-configuration`
-- **OIDC Client ID**: Retrieve from App Client settings page in AWS Cognito
-  Console
+- **OIDC Client ID**: Retrieve from App Client settings page in AWS Cognito User
+  Pool Console
 - **OIDC Client Secret**: Retrieve from App Client settings page in AWS Cognito
-  Console
+  User Pool Console
 
 Click 'Use Discovery Document' to auto-fill the remaining values, then click
 Save.
