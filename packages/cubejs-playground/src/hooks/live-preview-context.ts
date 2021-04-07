@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { LivePreviewContextContext } from '../components/LivePreviewContext/LivePreviewContextProvider';
 
-export default function useLivePreviewContext() {
+export function useLivePreviewContext() {
   return useContext(LivePreviewContextContext);
 }
