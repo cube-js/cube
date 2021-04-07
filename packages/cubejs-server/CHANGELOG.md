@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.83](https://github.com/cube-js/cube.js/compare/v0.26.82...v0.26.83) (2021-04-07)
+
+
+### Bug Fixes
+
+* **server:** Compatibility with CLI to run external commands ([#2510](https://github.com/cube-js/cube.js/issues/2510)) ([44b51dd](https://github.com/cube-js/cube.js/commit/44b51dd648e73897e341e408f4ae37db8e3fb0fc))
+
+
+
+
+
 ## [0.26.82](https://github.com/cube-js/cube.js/compare/v0.26.81...v0.26.82) (2021-04-07)
 
 **Note:** Version bump only for package @cubejs-backend/server
