@@ -30,6 +30,7 @@
     "unit": "jest --runInBand --coverage dist/test"
   },
   "dependencies": {
+    "@cubejs-backend/cloud": "^0.26.79",
     "@cubejs-backend/api-gateway": "^0.26.79",
     "@cubejs-backend/query-orchestrator": "^0.26.79",
     "@cubejs-backend/schema-compiler": "^0.26.79",

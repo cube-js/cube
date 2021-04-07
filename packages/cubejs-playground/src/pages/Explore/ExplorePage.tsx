@@ -4,12 +4,14 @@ import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
 import DashboardSource from '../../DashboardSource';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
+import { useCubejsApi, useSecurityContext, useLivePreviewContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
+import LivePreviewContextProvider from '../../components/LivePreviewContext/LivePreviewContextProvider';
 
 export default function ExplorePage() {
   const { push, location } = useHistory();
   const { token } = useSecurityContext();
+  const { statusLivePreview, createTokenWithPayload } = useLivePreviewContext();
 
   const [apiUrl, setApiUrl] = useState(null);
   const [playgroundContext, setPlaygroundContext] = useState<any>(null);
@@ -20,13 +22,26 @@ export default function ExplorePage() {
     token || playgroundContext?.cubejsToken
   );
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetch('/playground/context');
-      const result = await res.json();
+  const fetchPlaygroundContext = async () => {
+    const res = await fetch('/playground/context');
+    const result = await res.json();
+    setPlaygroundContext(result);
+  };
 
-      setPlaygroundContext(result);
-    })();
+  const handleChangeLivePreview = ({ token, apiUrl }) => {
+    if (token && apiUrl) {
+      setPlaygroundContext({
+        ...playgroundContext,
+        apiUrl,
+        cubejsToken: token.token
+      });
+    } else {
+      fetchPlaygroundContext();
+    }
+  }
+
+  useEffect(() => {
+    fetchPlaygroundContext();
   }, []);
 
   useLayoutEffect(() => {
@@ -55,16 +70,18 @@ export default function ExplorePage() {
   const query = (params.get('query') && JSON.parse(params.get('query') || '')) || {};
 
   return (
-    <CubeProvider cubejsApi={cubejsApi}>
-      <PlaygroundQueryBuilder
-        defaultQuery={query}
-        apiUrl={apiUrl}
-        cubejsToken={token || playgroundContext.cubejsToken}
-        dashboardSource={dashboardSource}
-        onVizStateChanged={({ query }) =>
-          push(`/build?query=${JSON.stringify(query)}`)
-        }
-      />
-    </CubeProvider>
+    <LivePreviewContextProvider disabled={!playgroundContext.livePreview} onChange={handleChangeLivePreview}>
+      <CubeProvider cubejsApi={cubejsApi}>
+        <PlaygroundQueryBuilder
+          defaultQuery={query}
+          apiUrl={apiUrl}
+          cubejsToken={token || playgroundContext.cubejsToken}
+          dashboardSource={dashboardSource}
+          onVizStateChanged={({ query }) =>
+            push(`/build?query=${JSON.stringify(query)}`)
+          }
+        />
+      </CubeProvider>
+    </LivePreviewContextProvider>
   );
 }

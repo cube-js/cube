@@ -131,7 +131,8 @@ describe('index.test', () => {
         algorithms: ['RS256'],
         audience: 'http://localhost:4000/v1',
         issuer: 'http://localhost:4000',
-      }
+      },
+      livePreview: true
     };
 
     const cubejsServerCore = new CubejsServerCore(<any>options);

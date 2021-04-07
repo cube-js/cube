@@ -135,4 +135,5 @@ export interface CreateOptions {
   dashboardAppPath?: string;
   dashboardAppPort?: number;
   sqlCache?: boolean;
+  livePreview?: boolean;
 }
