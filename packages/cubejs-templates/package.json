@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/templates",
-  "version": "0.26.75",
+  "version": "0.26.82",
   "description": "Cube.js Templates helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",

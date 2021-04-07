@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "0.26.74",
+  "version": "0.26.82",
   "engines": {},
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "^0.26.73",
+    "@cubejs-client/core": "^0.26.82",
     "@types/ws": "^7.2.9",
     "core-js": "^3.6.5",
     "isomorphic-ws": "^4.0.1",

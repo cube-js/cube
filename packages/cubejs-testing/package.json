@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.26.81",
+  "version": "0.26.82",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.26.74",
-    "@cubejs-client/core": "^0.26.73",
+    "@cubejs-client/core": "^0.26.82",
     "@types/node": "^10.17.55",
     "cypress": "^6.6.0",
     "cypress-intellij-reporter": "^0.0.6",
