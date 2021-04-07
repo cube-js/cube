@@ -80,14 +80,14 @@ const create = async (projectName, options) => {
   logStage('Installing DB driver dependencies');
   const CubejsServer = requireFromPackage<any>('@cubejs-backend/server');
 
-  const driverDependencies = CubejsServer.driverDependencies(options.dbType);
-  if (!driverDependencies) {
+  const driverPackageName = CubejsServer.driverDependencies(options.dbType);
+  if (!driverPackageName) {
     await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
   }
 
-  await npmInstall(driverDependencies, options.template === 'docker');
+  await npmInstall([driverPackageName], options.template === 'docker');
 
-  if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
+  if (driverPackageName === '@cubejs-backend/jdbc-driver') {
     logStage('Installing JDBC dependencies');
 
     // eslint-disable-next-line import/no-dynamic-require,global-require,@typescript-eslint/no-var-requires
@@ -122,9 +122,9 @@ const create = async (projectName, options) => {
 
   logStage('Writing files from template');
 
-  const driverClass = requireFromPackage<any>(driverDependencies[0]);
+  const driverClass = requireFromPackage<any>(driverPackageName);
 
-  const driverPackageManifest = await requirePackageManifest(driverDependencies[0]);
+  const driverPackageManifest = await requirePackageManifest(driverPackageName);
   const serverCorePackageManifest = await requirePackageManifest('@cubejs-backend/server-core');
   const serverPackageManifest = await requirePackageManifest('@cubejs-backend/server');
 
