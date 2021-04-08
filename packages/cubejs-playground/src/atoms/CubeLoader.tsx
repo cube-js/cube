@@ -140,6 +140,7 @@ const Centered = styled.div`
 export function CubeLoader({ size = 80, full = true }) {
   const img = (
     <div
+      data-test-id="cube-loader"
       key="loader"
       role="img"
       aria-label="Loading animation"

@@ -3,15 +3,19 @@ import 'cypress-wait-until';
 
 context('QueryBuilder', () => {
   it('successfully loads', async () => {
-    cy.visit('/')
+    cy.visit('/');
 
-    await cy.waitUntil(
-      () => cy.contains('Choose a measure or dimension to get started'),
-      {
-        errorMsg: `React didnt render anything.`,
-        timeout: 10 * 1000,
-        verbose: true,
-      }
-    )
-  })
+    const measureBox = cy.getByTestId('Measure');
+    measureBox.click();
+
+    cy.get('body').contains(`Orders Count`).click();
+
+    cy.getByTestId('query-execute-button').click();
+
+    cy.get('iframe')
+      .its('0.contentDocument.body')
+      .contains('[data-test-id="cube-loader"]').should('not.exist');
+
+    cy.get('iframe').matchImageSnapshot();
+  });
 })

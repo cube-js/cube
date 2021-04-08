@@ -47,6 +47,7 @@ const MemberGroup = ({
       disabled={disabled}
       availableMembers={availableMembers}
       type="dashed"
+      data-test-id={addMemberName}
       icon={<PlusOutlined />}
       onClick={(m) => updateMethods.add(m)}
     >
