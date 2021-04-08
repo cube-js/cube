@@ -84,6 +84,7 @@ type TChartRendererProps = {
   onQueryStatusChange: (result: TQueryLoadResult) => void;
   onChartRendererReadyChange: (isReady: boolean) => void;
   onRunButtonClick: () => void;
+  onQueryChange: () => void;
 };
 
 export default function ChartRenderer({
@@ -96,7 +97,8 @@ export default function ChartRenderer({
   isQueryLoading,
   onChartRendererReadyChange,
   onQueryStatusChange,
-  onRunButtonClick
+  onRunButtonClick,
+  onQueryChange
 }: TChartRendererProps) {
   const runButtonRef = useRef<HTMLButtonElement>(null);
   const [slowQuery, setSlowQuery] = useState(false);
@@ -115,6 +117,10 @@ export default function ChartRenderer({
     };
     // eslint-disable-next-line
   }, []);
+
+  useEffect(() => {
+    onQueryChange();
+  }, [areQueriesEqual])
 
   useEffect(() => {
     setResultSet(false);

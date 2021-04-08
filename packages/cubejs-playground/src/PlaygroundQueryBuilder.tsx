@@ -276,17 +276,17 @@ export default function PlaygroundQueryBuilder({
                         icon={<CloudOutlined />}
                         size="small"
                         type={
-                          livePreviewContext?.statusLivePreview.enabled
+                          livePreviewContext?.statusLivePreview.active
                             ? 'primary'
                             : 'default'
                         }
                         onClick={() =>
-                          livePreviewContext?.statusLivePreview.enabled
+                          livePreviewContext?.statusLivePreview.active
                             ? livePreviewContext?.stopLivePreview()
                             : livePreviewContext?.startLivePreview()
                         }
                       >
-                        {livePreviewContext?.statusLivePreview.enabled
+                        {livePreviewContext?.statusLivePreview.active
                           ? 'Stop'
                           : 'Start'}{' '}
                         Live Preview
@@ -297,8 +297,7 @@ export default function PlaygroundQueryBuilder({
               </Col>
             </Row>
 
-            {livePreviewContext?.statusLivePreview &&
-              livePreviewContext?.statusLivePreview.enabled && (
+            {livePreviewContext?.statusLivePreview.active && (
                 <Row>
                   <Col span={24}>
                     <LivePreviewBar />
@@ -541,6 +540,11 @@ export default function PlaygroundQueryBuilder({
                                 pivotConfig,
                                 chartType: chartType || 'line',
                               });
+                            }
+                          }}
+                          onQueryChange={() => {
+                            if (queryError) {
+                              setQueryError(null);
                             }
                           }}
                         />

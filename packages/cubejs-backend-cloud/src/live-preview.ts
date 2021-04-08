@@ -84,7 +84,7 @@ export class LivePreviewWatcher {
     let result = {
       lastHashTarget: this.lastHash,
       uploading: this.uploading,
-      enabled: !!this.watcher
+      active: !!this.watcher,
     };
 
     if (auth) {

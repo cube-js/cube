@@ -27,7 +27,10 @@ const LivePreviewBar = () => {
       <Space>
         <Typography.Text strong>Live preview mode</Typography.Text>
 
-        <StatusIcon {...livePreviewContext?.statusLivePreview} />
+        <StatusIcon
+          status={livePreviewContext?.statusLivePreview.status}
+          uploading={livePreviewContext?.statusLivePreview.uploading}
+        />
         <Typography.Text>
           {livePreviewContext?.statusLivePreview.deploymentUrl}
         </Typography.Text>

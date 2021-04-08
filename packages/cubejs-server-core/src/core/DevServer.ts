@@ -304,9 +304,7 @@ export class DevServer {
 
     app.get('/playground/live-preview/stop', catchErrors(async (req, res) => {
       this.livePreviewWatcher.stopWatch();
-      res.json({
-        enabled: false
-      });
+      res.json({ active: false });
     }));
 
     app.get('/playground/live-preview/status', catchErrors(async (req, res) => {
