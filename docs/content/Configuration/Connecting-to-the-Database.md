@@ -233,7 +233,7 @@ You can connect to a ClickHouse database when your user's permissions are
 
 ### Databricks JDBC
 
-Starting from `v0.26.83` Cube.js provides a driver from Databricks. It's based on top of a JDBC driver from DataBricks, which required
+Starting with `v0.26.83` Cube.js provides a driver for Databricks. It's on top of a JDBC driver from DataBricks, which required
 [installation of Java with JDK][link-java-guide]. You'll need to specify the JDBC url via `CUBEJS_DB_DATABRICKS_URL`.
 
 Example:
