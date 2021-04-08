@@ -40,6 +40,7 @@
     "jest:shapshot": "jest --updateSnapshot test"
   },
   "dependencies": {
+    "@cubejs-backend/cubestore-driver": "^0.27.4",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/server-core": "^0.27.4",
     "@cubejs-backend/shared": "^0.27.4",

@@ -12,8 +12,6 @@
     "@cubejs-backend/athena-driver": "^0.27.4",
     "@cubejs-backend/bigquery-driver": "^0.27.4",
     "@cubejs-backend/clickhouse-driver": "^0.27.4",
-    "@cubejs-backend/cubestore": "^0.27.4",
-    "@cubejs-backend/cubestore-driver": "^0.27.4",
     "@cubejs-backend/dremio-driver": "^0.27.4",
     "@cubejs-backend/druid-driver": "^0.27.4",
     "@cubejs-backend/elasticsearch-driver": "^0.27.4",

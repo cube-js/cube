@@ -5,6 +5,7 @@ import { unlink } from 'fs-extra';
 import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
 
@@ -33,11 +34,11 @@ export class CubeStoreDriver extends BaseDriver {
     super();
 
     this.config = {
-      host: process.env.CUBEJS_DB_HOST,
-      port: process.env.CUBEJS_DB_PORT,
-      user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
       ...config,
+      host: config?.host || getEnv('cubeStoreHost'),
+      port: config?.port || getEnv('cubeStorePort'),
+      user: config?.user || getEnv('cubeStoreUser'),
+      password: config?.password || getEnv('cubeStorePass'),
     };
     this.baseUrl = (this.config.url || `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);

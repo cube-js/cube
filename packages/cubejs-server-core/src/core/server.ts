@@ -299,13 +299,12 @@ export class CubejsServerCore {
     CubeStoreDevDriver: typeof CubeStoreDevDriver,
   }>('@cubejs-backend/cubestore-driver', {
     relative: isDockerImage(),
-    silent: true,
   });
 
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     optionsValidate(opts);
 
-    const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE || 'cubestore';
 
     const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
     const logger: LoggerFn = opts.logger || (
@@ -328,9 +327,32 @@ export class CubejsServerCore {
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
 
-    if (!externalDbType && getEnv('devMode')) {
-      const cubeStorePackage = this.requireCubeStoreDriver();
-      if (cubeStorePackage) {
+    if (externalDbType === 'cubestore' && getEnv('devMode') && !opts.serverless) {
+      const skipOnEnv = [
+        // Default EXT_DB variables
+        'CUBEJS_EXT_DB_URL',
+        'CUBEJS_EXT_DB_HOST',
+        'CUBEJS_EXT_DB_NAME',
+        'CUBEJS_EXT_DB_PORT',
+        'CUBEJS_EXT_DB_USER',
+        'CUBEJS_EXT_DB_PASS',
+        // Cube Store variables
+        'CUBEJS_CUBESTORE_HOST',
+        'CUBEJS_CUBESTORE_PORT',
+        'CUBEJS_CUBESTORE_USER',
+        'CUBEJS_CUBESTORE_PASS',
+      ];
+
+      const definedExtDBVariables = skipOnEnv.filter((field) => process.env[field] !== undefined);
+      if (definedExtDBVariables.length > 0) {
+        logger('Cube Store auto provisioning disabled', {
+          warning: (
+            'It\'s not possible to setup auto provisioning for Cube Store, ' +
+            `because you define "${definedExtDBVariables.join(', ')}" env variable(s).`
+          ),
+        });
+      } else {
+        const cubeStorePackage = this.requireCubeStoreDriver();
         if (cubeStorePackage.isCubeStoreSupported()) {
           console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
 
