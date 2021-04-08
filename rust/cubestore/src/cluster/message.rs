@@ -10,7 +10,7 @@ use tokio::net::TcpStream;
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetworkMessage {
     Select(SerializedPlan),
-    SelectResult(Result<Vec<SerializedRecordBatchStream>, CubeError>),
+    SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
     /// Select that sends results in batches.
     SelectStart(SerializedPlan),
