@@ -116,13 +116,6 @@ class DremioDriver extends BaseDriver {
 
   /**
    * @protected
-   */
-  async getJobFullResults(jobId, limit = 500, offset = 0) {
-    return this.restDremioQuery('get', `/api/v3/job/${jobId}/results?offset=${offset}&limit=${limit}`);
-  }
-
-  /**
-   * @protected
    * @param {string} sql
    * @return {Promise<*>}
    */

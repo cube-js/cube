@@ -163,10 +163,6 @@ const create = async (projectName, options) => {
     dbType: options.dbType
   });
 
-  // It's placed here, because fail of it can affect whole creation. Let's do it in the end for preview period.
-  logStage('Installing Cube Store driver');
-  await npmInstall(['@cubejs-backend/cubestore-driver'], options.template === 'docker');
-
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
 
   console.log();

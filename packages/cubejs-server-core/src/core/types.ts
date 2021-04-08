@@ -55,6 +55,7 @@ export interface DialectContext extends DriverContext {
 export interface DriverFactory {}
 
 export type DatabaseType =
+  | 'cubestore'
   | 'athena'
   | 'bigquery'
   | 'clickhouse'
@@ -128,4 +129,6 @@ export interface CreateOptions {
   dashboardAppPort?: number;
   sqlCache?: boolean;
   livePreview?: boolean;
+  // Internal flag, that we use to detect serverless env
+  serverless?: boolean;
 }

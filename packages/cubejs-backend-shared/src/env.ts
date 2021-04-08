@@ -119,6 +119,15 @@ const variables: Record<string, (...args: any) => any> = {
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
+  // Cube Store
+  cubeStoreHost: () => get('CUBEJS_CUBESTORE_HOST')
+    .asString(),
+  cubeStorePort: () => get('CUBEJS_CUBESTORE_PORT')
+    .asPortNumber(),
+  cubeStoreUser: () => get('CUBEJS_CUBESTORE_USER')
+    .asString(),
+  cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
+    .asString(),
   // Databricks
   databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
     .required()
