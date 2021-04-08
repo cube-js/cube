@@ -47,6 +47,7 @@ export default bundle('cubejs-playground', 'cubejsPlayground', {
   external: [
     'react',
     'react-dom',
+    'react/jsx-runtime',
     'react-router',
     'prop-types',
     'styled-components',

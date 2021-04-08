@@ -1,27 +1,31 @@
-import { Query } from '@cubejs-client/core';
-import { SchemaChangeProps, VizState } from '@cubejs-client/react';
-
 import PlaygroundWrapper from '../PlaygroundWrapper';
-import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
+import PlaygroundQueryBuilder, {
+  TPlaygroundQueryBuilderProps,
+} from '../../PlaygroundQueryBuilder';
+import { TSecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
 
 type TQueryBuilderProps = {
   apiUrl: string;
   token: string;
-  defaultQuery?: Query;
-  initialVizState?: VizState;
-  getToken?: (payload: string) => Promise<string>;
-  schemaVersion?: number;
-  onVizStateChanged?: (vizState: VizState) => void;
-  onSchemaChange?: (props: SchemaChangeProps) => void;
-};
+  tokenKey?: string;
+} & Pick<
+  TPlaygroundQueryBuilderProps,
+  | 'defaultQuery'
+  | 'initialVizState'
+  | 'schemaVersion'
+  | 'onVizStateChanged'
+  | 'onSchemaChange'
+> &
+  Pick<TSecurityContextContextProps, 'getToken'>;
 
-export function QueryBuilder({
-  apiUrl,
-  token,
-  ...props
-}: TQueryBuilderProps) {
+export function QueryBuilder({ apiUrl, token, ...props }: TQueryBuilderProps) {
   return (
-    <PlaygroundWrapper apiUrl={apiUrl} token={token} getToken={props.getToken}>
+    <PlaygroundWrapper
+      apiUrl={apiUrl}
+      token={token}
+      tokenKey={props.tokenKey}
+      getToken={props.getToken}
+    >
       <PlaygroundQueryBuilder
         apiUrl={apiUrl}
         cubejsToken={token}
@@ -30,7 +34,7 @@ export function QueryBuilder({
           ...props.initialVizState,
         }}
         schemaVersion={props.schemaVersion}
-        onVizStateChanged={(vizState) => props.onVizStateChanged?.(vizState)}
+        onVizStateChanged={props.onVizStateChanged}
         onSchemaChange={props.onSchemaChange}
       />
     </PlaygroundWrapper>

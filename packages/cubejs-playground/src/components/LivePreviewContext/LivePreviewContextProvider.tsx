@@ -1,15 +1,15 @@
 import { createContext, useState, useEffect } from 'react';
 
-type TLivePreviewContextProps = {
+export type TLivePreviewContextProps = {
   livePreviewDisabled: Boolean;
   statusLivePreview: any;
-  createTokenWithPayload: (payload) => Promise<any>; 
+  createTokenWithPayload: (payload) => Promise<any>;
   stopLivePreview: () => Promise<Boolean>;
   startLivePreview: () => Promise<Boolean>;
 };
 
-export const LivePreviewContextContext = createContext<TLivePreviewContextProps>(
-  {} as TLivePreviewContextProps
+export const LivePreviewContextContext = createContext<TLivePreviewContextProps | null>(
+  null
 );
 
 const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
@@ -77,8 +77,8 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
         const callbackUrl = encodeURIComponent(window.location.origin);
         const params: any = window.location.origin !== 'http://localhost:4000' && new URLSearchParams({ callbackUrl }).toString();
         const wn = window.open(
-          `https://cubecloud.dev/auth/live-preview${params ? `?${params}` : ''}`, 
-          '', 
+          `https://cubecloud.dev/auth/live-preview${params ? `?${params}` : ''}`,
+          '',
           `width=640,height=720`
         );
 
@@ -100,7 +100,7 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
   };
 };
 
-export default function LivePreviewContextProvider({ disabled = false, onChange, children }) {
+export function LivePreviewContextProvider({ disabled = false, onChange, children }) {
   const devModeHooks = useLivePreview(disabled, onChange);
 
   return (

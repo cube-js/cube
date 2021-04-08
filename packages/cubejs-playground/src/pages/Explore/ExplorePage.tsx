@@ -4,14 +4,13 @@ import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
 import DashboardSource from '../../DashboardSource';
-import { useCubejsApi, useSecurityContext, useLivePreviewContext } from '../../hooks';
+import { useCubejsApi, useSecurityContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
-import LivePreviewContextProvider from '../../components/LivePreviewContext/LivePreviewContextProvider';
+import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
 
 export default function ExplorePage() {
   const { push, location } = useHistory();
   const { token } = useSecurityContext();
-  const { statusLivePreview, createTokenWithPayload } = useLivePreviewContext();
 
   const [apiUrl, setApiUrl] = useState<string | null>(null);
   const [playgroundContext, setPlaygroundContext] = useState<any>(null);

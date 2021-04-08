@@ -1,9 +1,9 @@
-import { createContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import jwtDecode from 'jwt-decode';
 
 import { SecurityContext } from './SecurityContext';
 
-type TSecurityContextContextProps = {
+export type TSecurityContextContextProps = {
   payload: string;
   token: string | null;
   isValid: boolean;
@@ -17,11 +17,16 @@ export const SecurityContextContext = createContext<TSecurityContextContextProps
   {} as TSecurityContextContextProps
 );
 
+type TSecurityContextProviderProps = {
+  children: ReactNode;
+  tokenKey?: string | null;
+} & Pick<TSecurityContextContextProps, 'getToken'>
+
 export function SecurityContextProvider({
   children,
   getToken,
   tokenKey = null,
-}) {
+}: TSecurityContextProviderProps) {
   const [token, setToken] = useState<string | null>(null);
   const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
