@@ -216,7 +216,7 @@ impl Cluster for ClusterImpl {
             .await?;
         match response {
             NetworkMessage::SelectResult(r) => {
-                r.and_then(|batches| batches.into_iter().map(|b| b.read()).collect())
+                r.and_then(|(_, batches)| batches.into_iter().map(|b| b.read()).collect())
             }
             _ => panic!("unexpected response for select"),
         }
@@ -306,7 +306,7 @@ impl Cluster for ClusterImpl {
         match m {
             NetworkMessage::Select(plan) => {
                 let res = self.run_local_select_serialized(plan).await;
-                NetworkMessage::SelectResult(res.map(|r| r.1))
+                NetworkMessage::SelectResult(res)
             }
             NetworkMessage::WarmupDownload(remote_path) => {
                 let res = self.remote_fs.download_file(&remote_path).await;
@@ -995,56 +995,9 @@ impl ClusterImpl {
         m: &NetworkMessage,
     ) -> Box<dyn MessageStreamProcessor> {
         match m {
-            NetworkMessage::SelectStart(_) => {
-                return Box::new(QueryStreamer {
-                    cluster: self,
-                    results: Vec::new(),
-                });
-
-                struct QueryStreamer {
-                    cluster: Arc<ClusterImpl>,
-                    results: Vec<SerializedRecordBatchStream>,
-                }
-
-                impl QueryStreamer {
-                    fn poll_next_results(&mut self) -> Option<SerializedRecordBatchStream> {
-                        if self.results.is_empty() {
-                            return None;
-                        }
-                        let last = self.results.len() - 1;
-                        self.results.swap(0, last);
-                        self.results.pop()
-                    }
-                }
-
-                #[async_trait]
-                impl MessageStreamProcessor for QueryStreamer {
-                    async fn process(&mut self, m: NetworkMessage) -> (NetworkMessage, bool) {
-                        match m {
-                            NetworkMessage::SelectStart(plan) => {
-                                let (schema, results) = match self
-                                    .cluster
-                                    .run_local_select_serialized(plan)
-                                    .await
-                                {
-                                    Ok(results) => results,
-                                    Err(e) => {
-                                        return (NetworkMessage::SelectResultSchema(Err(e)), true)
-                                    }
-                                };
-                                self.results = results;
-                                (NetworkMessage::SelectResultSchema(Ok(schema)), false)
-                            }
-                            NetworkMessage::SelectNextBatch => {
-                                let batch = self.poll_next_results();
-                                let finished = batch.is_none();
-                                (NetworkMessage::SelectResultBatch(Ok(batch)), finished)
-                            }
-                            _ => panic!("unexpected message in select stream"),
-                        }
-                    }
-                }
-            }
+            NetworkMessage::SelectStart(_) => Box::new(QueryStreamer::new(Box::new(move |p| {
+                Box::pin(async move { self.run_local_select_serialized(p).await })
+            }))),
             _ => panic!("non-streaming request passed to start_stream"),
         }
     }
@@ -1174,5 +1127,62 @@ impl MetaStoreRpcClientTransport for ClusterMetaStoreClient {
             NetworkMessage::MetaStoreCallResult(res) => res,
             x => panic!("Unexpected message: {:?}", x),
         })
+    }
+}
+
+pub type QueryFn = Box<
+    dyn FnOnce(
+            SerializedPlan,
+        ) -> Pin<
+            Box<
+                dyn Future<
+                        Output = Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>,
+                    > + Send,
+            >,
+        > + Send,
+>;
+pub struct QueryStreamer {
+    query_fn: Option<QueryFn>,
+    results: Vec<SerializedRecordBatchStream>,
+}
+
+impl QueryStreamer {
+    pub fn new(query_fn: QueryFn) -> Self {
+        QueryStreamer {
+            query_fn: Some(query_fn),
+            results: Vec::new(),
+        }
+    }
+
+    fn poll_next_results(&mut self) -> Option<SerializedRecordBatchStream> {
+        if self.results.is_empty() {
+            return None;
+        }
+        let last = self.results.len() - 1;
+        self.results.swap(0, last);
+        self.results.pop()
+    }
+}
+
+#[async_trait]
+impl MessageStreamProcessor for QueryStreamer {
+    async fn process(&mut self, m: NetworkMessage) -> (NetworkMessage, bool) {
+        match m {
+            NetworkMessage::SelectStart(plan) => {
+                let query_fn = self.query_fn.take().expect("passing SelectStart twice");
+                let (schema, results) = match query_fn(plan).await {
+                    Ok(results) => results,
+                    Err(e) => return (NetworkMessage::SelectResultSchema(Err(e)), true),
+                };
+                self.results = results;
+                (NetworkMessage::SelectResultSchema(Ok(schema)), false)
+            }
+            NetworkMessage::SelectNextBatch => {
+                let batch = self.poll_next_results();
+                let finished = batch.is_none();
+                (NetworkMessage::SelectResultBatch(Ok(batch)), finished)
+            }
+            _ => panic!("unexpected message in select stream"),
+        }
     }
 }
