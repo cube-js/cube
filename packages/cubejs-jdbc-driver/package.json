@@ -27,10 +27,12 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.81",
     "generic-pool": "^3.1.7",
-    "java": "^0.12.1",
-    "jdbc": "^0.7.4",
     "node-java-maven": "^0.1.2",
     "sqlstring": "^2.3.0"
+  },
+  "optionalDependencies": {
+    "jdbc": "^0.7.4",
+    "java": "^0.12.1"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
