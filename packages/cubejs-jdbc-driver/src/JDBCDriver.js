@@ -1,10 +1,11 @@
-/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
 import genericPool from 'generic-pool';
 
 import { SupportedDrivers } from './supported-drivers';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
 
 const DriverManager = require('jdbc/lib/drivermanager');
