@@ -1,12 +1,11 @@
 {
-  "name": "cubejs-backend-jdbc",
+  "name": "JDBC workspaces for Cube.js JavaScript code",
   "version": "0.1.0",
   "description": "Cube.js workspace for JDBC",
   "private": true,
   "workspaces": {
     "packages": [
-      "jdbc-driver",
-      "databricks-jdbc-driver"
+      "*"
     ]
   },
   "scripts": {
@@ -18,6 +17,9 @@
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "packages": "*"
+  },
+  "devDependencies": {
+    "typescript": "~4.1.5"
   },
   "files": [
     "src",

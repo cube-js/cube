@@ -1,13 +1,11 @@
 {
-  "name": "core-workspace",
+  "name": "packages",
   "version": "0.1.0",
-  "description": "",
+  "description": "Main workspaces for Cube.js JavaScript code",
   "private": true,
   "workspaces": {
     "packages": [
-      "rust",
-      "packages/*",
-      "js/*"
+      "./*"
     ],
     "nohoist": [
       "packages/cubejs-client-ngx/*"

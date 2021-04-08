@@ -1,7 +1,8 @@
 {
   "private": true,
   "workspaces": [
-    "js/*",
-    "packages"
+    "js/jdbc/*",
+    "rust",
+    "packages/*"
   ]
 }

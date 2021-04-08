@@ -1,0 +1,47 @@
+{
+  "extends": "../tsconfig.base.json",
+  "references": [
+    {
+      "path": "packages/cubejs-templates"
+    },
+    {
+      "path": "packages/cubejs-backend-shared"
+    },
+    {
+      "path": "packages/cubejs-testing"
+    },
+    {
+      "path": "packages/cubejs-backend-cloud"
+    },
+    {
+      "path": "packages/cubejs-api-gateway"
+    },
+    {
+      "path": "packages/cubejs-schema-compiler"
+    },
+    {
+      "path": "packages/cubejs-query-orchestrator"
+    },
+    {
+      "path": "packages/cubejs-druid-driver"
+    },
+    {
+      "path": "rust/"
+    },
+    {
+      "path": "packages/cubejs-cubestore-driver"
+    },
+    {
+      "path": "packages/cubejs-server-core"
+    },
+    {
+      "path": "packages/cubejs-server"
+    },
+    {
+      "path": "packages/cubejs-cli"
+    },
+    {
+      "path": "rust"
+    }
+  ]
+}
