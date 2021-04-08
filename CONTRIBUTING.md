@@ -75,7 +75,7 @@ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/c
 
 #### Prerequisites
 
-If you are going to develop any JDBC driver, it's required to [install Java with JDK][link-java-guide].
+If you are going to develop any JDBC driver, you need to [install Java with JDK][link-java-guide].
 
 [link-java-guide]:
 https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
