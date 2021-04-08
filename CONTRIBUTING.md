@@ -85,7 +85,7 @@ https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/READM
 Cube.js is written in plain JavaScript, but some parts have already been migrated to TypeScript.
 
 > Attention: Cube.js uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
-> but in some cases you can get a problem with not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
+> but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
 
 1. After cloning Cube.js repository run `$ yarn install` in root directory.
 2. Use `yarn tsc:watch` to start TypeScript compiler in watch mode.
