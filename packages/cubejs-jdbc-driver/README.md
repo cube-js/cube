@@ -18,7 +18,7 @@ brew install openjdk@8
 sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
 ```
 
-If it doesn't work, please run commands from `$ brew info openjdk@8`.
+If this doesn't work, please run commands from `$ brew info openjdk@8`.
 
 ## Debian, Ubuntu, etc.
 
