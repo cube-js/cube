@@ -3,7 +3,7 @@ version: "3"
 services:
   cube:
     container_name: birdbox-cube
-    image: cubejs/cube:latest
+    image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
     environment:
       CUBEJS_DB_TYPE: postgres
       CUBEJS_DB_HOST: postgres
