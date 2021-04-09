@@ -93,6 +93,9 @@ export class CubeStoreHandler {
   // Promise that works as mutex, but can be rejected
   protected cubeStoreStarting: Promise<ChildProcess> | null = null;
 
+  // Flag when release was requested, in this state, we skip restart on exit
+  protected releaseRequested: boolean = false;
+
   public constructor(
     protected readonly config: Readonly<CubeStoreHandlerOptions>
   ) {}
@@ -121,6 +124,10 @@ export class CubeStoreHandler {
     }
 
     const onExit = (code: number|null) => {
+      if (this.releaseRequested) {
+        return;
+      }
+
       this.config.onRestart(code);
 
       this.cubeStoreStarting = new Promise<ChildProcess>(
@@ -168,7 +175,18 @@ export class CubeStoreHandler {
     return this.cubeStoreStarting;
   }
 
-  public async release() {
-    // @todo Use SIGTERM for gracefully shutdown?
+  public async release(force: boolean = false) {
+    // Force, is a compatibility flag, for now we release only in tests
+    if (force) {
+      if (this.cubeStoreStarting) {
+        throw new Error('Something wrong with logic, release was called, while cubestore is starting...');
+      }
+
+      this.releaseRequested = true;
+
+      if (this.cubeStore) {
+        this.cubeStore.kill('SIGTERM');
+      }
+    }
   }
 }
