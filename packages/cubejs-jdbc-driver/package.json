@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/jdbc-driver",
   "description": "Cube.js JDBC database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.81",
+  "version": "0.26.84",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -31,8 +31,8 @@
     "sqlstring": "^2.3.0"
   },
   "optionalDependencies": {
-    "jdbc": "^0.7.4",
-    "java": "^0.12.1"
+    "java": "^0.12.1",
+    "jdbc": "^0.7.4"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
