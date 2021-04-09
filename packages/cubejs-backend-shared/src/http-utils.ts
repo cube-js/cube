@@ -96,9 +96,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
     });
   });
 
-  await decompress(savedFilePath, cwd, {
-    strip: 1,
-  });
+  await decompress(savedFilePath, cwd);
 
   try {
     fs.unlinkSync(savedFilePath);
