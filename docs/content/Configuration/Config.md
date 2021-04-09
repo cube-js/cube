@@ -342,6 +342,9 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
+[[warning | Note]]
+| This is merely a refresh worker heart beat. It doesn't affect freshness of pre-aggregations or refresh keys. Setting this value to 30s doesn't mean pre-aggregatioins would be refreshed every 30s but rather checked for freshness every 30s. Please see [pre-aggregations refreshKey][ref-pre-aggregations-refresh-key] documentation on how to set refresh intervals for pre-aggregations.
+
 Cube.js enables background refresh by default. You can specify an interval as a
 number in seconds or as a string format e.g. `30s`, `1m`. Can be also set using
 `CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
@@ -664,3 +667,4 @@ the additional transpiler for check duplicates.
 [ref-rest-api]: /rest-api
 [ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
 [ref-development-mode]: /overview#development-mode
+[ref-pre-aggregations-refresh-key]: /pre-aggregations#refresh-key
