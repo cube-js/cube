@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cubestore",
-  "version": "0.26.85",
+  "version": "0.26.86",
   "description": "Cube.js pre-aggregation storage layer.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
