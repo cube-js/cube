@@ -151,6 +151,7 @@ jobs:
         run: yarn lerna run --concurrency 1 build
 
   integration-redis:
+    needs: [unit, lint]
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -225,6 +226,7 @@ jobs:
           CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
 
   integration:
+    needs: [unit, lint]
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -265,7 +267,7 @@ jobs:
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
-    needs: integration
+    needs: [lint]
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
@@ -279,10 +281,27 @@ jobs:
 
   docker-image-latest:
     needs: docker-image-latest-set-tag
-    name: Build only :latest image
+    name: Build & Test :latest for ${{ matrix.name }} without pushing
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: (!contains(needs['docker-image-latest-set-tag'].outputs.tag, 'v'))
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    strategy:
+      matrix:
+        dockerfile:
+          - latest.Dockerfile
+          - latest-alpine.Dockerfile
+        include:
+          - dockerfile: latest.Dockerfile
+            name: Debian
+            tag: tmp-latest
+          - dockerfile: latest-alpine.Dockerfile
+            tag: tmp-alpine
+      fail-fast: false
 
     steps:
       - name: Checkout
@@ -291,43 +310,72 @@ jobs:
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+        with:
+          driver-opts: network=host
       - name: Build only
         uses: docker/build-push-action@v2
         timeout-minutes: 15
         with:
           context: ./packages/cubejs-docker
-          file: ./packages/cubejs-docker/latest.Dockerfile
+          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
-          push: false
-
-  docker-image-alpine:
-    needs: docker-image-latest-set-tag
-    name: Build only :alpine image
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    if: (!contains(needs['docker-image-latest-set-tag'].outputs.tag, 'v'))
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Build only
-        uses: docker/build-push-action@v2
-        timeout-minutes: 15
+          push: true
+          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
+      - name: Use Node.js 15.x
+        uses: actions/setup-node@v1
         with:
-          context: ./packages/cubejs-docker
-          file: ./packages/cubejs-docker/latest-alpine.Dockerfile
-          platforms: linux/amd64
-          push: false
+          node-version: 15.x
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: |
+            ~/.npm
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-15.x-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-15.x-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Testing Docker image via BirdBox
+        run: |
+          cd packages/cubejs-testing/
+          export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+          export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
+          export DEBUG=testcontainers
+          yarn run birdbox:postgresql
 
-  docker-image-dev:
-    name: Build only :dev image
+  docker-dev:
+    needs: [build, unit, lint]
+    name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    strategy:
+      matrix:
+        dockerfile:
+          - dev.Dockerfile
+          - dev-alpine.Dockerfile
+        include:
+          - dockerfile: dev.Dockerfile
+            name: Debian
+            tag: tmp-dev
+          - dockerfile: dev-alpine.Dockerfile
+            name: Alpine
+            tag: tmp-dev-alpine
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -335,32 +383,45 @@ jobs:
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Build only
+        with:
+          driver-opts: network=host
+      - name: Build image
         uses: docker/build-push-action@v2
         timeout-minutes: 15
         with:
           context: .
-          file: ./packages/cubejs-docker/dev.Dockerfile
+          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
-          push: false
-
-  docker-image-alpine-dev:
-    name: Build only Alpine :dev image
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Build only
-        uses: docker/build-push-action@v2
-        timeout-minutes: 15
+          push: true
+          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
+      - name: Use Node.js 15.x
+        uses: actions/setup-node@v1
         with:
-          context: .
-          file: ./packages/cubejs-docker/dev-alpine.Dockerfile
-          platforms: linux/amd64
-          push: false
+          node-version: 15.x
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: |
+            ~/.npm
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-15.x-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-15.x-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Testing Docker image via BirdBox
+        run: |
+          cd packages/cubejs-testing/
+          export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+          export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
+          export DEBUG=testcontainers
+          yarn run birdbox:postgresql
