@@ -90,7 +90,7 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
     createTokenWithPayload,
     stopLivePreview: async (): Promise<Boolean> => {
       await fetch('/playground/live-preview/stop');
-      fetchStatus();
+      await fetchStatus();
       return true;
     },
     startLivePreview: (): Promise<Boolean> => {

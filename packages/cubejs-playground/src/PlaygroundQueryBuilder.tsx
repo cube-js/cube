@@ -171,11 +171,6 @@ export default function PlaygroundQueryBuilder({
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
 
-  const showLivePreview =
-    livePreviewContext &&
-    !livePreviewContext.livePreviewDisabled &&
-    !livePreviewContext.statusLivePreview.loading;
-
   function handleRunButtonClick({
     query,
     pivotConfig,
@@ -271,7 +266,7 @@ export default function PlaygroundQueryBuilder({
                     >
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
-                    {showLivePreview && (
+                    {!livePreviewContext?.livePreviewDisabled && (
                       <Button
                         icon={<CloudOutlined />}
                         size="small"
@@ -298,12 +293,12 @@ export default function PlaygroundQueryBuilder({
             </Row>
 
             {livePreviewContext?.statusLivePreview.active && (
-                <Row>
-                  <Col span={24}>
-                    <LivePreviewBar />
-                  </Col>
-                </Row>
-              )}
+              <Row>
+                <Col span={24}>
+                  <LivePreviewBar />
+                </Col>
+              </Row>
+            )}
 
             <Divider style={{ margin: 0 }} />
 
