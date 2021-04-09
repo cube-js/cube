@@ -25,7 +25,11 @@ import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { SectionHeader, SectionRow } from './components';
 import ChartContainer from './ChartContainer';
 import { dispatchPlaygroundEvent } from './utils';
-import { useDeepCompareMemoize, useSecurityContext, useLivePreviewContext } from './hooks';
+import {
+  useDeepCompareMemoize,
+  useSecurityContext,
+  useLivePreviewContext,
+} from './hooks';
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
 import DashboardSource from './DashboardSource';
@@ -126,7 +130,7 @@ type THandleRunButtonClickProps = {
   chartType: ChartType;
 };
 
-type TPlaygroundQueryBuilderProps = {
+export type TPlaygroundQueryBuilderProps = {
   apiUrl: string;
   cubejsToken: string;
   defaultQuery?: Query;
@@ -156,7 +160,7 @@ export default function PlaygroundQueryBuilder({
   const [isQueryLoading, setQueryLoading] = useState(false);
   const [queryError, setQueryError] = useState<Error | null>(null);
   const { token, setIsModalOpen } = useSecurityContext();
-  const { livePreviewDisabled, startLivePreview, stopLivePreview, statusLivePreview } = useLivePreviewContext();
+  const livePreviewContext = useLivePreviewContext();
 
   useEffect(() => {
     if (isChartRendererReady && ref.current) {
@@ -166,8 +170,6 @@ export default function PlaygroundQueryBuilder({
       });
     }
   }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
-
-  const showLivePreview = !livePreviewDisabled && !statusLivePreview.loading;
 
   function handleRunButtonClick({
     query,
@@ -264,32 +266,39 @@ export default function PlaygroundQueryBuilder({
                     >
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
-                    {
-                      showLivePreview &&
+                    {!livePreviewContext?.livePreviewDisabled && (
                       <Button
                         icon={<CloudOutlined />}
                         size="small"
-                        type={ statusLivePreview.enabled ? 'primary' : 'default'}
-                        onClick={() => statusLivePreview.enabled ? stopLivePreview() : startLivePreview()}
+                        type={
+                          livePreviewContext?.statusLivePreview.active
+                            ? 'primary'
+                            : 'default'
+                        }
+                        onClick={() =>
+                          livePreviewContext?.statusLivePreview.active
+                            ? livePreviewContext?.stopLivePreview()
+                            : livePreviewContext?.startLivePreview()
+                        }
                       >
-                        { statusLivePreview.enabled ? 'Stop' : 'Start'} Live Preview
+                        {livePreviewContext?.statusLivePreview.active
+                          ? 'Stop'
+                          : 'Start'}{' '}
+                        Live Preview
                       </Button>
-                    }
-
+                    )}
                   </Button.Group>
                 </Card>
               </Col>
             </Row>
 
-            {
-              statusLivePreview &&
-              statusLivePreview.enabled &&
+            {livePreviewContext?.statusLivePreview.active && (
               <Row>
                 <Col span={24}>
                   <LivePreviewBar />
                 </Col>
               </Row>
-            }
+            )}
 
             <Divider style={{ margin: 0 }} />
 
@@ -526,6 +535,11 @@ export default function PlaygroundQueryBuilder({
                                 pivotConfig,
                                 chartType: chartType || 'line',
                               });
+                            }
+                          }}
+                          onQueryChange={() => {
+                            if (queryError) {
+                              setQueryError(null);
                             }
                           }}
                         />

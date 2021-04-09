@@ -1,45 +1,66 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect, useRef } from 'react';
 
-type TLivePreviewContextProps = {
+type LivePreviewStatus = {
+  deploymentUrl: string | null;
+  active: boolean;
+  lastHash: string;
+  lastHashTarget: string;
+  loading: boolean;
+  status: 'loading' | 'inProgress' | 'running';
+  uploading: boolean;
+};
+
+export type TLivePreviewContextProps = {
   livePreviewDisabled: Boolean;
-  statusLivePreview: any;
-  createTokenWithPayload: (payload) => Promise<any>; 
+  statusLivePreview: LivePreviewStatus;
+  createTokenWithPayload: (payload) => Promise<any>;
   stopLivePreview: () => Promise<Boolean>;
   startLivePreview: () => Promise<Boolean>;
 };
 
-export const LivePreviewContextContext = createContext<TLivePreviewContextProps>(
-  {} as TLivePreviewContextProps
+export const LivePreviewContextContext = createContext<TLivePreviewContextProps | null>(
+  null
 );
 
 const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
-  const [status, setStatus] = useState({
+  const activeRef = useRef<boolean>(false);
+  const [status, setStatus] = useState<any>({
     loading: true,
-    enabled: false,
-    deploymentUrl: null
+    active: false,
+    deploymentUrl: null,
   });
 
   useEffect(() => {
-    if (disabled) return;
-    const statusPoolingInterval = setInterval(() => { fetchStatus(); }, 5000);
+    if (disabled) {
+      return;
+    }
+
+    const statusPoolingInterval = setInterval(() => {
+      fetchStatus();
+    }, 5000);
     fetchStatus();
     return () => {
       clearInterval(statusPoolingInterval);
-    }
-  }, [])
+    };
+  }, []);
 
-  useEffect(()=> {
-    if (!status.loading) handleChange();
-  }, [status.enabled])
+  useEffect(() => {
+    if (!status.loading && activeRef.current !== status.active) {
+      handleChange();
+    }
+    activeRef.current = status.active;
+  }, [activeRef, status.active, status.loading]);
 
   const fetchStatus = () => {
     return fetch('/playground/live-preview/status')
-      .then(res => res.json())
-      .then((status) => setStatus({
-        loading: false,
-        ...status
-      }));
-  }
+      .then((res) => res.json())
+      .then((status) => {
+        setStatus({
+          loading: false,
+          ...status,
+        });
+      });
+  };
 
   const createTokenWithPayload = async (payload): Promise<any> => {
     const res = await fetch('/playground/live-preview/token', {
@@ -47,18 +68,18 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
     return res.json();
   };
 
   const handleChange = async () => {
-    if(status && status.enabled) {
+    if (status?.active) {
       const { token } = await createTokenWithPayload({});
       onChange({
-        token,
-        apiUrl: status && status.deploymentUrl
-      })
+        token: token?.token,
+        apiUrl: status?.deploymentUrl,
+      });
     } else {
       onChange({});
     }
@@ -69,16 +90,20 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
     createTokenWithPayload,
     stopLivePreview: async (): Promise<Boolean> => {
       await fetch('/playground/live-preview/stop');
-      fetchStatus();
+      await fetchStatus();
       return true;
     },
     startLivePreview: (): Promise<Boolean> => {
       return new Promise((resolve, reject) => {
         const callbackUrl = encodeURIComponent(window.location.origin);
-        const params: any = window.location.origin !== 'http://localhost:4000' && new URLSearchParams({ callbackUrl }).toString();
+        const params: any =
+          window.location.origin !== 'http://localhost:4000' &&
+          new URLSearchParams({ callbackUrl }).toString();
         const wn = window.open(
-          `https://cubecloud.dev/auth/live-preview${params ? `?${params}` : ''}`, 
-          '', 
+          `https://cubecloud.dev/auth/live-preview${
+            params ? `?${params}` : ''
+          }`,
+          '',
           `width=640,height=720`
         );
 
@@ -96,15 +121,24 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
           }
         }, 1000);
       });
-    }
+    },
   };
 };
 
-export default function LivePreviewContextProvider({ disabled = false, onChange, children }) {
+export function LivePreviewContextProvider({
+  disabled = false,
+  onChange,
+  children,
+}) {
   const devModeHooks = useLivePreview(disabled, onChange);
 
   return (
-    <LivePreviewContextContext.Provider value={{...devModeHooks, livePreviewDisabled: disabled}}>
+    <LivePreviewContextContext.Provider
+      value={{
+        ...devModeHooks,
+        livePreviewDisabled: disabled,
+      }}
+    >
       {children}
     </LivePreviewContextContext.Provider>
   );

@@ -13,8 +13,7 @@
   "scripts": {
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
-    "tsc": "rm -rf dist && tsc --noEmit false --outDir dist",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && npm run tsc && rollup -c"
+    "build": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && rollup -c"
   },
   "browserslist": [
     ">0.2%",
@@ -25,7 +24,6 @@
   "files": [
     "public",
     "build",
-    "dist",
     "lib"
   ],
   "homepage": ".",

@@ -4,23 +4,47 @@ import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
 import DashboardSource from '../../DashboardSource';
-import { useCubejsApi, useSecurityContext, useLivePreviewContext } from '../../hooks';
+import { useCubejsApi, useSecurityContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
-import LivePreviewContextProvider from '../../components/LivePreviewContext/LivePreviewContextProvider';
+import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
+
+type TPlaygroundContext = {
+  apiUrl?: string;
+  cubejsToken: string;
+  basePath?: string;
+  livePreview?: boolean;
+};
+
+type TLivePreviewContext = {
+  apiUrl: string;
+  token: string;
+};
 
 export default function ExplorePage() {
+  const dashboardSource = useMemo(() => new DashboardSource(), []);
+
   const { push, location } = useHistory();
   const { token } = useSecurityContext();
-  const { statusLivePreview, createTokenWithPayload } = useLivePreviewContext();
 
+  const [schemaVersion, updateSchemaVersion] = useState<number>(0);
   const [apiUrl, setApiUrl] = useState<string | null>(null);
-  const [playgroundContext, setPlaygroundContext] = useState<any>(null);
+  const [
+    playgroundContext,
+    setPlaygroundContext,
+  ] = useState<TPlaygroundContext | null>(null);
+  const [
+    livePreviewContext,
+    setLivePreviewContext,
+  ] = useState<TLivePreviewContext | null>(null);
 
-  const dashboardSource = useMemo(() => new DashboardSource(), []);
-  const cubejsApi = useCubejsApi(
-    apiUrl,
-    token || playgroundContext?.cubejsToken
-  );
+  const currentToken =
+    livePreviewContext?.token || token || playgroundContext?.cubejsToken;
+
+  const cubejsApi = useCubejsApi(apiUrl, currentToken);
+
+  const changeApiUrl = (apiUrl, basePath = '/cubejs-api') => {
+    setApiUrl(`${apiUrl}${basePath}/v1`);
+  };
 
   const fetchPlaygroundContext = async () => {
     const res = await fetch('/playground/context');
@@ -30,53 +54,61 @@ export default function ExplorePage() {
 
   const handleChangeLivePreview = ({ token, apiUrl }) => {
     if (token && apiUrl) {
-      setPlaygroundContext({
-        ...playgroundContext,
+      setLivePreviewContext({
+        token,
         apiUrl,
-        cubejsToken: token.token
       });
+      changeApiUrl(apiUrl, playgroundContext?.basePath);
     } else {
-      fetchPlaygroundContext();
+      setApiUrl(null);
+      setLivePreviewContext(null);
     }
-  }
+
+    updateSchemaVersion((value) => value + 1);
+  };
 
   useEffect(() => {
     fetchPlaygroundContext();
   }, []);
 
   useLayoutEffect(() => {
-    if (playgroundContext) {
-      const basePath = playgroundContext.basePath || '/cubejs-api';
-      let apiUrl =
-        playgroundContext.apiUrl ||
-        window.location.href.split('#')[0].replace(/\/$/, '');
-      apiUrl = `${apiUrl}${basePath}/v1`;
-
-      setApiUrl(apiUrl);
-
+    if (apiUrl && currentToken) {
       window['__cubejsPlayground'] = {
         ...window['__cubejsPlayground'],
         apiUrl,
-        token: token || playgroundContext.cubejsToken,
+        token: currentToken,
       };
     }
-  }, [token, playgroundContext]);
+  }, [currentToken, apiUrl]);
+
+  useLayoutEffect(() => {
+    if (playgroundContext && livePreviewContext === null) {
+      changeApiUrl(
+        playgroundContext.apiUrl ||
+          window.location.href.split('#')[0].replace(/\/$/, '')
+      );
+    }
+  }, [playgroundContext, livePreviewContext]);
 
   if (!cubejsApi || !apiUrl) {
     return null;
   }
 
   const params = new URLSearchParams(location.search);
-  const query = (params.get('query') && JSON.parse(params.get('query') || '')) || {};
+  const query = JSON.parse(params.get('query') || '{}');
 
   return (
-    <LivePreviewContextProvider disabled={!playgroundContext.livePreview} onChange={handleChangeLivePreview}>
+    <LivePreviewContextProvider
+      disabled={!playgroundContext?.livePreview}
+      onChange={handleChangeLivePreview}
+    >
       <CubeProvider cubejsApi={cubejsApi}>
         <PlaygroundQueryBuilder
           defaultQuery={query}
           apiUrl={apiUrl}
-          cubejsToken={token || playgroundContext.cubejsToken}
+          cubejsToken={currentToken as string}
           dashboardSource={dashboardSource}
+          schemaVersion={schemaVersion}
           onVizStateChanged={({ query }) =>
             push(`/build?query=${JSON.stringify(query)}`)
           }
