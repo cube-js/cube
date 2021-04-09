@@ -9,10 +9,10 @@ import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
 
 type TPlaygroundContext = {
-  apiUrl?: string;
+  apiUrl: string;
   cubejsToken: string;
-  basePath?: string;
-  livePreview?: boolean;
+  basePath: string;
+  livePreview: boolean;
 };
 
 type TLivePreviewContext = {
@@ -99,7 +99,7 @@ export default function ExplorePage() {
 
   return (
     <LivePreviewContextProvider
-      disabled={!playgroundContext?.livePreview}
+      disabled={playgroundContext?.livePreview === false}
       onChange={handleChangeLivePreview}
     >
       <CubeProvider cubejsApi={cubejsApi}>

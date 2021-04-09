@@ -266,22 +266,22 @@ export default function PlaygroundQueryBuilder({
                     >
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
-                    {!livePreviewContext?.livePreviewDisabled && (
+                    {livePreviewContext && !livePreviewContext.livePreviewDisabled && (
                       <Button
                         icon={<CloudOutlined />}
                         size="small"
                         type={
-                          livePreviewContext?.statusLivePreview.active
+                          livePreviewContext.statusLivePreview.active
                             ? 'primary'
                             : 'default'
                         }
                         onClick={() =>
-                          livePreviewContext?.statusLivePreview.active
-                            ? livePreviewContext?.stopLivePreview()
-                            : livePreviewContext?.startLivePreview()
+                          livePreviewContext.statusLivePreview.active
+                            ? livePreviewContext.stopLivePreview()
+                            : livePreviewContext.startLivePreview()
                         }
                       >
-                        {livePreviewContext?.statusLivePreview.active
+                        {livePreviewContext.statusLivePreview.active
                           ? 'Stop'
                           : 'Start'}{' '}
                         Live Preview
