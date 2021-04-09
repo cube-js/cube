@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, macos-10.15, windows-2019]
-        node-version: [15.x]
+        node-version: [14.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
