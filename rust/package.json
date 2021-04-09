@@ -16,7 +16,7 @@
     "watch": "tsc -w",
     "lint": "eslint js-wrapper/* --ext .ts,.js",
     "lint:fix": "eslint --fix js-wrapper/* --ext .ts,js",
-    "postinstall": "./bin/post-install"
+    "postinstall": "bin/post-install"
   },
   "files": [
     "dist",
