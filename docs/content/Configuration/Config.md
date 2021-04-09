@@ -480,8 +480,8 @@ using `CUBEJS_JWK_URL`.
 
 #### key
 
-A JSON string that represents a cryptographic key. Similar to `API_SECRET`,
-which will be deprecated in the future. Can also be set using `CUBEJS_JWT_KEY`.
+A JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
+also be set using `CUBEJS_JWT_KEY`.
 
 #### algorithms
 
