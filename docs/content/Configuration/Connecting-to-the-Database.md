@@ -60,6 +60,7 @@ databases:
 | Presto                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                 |
 | Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`                                                                                                                                                            |
 | SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
+| Databricks                                             | `CUBEJS_DB_NAME`, `CUBEJS_DB_DATABRICKS_URL`                                                                                                                                                                                    |
 
 ## Multiple Databases
 
@@ -230,6 +231,24 @@ You can connect to a ClickHouse database when your user's permissions are
 [restricted][link-clickhouse-readonly] to read-only, by setting
 `CUBEJS_DB_CLICKHOUSE_READONLY` to `true`.
 
+### Databricks JDBC
+
+Starting with `v0.26.83` Cube.js provides a driver for Databricks. It's based on the JDBC driver from DataBricks, which requires
+
+[installation of Java with JDK][link-java-guide]. You'll need to specify the JDBC url via `CUBEJS_DB_DATABRICKS_URL`.
+
+Example:
+
+```
+CUBEJS_DB_TYPE=databricks-jdbc
+# CUBEJS_DB_NAME is an optional value
+CUBEJS_DB_NAME=default
+# You can find it inside specific cluster configuration
+CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token;PWD=XXXXX
+```
+
+[link-java-guide]:
+https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 [link-cubejs-driver-guide]:
   https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver
 [link-aws-athena-access]:
