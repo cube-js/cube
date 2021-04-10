@@ -6,6 +6,7 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
 use crate::metastore::{is_valid_hll, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
+use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
@@ -38,28 +39,10 @@ use tokio::task::JoinHandle;
 impl ImportFormat {
     async fn row_stream(
         &self,
+        file: File,
         location: String,
         columns: Vec<Column>,
-        table_id: u64,
-        temp_files: &mut TempFiles,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
-        let file = if location.starts_with("http") {
-            let tmp_file = temp_files.new_file(table_id);
-            let mut file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(tmp_file)
-                .await?;
-            let mut stream = reqwest::get(&location).await?.bytes_stream();
-            while let Some(bytes) = stream.next().await {
-                file.write_all(bytes?.as_ref()).await?;
-            }
-            file.seek(SeekFrom::Start(0)).await?;
-            file
-        } else {
-            File::open(location.clone()).await?
-        };
         match self {
             ImportFormat::CSV => {
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
@@ -339,6 +322,7 @@ crate::di_service!(MockImportService, [ImportService]);
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
+    remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
     limits: Arc<ConcurrencyLimits>,
 }
@@ -349,15 +333,52 @@ impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
+        remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
         limits: Arc<ConcurrencyLimits>,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
             chunk_store,
+            remote_fs,
             config_obj,
             limits,
         })
+    }
+
+    pub async fn resolve_location(
+        &self,
+        location: String,
+        table_id: u64,
+        temp_files: &mut TempFiles,
+    ) -> Result<File, CubeError> {
+        let file = if location.starts_with("http") {
+            let tmp_file = temp_files.new_file(table_id);
+            let mut file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(tmp_file)
+                .await?;
+            let mut stream = reqwest::get(&location).await?.bytes_stream();
+            while let Some(bytes) = stream.next().await {
+                file.write_all(bytes?.as_ref()).await?;
+            }
+            file.seek(SeekFrom::Start(0)).await?;
+            file
+        } else if location.starts_with("temp://") {
+            self.download_temp_file(location.clone()).await?
+        } else {
+            File::open(location.clone()).await?
+        };
+
+        Ok(file)
+    }
+
+    async fn download_temp_file(&self, location: String) -> Result<File, CubeError> {
+        let to_download = location.replace("temp://", "temp-uploads/");
+        let local_file = self.remote_fs.download_file(&to_download).await?;
+        Ok(File::open(local_file).await?)
     }
 }
 
@@ -412,12 +433,14 @@ impl ImportService for ImportServiceImpl {
         tokio::fs::create_dir_all(temp_dir.clone()).await?;
         for location in locations.into_iter() {
             let mut temp_files = TempFiles::new(temp_dir.clone());
+            let file = self
+                .resolve_location(location.clone(), table_id, &mut temp_files)
+                .await?;
             let mut row_stream = format
                 .row_stream(
+                    file,
                     location.to_string(),
                     table.get_row().get_columns().clone(),
-                    table_id,
-                    &mut temp_files,
                 )
                 .await?;
 

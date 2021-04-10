@@ -27,6 +27,7 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
 use crate::queryplanner::query_executor::QueryExecutor;
+use crate::remotefs::RemoteFs;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
 use crate::sys::malloc::trim_allocs;
@@ -46,6 +47,7 @@ use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
+use std::path::Path;
 use std::str::from_utf8_unchecked;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -64,6 +66,13 @@ pub trait SqlService: DIService + Send + Sync {
 
     /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
+
+    async fn upload_temp_file(
+        &self,
+        context: SqlQueryContext,
+        name: String,
+        file_path: &Path,
+    ) -> Result<(), CubeError>;
 }
 
 pub struct QueryPlans {
@@ -79,6 +88,7 @@ pub struct SqlQueryContext {
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
+    remote_fs: Arc<dyn RemoteFs>,
     limits: Arc<ConcurrencyLimits>,
     query_planner: Arc<dyn QueryPlanner>,
     query_executor: Arc<dyn QueryExecutor>,
@@ -97,6 +107,7 @@ impl SqlServiceImpl {
         query_planner: Arc<dyn QueryPlanner>,
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
+        remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
     ) -> Arc<SqlServiceImpl> {
@@ -109,6 +120,7 @@ impl SqlServiceImpl {
             cluster,
             rows_per_chunk,
             query_timeout,
+            remote_fs,
         })
     }
 
@@ -541,6 +553,21 @@ impl SqlService for SqlServiceImpl {
             }
         }
     }
+
+    async fn upload_temp_file(
+        &self,
+        _context: SqlQueryContext,
+        name: String,
+        file_path: &Path,
+    ) -> Result<(), CubeError> {
+        self.remote_fs
+            .upload_file(
+                file_path.to_string_lossy().as_ref(),
+                &format!("temp-uploads/{}", name),
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeError> {
@@ -910,6 +937,7 @@ mod tests {
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
+                remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
             );
@@ -959,6 +987,7 @@ mod tests {
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
+                remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
             );
@@ -2480,6 +2509,48 @@ mod tests {
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn create_table_with_temp_file() {
+        Config::run_test("create_table_with_temp_file", async move |services| {
+            let service = services.sql_service;
+
+            let paths = {
+                let dir = env::temp_dir();
+
+                let path_2 = dir.clone().join("foo-3.csv.gz");
+
+                let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
+
+                file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
+                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).await.unwrap();
+                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("4,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+
+                file.shutdown().await.unwrap();
+
+                services.remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/foo-3.csv.gz").await.unwrap();
+
+                vec!["temp://foo-3.csv.gz".to_string()]
+            };
+
+            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+            let _ = service.exec_query(
+                &format!(
+                    "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                    paths.into_iter().map(|p| format!("'{}'", p)).join(",")
+                )
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
         }).await;
     }
 

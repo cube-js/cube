@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use warp::{Filter, Rejection};
+use warp::{Filter, Rejection, Reply};
 
 use crate::codegen::http_message_generated::{
     get_root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
@@ -13,13 +13,16 @@ use crate::store::DataFrame;
 use crate::table::TableValue;
 use crate::util::WorkerLoop;
 use crate::CubeError;
-use futures::{SinkExt, StreamExt};
+use async_std::fs::File;
+use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
 use hex::ToHex;
 use http_auth_basic::Credentials;
 use log::error;
 use log::info;
 use log::trace;
+use serde::Deserialize;
 use std::net::SocketAddr;
+use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
@@ -37,11 +40,23 @@ pub struct HttpServer {
 crate::di_service!(HttpServer, []);
 
 #[derive(Debug)]
-pub enum WsError {
+pub enum CubeRejection {
     NotAuthorized,
+    Internal(String),
 }
 
-impl Reject for WsError {}
+impl From<CubeError> for warp::reject::Rejection {
+    fn from(e: CubeError) -> Self {
+        warp::reject::custom(CubeRejection::Internal(e.message.to_string()))
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UploadQuery {
+    name: String,
+}
+
+impl Reject for CubeRejection {}
 
 impl HttpServer {
     pub fn new(
@@ -72,13 +87,17 @@ impl HttpServer {
                     let res = HttpServer::authorize(auth_service, auth_header).await;
                     match res {
                         Ok(user) => Ok(SqlQueryContext { user }),
-                        Err(_) => Err(warp::reject::custom(WsError::NotAuthorized)),
+                        Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
                     }
                 }
             });
+
+        let context_filter = tx_to_move_filter.and(auth_filter.clone());
+
+        let context_filter_to_move = context_filter.clone();
+
         let query_route = warp::path!("ws")
-            .and(tx_to_move_filter)
-            .and(auth_filter)
+            .and(context_filter_to_move)
             .and(warp::ws::ws())
             .and_then(|tx: mpsc::Sender<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
@@ -137,15 +156,22 @@ impl HttpServer {
                         };
                     };
                 }))
-            }).recover(|err: Rejection| async move {
-                if let Some(ws_error) = err.find::<WsError>() {
-                    match ws_error {
-                        WsError::NotAuthorized => Ok(warp::reply::with_status("Not authorized", StatusCode::FORBIDDEN))
-                    }
-                } else {
-                    Err(err)
-                }
+            });
 
+        let auth_filter_to_move = auth_filter.clone();
+        let sql_service = self.sql_service.clone();
+
+        let upload_route = warp::path!("upload-temp-file")
+            .and(auth_filter_to_move)
+            .and(warp::query::query::<UploadQuery>())
+            .and(warp::body::stream())
+            .and_then(move |sql_query_context, upload_query, body| {
+                HttpServer::handle_upload(
+                    sql_service.clone(),
+                    sql_query_context,
+                    upload_query,
+                    body,
+                )
             });
 
         let sql_service = self.sql_service.clone();
@@ -187,13 +213,53 @@ impl HttpServer {
             },
         );
         let cancel_token = self.cancel_token.clone();
-        let (_, server_future) = warp::serve(
-            query_route, // .or(import_route)
-        )
+        let (_, server_future) = warp::serve(query_route.or(upload_route).recover(
+            |err: Rejection| async move {
+                if let Some(ws_error) = err.find::<CubeRejection>() {
+                    match ws_error {
+                        CubeRejection::NotAuthorized => Ok(warp::reply::with_status(
+                            "Not authorized".to_string(),
+                            StatusCode::FORBIDDEN,
+                        )),
+                        CubeRejection::Internal(e) => Ok(warp::reply::with_status(
+                            e.to_string(),
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                        )),
+                    }
+                } else {
+                    Err(err)
+                }
+            },
+        ))
         .bind_with_graceful_shutdown(addr, async move { cancel_token.cancelled().await });
         let _ = tokio::join!(process_loop, server_future);
 
         Ok(())
+    }
+
+    pub async fn handle_upload(
+        sql_service: Arc<dyn SqlService>,
+        sql_query_context: SqlQueryContext,
+        upload_query: UploadQuery,
+        mut body: impl Stream<Item = Result<impl warp::Buf, warp::Error>> + Unpin,
+    ) -> Result<impl Reply, Rejection> {
+        let temp_file = NamedTempFile::new().map_err(|e| CubeRejection::Internal(e.to_string()))?;
+        let mut file = File::create(temp_file.path())
+            .await
+            .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+        while let Some(item) = body.next().await {
+            let item = item.map_err(|e| CubeRejection::Internal(e.to_string()))?;
+            file.write_all(item.chunk())
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+        }
+
+        sql_service
+            .upload_temp_file(sql_query_context, upload_query.name, temp_file.path())
+            .await
+            .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+
+        Ok(warp::reply())
     }
 
     pub async fn process_command(
