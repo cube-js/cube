@@ -136,32 +136,36 @@ export class CubeStoreDriver extends BaseDriver {
   }
 
   private async importStream(columns: Column[], tableData: any, table: string, indexes) {
-    const writer = csvWriter({ headers: columns.map(c => c.name) });
-    const gzipStream = createGzip();
+    try {
+      const writer = csvWriter({ headers: columns.map(c => c.name) });
+      const gzipStream = createGzip();
 
-    await new Promise(
-      (resolve, reject) => pipeline(
-        tableData.rowStream, writer, gzipStream, (err) => (err ? reject(err) : resolve(null))
-      )
-    );
-    const fileName = `${table}.csv.gz`;
-    const res = await fetch(`${this.baseUrl.replace(/^ws/, 'http')}/upload-temp-file?name=${fileName}`, {
-      method: 'POST',
-      body: gzipStream,
-    });
+      await new Promise(
+        (resolve, reject) => pipeline(
+          tableData.rowStream, writer, gzipStream, (err) => (err ? reject(err) : resolve(null))
+        )
+      );
+      const fileName = `${table}.csv.gz`;
+      const res = await fetch(`${this.baseUrl.replace(/^ws/, 'http')}/upload-temp-file?name=${fileName}`, {
+        method: 'POST',
+        body: gzipStream,
+      });
 
-    const createTableSql = this.createTableSql(table, columns);
-    // eslint-disable-next-line no-unused-vars
-    const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ?`;
+      const createTableSql = this.createTableSql(table, columns);
+      // eslint-disable-next-line no-unused-vars
+      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ?`;
 
-    if (res.status !== 200) {
-      const err = await res.json();
-      throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
+      if (res.status !== 200) {
+        const err = await res.json();
+        throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
+      }
+      await this.query(createTableSqlWithLocation, [`temp://${fileName}`]).catch(e => {
+        e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+        throw e;
+      });
+    } finally {
+      await tableData.release();
     }
-    await this.query(createTableSqlWithLocation, [`temp://${fileName}`]).catch(e => {
-      e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
-      throw e;
-    });
   }
 
   public static dialectClass() {

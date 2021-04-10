@@ -170,10 +170,18 @@ class MySqlDriver extends BaseDriver {
     const types = columns.map(c => ({ name: c.Field, type: this.toGenericType(c.Type) }));
 
     if ((options || {}).streamImport) {
-      return this.withConnection(async db => {
-        await this.setTimeZone(db);
-        return { rowStream: db.query(query, values).stream(), types };
-      });
+      // TODO use pool once figure out how to close stream gracefully and recover from errors
+      // eslint-disable-next-line no-underscore-dangle
+      const conn = await this.pool._factory.create();
+      await this.setTimeZone(conn);
+      return {
+        rowStream: conn.query(query, values).stream(),
+        types,
+        release: async () => {
+          // eslint-disable-next-line no-underscore-dangle
+          await this.pool._factory.destroy(conn);
+        }
+      };
     }
 
     return {

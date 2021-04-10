@@ -69,6 +69,15 @@ impl RemoteFs for S3RemoteFs {
         .await??;
         let local_path = self.dir.as_path().join(remote_path);
         if Path::new(temp_upload_path) != local_path {
+            fs::create_dir_all(local_path.parent().unwrap())
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Create dir {}: {}",
+                        local_path.parent().as_ref().unwrap().to_string_lossy(),
+                        e
+                    ))
+                })?;
             fs::rename(&temp_upload_path, local_path).await?;
         }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
