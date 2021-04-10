@@ -107,6 +107,11 @@ class CubejsApi {
         await checkMutex();
         return continueWait(true);
       }
+
+      if (!response.ok) {
+        throw new Error(`Request error. Response status: ${response.status}`);
+      }
+
       const body = await response.json();
       if (body.error === 'Continue wait') {
         await checkMutex();
