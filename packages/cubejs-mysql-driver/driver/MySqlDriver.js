@@ -154,7 +154,7 @@ class MySqlDriver extends BaseDriver {
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }
 
-  async downloadQueryResults(query, values) {
+  async downloadQueryResults(query, values, options) {
     if (!this.config.database) {
       throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
     }
@@ -168,6 +168,13 @@ class MySqlDriver extends BaseDriver {
     });
 
     const types = columns.map(c => ({ name: c.Field, type: this.toGenericType(c.Type) }));
+
+    if ((options || {}).streamImport) {
+      return this.withConnection(async db => {
+        await this.setTimeZone(db);
+        return { rowStream: db.query(query, values).stream(), types };
+      });
+    }
 
     return {
       rows: await this.query(query, values),

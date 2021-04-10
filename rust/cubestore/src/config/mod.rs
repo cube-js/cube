@@ -746,6 +746,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
@@ -789,6 +790,7 @@ impl Config {
         self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
                 SqlServiceImpl::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

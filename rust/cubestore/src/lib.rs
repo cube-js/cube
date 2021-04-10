@@ -55,8 +55,8 @@ pub mod util;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
-    message: String,
-    cause: CubeErrorCauseType,
+    pub message: String,
+    pub cause: CubeErrorCauseType,
 }
 
 impl std::error::Error for CubeError {}
@@ -124,13 +124,6 @@ impl From<std::io::Error> for CubeError {
 impl From<ParserError> for CubeError {
     fn from(v: ParserError) -> Self {
         CubeError::internal(format!("{:?}", v))
-    }
-}
-
-impl From<CubeError> for warp::reject::Rejection {
-    fn from(_: CubeError) -> Self {
-        // TODO
-        warp::reject()
     }
 }
 

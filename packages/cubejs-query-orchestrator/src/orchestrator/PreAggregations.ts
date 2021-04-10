@@ -664,10 +664,15 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
+    const externalDriver = await this.externalDriverFactory();
+    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+
     const tableData = await saveCancelFn(client.downloadQueryResults(
       sql,
-      params,
-      this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry)
+      params, {
+        ...this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry),
+        ...capabilities,
+      }
     ));
     await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
     await this.loadCache.fetchTables(this.preAggregation);
@@ -683,8 +688,8 @@ class PreAggregationLoader {
       requestId: this.requestId
     });
     const externalDriver = await this.externalDriverFactory();
-    const { csvImport } = externalDriver.capabilities && externalDriver.capabilities();
-    const tableData = await saveCancelFn(client.downloadTable(table, { csvImport }));
+    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+    const tableData = await saveCancelFn(client.downloadTable(table, capabilities));
     tableData.types = await saveCancelFn(client.tableColumnTypes(table));
     return tableData;
   }
