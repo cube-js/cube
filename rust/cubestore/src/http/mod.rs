@@ -21,6 +21,7 @@ use log::error;
 use log::info;
 use log::trace;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
@@ -215,16 +216,23 @@ impl HttpServer {
         let cancel_token = self.cancel_token.clone();
         let (_, server_future) = warp::serve(query_route.or(upload_route).recover(
             |err: Rejection| async move {
+                let mut obj = HashMap::new();
                 if let Some(ws_error) = err.find::<CubeRejection>() {
                     match ws_error {
-                        CubeRejection::NotAuthorized => Ok(warp::reply::with_status(
-                            "Not authorized".to_string(),
-                            StatusCode::FORBIDDEN,
-                        )),
-                        CubeRejection::Internal(e) => Ok(warp::reply::with_status(
-                            e.to_string(),
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                        )),
+                        CubeRejection::NotAuthorized => {
+                            obj.insert("error".to_string(), "Not authorized".to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::FORBIDDEN,
+                            ))
+                        }
+                        CubeRejection::Internal(e) => {
+                            obj.insert("error".to_string(), e.to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                            ))
+                        }
                     }
                 } else {
                     Err(err)
