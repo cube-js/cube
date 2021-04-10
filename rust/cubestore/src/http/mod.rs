@@ -252,12 +252,20 @@ impl HttpServer {
         mut body: impl Stream<Item = Result<impl warp::Buf, warp::Error>> + Unpin,
     ) -> Result<impl Reply, Rejection> {
         let temp_file = NamedTempFile::new().map_err(|e| CubeRejection::Internal(e.to_string()))?;
-        let mut file = File::create(temp_file.path())
-            .await
-            .map_err(|e| CubeRejection::Internal(e.to_string()))?;
-        while let Some(item) = body.next().await {
-            let item = item.map_err(|e| CubeRejection::Internal(e.to_string()))?;
-            file.write_all(item.chunk())
+        {
+            let mut file = File::create(temp_file.path())
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+            while let Some(item) = body.next().await {
+                let item = item.map_err(|e| CubeRejection::Internal(e.to_string()))?;
+                file.write_all(item.chunk())
+                    .await
+                    .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+            }
+            file.flush()
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+            file.close()
                 .await
                 .map_err(|e| CubeRejection::Internal(e.to_string()))?;
         }
