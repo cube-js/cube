@@ -1,7 +1,7 @@
 import commonjs from '@rollup/plugin-commonjs';
+import typescript from '@rollup/plugin-typescript';
 import localResolve from 'rollup-plugin-local-resolve';
 import postcss from 'rollup-plugin-postcss';
-import typescript from 'rollup-plugin-typescript2';
 
 import { LESS_VARIABLES } from './src/variables-esm';
 
@@ -25,11 +25,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }) => {
           minimize: true,
         }),
         commonjs(),
-        typescript({
-          tsconfigOverride: {
-            include: ['src/playground/**/*'],
-          },
-        }),
+        typescript(),
         localResolve(),
       ],
       output: {

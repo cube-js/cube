@@ -13,7 +13,9 @@
   "scripts": {
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && rollup -c"
+    "build": "yarn run build:playground && yarn tsc && rollup -c",
+    "build:playground": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/",
+    "tsc": "tsc"
   },
   "browserslist": [
     ">0.2%",
@@ -62,6 +64,7 @@
     "@ant-design/compatible": "^1.0.2",
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
+    "@rollup/plugin-typescript": "^8.2.1",
     "@types/jest": "^26.0.20",
     "@types/node": "^14.14.35",
     "@types/react": "^17.0.3",
@@ -81,9 +84,10 @@
     "react-app-rewired": "^2.1.0",
     "react-dom": "^17.0.1",
     "recursive-readdir": "^2.2.2",
-    "rollup-plugin-typescript2": "^0.30.0",
+    "rollup": "^2.45.2",
     "styled-components": "5.2.0",
-    "terser-webpack-plugin": "^4.1.0"
+    "terser-webpack-plugin": "^4.1.0",
+    "typescript": "~4.1.5"
   },
   "peerDependencies": {
     "antd": ">=4.13.0",
