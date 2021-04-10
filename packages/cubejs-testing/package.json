@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.26.85",
+  "version": "0.26.87",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -28,7 +28,7 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.26.81",
+    "@cubejs-backend/shared": "^0.26.87",
     "testcontainers": "^7.5.0"
   },
   "devDependencies": {
