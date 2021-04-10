@@ -674,7 +674,13 @@ class PreAggregationLoader {
         ...capabilities,
       }
     ));
-    await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
+    try {
+      await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
+    } finally {
+      if (tableData.release) {
+        await tableData.release();
+      }
+    }
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
