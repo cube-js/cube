@@ -32,11 +32,13 @@
     "@cubejs-backend/shared": "^0.26.87",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "^1.12.0",
+    "fs-extra": "^9.1.0",
     "generic-pool": "^3.6.0",
     "moment-timezone": "^0.5.31",
     "mysql": "^2.16.0",
     "node-fetch": "^2.6.1",
     "sqlstring": "^2.3.2",
+    "tempy": "^1.0.1",
     "ws": "^7.4.3"
   },
   "devDependencies": {

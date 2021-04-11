@@ -1,5 +1,8 @@
 import { pipeline } from 'stream';
 import { createGzip } from 'zlib';
+import { createWriteStream, createReadStream } from 'fs';
+import { unlink } from 'fs-extra';
+import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import { format as formatSql } from 'sqlstring';
@@ -11,7 +14,7 @@ import { WebSocketConnection } from './WebSocketConnection';
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
-  text: 'varchar(255)',
+  text: 'varchar(255)'
 };
 
 type Column = {
@@ -138,31 +141,36 @@ export class CubeStoreDriver extends BaseDriver {
   private async importStream(columns: Column[], tableData: any, table: string, indexes) {
     const writer = csvWriter({ headers: columns.map(c => c.name) });
     const gzipStream = createGzip();
+    const tempFile = tempy.file();
 
-    const fileName = `${table}.csv.gz`;
-    const [res] = await Promise.all([
-      fetch(`${this.baseUrl.replace(/^ws/, 'http')}/upload-temp-file?name=${fileName}`, {
-        method: 'POST',
-        body: gzipStream,
-      }), new Promise(
+    try {
+      const outputStream = createWriteStream(tempFile);
+      await new Promise(
         (resolve, reject) => pipeline(
-          tableData.rowStream, writer, gzipStream, (err) => (err ? reject(err) : resolve(null)),
-        ),
-      )
-    ]);
+          tableData.rowStream, writer, gzipStream, outputStream, (err) => (err ? reject(err) : resolve(null))
+        )
+      );
+      const fileName = `${table}.csv.gz`;
+      const res = await fetch(`${this.baseUrl.replace(/^ws/, 'http')}/upload-temp-file?name=${fileName}`, {
+        method: 'POST',
+        body: createReadStream(tempFile),
+      });
 
-    const createTableSql = this.createTableSql(table, columns);
-    // eslint-disable-next-line no-unused-vars
-    const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ?`;
+      const createTableSql = this.createTableSql(table, columns);
+      // eslint-disable-next-line no-unused-vars
+      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ?`;
 
-    if (res.status !== 200) {
-      const err = await res.json();
-      throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
+      if (res.status !== 200) {
+        const err = await res.json();
+        throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
+      }
+      await this.query(createTableSqlWithLocation, [`temp://${fileName}`]).catch(e => {
+        e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+        throw e;
+      });
+    } finally {
+      await unlink(tempFile);
     }
-    await this.query(createTableSqlWithLocation, [`temp://${fileName}`]).catch(e => {
-      e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
-      throw e;
-    });
   }
 
   public static dialectClass() {
