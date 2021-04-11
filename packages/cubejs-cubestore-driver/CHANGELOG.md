@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** Import stream stuck if it's big ([2a41020](https://github.com/cube-js/cube.js/commit/2a41020027987a451818bbd8b5b750aec0dc6ace))
+* Manage stream connection release by orchestrator instead of driver ([adf059e](https://github.com/cube-js/cube.js/commit/adf059ec52e31e3ebc055b60a1ac6236c57251f8))
+
+
+
+
+
 ## [0.26.89](https://github.com/cube-js/cube.js/compare/v0.26.88...v0.26.89) (2021-04-10)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** display request status code ([b6108c9](https://github.com/cube-js/cube.js/commit/b6108c9285ffe177439b2310c201d19f19819206))
+
+
+
+
+
 ## [0.26.82](https://github.com/cube-js/cube.js/compare/v0.26.81...v0.26.82) (2021-04-07)
 
 
