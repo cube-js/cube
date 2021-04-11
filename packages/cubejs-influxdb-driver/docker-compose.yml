@@ -1,0 +1,30 @@
+version: '3'
+services:
+  influxdb:
+    image: quay.io/influxdb/influxdb:v2.0.4
+    volumes:
+      - ./data/influxdbv2:/root/.influxdbv2
+    ports:
+      - "8086:8086"
+    restart: always
+
+  influxdb_cli:
+    image: quay.io/influxdb/influxdb:v2.0.4
+    entrypoint: influx setup --bucket mybucket -t mysecrettoken -o myorg --username=root --password=testtest --host=http://influxdb:8086 -f
+    links:
+      - influxdb
+    depends_on:
+      - influxdb
+    restart: on-failure:10
+
+  telegraf:
+    image: telegraf
+    links:
+      - influxdb
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf
+    depends_on:
+      - influxdb_cli
+
+volumes:
+  influxdbv2:
