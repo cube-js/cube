@@ -16,6 +16,11 @@ const MySqlToGenericType = {
   mediumint: 'int',
   smallint: 'int',
   bigint: 'int',
+  tinyint: 'int',
+  'mediumint unsigned': 'int',
+  'smallint unsigned': 'int',
+  'bigint unsigned': 'int',
+  'tinyint unsigned': 'int',
 };
 
 class MySqlDriver extends BaseDriver {
