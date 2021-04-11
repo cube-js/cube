@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.91](https://github.com/cube-js/cube.js/compare/v0.26.90...v0.26.91) (2021-04-11)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** Import stream stuck if it's big: handle bigger uploads using temp files ([08155bc](https://github.com/cube-js/cube.js/commit/08155bc3ccc03f9bdcfa54a2ab6a2b10cd9edb39))
+
+
+
+
+
 ## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
 
 
