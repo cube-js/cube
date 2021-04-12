@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import { expect } from '@jest/globals';
 import cubejs from '@cubejs-client/core';
 import { BirdBox } from '../src';
@@ -25,24 +26,62 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       await birdbox.stop();
     });
 
-    it('Query Orders.totalAmount', async () => {
-      const client = cubejs(async () => 'test', {
-        apiUrl: birdbox.configuration.apiUrl,
-      });
-
-      const response = await client.load({
-        measures: [
-          'Orders.totalAmount'
-        ],
-        timeDimensions: [],
-        order: {}
-      });
-
-      expect(response.rawData()).toEqual([
+    const asserts: [schema: { name: string }, query: object][] = [
+      [
         {
-          'Orders.totalAmount': '1700'
+          name: '#1 Orders.totalAmount'
+        },
+        {
+          measures: [
+            'Orders.totalAmount'
+          ],
+          timeDimensions: [],
+          order: {}
+        },
+      ],
+      [
+        {
+          name: '#2 Events.count'
+        },
+        {
+          measures: [
+            'Events.count'
+          ],
+          timeDimensions: [],
+          order: {},
+          dimensions: []
+        },
+      ],
+      [
+        {
+          name: '#3 Events.count with Events.type order by Events.count DESC'
+        },
+        {
+          measures: [
+            'Events.count'
+          ],
+          timeDimensions: [],
+          order: {
+            'Events.count': 'desc'
+          },
+          dimensions: [
+            'Events.type'
+          ]
         }
-      ]);
-    });
+      ],
+    ];
+
+    for (const [schema, query] of asserts) {
+      // eslint-disable-next-line no-loop-func
+      it(schema.name, async () => {
+        const client = cubejs(async () => 'test', {
+          apiUrl: birdbox.configuration.apiUrl,
+        });
+
+        const response = await client.load(query);
+
+        expect(response.rawData()).toMatchSnapshot();
+      });
+    }
   });
 }

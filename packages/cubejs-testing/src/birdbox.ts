@@ -45,6 +45,26 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   const host = '127.0.0.1';
   const port = env.getContainer('birdbox-cube').getMappedPort(4000);
 
+  {
+    console.log('[Birdbox] Executing load.sh script');
+
+    const { output, exitCode } = await env.getContainer('birdbox-db').exec([
+      '/scripts/load.sh'
+    ]);
+
+    if (exitCode === 0) {
+      console.log('[Birdbox] Script load.sh finished successfully');
+    } else {
+      console.log(output);
+
+      console.log(`[Birdbox] Script load.sh finished with error: ${exitCode}`);
+
+      await env.down();
+
+      process.exit(1);
+    }
+  }
+
   return {
     stop: async () => {
       console.log('[Birdbox] Closing');
@@ -69,7 +89,40 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     throw new Error('Unsupported');
   }
 
-  const db = await PostgresDBRunner.startContainer({});
+  const db = await PostgresDBRunner.startContainer({
+    volumes: [
+      {
+        source: path.join(__dirname, '..', '..', '..', 'birdbox-fixtures', 'datasets'),
+        target: '/data',
+        bindMode: 'ro',
+      },
+      {
+        source: path.join(__dirname, '..', '..', '..', 'birdbox-fixtures', 'postgresql', 'scripts'),
+        target: '/scripts',
+        bindMode: 'ro',
+      }
+    ]
+  });
+
+  {
+    console.log('[Birdbox] Executing load.sh script');
+
+    const { output, exitCode } = await db.exec([
+      '/scripts/load.sh'
+    ]);
+
+    if (exitCode === 0) {
+      console.log('[Birdbox] Script load.sh finished successfully');
+    } else {
+      console.log(output);
+
+      console.log(`[Birdbox] Script load.sh finished with error: ${exitCode}`);
+
+      await db.stop();
+
+      process.exit(1);
+    }
+  }
 
   const cli = spawn('npm', ['run', 'dev'], {
     cwd: path.join(process.cwd(), 'birdbox-test-project'),

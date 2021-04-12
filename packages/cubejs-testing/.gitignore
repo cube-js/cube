@@ -3,3 +3,4 @@ cypress/videos
 cypress/screenshots
 # BirdBox for CLI is creating a project in package directory
 birdbox-test-project
+birdbox-fixtures/datasets

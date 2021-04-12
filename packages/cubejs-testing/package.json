@@ -16,8 +16,10 @@
     "watch": "tsc -w",
     "lint": "eslint --debug src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
+    "dataset:minimal": "node dist/test/bin/download-dataset.js",
     "birdbox": "jest dist/test",
     "birdbox:postgresql": "jest -i dist/test/birdbox-postgresql.test.js",
+    "birdbox:postgresql:snapshot": "jest --updateSnapshot -i dist/test/birdbox-postgresql.test.js",
     "birdbox:postgresql-cubestore": "jest -i dist/test/birdbox-postgresql-cubestore.test.js",
     "birdbox:cli:postgresql": "jest -i dist/test/birdbox-postgresql-cubestore.test.js",
     "cypress:install": "cypress install",
@@ -44,7 +46,12 @@
   "jest": {
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/dist/test/*.(test|spec).(ts|js)"
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   },
   "publishConfig": {
     "access": "public"
