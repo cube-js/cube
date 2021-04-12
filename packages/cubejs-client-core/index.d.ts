@@ -984,8 +984,13 @@ declare module '@cubejs-client/core' {
     chartType?: ChartType
   };
 
+  export type TDefaultHeuristicsState = {
+    query: Query;
+    chartType?: ChartType;
+  };
+
   export function defaultHeuristics(
-    newQuery: Query,
+    newState: TDefaultHeuristicsState,
     oldQuery: Query,
     options: TDefaultHeuristicsOptions
   ): TDefaultHeuristicsResponse;

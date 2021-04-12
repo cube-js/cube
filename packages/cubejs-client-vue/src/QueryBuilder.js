@@ -616,14 +616,14 @@ export default {
     },
     query: {
       deep: true,
-      handler() {
+      handler(query) {
         if (!this.meta) {
           // this is ok as if meta has not been loaded by the time query prop has changed,
           // then the promise for loading meta (found in mounted()) will call
           // copyQueryFromProps and will therefore update anyway.
           return;
         }
-        this.copyQueryFromProps();
+        this.copyQueryFromProps(query);
       },
     },
     pivotConfig: {
