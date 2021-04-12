@@ -108,10 +108,14 @@ export class RefreshScheduler {
 
     try {
       const compilerApi = this.serverCore.getCompilerApi(context);
-      await Promise.all([
-        this.refreshCubesRefreshKey(context, compilerApi, restOptions),
-        this.refreshPreAggregations(context, compilerApi, restOptions)
-      ]);
+      if (queryingOptions.preAggregationsWarmup) {
+        await this.refreshPreAggregations(context, compilerApi, restOptions);
+      } else {
+        await Promise.all([
+          this.refreshCubesRefreshKey(context, compilerApi, restOptions),
+          this.refreshPreAggregations(context, compilerApi, restOptions)
+        ]);
+      }
       return {
         finished: true
       };
