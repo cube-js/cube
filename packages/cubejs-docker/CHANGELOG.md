@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.93](https://github.com/cube-js/cube.js/compare/v0.26.92...v0.26.93) (2021-04-12)
+
+
+### Bug Fixes
+
+* **docker:** Lock yarn, workaround for PATH & post-installers ([907befa](https://github.com/cube-js/cube.js/commit/907befa4ae96cdba7f9d5ac167a74af9fb1fff18))
+
+
+
+
+
 ## [0.26.92](https://github.com/cube-js/cube.js/compare/v0.26.91...v0.26.92) (2021-04-12)
 
 **Note:** Version bump only for package @cubejs-backend/docker
