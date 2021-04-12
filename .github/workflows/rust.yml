@@ -162,6 +162,11 @@ jobs:
           # We need to force it everywhere before using it in cross building
           #args: --release --locked --target=${{ matrix.target }}
           use-cross: ${{ matrix.cross }}
+      - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew update
+          brew install upx
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
