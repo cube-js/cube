@@ -10,9 +10,7 @@ RUN apk add rxvt-unicode
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
-# Very strange issue with error Command "lerna" not found.
-# I dont have ideas, what is going wrong hear, but let's comment it for now, because it's dev image
-#ENV NODE_ENV production
+ENV NODE_ENV development
 
 WORKDIR /cubejs
 
@@ -50,6 +48,8 @@ COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/packag
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
 COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
+
+RUN yarn policies set-version v1.22.5
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
