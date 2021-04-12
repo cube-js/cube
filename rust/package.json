@@ -8,7 +8,8 @@
     "node": ">=10.8.0"
   },
   "bin": {
-    "cubestore-dev": "bin/cubestore-dev"
+    "cubestore-dev": "bin/cubestore-dev",
+    "cubestore-installer": "bin/post-install"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
@@ -18,7 +19,7 @@
     "lint:fix": "eslint --fix js-wrapper/* --ext .ts,js",
     "unit": "jest",
     "unit:debug": "jest --runInBand",
-    "postinstall": "bin/post-install"
+    "postinstall": "cubestore-installer"
   },
   "files": [
     "dist",
