@@ -216,11 +216,11 @@ If pre-aggregations aren't flagged `external: true` they are considered
 | We recommend always using **external** pre-aggregations for better concurrency and performance.
 <!-- prettier-ignore-end -->
 
-You should use external pre-aggregations for scenarios where you need
-high throughput for a big data backend. It allows downloading rollups and
-original SQL pre-aggregations prepared in big data backends such as AWS Athena,
-BigQuery, Presto, Hive and others to Cube Store for low latency and high
-throughput querying.
+You should use external pre-aggregations for scenarios where you need high
+throughput for a big data backend. It allows downloading rollups and original
+SQL pre-aggregations prepared in big data backends such as AWS Athena, BigQuery,
+Presto, Hive and others to Cube Store for low latency and high throughput
+querying.
 
 While big data backends aren't very suitable for handling massive amounts of
 concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage
@@ -350,6 +350,30 @@ SELECT * FROM information_schema.tables;
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
 folder in the project root during development.
 
+## Scaling
+
+Cube Store can be run in a single instance mode; but this is usually unsuitable
+for production deployments. For high concurrency and data throughput, we
+recommend running Cube Store as a cluster of multiple instances instead. Cube
+Store instances can be configured to be either a "router" instance or a "worker"
+instance through the `XXX` environment variable.
+
+A typical Cube Store cluster would consist of:
+
+- A single "router" instance, which acts as a load balancer and request entry
+  point for the cluster
+- One or more worker instances
+
+Both the router and worker instances must be able to read and write to file
+storage (as detailed in the next section). To improve concurrency, simply spin
+up more worker instances.
+
+## Storage
+
+Cube Store requires read/write access to file storage in order to persist
+pre-aggregations as well as maintain its' own internal state. Currently, Cube
+Store can use a local path on the machine, or AWS S3 and Google Cloud for
+highly-available, cloud storage.
 
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
