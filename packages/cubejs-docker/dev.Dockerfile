@@ -52,6 +52,8 @@ COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-dri
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
 COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 
+RUN yarn policies set-version v1.22.5
+
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
