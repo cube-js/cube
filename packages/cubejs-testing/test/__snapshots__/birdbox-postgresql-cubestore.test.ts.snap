@@ -1,0 +1,78 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`postgresql-cubestore #1 Orders.totalAmount 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+  },
+]
+`;
+
+exports[`postgresql-cubestore #2 Events.count 1`] = `
+Array [
+  Object {
+    "Events.count": "171334",
+  },
+]
+`;
+
+exports[`postgresql-cubestore #3 Events.count with Events.type order by Events.count DESC 1`] = `
+Array [
+  Object {
+    "Events.count": "92670",
+    "Events.type": "PushEvent",
+  },
+  Object {
+    "Events.count": "18969",
+    "Events.type": "CreateEvent",
+  },
+  Object {
+    "Events.count": "17448",
+    "Events.type": "WatchEvent",
+  },
+  Object {
+    "Events.count": "13289",
+    "Events.type": "IssueCommentEvent",
+  },
+  Object {
+    "Events.count": "7727",
+    "Events.type": "IssuesEvent",
+  },
+  Object {
+    "Events.count": "7007",
+    "Events.type": "PullRequestEvent",
+  },
+  Object {
+    "Events.count": "5548",
+    "Events.type": "ForkEvent",
+  },
+  Object {
+    "Events.count": "3036",
+    "Events.type": "DeleteEvent",
+  },
+  Object {
+    "Events.count": "1721",
+    "Events.type": "GollumEvent",
+  },
+  Object {
+    "Events.count": "1670",
+    "Events.type": "PullRequestReviewCommentEvent",
+  },
+  Object {
+    "Events.count": "1094",
+    "Events.type": "CommitCommentEvent",
+  },
+  Object {
+    "Events.count": "640",
+    "Events.type": "ReleaseEvent",
+  },
+  Object {
+    "Events.count": "370",
+    "Events.type": "MemberEvent",
+  },
+  Object {
+    "Events.count": "145",
+    "Events.type": "PublicEvent",
+  },
+]
+`;

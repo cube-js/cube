@@ -351,6 +351,7 @@ jobs:
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
           export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
           export DEBUG=testcontainers
+          yarn run dataset:minimal
           yarn run birdbox:postgresql
 
   docker-dev:
@@ -424,4 +425,5 @@ jobs:
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
           export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
           export DEBUG=testcontainers
+          yarn run dataset:minimal
           yarn run birdbox:postgresql
