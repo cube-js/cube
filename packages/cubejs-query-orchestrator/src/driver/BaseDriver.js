@@ -82,6 +82,16 @@ const DbTypeValueMatcher = {
 };
 
 export class BaseDriver {
+  /**
+   * Workaround for Type 'BaseDriver' has no construct signatures.
+   *
+   * @param {Object} [options]
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  constructor(options) {
+    //
+  }
+
   informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},

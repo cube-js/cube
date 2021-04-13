@@ -108,10 +108,10 @@ export function dispatchPlaygroundEvent(
   document.dispatchEvent(myEvent);
 }
 
-export function fetchWithTimeout(url, options, timeout) {
+export function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
   return Promise.race([
     fetch(url, options),
-    new Promise((_, reject) =>
+    new Promise<Response>((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), timeout)
     ),
   ]);

@@ -1,15 +1,16 @@
-/* eslint-disable global-require */
+/* eslint-disable global-require,no-restricted-syntax */
 import type { ChildProcess } from 'child_process';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
-import crypto from 'crypto';
 import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
+import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
 import type { Application as ExpressApplication } from 'express';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
-import { LivePreviewWatcher } from '@cubejs-backend/cloud';
+
+import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 
@@ -327,25 +328,47 @@ export class DevServer {
       }
     }));
 
-    app.get('/playground/test-connection', catchErrors(async (req, res) => {
-      const orchestratorApi = this.cubejsServer.getOrchestratorApi({
-        securityContext: null,
-        authInfo: null,
-        requestId: getRequestIdFromRequest(req),
-      });
+    app.post('/playground/test-connection', catchErrors(async (req, res) => {
+      const { variables = {} } = req.body || {};
+
+      let driver: BaseDriver|null = null;
 
       try {
-        orchestratorApi.addDataSeenSource('default');
-        await orchestratorApi.testConnection();
+        if (!variables.CUBEJS_DB_TYPE) {
+          throw new Error('CUBEJS_DB_TYPE is required');
+        }
+
+        // Backup env variables for restoring
+        const originalProcessEnv = process.env;
+        process.env = {
+          ...process.env,
+        };
+
+        for (const [envName, value] of Object.entries(variables)) {
+          process.env[envName] = <string>value;
+        }
+
+        driver = CubejsServerCore.createDriver(variables.CUBEJS_DB_TYPE);
+
+        // Restore original process.env
+        process.env = originalProcessEnv;
+
+        await driver.testConnection();
+
         this.cubejsServer.event('test_database_connection_success');
+
+        return res.json('ok');
       } catch (error) {
         this.cubejsServer.event('test_database_connection_error');
+
         return res.status(400).json({
           error: error.toString()
         });
+      } finally {
+        if (driver && (<any>driver).release) {
+          await (<any>driver).release();
+        }
       }
-
-      return res.json('ok');
     }));
 
     app.get('/restart', catchErrors(async (_, res) => {
