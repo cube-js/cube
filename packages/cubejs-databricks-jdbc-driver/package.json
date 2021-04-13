@@ -14,16 +14,13 @@
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
-  "bin": {
-    "databricks-jdbc-installer": "bin/post-install"
-  },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
-    "postinstall": "databricks-jdbc-installer"
+    "postinstall": "node bin/post-install"
   },
   "files": [
     "README.md",

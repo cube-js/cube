@@ -15,15 +15,10 @@ COPY . .
 
 RUN yarn policies set-version v1.22.5
 
-# @todo cubestore-installer doesn't work inside docker, it's why I'm hacking it for yarn install
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/cube/node_modules/.bin
-
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
 RUN yarn install
-
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
