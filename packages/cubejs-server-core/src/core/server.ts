@@ -17,6 +17,7 @@ import {
 
 import type { Application as ExpressApplication } from 'express';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import type { Constructor } from '@cubejs-backend/shared';
 import type { CubeStoreDevDriver, CubeStoreHandler, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
 import type {
   ContextToAppIdFn,
@@ -696,20 +697,13 @@ export class CubejsServerCore {
     return this.driver;
   }
 
-  public static createDriver(dbType: DatabaseType) {
+  public static createDriver(dbType: DatabaseType): BaseDriver {
     checkEnvForPlaceholders();
 
-    const module = CubejsServerCore.lookupDriverClass(dbType);
-    if (module.default) {
-      // eslint-disable-next-line new-cap
-      return new module.default();
-    }
-
-    // eslint-disable-next-line new-cap
-    return new module();
+    return new (CubejsServerCore.lookupDriverClass(dbType))();
   }
 
-  protected static lookupDriverClass(dbType) {
+  protected static lookupDriverClass(dbType): Constructor<BaseDriver> & { dialectClass?: () => any; } {
     // eslint-disable-next-line global-require,import/no-dynamic-require
     const module = require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
     if (module.default) {

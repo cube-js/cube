@@ -22,32 +22,21 @@ const databases = envVarsDatabaseMap.reduce<any>(
   []
 );
 
-function testConnection() {
-  const wait = (delay = 2000) =>
-    new Promise((resolve) => setTimeout(resolve, delay));
-  let retries = 0;
+async function testConnection(variables: Record<string, any>) {
+  const response = await fetchWithTimeout('/playground/test-connection', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      variables,
+    }),
+  }, 5 * 1000);
 
-  return new Promise<void>((resolve, reject) => {
-    async function retryFetch(url, options = {}, timeout = 1000) {
-      try {
-        // @ts-ignore
-        const { error } = await (
-          await fetchWithTimeout(url, options, timeout)
-        ).json();
-        error ? reject(error) : resolve();
-      } catch (error) {
-        if (retries >= 2) {
-          reject(error);
-        } else {
-          await wait();
-          retryFetch(url, options, timeout);
-        }
-      }
-      retries++;
-    }
-
-    retryFetch('/playground/test-connection');
-  });
+  const { error } = await response.json();
+  if (error) {
+    throw new Error(error)
+  }
 }
 
 const Layout = styled.div`
@@ -58,7 +47,7 @@ const Layout = styled.div`
   background-color: #fff;
 `;
 
-async function saveConnection(variables) {
+async function saveConnection(variables: Record<string, any>) {
   await fetch('/playground/env', {
     method: 'post',
     headers: {
@@ -68,6 +57,7 @@ async function saveConnection(variables) {
       variables,
     }),
   });
+
   await fetch('/restart');
 }
 
@@ -113,17 +103,20 @@ export default function ConnectionWizardPage({ history }) {
                 disabled={isTestConnectionLoading}
                 onCancel={() => undefined}
                 onSubmit={async (variables) => {
-                  setLoading(true);
-                  await saveConnection(variables);
-                  setLoading(false);
-
                   try {
                     setTestConnectionResult(null);
                     setTestConnectionLoading(true);
-                    await testConnection();
+
+                    await testConnection(variables);
+
                     setTestConnectionResult({
                       success: true,
                     });
+
+                    setLoading(true);
+                    await saveConnection(variables);
+                    setLoading(false);
+
                     history.push('/schema');
                   } catch (error) {
                     setTestConnectionResult({

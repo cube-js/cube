@@ -5,3 +5,5 @@
 export type ResolveAwait<T> = T extends {
   then(onfulfilled?: (value: infer U) => unknown): unknown;
 } ? U : T;
+
+export type Constructor<T> = new (...args: any[]) => T;
