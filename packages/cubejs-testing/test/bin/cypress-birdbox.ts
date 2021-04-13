@@ -25,14 +25,24 @@ import { startBirdBoxFromContainer } from '../../src';
   try {
     const browser = process.env.BIRDBOX_CYPRESS_BROWSER || 'chrome';
 
-    await cypress.run({
+    const results = await cypress.run({
       browser,
-      headless: true,
+      // @todo tput: No value for $TERM and no -T specified
+      // headless: true,
       config: {
         baseUrl: birdbox.configuration.playgroundUrl,
         video: true,
+        taskTimeout: 10 * 1000,
       }
     });
+
+    if (results.status === 'failed') {
+      throw new Error('Cypress failed');
+    }
+
+    if (results.status === 'finished' && results.totalFailed > 0) {
+      throw new Error('Cypress failed');
+    }
   } catch (e) {
     cypressFailed = true;
 

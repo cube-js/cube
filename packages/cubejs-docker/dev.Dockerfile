@@ -23,6 +23,7 @@ COPY yarn.lock .
 COPY tsconfig.base.json .
 COPY packages/cubejs-linter packages/cubejs-linter
 
+# Backend
 COPY rust/package.json rust/package.json
 COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
@@ -50,7 +51,12 @@ COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
 COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/package.json
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
+# Frontend
 COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
+COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
+COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
+COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
+COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
 RUN yarn policies set-version v1.22.5
 
@@ -59,6 +65,7 @@ RUN yarn policies set-version v1.22.5
 #RUN yarn install --frozen-lockfile
 RUN yarn install
 
+# Backend
 COPY rust/ rust/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
@@ -85,9 +92,16 @@ COPY packages/cubejs-server/ packages/cubejs-server/
 COPY packages/cubejs-server-core/ packages/cubejs-server-core/
 COPY packages/cubejs-snowflake-driver/ packages/cubejs-snowflake-driver/
 COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
+# Frontend
 COPY packages/cubejs-templates/ packages/cubejs-templates/
+COPY packages/cubejs-client-core/ packages/cubejs-client-core/
+COPY packages/cubejs-client-react/ packages/cubejs-client-react/
+COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
+COPY packages/cubejs-playground/ packages/cubejs-playground/
 
+RUN yarn build
 RUN yarn lerna run build
+
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
