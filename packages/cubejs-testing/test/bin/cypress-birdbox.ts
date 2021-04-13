@@ -4,17 +4,20 @@ import { startBirdBoxFromContainer } from '../../src';
 (async () => {
   let birdbox;
 
-  console.log('[Birdbox] Starting');
+  const name = process.env.BIRDBOX_CYPRESS_TARGET || 'postgresql-cubestore';
+
+  console.log(`[Birdbox] Starting "${name}"`);
 
   try {
     birdbox = await startBirdBoxFromContainer({
-      name: 'postgresql-cubestore',
+      name,
     });
   } catch (e) {
     console.log(e);
     process.exit(1);
   }
 
+  console.log(`[Birdbox] Started`);
   console.log('[Cypress] Starting');
 
   let cypressFailed = false;
@@ -24,6 +27,7 @@ import { startBirdBoxFromContainer } from '../../src';
 
     await cypress.run({
       browser,
+      headless: true,
       config: {
         baseUrl: birdbox.configuration.playgroundUrl,
         video: true,

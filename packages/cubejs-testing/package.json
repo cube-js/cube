@@ -18,6 +18,7 @@
     "lint:fix": "eslint --fix src/* --ext .ts",
     "dataset:minimal": "node dist/test/bin/download-dataset.js",
     "birdbox": "jest dist/test",
+    "birdbox:start": "node dist/test/bin/start-birdbox.js",
     "birdbox:postgresql": "jest -i dist/test/birdbox-postgresql.test.js",
     "birdbox:postgresql:snapshot": "jest --updateSnapshot -i dist/test/birdbox-postgresql.test.js",
     "birdbox:postgresql-cubestore": "jest -i dist/test/birdbox-postgresql-cubestore.test.js",

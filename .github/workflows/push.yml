@@ -427,3 +427,19 @@ jobs:
           export DEBUG=testcontainers
           yarn run dataset:minimal
           yarn run birdbox:postgresql
+      - name: Testing Docker image via Cypress (Chrome)
+        run: |
+          cd packages/cubejs-testing/
+          export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+          export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
+          export BIRDBOX_CYPRESS_BROWSER=chrome
+          export BIRDBOX_CYPRESS_TARGET=postgresql
+          export DEBUG=testcontainers
+          yarn run cypress:install
+          yarn run cypress:birdbox
+      - name: Upload screenshots on failure
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: cypress-screenshots-docker-dev-${{ matrix.name }}
+          path: packages/cubejs-testing/cypress/screenshots
