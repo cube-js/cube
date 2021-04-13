@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+
+### Bug Fixes
+
+* **playground:** Test connection in Connection Wizard ([715fa1c](https://github.com/cube-js/cube.js/commit/715fa1c0ab6667017e12851cbd97e97cf6807d60))
+* post-install compatibility with yarn ([4641e81](https://github.com/cube-js/cube.js/commit/4641e814909a807ecf49e838e6dc471db6920392))
+
+
+
+
+
 ## [0.26.94](https://github.com/cube-js/cube.js/compare/v0.26.93...v0.26.94) (2021-04-13)
 
 
