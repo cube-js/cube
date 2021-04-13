@@ -108,7 +108,7 @@ class CubejsApi {
         return continueWait(true);
       }
 
-      if (!response.ok) {
+      if (response.status < 200 || response.status > 299) {
         throw new Error(`Request error. Response status: ${response.status}`);
       }
 
