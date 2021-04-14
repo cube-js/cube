@@ -1,7 +1,61 @@
-/* eslint-disable no-restricted-syntax */
 import { expect } from '@jest/globals';
-import cubejs from '@cubejs-client/core';
+import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
+import WebSocketTransport from '@cubejs-client/ws-transport';
+
 import { BirdBox } from '../src';
+
+type QueryTestOptions = {
+  name: string;
+  ws?: true,
+};
+
+const asserts: [options: QueryTestOptions, query: Query][] = [
+  [
+    {
+      name: '#1 Orders.totalAmount',
+      ws: true,
+    },
+    {
+      measures: [
+        'Orders.totalAmount'
+      ],
+      timeDimensions: [],
+      order: {}
+    },
+  ],
+  [
+    {
+      name: '#2 Events.count',
+      ws: true,
+    },
+    {
+      measures: [
+        'Events.count'
+      ],
+      timeDimensions: [],
+      order: {},
+      dimensions: []
+    },
+  ],
+  [
+    {
+      name: '#3 Events.count with Events.type order by Events.count DESC',
+      ws: true,
+    },
+    {
+      measures: [
+        'Events.count'
+      ],
+      timeDimensions: [],
+      order: {
+        'Events.count': 'desc'
+      },
+      dimensions: [
+        'Events.type'
+      ]
+    }
+  ],
+];
 
 // eslint-disable-next-line import/prefer-default-export
 export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<BirdBox>) {
@@ -9,12 +63,25 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     jest.setTimeout(60 * 5 * 1000);
 
     let birdbox: BirdBox;
+    let httpClient: CubejsApi;
+    let wsClient: CubejsApi;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
       // Fail fast
       try {
         birdbox = await entrypoint();
+
+        httpClient = cubejs(async () => 'test', {
+          apiUrl: birdbox.configuration.apiUrl,
+        });
+
+        wsClient = cubejs(async () => 'test', {
+          apiUrl: birdbox.configuration.apiUrl,
+          transport: new WebSocketTransport({
+            apiUrl: birdbox.configuration.apiUrl,
+          }),
+        });
       } catch (e) {
         console.log(e);
         process.exit(1);
@@ -26,62 +93,28 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       await birdbox.stop();
     });
 
-    const asserts: [schema: { name: string }, query: object][] = [
-      [
-        {
-          name: '#1 Orders.totalAmount'
-        },
-        {
-          measures: [
-            'Orders.totalAmount'
-          ],
-          timeDimensions: [],
-          order: {}
-        },
-      ],
-      [
-        {
-          name: '#2 Events.count'
-        },
-        {
-          measures: [
-            'Events.count'
-          ],
-          timeDimensions: [],
-          order: {},
-          dimensions: []
-        },
-      ],
-      [
-        {
-          name: '#3 Events.count with Events.type order by Events.count DESC'
-        },
-        {
-          measures: [
-            'Events.count'
-          ],
-          timeDimensions: [],
-          order: {
-            'Events.count': 'desc'
-          },
-          dimensions: [
-            'Events.type'
-          ]
-        }
-      ],
-    ];
-
-    for (const [schema, query] of asserts) {
-      // eslint-disable-next-line no-loop-func
-      it(schema.name, async () => {
-        const client = cubejs(async () => 'test', {
-          apiUrl: birdbox.configuration.apiUrl,
+    describe('HTTP Transport', () => {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const [options, query] of asserts) {
+        // eslint-disable-next-line no-loop-func
+        it(`${options.name}`, async () => {
+          const response = await httpClient.load(query);
+          expect(response.rawData()).toMatchSnapshot(options.name);
         });
+      }
+    });
 
-        const response = await client.load(query);
-
-        expect(response.rawData()).toMatchSnapshot();
-      });
-    }
+    describe('WS Transport', () => {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const [options, query] of asserts) {
+        if (options.ws) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await httpClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
+      }
+    });
   });
 }

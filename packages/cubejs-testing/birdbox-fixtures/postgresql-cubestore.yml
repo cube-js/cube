@@ -11,6 +11,7 @@ services:
       CUBEJS_DB_USER: test
       CUBEJS_DB_PASS: test
       CUBEJS_DEV_MODE: "true"
+      CUBEJS_WEB_SOCKETS: "true"
       CUBEJS_API_SECRET: mysupersecret
     depends_on:
       - db
