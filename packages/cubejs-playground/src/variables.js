@@ -40,7 +40,7 @@ const VARIABLES = {
   'heading-color': color('dark', 0.65),
   'link-color': color('purple'),
   'info-color': color('purple'),
-  'layout-body-background': '#f6f6f8;',
+  'layout-body-background': '#f3f3fc',
   'layout-header-background': '#eeeef5',
   'menu-highlight-color': color('dark-01'),
   'item-hover-bg': color('light'),

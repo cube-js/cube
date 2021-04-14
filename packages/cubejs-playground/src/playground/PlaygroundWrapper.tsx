@@ -9,7 +9,7 @@ import {
 } from '../components/SecurityContext/SecurityContextProvider';
 
 const StyledWrapper = styled.div`
-  background-color: #f3f3fc;
+  background-color: var(--layout-body-background);
   min-height: 100vh;
 `;
 

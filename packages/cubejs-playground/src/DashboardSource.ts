@@ -75,6 +75,13 @@ class DashboardSource {
           description: 'Angular Material UI Dynamic',
         },
       ];
+    } else if (framework.toLowerCase() === 'vue') {
+      return [
+        {
+          name: 'vue-vuetify-dynamic',
+          description: 'Vue Vuetify UI Dynamic',
+        },
+      ];
     }
 
     return [];
