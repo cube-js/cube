@@ -15,6 +15,17 @@ class DremioFilter extends BaseFilter {
   likeIgnoreCase(column, not, param) {
     return ` ILIKE (${column}${not ? ' NOT' : ''}, CONCAT('%', ${this.allocateParam(param)}, '%'))`;
   }
+
+  castParameter() {
+    if (this.definition().type === 'boolean') {
+      return 'CAST(? AS BOOLEAN)';
+    } else if (this.measure || this.definition().type === 'number') {
+      // TODO here can be measure type of string actually
+      return 'CAST(? AS DOUBLE)';
+    }
+
+    return '?';
+  }
 }
 
 class DremioQuery extends BaseQuery {
