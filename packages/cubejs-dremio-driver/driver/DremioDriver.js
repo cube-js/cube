@@ -101,8 +101,6 @@ class DremioDriver extends BaseDriver {
     for (;;) {
       const { data } = await this.getJobStatus(jobId);
 
-      console.log(data.jobState, jobId);
-
       if (data.jobState === 'FAILED') {
         throw new Error(data.errorMessage);
       } else if (data.jobState === 'CANCELED') {
