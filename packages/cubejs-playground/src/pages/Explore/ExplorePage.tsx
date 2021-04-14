@@ -85,7 +85,8 @@ export default function ExplorePage() {
     if (playgroundContext && livePreviewContext === null) {
       changeApiUrl(
         playgroundContext.apiUrl ||
-          window.location.href.split('#')[0].replace(/\/$/, '')
+          window.location.href.split('#')[0].replace(/\/$/, ''),
+        playgroundContext.basePath
       );
     }
   }, [playgroundContext, livePreviewContext]);

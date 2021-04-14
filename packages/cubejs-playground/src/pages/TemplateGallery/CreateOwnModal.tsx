@@ -192,7 +192,7 @@ const CreateOwnModal = ({
 
         <StyledFormItem label="Web Socket Transport (Real-time)">
           <Switch
-            disabled={framework.toLowerCase() === 'angular'}
+            disabled={framework.toLowerCase() !== 'react'}
             checked={enableWebSocketTransport}
             onChange={(checked) =>
               onChange('enableWebSocketTransport', checked)
