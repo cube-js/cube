@@ -51,6 +51,7 @@ declare module '@cubejs-client/ws-transport' {
         protected messageQueue: Message[];
         constructor({ authorization, apiUrl, heartBeatInterval, hearBeatInterval }: WebSocketTransportOptions);
         set authorization(token: string | undefined);
+        close(): Promise<void>;
         get authorization(): string | undefined;
         protected initSocket(): any;
         protected sendMessage(message: any): void;
