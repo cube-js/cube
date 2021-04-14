@@ -1136,31 +1136,24 @@ impl MetaStoreRpcClientTransport for ClusterMetaStoreClient {
 
 pub struct QueryStream {
     schema: Option<Result<SchemaRef, CubeError>>,
-    results: Vec<SerializedRecordBatchStream>,
+    reversed_results: Vec<SerializedRecordBatchStream>,
 }
 
 impl QueryStream {
     pub fn new_error(e: CubeError) -> QueryStream {
         QueryStream {
             schema: Some(Err(e)),
-            results: Vec::new(),
+            reversed_results: Vec::new(),
         }
     }
 
-    pub fn new(schema: SchemaRef, results: Vec<SerializedRecordBatchStream>) -> QueryStream {
+    pub fn new(schema: SchemaRef, mut results: Vec<SerializedRecordBatchStream>) -> QueryStream {
+        // Reverse as we return items in reverse order later.
+        results.reverse();
         QueryStream {
             schema: Some(Ok(schema)),
-            results,
+            reversed_results: results,
         }
-    }
-
-    fn poll_next_results(&mut self) -> Option<SerializedRecordBatchStream> {
-        if self.results.is_empty() {
-            return None;
-        }
-        let last = self.results.len() - 1;
-        self.results.swap(0, last);
-        self.results.pop()
     }
 }
 
@@ -1171,7 +1164,7 @@ impl MessageStream for QueryStream {
             let finished = s.is_err();
             return (NetworkMessage::SelectResultSchema(s), finished);
         }
-        let batch = self.poll_next_results();
+        let batch = self.reversed_results.pop();
         let finished = batch.is_none();
         (NetworkMessage::SelectResultBatch(Ok(batch)), finished)
     }
