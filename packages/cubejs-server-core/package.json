@@ -54,6 +54,7 @@
     "uuid": "^3.3.3"
   },
   "devDependencies": {
+    "@cubejs-client/playground": "^0.26.96",
     "@cubejs-backend/cubestore-driver": "^0.26.95",
     "@cubejs-backend/linter": "^0.26.74",
     "@types/cross-spawn": "^6.0.2",
@@ -87,6 +88,5 @@
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
     ]
-  },
-  "@cubejs-client/playground": "0.26.96"
+  }
 }
