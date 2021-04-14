@@ -258,7 +258,8 @@ impl PlanRewriter for ChooseIndex<'_> {
     ) -> Result<LogicalPlan, DataFusionError> {
         let p = self.choose_table_index(n)?;
         let p = pull_up_cluster_send(p)?;
-        let p = materialize_topk(p)?;
+        // TODO: fix and re-enable.
+        // let p = materialize_topk(p)?;
         Ok(p)
     }
 }
