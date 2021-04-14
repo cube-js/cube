@@ -802,6 +802,7 @@ pub mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     pub async fn test_materialize_topk() {
         let indices = default_indices();
         let plan = initial_plan(
