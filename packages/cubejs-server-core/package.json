@@ -87,5 +87,6 @@
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
     ]
-  }
+  },
+  "@cubejs-client/playground": "0.26.96"
 }
