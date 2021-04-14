@@ -327,7 +327,6 @@ impl Cluster for ClusterImpl {
             }
             NetworkMessage::SelectStart(..)
             | NetworkMessage::SelectResultSchema(..)
-            | NetworkMessage::SelectNextBatch
             | NetworkMessage::SelectResultBatch(..) => {
                 panic!("streaming request passed to process_message")
             }
@@ -347,8 +346,8 @@ impl Cluster for ClusterImpl {
 }
 
 #[async_trait]
-pub trait MessageStreamProcessor: Send {
-    async fn process(&mut self, m: NetworkMessage) -> (NetworkMessage, /*finished*/ bool);
+pub trait MessageStream: Send {
+    async fn next(&mut self) -> (NetworkMessage, /*finished*/ bool);
 }
 
 pub struct JobResultListener {
@@ -689,24 +688,23 @@ impl ClusterImpl {
                             return;
                         }
                     } else {
-                        let mut p = c.start_stream_on_worker(&m);
-                        let mut request = m;
+                        let mut p = c.start_stream_on_worker(m).await;
                         loop {
-                            let (response, finished) = p.process(request).await;
-                            if let Err(e) = response.send(&mut socket).await {
-                                error!("Network error: {}", e);
-                                return;
-                            }
-                            if finished {
-                                break;
-                            }
-                            match NetworkMessage::maybe_receive(&mut socket).await {
-                                Ok(Some(m)) => request = m,
-                                Ok(None) => break, // server closed connection.
+                            let (response, finished) = p.next().await;
+                            match response.maybe_send(&mut socket).await {
+                                // All ok, continue streaming.
+                                Ok(true) => {}
+                                // Connection closed by client, stop streaming.
+                                Ok(false) => {
+                                    break;
+                                }
                                 Err(e) => {
                                     error!("Network error: {}", e);
                                     return;
                                 }
+                            }
+                            if finished {
+                                break;
                             }
                         }
                     }
@@ -970,34 +968,36 @@ impl ClusterImpl {
     }
 
     #[instrument(level = "trace", skip(self, m))]
-    async fn connect_or_loopback(
+    async fn call_streaming(
         self: &Arc<Self>,
         node_name: &str,
-        m: &NetworkMessage,
+        m: NetworkMessage,
     ) -> Result<Box<dyn WorkerConnection>, CubeError> {
+        assert!(m.is_streaming_request());
         if self.server_name == node_name {
-            let b: Box<dyn WorkerConnection> = Box::new(LoopbackConnection {
-                processor: ClusterImpl::start_stream_on_worker(self.clone(), &m),
+            let c: Box<dyn WorkerConnection> = Box::new(LoopbackConnection {
+                stream: ClusterImpl::start_stream_on_worker(self.clone(), m).await,
             });
-            Ok(b)
+            Ok(c)
         } else {
-            timeout(
-                Duration::from_secs(self.config_obj.query_timeout()),
-                self.cluster_transport
-                    .connect_to_worker(node_name.to_string()),
-            )
-            .await?
+            let mut c = self
+                .cluster_transport
+                .connect_to_worker(node_name.to_string())
+                .await?;
+            c.send(m).await?;
+            Ok(c)
         }
     }
 
-    fn start_stream_on_worker(
-        self: Arc<Self>,
-        m: &NetworkMessage,
-    ) -> Box<dyn MessageStreamProcessor> {
+    async fn start_stream_on_worker(self: Arc<Self>, m: NetworkMessage) -> Box<dyn MessageStream> {
         match m {
-            NetworkMessage::SelectStart(_) => Box::new(QueryStreamer::new(Box::new(move |p| {
-                Box::pin(async move { self.run_local_select_serialized(p).await })
-            }))),
+            NetworkMessage::SelectStart(p) => {
+                let (schema, results) = match self.run_local_select_serialized(p).await {
+                    Err(e) => return Box::new(QueryStream::new_error(e)),
+                    Ok(x) => x,
+                };
+                Box::new(QueryStream::new(schema, results))
+            }
             _ => panic!("non-streaming request passed to start_stream"),
         }
     }
@@ -1008,8 +1008,8 @@ impl ClusterImpl {
         plan: SerializedPlan,
     ) -> Result<SendableRecordBatchStream, CubeError> {
         let init_message = NetworkMessage::SelectStart(plan);
-        let mut c = self.connect_or_loopback(node_name, &init_message).await?;
-        let schema = match c.call(init_message).await? {
+        let mut c = self.call_streaming(node_name, init_message).await?;
+        let schema = match c.receive().await? {
             NetworkMessage::SelectResultSchema(s) => s,
             _ => panic!("unexpected response to select stream"),
         }?;
@@ -1044,7 +1044,7 @@ impl ClusterImpl {
                 if self.pending.is_none() {
                     let mut connection = self.as_mut().connection.take().unwrap();
                     self.pending = Some(Box::pin(async move {
-                        let res = connection.call(NetworkMessage::SelectNextBatch).await;
+                        let res = connection.receive().await;
                         (res, connection)
                     }));
                 }
@@ -1093,13 +1093,17 @@ impl ClusterImpl {
 }
 
 struct LoopbackConnection {
-    processor: Box<dyn MessageStreamProcessor>,
+    stream: Box<dyn MessageStream>,
 }
 
 #[async_trait]
 impl WorkerConnection for LoopbackConnection {
-    async fn call(&mut self, m: NetworkMessage) -> Result<NetworkMessage, CubeError> {
-        Ok(self.processor.process(m).await.0)
+    async fn maybe_send(&mut self, _: NetworkMessage) -> Result<bool, CubeError> {
+        panic!("loopback used to send messages");
+    }
+
+    async fn maybe_receive(&mut self) -> Result<Option<NetworkMessage>, CubeError> {
+        Ok(Some(self.stream.next().await.0))
     }
 }
 
@@ -1130,27 +1134,23 @@ impl MetaStoreRpcClientTransport for ClusterMetaStoreClient {
     }
 }
 
-pub type QueryFn = Box<
-    dyn FnOnce(
-            SerializedPlan,
-        ) -> Pin<
-            Box<
-                dyn Future<
-                        Output = Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>,
-                    > + Send,
-            >,
-        > + Send,
->;
-pub struct QueryStreamer {
-    query_fn: Option<QueryFn>,
+pub struct QueryStream {
+    schema: Option<Result<SchemaRef, CubeError>>,
     results: Vec<SerializedRecordBatchStream>,
 }
 
-impl QueryStreamer {
-    pub fn new(query_fn: QueryFn) -> Self {
-        QueryStreamer {
-            query_fn: Some(query_fn),
+impl QueryStream {
+    pub fn new_error(e: CubeError) -> QueryStream {
+        QueryStream {
+            schema: Some(Err(e)),
             results: Vec::new(),
+        }
+    }
+
+    pub fn new(schema: SchemaRef, results: Vec<SerializedRecordBatchStream>) -> QueryStream {
+        QueryStream {
+            schema: Some(Ok(schema)),
+            results,
         }
     }
 
@@ -1165,24 +1165,14 @@ impl QueryStreamer {
 }
 
 #[async_trait]
-impl MessageStreamProcessor for QueryStreamer {
-    async fn process(&mut self, m: NetworkMessage) -> (NetworkMessage, bool) {
-        match m {
-            NetworkMessage::SelectStart(plan) => {
-                let query_fn = self.query_fn.take().expect("passing SelectStart twice");
-                let (schema, results) = match query_fn(plan).await {
-                    Ok(results) => results,
-                    Err(e) => return (NetworkMessage::SelectResultSchema(Err(e)), true),
-                };
-                self.results = results;
-                (NetworkMessage::SelectResultSchema(Ok(schema)), false)
-            }
-            NetworkMessage::SelectNextBatch => {
-                let batch = self.poll_next_results();
-                let finished = batch.is_none();
-                (NetworkMessage::SelectResultBatch(Ok(batch)), finished)
-            }
-            _ => panic!("unexpected message in select stream"),
+impl MessageStream for QueryStream {
+    async fn next(&mut self) -> (NetworkMessage, bool) {
+        if let Some(s) = self.schema.take() {
+            let finished = s.is_err();
+            return (NetworkMessage::SelectResultSchema(s), finished);
         }
+        let batch = self.poll_next_results();
+        let finished = batch.is_none();
+        (NetworkMessage::SelectResultBatch(Ok(batch)), finished)
     }
 }

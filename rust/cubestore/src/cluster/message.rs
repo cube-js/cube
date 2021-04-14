@@ -12,13 +12,12 @@ pub enum NetworkMessage {
     Select(SerializedPlan),
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
-    /// Select that sends results in batches.
+    /// Select that sends results in batches. The immediate response is [SelectResultSchema],
+    /// followed by a stream of [SelectResultBatch].
     SelectStart(SerializedPlan),
     /// Response to [SelectStart].
     SelectResultSchema(Result<SchemaRef, CubeError>),
-    SelectNextBatch,
-    /// Response to [SelectNextBatch].
-    /// [None] indicates the end of the stream, no further requests should be made.
+    /// [None] indicates the end of the stream.
     SelectResultBatch(Result<Option<SerializedRecordBatchStream>, CubeError>),
 
     WarmupDownload(/*remote_path*/ String),
@@ -39,7 +38,20 @@ impl NetworkMessage {
         }
     }
 
+    /// Returns true iff the client accepted the message.
+    pub async fn maybe_send(&self, socket: &mut TcpStream) -> Result<bool, CubeError> {
+        match self.send_impl(socket).await {
+            Ok(()) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub async fn send(&self, socket: &mut TcpStream) -> Result<(), CubeError> {
+        Ok(self.send_impl(socket).await?)
+    }
+
+    async fn send_impl(&self, socket: &mut TcpStream) -> Result<(), std::io::Error> {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         self.serialize(&mut ser).unwrap();
         let message_buffer = ser.take_buffer();
