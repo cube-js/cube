@@ -12,7 +12,7 @@ type TPlaygroundContext = {
   apiUrl: string;
   cubejsToken: string;
   basePath: string;
-  livePreview: boolean;
+  livePreview?: boolean;
 };
 
 type TLivePreviewContext = {
@@ -100,7 +100,9 @@ export default function ExplorePage() {
 
   return (
     <LivePreviewContextProvider
-      disabled={playgroundContext?.livePreview === false}
+      disabled={
+        playgroundContext?.livePreview == null || !playgroundContext.livePreview
+      }
       onChange={handleChangeLivePreview}
     >
       <CubeProvider cubejsApi={cubejsApi}>
