@@ -1,6 +1,7 @@
 **
 !package.json
 !tsconfig.base.json
+!rollup.config.js
 !yarn.lock
 !lerna.json
 !packages/
@@ -11,9 +12,8 @@
 !rust/bin
 
 packages/*/node_modules/
+packages/*/dist/
 packages/cubejs-jdbc-driver
 packages/cubejs-serverless
 packages/cubejs-serverless-aws
 packages/cubejs-serverless-google
-packages/cubejs-client-ngx
-packages/cubejs-client-vue
