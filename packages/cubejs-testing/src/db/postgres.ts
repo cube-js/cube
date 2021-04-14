@@ -11,8 +11,8 @@ export class PostgresDBRunner extends DbRunnerAbstract {
     const version = process.env.TEST_PGSQL_VERSION || options.version || '9.6.8';
 
     const container = new GenericContainer(`postgres:${version}`)
-      .withEnv('POSTGRES_USER', 'root')
-      .withEnv('POSTGRES_DB', 'model_test')
+      .withEnv('POSTGRES_USER', 'test')
+      .withEnv('POSTGRES_DB', 'test')
       .withEnv('POSTGRES_PASSWORD', 'test')
       .withExposedPorts(5432)
       // .withHealthCheck({
