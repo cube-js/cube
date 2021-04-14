@@ -21,6 +21,7 @@ COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
 COPY tsconfig.base.json .
+COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
 
 # Backend
@@ -55,6 +56,8 @@ COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/pa
 COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
 COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
+COPY packages/cubejs-client-vue/package.json packages/cubejs-client-vue/package.json
+COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.json
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
@@ -96,6 +99,8 @@ COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
 COPY packages/cubejs-templates/ packages/cubejs-templates/
 COPY packages/cubejs-client-core/ packages/cubejs-client-core/
 COPY packages/cubejs-client-react/ packages/cubejs-client-react/
+COPY packages/cubejs-client-vue/ packages/cubejs-client-vue/
+COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
 COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
 COPY packages/cubejs-playground/ packages/cubejs-playground/
 

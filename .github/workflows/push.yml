@@ -314,7 +314,7 @@ jobs:
           driver-opts: network=host
       - name: Build only
         uses: docker/build-push-action@v2
-        timeout-minutes: 15
+        timeout-minutes: 30
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
@@ -388,7 +388,7 @@ jobs:
           driver-opts: network=host
       - name: Build image
         uses: docker/build-push-action@v2
-        timeout-minutes: 15
+        timeout-minutes: 30
         with:
           context: .
           file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
