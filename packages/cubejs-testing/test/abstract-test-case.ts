@@ -65,6 +65,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     let birdbox: BirdBox;
     let httpClient: CubejsApi;
     let wsClient: CubejsApi;
+    let wsTransport: WebSocketTransport;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
@@ -76,11 +77,12 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
           apiUrl: birdbox.configuration.apiUrl,
         });
 
+        wsTransport = new WebSocketTransport({
+          apiUrl: birdbox.configuration.apiUrl,
+        });
         wsClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
-          transport: new WebSocketTransport({
-            apiUrl: birdbox.configuration.apiUrl,
-          }),
+          transport: wsTransport,
         });
       } catch (e) {
         console.log(e);
@@ -90,6 +92,8 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
 
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
+      await wsTransport.close();
+
       await birdbox.stop();
     });
 
