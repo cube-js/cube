@@ -307,7 +307,7 @@ pub fn plan_topk(
         sort,
         &node.snapshots,
         schema.clone(),
-        /*use_streaming*/ false, // TODO: enable streaming.
+        /*use_streaming*/ true,
         /*max_batch_rows*/ max(2 * node.limit, MIN_TOPK_STREAM_ROWS),
     )?;
     let agg_fun = node
