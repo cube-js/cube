@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Bug Fixes
+
+* **dreamio-driver:** Allow casting boolean/number/measure ([#2560](https://github.com/cube-js/cube.js/issues/2560)) ([4ff93fe](https://github.com/cube-js/cube.js/commit/4ff93fe44a79926044ec5e2cbe291276ca0e3235))
+* **dreamio-driver:** Remove unexpected console.log ([#2561](https://github.com/cube-js/cube.js/issues/2561)) ([a3beee7](https://github.com/cube-js/cube.js/commit/a3beee76f4797a3a073762a2013362dfd88b136b))
+
+
+
+
+
 ## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
 
 **Note:** Version bump only for package @cubejs-backend/dremio-driver

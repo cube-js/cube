@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Bug Fixes
+
+* **cubestore:** allow to disable top-k with env var ([9c2838a](https://github.com/cube-js/cube.js/commit/9c2838aecf2980fa3c076aa812f12fef05924344)), closes [#2559](https://github.com/cube-js/cube.js/issues/2559)
+* **cubestore:** re-enable streaming for top-k ([c21b5f7](https://github.com/cube-js/cube.js/commit/c21b5f7690d5de7570034449d24a7842dfd097c6))
+
+
+
+
+
 ## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
 
 

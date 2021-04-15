@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** live preview check ([5b4b5b8](https://github.com/cube-js/cube.js/commit/5b4b5b818c1a8d095cd821494b3f2785428a60cb))
+* **cubestore:** allow to disable top-k with env var ([9c2838a](https://github.com/cube-js/cube.js/commit/9c2838aecf2980fa3c076aa812f12fef05924344)), closes [#2559](https://github.com/cube-js/cube.js/issues/2559)
+* **cubestore:** re-enable streaming for top-k ([c21b5f7](https://github.com/cube-js/cube.js/commit/c21b5f7690d5de7570034449d24a7842dfd097c6))
+* **docker:** Build playground for dev images ([42a75db](https://github.com/cube-js/cube.js/commit/42a75db492663d2ba296601ed42842a88176d4da))
+* **dreamio-driver:** Allow casting boolean/number/measure ([#2560](https://github.com/cube-js/cube.js/issues/2560)) ([4ff93fe](https://github.com/cube-js/cube.js/commit/4ff93fe44a79926044ec5e2cbe291276ca0e3235))
+* **dreamio-driver:** Remove unexpected console.log ([#2561](https://github.com/cube-js/cube.js/issues/2561)) ([a3beee7](https://github.com/cube-js/cube.js/commit/a3beee76f4797a3a073762a2013362dfd88b136b))
+
+
+### Features
+
+* **ws-transport:** Introduce close() method ([47394c1](https://github.com/cube-js/cube.js/commit/47394c195fc7513c664c6e1e35b43a6883924491))
+
+
+
+
+
 ## [0.26.97](https://github.com/cube-js/cube.js/compare/v0.26.96...v0.26.97) (2021-04-14)
 
 **Note:** Version bump only for package cubejs

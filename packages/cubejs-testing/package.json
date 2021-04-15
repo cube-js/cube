@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.26.95",
+  "version": "0.26.98",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -35,7 +35,7 @@
   ],
   "dependencies": {
     "@cubejs-backend/shared": "^0.26.95",
-    "@cubejs-client/ws-transport": "^0.26.94",
+    "@cubejs-client/ws-transport": "^0.26.98",
     "fs-extra": "^8.1.0",
     "testcontainers": "^7.5.0"
   },

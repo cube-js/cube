@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Bug Fixes
+
+* **docker:** Build playground for dev images ([42a75db](https://github.com/cube-js/cube.js/commit/42a75db492663d2ba296601ed42842a88176d4da))
+
+
+
+
+
 ## [0.26.97](https://github.com/cube-js/cube.js/compare/v0.26.96...v0.26.97) (2021-04-14)
 
 **Note:** Version bump only for package @cubejs-backend/docker

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Features
+
+* **ws-transport:** Introduce close() method ([47394c1](https://github.com/cube-js/cube.js/commit/47394c195fc7513c664c6e1e35b43a6883924491))
+
+
+
+
+
 ## [0.26.94](https://github.com/cube-js/cube.js/compare/v0.26.93...v0.26.94) (2021-04-13)
 
 **Note:** Version bump only for package @cubejs-client/ws-transport
