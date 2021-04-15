@@ -284,59 +284,6 @@ By default, Cube.js will store all content versions for 10 minutes and all
 structure versions for 7 days. Then it will retain only the most recent ones and
 orphaned tables are dropped from the database.
 
-## Running Cube Store in production
-
-### With Docker
-
-Start Cube Store in a Docker container and bind port `3030` to `127.0.0.1`:
-
-```bash
-docker run -d -p 3030:3030 cubejs/cubestore:edge
-```
-
-Configure Cube.js to use the above connection for an external database via the
-`.env` file:
-
-```dotenv
-CUBEJS_EXT_DB_TYPE=cubestore
-CUBEJS_EXT_DB_HOST=127.0.0.1
-```
-
-### With Docker Compose
-
-Create a `docker-compose.yml` file with the following content:
-
-```yml
-version: '2.2'
-services:
-  cubestore:
-    image: cubejs/cubestore:edge
-
-  cube:
-    image: cubejs/cube:latest
-    ports:
-      # 4000 is a port for Cube.js API
-      - 4000:4000
-      # 3000 is a port for Playground web server
-      # it is available only in dev mode
-      - 3000:3000
-    env_file: .env
-    depends_on:
-      - cubestore
-    links:
-      - cubestore
-    volumes:
-      - ./schema:/cube/conf/schema
-```
-
-Configure Cube.js to use the above connection for an external database via the
-`.env` file:
-
-```dotenv
-CUBEJS_EXT_DB_TYPE=cubestore
-CUBEJS_EXT_DB_HOST=cubestore
-```
-
 ## Inspecting Pre-Aggregations
 
 Cube Store partially supports the MySQL protocol. This allows you to execute
@@ -350,32 +297,42 @@ SELECT * FROM information_schema.tables;
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
 folder in the project root during development.
 
-## Scaling
+## Running in Production
 
-Cube Store can be run in a single instance mode; but this is usually unsuitable
+### Scaling
+
+Cube Store can be run in a single instance mode, but this is usually unsuitable
 for production deployments. For high concurrency and data throughput, we
-recommend running Cube Store as a cluster of multiple instances instead. Cube
-Store instances can be configured to be either a "router" instance or a "worker"
-instance through the `XXX` environment variable.
+**strongly** recommend running Cube Store as a cluster of multiple instances
+instead.
 
-A typical Cube Store cluster would consist of:
+In cluster mode, Cube Store runs two kinds of nodes:
 
-- A single "router" instance, which acts as a load balancer and request entry
-  point for the cluster
-- One or more worker instances
+- a single **router** node handles incoming client connections, manages database
+  metadata and serves simple queries.
+- multiple **worker** nodes which execute SQL queries
 
-Both the router and worker instances must be able to read and write to file
-storage (as detailed in the next section). To improve concurrency, simply spin
-up more worker instances.
+In terms of configuration, both the router and worker nodes **must** specify the
+`CUBESTORE_SERVER_NAME` environment variable. Additionally, the router node
+**must** specify the `CUBESTORE_META_PORT` and `CUBESTORE_WORKERS` environment
+variables; worker nodes **must** specify the `CUBESTORE_WORKER_PORT` and
+`CUBESTORE_META_ADDR` environment variables. More information about these
+variables can be found [in the Environment Variables reference][ref-config-env].
 
-## Storage
+### Storage
+
+<!-- prettier-ignore-start -->
+[[warning | ]]
+| Cube Store can only use one type of remote storage at runtime.
+<!-- prettier-ignore-end -->
 
 Cube Store requires read/write access to file storage in order to persist
 pre-aggregations as well as maintain its' own internal state. Currently, Cube
-Store can use a local path on the machine, or AWS S3 and Google Cloud for
-highly-available, cloud storage.
+Store can use a local path on the machine; alternatively both AWS S3 and Google
+Cloud are supported as highly-available, cloud storage.
 
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
+[ref-config-env]: /reference/environment-variables#cube-store
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
 [ref-preaggs]: /pre-aggregations
 [ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
