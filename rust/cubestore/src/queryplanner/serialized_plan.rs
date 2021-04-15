@@ -143,6 +143,7 @@ pub enum SerializedLogicalPlan {
         sort_columns: Vec<SortColumn>,
         schema: DFSchemaRef,
         snapshots: Vec<Vec<IndexSnapshot>>,
+        use_streaming: bool,
     },
 }
 
@@ -273,6 +274,7 @@ impl SerializedLogicalPlan {
                 sort_columns,
                 schema,
                 snapshots,
+                use_streaming,
             } => ClusterAggregateTopK {
                 limit: *limit,
                 input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
@@ -281,6 +283,7 @@ impl SerializedLogicalPlan {
                 order_by: sort_columns.clone(),
                 schema: schema.clone(),
                 snapshots: snapshots.clone(),
+                use_streaming: *use_streaming,
             }
             .into_plan(),
         })
@@ -617,6 +620,7 @@ impl SerializedPlan {
                         sort_columns: topk.order_by.clone(),
                         schema: topk.schema.clone(),
                         snapshots: topk.snapshots.clone(),
+                        use_streaming: topk.use_streaming,
                     }
                 } else {
                     panic!("unknown extension");

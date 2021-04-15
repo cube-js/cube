@@ -50,13 +50,14 @@ pub async fn choose_index(
     p: &LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
-    choose_index_ext(p, metastore, true).await
+    choose_index_ext(p, metastore, true, true).await
 }
 
 pub async fn choose_index_ext(
     p: &LogicalPlan,
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
+    enable_topk_streaming: bool,
 ) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -101,6 +102,7 @@ pub async fn choose_index_ext(
         chosen_indices: &indices,
         next_index: 0,
         enable_topk,
+        enable_topk_streaming,
     };
     let plan = rewrite_plan(p, &(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
@@ -257,6 +259,7 @@ struct ChooseIndex<'a> {
     next_index: usize,
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
+    enable_topk_streaming: bool,
 }
 
 impl PlanRewriter for ChooseIndex<'_> {
@@ -270,7 +273,7 @@ impl PlanRewriter for ChooseIndex<'_> {
         let p = self.choose_table_index(n)?;
         let mut p = pull_up_cluster_send(p)?;
         if self.enable_topk {
-            p = materialize_topk(p)?;
+            p = materialize_topk(p, self.enable_topk_streaming)?;
         }
         Ok(p)
     }

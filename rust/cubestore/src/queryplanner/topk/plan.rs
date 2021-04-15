@@ -15,7 +15,10 @@ use std::cmp::max;
 use std::sync::Arc;
 
 /// Replaces `Limit(Sort(Aggregate(ClusterSend)))` with [ClusterAggregateTopK] when possible.
-pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
+pub fn materialize_topk(
+    p: LogicalPlan,
+    use_streaming: bool,
+) -> Result<LogicalPlan, DataFusionError> {
     match &p {
         LogicalPlan::Limit {
             n: limit,
@@ -73,6 +76,7 @@ pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> 
                                         order_by: sort_columns,
                                         schema: aggregate_schema.clone(),
                                         snapshots: cs.snapshots.clone(),
+                                        use_streaming,
                                     }),
                                 };
                                 if let Some(p) = projection {
@@ -303,12 +307,17 @@ pub fn plan_topk(
 
     // Send results to router.
     let schema = sort_schema.clone();
+    let max_batch_rows = if node.use_streaming {
+        max(2 * node.limit, MIN_TOPK_STREAM_ROWS)
+    } else {
+        usize::MAX
+    };
     let cluster = ext_planner.plan_cluster_send(
         sort,
         &node.snapshots,
         schema.clone(),
-        /*use_streaming*/ true,
-        /*max_batch_rows*/ max(2 * node.limit, MIN_TOPK_STREAM_ROWS),
+        node.use_streaming,
+        max_batch_rows,
     )?;
     let agg_fun = node
         .aggregate_expr

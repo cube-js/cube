@@ -87,6 +87,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 &logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
+                self.config.enable_topk_streaming(),
             )
             .await?;
             QueryPlan::Select(SerializedPlan::try_new(logical_plan, index_snapshots).await?)

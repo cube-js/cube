@@ -30,6 +30,7 @@ pub struct ClusterAggregateTopK {
     pub order_by: Vec<SortColumn>,
     pub schema: DFSchemaRef,
     pub snapshots: Vec<Vec<IndexSnapshot>>,
+    pub use_streaming: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -116,6 +117,7 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
             order_by: self.order_by.clone(),
             schema: self.schema.clone(),
             snapshots: self.snapshots.clone(),
+            use_streaming: self.use_streaming,
         })
     }
 }
