@@ -10,9 +10,10 @@ pub use topk::MIN_TOPK_STREAM_ROWS;
 pub mod udfs;
 
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStore, MetaStoreTable};
-use crate::queryplanner::planning::choose_index;
+use crate::queryplanner::planning::choose_index_ext;
 use crate::queryplanner::query_executor::batch_to_dataframe;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -55,6 +56,7 @@ crate::di_service!(MockQueryPlanner, [QueryPlanner]);
 
 pub struct QueryPlannerImpl {
     meta_store: Arc<dyn MetaStore>,
+    config: Arc<dyn ConfigObj>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -81,8 +83,12 @@ impl QueryPlanner for QueryPlannerImpl {
         trace!("Logical Plan: {:#?}", &logical_plan);
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
-            let (logical_plan, index_snapshots) =
-                choose_index(&logical_plan, &self.meta_store.as_ref()).await?;
+            let (logical_plan, index_snapshots) = choose_index_ext(
+                &logical_plan,
+                &self.meta_store.as_ref(),
+                self.config.enable_topk(),
+            )
+            .await?;
             QueryPlan::Select(SerializedPlan::try_new(logical_plan, index_snapshots).await?)
         } else {
             QueryPlan::Meta(logical_plan)
@@ -113,8 +119,11 @@ impl QueryPlanner for QueryPlannerImpl {
 }
 
 impl QueryPlannerImpl {
-    pub fn new(meta_store: Arc<dyn MetaStore>) -> Arc<QueryPlannerImpl> {
-        Arc::new(QueryPlannerImpl { meta_store })
+    pub fn new(
+        meta_store: Arc<dyn MetaStore>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Arc<QueryPlannerImpl> {
+        Arc::new(QueryPlannerImpl { meta_store, config })
     }
 }
 

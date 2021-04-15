@@ -210,6 +210,8 @@ pub trait ConfigObj: DIService {
     fn max_ingestion_data_frames(&self) -> usize;
 
     fn upload_to_remote(&self) -> bool;
+
+    fn enable_topk(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -237,6 +239,7 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
+    pub enable_topk: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -326,6 +329,10 @@ impl ConfigObj for ConfigObjImpl {
     fn upload_to_remote(&self) -> bool {
         self.upload_to_remote
     }
+
+    fn enable_topk(&self) -> bool {
+        self.enable_topk
+    }
 }
 
 lazy_static! {
@@ -336,6 +343,17 @@ lazy_static! {
 lazy_static! {
     pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
         tokio::sync::RwLock::new(false);
+}
+
+fn env_bool(name: &str, default: bool) -> bool {
+    env::var(name)
+        .ok()
+        .map(|x| match x.as_str() {
+            "0" => false,
+            "1" => true,
+            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+        })
+        .unwrap_or(default)
 }
 
 impl Config {
@@ -422,6 +440,7 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
+                enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
             }),
         }
     }
@@ -461,6 +480,7 @@ impl Config {
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
+                enable_topk: true,
             }),
         }
     }
@@ -753,7 +773,7 @@ impl Config {
 
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(i.get_service_typed().await)
+                QueryPlannerImpl::new(i.get_service_typed().await, i.get_service_typed().await)
             })
             .await;
 

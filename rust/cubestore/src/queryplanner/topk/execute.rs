@@ -650,7 +650,11 @@ fn cmp_same_types(l: &ScalarValue, r: &ScalarValue, nulls_first: bool, asc: bool
         (ScalarValue::List(_, _), ScalarValue::List(_, _)) => {
             panic!("list as accumulator result is not supported")
         }
-        (_, _) => panic!("unhandled types in comparison"),
+        (l, r) => panic!(
+            "unhandled types in comparison: {} and {}",
+            l.get_datatype(),
+            r.get_datatype()
+        ),
     };
     if asc {
         o

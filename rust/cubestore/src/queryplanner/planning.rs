@@ -45,9 +45,18 @@ use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTop
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
 
+#[cfg(test)]
 pub async fn choose_index(
     p: &LogicalPlan,
     metastore: &dyn PlanIndexStore,
+) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
+    choose_index_ext(p, metastore, true).await
+}
+
+pub async fn choose_index_ext(
+    p: &LogicalPlan,
+    metastore: &dyn PlanIndexStore,
+    enable_topk: bool,
 ) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -91,6 +100,7 @@ pub async fn choose_index(
     let mut r = ChooseIndex {
         chosen_indices: &indices,
         next_index: 0,
+        enable_topk,
     };
     let plan = rewrite_plan(p, &(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
@@ -246,6 +256,7 @@ impl PlanRewriter for CollectConstraints {
 struct ChooseIndex<'a> {
     next_index: usize,
     chosen_indices: &'a [IndexSnapshot],
+    enable_topk: bool,
 }
 
 impl PlanRewriter for ChooseIndex<'_> {
@@ -257,9 +268,10 @@ impl PlanRewriter for ChooseIndex<'_> {
         _: &Self::Context,
     ) -> Result<LogicalPlan, DataFusionError> {
         let p = self.choose_table_index(n)?;
-        let p = pull_up_cluster_send(p)?;
-        // TODO: fix and re-enable.
-        // let p = materialize_topk(p)?;
+        let mut p = pull_up_cluster_send(p)?;
+        if self.enable_topk {
+            p = materialize_topk(p)?;
+        }
         Ok(p)
     }
 }
@@ -802,7 +814,6 @@ pub mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     pub async fn test_materialize_topk() {
         let indices = default_indices();
         let plan = initial_plan(
