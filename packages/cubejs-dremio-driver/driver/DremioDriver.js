@@ -1,12 +1,13 @@
 const axios = require('axios');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const SqlString = require('sqlstring');
-const { getEnv } = require('@cubejs-backend/shared');
+const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { getEnv, pausePromise } = require('@cubejs-backend/shared');
+
 const DremioQuery = require('./DremioQuery');
 
 // limit - Determines how many rows are returned (maximum of 500). Default: 100
 // @see https://docs.dremio.com/rest-api/jobs/get-job.html
-const dremioJobLimit = 500;
+const DREMIO_JOB_LIMIT = 500;
 
 const applyParams = (query, params) => SqlString.format(query, params);
 
@@ -35,15 +36,21 @@ class DremioDriver extends BaseDriver {
     this.config.url = `${protocol}://${this.config.host}:${this.config.port}`;
   }
 
+  /**
+   * @public
+   * @return {Promise<void>}
+   */
   async testConnection() {
-    await this.getToken();
-    return true;
+    return this.getToken();
   }
 
   quoteIdentifier(identifier) {
     return `"${identifier}"`;
   }
 
+  /**
+   * @protected
+   */
   async getToken() {
     if (this.authToken && this.authToken.expires > new Date().getTime()) {
       return `_dremio${this.authToken.token}`;
@@ -58,34 +65,67 @@ class DremioDriver extends BaseDriver {
     return `_dremio${this.authToken.token}`;
   }
 
-  async restDremioQuery(type, url, data) {
+  /**
+   * @protected
+   *
+   * @param {string} method
+   * @param {string} url
+   * @param {object} [data]
+   * @return {Promise<AxiosResponse<any>>}
+   */
+  async restDremioQuery(method, url, data) {
     const token = await this.getToken();
-    if (type === 'get') {
-      return axios[type](`${this.config.url}${url}`, {
-        headers: {
-          Authorization: token
-        }
-      });
-    }
-    return axios[type](`${this.config.url}${url}`, data, {
+
+    return axios.request({
+      method,
+      url: `${this.config.url}${url}`,
       headers: {
         Authorization: token
-      }
+      },
+      data,
     });
   }
 
+  /**
+   * @protected
+   */
   async getJobStatus(jobId) {
-    return this.restDremioQuery('get', `/api/v3/job/${jobId}`);
+    const { data } = await this.restDremioQuery('get', `/api/v3/job/${jobId}`);
+
+    if (data.jobState === 'FAILED') {
+      throw new Error(data.errorMessage);
+    }
+
+    if (data.jobState === 'CANCELED') {
+      throw new Error(`Job ${jobId} has been canceled`);
+    }
+
+    if (data.jobState === 'COMPLETED') {
+      return data;
+    }
+
+    return null;
   }
 
+  /**
+   * @protected
+   */
   async getJobResults(jobId, limit = 500, offset = 0) {
     return this.restDremioQuery('get', `/api/v3/job/${jobId}/results?offset=${offset}&limit=${limit}`);
   }
 
-  async sleep(time) {
-    await new Promise((resolve) => setTimeout(resolve, time));
+  /**
+   * @protected
+   */
+  async getJobFullResults(jobId, limit = 500, offset = 0) {
+    return this.restDremioQuery('get', `/api/v3/job/${jobId}/results?offset=${offset}&limit=${limit}`);
   }
 
+  /**
+   * @protected
+   * @param {string} sql
+   * @return {Promise<*>}
+   */
   async executeQuery(sql) {
     const { data } = await this.restDremioQuery('post', '/api/v3/sql', { sql });
     return data.id;
@@ -105,32 +145,27 @@ class DremioDriver extends BaseDriver {
     const startedTime = Date.now();
 
     for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
-      const { data } = await this.getJobStatus(jobId);
+      const job = await this.getJobStatus(jobId);
+      if (job) {
+        const queries = [];
 
-      if (data.jobState === 'FAILED') {
-        throw new Error(data.errorMessage);
-      } else if (data.jobState === 'CANCELED') {
-        throw new Error(`Job ${jobId} has been canceled`);
-      } else if (data.jobState === 'COMPLETED') {
-        let rows = [];
-        const querys = [];
-
-        for (let j = 0; j < data.rowCount; j += dremioJobLimit) {
-          querys.push(this.getJobResults(jobId, dremioJobLimit, j));
+        for (let offset = 0; offset < job.rowCount; offset += DREMIO_JOB_LIMIT) {
+          queries.push(this.getJobResults(jobId, DREMIO_JOB_LIMIT, offset));
         }
 
-        const parts = await Promise.all(querys);
-        parts.forEach((e) => {
-          rows = rows.concat(e.data.rows);
-        });
+        const results = await Promise.all(queries);
 
-        return rows;
+        return results.reduce(
+          (result, { data }) => result.concat(data.rows),
+          []
+        );
       }
 
-      await this.sleep(
+      await pausePromise(
         Math.min(this.config.pollMaxInterval, 200 * i),
       );
     }
+
     throw new Error(
       `DremioQuery job timeout reached ${this.config.pollTimeout}ms`,
     );
@@ -142,12 +177,12 @@ class DremioDriver extends BaseDriver {
       return true;
     }
 
-    const querys = data.children.map(element => {
+    const queries = data.children.map(element => {
       const url = element.path.join('/');
       return this.refreshTablesSchema(url);
     });
 
-    return Promise.all(querys);
+    return Promise.all(queries);
   }
 
   async tablesSchema() {

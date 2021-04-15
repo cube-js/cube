@@ -13,7 +13,8 @@
   },
   "main": "driver/DremioDriver.js",
   "scripts": {
-    "lint": "eslint driver/*.js"
+    "lint": "eslint driver/*.js",
+    "lint:fix": "eslint driver/*.js"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.26.95",
