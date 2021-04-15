@@ -3000,7 +3000,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn planning_inplace_aggregate2() {
         Config::run_test("planning_inplace_aggregate2", async move |services| {
             let service = services.sql_service;
