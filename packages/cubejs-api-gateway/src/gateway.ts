@@ -957,7 +957,7 @@ export class ApiGateway {
       }
     } catch (e) {
       if (e instanceof UserError) {
-        res.status(403).json({ error: e.message });
+        res.status(e.status).json({ error: e.message });
       } else {
         this.log({
           type: 'Auth Error',
