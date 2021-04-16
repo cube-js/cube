@@ -164,8 +164,7 @@ describe('API Gateway', () => {
   test('requires auth', async () => {
     const { app } = createApiGateway();
 
-    // 400, because it's bad request
-    const res = await request(app).get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}').expect(400);
+    const res = await request(app).get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}').expect(403);
     expect(res.body && res.body.error).toStrictEqual('Authorization header isn\'t set');
   });
 
@@ -521,8 +520,7 @@ describe('API Gateway', () => {
       return request(app)
         .get('/cubejs-system/v1/context')
         .set('Content-type', 'application/json')
-        // forbidden, no token
-        .expect(400);
+        .expect(403);
     });
 
     test('not route (works only with playgroundAuthSecret)', async () => {
