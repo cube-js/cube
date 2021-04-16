@@ -498,16 +498,14 @@ impl Config {
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         self.start_test_with_options(true, test_fn).await
     }
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         self.start_test_with_options(false, test_fn).await
     }
@@ -517,8 +515,7 @@ impl Config {
         clean_remote: bool,
         test_fn: impl FnOnce(CubeServices) -> T,
     ) where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -566,8 +563,7 @@ impl Config {
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         Self::test(name).start_test(test_fn).await;
     }
