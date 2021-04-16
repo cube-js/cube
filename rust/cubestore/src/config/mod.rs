@@ -895,7 +895,7 @@ impl Config {
         self.cube_services().await
     }
 
-    pub fn configure_worker(&self) {
+    pub fn configure_worker_services() {
         let mut services = WORKER_SERVICES.write().unwrap();
         *services = Some(WorkerServices {
             query_executor: Arc::new(QueryExecutorImpl),
