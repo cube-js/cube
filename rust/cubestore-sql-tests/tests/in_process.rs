@@ -4,7 +4,7 @@ use cubestore_sql_tests::run_sql_tests;
 use tokio::runtime::Builder;
 
 fn main() {
-    run_sql_tests("in_process", |test_name, test_fn| {
+    run_sql_tests("in_process", vec![], |test_name, test_fn| {
         let r = Builder::new_current_thread().enable_all().build().unwrap();
         // Add a suffix to avoid clashes with other configurations run concurrently.
         // TODO: run each test in unique temp folder.

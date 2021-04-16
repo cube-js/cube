@@ -9,7 +9,7 @@ fn main() {
     Config::configure_worker_services();
     procspawn::init(); // TODO: logs on workers.
 
-    run_sql_tests("multi_process", |test_name, test_fn| {
+    run_sql_tests("multi_process", vec![], |test_name, test_fn| {
         let r = Builder::new_current_thread().enable_all().build().unwrap();
         // Add a suffix to avoid clashes with other configurations run concurrently.
         // TODO: run each test in unique temp folder.
