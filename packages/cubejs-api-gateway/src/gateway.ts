@@ -896,7 +896,7 @@ export class ApiGateway {
           req.securityContext = await checkAuthFn(auth, secret);
         } catch (e) {
           if (this.enforceSecurityChecks) {
-            throw new UserError('Invalid token');
+            throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
           } else {
             this.log({
               type: e.message,
@@ -956,8 +956,8 @@ export class ApiGateway {
         next();
       }
     } catch (e) {
-      if (e instanceof UserError) {
-        res.status(403).json({ error: e.message });
+      if (e instanceof CubejsHandlerError) {
+        res.status(e.status).json({ error: e.message });
       } else {
         this.log({
           type: 'Auth Error',

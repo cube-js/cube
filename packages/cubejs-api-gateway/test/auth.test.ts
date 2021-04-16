@@ -1,9 +1,9 @@
 import express, { Application as ExpressApplication, RequestHandler } from 'express';
 import request from 'supertest';
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { pausePromise } from '@cubejs-backend/shared';
 
-import { ApiGateway, ApiGatewayOptions, Request } from '../src';
+import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request } from '../src';
 import { AdapterApiMock, DataSourceStorageMock } from './index.test';
 import { RequestContext } from '../src/interfaces';
 import { generateAuthToken } from './utils';
@@ -217,6 +217,33 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
     // authInfo was deprecated, but should exists as computability
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
+  });
+
+  test('custom checkAuth with async flow and throw exception', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      checkAuth: async () => {
+        throw new CubejsHandlerError(555, 'unknown', 'unknown message');
+      }
+    });
+
+    const token = generateAuthToken({ uid: 5, });
+
+    const res = await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(555);
+
+    expect(res.body).toMatchObject({
+      error: 'unknown message'
+    });
   });
 
   test('custom checkAuth with deprecated authInfo', async () => {
