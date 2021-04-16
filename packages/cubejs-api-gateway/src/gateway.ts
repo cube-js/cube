@@ -867,11 +867,19 @@ export class ApiGateway {
       checkAuthFn = async (auth) => {
         const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
         if (!decoded) {
-          throw new UserError('Unable to decode JWT key');
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden',
+            'Unable to decode JWT key'
+          );
         }
 
         if (!decoded.header || !decoded.header.kid) {
-          throw new UserError('JWT without kid inside headers');
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden',
+            'JWT without kid inside headers'
+          );
         }
 
         const jwk = await jwks.getJWKbyKid(
@@ -879,8 +887,10 @@ export class ApiGateway {
           decoded.header.kid
         );
         if (!jwk) {
-          throw new UserError(
-            `Unable to verify, JWK with kid: "${decoded.header.kid}" not found`,
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden',
+            `Unable to verify, JWK with kid: "${decoded.header.kid}" not found`
           );
         }
 
@@ -906,7 +916,8 @@ export class ApiGateway {
           }
         }
       } else if (this.enforceSecurityChecks) {
-        throw new UserError('Authorization header isn\'t set');
+        // @todo Move it to 401 or 400
+        throw new CubejsHandlerError(403, 'Forbidden', 'Authorization header isn\'t set');
       }
     };
   }
