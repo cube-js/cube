@@ -14,6 +14,8 @@ use test::TestFn::DynTestFn;
 use test::{ShouldPanic, TestDesc, TestDescAndFn, TestName, TestType};
 use tests::sql_tests;
 
+#[cfg(not(target_os = "windows"))]
+pub mod multiproc;
 mod tests;
 
 #[async_trait]
@@ -24,7 +26,8 @@ pub trait SqlClient: Send + Sync {
 
 pub fn run_sql_tests(
     prefix: &str,
-    runner: impl Fn(/*test_name*/ &str, &TestFn) + RefUnwindSafe + Send + Sync + Clone + 'static,
+    extra_args: Vec<String>,
+    runner: impl Fn(/*test_name*/ &str, TestFn) + RefUnwindSafe + Send + Sync + Clone + 'static,
 ) {
     let tests = sql_tests()
         .into_iter()
@@ -38,12 +41,16 @@ pub fn run_sql_tests(
                     allow_fail: false,
                     test_type: TestType::IntegrationTest,
                 },
-                testfn: DynTestFn(Box::new(move || runner(name, &test_fn))),
+                testfn: DynTestFn(Box::new(move || runner(name, test_fn))),
             }
         })
         .collect();
 
-    test::test_main(&env::args().collect::<Vec<String>>(), tests, None);
+    test::test_main(
+        &env::args().chain(extra_args).collect::<Vec<String>>(),
+        tests,
+        None,
+    );
 }
 
 #[async_trait]

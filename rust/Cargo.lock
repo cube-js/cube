@@ -1156,9 +1156,13 @@ dependencies = [
  "async-trait",
  "cubestore",
  "futures 0.3.13",
+ "ipc-channel",
  "itertools 0.9.0",
  "pretty_assertions",
  "procspawn",
+ "scopeguard",
+ "serde",
+ "serde_derive",
  "tokio 1.3.0",
 ]
 
