@@ -28,7 +28,7 @@ fn main() {
 
     let config = Config::default();
 
-    config.configure_worker();
+    Config::configure_worker_services();
 
     debug!("New process started");
 

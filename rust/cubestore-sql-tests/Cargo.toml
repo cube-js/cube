@@ -17,6 +17,14 @@ name = "in-process"
 path = "tests/in_process.rs"
 harness = false
 
+[[test]]
+name = "multi-process"
+path = "tests/multi_process.rs"
+harness = false
+
+[target.'cfg(not(target_os = "windows"))'.dev-dependencies]
+procspawn = { version = "0.9.0", features = ["test-support"] }
+
 [dependencies]
 async-trait = "0.1.36"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }

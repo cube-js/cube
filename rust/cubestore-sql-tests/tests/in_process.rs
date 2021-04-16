@@ -1,3 +1,4 @@
+//! Runs SQL tests in a single process.
 use cubestore::config::Config;
 use cubestore_sql_tests::run_sql_tests;
 use tokio::runtime::Builder;
