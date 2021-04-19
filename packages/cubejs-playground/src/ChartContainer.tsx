@@ -201,6 +201,7 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
     const chartLibrariesMenu =
       (chartLibraries[framework] || []).length > 0 ? (
         <Menu
+          data-testid="charting-library-dropdown"
           onClick={(e) => {
             playgroundAction('Set Chart Library', { chartingLibrary: e.key });
             setChartLibrary(e.key);
@@ -214,6 +215,7 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
 
     const frameworkMenu = (
       <Menu
+        data-testid="framework-dropdown"
         onClick={(e) => {
           if (e.key === framework) {
             return;
@@ -248,7 +250,7 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
         <SectionRow>
           <Button.Group>
             <Dropdown overlay={frameworkMenu} disabled={isFetchingMeta}>
-              <Button size="small">
+              <Button data-testid="framework-btn" size="small">
                 {frameworkItem?.title}
                 <DownOutlined />
               </Button>
@@ -259,7 +261,7 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
                 overlay={chartLibrariesMenu}
                 disabled={!frameworkItem?.supported || isFetchingMeta}
               >
-                <Button size="small">
+                <Button data-testid="charting-library-btn" size="small">
                   {currentLibraryItem?.title}
                   <DownOutlined />
                 </Button>
@@ -269,88 +271,95 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
 
           <Button.Group>
             <Button
+              data-testid="chart-btn"
+              size="small"
+              type={!showCode ? 'primary' : 'default'}
+              disabled={!frameworkItem?.supported || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Chart');
                 this.setState({
                   showCode: null,
                 });
               }}
-              size="small"
-              type={!showCode ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
             >
               Chart
             </Button>
 
             <Button
+              data-testid="json-query-btn"
+              icon={<ThunderboltOutlined />}
+              size="small"
+              type={showCode === 'query' ? 'primary' : 'default'}
+              disabled={!frameworkItem?.supported || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Query');
                 this.setState({
                   showCode: 'query',
                 });
               }}
-              icon={<ThunderboltOutlined />}
-              size="small"
-              type={showCode === 'query' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
             >
               JSON Query
             </Button>
 
             <Button
-              onClick={() => {
-                playgroundAction('Show Code');
-                this.setState({ showCode: 'code' });
-              }}
+              data-testid="code-btn"
               icon={<CodeOutlined />}
               size="small"
               type={showCode === 'code' ? 'primary' : 'default'}
               disabled={!frameworkItem?.supported || isFetchingMeta}
+              onClick={() => {
+                playgroundAction('Show Code');
+                this.setState({ showCode: 'code' });
+              }}
             >
               Code
             </Button>
 
             <Button
-              onClick={() => {
-                playgroundAction('Show SQL');
-                this.setState({ showCode: 'sql' });
-              }}
+              data-testid="sql-btn"
               icon={<QuestionCircleOutlined />}
               size="small"
               type={showCode === 'sql' ? 'primary' : 'default'}
               disabled={!frameworkItem?.supported || isFetchingMeta}
+              onClick={() => {
+                playgroundAction('Show SQL');
+                this.setState({ showCode: 'sql' });
+              }}
             >
               SQL
             </Button>
 
             <Button
+              data-testid="cache-btn"
+              icon={<SyncOutlined />}
+              size="small"
+              type={showCode === 'cache' ? 'primary' : 'default'}
+              disabled={!frameworkItem?.supported || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Cache');
                 this.setState({
                   showCode: 'cache',
                 });
               }}
-              icon={<SyncOutlined />}
-              size="small"
-              type={showCode === 'cache' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
             >
               Cache
             </Button>
           </Button.Group>
 
           <Button
+            data-testid="edit-btn"
             icon={<CodeSandboxOutlined />}
             size="small"
-            onClick={() => playgroundAction('Open Code Sandbox')}
             htmlType="submit"
             disabled={!frameworkItem?.supported || isFetchingMeta}
+            onClick={() => playgroundAction('Open Code Sandbox')}
           >
             Edit
           </Button>
 
           {dashboardSource && (
             <Button
+              data-testid="add-to-dashboard-btn"
               onClick={async () => {
                 this.setState({ addingToDashboard: true });
                 const canAddChart = await dashboardSource.canAddChart();
@@ -452,6 +461,7 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
         <SectionRow>
           <div>Query</div>
           <Button
+            data-testid="copy-code-btn"
             icon={<CopyOutlined />}
             size="small"
             onClick={async () => {
@@ -469,6 +479,7 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
         <SectionRow>
           <div>Query</div>
           <Button
+            data-testid="copy-cube-query-btn"
             icon={<CopyOutlined />}
             size="small"
             onClick={async () => {

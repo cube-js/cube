@@ -5,6 +5,7 @@
     "test"
   ],
   "compilerOptions": {
+    "types": ["cypress", "@4tw/cypress-drag-drop"],
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",

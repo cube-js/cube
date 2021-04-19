@@ -13,6 +13,7 @@ export default function DraggableItem({
     <Draggable draggableId={id} index={index}>
       {({ draggableProps, dragHandleProps, innerRef }) => (
         <div
+          data-testid="order-item"
           ref={innerRef}
           {...draggableProps}
           {...dragHandleProps}
@@ -27,7 +28,13 @@ export default function DraggableItem({
         >
           <DragOutlined />
 
-          <Typography.Text ellipsis style={{ margin: '0 auto 0 8px', padding: '5px 0' }}>
+          <Typography.Text
+            ellipsis
+            style={{
+              margin: '0 auto 0 8px',
+              padding: '5px 0',
+            }}
+          >
             {children}
           </Typography.Text>
 
@@ -35,16 +42,11 @@ export default function DraggableItem({
             onChange={(e) => onOrderChange(id, e.target.value)}
             defaultValue={order}
             size="small"
-            style={{ marginLeft: '8px' }}>
-            <Radio.Button value="asc">
-              ASC
-            </Radio.Button>
-            <Radio.Button value="desc">
-              DESC
-            </Radio.Button>
-            <Radio.Button value="none">
-              NONE
-            </Radio.Button>
+            style={{ marginLeft: '8px' }}
+          >
+            <Radio.Button value="asc">ASC</Radio.Button>
+            <Radio.Button value="desc">DESC</Radio.Button>
+            <Radio.Button value="none">NONE</Radio.Button>
           </Radio.Group>
 
           {/*<Button*/}

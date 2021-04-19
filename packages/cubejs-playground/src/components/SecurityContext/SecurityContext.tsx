@@ -105,99 +105,107 @@ export function SecurityContext() {
         setEditingToken(false);
       }}
     >
-      <Space direction="vertical" size={24} style={{ width: '100%' }}>
-        <Tabs
-          defaultActiveKey="json"
-          style={{ minHeight: 200 }}
-          onChange={(tabKey) => {
-            if (tabKey !== 'token' && editingToken && token) {
-              setEditingToken(false);
-              form.resetFields();
-            }
-          }}
-        >
-          <TabPane tab="JSON" key="json">
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              <TextArea
-                value={tmpPayload || ''}
-                rows={6}
-                style={{ width: '100%' }}
-                onChange={handlePayloadChange}
-              />
+      <div data-testid="security-context-modal">
+        <Space direction="vertical" size={24} style={{ width: '100%' }}>
+          <Tabs
+            defaultActiveKey="json"
+            style={{ minHeight: 200 }}
+            onChange={(tabKey) => {
+              if (tabKey !== 'token' && editingToken && token) {
+                setEditingToken(false);
+                form.resetFields();
+              }
+            }}
+          >
+            <TabPane tab="JSON" key="json">
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <TextArea
+                  data-testid="security-context-textarea"
+                  value={tmpPayload || ''}
+                  rows={6}
+                  style={{ width: '100%' }}
+                  onChange={handlePayloadChange}
+                />
 
-              <Button
-                type="primary"
-                disabled={Boolean(tmpPayload && !isJsonValid)}
-                onClick={handlePayloadSave}
-              >
-                Save
-              </Button>
-            </Space>
-          </TabPane>
+                <Button
+                  data-testid="save-security-context-payload-btn"
+                  type="primary"
+                  disabled={Boolean(tmpPayload && !isJsonValid)}
+                  onClick={handlePayloadSave}
+                >
+                  Save
+                </Button>
+              </Space>
+            </TabPane>
 
-          <TabPane tab="Token" key="token">
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              <Text type="secondary">
-                Edit or copy the generated token from below
-              </Text>
+            <TabPane data-testid="security-modal-token-tab" tab="Token" key="token">
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Text type="secondary">
+                  Edit or copy the generated token from below
+                </Text>
 
-              <Form
-                form={form}
-                initialValues={{
-                  token,
-                }}
-                onFinish={handleTokenSave}
-              >
-                <FlexBox editing={editingToken}>
-                  <Form.Item
-                    name="token"
-                    style={{
-                      width: 'auto',
-                      flexGrow: 1,
-                    }}
-                  >
-                    <Input ref={inputRef} disabled={!editingToken} />
-                  </Form.Item>
-
-                  {!editingToken ? (
-                    <>
-                      <Button
-                        ghost
-                        type="primary"
-                        icon={<EditOutlined />}
-                        onClick={() => {
-                          setEditingToken(true);
-                        }}
+                <Form
+                  form={form}
+                  initialValues={{
+                    token,
+                  }}
+                  onFinish={handleTokenSave}
+                >
+                  <FlexBox editing={editingToken}>
+                    <Form.Item
+                      name="token"
+                      style={{
+                        width: 'auto',
+                        flexGrow: 1,
+                      }}
+                    >
+                      <Input
+                        data-testid="security-context-token-input"
+                        ref={inputRef}
+                        disabled={!editingToken}
                       />
+                    </Form.Item>
+
+                    {!editingToken ? (
+                      <>
+                        <Button
+                          ghost
+                          type="primary"
+                          icon={<EditOutlined />}
+                          onClick={() => {
+                            setEditingToken(true);
+                          }}
+                        />
+                        <Button
+                          type="primary"
+                          icon={<CopyOutlined />}
+                          disabled={!token}
+                          onClick={() => copyToClipboard(token)}
+                        >
+                          Copy
+                        </Button>
+                      </>
+                    ) : (
                       <Button
                         type="primary"
-                        icon={<CopyOutlined />}
-                        disabled={!token}
-                        onClick={() => copyToClipboard(token)}
-                      >
-                        Copy
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      type="primary"
-                      icon={<CheckOutlined />}
-                      htmlType="submit"
-                    />
-                  )}
-                </FlexBox>
-              </Form>
-            </Space>
-          </TabPane>
-        </Tabs>
+                        icon={<CheckOutlined />}
+                        htmlType="submit"
+                      />
+                    )}
+                  </FlexBox>
+                </Form>
+              </Space>
+            </TabPane>
+          </Tabs>
 
-        <Text type="secondary">
-          Learn more about Security Context in{' '}
-          <Link href="https://cube.dev/docs/security/context" target="_blank">
-            docs
-          </Link>
-        </Text>
-      </Space>
+          <Text type="secondary">
+            Learn more about Security Context in{' '}
+            <Link href="https://cube.dev/docs/security/context" target="_blank">
+              docs
+            </Link>
+          </Text>
+        </Space>
+      </div>
     </Modal>
   );
 }

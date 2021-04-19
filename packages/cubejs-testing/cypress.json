@@ -1,3 +1,6 @@
 {
-  "baseUrl": "http://localhost:3080"
+  "baseUrl": "http://localhost:3080",
+  "chromeWebSecurity": false,
+  "viewportWidth": 3840,
+  "viewportHeight": 2160
 }

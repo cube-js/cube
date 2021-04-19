@@ -40,14 +40,18 @@
     "testcontainers": "^7.5.0"
   },
   "devDependencies": {
+    "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.26.74",
     "@cubejs-client/core": "^0.26.102",
     "@jest/globals": "^26.6.2",
     "@types/node": "^10.17.55",
     "cypress": "6.9.1",
+    "cypress-image-snapshot": "^4.0.1",
+    "cypress-localstorage-commands": "^1.4.3",
     "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.1",
     "jest": "^26.6.3",
+    "jwt-decode": "^3.1.2",
     "typescript": "~4.1.5"
   },
   "jest": {

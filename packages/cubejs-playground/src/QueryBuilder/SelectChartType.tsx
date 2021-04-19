@@ -20,7 +20,7 @@ const ChartTypes = [
 
 const SelectChartType = ({ chartType, updateChartType }) => {
   const menu = (
-    <Menu>
+    <Menu data-testid="chart-type-dropdown">
       {ChartTypes.map((m) => (
         <Menu.Item key={m.title} onClick={() => updateChartType(m.name)}>
           {m.icon} {m.title}
@@ -32,6 +32,7 @@ const SelectChartType = ({ chartType, updateChartType }) => {
   const foundChartType = ChartTypes.find((t) => t.name === chartType);
   return (
     <ButtonDropdown
+      data-testid="chart-type-btn"
       overlay={menu}
       icon={foundChartType?.icon}
       style={{ border: 0 }}
