@@ -217,7 +217,7 @@ export default function ChartRenderer({
         <Positioner>
           <Centered>
             <Button
-              data-test-id="query-execute-button"
+              data-testid="run-query-btn"
               ref={runButtonRef}
               size="large"
               type="primary"
@@ -255,6 +255,7 @@ export default function ChartRenderer({
 
       <ChartContainer invisible={invisible}>
         <iframe
+          data-testid="chart-renderer"
           ref={iframeRef}
           title="Chart renderer"
           src={`/chart-renderers/${framework}/index.html`}

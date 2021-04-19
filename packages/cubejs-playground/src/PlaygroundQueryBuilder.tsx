@@ -259,6 +259,7 @@ export default function PlaygroundQueryBuilder({
                 >
                   <Button.Group>
                     <Button
+                      data-testid="security-context-btn"
                       icon={<LockOutlined />}
                       size="small"
                       type={token ? 'primary' : 'default'}
@@ -268,6 +269,7 @@ export default function PlaygroundQueryBuilder({
                     </Button>
                     {livePreviewContext && !livePreviewContext.livePreviewDisabled && (
                       <Button
+                        data-testid="live-preview-btn"
                         icon={<CloudOutlined />}
                         size="small"
                         type={

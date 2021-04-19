@@ -17,7 +17,7 @@ export default class PrismCode extends Component<TPrismCodeProps> {
 
   render() {
     return (
-      <pre style={this.props.style}>
+      <pre data-testid="prism-code" style={this.props.style}>
         <code className="language-javascript">{this.props.code}</code>
       </pre>
     );
