@@ -213,10 +213,6 @@ export class RedisQueueDriverConnection {
     }
   }
 
-  release() {
-    return this.redisClient.quit();
-  }
-
   toProcessRedisKey() {
     return this.queueRedisKey('QUEUE');
   }
@@ -277,7 +273,7 @@ export class RedisQueueDriver extends BaseQueueDriver {
     });
   }
 
-  release(connection) {
+  async release(connection) {
     this.redisPool.release(connection.redisClient);
   }
 }

@@ -75,10 +75,13 @@ export class RedisPool {
     }
   }
 
-  public release(client) {
+  // eslint-disable-next-line consistent-return
+  public async release(client: AsyncRedisClient): Promise<void> {
     if (this.pool) {
-      this.pool.release(client);
-    } else if (client) {
+      return this.pool.release(client);
+    }
+
+    if (client) {
       client.quit();
     }
   }
@@ -89,7 +92,7 @@ export class RedisPool {
     try {
       await client.ping();
     } finally {
-      this.release(client);
+      await this.release(client);
     }
   }
 

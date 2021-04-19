@@ -197,8 +197,8 @@ export class LocalQueueDriverConnection {
     return true;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   release() {
+    //
   }
 
   queryRedisKey(queryKey, suffix) {

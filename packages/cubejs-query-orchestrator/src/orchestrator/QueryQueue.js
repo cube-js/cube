@@ -33,7 +33,9 @@ export class QueryQueue {
 
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
     options = options || {};
-    const redisClient = await this.queueDriver.createConnection();
+
+    const queueConnection = await this.queueDriver.createConnection();
+
     try {
       if (priority == null) {
         priority = 0;
@@ -41,7 +43,7 @@ export class QueryQueue {
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }
-      let result = await redisClient.getResult(queryKey);
+      let result = await queueConnection.getResult(queryKey);
       if (result) {
         return this.parseResult(result);
       }
@@ -49,7 +51,7 @@ export class QueryQueue {
       const keyScore = time + (10000 - priority) * 1E14;
 
       // eslint-disable-next-line no-unused-vars
-      const [added, b, c, queueSize] = await redisClient.addToQueue(
+      const [added, b, c, queueSize] = await queueConnection.addToQueue(
         keyScore, queryKey, time, queryHandler, query, priority, options
       );
 
@@ -65,8 +67,8 @@ export class QueryQueue {
 
       await this.reconcileQueue();
 
-      const queryDef = await redisClient.getQueryDef(queryKey);
-      const [active, toProcess] = await redisClient.getQueryStageState(true);
+      const queryDef = await queueConnection.getQueryDef(queryKey);
+      const [active, toProcess] = await queueConnection.getQueryStageState(true);
 
       if (queryDef) {
         this.logger('Waiting for query', {
@@ -76,19 +78,19 @@ export class QueryQueue {
           requestId: options.requestId,
           activeQueryKeys: active,
           toProcessQueryKeys: toProcess,
-          active: active.indexOf(redisClient.redisHash(queryKey)) !== -1,
-          queueIndex: toProcess.indexOf(redisClient.redisHash(queryKey)),
+          active: active.indexOf(queueConnection.redisHash(queryKey)) !== -1,
+          queueIndex: toProcess.indexOf(queueConnection.redisHash(queryKey)),
           waitingForRequestId: queryDef.requestId
         });
       }
 
-      result = await redisClient.getResultBlocking(queryKey);
+      result = await queueConnection.getResultBlocking(queryKey);
       if (!result) {
         throw new ContinueWaitError();
       }
       return this.parseResult(result);
     } finally {
-      this.queueDriver.release(redisClient);
+      await this.queueDriver.release(queueConnection);
     }
   }
 
@@ -121,16 +123,17 @@ export class QueryQueue {
   }
 
   async reconcileQueueImpl() {
-    const redisClient = await this.queueDriver.createConnection();
+    const queueConnection = await this.queueDriver.createConnection();
+
     try {
       const toCancel = (
-        await redisClient.getStalledQueries()
+        await queueConnection.getStalledQueries()
       ).concat(
-        await redisClient.getOrphanedQueries()
+        await queueConnection.getOrphanedQueries()
       );
 
       await Promise.all(toCancel.map(async queryKey => {
-        const [query] = await redisClient.getQueryAndRemove(queryKey);
+        const [query] = await queueConnection.getQueryAndRemove(queryKey);
         if (query) {
           this.logger('Removing orphaned query', {
             queryKey: query.queryKey,
@@ -141,8 +144,8 @@ export class QueryQueue {
         }
       }));
 
-      const active = await redisClient.getActiveQueries();
-      const toProcess = await redisClient.getToProcessQueries();
+      const active = await queueConnection.getActiveQueries();
+      const toProcess = await queueConnection.getToProcessQueries();
       await Promise.all(
         R.pipe(
           R.filter(p => active.indexOf(p) === -1),
@@ -151,7 +154,7 @@ export class QueryQueue {
         )(toProcess)
       );
     } finally {
-      this.queueDriver.release(redisClient);
+      await this.queueDriver.release(queueConnection);
     }
   }
 
@@ -176,11 +179,12 @@ export class QueryQueue {
   }
 
   async fetchQueryStageState() {
-    const redisClient = await this.queueDriver.createConnection();
+    const queueConnection = await this.queueDriver.createConnection();
+
     try {
-      return redisClient.getQueryStageState();
+      return queueConnection.getQueryStageState();
     } finally {
-      this.queueDriver.release(redisClient);
+      await this.queueDriver.release(queueConnection);
     }
   }
 
@@ -208,7 +212,8 @@ export class QueryQueue {
   }
 
   async processQuery(queryKey) {
-    const redisClient = await this.queueDriver.createConnection();
+    const queueConnection = await this.queueDriver.createConnection();
+
     let insertedCount;
     // eslint-disable-next-line no-unused-vars
     let removedCount;
@@ -216,15 +221,16 @@ export class QueryQueue {
     let queueSize;
     let query;
     let processingLockAcquired;
+
     try {
-      const processingId = await redisClient.getNextProcessingId();
-      const retrieveResult = await redisClient.retrieveForProcessing(queryKey, processingId);
+      const processingId = await queueConnection.getNextProcessingId();
+      const retrieveResult = await queueConnection.retrieveForProcessing(queryKey, processingId);
       if (retrieveResult) {
         [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
       const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
       if (!query) {
-        query = await redisClient.getQueryDef(this.redisHash(queryKey));
+        query = await queueConnection.getQueryDef(this.redisHash(queryKey));
       }
       if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
@@ -238,10 +244,10 @@ export class QueryQueue {
           requestId: query.requestId,
           timeInQueue
         });
-        await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
+        await queueConnection.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
         const heartBeatTimer = setInterval(
-          () => redisClient.updateHeartBeat(queryKey),
+          () => queueConnection.updateHeartBeat(queryKey),
           this.heartBeatInterval * 1000
         );
         try {
@@ -251,7 +257,7 @@ export class QueryQueue {
                 query.query,
                 async (cancelHandler) => {
                   try {
-                    return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
+                    return queueConnection.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
                   } catch (e) {
                     this.logger('Error while query update', {
                       queryKey: query.queryKey,
@@ -289,7 +295,7 @@ export class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            const queryWithCancelHandle = await redisClient.getQueryDef(queryKey);
+            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKey);
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
                 processingId,
@@ -304,7 +310,7 @@ export class QueryQueue {
 
         clearInterval(heartBeatTimer);
 
-        if (!(await redisClient.setResultAndRemoveQuery(queryKey, executionResult, processingId))) {
+        if (!(await queueConnection.setResultAndRemoveQuery(queryKey, executionResult, processingId))) {
           this.logger('Orphaned execution result', {
             processingId,
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
@@ -328,7 +334,7 @@ export class QueryQueue {
           activated,
           queryExists: !!query
         });
-        const currentProcessingId = await redisClient.freeProcessingLock(queryKey, processingId, activated);
+        const currentProcessingId = await queueConnection.freeProcessingLock(queryKey, processingId, activated);
         if (currentProcessingId) {
           this.logger('Skipping free processing lock', {
             processingId,
@@ -353,7 +359,7 @@ export class QueryQueue {
         queuePrefix: this.redisQueuePrefix
       });
     } finally {
-      this.queueDriver.release(redisClient);
+      await this.queueDriver.release(queueConnection);
     }
   }
 

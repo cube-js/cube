@@ -23,7 +23,7 @@ export class RedisCacheDriver implements CacheDriverInterface {
       const res = await client.getAsync(key);
       return res && JSON.parse(res);
     } finally {
-      this.redisPool.release(client);
+      await this.redisPool.release(client);
     }
   }
 
@@ -33,7 +33,7 @@ export class RedisCacheDriver implements CacheDriverInterface {
     try {
       return await client.setAsync(key, JSON.stringify(value), 'EX', expiration);
     } finally {
-      this.redisPool.release(client);
+      await this.redisPool.release(client);
     }
   }
 
@@ -43,7 +43,7 @@ export class RedisCacheDriver implements CacheDriverInterface {
     try {
       return await client.delAsync(key);
     } finally {
-      this.redisPool.release(client);
+      await this.redisPool.release(client);
     }
   }
 
@@ -53,7 +53,7 @@ export class RedisCacheDriver implements CacheDriverInterface {
     try {
       return await client.keysAsync(`${prefix}*`);
     } finally {
-      this.redisPool.release(client);
+      await this.redisPool.release(client);
     }
   }
 
@@ -67,7 +67,7 @@ export class RedisCacheDriver implements CacheDriverInterface {
     try {
       await client.ping();
     } finally {
-      this.redisPool.release(client);
+      await this.redisPool.release(client);
     }
   }
 }
