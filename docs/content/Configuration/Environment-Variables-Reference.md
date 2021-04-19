@@ -119,6 +119,8 @@ databases [in this guide][link-connecting-to-db].
 
 | Environment variable            | Description                                                                                                                  | Possible Values                                             |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `CUBEJS_CUBESTORE_HOST`         | The hostname of the Cube Store deployment                                                                                    | Any valid hostname                                          |
+| `CUBEJS_CUBESTORE_PORT`         | The port of the Cube Store deployment                                                                                       | Any valid port number                                       |
 | `CUBESTORE_BIND_ADDR`           | The address/port pair for Cube Store's MySQL-compatible interface. Defaults to `0.0.0.0:3306`                                | A valid address/port pair                                   |
 | `CUBESTORE_DATA_DIR`            | A path on the local filesystem to store database snapshots. Defaults to `.cubestore/data`                                    | A valid path on the local filesystem with read/write access |
 | `CUBESTORE_GCS_BUCKET`          | The name of a bucket in GCS                                                                                                  | -                                                           |
@@ -132,7 +134,7 @@ databases [in this guide][link-connecting-to-db].
 | `CUBESTORE_NO_UPLOAD`           | If `true`, prevents uploading serialized pre-aggregations to cloud storage                                                   | `true`, `false`                                             |
 | `CUBESTORE_PORT`                | The port for Cube Store to listen to connections on. Ignored when `CUBESTORE_BIND_ADDR` is set. Defaults to `3306`           | A valid port number                                         |
 | `CUBESTORE_QUERY_TIMEOUT`       | The timeout for SQL queries in seconds. Defaults to `120`                                                                    | A number in seconds                                         |
-| `CUBESTORE_REMOTE_DIR`          | A path on the local filesystem to mirror the data in remote storage.                                                         | A valid path on the local filesystem with read/write access |
+| `CUBESTORE_REMOTE_DIR`          | A path on the local filesystem to mirror the data in remote storage                                                          | A valid path on the local filesystem with read/write access |
 | `CUBESTORE_S3_BUCKET`           | The name of a bucket in AWS S3                                                                                               | -                                                           |
 | `CUBESTORE_S3_REGION`           | The region of a bucket in AWS S3                                                                                             | -                                                           |
 | `CUBESTORE_S3_SUB_PATH`         | The path in a AWS S3 bucket to store pre-aggregations. Optional                                                              | -                                                           |
