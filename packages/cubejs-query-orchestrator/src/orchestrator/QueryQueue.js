@@ -86,6 +86,7 @@ export class QueryQueue {
       if (!result) {
         throw new ContinueWaitError();
       }
+
       return this.parseResult(result);
     } finally {
       this.queueDriver.release(redisClient);
@@ -107,16 +108,25 @@ export class QueryQueue {
   async reconcileQueue() {
     if (!this.reconcilePromise) {
       this.reconcileAgain = false;
-      this.reconcilePromise = this.reconcileQueueImpl().then(() => {
-        this.reconcilePromise = null;
-        if (this.reconcileAgain) {
-          return this.reconcileQueue();
-        }
-        return null;
-      });
+      this.reconcilePromise = this.reconcileQueueImpl()
+        .catch((e) => {
+          this.reconcilePromise = null;
+
+          throw e;
+        })
+        .then(() => {
+          this.reconcilePromise = null;
+
+          if (this.reconcileAgain) {
+            return this.reconcileQueue();
+          }
+
+          return null;
+        });
     } else {
       this.reconcileAgain = true;
     }
+
     return this.reconcilePromise;
   }
 
