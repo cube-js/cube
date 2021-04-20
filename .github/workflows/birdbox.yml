@@ -48,6 +48,8 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
           cd packages/cubejs-testing/
           npx cubejs-cli@${{ github.event.inputs.version }} create birdbox-test-project -d postgres
@@ -152,6 +154,8 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CYPRESS_BROWSER=${{ matrix.browser }}

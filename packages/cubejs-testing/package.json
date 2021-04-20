@@ -14,8 +14,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint --debug src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts",
+    "lint": "eslint src/* test/ test/bin --ext .ts",
+    "lint:fix": "eslint --fix src/* test/ test/bin --ext .ts",
     "dataset:minimal": "node dist/test/bin/download-dataset.js",
     "birdbox": "jest --runInBand --verbose dist/test",
     "birdbox:snapshot": "jest --runInBand --updateSnapshot --verbose dist/test",
@@ -37,6 +37,7 @@
     "@cubejs-backend/shared": "^0.26.95",
     "@cubejs-client/ws-transport": "^0.26.102",
     "fs-extra": "^8.1.0",
+    "node-fetch": "^2.6.1",
     "testcontainers": "^7.5.0"
   },
   "devDependencies": {
@@ -44,6 +45,7 @@
     "@cubejs-backend/linter": "^0.26.74",
     "@cubejs-client/core": "^0.26.102",
     "@jest/globals": "^26.6.2",
+    "@types/jest": "^26.0.22",
     "@types/node": "^10.17.55",
     "cypress": "6.9.1",
     "cypress-image-snapshot": "^4.0.1",

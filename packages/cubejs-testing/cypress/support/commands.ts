@@ -1,4 +1,4 @@
-///<reference path="../global.d.ts" />
+/// <reference path="../global.d.ts" />
 
 // ***********************************************
 // This example commands.js shows you how to
@@ -44,8 +44,8 @@ Cypress.Commands.add('runQuery', () => {
   // cy.intercept('get', '/cubejs-api/v1/load').as('load');
   // cy.wait(['@load']);
 
-  cy.getByTestId('run-query-btn', { timeout: 2000 }).should('be.visible').click();
-  cy.getByTestId('cube-loader', { timeout: 5 * 1000 }).should('not.exist');
+  cy.getByTestId('run-query-btn', { timeout: 5 * 1000 }).should('be.visible').click();
+  cy.getByTestId('cube-loader', { timeout: 10 * 1000 }).should('not.exist');
   cy.wait(100);
 });
 

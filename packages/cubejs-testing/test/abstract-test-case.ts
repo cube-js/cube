@@ -1,4 +1,4 @@
-import { expect } from '@jest/globals';
+import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 
