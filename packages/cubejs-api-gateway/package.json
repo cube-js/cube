@@ -30,7 +30,7 @@
     "@cubejs-backend/shared": "^0.26.95",
     "@hapi/joi": "^15.1.1",
     "body-parser": "^1.19.0",
-    "chrono-node": "1.4.4",
+    "chrono-node": "^2.2.6",
     "cron-parser": "^2.16.3",
     "jsonwebtoken": "^8.3.0",
     "jwk-to-pem": "^2.0.4",
