@@ -428,6 +428,9 @@ jobs:
           yarn run dataset:minimal
           yarn run birdbox:postgresql
       - name: Testing Docker image via Cypress (Chrome)
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          BIRDBOX_CYPRESS_UPDATE_SCREENSHOTS: ${{ contains(github.event.head_commit.message, '[update screenshots]') }}
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}

@@ -1,12 +1,10 @@
 import { startBirdBoxFromContainer } from '../../src';
 
 (async () => {
-  let birdbox;
-
   console.log('[Birdbox] Starting');
 
   try {
-    birdbox = await startBirdBoxFromContainer({
+    await startBirdBoxFromContainer({
       name: 'postgresql-cubestore',
     });
   } catch (e) {
