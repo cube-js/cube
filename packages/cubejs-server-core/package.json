@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.99",
+  "version": "0.26.100",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -30,7 +30,7 @@
     "unit": "jest --runInBand --coverage dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.26.95",
+    "@cubejs-backend/api-gateway": "^0.26.100",
     "@cubejs-backend/cloud": "^0.26.95",
     "@cubejs-backend/query-orchestrator": "^0.26.99",
     "@cubejs-backend/schema-compiler": "^0.26.95",
