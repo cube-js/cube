@@ -99,7 +99,7 @@ cube(`Orders`, {
   preAggregations: {
     orderStatuses: {
       type: `rollup`,
-      measureReferences: [status],
+      dimensionReferences: [status],
     },
   },
 });
