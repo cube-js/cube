@@ -1,12 +1,14 @@
-import { Col, PageHeader, Row, Typography } from 'antd';
+import { Col, Row, Space, Typography } from 'antd';
 import { useState } from 'react';
 import styled from 'styled-components';
 
 import envVarsDatabaseMap from '../../shared/env-vars-db-map';
 import { fetchWithTimeout } from '../../utils';
 import ConnectionTest from './components/ConnectionTest';
-import DatabaseCard from './components/DatabaseCard';
+import { DatabaseCard, SelectedDatabaseCard } from './components/DatabaseCard';
 import DatabaseForm from './components/DatabaseForm';
+import { Button } from '../../atoms';
+import { LocalhostTipBox } from './components/LocalhostTipBox';
 
 const { Title, Paragraph } = Typography;
 
@@ -22,20 +24,24 @@ const databases = envVarsDatabaseMap.reduce<any>(
   []
 );
 
-async function testConnection(variables: Record<string, any>) {
-  const response = await fetchWithTimeout('/playground/test-connection', {
-    method: 'post',
-    headers: {
-      'Content-Type': 'application/json',
+async function testConnection(variables: Record<string, string>) {
+  const response = await fetchWithTimeout(
+    '/playground/test-connection',
+    {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        variables,
+      }),
     },
-    body: JSON.stringify({
-      variables,
-    }),
-  }, 5 * 1000);
+    5 * 1000
+  );
 
   const { error } = await response.json();
   if (error) {
-    throw new Error(error)
+    throw new Error(error);
   }
 }
 
@@ -47,7 +53,7 @@ const Layout = styled.div`
   background-color: #fff;
 `;
 
-async function saveConnection(variables: Record<string, any>) {
+async function saveConnection(variables: Record<string, string>) {
   await fetch('/playground/env', {
     method: 'post',
     headers: {
@@ -61,11 +67,17 @@ async function saveConnection(variables: Record<string, any>) {
   await fetch('/restart');
 }
 
+export type Database = {
+  title: string;
+  logo: string;
+  instructions?: string;
+};
+
 export default function ConnectionWizardPage({ history }) {
   const [isLoading, setLoading] = useState(false);
   const [isTestConnectionLoading, setTestConnectionLoading] = useState(false);
   const [testConnectionResult, setTestConnectionResult] = useState<any>(null);
-  const [db, selectDatabase] = useState<any>(null);
+  const [db, selectDatabase] = useState<Database | null>(null);
 
   return (
     <Layout>
@@ -73,72 +85,88 @@ export default function ConnectionWizardPage({ history }) {
 
       {db ? (
         <>
-          <Row gutter={[12, 12]}>
-            <Col span={24}>
-              <PageHeader
-                title={<DatabaseCard db={db} />}
-                onBack={() => selectDatabase(null)}
-              />
-            </Col>
+          <Space direction="vertical" size="large">
+            <Space size="middle">
+              <SelectedDatabaseCard db={db} />
 
-            <Col span={24}>
-              <Typography>
-                {db.instructions ? (
-                  <p>
-                    <span
-                      dangerouslySetInnerHTML={{ __html: db.instructions }}
-                    />
-                  </p>
-                ) : (
-                  <p>Enter database credentials to connect to your database</p>
-                )}
-              </Typography>
-            </Col>
+              <Button type="link" onClick={() => selectDatabase(null)}>
+                Change
+              </Button>
+            </Space>
 
-            <Col span={12}>
-              <DatabaseForm
-                db={db}
-                deployment={{}}
-                loading={isLoading}
-                disabled={isTestConnectionLoading}
-                onCancel={() => undefined}
-                onSubmit={async (variables) => {
-                  try {
-                    setTestConnectionResult(null);
-                    setTestConnectionLoading(true);
+            <Row gutter={[40, 12]}>
+              <Col span={24}>
+                <Typography>
+                  {db.instructions ? (
+                    <p>
+                      <span
+                        dangerouslySetInnerHTML={{ __html: db.instructions }}
+                      />
+                    </p>
+                  ) : (
+                    <p>
+                      Enter database credentials to connect to your database.{' '}
+                      <br />
+                      Cube.js will store your credentials into the .env file for
+                      future use.
+                    </p>
+                  )}
+                </Typography>
+              </Col>
 
-                    await testConnection(variables);
+              <Col span={12}>
+                <DatabaseForm
+                  db={db}
+                  deployment={{}}
+                  loading={isLoading}
+                  disabled={isTestConnectionLoading}
+                  onCancel={() => undefined}
+                  onSubmit={async (variables) => {
+                    try {
+                      setTestConnectionResult(null);
+                      setTestConnectionLoading(true);
 
-                    setTestConnectionResult({
-                      success: true,
-                    });
+                      await testConnection(variables);
 
-                    setLoading(true);
-                    await saveConnection(variables);
-                    setLoading(false);
+                      setTestConnectionResult({
+                        success: true,
+                      });
 
-                    history.push('/schema');
-                  } catch (error) {
-                    setTestConnectionResult({
-                      success: false,
-                      error,
-                    });
-                  }
+                      setLoading(true);
+                      await saveConnection(variables);
+                      setLoading(false);
 
-                  setTestConnectionLoading(false);
-                }}
-              />
-            </Col>
-          </Row>
+                      history.push('/schema');
+                    } catch (error) {
+                      setTestConnectionResult({
+                        success: false,
+                        error,
+                      });
+                    }
 
-          <Row>
-            <Col span={12}>
-              <ConnectionTest
-                loading={isTestConnectionLoading}
-                result={testConnectionResult}
-              />
-            </Col>
-          </Row>
+                    setTestConnectionLoading(false);
+                  }}
+                />
+              </Col>
+
+              {['MySQL', 'PostgreSQL', 'Druid', 'Clickhouse'].includes(
+                db?.title || ''
+              ) && (
+                <Col span={12}>
+                  <LocalhostTipBox />
+                </Col>
+              )}
+            </Row>
+
+            <Row>
+              <Col span={12}>
+                <ConnectionTest
+                  loading={isTestConnectionLoading}
+                  result={testConnectionResult}
+                />
+              </Col>
+            </Row>
+          </Space>
         </>
       ) : (
         <>
