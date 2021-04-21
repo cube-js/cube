@@ -22,11 +22,11 @@ declare module '@cubejs-client/core' {
      */
     headers?: Record<string, string>;
     credentials?: 'omit' | 'same-origin' | 'include';
-    method?: 'GET' | 'PUT' | 'POST' | 'PATCH'
+    method?: 'GET' | 'PUT' | 'POST' | 'PATCH';
   };
 
   export interface ITransportResponse<R> {
-    subscribe: <CBResult>(cb: (result: R, resubscribe: (() => Promise<CBResult>)) => CBResult) => Promise<CBResult>;
+    subscribe: <CBResult>(cb: (result: R, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
     // Optional, supported in WebSocketTransport
     unsubscribe?: () => Promise<void>;
   }
@@ -260,7 +260,7 @@ declare module '@cubejs-client/core' {
   };
 
   export type SerializedResult<T = any> = {
-    loadResponse: LoadResponse<T>
+    loadResponse: LoadResponse<T>;
   };
 
   /**
@@ -675,6 +675,7 @@ declare module '@cubejs-client/core' {
      */
     tableColumns(pivotConfig?: PivotConfig): TableColumn[];
     totalRow(pivotConfig?: PivotConfig): ChartPivotRow;
+    categories(pivotConfig?: PivotConfig): ChartPivotRow[];
 
     tableRow(): ChartPivotRow;
     query(): Query;
@@ -726,12 +727,12 @@ declare module '@cubejs-client/core' {
   type TimeDimensionComparisonFields = {
     compareDateRange: Array<DateRange>;
     dateRange?: never;
-  }
+  };
   export type TimeDimensionComparison = TimeDimensionBase & TimeDimensionComparisonFields;
 
   type TimeDimensionRangedFields = {
     dateRange?: DateRange;
-  }
+  };
   export type TimeDimensionRanged = TimeDimensionBase & TimeDimensionRangedFields;
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
@@ -779,8 +780,8 @@ declare module '@cubejs-client/core' {
   type TOrderMember = {
     id: string;
     title: string;
-    order: QueryOrder | 'none'
-  }
+    order: QueryOrder | 'none';
+  };
 
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
@@ -981,7 +982,7 @@ declare module '@cubejs-client/core' {
     shouldApplyHeuristicOrder: boolean;
     pivotConfig: PivotConfig | null;
     query: Query;
-    chartType?: ChartType
+    chartType?: ChartType;
   };
 
   export type TDefaultHeuristicsState = {
