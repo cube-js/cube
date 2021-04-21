@@ -13,7 +13,9 @@ use crate::config::injection::DIService;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
+use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
+use crate::metastore::partition::partition_file_name;
 use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
@@ -58,6 +60,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
+use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
@@ -94,7 +97,7 @@ pub trait Cluster: DIService + Send + Sync {
 
     fn job_result_listener(&self) -> JobResultListener;
 
-    async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError>;
+    fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String;
 
     async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError>;
 
@@ -140,6 +143,7 @@ pub struct ClusterImpl {
     >,
     config_obj: Arc<dyn ConfigObj>,
     query_executor: Arc<dyn QueryExecutor>,
+    stop_token: CancellationToken,
     close_worker_socket_tx: watch::Sender<bool>,
     close_worker_socket_rx: RwLock<watch::Receiver<bool>>,
 }
@@ -259,17 +263,17 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError> {
+    fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String {
         let workers = self.config_obj.select_workers();
         if workers.is_empty() {
-            return Ok(self.server_name.to_string());
+            return self.server_name.to_string();
         }
 
         let mut hasher = DefaultHasher::new();
         for p in partition_ids.iter() {
             p.hash(&mut hasher);
         }
-        Ok(workers[(hasher.finish() % workers.len() as u64) as usize].to_string())
+        workers[(hasher.finish() % workers.len() as u64) as usize].clone()
     }
 
     async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError> {
@@ -285,7 +289,7 @@ impl Cluster for ClusterImpl {
         partition: IdRow<Partition>,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError> {
-        let node_name = self.node_name_by_partitions(&[partition.get_id()]).await?;
+        let node_name = self.node_name_by_partitions(&[partition.get_id()]);
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
             futures.push(self.warmup_download(&node_name, name));
@@ -581,6 +585,7 @@ impl ClusterImpl {
             select_process_pool: RwLock::new(None),
             config_obj,
             query_executor,
+            stop_token: CancellationToken::new(),
             close_worker_socket_tx,
             close_worker_socket_rx: RwLock::new(close_worker_socket_rx),
         })
@@ -653,6 +658,7 @@ impl ClusterImpl {
         }
 
         self.close_worker_socket_tx.send(true)?;
+        self.stop_token.cancel();
         Ok(())
     }
 
@@ -1089,6 +1095,55 @@ impl ClusterImpl {
                 self.schema.clone()
             }
         }
+    }
+
+    /// Downloads missing data files for the current partition. Will do the downloads sequentially
+    /// to avoid monopolizing the queue of selects that might follow.
+    ///
+    /// Can take awhile, use the passed cancellation token to stop the worker before it finishes.
+    /// Designed to run in the background.
+    pub async fn warmup_select_worker(&self) -> Result<(), CubeError> {
+        if self.config_obj.select_workers().len() == 0 {
+            return Err(CubeError::internal(
+                "no select workers specified".to_owned(),
+            ));
+        }
+        if !self.config_obj.select_workers().contains(&self.server_name) {
+            return Err(CubeError::internal(
+                "current node is not a select worker".to_owned(),
+            ));
+        }
+
+        if !self.config_obj.enable_startup_warmup() {
+            log::info!("Startup warmup disabled");
+            return Ok(());
+        }
+
+        log::debug!("Requesting partitions for startup warmup");
+        let partitions = self.meta_store.get_warmup_partitions().await?;
+        log::debug!("Got {} partitions, running the warmup", partitions.len());
+
+        for (p, chunks) in partitions {
+            if self.node_name_by_partitions(&[p.partition_id]) != self.server_name {
+                continue;
+            }
+            if let Some(file) = partition_file_name(p.parent_partition_id, p.partition_id) {
+                if self.stop_token.is_cancelled() {
+                    log::debug!("Startup warmup cancelled");
+                    return Ok(());
+                }
+                self.remote_fs.download_file(&file).await?;
+            }
+            for c in chunks {
+                if self.stop_token.is_cancelled() {
+                    log::debug!("Startup warmup cancelled");
+                    return Ok(());
+                }
+                self.remote_fs.download_file(&chunk_file_name(c)).await?;
+            }
+        }
+        log::debug!("Startup warmup finished");
+        return Ok(());
     }
 }
 

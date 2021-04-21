@@ -624,15 +624,12 @@ impl ExecutionPlan for ClusterSendExec {
         &self,
         partition: usize,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        let node_name = &self
-            .cluster
-            .node_name_by_partitions(
-                &self.partitions[partition]
-                    .iter()
-                    .map(|p| p.get_id())
-                    .collect_vec(),
-            )
-            .await?;
+        let node_name = &self.cluster.node_name_by_partitions(
+            &self.partitions[partition]
+                .iter()
+                .map(|p| p.get_id())
+                .collect_vec(),
+        );
         let plan = self.serialized_plan.with_partition_id_to_execute(
             self.partitions[partition]
                 .iter()
