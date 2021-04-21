@@ -486,6 +486,12 @@ impl SerializedPlan {
 
         for index in indexes.iter() {
             for partition in index.partitions() {
+                if !self
+                    .partition_ids_to_execute
+                    .contains(&partition.partition.get_id())
+                {
+                    continue;
+                }
                 if let Some(file) = partition
                     .partition
                     .get_row()
