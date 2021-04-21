@@ -244,6 +244,14 @@ const GlobalStyles = createGlobalStyle`
   .missing-member-tooltip {
     max-width: none;
   }
+  
+  .ant-btn-link > span {
+    text-decoration: underline;
+  }
+  
+  a.ant-typography {
+    text-decoration: underline;
+  }
 `;
 
 export default GlobalStyles;

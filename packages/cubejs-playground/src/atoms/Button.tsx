@@ -2,7 +2,7 @@ import styled from 'styled-components';
 import { Button } from 'antd';
 
 const StyledButton: typeof Button = styled(Button)`
-  && {
+  &&:not(.ant-btn-link) {
     padding: 5px 12px;
     height: auto;
     border-color: var(--dark-05-color); 
