@@ -27,6 +27,7 @@ a {
   font-size: 1.7rem;
   color: #B1B7C5;
   transition: opacity .2s, ease;
+
   &:hover {
     opacity: 0.7;
     color: #B1B7C5;
@@ -115,6 +116,7 @@ a {
   height: 24px;
   width: 24px;
   margin: -1px 8px 0 0;
+
   & > svg {
     display: none !important;
   }
@@ -151,12 +153,15 @@ a {
   &::-webkit-input-placeholder { /* Chrome/Opera/Safari */
     color: $search-placeholder-color;
   }
+
   &::-moz-placeholder { /* Firefox 19+ */
     color: $search-placeholder-color;
   }
+
   &:-ms-input-placeholder { /* IE 10+ */
     color: $search-placeholder-color;
   }
+
   &:-moz-placeholder { /* Firefox 18- */
     color: $search-placeholder-color;
   }
@@ -276,64 +281,28 @@ a {
 }
 
 .mainTabs {
-  margin-top: 20px;
+  @include card-grid;
 
   .mainTab {
-    position: relative;
-    background: #FFFFFF;
-    border: 1px solid #ECECF0;
-    box-sizing: border-box;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    cursor: pointer;
-    top: 0;
-    transition: all .2s ease;
-    box-shadow: none;
-    width: calc(50% - 20px);
+    @include card-grid-item;
 
     &.mainTabRight {
-      margin-left: 20px;
-    }
-
-    @media screen and (max-width: 992px) {
-      width: 100%;
-
-      &.mainTabRight {
-        margin-left: 0;
-      }
-    }
-
-    &:hover {
-      top: -3px;
-      box-shadow: 0px 2px 10px rgba(177, 183, 197, 0.2);
+      @include card-grid-item-adjacent;
     }
 
     .mainTabContent {
-      margin: 10px 0 10px 0;
-      min-height: 98px;
+      @include card-grid-item-content;
 
       .mainTabImg {
-        position: relative;
-        top: 25px;
-        left: 15px;
+        @include card-grid-item-image;
       }
 
       .mainTabLink {
-        font-family: $header-font;
-        font-weight: bold;
-        line-height: 32px;
-        font-size: 19px;
-        letter-spacing: 0.02em;
-        color: $brand-color;
+        @include card-grid-item-link;
       }
 
       .mainTabText {
-        font-family: $body-font;
-        line-height: 22px;
-        font-size: 16px;
-        letter-spacing: 0.02em;
-        color: #50556C;
-        max-width: 100%;
+        @include card-grid-item-text;
       }
     }
   }
@@ -342,6 +311,7 @@ a {
 span.group-header {
   transition: color .2s ease;
   cursor: pointer;
+
   &:hover {
     color: $brand-color;
   }
@@ -354,6 +324,7 @@ span.group-header {
   opacity: 0;
   line-height: 0;
   transition: all .2s ease-out;
+
   &.active {
     height: 100%;
     visibility: visible;
@@ -530,6 +501,7 @@ span.group-header {
             }
           }
         }
+
         .ant-menu-item-group-title {
           text-transform: uppercase;
           font-size: 0.8rem;
@@ -820,18 +792,18 @@ section[type=h2] h2 {
 }
 
 .postClearSection {
-	h2, h3 {
-		border-top: none;
-		margin-top: 0;
-	}
+  h2, h3 {
+    border-top: none;
+    margin-top: 0;
+  }
 }
 
 .clearSection + .postClearSection {
-	h2 {
-		margin-top: 0;
-		border: none;
-		padding-top: 11px;
-	}
+  h2 {
+    margin-top: 0;
+    border: none;
+    padding-top: 11px;
+  }
 }
 
 // md inner content styles
@@ -871,6 +843,7 @@ section[type=h2] h2 {
     a {
       border-bottom: 1px solid rgba(67, 125, 171, 0.3);
       transition: border 0.2s;
+
       &:hover {
         border-color: rgba(67, 125, 171, 0.8);
       }
@@ -878,6 +851,7 @@ section[type=h2] h2 {
 
     p {
       margin-bottom: 12px;
+
       &:last-child {
         margin-bottom: 0;
       }
@@ -900,6 +874,7 @@ section[type=h2] h2 {
 
       a {
         border-color: rgba(255, 159, 157, 0.3);
+
         &:hover {
           border-color: rgba(255, 159, 157, 0.8);
         }
@@ -915,6 +890,7 @@ section[type=h2] h2 {
 
       a {
         border-color: rgba(241, 165, 93, 0.3);
+
         &:hover {
           border-color: rgba(241, 165, 93, 0.8);
         }
@@ -981,6 +957,49 @@ section[type=h2] h2 {
 
     .ant-radio-button-wrapper::before {
       background-color: white !important;
+    }
+  }
+}
+
+
+:global {
+  .gettingStartedGrid {
+    @include card-grid;
+
+    .gettingStartedItem {
+      @include card-grid-item;
+
+      &.gettingStartedItemAdjacent {
+        @include card-grid-item-adjacent;
+      }
+
+      .gettingStartedItemContent {
+        @include card-grid-item-content;
+        margin: 1.5rem;
+
+        .gettingStartedItemImage {
+          @include card-grid-item-image;
+          position: unset;
+          display: flex;
+          justify-content: center;
+
+          > img {
+            box-shadow: none !important;
+            border: none;
+            max-height: 160px;
+          }
+        }
+
+        .gettingStartedItemLink {
+          @include card-grid-item-link;
+          margin-top: 0.5rem;
+          text-align: center;
+        }
+
+        .gettingStartedItemText {
+          @include card-grid-item-text;
+        }
+      }
     }
   }
 }

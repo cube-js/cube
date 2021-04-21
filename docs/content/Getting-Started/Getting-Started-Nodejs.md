@@ -1,18 +1,10 @@
 ---
-title: Getting Started
-permalink: /getting-started
-category: Getting Started
+title: Getting Started with Cube.js using Node.js
+permalink: /getting-started/nodejs
 ---
 
-[link-connecting-to-the-database]: /connecting-to-the-database
-[link-cubejs-schema]: /getting-started-cubejs-schema
-[link-getting-started-docker]: /getting-started-docker
-
 This guide walks you through getting started with Cube.js and requires
-[Node.js](https://nodejs.org/en/) to be installed.
-
-In case you don't have Node.js, or you'd like to run Cube.js with Docker, follow
-the [Getting started with Docker guide][link-getting-started-docker].
+[Node.js][link-nodejs] to be installed.
 
 ## 1. Scaffold the project
 
@@ -23,9 +15,8 @@ name and optionally your database using the `-d` flag.
 $ npx cubejs-cli create <project name> -d <database type>
 ```
 
-You can find [all available databases here][link-connecting-to-the-database].
-For example, to create a new project with the Postgres database, use the
-following:
+You can find [all available databases here][ref-connecting-to-the-database]. For
+example, to create a new project with the Postgres database, use the following:
 
 ```bash
 $ npx cubejs-cli create hello-world -d postgres
@@ -38,17 +29,17 @@ highlight the format of the Cube.js Data Schema layer.
 
 The `.env` file in this project directory contains placeholders for the relevant
 database credentials. Setting credentials is covered in the [Connecting to the
-Database][link-connecting-to-the-database] section.
+Database][ref-connecting-to-the-database] section.
 
 ## 2. Define Your Data Schema
 
-Cube.js uses [Data Schema][link-cubejs-schema] to generate and execute SQL.
+Cube.js uses [Data Schema][ref-cubejs-schema] to generate and execute SQL.
 
 It acts as an ORM for your database and it is flexible enough to model
 everything from simple counts to cohort retention and funnel analysis. [Read
-more about Cube.js Schema][link-cubejs-schema].
+more about Cube.js Schema][ref-cubejs-schema].
 
-You can generate schema files using [Developer Playground][link-dev-playground].
+You can generate schema files using [Developer Playground][ref-dev-playground].
 To do so, you can start the dev server from project directory like this:
 
 ```bash
@@ -57,8 +48,6 @@ $ npm run dev
 
 Then go to `http://localhost:4000` and use Developer Playground to generate
 schema files.
-
-[link-dev-playground]: /dev-tools/dev-playground
 
 ### Manually creating Data Schema files
 
@@ -97,9 +86,7 @@ The Cube.js client provides set of methods to access Cube.js API and to work
 with query result. The client itself doesn't provide any visualizations and is
 designed to work with existing chart libraries. You can find more information
 about [the Cube.js client as well as our frontend integrations here]
-[link-frontend-intro].
-
-[link-frontend-intro]: /frontend-introduction
+[ref-frontend-intro].
 
 As a shortcut you can run your dev server first:
 
@@ -340,15 +327,10 @@ export class AppComponent {
 Cube.js has first-class deployment support for [Docker][link-docker] and the
 [Serverless Framework][link-serverless-framework].
 
-[link-docker]: https://www.docker.com/
-[link-serverless-framework]: https://www.serverless.com/
-
 ### Docker
 
 For more information on deploying our official Docker image, please consult the
-[Deployment Guide][link-docker-deployment-guide].
-
-[link-docker-deployment-guide]: /deployment#docker
+[Deployment Guide][ref-docker-deployment-guide].
 
 ```bash
 $ docker run --rm \
@@ -366,6 +348,14 @@ $ docker run --rm \
 ### Serverless
 
 For more information on deploying with the Serverless Framework, consult the
-[Deployment Guide][link-sls-aws-deployment-guide].
+[Deployment Guide][ref-sls-aws-deployment-guide].
 
-[link-sls-aws-deployment-guide]: /deployment#aws-serverless-deploy
+[link-docker]: https://www.docker.com/
+[link-nodejs]: https://nodejs.org/en/
+[link-serverless-framework]: https://www.serverless.com/
+[ref-dev-playground]: /dev-tools/dev-playground
+[ref-frontend-intro]: /frontend-introduction
+[ref-docker-deployment-guide]: /deployment#docker
+[ref-sls-aws-deployment-guide]: /deployment#aws-serverless-deploy
+[ref-connecting-to-the-database]: /connecting-to-the-database
+[ref-cubejs-schema]: /getting-started-cubejs-schema
