@@ -114,7 +114,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         if (options.ws) {
           // eslint-disable-next-line no-loop-func
           it(`${options.name}`, async () => {
-            const response = await httpClient.load(query);
+            const response = await wsClient.load(query);
             expect(response.rawData()).toMatchSnapshot(options.name);
           });
         }
