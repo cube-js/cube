@@ -310,18 +310,51 @@ export class ServerContainer {
     let instance = await makeInstance(false);
 
     if (!embedded) {
-      if (instance.gracefulEnabled) {
-        // eslint-disable-next-line no-restricted-syntax
-        for (const bindSignal of ['SIGTERM', 'SIGINT']) {
-          // eslint-disable-next-line no-loop-func
-          process.on(bindSignal, async (signal) => {
+      let shutdownHandler: Promise<0|1>|null = null;
+      let killSignalCount = 0;
+
+      const signalToShutdown = [
+        // Signal Terminate - graceful shutdown in Unix systems
+        'SIGTERM',
+        // Ctrl+C
+        'SIGINT'
+      ];
+
+      // eslint-disable-next-line no-restricted-syntax
+      for (const bindSignal of signalToShutdown) {
+        // eslint-disable-next-line no-loop-func
+        process.on(bindSignal, async (signal) => {
+          killSignalCount++;
+
+          if (killSignalCount === 3) {
+            console.log('Received killing signal 3 times, exiting immediately');
+
+            // 130 is the default exit code when killed by a signal.
+            process.exit(130);
+          }
+
+          if (instance.gracefulEnabled) {
+            if (shutdownHandler) {
+              return;
+            }
+
             console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
 
-            process.exit(
-              await instance.server.shutdown(signal, true)
-            );
-          });
-        }
+            try {
+              shutdownHandler = instance.server.shutdown(signal, true);
+
+              process.exit(
+                await shutdownHandler,
+              );
+            } catch (e) {
+              console.log(e);
+
+              process.exit(1);
+            }
+          } else {
+            process.exit(0);
+          }
+        });
       }
 
       let restartHandler: Promise<0|1>|null = null;
