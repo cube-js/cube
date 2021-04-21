@@ -102,6 +102,10 @@ impl CubeServices {
             futures.push(tokio::spawn(async move {
                 ClusterImpl::listen_on_worker_port(cluster).await
             }));
+            let cluster = self.cluster.clone();
+            futures.push(tokio::spawn(
+                async move { cluster.warmup_select_worker().await },
+            ))
         }
         futures.push(tokio::spawn(async move {
             start_track_event_loop().await;
@@ -212,6 +216,8 @@ pub trait ConfigObj: DIService {
     fn upload_to_remote(&self) -> bool;
 
     fn enable_topk(&self) -> bool;
+
+    fn enable_startup_warmup(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -240,6 +246,7 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub enable_startup_warmup: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -332,6 +339,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+
+    fn enable_startup_warmup(&self) -> bool {
+        self.enable_startup_warmup
     }
 }
 
@@ -441,6 +452,7 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
             }),
         }
     }
@@ -481,6 +493,7 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                enable_startup_warmup: true,
             }),
         }
     }

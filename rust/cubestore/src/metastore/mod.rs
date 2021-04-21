@@ -720,6 +720,10 @@ pub trait MetaStore: DIService + Send + Sync {
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError>;
 
+    async fn get_warmup_partitions(
+        &self,
+    ) -> Result<Vec<(PartitionName, Vec</*chunk_id*/ u64>)>, CubeError>;
+
     fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
         &self,
@@ -772,6 +776,13 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         table_name: Vec<(String, String)>,
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError>;
+}
+
+/// Information required to produce partition name on remote fs.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct PartitionName {
+    pub parent_partition_id: Option<u64>,
+    pub partition_id: u64,
 }
 
 crate::di_service!(RocksMetaStore, [MetaStore]);
@@ -2652,6 +2663,51 @@ impl MetaStore for RocksMetaStore {
                 results.push(result)
             }
             Ok(results)
+        })
+        .await
+    }
+
+    async fn get_warmup_partitions(&self) -> Result<Vec<(PartitionName, Vec<u64>)>, CubeError> {
+        self.read_operation(|db| {
+            // Do full scan, likely only a small number chunks and partitions are inactive.
+            let mut partition_to_chunks = HashMap::new();
+            for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let c = c?;
+                if !c.row.active() {
+                    continue;
+                }
+                partition_to_chunks
+                    .entry(c.row.partition_id)
+                    .or_insert(Vec::new())
+                    .push(c.id)
+            }
+
+            let mut partitions = Vec::new();
+            for p in PartitionRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let p = p?;
+                if p.row.is_active() {
+                    let mut chunks = Vec::new();
+                    chunks.extend(partition_to_chunks.entry(p.id).or_default().iter().cloned());
+                    if let Some(parent_id) = p.row.parent_partition_id {
+                        chunks.extend(
+                            partition_to_chunks
+                                .entry(parent_id)
+                                .or_default()
+                                .iter()
+                                .cloned(),
+                        );
+                    }
+
+                    partitions.push((
+                        PartitionName {
+                            parent_partition_id: p.row.parent_partition_id,
+                            partition_id: p.id,
+                        },
+                        chunks,
+                    ));
+                }
+            }
+            Ok(partitions)
         })
         .await
     }
