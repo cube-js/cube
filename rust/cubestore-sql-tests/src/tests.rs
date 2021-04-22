@@ -69,6 +69,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
         t("topk_query", topk_query),
+        t("topk_decimals", topk_decimals),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -1971,6 +1972,52 @@ async fn topk_query(service: Box<dyn SqlClient>) {
     fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
         a.iter()
             .map(|(s, i)| vec![TableValue::String(s.to_string()), TableValue::Int(*i)])
+            .collect_vec()
+    }
+}
+
+async fn topk_decimals(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', NULL), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80), ('z', NULL)")
+        .await
+        .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC NULLS LAST \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("z", 100), ("y", 80), ("b", 52)]));
+
+    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(s, i)| {
+                vec![
+                    TableValue::String(s.to_string()),
+                    TableValue::Decimal(i.to_string()),
+                ]
+            })
             .collect_vec()
     }
 }
