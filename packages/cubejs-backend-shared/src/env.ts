@@ -147,9 +147,9 @@ const variables: Record<string, (...args: any) => any> = {
   redisTls: () => get('REDIS_TLS')
     .default('false')
     .asBoolStrict(),
-  jwkKey: () => get('CUBEJS_JWK_KEY')
-    .asUrlString(),
   jwkUrl: () => get('CUBEJS_JWK_URL')
+    .asString(),
+  jwtKey: () => get('CUBEJS_JWT_KEY')
     .asUrlString(),
   jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
     .asArray(','),

@@ -149,7 +149,7 @@ Add the following to your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    key: '<JWKS_AS_STRING>',
+    key: '<JWK_AS_STRING>',
   },
 };
 ```
@@ -157,7 +157,7 @@ module.exports = {
 Or configure the same using environment variables:
 
 ```dotenv
-CUBEJS_JWK_KEY='<JWKS_AS_STRING>'
+CUBEJS_JWT_KEY='<JWK_AS_STRING>'
 ```
 
 #### Using a key from a URL

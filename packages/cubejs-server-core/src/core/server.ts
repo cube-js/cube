@@ -373,7 +373,7 @@ export class CubejsServerCore {
       livePreview: getEnv('livePreview'),
       ...opts,
       jwt: {
-        key: getEnv('jwkKey'),
+        key: getEnv('jwtKey'),
         algorithms: getEnv('jwtAlgorithms'),
         issuer: getEnv('jwtIssuer'),
         audience: getEnv('jwtAudience'),

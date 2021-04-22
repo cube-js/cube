@@ -168,7 +168,6 @@ module.exports = {
 };
 ```
 
-
 ### contextToAppId
 
 It is a [Multitenancy Setup][ref-multitenancy] option.
@@ -295,8 +294,8 @@ there. Either `String` or `Function` could be passed. Providing a `Function`
 allows to dynamically set the pre-aggregation schema name depending on the
 user's context.
 
-Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode] and `prod_pre_aggregations` in production.
-
+Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
+and `prod_pre_aggregations` in production.
 
 Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
 
@@ -311,7 +310,7 @@ Called once per [`appId`][ref-opts-ctx-to-appid].
 ```javascript
 // Static usage
 module.exports = {
-  preAggregationsSchema: `my_pre_aggregations`
+  preAggregationsSchema: `my_pre_aggregations`,
 };
 
 // Dynamic usage
@@ -481,8 +480,8 @@ using `CUBEJS_JWK_URL`.
 
 #### key
 
-A JSON string that represents a cryptographic key and its' properties. Can also
-be set using `CUBEJS_JWK_KEY`.
+A JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
+also be set using `CUBEJS_JWT_KEY`.
 
 #### algorithms
 
@@ -509,13 +508,12 @@ JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
-
 ### externalDbType
 
 Should be used in conjunction with
 [`externalDriverFactory`](#external-driver-factory) option. Either `String` or
-`Function` could be passed. Providing a `Function` allows you to dynamically select
-a database type depending on the user's context. It is usually used in
+`Function` could be passed. Providing a `Function` allows you to dynamically
+select a database type depending on the user's context. It is usually used in
 [Multitenancy Setup][ref-multitenancy].
 
 Called only once per [`appId`][ref-opts-ctx-to-appid].
