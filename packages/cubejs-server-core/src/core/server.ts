@@ -555,36 +555,67 @@ export class CubejsServerCore {
       return this.orchestratorStorage.get(orchestratorId);
     }
 
-    const driverPromise = {};
-    let externalPreAggregationsDriverPromise;
+    const driverPromise: Record<string, Promise<BaseDriver>> = {};
+    let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
 
     const orchestratorApi = this.createOrchestratorApi({
-      getDriver: async (dataSource) => {
-        if (!driverPromise[dataSource || 'default']) {
-          orchestratorApi.addDataSeenSource(dataSource);
-          const driver = await this.options.driverFactory({ ...context, dataSource });
-          if (driver.setLogger) {
-            driver.setLogger(this.logger);
-          }
-          driverPromise[dataSource || 'default'] = driver.testConnection().then(() => driver).catch(e => {
-            driverPromise[dataSource || 'default'] = null;
-            throw e;
-          });
+      getDriver: async (dataSource = 'default') => {
+        if (driverPromise[dataSource]) {
+          return driverPromise[dataSource];
         }
-        return driverPromise[dataSource || 'default'];
+
+        // eslint-disable-next-line no-return-assign
+        return driverPromise[dataSource] = (async () => {
+          let driver: BaseDriver|null = null;
+
+          try {
+            driver = await this.options.driverFactory({ ...context, dataSource });
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
+
+            await driver.testConnection();
+
+            return driver;
+          } catch (e) {
+            driverPromise[dataSource] = null;
+
+            if (driver) {
+              await driver.release();
+            }
+
+            throw e;
+          }
+        })();
       },
       getExternalDriverFactory: this.options.externalDriverFactory && (async () => {
-        if (!externalPreAggregationsDriverPromise) {
-          const driver = await this.options.externalDriverFactory(context);
-          if (driver.setLogger) {
-            driver.setLogger(this.logger);
-          }
-          externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
-            externalPreAggregationsDriverPromise = null;
-            throw e;
-          });
+        if (externalPreAggregationsDriverPromise) {
+          return externalPreAggregationsDriverPromise;
         }
-        return externalPreAggregationsDriverPromise;
+
+        // eslint-disable-next-line no-return-assign
+        return externalPreAggregationsDriverPromise = (async () => {
+          let driver: BaseDriver|null = null;
+
+          try {
+            driver = await this.options.externalDriverFactory(context);
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
+
+            await driver.testConnection();
+
+            return driver;
+          } catch (e) {
+            externalPreAggregationsDriverPromise = null;
+
+            if (driver) {
+              await driver.release();
+            }
+
+            throw e;
+          }
+        })();
       }),
       redisPrefix: orchestratorId,
       orchestratorOptions: this.orchestratorOptions(context)

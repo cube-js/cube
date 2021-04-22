@@ -393,6 +393,13 @@ export class BaseDriver {
     }
   }
 
+  /**
+   * @public
+   */
+  async release() {
+    // override, if it's needed
+  }
+
   capabilities() {
     return {};
   }
