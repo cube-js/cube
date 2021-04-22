@@ -64,10 +64,7 @@ const generate = async (options) => {
   });
 
   const dbSchema = await driver.tablesSchema();
-
-  if ((<any>driver).release) {
-    await (<any>driver).release();
-  }
+  await driver.release();
 
   logStage('Generating schema files');
   const ScaffoldingTemplate = requireFromPackage<any>(
