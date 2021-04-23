@@ -30,8 +30,10 @@ use log::{debug, error};
 use mockall::automock;
 use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
+use std::fmt::Display;
 use std::future::Future;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
 use tokio::sync::broadcast;
@@ -218,6 +220,8 @@ pub trait ConfigObj: DIService {
     fn enable_topk(&self) -> bool;
 
     fn enable_startup_warmup(&self) -> bool;
+
+    fn malloc_trim_every_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -247,6 +251,7 @@ pub struct ConfigObjImpl {
     pub upload_to_remote: bool,
     pub enable_topk: bool,
     pub enable_startup_warmup: bool,
+    pub malloc_trim_every_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -344,6 +349,9 @@ impl ConfigObj for ConfigObjImpl {
     fn enable_startup_warmup(&self) -> bool {
         self.enable_startup_warmup
     }
+    fn malloc_trim_every_secs(&self) -> u64 {
+        self.malloc_trim_every_secs
+    }
 }
 
 lazy_static! {
@@ -363,6 +371,20 @@ fn env_bool(name: &str, default: bool) -> bool {
             "0" => false,
             "1" => true,
             _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+        })
+        .unwrap_or(default)
+}
+
+fn env_parse<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    env::var(name)
+        .ok()
+        .map(|x| match x.parse::<T>() {
+            Ok(v) => v,
+            Err(e) => panic!("could not parse value for '{}': {}", name, e),
         })
         .unwrap_or(default)
 }
@@ -453,6 +475,7 @@ impl Config {
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
+                malloc_trim_every_secs: env_parse::<u64>("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
             }),
         }
     }
@@ -494,6 +517,7 @@ impl Config {
                 upload_to_remote: true,
                 enable_topk: true,
                 enable_startup_warmup: true,
+                malloc_trim_every_secs: 0,
             }),
         }
     }

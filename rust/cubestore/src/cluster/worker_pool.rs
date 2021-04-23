@@ -1,4 +1,3 @@
-use crate::sys::malloc::trim_allocs;
 use crate::CubeError;
 use async_trait::async_trait;
 use deadqueue::unlimited;
@@ -239,7 +238,6 @@ impl<
                 let res = rx.recv();
                 match res {
                     Ok(args) => {
-                        scopeguard::defer!(trim_allocs());
                         let send_res = tx.send(runtime.block_on(P::process(args)));
                         if let Err(e) = send_res {
                             error!("Worker message send error: {:?}", e);

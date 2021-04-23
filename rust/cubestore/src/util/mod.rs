@@ -1,7 +1,9 @@
 pub mod lock;
+mod malloc_trim_loop;
 pub mod maybe_owned;
 pub mod ordfloat;
 pub mod time_span;
+pub use malloc_trim_loop::spawn_malloc_trim_loop;
 
 use crate::CubeError;
 use log::error;
