@@ -32,6 +32,7 @@
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.26.102",
     "@cubejs-backend/cloud": "^0.26.95",
+    "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.26.101",
     "@cubejs-backend/schema-compiler": "^0.26.95",
     "@cubejs-backend/shared": "^0.26.95",
