@@ -9,7 +9,6 @@ use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
-use crate::sys::malloc::trim_allocs;
 use crate::table::data::{MutRows, Rows};
 use crate::table::{Row, TableValue};
 use crate::util::maybe_owned::MaybeOwnedStr;
@@ -27,7 +26,6 @@ use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
 use pin_project_lite::pin_project;
-use scopeguard::defer;
 use std::fs;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -443,8 +441,6 @@ impl ImportService for ImportServiceImpl {
                     table.get_row().get_columns().clone(),
                 )
                 .await?;
-
-            defer!(trim_allocs());
 
             let mut ingestion = Ingestion::new(
                 self.meta_store.clone(),

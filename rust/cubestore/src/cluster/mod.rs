@@ -26,7 +26,6 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
-use crate::sys::malloc::trim_allocs;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
@@ -806,7 +805,6 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
-        scopeguard::defer!(trim_allocs());
         let start = SystemTime::now();
         debug!("Running select: {:?}", plan_node);
         let to_download = plan_node.files_to_download();

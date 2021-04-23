@@ -22,7 +22,6 @@ use std::{
 };
 
 use crate::config::injection::DIService;
-use crate::sys::malloc::trim_allocs;
 use crate::table::data::{cmp_row_key, cmp_row_key_heap, MutRows, Rows};
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
@@ -31,7 +30,6 @@ use futures::future::join_all;
 use itertools::Itertools;
 use log::trace;
 use mockall::automock;
-use scopeguard::defer;
 use std::cmp::Ordering;
 use tokio::task::JoinHandle;
 
@@ -329,8 +327,6 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError> {
-        defer!(trim_allocs());
-
         let partition = self.meta_store.get_partition(partition_id).await?;
         if partition.get_row().is_active() {
             return Err(CubeError::internal(format!(
@@ -722,7 +718,6 @@ impl ChunkStore {
         mut rows: Rows,
         columns: &[Column],
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
-        defer!(trim_allocs());
         let mut new_chunks = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();

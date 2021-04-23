@@ -1,10 +1,12 @@
 use cubestore::config::{Config, CubeServices};
 use cubestore::telemetry::{track_event, ReportingLogger};
+use cubestore::util::spawn_malloc_trim_loop;
 use log::debug;
 use log::Level;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::env;
+use std::time::Duration;
 use tokio::runtime::Builder;
 
 fn main() {
@@ -29,6 +31,11 @@ fn main() {
     let config = Config::default();
 
     Config::configure_worker_services();
+
+    let trim_every = config.config_obj().malloc_trim_every_secs();
+    if trim_every != 0 {
+        spawn_malloc_trim_loop(Duration::from_secs(trim_every));
+    }
 
     debug!("New process started");
 

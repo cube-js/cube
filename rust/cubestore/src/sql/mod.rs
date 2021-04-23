@@ -30,7 +30,6 @@ use crate::queryplanner::query_executor::QueryExecutor;
 use crate::remotefs::RemoteFs;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
-use crate::sys::malloc::trim_allocs;
 use crate::table::data::{MutRows, Rows, TableValueR};
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -449,8 +448,6 @@ impl SqlService for SqlServiceImpl {
                 columns,
                 source,
             }) => {
-                scopeguard::defer!(trim_allocs());
-
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
                 } else {
@@ -472,7 +469,6 @@ impl SqlService for SqlServiceImpl {
                 Ok(DataFrame::new(vec![], vec![]))
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
-                scopeguard::defer!(trim_allocs());
                 let logical_plan = self
                     .query_planner
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))
@@ -506,7 +502,6 @@ impl SqlService for SqlServiceImpl {
         };
         match ast {
             CubeStoreStatement::Statement(Statement::Query(q)) => {
-                scopeguard::defer!(trim_allocs());
                 let logical_plan = self
                     .query_planner
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))
