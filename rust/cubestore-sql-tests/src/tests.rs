@@ -61,6 +61,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_inputs", hyperloglog_empty_inputs),
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
+        t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
@@ -1260,6 +1261,85 @@ async fn hyperloglog_inserts(service: Box<dyn SqlClient>) {
         .exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')")
         .await
         .expect_err("should not allow invalid HLL (with extra bytes)");
+}
+
+async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE hll.sketches1(id int, hll hyperloglog)")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE hll.sketches2(id int, hll hyperloglog)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO hll.sketches1(id, hll) \
+                     VALUES (0, X'020C0200C02FF58941D5F0C6'), \
+                            (1, X'020C0200C02FF58941D5F0C6')",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO hll.sketches2(id, hll) \
+                     VALUES (1, X'020C0200C02FF58941D5F0C6'), \
+                            (2, X'020C0200C02FF58941D5F0C6')",
+        )
+        .await
+        .unwrap();
+
+    // Case expression should handle binary results.
+    service
+        .exec_query(
+            "SELECT id, CASE WHEN id = 0 THEN merge(hll) ELSE merge(hll) END \
+             FROM hll.sketches1 \
+             GROUP BY 1",
+        )
+        .await
+        .unwrap();
+    // Without the ELSE branch.
+    service
+        .exec_query(
+            "SELECT id, CASE WHEN id = 0 THEN merge(hll) END \
+             FROM hll.sketches1 \
+             GROUP BY 1",
+        )
+        .await
+        .unwrap();
+    // Binary type in condition. For completeness, probably not very useful in practice.
+    // TODO: this fails for unrelated reasons, binary support is ad-hoc at this point.
+    //       uncomment when fixed.
+    // service.exec_query(
+    //     "SELECT id, CASE hll WHEN '' THEN NULL else hll END \
+    //      FROM hll.sketches1",
+    // ).await.unwrap();
+
+    // MergeSortExec uses the same code as case expression internally.
+    let rows = service
+        .exec_query(
+            "SELECT id, cardinality(merge(hll)) \
+             FROM
+               (SELECT * FROM hll.sketches1
+                UNION ALL
+                SELECT * FROM hll.sketches2) \
+             GROUP BY 1 ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&rows),
+        vec![
+            vec![TableValue::Int(0), TableValue::Int(2)],
+            vec![TableValue::Int(1), TableValue::Int(2)],
+            vec![TableValue::Int(2), TableValue::Int(2)],
+        ]
+    )
 }
 
 async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
