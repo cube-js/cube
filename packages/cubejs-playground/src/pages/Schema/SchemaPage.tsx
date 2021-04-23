@@ -201,6 +201,7 @@ export default class SchemaPage extends Component<any, any> {
     const renderTreeOrError = () =>
       schemaLoadingError ? (
         <Alert
+          data-testid="schema-error"
           message="Error while loading DB schema"
           description={schemaLoadingError.toString()}
           type="error"

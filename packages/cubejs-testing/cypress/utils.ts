@@ -21,6 +21,12 @@ export function blockAllAnalytics() {
   });
 }
 
-export function delay(timeout: number = 1000): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, timeout));
+export function getLocalHostnameByOs() {
+  if (Cypress.platform === 'win32') {
+    return 'docker.for.win.localhost';
+  } else if (Cypress.platform === 'darwin') {
+    return 'host.docker.internal';
+  }
+
+  return 'localhost';
 }

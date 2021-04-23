@@ -290,7 +290,10 @@ export class CubejsServerCore {
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     optionsValidate(opts);
 
-    const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
+    function getDbType() {
+      return opts.dbType || <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
+    }
+
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
     const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
     const logger: LoggerFn = opts.logger || (
@@ -346,10 +349,10 @@ export class CubejsServerCore {
     }
 
     const options: ServerCoreInitializedOptions = {
-      dbType,
+      dbType: getDbType(),
       externalDbType,
       devServer,
-      driverFactory: () => typeof dbType === 'string' && CubejsServerCore.createDriver(dbType),
+      driverFactory: () => typeof getDbType() === 'string' && CubejsServerCore.createDriver(<DatabaseType>getDbType()),
       dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
       externalDriverFactory,
@@ -546,6 +549,11 @@ export class CubejsServerCore {
 
     compilerApi.schemaVersion = currentSchemaVersion;
     return compilerApi;
+  }
+
+  public async resetDatabaseDriver() {
+    await this.orchestratorStorage.releaseConnections();
+    this.orchestratorStorage.clear();
   }
 
   public getOrchestratorApi(context: RequestContext): OrchestratorApi {

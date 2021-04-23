@@ -1,12 +1,13 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import type { ChildProcess } from 'child_process';
+import dotenv from '@cubejs-backend/dotenv';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
 import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
 import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, Request } from 'express';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 
@@ -25,6 +26,7 @@ export class DevServer {
   protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> } | null = null;
 
   protected livePreviewWatcher = new LivePreviewWatcher();
+  private dotenv: any;
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
@@ -371,12 +373,6 @@ export class DevServer {
       }
     }));
 
-    app.get('/restart', catchErrors(async (_, res) => {
-      process.kill(process.pid, 'SIGUSR1');
-
-      return res.json('Restarting...');
-    }));
-
     app.post('/playground/env', catchErrors(async (req, res) => {
       let { variables = {} } = req.body || {};
 
@@ -396,7 +392,10 @@ export class DevServer {
 
       fs.writeFileSync('.env', variables.join('\n'));
 
-      res.status(200).json('ok');
+      dotenv.config({ override: true });
+      await this.cubejsServer.resetDatabaseDriver();
+
+      res.status(200).json(process.env);
     }));
 
     app.post('/playground/token', catchErrors(async (req, res) => {

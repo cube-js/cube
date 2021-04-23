@@ -4,26 +4,7 @@ import jwtDecode from 'jwt-decode';
 import crypto from 'crypto';
 
 import { blockAllAnalytics } from '../utils';
-
-const ordersCountQuery = {
-  measures: ['Orders.count'],
-};
-
-const countWithTimedimenionQuery = {
-  measures: ['Events.count'],
-  timeDimensions: [
-    {
-      dimension: 'Events.createdAt',
-      granularity: 'hour',
-    },
-  ],
-  order: { 'Events.createdAt': 'asc' },
-};
-
-const tableQuery = {
-  measures: ['Events.count'],
-  dimensions: ['Events.type'],
-};
+import { countWithTimedimenionQuery, ordersCountQuery, tableQuery } from '../queries';
 
 context('Playground: Explore Page', () => {
   beforeEach(() => {
