@@ -74,7 +74,7 @@ context('Playground: Connection Wizard', () => {
           if (key === 'CUBEJS_DB_HOST') {
             value = getLocalHostnameByOs();
           } else if (key === 'CUBEJS_DB_PORT') {
-            value = Cypress.env('CUBEJS_DB_HOST');
+            value = Cypress.env('CUBEJS_DB_PORT');
           }
           cy.getByTestId(key).type(value);
         });

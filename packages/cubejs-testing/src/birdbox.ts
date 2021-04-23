@@ -18,7 +18,9 @@ export interface BirdBox {
     playgroundUrl: string;
     apiUrl: string;
     wsUrl: string;
-    dbPort?: number;
+    env?: {
+      dbPort?: number;
+    }
   };
 }
 
@@ -55,6 +57,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   const playgroundPort = process.env.TEST_PLAYGROUND_PORT ? process.env.TEST_PLAYGROUND_PORT : port;
 
   let proxyServer: HttpProxy | null = null;
+
   if (process.env.TEST_PLAYGROUND_PORT) {
     console.log(`[Birdbox] Creating a proxy server 4000->${port} for local testing`);
     // As local Playground proxies requests to the 4000 port
@@ -102,7 +105,9 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       playgroundUrl: `http://${host}:${playgroundPort}`,
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
       wsUrl: `ws://${host}:${port}`,
-      dbPort,
+      env: {
+        dbPort
+      },
     },
   };
 }

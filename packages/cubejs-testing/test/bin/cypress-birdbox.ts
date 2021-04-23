@@ -39,7 +39,7 @@ import { startBirdBoxFromContainer } from '../../src';
         taskTimeout: 10 * 1000,
       },
       env: {
-        CUBEJS_DB_HOST: birdbox.configuration.dbPort,
+        CUBEJS_DB_PORT: birdbox.configuration.env?.dbPort,
       },
     };
 

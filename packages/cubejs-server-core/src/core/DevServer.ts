@@ -27,8 +27,6 @@ export class DevServer {
 
   protected livePreviewWatcher = new LivePreviewWatcher();
 
-  private dotenv: any;
-
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
   ) {

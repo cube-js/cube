@@ -3,7 +3,6 @@
     "credentials": {
       "valid": {
         "CUBEJS_DB_HOST": "localhost",
-        "CUBEJS_DB_PORT": "5432",
         "CUBEJS_DB_NAME": "test",
         "CUBEJS_DB_USER": "test",
         "CUBEJS_DB_PASS": "test"
