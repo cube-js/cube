@@ -52,6 +52,16 @@ const hydrators = [
   }
 ];
 
+const SnowflakeToGenericType = {
+  number: 'decimal',
+  timestamp_ntz: 'timestamp'
+};
+
+/**
+ * Attention:
+ * Snowflake is using UPPER_CASE for table, schema and column names
+ * Similar to data in response, column_name will be COLUMN_NAME
+ */
 class SnowflakeDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -152,6 +162,26 @@ class SnowflakeDriver extends BaseDriver {
     return this.initialConnectPromise.then((connection) => new Promise(
       (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
     ));
+  }
+
+  toGenericType(columnType) {
+    return SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+  }
+
+  async tableColumnTypes(table) {
+    const [schema, name] = table.split('.');
+
+    const columns = await this.query(
+      `SELECT columns.column_name,
+             columns.table_name,
+             columns.table_schema,
+             columns.data_type
+      FROM information_schema.columns
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      [name.toUpperCase(), schema.toUpperCase()]
+    );
+
+    return columns.map(c => ({ name: c.COLUMN_NAME, type: this.toGenericType(c.DATA_TYPE) }));
   }
 
   async getTablesQuery(schemaName) {
