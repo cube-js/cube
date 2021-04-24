@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+
+### Bug Fixes
+
+* **mssql-driver:** multi-part identifier `columns.data_type` ([487e8b2](https://github.com/cube-js/cube.js/commit/487e8b2fa8da761f32d10481bcc1d77eaf094ab4))
+
+
+
+
+
 ## [0.26.101](https://github.com/cube-js/cube.js/compare/v0.26.100...v0.26.101) (2021-04-20)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver

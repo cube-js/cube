@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.101",
+  "version": "0.26.103",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -14,8 +14,8 @@
   "main": "driver/BigQueryDriver.js",
   "types": "driver/index.d.ts",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.26.101",
-    "@cubejs-backend/shared": "^0.26.95",
+    "@cubejs-backend/query-orchestrator": "^0.26.103",
+    "@cubejs-backend/shared": "^0.26.103",
     "@google-cloud/bigquery": "^5.5.0",
     "@google-cloud/storage": "^5.7.2",
     "ramda": "^0.27.0"
