@@ -1,6 +1,7 @@
 import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import type { SchemaFileRepository } from './FileRepository';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -49,15 +50,6 @@ export interface DriverContext extends RequestContext {
 
 export interface DialectContext extends DriverContext {
   dbType: string;
-}
-
-export interface FileContent {
-  fileName: string;
-  content: string;
-}
-
-export interface SchemaFileRepository {
-  dataSchemaFiles: () => Promise<FileContent[]>;
 }
 
 export interface DriverFactory {}

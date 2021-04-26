@@ -29,12 +29,11 @@ import type {
   PreAggregationsSchemaFn,
   RequestContext,
   DriverContext,
-  SchemaFileRepository,
   UserBackgroundContext,
   LoggerFn,
 } from './types';
 
-import { FileRepository } from './FileRepository';
+import { FileRepository, SchemaFileRepository } from './FileRepository';
 import { RefreshScheduler } from './RefreshScheduler';
 import { OrchestratorApi } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
@@ -405,9 +404,16 @@ export class CubejsServerCore {
       );
     }
 
-    if (
-      !options.devServer || (options.devServer && this.configFileExists())
-    ) {
+    // Create schema directory to protect error on new project with dev mode (docker flow)
+    if (options.devServer && !this.configFileExists()) {
+      const repositoryPath = path.join(process.cwd(), options.schemaPath);
+
+      if (!fs.existsSync(repositoryPath)) {
+        fs.mkdirSync(repositoryPath);
+      }
+    }
+
+    if (!options.devServer || this.configFileExists()) {
       const fieldsForValidation: (keyof ServerCoreInitializedOptions)[] = [
         'driverFactory',
         'dbType'

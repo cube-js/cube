@@ -385,8 +385,10 @@ export class DevServer {
         fs.removeSync('./.env');
       }
 
-      if (!fs.existsSync('./schema')) {
-        fs.mkdirSync('./schema');
+      const repositoryPath = path.join(process.cwd(), options.schemaPath);
+
+      if (!fs.existsSync(repositoryPath)) {
+        fs.mkdirSync(repositoryPath);
       }
 
       fs.writeFileSync('.env', variables.join('\n'));

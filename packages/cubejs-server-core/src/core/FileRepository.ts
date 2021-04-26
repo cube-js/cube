@@ -1,18 +1,29 @@
-const path = require('path');
-const fs = require('fs-extra');
-const R = require('ramda');
+import path from 'path';
+import fs from 'fs-extra';
+import R from 'ramda';
 
-export class FileRepository {
-  constructor(repositoryPath) {
-    this.repositoryPath = repositoryPath;
+export interface FileContent {
+  fileName: string;
+  content: string;
+}
+
+export interface SchemaFileRepository {
+  dataSchemaFiles: (includeDependencies?: boolean) => Promise<FileContent[]>;
+}
+
+export class FileRepository implements SchemaFileRepository {
+  public constructor(
+    protected readonly repositoryPath: string
+  ) {
   }
 
-  localPath() {
+  public localPath(): string {
     return path.join(process.cwd(), this.repositoryPath);
   }
 
-  async getFiles(dir, fileList = []) {
+  protected async getFiles(dir: string, fileList: string[] = []) {
     const files = await fs.readdir(path.join(this.localPath(), dir));
+
     // eslint-disable-next-line no-restricted-syntax
     for (const file of files) {
       const stat = await fs.stat(path.join(this.localPath(), dir, file));
@@ -20,12 +31,14 @@ export class FileRepository {
         fileList = await this.getFiles(path.join(dir, file), fileList);
       } else fileList.push(path.join(dir, file));
     }
+
     return fileList;
   }
 
-  async dataSchemaFiles(includeDependencies) {
+  public async dataSchemaFiles(includeDependencies: boolean = false): Promise<FileContent[]> {
     const self = this;
     const files = await self.getFiles('');
+
     let result = await Promise.all(
       files
         .filter(file => R.endsWith('.js', file))
@@ -34,28 +47,34 @@ export class FileRepository {
           return { fileName: file, content };
         })
     );
+
     if (includeDependencies) {
       result = result.concat(await this.readModules());
     }
+
     return result;
   }
 
-  async readModules() {
+  protected async readModules() {
     const packageJson = JSON.parse(await fs.readFile('package.json', 'utf-8'));
+
     const files = await Promise.all(
       Object.keys(packageJson.dependencies).map(async module => {
         if (R.endsWith('-schema', module)) {
           return this.readModuleFiles(path.join('node_modules', module));
         }
+
         return [];
       })
     );
+
     return files.reduce((a, b) => a.concat(b));
   }
 
-  async readModuleFiles(modulePath) {
+  protected async readModuleFiles(modulePath: string) {
     const files = await fs.readdir(modulePath);
-    return (await Promise.all(
+
+    const result = await Promise.all(
       files.map(async file => {
         const fileName = path.join(modulePath, file);
         const stats = await fs.lstat(fileName);
@@ -74,6 +93,8 @@ export class FileRepository {
           return [];
         }
       })
-    )).reduce((a, b) => a.concat(b), []);
+    );
+
+    return result.reduce((a, b) => a.concat(b), []);
   }
 }
