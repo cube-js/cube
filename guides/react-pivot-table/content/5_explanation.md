@@ -12,7 +12,7 @@ In the imports, you can see this React hook imported from the Cube.js client Rea
 import { useCubeQuery } from '@cubejs-client/react';
 ```
 
-Next, AG Grid imports go. It has a convenient `AgGridReact` component that we'll use. However, in complex scenarios, you'll need to use the `[onGridReady](https://www.ag-grid.com/react-grid/grid-interface/#access-the-grid--column-api-1)` callback to get access to the Grid API and tinker with it directly. Also, note that AG Grid provides style definitions and a few [themes](https://www.ag-grid.com/react-grid/themes-provided/) you can import and use.
+After that, we'll import AG Grid and its' React integration, which has a convenient `AgGridReact` component that we'll use. However, in complex scenarios, you'll need to use the `[onGridReady](https://www.ag-grid.com/react-grid/grid-interface/#access-the-grid--column-api-1)` callback to get access to the Grid API and tinker with it directly. Also, note that AG Grid provides style definitions and a few [themes](https://www.ag-grid.com/react-grid/themes-provided/) you can import and use.
 
 ```js
 // AG Grid React components & library
