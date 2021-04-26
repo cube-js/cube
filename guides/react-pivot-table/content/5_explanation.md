@@ -3,7 +3,7 @@ order: 5
 title: "How Everything Works"
 ---
 
-All relevant code resides inside the `src/components/Grid.js` component. We'll explore it from the top to the bottom.
+All relevant code resides inside the `src/components/Grid.js` component. We'll explore it from top to bottom.
 
 In the imports, you can see this React hook imported from the Cube.js client React package. We'll use it later to send a query to Cube.js API:
 
@@ -12,7 +12,7 @@ In the imports, you can see this React hook imported from the Cube.js client Rea
 import { useCubeQuery } from '@cubejs-client/react';
 ```
 
-Next, AG Grid imports go. It has a convenient `AgGridReact` component that we'll use. However, in complex scenarios, you'll need to use the `[onGridReady](https://www.ag-grid.com/react-grid/grid-interface/#access-the-grid--column-api-1)` callback to get access to the Grid API and tinker with it directly. Also, note that AG Grid provides style definitions and a few [themes](https://www.ag-grid.com/react-grid/themes-provided/) you can import and use.
+After that, we'll import AG Grid and its' React integration, which has a convenient `AgGridReact` component that we'll use. However, in complex scenarios, you'll need to use the `[onGridReady](https://www.ag-grid.com/react-grid/grid-interface/#access-the-grid--column-api-1)` callback to get access to the Grid API and tinker with it directly. Also, note that AG Grid provides style definitions and a few [themes](https://www.ag-grid.com/react-grid/themes-provided/) you can import and use.
 
 ```js
 // AG Grid React components & library
@@ -145,7 +145,7 @@ You can click on "Values" to change the aggregation function used for every colu
 
 I strongly encourage you to [spend some time](https://react-pivot-table-demo.cube.dev) with this pivot table and explore what AG Grid is capable of. You'll find column sorting, a context menu with CSV export, drag-and-drop in the sidebar, and much more. Don't hesitate to check AG Grid [docs](https://www.ag-grid.com/react-grid/) to learn more about these features.
 
-**Thank you for following this tutorial, learning more about [Cube.js](https://cube.dev?utm_source=dev-to&utm_medium=post&utm_campaign=react-pivot-table), building a pivot table, and exploring how to work with AG Grid. I wholeheartedly hope that you enjoyed it 😇**
+**Thank you for following this tutorial to learn more about [Cube.js](https://cube.dev?utm_source=dev-to&utm_medium=post&utm_campaign=react-pivot-table), build a pivot table, and explore how to work with AG Grid. I wholeheartedly hope that you enjoyed it 😇**
 
 Please don't hesitate to like and bookmark this post, write a comment, and give a star to [Cube.js](https://github.com/cube-js/cube.js) or [AG Grid](https://github.com/ag-grid/ag-grid/) on GitHub. I hope that you'll try Cube.js and AG Grid in your next production gig or your next pet project.
 
