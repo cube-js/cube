@@ -108,7 +108,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       wsUrl: `ws://${host}:${port}`,
       env: {
         dbPort,
-        dbHost:  env.getContainer('birdbox-db').getHost()
+        dbHost: env.getContainer('birdbox-db').getHost()
       },
     },
   };
