@@ -340,6 +340,28 @@ describe('PreAggregations', () => {
       extends: EveryHourVisitors,
       sql: \`select v.* from \${visitors.sql()} v where created_at < '2000-01-01'\`
     })
+    
+    cube('ReferenceOriginalSql', {
+      extends: visitors,
+      sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
+      
+      preAggregations: {
+        partitioned: {
+          type: 'rollup',
+          measureReferences: [count],
+          dimensionReferences: [source],
+          timeDimensionReference: createdAt,
+          granularity: 'day',
+          partitionGranularity: 'month',
+          refreshKey: {
+            every: '1 hour',
+            incremental: true,
+            updateWindow: '1 day'
+          },
+          useOriginalSqlPreAggregations: true
+        }
+      }
+    })
     `);
 
   function replaceTableName(query, preAggregation, suffix) {
@@ -579,6 +601,48 @@ describe('PreAggregations', () => {
             every_hour_visitors__source: 'google',
             every_hour_visitors__created_at_day: '2017-01-05T00:00:00.000Z',
             every_hour_visitors__checkins_total: '1'
+          }
+        ]
+      );
+    });
+  }));
+
+  it('reference original sql', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'ReferenceOriginalSql.count'
+      ],
+      dimensions: [
+        'ReferenceOriginalSql.source'
+      ],
+      timeDimensions: [{
+        dimension: 'ReferenceOriginalSql.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-25']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'ReferenceOriginalSql.createdAt'
+      }],
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    expect(preAggregationsDescription[0].tableName).toEqual('visitors_default');
+
+    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
+      query.buildSqlAndParams()
+    ]).map(q => replaceTableName(q, preAggregationsDescription, 104))).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            reference_original_sql__source: 'google',
+            reference_original_sql__created_at_day: '2017-01-05T00:00:00.000Z',
+            reference_original_sql__count: '1'
           }
         ]
       );
