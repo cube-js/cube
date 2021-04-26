@@ -7,7 +7,7 @@ import { pausePromise } from '@cubejs-backend/shared';
 import fsExtra from 'fs-extra';
 
 import { PostgresDBRunner } from './db/postgres';
-import { getLocalHostnameByOs } from './utils';
+// import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
@@ -19,10 +19,7 @@ export interface BirdBox {
     playgroundUrl: string;
     apiUrl: string;
     wsUrl: string;
-    env?: {
-      dbPort?: number;
-      dbHost?: string;
-    };
+    env?: Record<string, unknown>;
   };
 }
 
@@ -94,6 +91,9 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     }
   }
 
+  console.log('[Birdbox:debug]', 'process.env.TEST_PLAYGROUND_PORT', process.env.TEST_PLAYGROUND_PORT);
+  console.log('[Birdbox:debug]', 'env.getContainer(\'birdbox-db\').getHost()', env.getContainer('birdbox-db').getHost());
+
   return {
     stop: async () => {
       console.log('[Birdbox] Closing');
@@ -108,8 +108,9 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
-        dbPort,
-        dbHost: process.env.TEST_PLAYGROUND_PORT ? getLocalHostnameByOs() : env.getContainer('birdbox-db').getHost(),
+        CUBEJS_DB_PORT: dbPort,
+        // CUBEJS_DB_HOST: process.env.TEST_PLAYGROUND_PORT ? getLocalHostnameByOs() : env.getContainer('birdbox-db').getHost(),
+        CUBEJS_DB_HOST: env.getContainer('birdbox-db').getHost(),
       },
     },
   };

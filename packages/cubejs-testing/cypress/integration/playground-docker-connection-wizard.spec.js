@@ -73,7 +73,7 @@ context('Playground: Connection Wizard', () => {
         postgresql.cubejsEnvVars.forEach((key) => {
           const value = Cypress.env(key) || postgresql.credentials.valid[key];
 
-          cy.log(JSON.stringify({ key, value }))
+          cy.log(JSON.stringify({ key, value, cypress: Cypress.env('CUBEJS_DB_HOST') }))
           cy.getByTestId(key).type(value);
         });
       });
