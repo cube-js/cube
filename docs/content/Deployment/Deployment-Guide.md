@@ -374,7 +374,7 @@ If you use another Redis server, you should pass your Redis URL as an
 environment variable:
 
 ```bash
-heroku config:set REDIS_URL=<YOUR-REDIS-URL> -a cubejs-heroku-demo
+heroku config:set CUBEJS_REDIS_URL=<YOUR-REDIS-URL> -a cubejs-heroku-demo
 ```
 
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis

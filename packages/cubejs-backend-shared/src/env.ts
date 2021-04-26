@@ -131,6 +131,23 @@ const variables: Record<string, (...args: any) => any> = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
+  redisPassword: () => {
+    const redisPassword = get('CUBEJS_REDIS_PASSWORD')
+      .asString();
+    if (redisPassword) {
+      return redisPassword;
+    }
+
+    const legacyRedisPassword = get('REDIS_PASSWORD')
+      .asString();
+    if (legacyRedisPassword) {
+      displayCLIWarning('REDIS_PASSWORD is deprecated and will be removed, please use CUBEJS_REDIS_PASSWORD.');
+
+      return legacyRedisPassword;
+    }
+
+    return undefined;
+  },
   redisUrl: () => {
     const redisUrl = get('CUBEJS_REDIS_URL')
       .asString();
@@ -174,8 +191,6 @@ const variables: Record<string, (...args: any) => any> = {
   nodeEnv: () => get('NODE_ENV')
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
-    .asString(),
-  redisPassword: () => get('REDIS_PASSWORD')
     .asString(),
   jwkKey: () => get('CUBEJS_JWK_KEY')
     .asUrlString(),

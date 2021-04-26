@@ -20,7 +20,7 @@ provider:
         - "glue:*"
       Resource:
         - "*"
-# When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12  
+# When you uncomment vpc please make sure lambda has access to internet: https://medium.com/@philippholly/aws-lambda-enable-outgoing-internet-access-within-vpc-8dd250e11e12
   vpc:
     securityGroupIds:
      - "${self:custom.secrets.SECURITY_GROUP_IDS}" # Your DB and Redis security groups here
@@ -31,7 +31,7 @@ provider:
     CUBEJS_AWS_S3_OUTPUT_LOCATION: "${self:custom.secrets.CUBEJS_AWS_S3_OUTPUT_LOCATION}"
     CUBEJS_DB_TYPE: "${self:custom.secrets.CUBEJS_DB_TYPE}"
     CUBEJS_API_SECRET: "${self:custom.secrets.CUBEJS_API_SECRET}"
-    REDIS_URL: "${self:custom.secrets.REDIS_URL}"
+    CUBEJS_REDIS_URL: "${self:custom.secrets.REDIS_URL}"
     CUBEJS_APP: "${self:service.name}-${self:provider.stage}"
     NODE_ENV: "${self:provider.stage}"
     CUBEJS_API_URL:
