@@ -39,11 +39,8 @@ export class PreAggregations {
       isInPreAggregationQuery && this.query.options.useOriginalSqlPreAggregationsInPreAggregation) {
       return R.pipe(
         R.map(cube => {
-          const foundPreAggregation = this.findPreAggregationToUseForCube(cube);
-          if (foundPreAggregation) {
-            return this.preAggregationDescriptionsFor(foundPreAggregation);
-          }
-          return null;
+          const { preAggregations } = this.collectOriginalSqlPreAggregations(() => this.query.cubeSql(cube));
+          return R.unnest(preAggregations.map(p => this.preAggregationDescriptionsFor(p)));
         }),
         R.filter(R.identity),
         R.unnest
