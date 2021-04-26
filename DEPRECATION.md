@@ -47,6 +47,7 @@ features:
 | Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    |           |
 | Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |           |
 | Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |           |
+| Deprecated | [Prefix env variables for Redis with CUBEJS_](#prefix-env-variables-for-redis-with-cubejs_)                        | v0.27.0    |           |
 
 ### Node.js 8
 
@@ -274,4 +275,24 @@ const server = new CubejsServer({
   preAggregationsSchema: ({ securityContext }) =>
     `pre_aggregations_${securityContext.userId}`,
 });
+```
+
+### Prefix env variables for Redis with CUBEJS_
+
+**Deprecated in Release: v0.27.0**
+
+Deprecated:
+
+```
+REDIS_URL=XXXX
+REDIS_REDIS_PASSWORD=XXX
+REDIS_TLS=true
+```
+
+You should use:
+
+```
+CUBEJS_REDIS_URL=XXXX
+CUBEJS_REDIS_REDIS_PASSWORD=XXX
+CUBEJS_REDIS_TLS=true
 ```
