@@ -2,6 +2,7 @@ use crate::queryplanner::topk::SortColumn;
 use arrow::array::ArrayRef;
 use arrow::compute::SortOptions;
 use arrow::datatypes::SchemaRef;
+use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::error::DataFusionError;
@@ -18,7 +19,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::scalar::ScalarValue;
 use flatbuffers::bitflags::_core::cmp::Ordering;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use smallvec::smallvec;
 use smallvec::SmallVec;
@@ -153,7 +154,7 @@ impl ExecutionPlan for AggregateTopKExec {
             let cluster = self.cluster.clone();
             tasks.push(tokio::spawn(async move {
                 // fuse the streams to simplify further code.
-                cluster.execute(p).await.map(|s| s.fuse())
+                cluster.execute(p).await.map(|s| (s.schema(), s.fuse()))
             }));
         }
         let mut streams = Vec::with_capacity(nodes);
@@ -175,22 +176,17 @@ impl ExecutionPlan for AggregateTopKExec {
             &self.agg_descr,
             &mut buffer,
         )?;
+        let mut wanted_nodes = vec![true; nodes];
         let mut batches = Vec::with_capacity(nodes);
         'processing: loop {
             assert!(batches.is_empty());
-            for s in &mut streams {
+            for i in 0..nodes {
+                let (schema, s) = &mut streams[i];
                 let batch;
-                loop {
-                    if let Some(b) = s.next().await {
-                        let b = b?;
-                        if b.num_rows() == 0 {
-                            continue;
-                        }
-                        batch = Some(b);
-                    } else {
-                        batch = None;
-                    }
-                    break;
+                if wanted_nodes[i] {
+                    batch = next_non_empty(s).await?;
+                } else {
+                    batch = Some(RecordBatch::new_empty(schema.clone()))
                 }
                 batches.push(batch);
             }
@@ -199,6 +195,7 @@ impl ExecutionPlan for AggregateTopKExec {
                 batches.clear();
                 break 'processing;
             }
+            state.populate_wanted_nodes(&mut wanted_nodes);
             batches.clear();
         }
 
@@ -335,6 +332,25 @@ impl TopKState<'_> {
             groups: HashSet::new(),
             top: Vec::new(),
         })
+    }
+
+    /// Sets `wanted_nodes[i]` iff we need to scan the node `i` to make progress on top candidate.
+    pub fn populate_wanted_nodes(&self, wanted_nodes: &mut Vec<bool>) {
+        let candidate = self.sorted.first();
+        if candidate.is_none() {
+            for i in 0..wanted_nodes.len() {
+                wanted_nodes[i] = true;
+            }
+            return;
+        }
+
+        let candidate = candidate.unwrap();
+        let buf = self.buffer.lock().unwrap();
+        let candidate_nodes = &buf[candidate.index].nodes;
+        assert_eq!(candidate_nodes.len(), wanted_nodes.len());
+        for i in 0..wanted_nodes.len() {
+            wanted_nodes[i] = !candidate_nodes[i];
+        }
     }
 
     pub fn update(&mut self, batches: &mut [Option<RecordBatch>]) -> Result<bool, DataFusionError> {
@@ -505,7 +521,6 @@ impl TopKState<'_> {
                     candidate = self.sorted.pop_first().unwrap();
                 }
             }
-
             self.top.push(candidate.index);
         }
         return Ok(self.top.len() == self.limit || self.finished_nodes.iter().all(|f| *f));
@@ -1217,5 +1232,22 @@ mod tests {
             }
         }
         rows
+    }
+}
+
+async fn next_non_empty<S>(s: &mut S) -> Result<Option<RecordBatch>, ArrowError>
+where
+    S: Stream<Item = Result<RecordBatch, ArrowError>> + Unpin,
+{
+    loop {
+        if let Some(b) = s.next().await {
+            let b = b?;
+            if b.num_rows() == 0 {
+                continue;
+            }
+            return Ok(Some(b));
+        } else {
+            return Ok(None);
+        }
     }
 }
