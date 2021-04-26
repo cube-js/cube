@@ -109,7 +109,6 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       wsUrl: `ws://${host}:${port}`,
       env: {
         CUBEJS_DB_PORT: dbPort,
-        // CUBEJS_DB_HOST: process.env.TEST_PLAYGROUND_PORT ? getLocalHostnameByOs() : env.getContainer('birdbox-db').getHost(),
         CUBEJS_DB_HOST: env.getContainer('birdbox-db').getHost(),
       },
     },
