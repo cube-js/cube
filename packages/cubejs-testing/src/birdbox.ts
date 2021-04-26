@@ -20,6 +20,7 @@ export interface BirdBox {
     wsUrl: string;
     env?: {
       dbPort?: number;
+      dbHost?: string;
     }
   };
 }
@@ -106,7 +107,8 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
-        dbPort
+        dbPort,
+        dbHost:  env.getContainer('birdbox-db').getHost()
       },
     },
   };

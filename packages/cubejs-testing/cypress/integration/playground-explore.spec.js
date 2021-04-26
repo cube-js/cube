@@ -7,6 +7,10 @@ import { blockAllAnalytics } from '../utils';
 import { countWithTimedimenionQuery, ordersCountQuery, tableQuery } from '../queries';
 
 context('Playground: Explore Page', () => {
+  before(() => {
+    cy.viewport(3840, 2160);
+  });
+
   beforeEach(() => {
     blockAllAnalytics();
   });
@@ -132,21 +136,6 @@ context('Playground: Explore Page', () => {
       cy.getByTestId('chart-renderer').matchImageSnapshot('applied-order');
     });
   });
-
-  // describe('Pivot config', () => {
-  //   it('applies pivot config', () => {
-  //     cy.setQuery({
-  //       measures: ['Events.count'],
-  //       dimensions: ['Events.type'],
-  //     });
-  //     cy.runQuery();
-  //     cy.getByTestId('pivot-btn').click();
-  //     cy.wait(1000);
-  //     cy.getByTestId('pivot-popover').find('.my-test').eq(0)
-  //       // .move({ x: 100, y: 0, force: true });
-  //     .drag('div[data-testid=pivot-popover-y]', { position: 'top', delay: 1000 })
-  //   });
-  // });
 
   describe('Chart Renderers', () => {
     const chartTypeByQuery = [

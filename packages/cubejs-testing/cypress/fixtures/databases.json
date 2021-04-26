@@ -1,5 +1,6 @@
 {
   "postgresql": {
+    "cubejsEnvVars": ["CUBEJS_DB_HOST", "CUBEJS_DB_PORT", "CUBEJS_DB_NAME", "CUBEJS_DB_USER", "CUBEJS_DB_PASS"],
     "credentials": {
       "valid": {
         "CUBEJS_DB_HOST": "localhost",

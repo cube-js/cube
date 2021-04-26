@@ -70,12 +70,15 @@ context('Playground: Connection Wizard', () => {
       cy.visit('/');
       cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
       cy.fixture('databases.json').then(({ postgresql }) => {
-        Object.entries(postgresql.credentials.valid).forEach(([key, value]) => {
+        postgresql.cubejsEnvVars.forEach((key) => {
+          let value = postgresql.credentials.valid[key];
+
           if (key === 'CUBEJS_DB_HOST') {
             value = getLocalHostnameByOs();
           } else if (key === 'CUBEJS_DB_PORT') {
             value = Cypress.env('CUBEJS_DB_PORT');
           }
+          cy.log(JSON.stringify({ key, value, env: Cypress.env('CUBEJS_DB_PORT') }))
           cy.getByTestId(key).type(value);
         });
       });

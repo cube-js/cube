@@ -40,6 +40,7 @@ import { startBirdBoxFromContainer } from '../../src';
       },
       env: {
         CUBEJS_DB_PORT: birdbox.configuration.env?.dbPort,
+        CUBEJS_DB_HOST: birdbox.configuration.env?.dbHost,
       },
     };
 
