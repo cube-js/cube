@@ -299,12 +299,73 @@ folder in the project root during development.
 
 ## Running in Production
 
+Cube Store is enabled by default when running Cube.js in development mode. In
+production, Cube Store **must** run as a separate process. The easiest way to do
+this is to use the official Docker images for Cube.js and Cube Store.
+
+You can run Cube Store with Docker with the following command:
+
+```bash
+docker run -p 3030:3030 cubejs/cubestore
+```
+
+<!-- prettier-ignore-start -->
+[[info | ]]
+| Cube Store can further be configured via environment variables. To see a
+| complete reference, please consult the [Cube Store section of the Environment
+| Variables reference][ref-config-env].
+<!-- prettier-ignore-end -->
+
+Next, run Cube.js and tell it to connect to Cube Store running on `localhost`
+(on the default port `3030`):
+
+```bash
+docker run -p 4000:4000 \
+  -e CUBEJS_CUBESTORE_HOST=localhost \
+  -v ~/cube-conf:/cube/conf \
+  cubejs/cube
+```
+
+In the command above, we're specifying `CUBEJS_CUBESTORE_HOST` to let Cube.js
+know where Cube Store is running.
+
+You can also use Docker Compose to achieve the same:
+
+```yaml
+version: '2.2'
+services:
+  cubestore:
+    image: cubejs/cubestore:latest
+
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_CUBESTORE_HOST=localhost
+      - CUBEJS_CUBESTORE_PORT=3030
+    depends_on:
+      - cubestore
+    links:
+      - cubestore
+    volumes:
+      - ./schema:/cube/conf/schema
+```
+
 ### Scaling
 
-Cube Store can be run in a single instance mode, but this is usually unsuitable
-for production deployments. For high concurrency and data throughput, we
-**strongly** recommend running Cube Store as a cluster of multiple instances
-instead.
+<!-- prettier-ignore-start -->
+[[warning | ]]
+| Cube Store _can_ be run in a single instance mode, but this is usually
+| unsuitable for production deployments. For high concurrency and data
+| throughput, we **strongly** recommend running Cube Store as a cluster of
+| multiple instances instead.
+<!-- prettier-ignore-end -->
+
+Scaling Cube Store for a higher concurrency is relatively simple when running in
+cluster mode. Because [the storage layer](#running-in-production-storage) is
+decoupled from the query processing engine, you can horizontally scale your Cube
+Store cluster for as much concurrency as you require.
 
 In cluster mode, Cube Store runs two kinds of nodes:
 
@@ -319,6 +380,60 @@ variables; worker nodes **must** specify the `CUBESTORE_WORKER_PORT` and
 `CUBESTORE_META_ADDR` environment variables. More information about these
 variables can be found [in the Environment Variables reference][ref-config-env].
 
+A sample Docker Compose stack setting this up might look like:
+
+```yaml
+version: '2.2'
+services:
+  cubestore_router:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_LOG_LEVEL=trace
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
+    expose:
+      - 9999 # This exposes the Metastore endpoint
+      - 3306 # This exposes the MySQL endpoint
+      - 3030 # This exposes the HTTP endpoint for CubeJS
+  cubestore_worker_1:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    depends_on:
+      - cubestore_router
+    expose:
+      - 9001
+  cubestore_worker_2:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_2:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    depends_on:
+      - cubestore_router
+    expose:
+      - 9001
+
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 9999
+    environment:
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_CUBESTORE_PORT=9999
+    depends_on:
+      - cubestore_router
+    volumes:
+      - .:/cube/conf
+```
+
 ### Storage
 
 <!-- prettier-ignore-start -->
@@ -326,10 +441,37 @@ variables can be found [in the Environment Variables reference][ref-config-env].
 | Cube Store can only use one type of remote storage at runtime.
 <!-- prettier-ignore-end -->
 
-Cube Store requires read/write access to file storage in order to persist
-pre-aggregations as well as maintain its' own internal state. Currently, Cube
-Store can use a local path on the machine; alternatively both AWS S3 and Google
-Cloud are supported as highly-available, cloud storage.
+Cube Store makes use of a separate storage layer for storing metadata as well as
+for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
+and Google Cloud, or if desired, a local path on the server.
+
+A simplified example with Docker Compose might look like:
+
+```yaml
+version: '2.2'
+services:
+  cubestore:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_ON_S3>
+      - CUBESTORE_S3_REGION=<AWS_REGION>
+      - CUBESTORE_S3_SUB_PATH=/
+      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_CUBESTORE_HOST=localhost
+      - CUBEJS_CUBESTORE_PORT=3030
+    depends_on:
+      - cubestore
+    links:
+      - cubestore
+    volumes:
+      - ./schema:/cube/conf/schema
+```
 
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
 [ref-config-env]: /reference/environment-variables#cube-store

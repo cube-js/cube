@@ -91,25 +91,20 @@ If you want to run Cube.js in production without Redis, you can use
 
 ## Set up Pre-aggregations Storage
 
-Follow the [instructions here][ref-caching-cubestore] to set up Cube Store. If
-you are using another [external database][ref-pre-aggregations], you'll need to
+Currently, we recommend using Cube Store for external pre-aggregations storage.
+Follow the [instructions here][ref-caching-cubestore] to set it up. If you are
+using another [external database][ref-pre-aggregations], you'll need to
 configure it.
 
-[ref-caching-cubestore]:
-  /caching/using-pre-aggregations#running-cube-store-in-production
+[ref-caching-cubestore]: /caching/using-pre-aggregations#running-in-production
 [ref-pre-aggregations]: /pre-aggregations#external-pre-aggregations
 
 By default, Cube.js will use `prod_pre_aggregations` as the schema name for
 storing pre-aggregations. This behavior can be modified by the
-`CUBEJS_PRE_AGGREGATIONS_SCHEMA` environent variable; see the [Environment
+`CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable; see the [Environment
 Variables][ref-env-vars-general] page for more details.
 
 [ref-env-vars-general]: /reference/environment-variables#general
-
-Currently, we recommend using MySQL for external pre-aggregations storage. There
-is some additional MySQL configuration required to optimize for pre-aggregation
-ingestion and serving. The final configuration may vary depending on the
-specific use case.
 
 ## Set up Refresh Worker
 
