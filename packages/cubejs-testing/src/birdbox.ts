@@ -7,6 +7,7 @@ import { pausePromise } from '@cubejs-backend/shared';
 import fsExtra from 'fs-extra';
 
 import { PostgresDBRunner } from './db/postgres';
+import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
@@ -21,7 +22,7 @@ export interface BirdBox {
     env?: {
       dbPort?: number;
       dbHost?: string;
-    }
+    };
   };
 }
 
@@ -108,7 +109,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       wsUrl: `ws://${host}:${port}`,
       env: {
         dbPort,
-        dbHost: env.getContainer('birdbox-db').getHost()
+        dbHost: process.env.TEST_PLAYGROUND_PORT ? getLocalHostnameByOs() : env.getContainer('birdbox-db').getHost(),
       },
     },
   };

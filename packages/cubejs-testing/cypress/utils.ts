@@ -20,13 +20,3 @@ export function blockAllAnalytics() {
     });
   });
 }
-
-export function getLocalHostnameByOs() {
-  if (Cypress.platform === 'win32') {
-    return 'docker.for.win.localhost';
-  } else if (Cypress.platform === 'darwin') {
-    return 'host.docker.internal';
-  }
-
-  return 'localhost';
-}

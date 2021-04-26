@@ -1,7 +1,7 @@
 /// <reference types="cypress" />
 import 'cypress-wait-until';
 
-import { blockAllAnalytics, getLocalHostnameByOs } from '../utils';
+import { blockAllAnalytics } from '../utils';
 import { eventsCountQuery } from '../queries';
 
 context('Playground: Connection Wizard', () => {
@@ -71,14 +71,9 @@ context('Playground: Connection Wizard', () => {
       cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
       cy.fixture('databases.json').then(({ postgresql }) => {
         postgresql.cubejsEnvVars.forEach((key) => {
-          let value = postgresql.credentials.valid[key];
+          const value = Cypress.env(key) || postgresql.credentials.valid[key];
 
-          if (key === 'CUBEJS_DB_HOST') {
-            value = getLocalHostnameByOs();
-          } else if (key === 'CUBEJS_DB_PORT') {
-            value = Cypress.env('CUBEJS_DB_PORT');
-          }
-          cy.log(JSON.stringify({ key, value, env: Cypress.env('CUBEJS_DB_PORT') }))
+          cy.log(JSON.stringify({ key, value }))
           cy.getByTestId(key).type(value);
         });
       });
