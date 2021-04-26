@@ -3,6 +3,126 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.26.102](https://github.com/cube-js/cube.js/compare/v0.26.101...v0.26.102) (2021-04-22)
+
+
+### Features
+
+* **@cubejs-playground:** localhost connection tipbox ([#2587](https://github.com/cube-js/cube.js/issues/2587)) ([bab3265](https://github.com/cube-js/cube.js/commit/bab3265265747266285a4ca3aa1a3b36bfab9783))
+
+
+
+
+
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** live preview check ([5b4b5b8](https://github.com/cube-js/cube.js/commit/5b4b5b818c1a8d095cd821494b3f2785428a60cb))
+
+
+
+
+
+## [0.26.96](https://github.com/cube-js/cube.js/compare/v0.26.95...v0.26.96) (2021-04-14)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** basePath, vue dashboard selection ([#2555](https://github.com/cube-js/cube.js/issues/2555)) ([5723786](https://github.com/cube-js/cube.js/commit/5723786056b1a42ead4554f817210ea7881c0ddb))
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+
+### Bug Fixes
+
+* **playground:** Test connection in Connection Wizard ([715fa1c](https://github.com/cube-js/cube.js/commit/715fa1c0ab6667017e12851cbd97e97cf6807d60))
+
+
+
+
+
+## [0.26.94](https://github.com/cube-js/cube.js/compare/v0.26.93...v0.26.94) (2021-04-13)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.26.93](https://github.com/cube-js/cube.js/compare/v0.26.92...v0.26.93) (2021-04-12)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.26.85](https://github.com/cube-js/cube.js/compare/v0.26.84...v0.26.85) (2021-04-09)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** token refresh, Vue apiUrl ([#2523](https://github.com/cube-js/cube.js/issues/2523)) ([c1085f2](https://github.com/cube-js/cube.js/commit/c1085f21125f9b8537bf0856e0be9fccfb3ecbb9))
+
+
+
+
+
+## [0.26.84](https://github.com/cube-js/cube.js/compare/v0.26.83...v0.26.84) (2021-04-09)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** make live preview optional for PlaygroundQueryBuilder ([#2513](https://github.com/cube-js/cube.js/issues/2513)) ([db7a7f5](https://github.com/cube-js/cube.js/commit/db7a7f5fe9783a0c4834d9ace9ffbe710bd266b0))
+
+
+
+
+
+## [0.26.82](https://github.com/cube-js/cube.js/compare/v0.26.81...v0.26.82) (2021-04-07)
+
+
+### Features
+
+* **@cubejs-client/playground:** run query button, disable query auto triggering ([#2476](https://github.com/cube-js/cube.js/issues/2476)) ([92a5d45](https://github.com/cube-js/cube.js/commit/92a5d45eca00e88e925e547a12c3f69b05bfafa6))
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+
+### Features
+
+* Dev mode and live preview  ([#2440](https://github.com/cube-js/cube.js/issues/2440)) ([1a7cde8](https://github.com/cube-js/cube.js/commit/1a7cde816ee231ea00d1a952f5000dcc5a8c0ca4))
+
+
+
+
+
 ## [0.26.75](https://github.com/cube-js/cube.js/compare/v0.26.74...v0.26.75) (2021-04-02)
 
 **Note:** Version bump only for package @cubejs-client/playground

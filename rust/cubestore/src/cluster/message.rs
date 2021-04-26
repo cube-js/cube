@@ -2,6 +2,7 @@ use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::CubeError;
+use arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -9,7 +10,15 @@ use tokio::net::TcpStream;
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetworkMessage {
     Select(SerializedPlan),
-    SelectResult(Result<SerializedRecordBatchStream, CubeError>),
+    SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
+
+    /// Select that sends results in batches. The immediate response is [SelectResultSchema],
+    /// followed by a stream of [SelectResultBatch].
+    SelectStart(SerializedPlan),
+    /// Response to [SelectStart].
+    SelectResultSchema(Result<SchemaRef, CubeError>),
+    /// [None] indicates the end of the stream.
+    SelectResultBatch(Result<Option<SerializedRecordBatchStream>, CubeError>),
 
     WarmupDownload(/*remote_path*/ String),
     WarmupDownloadResult(Result<(), CubeError>),
@@ -22,7 +31,27 @@ pub enum NetworkMessage {
 }
 
 impl NetworkMessage {
+    pub fn is_streaming_request(&self) -> bool {
+        match self {
+            NetworkMessage::SelectStart(..) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true iff the client accepted the message.
+    pub async fn maybe_send(&self, socket: &mut TcpStream) -> Result<bool, CubeError> {
+        match self.send_impl(socket).await {
+            Ok(()) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     pub async fn send(&self, socket: &mut TcpStream) -> Result<(), CubeError> {
+        Ok(self.send_impl(socket).await?)
+    }
+
+    async fn send_impl(&self, socket: &mut TcpStream) -> Result<(), std::io::Error> {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         self.serialize(&mut ser).unwrap();
         let message_buffer = ser.take_buffer();
@@ -32,11 +61,26 @@ impl NetworkMessage {
     }
 
     pub async fn receive(socket: &mut TcpStream) -> Result<Self, CubeError> {
-        let len = socket.read_u64().await?;
+        match Self::maybe_receive(socket).await? {
+            Some(m) => Ok(m),
+            None => Err(CubeError::internal("connection closed".to_string())),
+        }
+    }
+
+    /// Either receives a message or waits for the connection to close.
+    pub async fn maybe_receive(socket: &mut TcpStream) -> Result<Option<Self>, CubeError> {
+        let len = socket.read_u64().await;
+        if let Err(e) = &len {
+            // TODO: corner case with `0 < n < 8` read bytes.
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                return Ok(None);
+            }
+        };
+        let len = len?;
+
         let mut buffer = Vec::with_capacity(len as usize);
         socket.take(len).read_to_end(&mut buffer).await?;
         let r = flexbuffers::Reader::get_root(&buffer)?;
-        let message = Self::deserialize(r)?;
-        Ok(message)
+        Ok(Some(Self::deserialize(r)?))
     }
 }

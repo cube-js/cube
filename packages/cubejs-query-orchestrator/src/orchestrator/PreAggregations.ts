@@ -62,7 +62,13 @@ type VersionEntry = {
   naming_version?: number
 };
 
-const tablesToVersionEntries = (schema, tables: any[]): VersionEntry[] => R.sortBy(
+type TableCacheEntry = {
+  // eslint-disable-next-line camelcase
+  table_name?: string;
+  TABLE_NAME?: string;
+};
+
+const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
   table => -table.last_updated_at,
   tables.map(table => {
     const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
@@ -118,10 +124,13 @@ class PreAggregationLoadCache {
 
   private requestId: any;
 
-  private versionEntries: any;
+  private versionEntries: { [redisKey: string]: VersionEntriesObj };
 
-  private tables: any;
+  private tables: { [redisKey: string]: TableCacheEntry[] };
 
+  // TODO this is in memory cache structure as well however it depends on
+  // data source only and load cache is per data source for now.
+  // Make it per data source key in case load cache scope is broaden.
   private queryStageState: any;
 
   private dataSource: string;
@@ -142,6 +151,8 @@ class PreAggregationLoadCache {
     this.cacheDriver = preAggregations.cacheDriver;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
+    this.versionEntries = {};
+    this.tables = {};
   }
 
   protected async tablesFromCache(preAggregation, forceRenew?) {
@@ -182,14 +193,16 @@ class PreAggregationLoadCache {
   }
 
   protected async getTablesQuery(preAggregation) {
-    if (!this.tables) {
-      this.tables = await this.tablesFromCache(preAggregation);
+    const redisKey = this.tablesRedisKey(preAggregation);
+    if (!this.tables[redisKey]) {
+      this.tables[redisKey] = await this.tablesFromCache(preAggregation);
     }
-    return this.tables;
+    return this.tables[redisKey];
   }
 
   protected async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
-    if (!this.versionEntries) {
+    const redisKey = this.tablesRedisKey(preAggregation);
+    if (!this.versionEntries[redisKey]) {
       const entries = tablesToVersionEntries(
         preAggregation.preAggregationsSchema,
         await this.getTablesQuery(preAggregation)
@@ -223,9 +236,9 @@ class PreAggregationLoadCache {
         }
       });
 
-      this.versionEntries = { versionEntries, byContent, byStructure, byTableName };
+      this.versionEntries[redisKey] = { versionEntries, byContent, byStructure, byTableName };
     }
-    return this.versionEntries;
+    return this.versionEntries[redisKey];
   }
 
   protected async keyQueryResult(keyQuery, waitForRenew, priority, renewalThreshold) {
@@ -272,9 +285,9 @@ class PreAggregationLoadCache {
 
   protected async reset(preAggregation) {
     await this.tablesFromCache(preAggregation, true);
-    this.tables = undefined;
+    this.tables = {};
     this.queryStageState = undefined;
-    this.versionEntries = undefined;
+    this.versionEntries = {};
   }
 }
 
@@ -664,12 +677,23 @@ class PreAggregationLoader {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
+    const externalDriver = await this.externalDriverFactory();
+    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+
     const tableData = await saveCancelFn(client.downloadQueryResults(
       sql,
-      params,
-      this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry)
+      params, {
+        ...this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry),
+        ...capabilities,
+      }
     ));
-    await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
+    try {
+      await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
+    } finally {
+      if (tableData.release) {
+        await tableData.release();
+      }
+    }
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
@@ -683,8 +707,8 @@ class PreAggregationLoader {
       requestId: this.requestId
     });
     const externalDriver = await this.externalDriverFactory();
-    const { csvImport } = externalDriver.capabilities && externalDriver.capabilities();
-    const tableData = await saveCancelFn(client.downloadTable(table, { csvImport }));
+    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+    const tableData = await saveCancelFn(client.downloadTable(table, capabilities));
     tableData.types = await saveCancelFn(client.tableColumnTypes(table));
     return tableData;
   }
@@ -858,9 +882,10 @@ export class PreAggregations {
     const preAggregations = queryBody.preAggregations || [];
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
+
     const getLoadCacheByDataSource = (dataSource) => {
+      dataSource = dataSource || 'default';
       if (!loadCacheByDataSource[dataSource]) {
-        dataSource = dataSource || 'default';
         loadCacheByDataSource[dataSource] =
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
             requestId: queryBody.requestId,
@@ -869,6 +894,7 @@ export class PreAggregations {
       }
       return loadCacheByDataSource[dataSource];
     };
+
     return preAggregations.map(p => (preAggregationsTablesToTempTables) => {
       const loader = new PreAggregationLoader(
         this.redisPrefix,

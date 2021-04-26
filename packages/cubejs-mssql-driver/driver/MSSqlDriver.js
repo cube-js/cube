@@ -74,6 +74,18 @@ class MSSqlDriver extends BaseDriver {
     });
   }
 
+  informationSchemaQuery() {
+    // fix The multi-part identifier "columns.data_type" could not be bound
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+        columns.table_name as ${this.quoteIdentifier('table_name')},
+        columns.table_schema as ${this.quoteIdentifier('table_schema')},
+        columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns columns
+      WHERE columns.table_schema NOT IN ('information_schema', 'sys')
+    `;
+  }
+
   async downloadQueryResults(query, values) {
     const result = await this.query(query, values);
     const types = Object.keys(result.columns).map((key) => ({

@@ -1,5 +1,12 @@
 <template>
-  <v-data-table v-if="resultSet" :headers="headers" :items="items" :items-per-page="50" class="elevation-1"></v-data-table>
+  <v-data-table
+    v-if="resultSet"
+    :headers="headers"
+    :items="items"
+    :items-per-page="50"
+    :hide-default-footer="true"
+    class="elevation-1"
+  ></v-data-table>
 </template>
 
 <script>

@@ -80,4 +80,14 @@ describe('getEnv', () => {
     process.env.CUBEJS_DB_POLL_MAX_INTERVAL = '10s';
     expect(getEnv('dbPollMaxInterval')).toBe(10);
   });
+
+  test('livePreview', () => {
+    expect(getEnv('livePreview')).toBe(false);
+    
+    process.env.CUBEJS_LIVE_PREVIEW = 'true';
+    expect(getEnv('livePreview')).toBe(true);
+
+    process.env.CUBEJS_LIVE_PREVIEW = 'false';
+    expect(getEnv('livePreview')).toBe(false);
+  });
 });

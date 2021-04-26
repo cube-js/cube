@@ -45,9 +45,18 @@ use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTop
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
 
+#[cfg(test)]
 pub async fn choose_index(
     p: &LogicalPlan,
     metastore: &dyn PlanIndexStore,
+) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
+    choose_index_ext(p, metastore, true).await
+}
+
+pub async fn choose_index_ext(
+    p: &LogicalPlan,
+    metastore: &dyn PlanIndexStore,
+    enable_topk: bool,
 ) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -91,6 +100,7 @@ pub async fn choose_index(
     let mut r = ChooseIndex {
         chosen_indices: &indices,
         next_index: 0,
+        enable_topk,
     };
     let plan = rewrite_plan(p, &(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
@@ -246,6 +256,7 @@ impl PlanRewriter for CollectConstraints {
 struct ChooseIndex<'a> {
     next_index: usize,
     chosen_indices: &'a [IndexSnapshot],
+    enable_topk: bool,
 }
 
 impl PlanRewriter for ChooseIndex<'_> {
@@ -257,8 +268,10 @@ impl PlanRewriter for ChooseIndex<'_> {
         _: &Self::Context,
     ) -> Result<LogicalPlan, DataFusionError> {
         let p = self.choose_table_index(n)?;
-        let p = pull_up_cluster_send(p)?;
-        let p = materialize_topk(p)?;
+        let mut p = pull_up_cluster_send(p)?;
+        if self.enable_topk {
+            p = materialize_topk(p)?;
+        }
         Ok(p)
     }
 }
@@ -593,7 +606,7 @@ impl ExtensionPlanner for CubeExtensionPlanner {
         if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
-            self.plan_cluster_send(input, &cs.snapshots, cs.schema().clone())
+            self.plan_cluster_send(input, &cs.snapshots, cs.schema().clone(), false, usize::MAX)
         } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
@@ -613,6 +626,8 @@ impl CubeExtensionPlanner {
         input: Arc<dyn ExecutionPlan>,
         snapshots: &Vec<Vec<IndexSnapshot>>,
         schema: DFSchemaRef,
+        use_streaming: bool,
+        max_batch_rows: usize,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if snapshots.is_empty() {
             return Ok(Arc::new(EmptyExec::new(false, schema.to_schema_ref())));
@@ -625,9 +640,14 @@ impl CubeExtensionPlanner {
                 self.serialized_plan.clone(),
                 snapshots.clone(),
                 input,
+                use_streaming,
             )))
         } else {
-            Ok(Arc::new(WorkerExec { input, schema }))
+            Ok(Arc::new(WorkerExec {
+                input,
+                schema,
+                max_batch_rows,
+            }))
         }
     }
 }
@@ -640,6 +660,7 @@ pub struct WorkerExec {
     // TODO: remove and use `self.input.schema()`
     //       This is a hacky workaround for wrong schema of joins after projection pushdown.
     pub schema: DFSchemaRef,
+    pub max_batch_rows: usize,
 }
 
 #[async_trait]
@@ -668,6 +689,7 @@ impl ExecutionPlan for WorkerExec {
         Ok(Arc::new(WorkerExec {
             input: children.into_iter().next().unwrap(),
             schema: self.schema.clone(),
+            max_batch_rows: self.max_batch_rows,
         }))
     }
 
@@ -684,9 +706,11 @@ impl ExecutionPlan for WorkerExec {
 }
 
 /// Use this to pick the part of the plan that the worker must execute.
-pub fn get_worker_plan(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+pub fn get_worker_plan(
+    p: &Arc<dyn ExecutionPlan>,
+) -> Option<(Arc<dyn ExecutionPlan>, /*max_batch_rows*/ usize)> {
     if let Some(p) = p.as_any().downcast_ref::<WorkerExec>() {
-        return Some(p.input.clone());
+        return Some((p.input.clone(), p.max_batch_rows));
     } else {
         let children = p.children();
         // We currently do not split inside joins or leaf nodes.

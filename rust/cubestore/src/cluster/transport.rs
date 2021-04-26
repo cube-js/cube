@@ -7,13 +7,54 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 
+/// Client-side connection for exchanging messages between the server and the client.
+/// Created by [ClusterTransport].
+#[async_trait]
+pub trait WorkerConnection: Send {
+    /// If connection is open, send the message to the server and return true.
+    /// If connection is closed, return false.
+    async fn maybe_send(&mut self, m: NetworkMessage) -> Result<bool, CubeError>;
+    /// If connection is open, receive the message from the server and return it.
+    /// If connection is closed, return None.
+    async fn maybe_receive(&mut self) -> Result<Option<NetworkMessage>, CubeError>;
+}
+
+impl dyn WorkerConnection {
+    pub async fn send(&mut self, m: NetworkMessage) -> Result<(), CubeError> {
+        let sent = self.maybe_send(m).await?;
+        if sent {
+            Ok(())
+        } else {
+            Err(CubeError::internal("connection closed".to_string()))
+        }
+    }
+
+    pub async fn receive(&mut self) -> Result<NetworkMessage, CubeError> {
+        match self.maybe_receive().await? {
+            Some(m) => Ok(m),
+            None => Err(CubeError::internal("connection closed".to_string())),
+        }
+    }
+}
+
 #[async_trait]
 pub trait ClusterTransport: DIService {
-    async fn send_to_worker(
+    async fn connect_to_worker(
+        &self,
+        worker_node: String,
+    ) -> Result<Box<dyn WorkerConnection>, CubeError>;
+}
+
+impl dyn ClusterTransport {
+    pub async fn send_to_worker(
         &self,
         worker_node: String,
         m: NetworkMessage,
-    ) -> Result<NetworkMessage, CubeError>;
+    ) -> Result<NetworkMessage, CubeError> {
+        let mut c = self.connect_to_worker(worker_node).await?;
+        c.send(m).await?;
+        c.receive().await
+    }
 }
 
 pub struct ClusterTransportImpl {
@@ -28,20 +69,33 @@ impl ClusterTransportImpl {
     }
 }
 
+struct Connection {
+    stream: TcpStream,
+}
+
+#[async_trait]
+impl WorkerConnection for Connection {
+    async fn maybe_send(&mut self, m: NetworkMessage) -> Result<bool, CubeError> {
+        m.maybe_send(&mut self.stream).await
+    }
+
+    async fn maybe_receive(&mut self) -> Result<Option<NetworkMessage>, CubeError> {
+        NetworkMessage::maybe_receive(&mut self.stream).await
+    }
+}
+
 #[async_trait]
 impl ClusterTransport for ClusterTransportImpl {
-    async fn send_to_worker(
+    async fn connect_to_worker(
         &self,
         worker_node: String,
-        m: NetworkMessage,
-    ) -> Result<NetworkMessage, CubeError> {
-        let mut stream = tokio::time::timeout(
+    ) -> Result<Box<dyn WorkerConnection>, CubeError> {
+        let stream = tokio::time::timeout(
             Duration::from_secs(self.config.connection_timeout()),
             TcpStream::connect(worker_node),
         )
         .await??;
-        m.send(&mut stream).await?;
-        return Ok(NetworkMessage::receive(&mut stream).await?);
+        Ok(Box::new(Connection { stream }))
     }
 }
 

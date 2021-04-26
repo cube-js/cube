@@ -19,7 +19,7 @@ import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
 import { gracefulMiddleware } from './graceful-middleware';
 import { ServerStatusHandler } from './server-status';
 
-const { version } = require('../package.json');
+const { version } = require('../../package.json');
 
 dotenv.config({
   multiline: 'line-breaks',

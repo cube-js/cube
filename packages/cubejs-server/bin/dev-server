@@ -2,4 +2,4 @@
 
 require('@cubejs-backend/shared/dist/src/node-check');
 
-require('../dist/bin/dev-server');
+require('../dist/src/bin/server');

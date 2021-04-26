@@ -15,7 +15,7 @@ export const GRANULARITIES = [
 
 export function areQueriesEqual(query1 = {}, query2 = {}) {
   return (
-    equals(Object.entries(query1.order || {}), Object.entries(query2.order || {})) &&
+    equals(Object.entries((query1 && query1.order) || {}), Object.entries((query2 && query2.order) || {})) &&
     equals(query1, query2)
   );
 }
@@ -47,7 +47,7 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
 
   let state = {
     query,
-    ...props
+    ...props,
   };
 
   let newQuery = null;
@@ -56,7 +56,7 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
   }
 
   if (Array.isArray(newQuery) || Array.isArray(oldQuery)) {
-    return newQuery;
+    return newState;
   }
 
   if (newQuery) {
@@ -87,7 +87,7 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
             {
               dimension: defaultTimeDimension,
               granularity: (td && td.granularity) || granularity,
-              dateRange: td && td.dateRange
+              dateRange: td && td.dateRange,
             },
           ]
           : [],
@@ -208,7 +208,6 @@ export function isQueryPresent(query) {
   );
 }
 
-
 export function movePivotItem(pivotConfig, sourceIndex, destinationIndex, sourceAxis, destinationAxis) {
   const nextPivotConfig = {
     ...pivotConfig,
@@ -279,7 +278,7 @@ export function getOrderMembersFromOrder(orderMembers, order) {
     if (!ids.has(member.id)) {
       nextOrderMembers.push({
         ...member,
-        order: member.order || 'none'
+        order: member.order || 'none',
       });
     }
   });

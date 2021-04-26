@@ -101,14 +101,18 @@ export class AppContainer {
       })
     );
 
-    const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
-    packageJson.cubejsTemplates = {
-      ...packageJson.cubejsTemplates,
-      ...packageVersions,
-    };
-    await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
-      spaces: 2,
-    });
+    try {
+      const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+      packageJson.cubejsTemplates = {
+        ...packageJson.cubejsTemplates,
+        ...packageVersions,
+      };
+      await fs.writeJson(path.join(this.appPath, 'package.json'), packageJson, {
+        spaces: 2,
+      });
+    } catch (_) {
+      //
+    }
   }
 
   public async executeCommand(command, args, options) {
@@ -117,7 +121,13 @@ export class AppContainer {
 
   public async ensureDependencies() {
     const dependencies = this.sourceContainer?.importDependencies || [];
-    const packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+    let packageJson;
+
+    try {
+      packageJson = fs.readJsonSync(path.join(this.appPath, 'package.json'));
+    } catch (_) {
+      //
+    }
 
     if (!packageJson || !packageJson.dependencies) {
       return [];

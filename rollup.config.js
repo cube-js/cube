@@ -2,6 +2,7 @@ import babel from '@rollup/plugin-babel';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import alias from '@rollup/plugin-alias';
+import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 
 const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) => {
   const baseUmdConfig = {
@@ -76,6 +77,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     {
       ...baseConfig,
       plugins: [
+        peerDepsExternal(),
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
@@ -117,6 +119,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     {
       ...baseConfig,
       plugins: [
+        peerDepsExternal(),
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',

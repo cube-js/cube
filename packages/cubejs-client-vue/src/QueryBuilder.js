@@ -214,8 +214,8 @@ export default {
         },
         scopedSlots: this.$scopedSlots,
         on: {
-          queryLoad: (event) => {
-            this.$emit('queryLoad', event);
+          queryStatus: (event) => {
+            this.$emit('queryStatus', event);
           }
         }
       },
@@ -355,7 +355,6 @@ export default {
   },
 
   async mounted() {
-    console.log('Local Dep', Date.now());
     this.meta = await this.cubejsApi.meta();
 
     this.copyQueryFromProps();
@@ -617,14 +616,14 @@ export default {
     },
     query: {
       deep: true,
-      handler() {
+      handler(query) {
         if (!this.meta) {
           // this is ok as if meta has not been loaded by the time query prop has changed,
           // then the promise for loading meta (found in mounted()) will call
           // copyQueryFromProps and will therefore update anyway.
           return;
         }
-        this.copyQueryFromProps();
+        this.copyQueryFromProps(query);
       },
     },
     pivotConfig: {

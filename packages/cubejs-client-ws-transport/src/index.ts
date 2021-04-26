@@ -80,6 +80,12 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
     }
   }
 
+  public async close(): Promise<void> {
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+
   public get authorization() {
     return this.token;
   }

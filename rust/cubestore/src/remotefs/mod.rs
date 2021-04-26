@@ -105,12 +105,47 @@ impl RemoteFs for LocalDirRemoteFs {
         if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
             debug!("Uploading {}", remote_path);
             let dest = remote_dir.as_path().join(remote_path);
-            fs::create_dir_all(dest.parent().unwrap()).await?;
-            fs::copy(&temp_upload_path, dest.clone()).await?;
+            fs::create_dir_all(dest.parent().unwrap())
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Create dir {}: {}",
+                        dest.parent().as_ref().unwrap().to_string_lossy(),
+                        e
+                    ))
+                })?;
+            fs::copy(&temp_upload_path, dest.clone())
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Copy {} -> {}: {}",
+                        temp_upload_path,
+                        dest.to_string_lossy(),
+                        e
+                    ))
+                })?;
         }
         let local_path = self.dir.as_path().join(remote_path);
         if Path::new(temp_upload_path) != local_path {
-            fs::rename(&temp_upload_path, local_path).await?;
+            fs::create_dir_all(local_path.parent().unwrap())
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Create dir {}: {}",
+                        local_path.parent().as_ref().unwrap().to_string_lossy(),
+                        e
+                    ))
+                })?;
+            fs::rename(&temp_upload_path, local_path.clone())
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Rename {} -> {}: {}",
+                        temp_upload_path,
+                        local_path.to_string_lossy(),
+                        e
+                    ))
+                })?;
         }
         Ok(())
     }

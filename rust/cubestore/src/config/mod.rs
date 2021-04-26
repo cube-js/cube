@@ -102,6 +102,10 @@ impl CubeServices {
             futures.push(tokio::spawn(async move {
                 ClusterImpl::listen_on_worker_port(cluster).await
             }));
+            let cluster = self.cluster.clone();
+            futures.push(tokio::spawn(
+                async move { cluster.warmup_select_worker().await },
+            ))
         }
         futures.push(tokio::spawn(async move {
             start_track_event_loop().await;
@@ -210,6 +214,10 @@ pub trait ConfigObj: DIService {
     fn max_ingestion_data_frames(&self) -> usize;
 
     fn upload_to_remote(&self) -> bool;
+
+    fn enable_topk(&self) -> bool;
+
+    fn enable_startup_warmup(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -237,6 +245,8 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
+    pub enable_topk: bool,
+    pub enable_startup_warmup: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -326,6 +336,14 @@ impl ConfigObj for ConfigObjImpl {
     fn upload_to_remote(&self) -> bool {
         self.upload_to_remote
     }
+
+    fn enable_topk(&self) -> bool {
+        self.enable_topk
+    }
+
+    fn enable_startup_warmup(&self) -> bool {
+        self.enable_startup_warmup
+    }
 }
 
 lazy_static! {
@@ -336,6 +354,17 @@ lazy_static! {
 lazy_static! {
     pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
         tokio::sync::RwLock::new(false);
+}
+
+fn env_bool(name: &str, default: bool) -> bool {
+    env::var(name)
+        .ok()
+        .map(|x| match x.as_str() {
+            "0" => false,
+            "1" => true,
+            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+        })
+        .unwrap_or(default)
 }
 
 impl Config {
@@ -422,6 +451,8 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
+                enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
             }),
         }
     }
@@ -461,6 +492,8 @@ impl Config {
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
+                enable_topk: true,
+                enable_startup_warmup: true,
             }),
         }
     }
@@ -478,16 +511,14 @@ impl Config {
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         self.start_test_with_options(true, test_fn).await
     }
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         self.start_test_with_options(false, test_fn).await
     }
@@ -497,8 +528,7 @@ impl Config {
         clean_remote: bool,
         test_fn: impl FnOnce(CubeServices) -> T,
     ) where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -546,8 +576,7 @@ impl Config {
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         Self::test(name).start_test(test_fn).await;
     }
@@ -746,13 +775,14 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
 
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(i.get_service_typed().await)
+                QueryPlannerImpl::new(i.get_service_typed().await, i.get_service_typed().await)
             })
             .await;
 
@@ -795,9 +825,13 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
+                    Duration::from_secs(
+                        i.get_service_typed::<dyn ConfigObj>().await.query_timeout(),
+                    ),
                 )
             })
             .await;
@@ -874,7 +908,7 @@ impl Config {
         self.cube_services().await
     }
 
-    pub fn configure_worker(&self) {
+    pub fn configure_worker_services() {
         let mut services = WORKER_SERVICES.write().unwrap();
         *services = Some(WorkerServices {
             query_executor: Arc::new(QueryExecutorImpl),

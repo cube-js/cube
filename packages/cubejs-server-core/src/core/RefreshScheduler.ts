@@ -108,10 +108,14 @@ export class RefreshScheduler {
 
     try {
       const compilerApi = this.serverCore.getCompilerApi(context);
-      await Promise.all([
-        this.refreshCubesRefreshKey(context, compilerApi, restOptions),
-        this.refreshPreAggregations(context, compilerApi, restOptions)
-      ]);
+      if (queryingOptions.preAggregationsWarmup) {
+        await this.refreshPreAggregations(context, compilerApi, restOptions);
+      } else {
+        await Promise.all([
+          this.refreshCubesRefreshKey(context, compilerApi, restOptions),
+          this.refreshPreAggregations(context, compilerApi, restOptions)
+        ]);
+      }
       return {
         finished: true
       };
@@ -170,7 +174,7 @@ export class RefreshScheduler {
   }
 
   protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions) {
-    const { timezones } = queryingOptions;
+    const { timezones, preAggregationsWarmup } = queryingOptions;
     const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
 
     let preAggregationCursor = 0;
@@ -229,6 +233,9 @@ export class RefreshScheduler {
         return false;
       },
       current: async () => {
+        if (!scheduledPreAggregations[preAggregationCursor]) {
+          return null;
+        }
         const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
         if (partitionCursor < queries.length) {
           const queryCursor = queries.length - 1 - partitionCursor;
@@ -237,7 +244,7 @@ export class RefreshScheduler {
           return {
             ...sqlQuery,
             preAggregations: sqlQuery.preAggregations.map(
-              (p) => ({ ...p, priority: queryCursor - queries.length })
+              (p) => ({ ...p, priority: preAggregationsWarmup ? 1 : queryCursor - queries.length })
             ),
             continueWait: true,
             renewQuery: true,

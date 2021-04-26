@@ -265,12 +265,18 @@ class TemplateGalleryPage extends Component<any, any> {
                 ].concat(
                   enableWebSocketTransport ? ['react-web-socket-transport'] : []
                 );
-              } else {
+              } else if (framework.toLowerCase() === 'angular') {
                 templatePackages = [
                   'create-ng-app',
                   templatePackageName,
-                  `ng2-charts`,
+                  'ng2-charts',
                   'ng-credentials',
+                ];
+              } else {
+                templatePackages = [
+                  'create-vue-app',
+                  templatePackageName,
+                  'vue-chartkick-charts',
                 ];
               }
 
@@ -280,24 +286,25 @@ class TemplateGalleryPage extends Component<any, any> {
               history.push('/dashboard');
             }}
             onCancel={() => this.setState({ createOwnModalVisible: false })}
-            onChange={(key, value) => {
+            onChange={(key, value: string) => {
               if (key === 'framework' && framework !== value) {
+                const packages = this.dashboardSource?.templatePackages(value) || [];
+
                 this.setState({
-                  templatePackageName: 'ng-material-dynamic',
+                  templatePackageName: packages[0]?.name,
                   chartLibrary:
-                    frameworkChartLibraries[value.toLowerCase()][0].value,
+                    frameworkChartLibraries[value.toLowerCase()]?.[0].value,
                 });
               }
               this.setState({ [key]: value });
             }}
             chartLibraries={frameworkChartLibraries[framework]}
             currentLibraryItem={currentLibraryItem}
-            frameworks={frameworks}
+            frameworks={frameworks.filter((currentFramework) => currentFramework.id !== 'vanilla')}
             framework={framework}
             frameworkItem={frameworkItem}
             templatePackages={
-              this.dashboardSource &&
-              this.dashboardSource.templatePackages(framework)
+              this.dashboardSource?.templatePackages(framework) || []
             }
             templatePackage={templatePackage}
             enableWebSocketTransport={

@@ -168,7 +168,6 @@ module.exports = {
 };
 ```
 
-
 ### contextToAppId
 
 It is a [Multitenancy Setup][ref-multitenancy] option.
@@ -275,12 +274,11 @@ where needed.
 ```javascript
 module.exports = {
   queryTransformer: (query, { securityContext }) => {
-    const user = securityContext.u;
-    if (user.filterByRegion) {
+    if (securityContext.filterByRegion) {
       query.filters.push({
         member: 'Regions.id',
         operator: 'equals',
-        values: [user.regionId],
+        values: [securityContext.regionId],
       });
     }
     return query;
@@ -296,8 +294,8 @@ there. Either `String` or `Function` could be passed. Providing a `Function`
 allows to dynamically set the pre-aggregation schema name depending on the
 user's context.
 
-Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode] and `prod_pre_aggregations` in production.
-
+Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
+and `prod_pre_aggregations` in production.
 
 Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
 
@@ -312,7 +310,7 @@ Called once per [`appId`][ref-opts-ctx-to-appid].
 ```javascript
 // Static usage
 module.exports = {
-  preAggregationsSchema: `my_pre_aggregations`
+  preAggregationsSchema: `my_pre_aggregations`,
 };
 
 // Dynamic usage
@@ -342,6 +340,9 @@ module.exports = {
 ```
 
 ### scheduledRefreshTimer
+
+[[warning | Note]]
+| This is merely a refresh worker heart beat. It doesn't affect freshness of pre-aggregations or refresh keys. Setting this value to 30s doesn't mean pre-aggregatioins would be refreshed every 30s but rather checked for freshness every 30s. Please see [pre-aggregations refreshKey][ref-pre-aggregations-refresh-key] documentation on how to set refresh intervals for pre-aggregations.
 
 Cube.js enables background refresh by default. You can specify an interval as a
 number in seconds or as a string format e.g. `30s`, `1m`. Can be also set using
@@ -479,8 +480,8 @@ using `CUBEJS_JWK_URL`.
 
 #### key
 
-A JSON string that represents a cryptographic key and its' properties. Can also
-be set using `CUBEJS_JWK_KEY`.
+A JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
+also be set using `CUBEJS_JWT_KEY`.
 
 #### algorithms
 
@@ -507,13 +508,12 @@ JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
-
 ### externalDbType
 
 Should be used in conjunction with
 [`externalDriverFactory`](#external-driver-factory) option. Either `String` or
-`Function` could be passed. Providing a `Function` allows you to dynamically select
-a database type depending on the user's context. It is usually used in
+`Function` could be passed. Providing a `Function` allows you to dynamically
+select a database type depending on the user's context. It is usually used in
 [Multitenancy Setup][ref-multitenancy].
 
 Called only once per [`appId`][ref-opts-ctx-to-appid].
@@ -665,3 +665,4 @@ the additional transpiler for check duplicates.
 [ref-rest-api]: /rest-api
 [ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
 [ref-development-mode]: /overview#development-mode
+[ref-pre-aggregations-refresh-key]: /pre-aggregations#refresh-key

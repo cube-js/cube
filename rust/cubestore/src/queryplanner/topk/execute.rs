@@ -150,7 +150,6 @@ impl ExecutionPlan for AggregateTopKExec {
         let nodes = self.cluster.output_partitioning().partition_count();
         let mut tasks = Vec::with_capacity(nodes);
         for p in 0..nodes {
-            // TODO: actual streaming of results.
             let cluster = self.cluster.clone();
             tasks.push(tokio::spawn(async move {
                 // fuse the streams to simplify further code.
@@ -651,7 +650,11 @@ fn cmp_same_types(l: &ScalarValue, r: &ScalarValue, nulls_first: bool, asc: bool
         (ScalarValue::List(_, _), ScalarValue::List(_, _)) => {
             panic!("list as accumulator result is not supported")
         }
-        (_, _) => panic!("unhandled types in comparison"),
+        (l, r) => panic!(
+            "unhandled types in comparison: {} and {}",
+            l.get_datatype(),
+            r.get_datatype()
+        ),
     };
     if asc {
         o

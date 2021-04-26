@@ -10,7 +10,7 @@ const ButtonDropdown = ({ overlay, disabled = false, ...buttonProps }: any) => {
       placement="bottomLeft"
       trigger={['click']}
     >
-      <Button {...buttonProps} disabled={disabled} data-iddd={111} />
+      <Button {...buttonProps} disabled={disabled} />
     </Dropdown>
   );
 };

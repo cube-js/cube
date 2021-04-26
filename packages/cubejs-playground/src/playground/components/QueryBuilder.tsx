@@ -1,34 +1,78 @@
-import { Query } from '@cubejs-client/core';
-import { VizState } from '@cubejs-client/react';
+import { useLayoutEffect } from 'react';
+import { CubeProvider } from '@cubejs-client/react';
 
 import PlaygroundWrapper from '../PlaygroundWrapper';
-import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
+import PlaygroundQueryBuilder, {
+  TPlaygroundQueryBuilderProps,
+} from '../../PlaygroundQueryBuilder';
+import { TSecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
+import { useCubejsApi, useSecurityContext } from '../../hooks';
 
 type TQueryBuilderProps = {
   apiUrl: string;
   token: string;
-  defaultQuery?: Query;
-  initialVizState?: VizState;
-  getToken?: (payload: string) => Promise<string>;
-  onVizStateChanged?: (vizState: VizState) => void;
-};
+  tokenKey?: string;
+} & Pick<
+  TPlaygroundQueryBuilderProps,
+  | 'defaultQuery'
+  | 'initialVizState'
+  | 'schemaVersion'
+  | 'onVizStateChanged'
+  | 'onSchemaChange'
+> &
+  Pick<TSecurityContextContextProps, 'getToken'>;
 
-export default function QueryBuilder({
+export function QueryBuilder({ apiUrl, token, ...props }: TQueryBuilderProps) {
+  return (
+    <PlaygroundWrapper tokenKey={props.tokenKey} getToken={props.getToken}>
+      <QueryBuilderContainer apiUrl={apiUrl} token={token} {...props} />
+    </PlaygroundWrapper>
+  );
+}
+
+type TQueryBuilderContainerProps = Omit<
+  TQueryBuilderProps,
+  'tokenKey' | 'getToken'
+>;
+
+function QueryBuilderContainer({
   apiUrl,
   token,
   ...props
-}: TQueryBuilderProps) {
+}: TQueryBuilderContainerProps) {
+  const { token: securityContextToken } = useSecurityContext();
+  const currentToken = securityContextToken || token;
+  const cubejsApi = useCubejsApi(apiUrl, currentToken);
+
+  useLayoutEffect(() => {
+    if (apiUrl && currentToken) {
+      // @ts-ignore
+      window.__cubejsPlayground = {
+        // @ts-ignore
+        ...window.__cubejsPlayground,
+        apiUrl,
+        token: currentToken,
+      };
+    }
+  }, [apiUrl, currentToken]);
+
+  if (!cubejsApi) {
+    return null;
+  }
+
   return (
-    <PlaygroundWrapper apiUrl={apiUrl} token={token} getToken={props.getToken}>
+    <CubeProvider cubejsApi={cubejsApi}>
       <PlaygroundQueryBuilder
         apiUrl={apiUrl}
-        cubejsToken={token}
+        cubejsToken={currentToken}
         initialVizState={{
           query: props.defaultQuery,
           ...props.initialVizState,
         }}
-        onVizStateChanged={(vizState) => props.onVizStateChanged?.(vizState)}
+        schemaVersion={props.schemaVersion}
+        onVizStateChanged={props.onVizStateChanged}
+        onSchemaChange={props.onSchemaChange}
       />
-    </PlaygroundWrapper>
+    </CubeProvider>
   );
 }

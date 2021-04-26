@@ -431,6 +431,7 @@ declare module '@cubejs-client/react' {
     isLoading: boolean;
     resultSet: ResultSet<TData> | null;
     progress: ProgressResponse;
+    refetch: () => void;
   };
 
   /**

@@ -13,11 +13,16 @@ export class PreAggregations {
    * @return {unknown[]}
    */
   preAggregationsDescription() {
-    return R.pipe(R.unnest, R.uniqBy(desc => desc.tableName))(
-      [this.preAggregationsDescriptionLocal()].concat(
-        this.query.subQueryDimensions.map(d => this.query.subQueryDescription(d).subQuery)
-          .map(q => q.preAggregations.preAggregationsDescription())
-      )
+    const preAggregations = [this.preAggregationsDescriptionLocal()].concat(
+      this.query.subQueryDimensions.map(d => this.query.subQueryDescription(d).subQuery)
+        .map(q => q.preAggregations.preAggregationsDescription())
+    );
+
+    return R.pipe(
+      R.unnest,
+      R.uniqBy(desc => desc.tableName)
+    )(
+      preAggregations
     );
   }
 
@@ -34,11 +39,8 @@ export class PreAggregations {
       isInPreAggregationQuery && this.query.options.useOriginalSqlPreAggregationsInPreAggregation) {
       return R.pipe(
         R.map(cube => {
-          const foundPreAggregation = this.findPreAggregationToUseForCube(cube);
-          if (foundPreAggregation) {
-            return this.preAggregationDescriptionsFor(foundPreAggregation);
-          }
-          return null;
+          const { preAggregations } = this.collectOriginalSqlPreAggregations(() => this.query.cubeSql(cube));
+          return R.unnest(preAggregations.map(p => this.preAggregationDescriptionsFor(p)));
         }),
         R.filter(R.identity),
         R.unnest
@@ -107,8 +109,8 @@ export class PreAggregations {
 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
-    const name = foundPreAggregation.sqlAlias || preAggregationName;
-    const tableName = this.preAggregationTableName(cube, name, preAggregation);
+
+    const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
     return {
       preAggregationsSchema: this.query.preAggregationSchema(),
@@ -121,6 +123,7 @@ export class PreAggregations {
       external: preAggregation.external,
       indexesSql: Object.keys(preAggregation.indexes || {}).map(
         index => {
+          // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
           const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
           return {
             indexName,
@@ -593,18 +596,21 @@ export class PreAggregations {
     return this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
   }
 
-  originalSqlPreAggregationTable(preAggregation) {
-    if (this.canPartitionsBeUsed(preAggregation)) {
-      return this.partitionUnion(preAggregation);
+  originalSqlPreAggregationTable(preAggregationDescription) {
+    if (this.canPartitionsBeUsed(preAggregationDescription)) {
+      return this.partitionUnion(preAggregationDescription);
     }
 
-    let { preAggregationName } = preAggregation;
-    if (preAggregation.preAggregation && preAggregation.preAggregation.sqlAlias) {
-      preAggregationName = preAggregation.preAggregation.sqlAlias;
+    // eslint-disable-next-line prefer-const
+    let { preAggregationName, preAggregation } = preAggregationDescription;
+
+    // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
+    if (preAggregation && preAggregation.sqlAlias) {
+      preAggregationName = preAggregation.sqlAlias;
     }
 
     return this.query.preAggregationTableName(
-      preAggregation.cube,
+      preAggregationDescription.cube,
       preAggregationName
     );
   }
@@ -649,7 +655,8 @@ export class PreAggregations {
           this.partitionUnion(j.preAggregation) :
           this.query.preAggregationTableName(
             j.preAggregation.cube,
-            j.preAggregation.sqlAlias || j.preAggregation.preAggregationName
+            // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
+            j.preAggregation.preAggregation.sqlAlias || j.preAggregation.preAggregationName
           )
       }))
     );
@@ -703,11 +710,12 @@ export class PreAggregations {
     const { dimension, partitionDimension } = this.partitionDimension(preAggregationForQuery);
 
     const tables = partitionDimension.timeSeries().map(range => {
-      const preAggregation = this.addPartitionRangeTo(preAggregationForQuery, dimension, range);
+      const preAggregationDescription = this.addPartitionRangeTo(preAggregationForQuery, dimension, range);
       return this.preAggregationTableName(
         preAggregationForQuery.cube,
+        // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
         preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName,
-        preAggregation.preAggregation
+        preAggregationDescription.preAggregation
       );
     });
     if (tables.length === 1) {

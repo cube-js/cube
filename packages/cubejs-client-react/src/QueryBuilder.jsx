@@ -1,6 +1,14 @@
 import React from 'react';
 import { prop, uniqBy, equals, pick, clone } from 'ramda';
-import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers, movePivotItem } from '@cubejs-client/core';
+import {
+  ResultSet,
+  moveItemInArray,
+  defaultOrder,
+  flattenFilters,
+  getQueryMembers,
+  movePivotItem,
+  defaultHeuristics,
+} from '@cubejs-client/core';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 
@@ -46,10 +54,15 @@ export default class QueryBuilder extends React.Component {
     }
 
     if (Array.isArray(query)) {
-      return query.reduce((memo, currentQuery) => memo.concat(QueryBuilder.resolveMember(type, {
-        meta,
-        query: currentQuery
-      })), []);
+      return query.reduce(
+        (memo, currentQuery) => memo.concat(
+          QueryBuilder.resolveMember(type, {
+            meta,
+            query: currentQuery,
+          })
+        ),
+        []
+      );
     }
 
     if (type === 'timeDimensions') {
@@ -80,7 +93,7 @@ export default class QueryBuilder extends React.Component {
       isFetchingMeta: false,
       dryRunResponse: null,
       ...props.vizState, // deprecated
-      ...props.initialVizState
+      ...props.initialVizState,
     };
 
     this.mutexObj = {};
@@ -102,7 +115,7 @@ export default class QueryBuilder extends React.Component {
             schemaVersion,
             refresh: async () => {
               await this.fetchMeta();
-            }
+            },
           });
         }
       } catch (error) {
@@ -123,16 +136,19 @@ export default class QueryBuilder extends React.Component {
       metaError = error;
     }
 
-    this.setState({
-      meta,
-      metaError,
-      isFetchingMeta: false
-    }, () => {
-      // Run update query to force viz state update
-      // This will catch any new missing members, and also validate the query against the new meta
-      this.updateQuery({});
-    });
-  }
+    this.setState(
+      {
+        meta,
+        metaError,
+        isFetchingMeta: false,
+      },
+      () => {
+        // Run update query to force viz state update
+        // This will catch any new missing members, and also validate the query against the new meta
+        this.updateQuery({});
+      }
+    );
+  };
 
   cubejsApi() {
     const { cubejsApi } = this.props;
@@ -214,7 +230,7 @@ export default class QueryBuilder extends React.Component {
       validatedQuery,
       missingMembers,
       isFetchingMeta,
-      dryRunResponse
+      dryRunResponse,
     } = this.state;
 
     const flatFilters = uniqBy(
@@ -322,13 +338,7 @@ export default class QueryBuilder extends React.Component {
       updatePivotConfig: {
         moveItem: ({ sourceIndex, destinationIndex, sourceAxis, destinationAxis }) => {
           this.updateVizState({
-            pivotConfig: movePivotItem(
-              pivotConfig,
-              sourceIndex,
-              destinationIndex,
-              sourceAxis,
-              destinationAxis
-            )
+            pivotConfig: movePivotItem(pivotConfig, sourceIndex, destinationIndex, sourceAxis, destinationAxis),
           });
         },
         update: (config) => {
@@ -339,7 +349,7 @@ export default class QueryBuilder extends React.Component {
               ...pivotConfig,
               ...config,
             },
-            ...(limit ? { query: { ...query, limit } } : null)
+            ...(limit ? { query: { ...query, limit } } : null),
           });
         },
       },
@@ -444,7 +454,7 @@ export default class QueryBuilder extends React.Component {
       } catch (error) {
         console.error(error);
         this.setState({
-          queryError: error
+          queryError: error,
         });
       }
     }
@@ -463,148 +473,11 @@ export default class QueryBuilder extends React.Component {
 
   defaultHeuristics(newState) {
     const { query, sessionGranularity, meta } = this.state;
-    const defaultGranularity = sessionGranularity || 'day';
 
-    if (Array.isArray(query)) {
-      return newState;
-    }
-
-    if (newState.query) {
-      const oldQuery = query;
-      let newQuery = newState.query;
-
-      if (
-        (oldQuery.timeDimensions || []).length === 1
-        && (newQuery.timeDimensions || []).length === 1
-        && newQuery.timeDimensions[0].granularity
-        && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
-      ) {
-        newState = {
-          ...newState,
-          sessionGranularity: newQuery.timeDimensions[0].granularity,
-        };
-      }
-
-      if (
-        ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0)
-        || ((oldQuery.measures || []).length === 1
-          && (newQuery.measures || []).length === 1
-          && oldQuery.measures[0] !== newQuery.measures[0])
-      ) {
-        const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
-        newQuery = {
-          ...newQuery,
-          timeDimensions: defaultTimeDimension
-            ? [
-              {
-                dimension: defaultTimeDimension,
-                granularity: defaultGranularity,
-              },
-            ]
-            : [],
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          chartType: defaultTimeDimension ? 'line' : 'number',
-        };
-      }
-
-      if ((oldQuery.dimensions || []).length === 0 && (newQuery.dimensions || []).length > 0) {
-        newQuery = {
-          ...newQuery,
-          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({ ...td, granularity: undefined })),
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          chartType: 'table',
-        };
-      }
-
-      if ((oldQuery.dimensions || []).length > 0 && (newQuery.dimensions || []).length === 0) {
-        newQuery = {
-          ...newQuery,
-          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({
-            ...td,
-            granularity: td.granularity || defaultGranularity,
-          })),
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number',
-        };
-      }
-
-      if (
-        ((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0)
-        && (newQuery.dimensions || []).length === 0
-        && (newQuery.measures || []).length === 0
-      ) {
-        newQuery = {
-          ...newQuery,
-          timeDimensions: [],
-          filters: [],
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          sessionGranularity: null,
-        };
-      }
-      return newState;
-    }
-
-    if (newState.chartType) {
-      const newChartType = newState.chartType;
-      if (
-        (newChartType === 'line' || newChartType === 'area')
-        && (query.timeDimensions || []).length === 1
-        && !query.timeDimensions[0].granularity
-      ) {
-        const [td] = query.timeDimensions;
-        return {
-          ...newState,
-          pivotConfig: null,
-          query: {
-            ...query,
-            timeDimensions: [{ ...td, granularity: defaultGranularity }],
-          },
-        };
-      }
-
-      if (
-        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number')
-        && (query.timeDimensions || []).length === 1
-        && query.timeDimensions[0].granularity
-      ) {
-        const [td] = query.timeDimensions;
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: {
-            ...query,
-            timeDimensions: [{ ...td, granularity: undefined }],
-          },
-        };
-      }
-    }
-
-    return newState;
+    return defaultHeuristics(newState, query, {
+      meta,
+      sessionGranularity: sessionGranularity || 'day',
+    });
   }
 
   applyStateChangeHeuristics(newState) {

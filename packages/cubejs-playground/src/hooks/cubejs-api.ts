@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import cubejs from '@cubejs-client/core';
 
-export default function useCubejsApi(apiUrl, token) {
+export function useCubejsApi(apiUrl, token) {
   const cubejsApiInstance = useMemo(() => {
     if (!token || !apiUrl || token === 'undefined') {
       return null;

@@ -10,7 +10,6 @@ import vuetify from './plugins/vuetify';
 import Explore from './pages/explore/Explore.vue';
 import Dashboard from './pages/dashboard/Dashboard.vue';
 import apolloClient from './graphql/client';
-import ChartContainer from '@/pages/test/ChartContainer';
 
 Vue.use(VueApollo);
 
@@ -30,7 +29,6 @@ const router = new VueRouter({
     { path: '/', component: Explore, props: { cubejsApi } },
     { path: '/explore', component: Explore, props: { cubejsApi } },
     { path: '/dashboard', component: Dashboard, props: { cubejsApi } },
-    { path: '/test', component: ChartContainer, props: { cubejsApi } },
   ]
 })
 

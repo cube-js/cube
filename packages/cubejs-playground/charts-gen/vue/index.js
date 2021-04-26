@@ -1,5 +1,4 @@
 const t = require('@babel/types');
-const generator = require('@babel/generator').default;
 const traverse = require('@babel/traverse').default;
 const fs = require('fs-extra');
 const { SourceSnippet, VueMainSnippet } = require('@cubejs-templates/core');
@@ -24,12 +23,6 @@ const packages = ['dev-cva', 'vue-charts'];
 const rootPath = path.resolve(`${__dirname}/../..`);
 const distPath = `${rootPath}/charts-dist/vue`;
 const vueChartsPath = `${distPath}/vue-charts`;
-
-function astToCode(ast) {
-  return generator(ast, {
-    decoratorsBeforeExport: true,
-  }).code;
-}
 
 (async () => {
   await executeCommand('rm -rf ../../charts-dist/vue', [], {
@@ -171,7 +164,7 @@ function astToCode(ast) {
   await appContainer.ensureDependencies();
   try {
     await executeCommand(
-      'npm link @cubejs-client/core && npm link @cubejs-client/vue',
+      'npm link @cubejs-client/vue',
       [],
       {
         shell: true,

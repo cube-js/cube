@@ -1,17 +1,18 @@
 import { GenericContainer } from 'testcontainers';
-import { DbRunnerAbstract } from './db-runner.abstract';
 
-interface PostgresStartOptions {
+import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+
+type PostgresStartOptions = DBRunnerContainerOptions & {
   version?: string,
-}
+};
 
 export class PostgresDBRunner extends DbRunnerAbstract {
   public static startContainer(options: PostgresStartOptions) {
     const version = process.env.TEST_PGSQL_VERSION || options.version || '9.6.8';
 
-    return new GenericContainer(`postgres:${version}`)
-      .withEnv('POSTGRES_USER', 'root')
-      .withEnv('POSTGRES_DB', 'model_test')
+    const container = new GenericContainer(`postgres:${version}`)
+      .withEnv('POSTGRES_USER', 'test')
+      .withEnv('POSTGRES_DB', 'test')
       .withEnv('POSTGRES_PASSWORD', 'test')
       .withExposedPorts(5432)
       // .withHealthCheck({
@@ -22,7 +23,15 @@ export class PostgresDBRunner extends DbRunnerAbstract {
       // })
       // .withWaitStrategy(Wait.forHealthCheck())
       // Postgresql do fast shutdown on start for db applying
-      .withStartupTimeout(10 * 1000)
-      .start();
+      .withStartupTimeout(10 * 1000);
+
+    if (options.volumes) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const { source, target, bindMode } of options.volumes) {
+        container.withBindMount(source, target, bindMode);
+      }
+    }
+
+    return container.start();
   }
 }

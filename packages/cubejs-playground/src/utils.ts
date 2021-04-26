@@ -1,4 +1,5 @@
 import { notification } from 'antd';
+import { PlaygroundEvent } from './types';
 
 const bootstrapDefinition = {
   'angular-cli': {
@@ -74,13 +75,10 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
         content: {
           dependencies: {
             ...bootstrapDefinition[template]?.dependencies,
-            ...dependencies.reduce(
-              (memo, d) => {
-                const [name, version] = Array.isArray(d) ? d : [d, 'latest'];
-                return ({ ...memo, [name]: version });
-              },
-              {}
-            ),
+            ...dependencies.reduce((memo, d) => {
+              const [name, version] = Array.isArray(d) ? d : [d, 'latest'];
+              return { ...memo, [name]: version };
+            }, {}),
           },
         },
       },
@@ -89,7 +87,15 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
   };
 }
 
-export function dispatchPlaygroundEvent(document, eventType, detail) {
+export function dispatchPlaygroundEvent(
+  document: Document | null,
+  eventType: PlaygroundEvent,
+  detail: Record<string, unknown> = {}
+) {
+  if (!document) {
+    return;
+  }
+
   const myEvent = new CustomEvent('__cubejsPlaygroundEvent', {
     bubbles: true,
     composed: true,
@@ -102,10 +108,10 @@ export function dispatchPlaygroundEvent(document, eventType, detail) {
   document.dispatchEvent(myEvent);
 }
 
-export function fetchWithTimeout(url, options, timeout) {
+export function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
   return Promise.race([
     fetch(url, options),
-    new Promise((_, reject) =>
+    new Promise<Response>((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), timeout)
     ),
   ]);

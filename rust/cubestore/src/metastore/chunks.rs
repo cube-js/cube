@@ -23,7 +23,7 @@ impl Chunk {
     }
 
     pub fn get_full_name(&self, chunk_id: u64) -> String {
-        format!("{}.chunk.parquet", chunk_id)
+        chunk_file_name(chunk_id)
     }
 
     pub fn get_partition_id(&self) -> u64 {
@@ -57,6 +57,10 @@ impl Chunk {
     pub fn active(&self) -> bool {
         self.active
     }
+}
+
+pub fn chunk_file_name(chunk_id: u64) -> String {
+    format!("{}.chunk.parquet", chunk_id)
 }
 
 #[derive(Clone, Copy, Debug)]
