@@ -1,15 +1,21 @@
 import { Link } from 'react-router-dom';
-import { FileFilled, MenuOutlined, SlackOutlined } from '@ant-design/icons';
+import Icon, {
+  FileFilled,
+  MenuOutlined,
+  SlackOutlined,
+} from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';
 import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
+
+import { DiscourseIcon } from '../shared/icons/DiscourseIcon';
 
 const StyledHeader = styled(Layout.Header)`
   && {
     background-color: var(--dark-02-color);
     color: white;
-    padding: 0 16px; 
-    line-height: 44px; 
+    padding: 0 16px;
+    line-height: 44px;
     height: 48px;
   }
 `;
@@ -28,7 +34,8 @@ const StyledMenuItem = styled(Menu.Item)`
     line-height: 48px;
     height: 49px;
     & > a {
-      &, &:hover {
+      &,
+      &:hover {
         opacity: 0.6;
         color: white;
       }
@@ -37,17 +44,17 @@ const StyledMenuItem = styled(Menu.Item)`
     &.ant-menu-item-active {
       color: white;
       border-bottom: 2px solid white;
-      
+
       &:hover {
-        border-bottom: 2px solid white;      
+        border-bottom: 2px solid white;
       }
-    
+
       a {
         opacity: 1;
         color: white;
       }
     }
-  
+
     &:not(.ant-menu-item-selected) {
       &.ant-menu-item-active,
       &:hover {
@@ -74,12 +81,12 @@ const StyledMenuButton = styled.a<TStyledMenuButtonProps>`
     color: white;
     transition: all 0.25s ease;
     padding: 0 10px;
-  
+
     span {
       font-size: 14px;
       margin-right: 10px;
     }
-  
+
     &:hover {
       border-color: white;
       color: white;
@@ -120,7 +127,6 @@ const Header = ({ selectedKeys }) => {
           </StyledMenuItem>
 
           <StyledMenuButton
-            noMargin
             key="slack"
             href="https://slack.cube.dev"
             target="_blank"
@@ -128,6 +134,17 @@ const Header = ({ selectedKeys }) => {
             <SlackOutlined />
             Slack
           </StyledMenuButton>
+
+          <StyledMenuButton
+            noMargin
+            key="discourse"
+            href="https://forum.cube.dev/"
+            target="_blank"
+          >
+            <Icon component={() => <DiscourseIcon />} />
+            Discourse
+          </StyledMenuButton>
+
           <StyledMenuButton
             key="docs"
             href="https://cube.dev/docs"
