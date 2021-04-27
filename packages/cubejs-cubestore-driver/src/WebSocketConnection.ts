@@ -21,13 +21,15 @@ export class WebSocketConnection {
       webSocket.readyPromise = new Promise<WebSocket>((resolve, reject) => {
         webSocket.lastHeartBeat = new Date();
         const pingInterval = setInterval(() => {
-          if (webSocket.readyState !== WebSocket.CLOSED) {
+          if (webSocket.readyState === WebSocket.OPEN) {
             webSocket.ping();
           }
+
           if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > 30000) {
             webSocket.close();
           }
         }, 5000);
+
         webSocket.sendAsync = async (message) => new Promise<void>((resolveSend, rejectSend) => {
           webSocket.send(message, (err) => {
             if (err) {
@@ -49,6 +51,7 @@ export class WebSocketConnection {
         });
         webSocket.on('close', () => {
           clearInterval(pingInterval);
+
           if (Object.keys(webSocket.sentMessages).length) {
             setTimeout(async () => {
               try {
