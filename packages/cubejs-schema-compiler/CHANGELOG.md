@@ -3,6 +3,106 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.26.104](https://github.com/cube-js/cube.js/compare/v0.26.103...v0.26.104) (2021-04-26)
+
+
+### Bug Fixes
+
+* Original SQL table is not found when `useOriginalSqlPreAggregations` used together with `CUBE.sql()` reference ([#2603](https://github.com/cube-js/cube.js/issues/2603)) ([5fd8e42](https://github.com/cube-js/cube.js/commit/5fd8e42cbe361a66cf0ffe6542478b6beaad86c5))
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+
+### Features
+
+* Introduce databricks-jdbc-driver ([bb0b31f](https://github.com/cube-js/cube.js/commit/bb0b31fb333f2aa379f11f6733c4efc17ec12dde))
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+
+### Bug Fixes
+
+* sqlAlias on non partitioned rollups ([0675925](https://github.com/cube-js/cube.js/commit/0675925efb61a6492344b28179b7647eabb01a1d))
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.26.67](https://github.com/cube-js/cube.js/compare/v0.26.66...v0.26.67) (2021-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+
+### Bug Fixes
+
+* Allow using sub query dimensions in join conditions ([#2419](https://github.com/cube-js/cube.js/issues/2419)) ([496a075](https://github.com/cube-js/cube.js/commit/496a0755308f376666e732ea09a4c7816682cfb0))
+
+
+
+
+
 ## [0.26.56](https://github.com/cube-js/cube.js/compare/v0.26.55...v0.26.56) (2021-03-13)
 
 

@@ -3,6 +3,281 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+
+### Bug Fixes
+
+* **cubestore:** deploy datafusion fix, add test for failing top-k ([59bc127](https://github.com/cube-js/cube.js/commit/59bc127e401a03364622b9257e48db47b496caae))
+* **cubestore:** fix error on binary results of CASE ([72634e9](https://github.com/cube-js/cube.js/commit/72634e9d4e5a2cf66595895513f721032a64a0a5))
+
+
+
+
+
+## [0.26.102](https://github.com/cube-js/cube.js/compare/v0.26.101...v0.26.102) (2021-04-22)
+
+
+### Bug Fixes
+
+* **cubestore:** download data files on worker startup ([0a6caba](https://github.com/cube-js/cube.js/commit/0a6cabad2cec32ba25d995d99f65f9c1f874895b))
+* **cubestore:** download only relevant partitions on workers ([7adfd62](https://github.com/cube-js/cube.js/commit/7adfd62b220ef2194a77d82101f93831a8e02c20))
+
+
+
+
+
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Bug Fixes
+
+* **cubestore:** allow to disable top-k with env var ([9c2838a](https://github.com/cube-js/cube.js/commit/9c2838aecf2980fa3c076aa812f12fef05924344)), closes [#2559](https://github.com/cube-js/cube.js/issues/2559)
+* **cubestore:** re-enable streaming for top-k ([c21b5f7](https://github.com/cube-js/cube.js/commit/c21b5f7690d5de7570034449d24a7842dfd097c6))
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+
+### Bug Fixes
+
+* post-install compatibility with yarn ([4641e81](https://github.com/cube-js/cube.js/commit/4641e814909a807ecf49e838e6dc471db6920392))
+
+
+
+
+
+## [0.26.92](https://github.com/cube-js/cube.js/compare/v0.26.91...v0.26.92) (2021-04-12)
+
+
+### Bug Fixes
+
+* **cubestore:** temporarily disable streaming in top-k ([ff629d5](https://github.com/cube-js/cube.js/commit/ff629d51790bb54f719b38448acfbd7fb1eba67c))
+* post installers compatiblity with Windows [#2520](https://github.com/cube-js/cube.js/issues/2520) ([7e9bd7c](https://github.com/cube-js/cube.js/commit/7e9bd7c86df1032d53e752654fe4a446951480bb))
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+
+### Bug Fixes
+
+* **cubestore:** Empty files on temp upload ([893e467](https://github.com/cube-js/cube.js/commit/893e467dcbb1461a3f769709197838773b9eccc0))
+
+
+
+
+
+## [0.26.89](https://github.com/cube-js/cube.js/compare/v0.26.88...v0.26.89) (2021-04-10)
+
+
+### Bug Fixes
+
+* **cubestore:** File not found for S3 during uploads ([a1b0087](https://github.com/cube-js/cube.js/commit/a1b00876c64e3206a9e0cbfa39f0440a865125a2))
+* **cubestore:** Return http errors as JSON ([fb52f7d](https://github.com/cube-js/cube.js/commit/fb52f7dc647840747b86640c1466bbce78cc3817))
+
+
+
+
+
+## [0.26.88](https://github.com/cube-js/cube.js/compare/v0.26.87...v0.26.88) (2021-04-10)
+
+
+### Features
+
+* Mysql Cube Store streaming ingests ([#2528](https://github.com/cube-js/cube.js/issues/2528)) ([0b36a6f](https://github.com/cube-js/cube.js/commit/0b36a6faa184766873ec3792785eb1aa5ca582af))
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+
+### Bug Fixes
+
+* **cubestore:** Something wrong with downloading Cube Store before running it. ([208dd31](https://github.com/cube-js/cube.js/commit/208dd31f20aa64a5c79e143d40055ac2658d0745))
+
+
+
+
+
+## [0.26.86](https://github.com/cube-js/cube.js/compare/v0.26.85...v0.26.86) (2021-04-09)
+
+
+### Bug Fixes
+
+* **cubestore:** installer - compability with windows. fix [#2520](https://github.com/cube-js/cube.js/issues/2520) ([e05db81](https://github.com/cube-js/cube.js/commit/e05db81cc7b885046b08b2a0f034e472e22c8b3e))
+
+
+
+
+
+## [0.26.85](https://github.com/cube-js/cube.js/compare/v0.26.84...v0.26.85) (2021-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.26.84](https://github.com/cube-js/cube.js/compare/v0.26.83...v0.26.84) (2021-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+
+### Features
+
+* Introduce databricks-jdbc-driver ([bb0b31f](https://github.com/cube-js/cube.js/commit/bb0b31fb333f2aa379f11f6733c4efc17ec12dde))
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+
+### Bug Fixes
+
+* **cubestore:** reduce serialization time for record batches ([cea5fd2](https://github.com/cube-js/cube.js/commit/cea5fd21c721b0252b3a068e8f324100ebfff546))
+* **cubestore:** stream results for topk ([d2c7485](https://github.com/cube-js/cube.js/commit/d2c7485807cd20d15f8da333fcf31035dab0d529))
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+
+### Features
+
+* **cubestore:** top-k query planning and execution ([#2464](https://github.com/cube-js/cube.js/issues/2464)) ([3607a3a](https://github.com/cube-js/cube.js/commit/3607a3a69537feb815de470cf0a2ec9dde351ae8))
+
+
+
+
+
+## [0.26.72](https://github.com/cube-js/cube.js/compare/v0.26.71...v0.26.72) (2021-03-29)
+
+
+### Bug Fixes
+
+* **cubestore:** Detect gnu libc without warning ([03e01e5](https://github.com/cube-js/cube.js/commit/03e01e5a30f88acfd61b4285461b25c26ef9ecfe))
+
+
+
+
+
+## [0.26.71](https://github.com/cube-js/cube.js/compare/v0.26.70...v0.26.71) (2021-03-26)
+
+
+### Bug Fixes
+
+* **cubestore:** Remove tracing from logs ([10a264c](https://github.com/cube-js/cube.js/commit/10a264c1261bad9ae3f04753ac8c49dfe30efa63))
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+
+### Features
+
+* Introduce @cubejs-backend/maven ([#2432](https://github.com/cube-js/cube.js/issues/2432)) ([6dc6034](https://github.com/cube-js/cube.js/commit/6dc6034c3cdcc8e2c2b0568c218228a18b64f44b))
+
+
+
+
+
+## [0.26.68](https://github.com/cube-js/cube.js/compare/v0.26.67...v0.26.68) (2021-03-25)
+
+
+### Bug Fixes
+
+* **cubestore:** make get active partitions a read operation ([#2416](https://github.com/cube-js/cube.js/issues/2416)) ([a1981f3](https://github.com/cube-js/cube.js/commit/a1981f3eadeb7359ab5cabdedf7ee2e5cfe9cc00))
+
+
+
+
+
+## [0.26.66](https://github.com/cube-js/cube.js/compare/v0.26.65...v0.26.66) (2021-03-24)
+
+
+### Bug Fixes
+
+* **cubestore:** choose inplace aggregate in more cases ([#2402](https://github.com/cube-js/cube.js/issues/2402)) ([9ab6559](https://github.com/cube-js/cube.js/commit/9ab65599ea2a900bf63c4cb5e0a2544e5766822f))
+
+
+### Features
+
+* **cubestore:** add 'no upload' mode ([#2405](https://github.com/cube-js/cube.js/issues/2405)) ([38999b0](https://github.com/cube-js/cube.js/commit/38999b05a41849cae690b8900319340a99177fdb))
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+
+### Bug Fixes
+
+* Warning/skip Cube Store on unsupported platforms ([c187e11](https://github.com/cube-js/cube.js/commit/c187e119b8747e1f6bb3fe2bd84f66ae3822ac7d))
+* **cubestore:** use less read and write locks during planning ([#2420](https://github.com/cube-js/cube.js/issues/2420)) ([2d5d963](https://github.com/cube-js/cube.js/commit/2d5d96343dd2ef9204cb68c7a3e897dd28fa0d52))
+
+
+
+
+
+## [0.26.64](https://github.com/cube-js/cube.js/compare/v0.26.63...v0.26.64) (2021-03-22)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Download x86-darwin for arm64-apple (for Rosetta2) ([562ea1a](https://github.com/cube-js/cube.js/commit/562ea1aa2dd34dc6b282ad8b4216be6c09b4240e))
+
+
+
+
+
+## [0.26.63](https://github.com/cube-js/cube.js/compare/v0.26.62...v0.26.63) (2021-03-22)
+
+
+### Bug Fixes
+
+* **cubestore:** Http message processing isn't forked ([844dab2](https://github.com/cube-js/cube.js/commit/844dab24114508c0c6ddbe068aa81d0f609250be))
+* **cubestore:** Introduce meta store lock acquire timeouts to avoid deadlocks ([24b87e4](https://github.com/cube-js/cube.js/commit/24b87e41e172ab04d02e65f2343b928e3806e6bd))
+* **cubestore:** Narrow check point lock life time ([b8e9003](https://github.com/cube-js/cube.js/commit/b8e9003a243d17e6ce5fa2ea8eabbf097cb42835))
+* **cubestore:** Remove upstream directory when runs locally ([d5975f1](https://github.com/cube-js/cube.js/commit/d5975f13d34c46c03224d584995de6862e82f7ef))
+
+
+### Features
+
+* **cubestore:** Make query planning for indices explicit ([#2400](https://github.com/cube-js/cube.js/issues/2400)) ([a3e6c5c](https://github.com/cube-js/cube.js/commit/a3e6c5ce98974ffcb0280295e1c6182c1a46a1f4))
+
+
+
+
+
 ## [0.26.60](https://github.com/cube-js/cube.js/compare/v0.26.59...v0.26.60) (2021-03-16)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

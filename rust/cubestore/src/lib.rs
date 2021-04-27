@@ -8,6 +8,9 @@
 #![feature(raw)]
 #![feature(total_cmp)]
 #![feature(vec_into_raw_parts)]
+#![feature(hash_set_entry)]
+#![feature(map_first_last)]
+#![feature(arc_new_cyclic)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
@@ -52,9 +55,11 @@ pub mod util;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
-    message: String,
-    cause: CubeErrorCauseType,
+    pub message: String,
+    pub cause: CubeErrorCauseType,
 }
+
+impl std::error::Error for CubeError {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CubeErrorCauseType {
@@ -122,13 +127,6 @@ impl From<ParserError> for CubeError {
     }
 }
 
-impl From<CubeError> for warp::reject::Rejection {
-    fn from(_: CubeError) -> Self {
-        // TODO
-        warp::reject()
-    }
-}
-
 impl From<ParquetError> for CubeError {
     fn from(v: ParquetError) -> Self {
         CubeError::internal(v.to_string())
@@ -141,8 +139,11 @@ impl From<tokio::task::JoinError> for CubeError {
     }
 }
 
-impl From<SendError<metastore::MetaStoreEvent>> for CubeError {
-    fn from(v: SendError<metastore::MetaStoreEvent>) -> Self {
+impl<T> From<SendError<T>> for CubeError
+where
+    T: Debug,
+{
+    fn from(v: SendError<T>) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }
@@ -360,5 +361,11 @@ impl From<tempfile::PathPersistError> for CubeError {
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
         return CubeError::from_error(v);
+    }
+}
+
+impl Into<ArrowError> for CubeError {
+    fn into(self) -> ArrowError {
+        ArrowError::ExternalError(Box::new(self))
     }
 }

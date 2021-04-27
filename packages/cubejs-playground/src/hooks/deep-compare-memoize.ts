@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import equals from 'fast-deep-equal';
 
-export default function useDeepCompareMemoize(value) {
+export function useDeepCompareMemoize(value) {
   const ref = useRef([]);
 
   if (!equals(value, ref.current)) {

@@ -10,16 +10,20 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Menu, Modal } from 'antd';
-import { Button, Card, SectionRow } from './components';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
-import { Redirect, withRouter } from 'react-router-dom';
+import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
-import sqlFormatter from 'sql-formatter';
+import { Query, ResultSet } from '@cubejs-client/core';
+import { format } from 'sql-formatter';
+
+import { SectionRow } from './components';
+import { Button, Card } from './atoms';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
+import DashboardSource from './DashboardSource';
 
 const frameworkToTemplate = {
   react: 'create-react-app',
@@ -42,12 +46,15 @@ const StyledCard: any = styled(Card)`
   }
 `;
 
-export const frameworks = [
-  {
-    id: 'vanilla',
-    title: 'Vanilla JavaScript',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-core',
-  },
+type FrameworkDescriptor = {
+  id: string;
+  title: string;
+  docsLink?: string;
+  supported?: boolean;
+  scaffoldingSupported?: boolean;
+};
+
+export const frameworks: FrameworkDescriptor[] = [
   {
     id: 'react',
     title: 'React',
@@ -62,19 +69,30 @@ export const frameworks = [
   },
   {
     id: 'vue',
-    title: 'Vue.js',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-vue',
+    title: 'Vue',
+    supported: true,
+    scaffoldingSupported: true,
+  },
+  {
+    id: 'vanilla',
+    title: 'Vanilla JavaScript',
+    docsLink: 'https://cube.dev/docs/@cubejs-client-core',
   },
 ];
 
-class ChartContainer extends Component<any, any> {
+type TChartContainerProps = {
+  query: Query;
+  hideActions: boolean;
+  dashboardSource?: DashboardSource;
+  error?: Error;
+  resultSet?: ResultSet;
+  [k: string]: any;
+}
+
+class ChartContainer extends Component<TChartContainerProps & RouteComponentProps, any> {
   static defaultProps = {
     query: {},
-    hideActions: null,
-    dashboardSource: null,
-    codeSandboxSource: null,
-    error: null,
-    resultSet: null,
+    hideActions: false,
   };
 
   static getDerivedStateFromProps(props, state) {
@@ -111,6 +129,8 @@ class ChartContainer extends Component<any, any> {
           codesandboxFiles[
             'src/app/query-renderer/query-renderer.component.ts'
           ];
+      } else if (props.framework === 'vue') {
+        codeExample = codesandboxFiles['src/components/ChartRenderer.vue'];
       }
 
       return {
@@ -181,21 +201,21 @@ class ChartContainer extends Component<any, any> {
     const chartLibrariesMenu =
       (chartLibraries[framework] || []).length > 0 ? (
         <Menu
+          data-testid="charting-library-dropdown"
           onClick={(e) => {
             playgroundAction('Set Chart Library', { chartingLibrary: e.key });
             setChartLibrary(e.key);
           }}
         >
           {(chartLibraries[framework] || []).map((library) => (
-            <Menu.Item key={library.value}>
-              {library.title}
-            </Menu.Item>
+            <Menu.Item key={library.value}>{library.title}</Menu.Item>
           ))}
         </Menu>
       ) : null;
 
     const frameworkMenu = (
       <Menu
+        data-testid="framework-dropdown"
         onClick={(e) => {
           if (e.key === framework) {
             return;
@@ -230,7 +250,7 @@ class ChartContainer extends Component<any, any> {
         <SectionRow>
           <Button.Group>
             <Dropdown overlay={frameworkMenu} disabled={isFetchingMeta}>
-              <Button size="small">
+              <Button data-testid="framework-btn" size="small">
                 {frameworkItem?.title}
                 <DownOutlined />
               </Button>
@@ -241,7 +261,7 @@ class ChartContainer extends Component<any, any> {
                 overlay={chartLibrariesMenu}
                 disabled={!frameworkItem?.supported || isFetchingMeta}
               >
-                <Button size="small">
+                <Button data-testid="charting-library-btn" size="small">
                   {currentLibraryItem?.title}
                   <DownOutlined />
                 </Button>
@@ -251,88 +271,95 @@ class ChartContainer extends Component<any, any> {
 
           <Button.Group>
             <Button
+              data-testid="chart-btn"
+              size="small"
+              type={!showCode ? 'primary' : 'default'}
+              disabled={!frameworkItem?.supported || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Chart');
                 this.setState({
                   showCode: null,
                 });
               }}
-              size="small"
-              type={!showCode ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
             >
               Chart
             </Button>
 
             <Button
+              data-testid="json-query-btn"
+              icon={<ThunderboltOutlined />}
+              size="small"
+              type={showCode === 'query' ? 'primary' : 'default'}
+              disabled={!frameworkItem?.supported || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Query');
                 this.setState({
                   showCode: 'query',
                 });
               }}
-              icon={<ThunderboltOutlined />}
-              size="small"
-              type={showCode === 'query' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
             >
               JSON Query
             </Button>
 
             <Button
-              onClick={() => {
-                playgroundAction('Show Code');
-                this.setState({ showCode: 'code' });
-              }}
+              data-testid="code-btn"
               icon={<CodeOutlined />}
               size="small"
               type={showCode === 'code' ? 'primary' : 'default'}
               disabled={!frameworkItem?.supported || isFetchingMeta}
+              onClick={() => {
+                playgroundAction('Show Code');
+                this.setState({ showCode: 'code' });
+              }}
             >
               Code
             </Button>
 
             <Button
-              onClick={() => {
-                playgroundAction('Show SQL');
-                this.setState({ showCode: 'sql' });
-              }}
+              data-testid="sql-btn"
               icon={<QuestionCircleOutlined />}
               size="small"
               type={showCode === 'sql' ? 'primary' : 'default'}
               disabled={!frameworkItem?.supported || isFetchingMeta}
+              onClick={() => {
+                playgroundAction('Show SQL');
+                this.setState({ showCode: 'sql' });
+              }}
             >
               SQL
             </Button>
 
             <Button
+              data-testid="cache-btn"
+              icon={<SyncOutlined />}
+              size="small"
+              type={showCode === 'cache' ? 'primary' : 'default'}
+              disabled={!frameworkItem?.supported || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Cache');
                 this.setState({
                   showCode: 'cache',
                 });
               }}
-              icon={<SyncOutlined />}
-              size="small"
-              type={showCode === 'cache' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
             >
               Cache
             </Button>
           </Button.Group>
 
           <Button
+            data-testid="edit-btn"
             icon={<CodeSandboxOutlined />}
             size="small"
-            onClick={() => playgroundAction('Open Code Sandbox')}
             htmlType="submit"
             disabled={!frameworkItem?.supported || isFetchingMeta}
+            onClick={() => playgroundAction('Open Code Sandbox')}
           >
             Edit
           </Button>
 
           {dashboardSource && (
             <Button
+              data-testid="add-to-dashboard-btn"
               onClick={async () => {
                 this.setState({ addingToDashboard: true });
                 const canAddChart = await dashboardSource.canAddChart();
@@ -416,7 +443,7 @@ class ChartContainer extends Component<any, any> {
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
               return (
-                <PrismCode code={query && sqlFormatter.format(query.sql())} />
+                <PrismCode code={query && format(query.sql())} />
               );
             }}
           />
@@ -434,6 +461,7 @@ class ChartContainer extends Component<any, any> {
         <SectionRow>
           <div>Query</div>
           <Button
+            data-testid="copy-code-btn"
             icon={<CopyOutlined />}
             size="small"
             onClick={async () => {
@@ -451,6 +479,7 @@ class ChartContainer extends Component<any, any> {
         <SectionRow>
           <div>Query</div>
           <Button
+            data-testid="copy-cube-query-btn"
             icon={<CopyOutlined />}
             size="small"
             onClick={async () => {

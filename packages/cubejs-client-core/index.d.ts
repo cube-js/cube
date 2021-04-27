@@ -8,8 +8,6 @@
  */
 
 declare module '@cubejs-client/core' {
-  import type { ChartType } from '@cubejs-client/react';
-
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -24,18 +22,24 @@ declare module '@cubejs-client/core' {
      */
     headers?: Record<string, string>;
     credentials?: 'omit' | 'same-origin' | 'include';
-    method?: 'GET' | 'PUT' | 'POST' | 'PATCH'
+    method?: 'GET' | 'PUT' | 'POST' | 'PATCH';
   };
 
-  export interface ITransport {
-    request(method: string, params: Record<string, unknown>): () => Promise<void>;
+  export interface ITransportResponse<R> {
+    subscribe: <CBResult>(cb: (result: R, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
+    // Optional, supported in WebSocketTransport
+    unsubscribe?: () => Promise<void>;
+  }
+
+  export interface ITransport<R> {
+    request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
   }
 
   /**
    * Default transport implementation.
    * @order 3
    */
-  export class HttpTransport implements ITransport {
+  export class HttpTransport implements ITransport<ResultSet> {
     /**
      * @hidden
      */
@@ -56,8 +60,10 @@ declare module '@cubejs-client/core' {
      * @hidden
      */
     protected credentials: TransportOptions['credentials'];
+
     constructor(options: TransportOptions);
-    request(method: string, params: any): () => Promise<any>;
+
+    public request(method: string, params: any): ITransportResponse<ResultSet>;
   }
 
   export type CubeJSApiOptions = {
@@ -68,7 +74,7 @@ declare module '@cubejs-client/core' {
     /**
      * Transport implementation to use. [HttpTransport](#http-transport) will be used by default.
      */
-    transport?: ITransport;
+    transport?: ITransport<any>;
     headers?: Record<string, string>;
     pollInterval?: number;
     credentials?: 'omit' | 'same-origin' | 'include';
@@ -254,7 +260,7 @@ declare module '@cubejs-client/core' {
   };
 
   export type SerializedResult<T = any> = {
-    loadResponse: LoadResponse<T>
+    loadResponse: LoadResponse<T>;
   };
 
   /**
@@ -668,6 +674,8 @@ declare module '@cubejs-client/core' {
      * @returns An array of columns
      */
     tableColumns(pivotConfig?: PivotConfig): TableColumn[];
+    totalRow(pivotConfig?: PivotConfig): ChartPivotRow;
+    categories(pivotConfig?: PivotConfig): ChartPivotRow[];
 
     tableRow(): ChartPivotRow;
     query(): Query;
@@ -719,12 +727,12 @@ declare module '@cubejs-client/core' {
   type TimeDimensionComparisonFields = {
     compareDateRange: Array<DateRange>;
     dateRange?: never;
-  }
+  };
   export type TimeDimensionComparison = TimeDimensionBase & TimeDimensionComparisonFields;
 
   type TimeDimensionRangedFields = {
     dateRange?: DateRange;
-  }
+  };
   export type TimeDimensionRanged = TimeDimensionBase & TimeDimensionRangedFields;
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
@@ -772,8 +780,8 @@ declare module '@cubejs-client/core' {
   type TOrderMember = {
     id: string;
     title: string;
-    order: QueryOrder | 'none'
-  }
+    order: QueryOrder | 'none';
+  };
 
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
@@ -963,6 +971,8 @@ declare module '@cubejs-client/core' {
    */
   export type TSourceAxis = 'x' | 'y';
 
+  export type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
+
   export type TDefaultHeuristicsOptions = {
     meta: Meta;
     sessionGranularity?: TimeDimensionGranularity;
@@ -972,11 +982,16 @@ declare module '@cubejs-client/core' {
     shouldApplyHeuristicOrder: boolean;
     pivotConfig: PivotConfig | null;
     query: Query;
-    chartType?: ChartType
+    chartType?: ChartType;
+  };
+
+  export type TDefaultHeuristicsState = {
+    query: Query;
+    chartType?: ChartType;
   };
 
   export function defaultHeuristics(
-    newQuery: Query,
+    newState: TDefaultHeuristicsState,
     oldQuery: Query,
     options: TDefaultHeuristicsOptions
   ): TDefaultHeuristicsResponse;
@@ -1028,6 +1043,8 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function getQueryMembers(query: Query): string[];
+
+  export function areQueriesEqual(query1: Query | null, query2: Query | null): boolean;
 
   export type ProgressResponse = {
     stage: string;

@@ -32,12 +32,12 @@ CUBEJS_DEV_MODE=false
 Cube.js requires [Redis](https://redis.io/), an in-memory data structure store,
 to run in production.
 
-It uses Redis for query caching and queue. Set the `REDIS_URL` environment
-variable to allow Cube.js to connect to Redis. If your Redis instance also has a
-password, please set it via the `REDIS_PASSWORD` environment variable. Set the
-`REDIS_TLS` environment variable to `true` if you want to enable SSL-secured
-connections. Ensure your Redis cluster allows at least 15 concurrent
-connections.
+It uses Redis for query caching and queue. Set the `CUBEJS_REDIS_URL`
+environment variable to allow Cube.js to connect to Redis. If your Redis
+instance also has a password, please set it via the `CUBEJS_REDIS_PASSWORD`
+environment variable. Set the `CUBEJS_REDIS_TLS` environment variable to `true`
+if you want to enable SSL-secured connections. Ensure your Redis cluster allows
+at least 15 concurrent connections.
 
 ### Redis Sentinel
 
@@ -64,8 +64,8 @@ to connect to the Redis Sentinel.
 
 ### Redis Pool
 
-If `REDIS_URL` is provided Cube.js, will create a Redis connection pool with a
-minimum of 2 and maximum of 1000 concurrent connections, by default. The
+If `CUBEJS_REDIS_URL` is provided Cube.js, will create a Redis connection pool
+with a minimum of 2 and maximum of 1000 concurrent connections, by default. The
 `CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be
 used to tweak pool size limits. To disable connection pooling, and instead
 create connections on-demand, you can set `CUBEJS_REDIS_POOL_MAX` to 0.
@@ -91,10 +91,13 @@ If you want to run Cube.js in production without Redis, you can use
 
 ## Set up Pre-aggregations Storage
 
-If you are using [external pre-aggregations][link-pre-aggregations], you need to
-set up and configure external pre-aggregations storage.
+Follow the [instructions here][ref-caching-cubestore] to set up Cube Store. If
+you are using another [external database][ref-pre-aggregations], you'll need to
+configure it.
 
-[link-pre-aggregations]: /pre-aggregations#external-pre-aggregations
+[ref-caching-cubestore]:
+  /caching/using-pre-aggregations#running-cube-store-in-production
+[ref-pre-aggregations]: /pre-aggregations#external-pre-aggregations
 
 By default, Cube.js will use `prod_pre_aggregations` as the schema name for
 storing pre-aggregations. This behavior can be modified by the

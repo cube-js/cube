@@ -107,6 +107,11 @@ class CubejsApi {
         await checkMutex();
         return continueWait(true);
       }
+
+      if (response.status < 200 || response.status > 299) {
+        throw new Error(`Request error. Response status: ${response.status}`);
+      }
+
       const body = await response.json();
       if (body.error === 'Continue wait') {
         await checkMutex();
@@ -228,6 +233,7 @@ export default (apiToken, options) => new CubejsApi(apiToken, options);
 
 export { HttpTransport, ResultSet };
 export {
+  areQueriesEqual,
   defaultHeuristics,
   movePivotItem,
   isQueryPresent,

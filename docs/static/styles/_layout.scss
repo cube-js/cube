@@ -952,6 +952,10 @@ section[type=h2] h2 {
       transition: color .3s, background .3s, border .3s, box-shadow .3s;
       min-width: 80px;
       text-align: center;
+
+      &:focus-within {
+        outline: none !important;
+      }
     }
 
     .ant-radio-button-wrapper-checked {

@@ -72,25 +72,27 @@ export class QueryOrchestrator {
   }
 
   public async fetchQuery(queryBody: any) {
-    return this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody)
-      .then(async preAggregationsTablesToTempTables => {
-        const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
-        if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
-          throw new Error('No pre-aggregation exists for that query');
-        }
-        if (!queryBody.query) {
-          return {
-            usedPreAggregations
-          };
-        }
-        const result = await this.queryCache.cachedQueryResult(
-          queryBody, preAggregationsTablesToTempTables
-        );
-        return {
-          ...result,
-          usedPreAggregations
-        };
-      });
+    const preAggregationsTablesToTempTables = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+
+    const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
+    if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
+      throw new Error('No pre-aggregation exists for that query');
+    }
+
+    if (!queryBody.query) {
+      return {
+        usedPreAggregations
+      };
+    }
+
+    const result = await this.queryCache.cachedQueryResult(
+      queryBody, preAggregationsTablesToTempTables
+    );
+
+    return {
+      ...result,
+      usedPreAggregations
+    };
   }
 
   public async loadRefreshKeys(query) {

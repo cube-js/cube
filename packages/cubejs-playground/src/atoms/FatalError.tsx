@@ -1,7 +1,7 @@
 import { Space, Typography } from 'antd';
 import styled from 'styled-components';
 
-import Alert from './Alert';
+import { Alert } from './Alert';
 
 const { Text, Paragraph } = Typography;
 
@@ -10,7 +10,11 @@ const Code = styled.pre`
   font-size: 13px;
 `;
 
-export default function FatalError({ error }) {
+type TFatalErrorProps = {
+  error: Error
+}
+
+export function FatalError({ error }: TFatalErrorProps) {
   return (
     <Space direction="vertical">
       <Text strong style={{ fontSize: 18 }}>Error 😢</Text>

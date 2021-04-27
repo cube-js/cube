@@ -81,6 +81,7 @@ export async function track(opts: BaseEvent) {
     id: crypto.randomBytes(16).toString('hex'),
     clientTimestamp: new Date().toJSON(),
     platform: process.platform,
+    arch: process.arch,
     nodeVersion: process.version,
     anonymousId,
   });

@@ -8,7 +8,7 @@ import isDocker from 'is-docker';
 import { ApiGateway } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
-  createCancelableInterval, formatDuration,
+  createCancelableInterval, displayCLIWarning, formatDuration,
   getAnonymousId,
   getEnv,
   internalExceptions, isDockerImage, requireFromPackage,
@@ -17,6 +17,7 @@ import {
 
 import type { Application as ExpressApplication } from 'express';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import type { Constructor } from '@cubejs-backend/shared';
 import type { CubeStoreDevDriver, CubeStoreHandler, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
 import type {
   ContextToAppIdFn,
@@ -137,18 +138,6 @@ export class CubejsServerCore {
   public constructor(opts: CreateOptions = {}) {
     this.options = this.handleConfiguration(opts);
 
-    if (
-      !this.options.devServer || (this.options.devServer && this.configFileExists())
-    ) {
-      if (
-        !this.options.driverFactory ||
-        !this.options.apiSecret ||
-        !this.options.dbType
-      ) {
-        throw new Error('driverFactory, apiSecret, dbType are required options');
-      }
-    }
-
     this.logger = this.options.logger;
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
@@ -188,7 +177,7 @@ export class CubejsServerCore {
     );
     if (scheduledRefreshTimer) {
       this.scheduledRefreshTimerInterval = createCancelableInterval(
-        this.handleScheduledRefreshInterval,
+        () => this.handleScheduledRefreshInterval({}),
         {
           interval: scheduledRefreshTimer,
           onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
@@ -289,15 +278,26 @@ export class CubejsServerCore {
     }
   }
 
+  private requireCubeStoreDriver = () => requireFromPackage<{
+    isCubeStoreSupported: typeof isCubeStoreSupported,
+    CubeStoreHandler: typeof CubeStoreHandler,
+    CubeStoreDevDriver: typeof CubeStoreDevDriver,
+  }>('@cubejs-backend/cubestore-driver', {
+    relative: isDockerImage(),
+    silent: true,
+  });
+
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     optionsValidate(opts);
 
     const dbType = opts.dbType || <DatabaseType|undefined>process.env.CUBEJS_DB_TYPE;
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
     const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
-    const logger: LoggerFn = opts.logger || process.env.NODE_ENV !== 'production'
-      ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-      : prodLogger(process.env.CUBEJS_LOG_LEVEL);
+    const logger: LoggerFn = opts.logger || (
+      process.env.NODE_ENV !== 'production'
+        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
+        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
+    );
 
     let externalDriverFactory = externalDbType && (
       () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
@@ -314,14 +314,7 @@ export class CubejsServerCore {
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
 
     if (!externalDbType && getEnv('devMode')) {
-      const cubeStorePackage = requireFromPackage<{
-        isCubeStoreSupported: typeof isCubeStoreSupported,
-        CubeStoreHandler: typeof CubeStoreHandler,
-        CubeStoreDevDriver: typeof CubeStoreDevDriver,
-      }>('@cubejs-backend/cubestore-driver', {
-        relative: isDockerImage(),
-        silent: true,
-      });
+      const cubeStorePackage = this.requireCubeStoreDriver();
       if (cubeStorePackage) {
         if (cubeStorePackage.isCubeStoreSupported()) {
           console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
@@ -341,6 +334,13 @@ export class CubejsServerCore {
           // Lazy loading for Cube Store
           externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
           externalDialectFactory = () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
+        } else {
+          logger('Cube Store is not supported on your system', {
+            warning: (
+              `You are using ${process.platform} platform with ${process.arch} architecture, ` +
+              'which is not supported by Cube Store.'
+            ),
+          });
         }
       }
     }
@@ -370,9 +370,10 @@ export class CubejsServerCore {
       logger,
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
       sqlCache: true,
+      livePreview: getEnv('livePreview'),
       ...opts,
       jwt: {
-        key: getEnv('jwkKey'),
+        key: getEnv('jwtKey'),
         algorithms: getEnv('jwtAlgorithms'),
         issuer: getEnv('jwtIssuer'),
         audience: getEnv('jwtAudience'),
@@ -391,6 +392,35 @@ export class CubejsServerCore {
           'https://cube.dev/docs/config#options-reference-scheduled-refresh-contexts'
         ),
       });
+    }
+
+    if (options.devServer && !options.apiSecret) {
+      options.apiSecret = crypto.randomBytes(16).toString('hex');
+
+      displayCLIWarning(
+        `Option apiSecret is required in dev mode. Cube.js has generated it as ${options.apiSecret}`
+      );
+    }
+
+    if (
+      !options.devServer || (options.devServer && this.configFileExists())
+    ) {
+      const fieldsForValidation: (keyof ServerCoreInitializedOptions)[] = [
+        'driverFactory',
+        'dbType'
+      ];
+
+      if (!options.jwt?.jwkUrl) {
+        // apiSecret is required only for auth by JWT, for JWK it's not needed
+        fieldsForValidation.push('apiSecret');
+      }
+
+      const invalidFields = fieldsForValidation.filter((field) => options[field] === undefined);
+      if (invalidFields.length) {
+        throw new Error(
+          `${invalidFields.join(', ')} ${invalidFields.length === 1 ? 'is' : 'are'} required option(s)`
+        );
+      }
     }
 
     return options;
@@ -518,43 +548,74 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
-  public getOrchestratorApi(context: DriverContext): OrchestratorApi {
+  public getOrchestratorApi(context: RequestContext): OrchestratorApi {
     const orchestratorId = this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
       return this.orchestratorStorage.get(orchestratorId);
     }
 
-    const driverPromise = {};
-    let externalPreAggregationsDriverPromise;
+    const driverPromise: Record<string, Promise<BaseDriver>> = {};
+    let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
 
     const orchestratorApi = this.createOrchestratorApi({
-      getDriver: async (dataSource) => {
-        if (!driverPromise[dataSource || 'default']) {
-          orchestratorApi.addDataSeenSource(dataSource);
-          const driver = await this.options.driverFactory({ ...context, dataSource });
-          if (driver.setLogger) {
-            driver.setLogger(this.logger);
-          }
-          driverPromise[dataSource || 'default'] = driver.testConnection().then(() => driver).catch(e => {
-            driverPromise[dataSource || 'default'] = null;
-            throw e;
-          });
+      getDriver: async (dataSource = 'default') => {
+        if (driverPromise[dataSource]) {
+          return driverPromise[dataSource];
         }
-        return driverPromise[dataSource || 'default'];
+
+        // eslint-disable-next-line no-return-assign
+        return driverPromise[dataSource] = (async () => {
+          let driver: BaseDriver|null = null;
+
+          try {
+            driver = await this.options.driverFactory({ ...context, dataSource });
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
+
+            await driver.testConnection();
+
+            return driver;
+          } catch (e) {
+            driverPromise[dataSource] = null;
+
+            if (driver) {
+              await driver.release();
+            }
+
+            throw e;
+          }
+        })();
       },
       getExternalDriverFactory: this.options.externalDriverFactory && (async () => {
-        if (!externalPreAggregationsDriverPromise) {
-          const driver = await this.options.externalDriverFactory(context);
-          if (driver.setLogger) {
-            driver.setLogger(this.logger);
-          }
-          externalPreAggregationsDriverPromise = driver.testConnection().then(() => driver).catch(e => {
-            externalPreAggregationsDriverPromise = null;
-            throw e;
-          });
+        if (externalPreAggregationsDriverPromise) {
+          return externalPreAggregationsDriverPromise;
         }
-        return externalPreAggregationsDriverPromise;
+
+        // eslint-disable-next-line no-return-assign
+        return externalPreAggregationsDriverPromise = (async () => {
+          let driver: BaseDriver|null = null;
+
+          try {
+            driver = await this.options.externalDriverFactory(context);
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
+
+            await driver.testConnection();
+
+            return driver;
+          } catch (e) {
+            externalPreAggregationsDriverPromise = null;
+
+            if (driver) {
+              await driver.release();
+            }
+
+            throw e;
+          }
+        })();
       }),
       redisPrefix: orchestratorId,
       orchestratorOptions: this.orchestratorOptions(context)
@@ -593,7 +654,7 @@ export class CubejsServerCore {
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public handleScheduledRefreshInterval = async () => {
+  public handleScheduledRefreshInterval = async (options) => {
     const contexts = await this.options.scheduledRefreshContexts();
     if (contexts.length < 1) {
       this.logger('Refresh Scheduler Error', {
@@ -602,13 +663,13 @@ export class CubejsServerCore {
     }
 
     return Promise.all(contexts.map(async context => {
-      const queryingOptions: any = { concurrency: this.options.scheduledRefreshConcurrency };
+      const queryingOptions: any = { ...options, concurrency: this.options.scheduledRefreshConcurrency };
 
       if (this.options.scheduledRefreshTimeZones) {
         queryingOptions.timezones = this.options.scheduledRefreshTimeZones;
       }
 
-      await this.runScheduledRefresh(context, queryingOptions);
+      return this.runScheduledRefresh(context, queryingOptions);
     }));
   };
 
@@ -667,20 +728,13 @@ export class CubejsServerCore {
     return this.driver;
   }
 
-  public static createDriver(dbType: DatabaseType) {
+  public static createDriver(dbType: DatabaseType): BaseDriver {
     checkEnvForPlaceholders();
 
-    const module = CubejsServerCore.lookupDriverClass(dbType);
-    if (module.default) {
-      // eslint-disable-next-line new-cap
-      return new module.default();
-    }
-
-    // eslint-disable-next-line new-cap
-    return new module();
+    return new (CubejsServerCore.lookupDriverClass(dbType))();
   }
 
-  protected static lookupDriverClass(dbType) {
+  protected static lookupDriverClass(dbType): Constructor<BaseDriver> & { dialectClass?: () => any; } {
     // eslint-disable-next-line global-require,import/no-dynamic-require
     const module = require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
     if (module.default) {

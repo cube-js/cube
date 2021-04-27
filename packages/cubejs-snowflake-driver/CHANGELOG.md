@@ -3,6 +3,140 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+
+### Bug Fixes
+
+* **snowflake:** pre-aggregations & add support for number/timestamp_ntz -> generic type ([d66bac8](https://github.com/cube-js/cube.js/commit/d66bac82f5b61e33265b4bb257f3a58640dfa983))
+
+
+
+
+
+## [0.26.101](https://github.com/cube-js/cube.js/compare/v0.26.100...v0.26.101) (2021-04-20)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.99](https://github.com/cube-js/cube.js/compare/v0.26.98...v0.26.99) (2021-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.88](https://github.com/cube-js/cube.js/compare/v0.26.87...v0.26.88) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.78](https://github.com/cube-js/cube.js/compare/v0.26.77...v0.26.78) (2021-04-05)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Cube.js doesn't see pre-aggregations ([c9279bf](https://github.com/cube-js/cube.js/commit/c9279bfcb04230684676d1db87c18ebdc6a0f9d2)), closes [#2487](https://github.com/cube-js/cube.js/issues/2487)
+
+
+
+
+
+## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.76](https://github.com/cube-js/cube.js/compare/v0.26.75...v0.26.76) (2021-04-03)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
 ## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

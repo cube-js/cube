@@ -2,10 +2,19 @@
   "extends": "./tsconfig.base.json",
   "references": [
     {
-      "path": "packages/cubejs-testing"
+      "path": "packages/cubejs-templates"
     },
     {
       "path": "packages/cubejs-backend-shared"
+    },
+    {
+      "path": "packages/cubejs-testing"
+    },
+    {
+      "path": "packages/cubejs-backend-cloud"
+    },
+    {
+      "path": "packages/cubejs-backend-maven"
     },
     {
       "path": "packages/cubejs-api-gateway"
@@ -18,6 +27,12 @@
     },
     {
       "path": "packages/cubejs-druid-driver"
+    },
+    {
+      "path": "packages/cubejs-jdbc-driver"
+    },
+    {
+      "path": "packages/cubejs-databricks-jdbc-driver"
     },
     {
       "path": "rust/"

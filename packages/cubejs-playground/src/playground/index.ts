@@ -1,3 +1,6 @@
 import './index.less';
 
-export { default as QueryBuilder } from './components/QueryBuilder';
+export * from './components/QueryBuilder';
+export * from '../components/SecurityContext/SecurityContextProvider';
+export * from '../components/LivePreviewContext/LivePreviewContextProvider';
+export * from '../hooks';

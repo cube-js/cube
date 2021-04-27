@@ -3,6 +3,7 @@ import Chart from 'chart.js';
 import VueChartkick from 'vue-chartkick';
 import VueRouter from 'vue-router';
 import VueApollo from 'vue-apollo';
+import cubejs from '@cubejs-client/core';
 
 import App from './App.vue';
 import vuetify from './plugins/vuetify';
@@ -16,7 +17,6 @@ const apolloProvider = new VueApollo({
   defaultClient: apolloClient
 });
 
-import cubejs from '@cubejs-client/core';
 const API_URL = 'https://ecom.cubecloudapp.dev';
 const CUBEJS_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjY4OTR9.0fdi5cuDZ2t3OSrPOMoc3B1_pwhnWj4ZmM3FHEX7Aus';

@@ -313,7 +313,7 @@ Keep-Alive: timeout=5
 
 Failure example response:
 ```bash
-HTTP/1.1 200 OK
+HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express
 Access-Control-Allow-Origin: *
 Content-Type: application/json; charset=utf-8
@@ -351,7 +351,7 @@ Keep-Alive: timeout=5
 
 Failure example response:
 ```bash
-HTTP/1.1 200 OK
+HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express
 Access-Control-Allow-Origin: *
 Content-Type: application/json; charset=utf-8

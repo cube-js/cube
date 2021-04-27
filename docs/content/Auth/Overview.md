@@ -13,7 +13,7 @@ Cube.js:
   style="text-align: center"
 >
   <img
-  src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/authentication-overview.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/authentication-overview.png"
   style="border: none"
   width="80%"
   />
@@ -149,7 +149,7 @@ Add the following to your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    key: '<JWKS_AS_STRING>',
+    key: '<JWK_AS_STRING>',
   },
 };
 ```
@@ -157,7 +157,7 @@ module.exports = {
 Or configure the same using environment variables:
 
 ```dotenv
-CUBEJS_JWK_KEY='<JWKS_AS_STRING>'
+CUBEJS_JWT_KEY='<JWK_AS_STRING>'
 ```
 
 #### Using a key from a URL
@@ -220,6 +220,18 @@ module.exports = {
   },
 };
 ```
+
+### Caching
+
+Cube.js caches JWKS by default when [`CUBEJS_JWK_URL` or `jwt.jwkUrl` is
+specified](##using-json-web-key-sets-jwks-configuration).
+
+- If the response contains a `Cache-Control` header, then Cube.js uses it to
+  determine cache expiry.
+- The keys inside the JWKS are checked for expiry values and used for cache
+  expiry.
+- If an inbound request supplies a JWT referencing a key not found in the cache,
+  the cache is refreshed.
 
 ## Custom authentication
 

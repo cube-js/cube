@@ -16,6 +16,11 @@ const MySqlToGenericType = {
   mediumint: 'int',
   smallint: 'int',
   bigint: 'int',
+  tinyint: 'int',
+  'mediumint unsigned': 'int',
+  'smallint unsigned': 'int',
+  'bigint unsigned': 'int',
+  'tinyint unsigned': 'int',
 };
 
 class MySqlDriver extends BaseDriver {
@@ -154,7 +159,7 @@ class MySqlDriver extends BaseDriver {
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }
 
-  async downloadQueryResults(query, values) {
+  async downloadQueryResults(query, values, options) {
     if (!this.config.database) {
       throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
     }
@@ -168,6 +173,21 @@ class MySqlDriver extends BaseDriver {
     });
 
     const types = columns.map(c => ({ name: c.Field, type: this.toGenericType(c.Type) }));
+
+    if ((options || {}).streamImport) {
+      // TODO use pool once figure out how to close stream gracefully and recover from errors
+      // eslint-disable-next-line no-underscore-dangle
+      const conn = await this.pool._factory.create();
+      await this.setTimeZone(conn);
+      return {
+        rowStream: conn.query(query, values).stream(),
+        types,
+        release: async () => {
+          // eslint-disable-next-line no-underscore-dangle
+          await this.pool._factory.destroy(conn);
+        }
+      };
+    }
 
     return {
       rows: await this.query(query, values),

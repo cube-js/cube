@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.26.60",
+  "version": "0.27.0",
   "engines": {},
   "repository": {
     "type": "git",
@@ -10,10 +10,29 @@
   },
   "module": "lib/cubejs-playground.esm.js",
   "types": "lib/playground/index.d.ts",
+  "scripts": {
+    "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
+    "watch": "rollup -c -w",
+    "build": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && rollup -c"
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ],
+  "files": [
+    "public",
+    "build",
+    "lib"
+  ],
+  "homepage": ".",
+  "proxy": "http://localhost:4000",
+  "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.26.60",
-    "@cubejs-client/react": "^0.26.60",
+    "@cubejs-client/core": "^0.27.0",
+    "@cubejs-client/react": "^0.27.0",
     "codesandbox-import-utils": "^2.1.1",
     "component-cookie": "^1.1.4",
     "customize-cra": "^1.0.0",
@@ -28,41 +47,16 @@
     "react-beautiful-dnd": "^13.0.0",
     "react-chartjs-2": "^2.7.4",
     "react-helmet": "^6.1.0",
+    "react-hotkeys-hook": "^3.3.0",
     "react-is": "^16.8.4",
     "react-responsive": "^8.0.1",
     "react-router": "^5.1.2",
     "react-router-dom": "^5.1.2",
     "react-scripts": "4.0.1",
     "react-source-render": "4.0.0-1",
-    "sql-formatter": "^2.3.2",
+    "sql-formatter": "^4.0.2",
     "uuid": "^3.3.3",
     "whatwg-fetch": "^3.0.0"
-  },
-  "scripts": {
-    "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
-    "watch": "rollup -c -w",
-    "tsc": "rm -rf dist && tsc --noEmit false --outDir dist",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/ && npm run tsc && rollup -c"
-  },
-  "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not ie <= 11",
-    "not op_mini all"
-  ],
-  "files": [
-    "public",
-    "build",
-    "dist",
-    "lib"
-  ],
-  "homepage": ".",
-  "proxy": "http://localhost:4000",
-  "license": "MIT",
-  "peerDependencies": {
-    "antd": "^4.13.0",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1"
   },
   "devDependencies": {
     "@ant-design/compatible": "^1.0.2",
@@ -90,5 +84,11 @@
     "rollup-plugin-typescript2": "^0.30.0",
     "styled-components": "5.2.0",
     "terser-webpack-plugin": "^4.1.0"
+  },
+  "peerDependencies": {
+    "antd": ">=4.13.0",
+    "react": ">=17.0.1",
+    "react-dom": ">=17.0.1",
+    "styled-components": ">=5.2.0"
   }
 }

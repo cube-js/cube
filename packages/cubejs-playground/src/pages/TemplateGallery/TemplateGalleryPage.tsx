@@ -7,10 +7,9 @@ import '@ant-design/compatible/assets/index.css';
 
 import DashboardSource from '../../DashboardSource';
 import { frameworks } from '../../ChartContainer';
-import { Button, Card } from '../../components';
 import CreateOwnModal from './CreateOwnModal';
 import { frameworkChartLibraries } from '../../PlaygroundQueryBuilder';
-import { CubeLoader } from '../../atoms';
+import { Button, Card, CubeLoader } from '../../atoms';
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>
@@ -28,7 +27,11 @@ const Image = styled.div<any>`
   background-image: ${(props) => `url("${props.src}")`};
 `;
 
-const RecipeCard: any = styled<any>(Card)`
+type TRecipeCardProps = {
+  createYourOwn?: boolean;
+}
+
+const RecipeCard = styled(Card)<TRecipeCardProps>`
   && {
     border: none;
     border-radius: 8px;
@@ -262,12 +265,18 @@ class TemplateGalleryPage extends Component<any, any> {
                 ].concat(
                   enableWebSocketTransport ? ['react-web-socket-transport'] : []
                 );
-              } else {
+              } else if (framework.toLowerCase() === 'angular') {
                 templatePackages = [
                   'create-ng-app',
                   templatePackageName,
-                  `ng2-charts`,
+                  'ng2-charts',
                   'ng-credentials',
+                ];
+              } else {
+                templatePackages = [
+                  'create-vue-app',
+                  templatePackageName,
+                  'vue-chartkick-charts',
                 ];
               }
 
@@ -277,24 +286,25 @@ class TemplateGalleryPage extends Component<any, any> {
               history.push('/dashboard');
             }}
             onCancel={() => this.setState({ createOwnModalVisible: false })}
-            onChange={(key, value) => {
+            onChange={(key, value: string) => {
               if (key === 'framework' && framework !== value) {
+                const packages = this.dashboardSource?.templatePackages(value) || [];
+
                 this.setState({
-                  templatePackageName: 'ng-material-dynamic',
+                  templatePackageName: packages[0]?.name,
                   chartLibrary:
-                    frameworkChartLibraries[value.toLowerCase()][0].value,
+                    frameworkChartLibraries[value.toLowerCase()]?.[0].value,
                 });
               }
               this.setState({ [key]: value });
             }}
             chartLibraries={frameworkChartLibraries[framework]}
             currentLibraryItem={currentLibraryItem}
-            frameworks={frameworks}
+            frameworks={frameworks.filter((currentFramework) => currentFramework.id !== 'vanilla')}
             framework={framework}
             frameworkItem={frameworkItem}
             templatePackages={
-              this.dashboardSource &&
-              this.dashboardSource.templatePackages(framework)
+              this.dashboardSource?.templatePackages(framework) || []
             }
             templatePackage={templatePackage}
             enableWebSocketTransport={

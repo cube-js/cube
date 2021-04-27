@@ -10,7 +10,7 @@ export default function OrderGroup({ orderMembers, onOrderChange, onReorder }) {
     >
       <Droppable droppableId="droppable">
         {(provided) => (
-          <div ref={provided.innerRef} {...provided.droppableProps}>
+          <div data-testid="order-popover" ref={provided.innerRef} {...provided.droppableProps}>
             {orderMembers.map(({ id, title, order }, index) => (
               <DraggableItem
                 key={id}

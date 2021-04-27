@@ -108,10 +108,14 @@ export class RefreshScheduler {
 
     try {
       const compilerApi = this.serverCore.getCompilerApi(context);
-      await Promise.all([
-        this.refreshCubesRefreshKey(context, compilerApi, restOptions),
-        this.refreshPreAggregations(context, compilerApi, restOptions)
-      ]);
+      if (queryingOptions.preAggregationsWarmup) {
+        await this.refreshPreAggregations(context, compilerApi, restOptions);
+      } else {
+        await Promise.all([
+          this.refreshCubesRefreshKey(context, compilerApi, restOptions),
+          this.refreshPreAggregations(context, compilerApi, restOptions)
+        ]);
+      }
       return {
         finished: true
       };
@@ -130,7 +134,7 @@ export class RefreshScheduler {
     return { finished: false };
   }
 
-  protected async refreshCubesRefreshKey(context, compilerApi: CompilerApi, queryingOptions) {
+  protected async refreshCubesRefreshKey(context: RequestContext, compilerApi: CompilerApi, queryingOptions) {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
@@ -157,6 +161,7 @@ export class RefreshScheduler {
         const orchestratorApi = this.serverCore.getOrchestratorApi(context);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
+          sql: null,
           preAggregations: [],
           continueWait: true,
           renewQuery: true,
@@ -169,12 +174,13 @@ export class RefreshScheduler {
   }
 
   protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions) {
-    const { timezones } = queryingOptions;
+    const { timezones, preAggregationsWarmup } = queryingOptions;
     const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
 
-    let preAggregationCursor = null;
+    let preAggregationCursor = 0;
     let timezoneCursor = 0;
     let partitionCursor = 0;
+    let partitionCounter = 0;
 
     const queriesCache = {};
     const finishedPartitions = {};
@@ -195,7 +201,7 @@ export class RefreshScheduler {
     };
 
     const advance = async () => {
-      preAggregationCursor = preAggregationCursor != null ? preAggregationCursor + 1 : 0;
+      preAggregationCursor += 1;
       if (preAggregationCursor >= scheduledPreAggregations.length) {
         preAggregationCursor = 0;
         timezoneCursor += 1;
@@ -208,60 +214,78 @@ export class RefreshScheduler {
 
       const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
       if (partitionCursor < queries.length) {
-        const queryCursor = queries.length - 1 - partitionCursor;
-        const query = queries[queryCursor];
-        const sqlQuery = await compilerApi.getSql(query);
-        return {
-          ...sqlQuery,
-          preAggregations: sqlQuery.preAggregations.map(
-            (p) => ({ ...p, priority: queryCursor - queries.length })
-          ),
-          continueWait: true,
-          renewQuery: true,
-          requestId: context.requestId,
-          timezone: timezones[timezoneCursor],
-          scheduledRefresh: true,
-        };
+        partitionCounter += 1;
+        return true;
       } else {
         finishedPartitions[`${preAggregationCursor}_${timezoneCursor}`] = true;
-        return null;
+        return false;
       }
     };
 
     return {
-      next: async () => {
-        let next;
+      partitionCounter: () => partitionCounter,
+      advance: async () => {
         while (Object.keys(finishedPartitions).find(k => !finishedPartitions[k])) {
-          next = await advance();
-          if (next) {
-            return next;
+          if (await advance()) {
+            return true;
           }
         }
-        return null;
+        return false;
+      },
+      current: async () => {
+        if (!scheduledPreAggregations[preAggregationCursor]) {
+          return null;
+        }
+        const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
+        if (partitionCursor < queries.length) {
+          const queryCursor = queries.length - 1 - partitionCursor;
+          const query = queries[queryCursor];
+          const sqlQuery = await compilerApi.getSql(query);
+          return {
+            ...sqlQuery,
+            preAggregations: sqlQuery.preAggregations.map(
+              (p) => ({ ...p, priority: preAggregationsWarmup ? 1 : queryCursor - queries.length })
+            ),
+            continueWait: true,
+            renewQuery: true,
+            requestId: context.requestId,
+            timezone: timezones[timezoneCursor],
+            scheduledRefresh: true,
+          };
+        } else {
+          return null;
+        }
       }
     };
   }
 
-  protected async refreshPreAggregations(context, compilerApi: CompilerApi, queryingOptions) {
+  protected async refreshPreAggregations(context: RequestContext, compilerApi: CompilerApi, queryingOptions) {
+    const { securityContext } = context;
+    const { queryIteratorState } = queryingOptions;
     let { concurrency, workerIndices } = queryingOptions;
     concurrency = concurrency || 1;
     workerIndices = workerIndices || R.range(0, concurrency);
+    const preAggregationsLoadCacheByDataSource = {};
     return Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
-        const queryIterator = await this.roundRobinRefreshPreAggregationsQueryIterator(
-          context, compilerApi, queryingOptions
-        );
+        const queryIteratorStateKey = JSON.stringify({ ...securityContext, workerIndex });
+        const queryIterator = queryIteratorState && queryIteratorState[queryIteratorStateKey] ||
+          (await this.roundRobinRefreshPreAggregationsQueryIterator(
+            context, compilerApi, queryingOptions
+          ));
+        if (queryIteratorState) {
+          queryIteratorState[queryIteratorStateKey] = queryIterator;
+        }
         for (;;) {
-          for (let i = 0; i < concurrency; i++) {
-            const nextQuery = await queryIterator.next();
-            if (!nextQuery) {
-              return;
-            }
-            if (i === workerIndex) {
-              const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-              await orchestratorApi.executeQuery(nextQuery);
-            }
+          const currentQuery = await queryIterator.current();
+          if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
+            const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+            await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
+          }
+          const hasNext = await queryIterator.advance();
+          if (!hasNext) {
+            return;
           }
         }
       }));

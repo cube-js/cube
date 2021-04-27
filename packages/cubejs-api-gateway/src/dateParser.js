@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import chrono from 'chrono-node';
+import { parse } from 'chrono-node';
 
 import { UserError } from './UserError';
 
@@ -50,8 +50,8 @@ export function dateParser(dateString, timezone, now = new Date()) {
     const [all, from, to] = dateString.match(/^from (.*) to (.*)$/);
 
     const current = moment(now).tz(timezone);
-    const fromResults = chrono.parse(from, current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
-    const toResults = chrono.parse(to, current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+    const fromResults = parse(from, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
+    const toResults = parse(to, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
 
     if (!fromResults) {
       throw new UserError(`Can't parse date: '${from}'`);
@@ -69,7 +69,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
 
     momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   } else {
-    const results = chrono.parse(dateString, moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS));
+    const results = parse(dateString, new Date(moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
     if (!results || !results.length) {
       throw new UserError(`Can't parse date: '${dateString}'`);
     }

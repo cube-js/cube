@@ -6,10 +6,8 @@ use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
-use chrono::Utc;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
-use std::ops::Sub;
 
 impl Partition {
     pub fn new(index_id: u64, min_value: Option<Row>, max_value: Option<Row>) -> Partition {
@@ -47,8 +45,7 @@ impl Partition {
     }
 
     pub fn get_full_name(&self, partition_id: u64) -> Option<String> {
-        self.parent_partition_id
-            .and(Some(format!("{}.parquet", partition_id)))
+        partition_file_name(self.parent_partition_id, partition_id)
     }
 
     pub fn to_active(&self, active: bool) -> Partition {
@@ -76,12 +73,6 @@ impl Partition {
         p
     }
 
-    pub fn update_last_used(&self) -> Self {
-        let mut new = self.clone();
-        new.last_used = Some(Utc::now());
-        new
-    }
-
     pub fn get_index_id(&self) -> u64 {
         self.index_id
     }
@@ -101,12 +92,10 @@ impl Partition {
     pub fn main_table_row_count(&self) -> u64 {
         self.main_table_row_count
     }
+}
 
-    pub fn is_used(&self, timeout: u64) -> bool {
-        self.last_used
-            .map(|time| Utc::now().sub(time.clone()).num_seconds() < timeout as i64)
-            .unwrap_or(false)
-    }
+pub fn partition_file_name(parent_partition_id: Option<u64>, partition_id: u64) -> Option<String> {
+    parent_partition_id.and(Some(format!("{}.parquet", partition_id)))
 }
 
 #[derive(Clone, Copy, Debug)]

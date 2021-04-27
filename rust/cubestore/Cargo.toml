@@ -21,6 +21,7 @@ warp = { git = 'https://github.com/seanmonstar/warp', version = "0.3.0" }
 sqlparser = "0.7.0"
 serde_derive = "1.0.115"
 serde = "1.0.115"
+serde_bytes = "0.11.5"
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
 cuberpc = { path = "../cuberpc" }
@@ -76,3 +77,6 @@ flatbuffers = "0.7.0"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
+
+[dev-dependencies]
+pretty_assertions = "0.7.1"

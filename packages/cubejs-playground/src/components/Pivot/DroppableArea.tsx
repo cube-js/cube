@@ -17,9 +17,13 @@ export default function DroppableArea({ pivotConfig, axis }) {
       >
         {axis}
       </Typography.Text>
-      <div style={{
-        padding: '8px',
-      }}>
+
+      <div
+        data-testid={`pivot-popover-${axis}`}
+        style={{
+          padding: '8px',
+        }}
+      >
         <Droppable droppableId={axis}>
           {(provided) => (
             <div

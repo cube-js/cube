@@ -1,4 +1,4 @@
-FROM node:12.20.1-alpine3.12
+FROM node:12.22.1-alpine3.12
 
 ARG IMAGE_VERSION=unknown
 
@@ -12,6 +12,8 @@ ENV NODE_ENV production
 
 WORKDIR /cube
 COPY . .
+
+RUN yarn policies set-version v1.22.5
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.

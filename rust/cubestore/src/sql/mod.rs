@@ -27,9 +27,9 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
 use crate::queryplanner::query_executor::QueryExecutor;
+use crate::remotefs::RemoteFs;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
-use crate::sys::malloc::trim_allocs;
 use crate::table::data::{MutRows, Rows, TableValueR};
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -38,6 +38,7 @@ use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
+use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
 use hex::FromHex;
@@ -45,7 +46,10 @@ use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
+use std::path::Path;
 use std::str::from_utf8_unchecked;
+use std::time::Duration;
+use tokio::time::timeout;
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
 
@@ -58,6 +62,21 @@ pub trait SqlService: DIService + Send + Sync {
         context: SqlQueryContext,
         query: &str,
     ) -> Result<DataFrame, CubeError>;
+
+    /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
+    async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
+
+    async fn upload_temp_file(
+        &self,
+        context: SqlQueryContext,
+        name: String,
+        file_path: &Path,
+    ) -> Result<(), CubeError>;
+}
+
+pub struct QueryPlans {
+    pub router: Arc<dyn ExecutionPlan>,
+    pub worker: Arc<dyn ExecutionPlan>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -68,11 +87,13 @@ pub struct SqlQueryContext {
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
+    remote_fs: Arc<dyn RemoteFs>,
     limits: Arc<ConcurrencyLimits>,
     query_planner: Arc<dyn QueryPlanner>,
     query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
+    query_timeout: Duration,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -85,7 +106,9 @@ impl SqlServiceImpl {
         query_planner: Arc<dyn QueryPlanner>,
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
+        remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
+        query_timeout: Duration,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
@@ -95,6 +118,8 @@ impl SqlServiceImpl {
             query_executor,
             cluster,
             rows_per_chunk,
+            query_timeout,
+            remote_fs,
         })
     }
 
@@ -162,15 +187,14 @@ impl SqlServiceImpl {
 
             let mut futures = Vec::new();
             let indexes = self.db.get_table_indexes(table.get_id()).await?;
-            for index in indexes.into_iter() {
-                // TODO it may be too much to mark those as last used in a light of it can be still compacted
-                let partitions = self
-                    .db
-                    .get_active_partitions_and_chunks_by_index_id_for_select(index.get_id())
-                    .await?;
-                for (partition, chunks) in partitions.into_iter() {
-                    futures.push(self.cluster.warmup_partition(partition, chunks));
-                }
+            let partitions = self
+                .db
+                .get_active_partitions_and_chunks_by_index_id_for_select(
+                    indexes.iter().map(|i| i.get_id()).collect(),
+                )
+                .await?;
+            for (partition, chunks) in partitions.into_iter().flatten() {
+                futures.push(self.cluster.warmup_partition(partition, chunks));
             }
             join_all(futures)
                 .await
@@ -286,7 +310,7 @@ impl SqlService for SqlServiceImpl {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn exec_query_with_context(
         &self,
         _context: SqlQueryContext,
@@ -424,8 +448,6 @@ impl SqlService for SqlServiceImpl {
                 columns,
                 source,
             }) => {
-                scopeguard::defer!(trim_allocs());
-
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
                 } else {
@@ -447,7 +469,6 @@ impl SqlService for SqlServiceImpl {
                 Ok(DataFrame::new(vec![], vec![]))
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
-                scopeguard::defer!(trim_allocs());
                 let logical_plan = self
                     .query_planner
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))
@@ -458,16 +479,89 @@ impl SqlService for SqlServiceImpl {
                         self.query_planner.execute_meta_plan(logical_plan).await?
                     }
                     QueryPlan::Select(serialized) => {
-                        self.query_executor
-                            .execute_router_plan(serialized, self.cluster.clone())
-                            .with_current_subscriber()
-                            .await?
+                        timeout(
+                            self.query_timeout,
+                            self.query_executor
+                                .execute_router_plan(serialized, self.cluster.clone())
+                                .with_current_subscriber(),
+                        )
+                        .await??
                     }
                 };
                 Ok(res)
             }
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", q))),
         }
+    }
+
+    async fn plan_query(&self, q: &str) -> Result<QueryPlans, CubeError> {
+        let ast = {
+            let replaced_quote = q.replace("\\'", "''");
+            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            parser.parse_statement()?
+        };
+        match ast {
+            CubeStoreStatement::Statement(Statement::Query(q)) => {
+                let logical_plan = self
+                    .query_planner
+                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .await?;
+                match logical_plan {
+                    QueryPlan::Select(router_plan) => {
+                        // For tests, pretend we have all partitions on the same worker.
+                        let worker_plan = router_plan.with_partition_id_to_execute(
+                            router_plan
+                                .index_snapshots()
+                                .iter()
+                                .flat_map(|i| i.partitions.iter().map(|p| p.partition.get_id()))
+                                .collect(),
+                        );
+                        let mocked_names = worker_plan
+                            .files_to_download()
+                            .iter()
+                            .map(|f| (f.clone(), f.clone()))
+                            .collect();
+                        return Ok(QueryPlans {
+                            router: self
+                                .query_executor
+                                .router_plan(router_plan, self.cluster.clone())
+                                .await?
+                                .0,
+                            worker: self
+                                .query_executor
+                                .worker_plan(worker_plan, mocked_names)
+                                .await?
+                                .0,
+                        });
+                    }
+                    QueryPlan::Meta(_) => {
+                        return Err(CubeError::internal(
+                            "plan_query only works for data selects".to_string(),
+                        ))
+                    }
+                };
+            }
+            _ => {
+                return Err(CubeError::internal(
+                    "plan_query only works for data selects".to_string(),
+                ))
+            }
+        }
+    }
+
+    async fn upload_temp_file(
+        &self,
+        _context: SqlQueryContext,
+        name: String,
+        file_path: &Path,
+    ) -> Result<(), CubeError> {
+        self.remote_fs
+            .upload_file(
+                file_path.to_string_lossy().as_ref(),
+                &format!("temp-uploads/{}", name),
+            )
+            .await?;
+        Ok(())
     }
 }
 
@@ -792,6 +886,7 @@ mod tests {
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
+    use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
@@ -815,11 +910,12 @@ mod tests {
 
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
-                PathBuf::from(remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
+            let query_timeout = Duration::from_secs(30);
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let store = ChunkStore::new(
                 meta_store.clone(),
@@ -835,7 +931,9 @@ mod tests {
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
+                remote_fs.clone(),
                 rows_per_chunk,
+                query_timeout,
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -862,11 +960,12 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
-                PathBuf::from(remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
+            let query_timeout = Duration::from_secs(30);
             let store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
@@ -882,7 +981,9 @@ mod tests {
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
+                remote_fs.clone(),
                 rows_per_chunk,
+                query_timeout,
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -914,120 +1015,6 @@ mod tests {
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
-    }
-
-    #[tokio::test]
-    async fn insert() {
-        Config::run_test("insert", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
-
-            let _ = service.exec_query(
-                "CREATE TABLE Foo.Persons (
-                                PersonID int,
-                                LastName varchar(255),
-                                FirstName varchar(255),
-                                Address varchar(255),
-                                City varchar(255)
-                              )"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO Foo.Persons
-            (
-                PersonID,
-                LastName,
-                FirstName,
-                Address,
-                City
-            )
-
-            VALUES
-            (23, 'LastName 1', 'FirstName 1', 'Address 1', 'City 1'), (38, 'LastName 21', 'FirstName 2', 'Address 2', 'City 2'),
-            (24, 'LastName 3', 'FirstName 1', 'Address 1', 'City 1'), (37, 'LastName 22', 'FirstName 2', 'Address 2', 'City 2'),
-            (25, 'LastName 4', 'FirstName 1', 'Address 1', 'City 1'), (36, 'LastName 23', 'FirstName 2', 'Address 2', 'City 2'),
-            (26, 'LastName 5', 'FirstName 1', 'Address 1', 'City 1'), (35, 'LastName 24', 'FirstName 2', 'Address 2', 'City 2'),
-            (27, 'LastName 6', 'FirstName 1', 'Address 1', 'City 1'), (34, 'LastName 25', 'FirstName 2', 'Address 2', 'City 2'),
-            (28, 'LastName 7', 'FirstName 1', 'Address 1', 'City 1'), (33, 'LastName 26', 'FirstName 2', 'Address 2', 'City 2'),
-            (29, 'LastName 8', 'FirstName 1', 'Address 1', 'City 1'), (32, 'LastName 27', 'FirstName 2', 'Address 2', 'City 2'),
-            (30, 'LastName 9', 'FirstName 1', 'Address 1', 'City 1'), (31, 'LastName 28', 'FirstName 2', 'Address 2', 'City 2')"
-            ).await.unwrap();
-
-            service.exec_query("INSERT INTO Foo.Persons
-            (LastName, PersonID, FirstName, Address, City)
-            VALUES
-            ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'), ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');").await.unwrap();
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn select_test() {
-        Config::run_test("select", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
-
-            let _ = service
-                .exec_query(
-                    "CREATE TABLE Foo.Persons (
-                                PersonID int,
-                                LastName varchar(255),
-                                FirstName varchar(255),
-                                Address varchar(255),
-                                City varchar(255)
-                              );",
-                )
-                .await
-                .unwrap();
-
-            service
-                .exec_query(
-                    "INSERT INTO Foo.Persons
-                (LastName, PersonID, FirstName, Address, City)
-                VALUES
-                ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'),
-                ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');",
-                )
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query("SELECT PersonID person_id from Foo.Persons")
-                .await
-                .unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(22)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(23)]));
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn negative_numbers() {
-        Config::run_test("negative_numbers", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            let _ = service
-                .exec_query("CREATE TABLE foo.values (int_value int)")
-                .await
-                .unwrap();
-
-            service
-                .exec_query("INSERT INTO foo.values (int_value) VALUES (-153)")
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query("SELECT * from foo.values")
-                .await
-                .unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
-        })
-        .await;
     }
 
     #[tokio::test]
@@ -1086,110 +1073,6 @@ mod tests {
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float(0.45.into())]));
         })
             .await;
-    }
-
-    #[tokio::test]
-    async fn custom_types() {
-        Config::run_test("custom_types", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service
-                .exec_query("CREATE TABLE foo.values (int_value mediumint, b1 bytes, b2 varbinary)")
-                .await
-                .unwrap();
-
-            service
-                .exec_query(
-                    "INSERT INTO foo.values (int_value, b1, b2) VALUES (-153, X'0a', X'0b')",
-                )
-                .await
-                .unwrap();
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn group_by_boolean() {
-        Config::run_test("group_by_boolean", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            let _ = service.exec_query("CREATE TABLE foo.bool_group (bool_value boolean)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.bool_group (bool_value) VALUES (true), (false), (true), (false), (false)"
-            ).await.unwrap();
-
-            // TODO compaction fails the test in between?
-            // service.exec_query(
-            //     "INSERT INTO foo.bool_group (bool_value) VALUES (true), (false), (true), (false), (false)"
-            // ).await.unwrap();
-
-            let result = service.exec_query("SELECT count(*) from foo.bool_group").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5)]));
-
-            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = true").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
-
-            let result = service.exec_query("SELECT count(*) from foo.bool_group where bool_value = 'true'").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
-
-            let result = service.exec_query("SELECT g.bool_value, count(*) from foo.bool_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(3)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(2)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn group_by_decimal() {
-        Config::run_test("group_by_decimal", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            let _ = service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value DECIMAL)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 100), (2, 200), (3, 100), (4, 100), (5, 200)"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT count(*) from foo.decimal_group").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5)]));
-
-            let result = service.exec_query("SELECT count(*) from foo.decimal_group where decimal_value = 200").await.unwrap();
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
-
-            let result = service.exec_query("SELECT g.decimal_value, count(*) from foo.decimal_group g GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
-
-            assert_eq!(result.get_rows(), &vec![
-                Row::new(vec![TableValue::Decimal("100".to_string()), TableValue::Int(3)]), 
-                Row::new(vec![TableValue::Decimal("200".to_string()), TableValue::Int(2)])
-            ]);
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn float_decimal_scale() {
-        Config::run_test("float_decimal_scale", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-            service.exec_query("CREATE TABLE foo.decimal_group (id INT, decimal_value FLOAT)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.decimal_group (id, decimal_value) VALUES (1, 677863988852), (2, 677863988852.123e-10), (3, 6778639882.123e+3)"
-            ).await.unwrap();
-
-            let result = service.exec_query(
-                "SELECT SUM(decimal_value) FROM foo.decimal_group"
-            ).await.unwrap();
-
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Float(7456503871042.786.into())])]);
-        }).await;
     }
 
     #[tokio::test]
@@ -1509,6 +1392,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
                 c.compaction_chunks_count_threshold = 0;
+                c.not_used_timeout = 0;
                 c
             })
             .start_test(async move |services| {
@@ -1576,220 +1460,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn join() {
-        Config::run_test("join", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            let _ = service.exec_query("CREATE TABLE foo.orders (customer_id text, amount int)").await.unwrap();
-            let _ = service.exec_query("CREATE TABLE foo.customers (id text, city text, state text)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders (customer_id, amount) VALUES ('a', 10), ('b', 2), ('b', 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON o.customer_id = c.id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::Int(10)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("New York".to_string()), TableValue::Int(5)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn three_tables_join() {
-        Config::run_test("three_tables_join", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.orders (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (orders_product_id)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
-            ).await.unwrap();
-
-            let result = service.exec_query(
-                "SELECT city, name, sum(amount) FROM foo.orders o \
-                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
-                LEFT JOIN foo.products p ON orders_product_id = product_id \
-                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
-            ).await.unwrap();
-
-            let expected = vec![
-                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(20)]),
-                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
-                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(10)]),
-                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)])
-            ];
-
-            assert_eq!(
-                result.get_rows(),
-                &expected
-            );
-
-            let result = service.exec_query(
-                "SELECT city, name, sum(amount) FROM foo.orders o \
-                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
-                LEFT JOIN foo.products p ON orders_product_id = product_id \
-                WHERE customer_id = 'b' AND product_id IN ('2')
-                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
-            ).await.unwrap();
-
-            let expected = vec![
-                Row::new(vec![TableValue::String("New York".to_string()), TableValue::String("Tomato".to_string()), TableValue::Int(5)]),
-            ];
-
-            assert_eq!(
-                result.get_rows(),
-                &expected
-            );
-
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn three_tables_join_with_filter() {
-        Config::run_test("three_tables_join_with_filter", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.orders (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-            service.exec_query("CREATE INDEX orders_by_product ON foo.orders (orders_product_id)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
-            ).await.unwrap();
-
-            let result = service.exec_query(
-                "SELECT city, name, sum(amount) FROM foo.orders o \
-                LEFT JOIN foo.products p ON orders_product_id = product_id \
-                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
-                WHERE customer_id = 'a' \
-                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
-            ).await.unwrap();
-
-            let expected = vec![
-                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
-            ];
-
-            assert_eq!(
-                result.get_rows(),
-                &expected
-            );
-
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn three_tables_join_with_union() {
-        Config::run_test("three_tables_join_with_union", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.orders_1 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.orders_2 (orders_customer_id text, orders_product_id int, amount int)").await.unwrap();
-            service.exec_query("CREATE INDEX orders_by_product_1 ON foo.orders_1 (orders_product_id)").await.unwrap();
-            service.exec_query("CREATE INDEX orders_by_product_2 ON foo.orders_2 (orders_product_id)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.customers (customer_id text, city text, state text)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.products (product_id int, name text)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('a', 1, 10), ('b', 2, 2), ('b', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders_1 (orders_customer_id, orders_product_id, amount) VALUES ('b', 1, 10), ('c', 2, 2), ('c', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders_2 (orders_customer_id, orders_product_id, amount) VALUES ('c', 1, 10), ('d', 2, 2), ('d', 2, 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (customer_id, city, state) VALUES ('c', 'San Francisco', 'CA'), ('d', 'New York', 'NY')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.products (product_id, name) VALUES (1, 'Potato'), (2, 'Tomato')"
-            ).await.unwrap();
-
-            let result = service.exec_query(
-                "SELECT city, name, sum(amount) FROM (SELECT * FROM foo.orders_1 UNION ALL SELECT * FROM foo.orders_2) o \
-                LEFT JOIN foo.customers c ON orders_customer_id = customer_id \
-                LEFT JOIN foo.products p ON orders_product_id = product_id \
-                WHERE customer_id = 'a' \
-                GROUP BY 1, 2 ORDER BY 3 DESC, 1 ASC, 2 ASC"
-            ).await.unwrap();
-
-            let expected = vec![
-                Row::new(vec![TableValue::String("San Francisco".to_string()), TableValue::String("Potato".to_string()), TableValue::Int(10)]),
-            ];
-
-            assert_eq!(
-                result.get_rows(),
-                &expected
-            );
-
-        }).await;
-    }
-
-    #[tokio::test]
     async fn cluster() {
         Config::test("cluster_router").update_config(|mut config| {
             config.select_workers = vec!["127.0.0.1:14306".to_string(), "127.0.0.1:14307".to_string()];
@@ -1804,9 +1474,9 @@ mod tests {
                 config.server_name = "127.0.0.1:14306".to_string();
                 config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                 config.store_provider = FileStoreProvider::Filesystem {
-                    remote_dir: env::current_dir()
+                    remote_dir: Some(env::current_dir()
                         .unwrap()
-                        .join("cluster_router-upstream".to_string()),
+                        .join("cluster_router-upstream".to_string())),
                 };
                 config.compaction_chunks_count_threshold = 0;
                 config
@@ -1816,9 +1486,9 @@ mod tests {
                     config.server_name = "127.0.0.1:14307".to_string();
                     config.metastore_remote_address = Some("127.0.0.1:15306".to_string());
                     config.store_provider = FileStoreProvider::Filesystem {
-                        remote_dir: env::current_dir()
+                        remote_dir: Some(env::current_dir()
                             .unwrap()
-                            .join("cluster_router-upstream".to_string()),
+                            .join("cluster_router-upstream".to_string())),
                     };
                     config.compaction_chunks_count_threshold = 0;
                     config
@@ -1954,674 +1624,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn in_list() {
-        Config::run_test("in_list", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.customers (id text, city text, state text)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.customers (id, city, state) VALUES ('a', 'San Francisco', 'CA'), ('b', 'New York', 'NY'), ('c', 'San Diego', 'CA'), ('d', 'Austin', 'TX')"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT count(*) from foo.customers WHERE state in ('CA', 'TX')").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn numeric_cast() {
-        Config::run_test("numeric_cast", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.managers (id text, department_id int)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.managers (id, department_id) VALUES ('a', 1), ('b', 3), ('c', 3), ('d', 5)"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT count(*) from foo.managers WHERE department_id in ('3', '5')").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn union() {
-        Config::run_test("union", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            let _ = service.exec_query("CREATE TABLE foo.orders1 (customer_id text, amount int)").await.unwrap();
-            let _ = service.exec_query("CREATE TABLE foo.orders2 (customer_id text, amount int)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders1 (customer_id, amount) VALUES ('a', 10), ('b', 2), ('b', 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.orders2 (customer_id, amount) VALUES ('b', 20), ('c', 20), ('b', 30)"
-            ).await.unwrap();
-
-            let result = service.exec_query(
-                "SELECT `u`.customer_id, sum(`u`.amount) FROM \
-                (select * from foo.orders1 union all select * from foo.orders2) `u` \
-                WHERE `u`.customer_id like '%' GROUP BY 1 ORDER BY 2 DESC"
-            ).await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::String("b".to_string()), TableValue::Int(55)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::String("c".to_string()), TableValue::Int(20)]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::String("a".to_string()), TableValue::Int(10)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn timestamp_select() {
-        Config::run_test("timestamp_select", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            let _ = service.exec_query("CREATE TABLE foo.timestamps (t timestamp)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.timestamps (t) VALUES ('2020-01-01T00:00:00.000Z'), ('2020-01-02T00:00:00.000Z'), ('2020-01-03T00:00:00.000Z')"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.timestamps (t) VALUES ('2020-01-01T00:00:00.000Z'), ('2020-01-02T00:00:00.000Z'), ('2020-01-03T00:00:00.000Z')"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn column_escaping() {
-        Config::run_test("column_escaping", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service
-                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
-                .await
-                .unwrap();
-
-            service
-                .exec_query(
-                    "INSERT INTO foo.timestamps (t, amount) VALUES \
-                ('2020-01-01T00:00:00.000Z', 1), \
-                ('2020-01-01T00:01:00.000Z', 2), \
-                ('2020-01-02T00:10:00.000Z', 3)",
-                )
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query(
-                    "SELECT date_trunc('day', `timestamp`.t) `day`, sum(`timestamp`.amount) \
-                FROM foo.timestamps `timestamp` \
-                WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
-                )
-                .await
-                .unwrap();
-
-            assert_eq!(
-                result.get_rows()[0],
-                Row::new(vec![
-                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
-                    TableValue::Int(3)
-                ])
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn information_schema() {
-        Config::run_test("information_schema", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service
-                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query("SELECT schema_name FROM information_schema.schemata")
-                .await
-                .unwrap();
-
-            assert_eq!(
-                result.get_rows(),
-                &vec![Row::new(vec![TableValue::String("foo".to_string())])]
-            );
-
-            let result = service
-                .exec_query("SELECT table_name FROM information_schema.tables")
-                .await
-                .unwrap();
-
-            assert_eq!(
-                result.get_rows(),
-                &vec![Row::new(vec![TableValue::String("timestamps".to_string())])]
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn case_column_escaping() {
-        Config::run_test("case_column_escaping", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query(
-                "CREATE TABLE foo.timestamps (t timestamp, amount int)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.timestamps (t, amount) VALUES \
-                ('2020-01-01T00:00:00.000Z', 1), \
-                ('2020-01-01T00:01:00.000Z', 2), \
-                ('2020-01-02T00:10:00.000Z', 3)"
-            ).await.unwrap();
-
-            let result = service.exec_query(
-                "SELECT date_trunc('day', `timestamp`.t) `day`, sum(CASE WHEN `timestamp`.t > to_timestamp('2020-01-02T00:01:00.000Z') THEN `timestamp`.amount END) \
-                FROM foo.timestamps `timestamp` \
-                WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1"
-            ).await.unwrap();
-
-            assert_eq!(
-                result.get_rows()[0],
-                Row::new(vec![
-                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
-                    TableValue::Int(3)
-                ])
-            );
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn inner_column_escaping() {
-        Config::run_test("inner_column_escaping", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service
-                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
-                .await
-                .unwrap();
-
-            service
-                .exec_query(
-                    "INSERT INTO foo.timestamps (t, amount) VALUES \
-                ('2020-01-01T00:00:00.000Z', 1), \
-                ('2020-01-01T00:01:00.000Z', 2), \
-                ('2020-01-02T00:10:00.000Z', 3)",
-                )
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query(
-                    "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
-                FROM foo.timestamps `timestamp` \
-                WHERE `t` >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
-                )
-                .await
-                .unwrap();
-
-            assert_eq!(
-                result.get_rows()[0],
-                Row::new(vec![
-                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
-                    TableValue::Int(3)
-                ])
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn convert_tz() {
-        Config::run_test("convert_tz", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service
-                .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
-                .await
-                .unwrap();
-
-            service
-                .exec_query(
-                    "INSERT INTO foo.timestamps (t, amount) VALUES \
-                ('2020-01-01T00:00:00.000Z', 1), \
-                ('2020-01-01T00:01:00.000Z', 2), \
-                ('2020-01-02T00:10:00.000Z', 3)",
-                )
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query(
-                    "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
-                FROM foo.timestamps `timestamp` \
-                WHERE `t` >= convert_tz(to_timestamp('2020-01-02T08:00:00.000Z'), '-08:00') GROUP BY 1",
-                )
-                .await
-                .unwrap();
-
-            assert_eq!(
-                result.get_rows(),
-                &vec![Row::new(vec![
-                    TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
-                    TableValue::Int(3)
-                ])]
-            );
-        })
-            .await;
-    }
-
-    #[tokio::test]
-    async fn create_schema_if_not_exists() {
-        Config::run_test("create_schema_if_not_exists", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS Foo")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS Foo")
-                .await
-                .unwrap();
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn create_index_before_ingestion() {
-        Config::run_test("create_index_before_ingestion", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.timestamps (id int, t timestamp)").await.unwrap();
-
-            service.exec_query("CREATE INDEX by_timestamp ON foo.timestamps (`t`)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.timestamps (id, t) VALUES (1, '2020-01-01T00:00:00.000Z'), (2, '2020-01-02T00:00:00.000Z'), (3, '2020-01-03T00:00:00.000Z')"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(2)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn ambiguous_join_sort() {
-        Config::run_test("ambiguous_join_sort", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.sessions (t timestamp, id int)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.page_views (session_id int, page_view_count int)").await.unwrap();
-
-            service.exec_query("CREATE INDEX by_id ON foo.sessions (id)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.sessions (t, id) VALUES ('2020-01-01T00:00:00.000Z', 1), ('2020-01-02T00:00:00.000Z', 2), ('2020-01-03T00:00:00.000Z', 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.page_views (session_id, page_view_count) VALUES (1, 10), (2, 20), (3, 30)"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT sum(p.page_view_count) from foo.sessions s JOIN foo.page_views p ON s.id = p.session_id WHERE s.t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(50)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn join_with_aliases() {
-        Config::run_test("join_with_aliases", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.sessions (t timestamp, id int)").await.unwrap();
-            service.exec_query("CREATE TABLE foo.page_views (session_id int, page_view_count int)").await.unwrap();
-
-            service.exec_query("CREATE INDEX by_id ON foo.sessions (id)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.sessions (t, id) VALUES ('2020-01-01T00:00:00.000Z', 1), ('2020-01-02T00:00:00.000Z', 2), ('2020-01-03T00:00:00.000Z', 3)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.page_views (session_id, page_view_count) VALUES (1, 10), (2, 20), (3, 30)"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT sum(`page_view_count`) from foo.sessions `sessions` JOIN foo.page_views `page_views` ON `id` = `session_id` WHERE `t` >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
-
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(50)]));
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn group_by_without_aggregates() {
-        Config::run_test("group_by_without_aggregates", async move |services| {
-            let service = services.sql_service;
-
-            service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-            service.exec_query("CREATE TABLE foo.sessions (id int, company_id int, location_id int, t timestamp)").await.unwrap();
-
-            service.exec_query("CREATE INDEX by_company ON foo.sessions (company_id, location_id, id)").await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.sessions (company_id, location_id, t, id) VALUES (1, 1, '2020-01-01T00:00:00.000Z', 1), (1, 2, '2020-01-02T00:00:00.000Z', 2), (2, 1, '2020-01-03T00:00:00.000Z', 3)"
-            ).await.unwrap();
-
-            let result = service.exec_query("SELECT `sessions`.location_id, `sessions`.id FROM foo.sessions `sessions` GROUP BY 1, 2 ORDER BY 2").await.unwrap();
-
-            assert_eq!(result.get_rows(), &vec![
-                Row::new(vec![TableValue::Int(1), TableValue::Int(1)]),
-                Row::new(vec![TableValue::Int(2), TableValue::Int(2)]),
-                Row::new(vec![TableValue::Int(1), TableValue::Int(3)]),
-            ]);
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn create_table_with_location() {
-        Config::run_test("create_table_with_location", async move |services| {
-            let service = services.sql_service;
-
-            let paths = {
-                let dir = env::temp_dir();
-
-                let path_1 = dir.clone().join("foo-1.csv");
-                let path_2 = dir.clone().join("foo-2.csv.gz");
-                let mut file = File::create(path_1.clone()).unwrap();
-
-                file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
-                file.write_all("1,San Francisco,\"[\"\"Foo\n\n\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
-                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n".as_bytes()).unwrap();
-                file.write_all("3,New York,\"de Comunicación\",2021-01-25 19:12:23 UTC\n".as_bytes()).unwrap();
-
-                let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
-
-                file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
-                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).await.unwrap();
-                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).await.unwrap();
-                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
-                file.write_all("4,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
-                file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
-
-                file.shutdown().await.unwrap();
-
-                vec![path_1, path_2]
-            };
-
-            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
-            let _ = service.exec_query(
-                &format!(
-                    "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
-                    paths.into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
-                )
-            ).await.unwrap();
-            let res = service.exec_query("CREATE INDEX by_city ON Foo.Persons (city)").await;
-            let error = format!("{:?}", res);
-            assert!(error.contains("has data"));
-
-            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8)])]);
-
-            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn create_table_with_url() {
-        Config::run_test("create_table_with_url", async move |services| {
-            let service = services.sql_service;
-
-            let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
-
-            service.exec_query("CREATE SCHEMA IF NOT EXISTS foo").await.unwrap();
-            service.exec_query(&format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url)).await.unwrap();
-
-            let result = service.exec_query("SELECT count(*) from foo.bikes").await.unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(813)])]);
-        }).await;
-    }
-
-    #[tokio::test]
-    async fn empty_crash() {
-        Config::run_test("empty_crash", async move |services| {
-            let service = services.sql_service;
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS s")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("CREATE TABLE s.Table (id int, s int)")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("INSERT INTO s.Table(id, s) VALUES (1, 10);")
-                .await
-                .unwrap();
-
-            let r = service
-                .exec_query("SELECT * from s.Table WHERE id = 1 AND s = 15")
-                .await
-                .unwrap();
-            assert_eq!(r.into_rows(), vec![]);
-
-            let r = service
-                .exec_query("SELECT id, sum(s) from s.Table WHERE id = 1 AND s = 15 GROUP BY 1")
-                .await
-                .unwrap();
-            assert_eq!(r.into_rows(), vec![]);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn bytes() {
-        Config::run_test("bytes", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS s")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("CREATE TABLE s.Bytes (id int, data bytea)")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query(
-                    "INSERT INTO s.Bytes(id, data) VALUES (1, '01 ff 1a'), (2, X'deADbeef'), (3, 456)",
-                )
-                .await
-                .unwrap();
-
-            let result = service.exec_query("SELECT * from s.Bytes").await.unwrap();
-            let r = result.get_rows();
-            assert_eq!(r.len(), 3);
-            assert_eq!(
-                r[0].values()[1],
-                TableValue::Bytes(vec![0x01, 0xff, 0x1a])
-            );
-            assert_eq!(
-                r[1].values()[1],
-                TableValue::Bytes(vec![0xde, 0xad, 0xbe, 0xef])
-            );
-            assert_eq!(
-                r[2].values()[1],
-                TableValue::Bytes("456".as_bytes().to_vec())
-            );
-        })
-        .await;
-    }
-    #[tokio::test]
-    async fn hyperloglog() {
-        Config::run_test("hyperloglog", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("CREATE TABLE hll.sketches (id int, hll varbinary)")
-                .await
-                .unwrap();
-
-            let sparse = "X'020C0200C02FF58941D5F0C6'";
-            let dense = "X'030C004020000001000000000000000000000000000000000000050020000001030100000410000000004102100000000000000051000020000020003220000003102000000000001200042000000001000200000002000000100000030040000000010040003010000000000100002000000000000000000031000020000000000000000000100000200302000000000000000000001002000000000002204000000001000001000200400000000000001000020031100000000080000000002003000000100000000100110000000000000000000010000000000000000000000020000001320205000100000612000000000004100020100000000000000000001000000002200000100000001000001020000000000020000000000000001000010300060000010000000000070100003000000000000020000000000001000010000104000000000000000000101000100000001401000000000000000000000000000100010000000000000000000000000400020000000002002300010000000000040000041000200005100000000000001000000000100000203010000000000000000000000000001006000100000000000000300100001000100254200000000000101100040000000020000010000050000000501000000000101020000000010000000003000000000200000102100000000204007000000200010000033000000000061000000000000000000000000000000000100001000001000000013000000003000000000002000000000000010001000000000000000000020010000020000000100001000000000000001000103000000000000000000020020000001000000000100001000000000000000020220200200000001001000010100000000200000000000001000002000000011000000000101200000000000000000000000000000000000000100130000000000000000000100000120000300040000000002000000000000000000000100000000070000100000000301000000401200002020000000000601030001510000000000000110100000000000000000050000000010000100000000000000000100022000100000101054010001000000000000001000001000000002000000000100000000000021000001000002000000000100000000000000000000951000000100000000000000000000000000102000200000000000000010000010000000000100002000000000000000000010000000000000010000000010000000102010000000010520100000021010100000030000000000000000100000001000000022000330051000000100000000000040003020000010000020000100000013000000102020000000050000000020010000000000000000101200C000100000001200400000000010000001000000000100010000000001000001000000100000000010000000004000000002000013102000100000000000000000000000600000010000000000000020000000000001000000000030000000000000020000000001000001000000000010000003002000003000200070001001003030010000000003000000000000020000006000000000000000011000000010000200000000000500000000000000020500000000003000000000000000004000030000100000000103000001000000000000200002004200000020000000030000000000000000000000002000100000000000000002000000000000000010020101000000005250000010000000000023010000001000000000000500002001000123100030011000020001310600000000000021000023000003000000000000000001000000000000220200000000004040000020201000000010201000000000020000400010000050000000000000000000000010000020000000000000000000000000000000000102000010000000000000000000000002010000200200000000000000000000000000100000000000000000200400000000010000000000000000000000000000000010000200300000000000100110000000000000000000000000010000030000001000000000010000010200013000000000000200000001000001200010000000010000000000001000000000000100000000410000040000001000100010000100000002001010000000000000000001000000000000010000000000000000000000002000000000001100001000000001010000000000000002200000000004000000000000100010000000000600000000100300000000000000000000010000003000000000000000000310000010100006000010001000000000000001010101000100000000000000000000000000000201000000000000000700010000030000000000000021000000000000000001020000000030000100001000000000000000000000004010100000000000000000000004000000040100000040100100001000000000300000100000000010010000300000200000000000001302000000000000000000100100000400030000001001000100100002300000004030000002010000220100000000000002000000010010000000003010500000000300000000005020102000200000000000000020100000000000000000000000011000000023000000000010000101000000000000010020040200040000020000004000020000000001000000000100000200000010000000000030100010001000000100000000000600400000000002000000000000132000000900010000000030021400000000004100006000304000000000000010000106000001300020000'";
-
-            service.exec_query(&format!("INSERT INTO hll.sketches (id, hll) VALUES (1, {s}), (2, {d}), (3, {s}), (4, {d})", s = sparse, d = dense)).await.unwrap();
-
-            //  Check cardinality.
-            let result = service
-                .exec_query("SELECT id, cardinality(hll) as cnt from hll.sketches WHERE id < 3 ORDER BY 1")
-                .await
-                .unwrap();
-            assert_eq!(to_rows(&result),
-                vec![vec![TableValue::Int(1), TableValue::Int(2)],
-                     vec![TableValue::Int(2), TableValue::Int(655)]]);
-            // Check merge and cardinality.
-            let result = service
-                .exec_query("SELECT cardinality(merge(hll)) from hll.sketches WHERE id < 3")
-                .await
-                .unwrap();
-            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(657)]]);
-
-            // Now merge all 4 HLLs, results should stay the same.
-            let result = service
-                .exec_query("SELECT cardinality(merge(hll)) from hll.sketches")
-                .await
-                .unwrap();
-            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(657)]]);
-
-            // TODO: add format checks on insert and test invalid inputs.
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn hyperloglog_empty_inputs() {
-        Config::run_test("hyperloglog_empty_inputs", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("CREATE TABLE hll.sketches (id int, hll varbinary)")
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query("SELECT cardinality(merge(hll)) from hll.sketches")
-                .await
-                .unwrap();
-            assert_eq!(to_rows(&result), vec![vec![TableValue::Int(0)]]);
-
-            let result = service
-                .exec_query("SELECT merge(hll) from hll.sketches")
-                .await
-                .unwrap();
-            assert_eq!(to_rows(&result), vec![vec![TableValue::Bytes(vec![])]]);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn hyperloglog_empty_group_by() {
-        Config::run_test("hyperloglog_empty_group_by", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("CREATE TABLE hll.sketches (id int, key int, hll varbinary)")
-                .await
-                .unwrap();
-
-            let result = service
-                .exec_query("SELECT key, cardinality(merge(hll)) from hll.sketches group by key")
-                .await
-                .unwrap();
-            assert_eq!(to_rows(&result), Vec::<Vec<TableValue>>::new());
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn hyperloglog_inserts() {
-        Config::run_test("hyperloglog_inserts", async move |services| {
-            let service = services.sql_service;
-
-            let _ = service
-                .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
-                .await
-                .unwrap();
-            let _ = service
-                .exec_query("CREATE TABLE hll.sketches (id int, hll hyperloglog)")
-                .await
-                .unwrap();
-
-            service
-                .exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'')")
-                .await
-                .expect_err("should not allow invalid HLL");
-            service
-                .exec_query(
-                    "INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6')",
-                )
-                .await
-                .expect("should allow valid HLL");
-            service
-                .exec_query(
-                    "INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')",
-                )
-                .await
-                .expect_err("should not allow invalid HLL (with extra bytes)");
-        })
-        .await;
-    }
-
-    #[tokio::test]
     async fn compaction() {
         Config::test("compaction").update_config(|mut config| {
             config.partition_split_threshold = 5;
@@ -2681,12 +1683,46 @@ mod tests {
         }).await;
     }
 
-    fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
-        return d
-            .get_rows()
-            .iter()
-            .map(|r| r.values().clone())
-            .collect_vec();
+    #[tokio::test]
+    async fn create_table_with_temp_file() {
+        Config::run_test("create_table_with_temp_file", async move |services| {
+            let service = services.sql_service;
+
+            let paths = {
+                let dir = env::temp_dir();
+
+                let path_2 = dir.clone().join("foo-3.csv.gz");
+
+                let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
+
+                file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
+                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).await.unwrap();
+                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("4,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+
+                file.shutdown().await.unwrap();
+
+                services.remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/foo-3.csv.gz").await.unwrap();
+
+                vec!["temp://foo-3.csv.gz".to_string()]
+            };
+
+            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+            let _ = service.exec_query(
+                &format!(
+                    "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                    paths.into_iter().map(|p| format!("'{}'", p)).join(",")
+                )
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
+        }).await;
     }
 }
 

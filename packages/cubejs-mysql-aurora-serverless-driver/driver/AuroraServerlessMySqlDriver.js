@@ -20,7 +20,8 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
     this.dataApi = dataApi({
       secretArn: this.config.secretArn,
       resourceArn: this.config.resourceArn,
-      database: this.config.database
+      database: this.config.database,
+      options: this.config.options,
     });
   }
 

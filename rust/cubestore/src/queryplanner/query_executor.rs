@@ -3,16 +3,18 @@ use crate::config::injection::DIService;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::optimizations::CubeQueryPlanner;
+use crate::queryplanner::planning::get_worker_plan;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
 use arrow::array::{
-    Array, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
+    Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
     Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
     Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
     TimestampNanosecondArray, UInt64Array,
 };
+use arrow::compute::take;
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
 use arrow::ipc::writer::MemStreamWriter;
@@ -26,17 +28,15 @@ use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 use datafusion::logical_plan;
-use datafusion::logical_plan::{DFSchemaRef, Expr, ToDFSchema};
+use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
-use datafusion::physical_plan::limit::GlobalLimitExec;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge::{MergeExec, UnionExec};
+use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::parquet::ParquetExec;
-use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
     collect, ExecutionPlan, OptimizerHints, Partitioning, RecordBatchStream,
+    SendableRecordBatchStream,
 };
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
@@ -45,6 +45,7 @@ use num::BigInt;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
+use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
@@ -67,6 +68,17 @@ pub trait QueryExecutor: DIService + Send + Sync {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
+
+    async fn router_plan(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+    ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
+    async fn worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+    ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
 }
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
@@ -77,26 +89,15 @@ crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
-    #[instrument(skip(self, plan, cluster))]
+    #[instrument(level = "trace", skip(self, plan, cluster))]
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<DataFrame, CubeError> {
-        let collect_span = tracing::span!(tracing::Level::INFO, "collect_physical_plan");
-        let plan_to_move = plan.logical_plan(&HashMap::new())?;
-        let ctx = self.execution_context()?;
-        let plan_ctx = ctx.clone();
-
-        let serialized_plan = Arc::new(plan);
-        let physical_plan = plan_ctx.create_physical_plan(&plan_to_move.clone())?;
-        let available_nodes = cluster.available_nodes().await?;
-        let split_plan = self.get_router_split_plan(
-            physical_plan,
-            serialized_plan.clone(),
-            cluster,
-            available_nodes,
-        )?;
+        let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
+        let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
+        let split_plan = physical_plan;
 
         trace!("Router Query Physical Plan: {:#?}", &split_plan);
 
@@ -111,7 +112,7 @@ impl QueryExecutor for QueryExecutorImpl {
             warn!(
                 "Slow Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                plan_to_move
+                logical_plan
             );
             debug!(
                 "Slow Query Physical Plan ({:?}): {:#?}",
@@ -123,7 +124,7 @@ impl QueryExecutor for QueryExecutorImpl {
             error!(
                 "Error Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                plan_to_move
+                logical_plan
             );
             error!(
                 "Error Query Physical Plan ({:?}): {:#?}",
@@ -135,26 +136,32 @@ impl QueryExecutor for QueryExecutorImpl {
         Ok(data_frame)
     }
 
-    #[instrument(skip(self, plan, remote_to_local_names))]
+    #[instrument(level = "trace", skip(self, plan, remote_to_local_names))]
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
-        let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
-        let ctx = self.execution_context()?;
-        let plan_ctx = ctx.clone();
+        let (physical_plan, logical_plan) = self.worker_plan(plan, remote_to_local_names).await?;
 
-        let physical_plan = plan_ctx.create_physical_plan(&plan_to_move.clone())?;
-
-        let worker_plan = self.get_worker_split_plan(physical_plan, &plan);
+        let worker_plan;
+        let max_batch_rows;
+        if let Some((p, s)) = get_worker_plan(&physical_plan) {
+            worker_plan = p;
+            max_batch_rows = s;
+        } else {
+            error!("No worker marker in physical plan: {:?}", physical_plan);
+            return Err(CubeError::internal(
+                "Invalid physical plan on worker".to_string(),
+            ));
+        }
 
         trace!("Partition Query Physical Plan: {:#?}", &worker_plan);
 
         let execution_time = SystemTime::now();
         let results = collect(worker_plan.clone())
             .instrument(tracing::span!(
-                tracing::Level::INFO,
+                tracing::Level::TRACE,
                 "collect_physical_plan"
             ))
             .await;
@@ -166,7 +173,7 @@ impl QueryExecutor for QueryExecutorImpl {
             warn!(
                 "Slow Partition Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                plan_to_move
+                logical_plan
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {:#?}",
@@ -178,7 +185,7 @@ impl QueryExecutor for QueryExecutorImpl {
             error!(
                 "Error Partition Query ({:?}):\n{:#?}",
                 execution_time.elapsed()?,
-                plan_to_move
+                logical_plan
             );
             error!(
                 "Error Partition Query Physical Plan ({:?}): {:#?}",
@@ -186,283 +193,68 @@ impl QueryExecutor for QueryExecutorImpl {
                 &worker_plan
             );
         }
-        Ok((worker_plan.schema().to_schema_ref(), results?))
+        // TODO: stream results as they become available.
+        let results = regroup_batches(results.unwrap(), max_batch_rows)?;
+        Ok((worker_plan.schema().to_schema_ref(), results))
+    }
+
+    async fn router_plan(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+    ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
+        let plan_to_move = plan.logical_plan(&HashMap::new())?;
+        let serialized_plan = Arc::new(plan);
+        let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
+        Ok((
+            ctx.clone().create_physical_plan(&plan_to_move.clone())?,
+            plan_to_move,
+        ))
+    }
+
+    async fn worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+    ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
+        let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
+        let plan = Arc::new(plan);
+        let ctx = self.worker_context(plan.clone())?;
+        let plan_ctx = ctx.clone();
+        Ok((
+            plan_ctx.create_physical_plan(&plan_to_move.clone())?,
+            plan_to_move,
+        ))
     }
 }
 
 impl QueryExecutorImpl {
-    fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
-        let ctx = ExecutionContext::with_config(
+    fn router_context(
+        &self,
+        cluster: Arc<dyn Cluster>,
+        serialized_plan: Arc<SerializedPlan>,
+    ) -> Result<Arc<ExecutionContext>, CubeError> {
+        Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
                 .with_batch_size(4096)
                 .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner {})),
-        );
-        Ok(Arc::new(ctx))
+                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
+                    cluster,
+                    serialized_plan,
+                ))),
+        )))
     }
 
-    fn get_router_split_plan(
+    fn worker_context(
         &self,
-        execution_plan: Arc<dyn ExecutionPlan>,
         serialized_plan: Arc<SerializedPlan>,
-        cluster: Arc<dyn Cluster>,
-        available_nodes: Vec<String>,
-    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
-        // With a single partition, run the whole computation on a single node.
-        if Self::is_single_node_plan(&serialized_plan) {
-            return Ok(self.build_cluster_send(
-                execution_plan.as_ref(),
-                serialized_plan,
-                cluster,
-                available_nodes,
-                execution_plan.schema(),
-                OptimizerHints::default(),
-            )?);
-        }
-        return self.build_router_split_plan(
-            execution_plan,
-            serialized_plan,
-            cluster,
-            available_nodes,
-        );
-    }
-
-    fn is_single_node_plan(p: &SerializedPlan) -> bool {
-        let indices = p.index_snapshots();
-        return indices.len() == 1 && indices[0].partitions().len() == 1;
-    }
-
-    fn build_router_split_plan(
-        &self,
-        execution_plan: Arc<dyn ExecutionPlan>,
-        serialized_plan: Arc<SerializedPlan>,
-        cluster: Arc<dyn Cluster>,
-        available_nodes: Vec<String>,
-    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
-        if self.has_node::<HashAggregateExec>(execution_plan.clone()) {
-            self.build_router_split_plan_at(
-                execution_plan,
-                serialized_plan,
-                cluster,
-                available_nodes,
-                |h| h.as_any().downcast_ref::<HashAggregateExec>().is_some(),
-            )
-        } else if self.has_node::<SortExec>(execution_plan.clone()) {
-            self.build_router_split_plan_at(
-                execution_plan,
-                serialized_plan,
-                cluster,
-                available_nodes,
-                |h| h.as_any().downcast_ref::<SortExec>().is_some(),
-            )
-        } else if self.has_node::<GlobalLimitExec>(execution_plan.clone()) {
-            self.build_router_split_plan_at(
-                execution_plan,
-                serialized_plan,
-                cluster,
-                available_nodes,
-                |h| h.as_any().downcast_ref::<GlobalLimitExec>().is_some(),
-            )
-        } else {
-            self.build_router_split_plan_at(
-                execution_plan,
-                serialized_plan,
-                cluster,
-                available_nodes,
-                |_| true,
-            )
-        }
-    }
-
-    fn get_worker_split_plan(
-        &self,
-        execution_plan: Arc<dyn ExecutionPlan>,
-        serialized_plan: &SerializedPlan,
-    ) -> Arc<dyn ExecutionPlan> {
-        if Self::is_single_node_plan(serialized_plan) {
-            return execution_plan;
-        }
-        return self.build_worker_split_plan(execution_plan);
-    }
-
-    fn build_worker_split_plan(
-        &self,
-        execution_plan: Arc<dyn ExecutionPlan>,
-    ) -> Arc<dyn ExecutionPlan> {
-        if self.has_node::<HashAggregateExec>(execution_plan.clone()) {
-            self.build_worker_split_plan_at(execution_plan, |h| {
-                h.as_any().downcast_ref::<HashAggregateExec>().is_some()
-            })
-        } else if self.has_node::<SortExec>(execution_plan.clone()) {
-            self.build_worker_split_plan_at(execution_plan, |h| {
-                h.as_any().downcast_ref::<SortExec>().is_some()
-            })
-        } else if self.has_node::<GlobalLimitExec>(execution_plan.clone()) {
-            self.build_worker_split_plan_at(execution_plan, |h| {
-                h.as_any().downcast_ref::<GlobalLimitExec>().is_some()
-            })
-        } else {
-            self.build_worker_split_plan_at(execution_plan, |_| true)
-        }
-    }
-
-    fn build_worker_split_plan_at(
-        &self,
-        execution_plan: Arc<dyn ExecutionPlan>,
-        split_at_fn: impl Fn(Arc<dyn ExecutionPlan>) -> bool,
-    ) -> Arc<dyn ExecutionPlan> {
-        let children = execution_plan.children();
-        assert!(
-            children.len() == 1,
-            "Only one child is expected for {:?}",
-            &execution_plan
-        );
-        if split_at_fn(execution_plan.clone()) {
-            children[0].clone()
-        } else {
-            self.build_worker_split_plan(children[0].clone())
-        }
-    }
-
-    fn build_router_split_plan_at(
-        &self,
-        execution_plan: Arc<dyn ExecutionPlan>,
-        serialized_plan: Arc<SerializedPlan>,
-        cluster: Arc<dyn Cluster>,
-        available_nodes: Vec<String>,
-        split_at_fn: impl Fn(Arc<dyn ExecutionPlan>) -> bool,
-    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
-        if split_at_fn(execution_plan.clone()) {
-            let children = execution_plan.children();
-            self.wrap_with_cluster_send(
-                execution_plan,
-                serialized_plan,
-                cluster,
-                available_nodes,
-                children,
-            )
-        } else {
-            let children = execution_plan
-                .children()
-                .iter()
-                .map(move |c| {
-                    self.build_router_split_plan(
-                        c.clone(),
-                        serialized_plan.clone(),
-                        cluster.clone(),
-                        available_nodes.clone(),
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(execution_plan.with_new_children(children)?)
-        }
-    }
-
-    fn wrap_with_cluster_send(
-        &self,
-        execution_plan: Arc<dyn ExecutionPlan>,
-        serialized_plan: Arc<SerializedPlan>,
-        cluster: Arc<dyn Cluster>,
-        available_nodes: Vec<String>,
-        children: Vec<Arc<dyn ExecutionPlan>>,
-    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
-        Ok(
-            execution_plan.with_new_children(vec![self.build_cluster_send(
-                execution_plan.as_ref(),
-                serialized_plan,
-                cluster,
-                available_nodes,
-                children[0].schema(),
-                if children.len() == 1 {
-                    children[0].output_hints()
-                } else {
-                    OptimizerHints::default()
-                },
-            )?])?,
-        )
-    }
-
-    fn build_cluster_send(
-        &self,
-        source: &dyn ExecutionPlan,
-        serialized_plan: Arc<SerializedPlan>,
-        cluster: Arc<dyn Cluster>,
-        available_nodes: Vec<String>,
-        schema: DFSchemaRef,
-        output_sort_order: OptimizerHints,
-    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
-        let union_snapshots = self.union_snapshots_from_cube_table(source);
-        if !union_snapshots.is_empty() {
-            let cluster_exec = Arc::new(ClusterSendExec::new(
-                schema.clone(),
-                cluster,
-                serialized_plan,
-                available_nodes,
-                union_snapshots,
-            ));
-            if let Some(order) = output_sort_order.sort_order {
-                Ok(Arc::new(MergeSortExec::try_new(
-                    cluster_exec,
-                    order
-                        .iter()
-                        .map(|i| schema.field(*i).qualified_name().to_string())
-                        .collect(),
-                )?))
-            } else {
-                Ok(Arc::new(MergeExec::new(cluster_exec)))
-            }
-        } else {
-            // TODO .to_schema_ref()
-            Ok(Arc::new(EmptyExec::new(false, schema.to_schema_ref())))
-        }
-    }
-
-    fn has_node<T: Any>(&self, execution_plan: Arc<dyn ExecutionPlan>) -> bool {
-        if execution_plan.as_any().downcast_ref::<T>().is_some() {
-            true
-        } else {
-            execution_plan
-                .children()
-                .into_iter()
-                .find(|c| self.has_node::<T>(c.clone()))
-                .is_some()
-        }
-    }
-
-    fn union_snapshots_from_cube_table(
-        &self,
-        execution_plan: &dyn ExecutionPlan,
-    ) -> Vec<Vec<IndexSnapshot>> {
-        if let Some(cube_table) = execution_plan.as_any().downcast_ref::<CubeTableExec>() {
-            vec![vec![cube_table.index_snapshot.clone()]]
-        } else if let Some(union_exec) = execution_plan.as_any().downcast_ref::<UnionExec>() {
-            vec![union_exec
-                .children()
-                .iter()
-                .flat_map(|e| self.index_snapshots_from_cube_table(e.as_ref()))
-                .collect::<Vec<_>>()]
-        } else {
-            execution_plan
-                .children()
-                .iter()
-                .flat_map(|e| self.union_snapshots_from_cube_table(e.as_ref()))
-                .collect::<Vec<_>>()
-        }
-    }
-
-    fn index_snapshots_from_cube_table(
-        &self,
-        execution_plan: &dyn ExecutionPlan,
-    ) -> Vec<IndexSnapshot> {
-        if let Some(cube_table) = execution_plan.as_any().downcast_ref::<CubeTableExec>() {
-            vec![cube_table.index_snapshot.clone()]
-        } else {
-            execution_plan
-                .children()
-                .iter()
-                .flat_map(|e| self.index_snapshots_from_cube_table(e.as_ref()))
-                .collect::<Vec<_>>()
-        }
+    ) -> Result<Arc<ExecutionContext>, CubeError> {
+        Ok(Arc::new(ExecutionContext::with_config(
+            ExecutionConfig::new()
+                .with_batch_size(4096)
+                .with_concurrency(1)
+                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(serialized_plan))),
+        )))
     }
 }
 
@@ -495,6 +287,22 @@ impl CubeTable {
             remote_to_local_names,
             worker_partition_ids,
         })
+    }
+
+    #[must_use]
+    pub fn to_worker_table(
+        &self,
+        remote_to_local_names: HashMap<String, String>,
+        worker_partition_ids: HashSet<u64>,
+    ) -> CubeTable {
+        let mut t = self.clone();
+        t.remote_to_local_names = remote_to_local_names;
+        t.worker_partition_ids = worker_partition_ids;
+        t
+    }
+
+    pub fn index_snapshot(&self) -> &IndexSnapshot {
+        &self.index_snapshot
     }
 
     fn async_scan(
@@ -584,6 +392,7 @@ impl CubeTable {
                     schema,
                     partition_execs,
                     index_snapshot: self.index_snapshot.clone(),
+                    filter: predicate,
                 }),
                 join_columns.clone(),
             )?)
@@ -592,6 +401,7 @@ impl CubeTable {
                 schema,
                 partition_execs,
                 index_snapshot: self.index_snapshot.clone(),
+                filter: predicate,
             })))
         };
 
@@ -627,8 +437,9 @@ impl CubeTable {
 
 pub struct CubeTableExec {
     schema: DFSchemaRef,
-    index_snapshot: IndexSnapshot,
+    pub(crate) index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
+    pub(crate) filter: Option<Expr>,
 }
 
 impl Debug for CubeTableExec {
@@ -666,6 +477,7 @@ impl ExecutionPlan for CubeTableExec {
             schema: self.schema.clone(),
             partition_execs: children,
             index_snapshot: self.index_snapshot.clone(),
+            filter: self.filter.clone(),
         }))
     }
 
@@ -711,10 +523,12 @@ impl ExecutionPlan for CubeTableExec {
 
 pub struct ClusterSendExec {
     schema: DFSchemaRef,
-    partitions: Vec<Vec<IdRow<Partition>>>,
-    cluster: Arc<dyn Cluster>,
-    available_nodes: Vec<String>,
-    serialized_plan: Arc<SerializedPlan>,
+    /// Never executed, only stored to allow consistent optimization on router and worker.
+    pub input_for_optimizations: Arc<dyn ExecutionPlan>,
+    pub partitions: Vec<Vec<IdRow<Partition>>>,
+    pub cluster: Arc<dyn Cluster>,
+    pub serialized_plan: Arc<SerializedPlan>,
+    pub use_streaming: bool,
 }
 
 impl ClusterSendExec {
@@ -722,8 +536,9 @@ impl ClusterSendExec {
         schema: DFSchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        available_nodes: Vec<String>,
         union_snapshots: Vec<Vec<IndexSnapshot>>,
+        input_for_optimizations: Arc<dyn ExecutionPlan>,
+        use_streaming: bool,
     ) -> Self {
         let to_multiply = union_snapshots
             .into_iter()
@@ -742,8 +557,24 @@ impl ClusterSendExec {
             schema,
             partitions,
             cluster,
-            available_nodes,
             serialized_plan,
+            input_for_optimizations,
+            use_streaming,
+        }
+    }
+
+    pub fn with_changed_schema(
+        &self,
+        schema: DFSchemaRef,
+        input_for_optimizations: Arc<dyn ExecutionPlan>,
+    ) -> Self {
+        ClusterSendExec {
+            schema,
+            partitions: self.partitions.clone(),
+            cluster: self.cluster.clone(),
+            serialized_plan: self.serialized_plan.clone(),
+            input_for_optimizations,
+            use_streaming: self.use_streaming,
         }
     }
 }
@@ -763,54 +594,57 @@ impl ExecutionPlan for ClusterSendExec {
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![]
+        vec![self.input_for_optimizations.clone()]
     }
 
     fn with_new_children(
         &self,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        if children.len() != 0 {
-            panic!("Expected to be a leaf node");
+        if children.len() != 1 {
+            panic!("expected exactly one input");
         }
+        let input_for_optimizations = children.into_iter().next().unwrap();
         Ok(Arc::new(ClusterSendExec {
             schema: self.schema.clone(),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
-            available_nodes: self.available_nodes.clone(),
             serialized_plan: self.serialized_plan.clone(),
+            input_for_optimizations,
+            use_streaming: self.use_streaming,
         }))
     }
 
-    #[instrument(skip(self))]
+    fn output_hints(&self) -> OptimizerHints {
+        self.input_for_optimizations.output_hints()
+    }
+
+    #[instrument(level = "trace", skip(self))]
     async fn execute(
         &self,
         partition: usize,
-    ) -> Result<Pin<Box<dyn RecordBatchStream + Send>>, DataFusionError> {
-        let record_batches = self
-            .cluster
-            .run_select(
-                &self
-                    .cluster
-                    .node_name_by_partitions(
-                        &self.partitions[partition]
-                            .iter()
-                            .map(|p| p.get_id())
-                            .collect_vec(),
-                    )
-                    .await?,
-                self.serialized_plan.with_partition_id_to_execute(
-                    self.partitions[partition]
-                        .iter()
-                        .map(|p| p.get_id())
-                        .collect(),
-                ),
-            )
-            .await?;
-        // TODO .to_schema_ref()
-        let memory_exec =
-            MemoryExec::try_new(&vec![record_batches], self.schema.to_schema_ref(), None)?;
-        memory_exec.execute(0).await
+    ) -> Result<SendableRecordBatchStream, DataFusionError> {
+        let node_name = &self.cluster.node_name_by_partitions(
+            &self.partitions[partition]
+                .iter()
+                .map(|p| p.get_id())
+                .collect_vec(),
+        );
+        let plan = self.serialized_plan.with_partition_id_to_execute(
+            self.partitions[partition]
+                .iter()
+                .map(|p| p.get_id())
+                .collect(),
+        );
+        if self.use_streaming {
+            Ok(self.cluster.run_select_stream(node_name, plan).await?)
+        } else {
+            let record_batches = self.cluster.run_select(node_name, plan).await?;
+            // TODO .to_schema_ref()
+            let memory_exec =
+                MemoryExec::try_new(&vec![record_batches], self.schema.to_schema_ref(), None)?;
+            memory_exec.execute(0).await
+        }
     }
 }
 
@@ -1084,26 +918,42 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SerializedRecordBatchStream {
+    #[serde(with = "serde_bytes")] // serde_bytes makes serialization efficient.
     record_batch_file: Vec<u8>,
 }
 
 impl SerializedRecordBatchStream {
-    pub fn write(schema: &Schema, record_batches: Vec<RecordBatch>) -> Result<Self, CubeError> {
-        let file = Vec::new();
-        let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
-        for batch in record_batches.iter() {
-            writer.write(batch)?;
+    pub fn write(
+        schema: &Schema,
+        record_batches: Vec<RecordBatch>,
+    ) -> Result<Vec<Self>, CubeError> {
+        let mut results = Vec::with_capacity(record_batches.len());
+        for batch in record_batches {
+            let file = Vec::new();
+            let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
+            writer.write(&batch)?;
+            let cursor = writer.finish()?;
+            results.push(Self {
+                record_batch_file: cursor.into_inner(),
+            })
         }
-        let cursor = writer.finish()?;
-        Ok(Self {
-            record_batch_file: cursor.into_inner(),
-        })
+        Ok(results)
     }
 
-    pub fn read(self) -> Result<Vec<RecordBatch>, CubeError> {
+    pub fn read(self) -> Result<RecordBatch, CubeError> {
         let cursor = Cursor::new(self.record_batch_file);
-        let reader = StreamReader::try_new(cursor)?;
-        Ok(reader.collect::<Result<Vec<_>, _>>()?)
+        let mut reader = StreamReader::try_new(cursor)?;
+        let batch = reader.next();
+        if batch.is_none() {
+            return Err(CubeError::internal("zero batches deserialized".to_string()));
+        }
+        let batch = batch.unwrap()?;
+        if !reader.next().is_none() {
+            return Err(CubeError::internal(
+                "more than one batch deserialized".to_string(),
+            ));
+        }
+        Ok(batch)
     }
 }
 /// Note: copy of the function in 'datafusion/src/datasource/parquet.rs'.
@@ -1122,4 +972,35 @@ fn combine_filters(filters: &[Expr]) -> Option<Expr> {
             logical_plan::and(acc, filter.clone())
         });
     Some(combined_filter)
+}
+
+fn regroup_batches(
+    batches: Vec<RecordBatch>,
+    max_rows: usize,
+) -> Result<Vec<RecordBatch>, CubeError> {
+    let mut r = Vec::with_capacity(batches.len());
+    for b in batches {
+        let mut row = 0;
+        while row != b.num_rows() {
+            let slice_len = min(b.num_rows() - row, max_rows);
+            r.push(RecordBatch::try_new(
+                b.schema(),
+                b.columns()
+                    .iter()
+                    .map(|c| slice_copy(c.as_ref(), row, slice_len))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?);
+            row += slice_len
+        }
+    }
+    Ok(r)
+}
+
+fn slice_copy(a: &dyn Array, start: usize, len: usize) -> Result<ArrayRef, CubeError> {
+    // If we use [Array::slice], serialization will still copy the whole contents.
+    Ok(take(
+        a,
+        &UInt64Array::from_iter_values(start as u64..(start + len) as u64),
+        None,
+    )?)
 }

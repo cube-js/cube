@@ -92,6 +92,7 @@ const TimeGroup = ({
             onRemoveClick={() => updateMethods.remove(m)}
           >
             <MemberDropdown
+              data-testid="TimeDimension"
               disabled={disabled}
               availableMembers={availableMembers}
               onClick={(updateWith) =>
@@ -164,6 +165,7 @@ const TimeGroup = ({
 
       {!members.length && (
         <MemberDropdown
+          data-testid="TimeDimension"
           disabled={disabled}
           availableMembers={availableMembers}
           type="dashed"

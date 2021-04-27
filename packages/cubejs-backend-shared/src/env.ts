@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
+import { displayCLIWarning } from './cli';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -68,7 +69,7 @@ function asBoolOrTime(input: string, envName: string): number|boolean {
   );
 }
 
-const variables = {
+const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
@@ -107,8 +108,18 @@ const variables = {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
   },
+  // Common db options
+  dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
+    .required(required)
+    .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
+    .asString(),
+  // Databricks
+  databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
+    .required()
+    .asString(),
+  databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
     .asString(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
@@ -120,8 +131,57 @@ const variables = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
-  redisUrl: () => get('REDIS_URL')
-    .asString(),
+  redisPassword: () => {
+    const redisPassword = get('CUBEJS_REDIS_PASSWORD')
+      .asString();
+    if (redisPassword) {
+      return redisPassword;
+    }
+
+    const legacyRedisPassword = get('REDIS_PASSWORD')
+      .asString();
+    if (legacyRedisPassword) {
+      displayCLIWarning('REDIS_PASSWORD is deprecated and will be removed, please use CUBEJS_REDIS_PASSWORD.');
+
+      return legacyRedisPassword;
+    }
+
+    return undefined;
+  },
+  redisUrl: () => {
+    const redisUrl = get('CUBEJS_REDIS_URL')
+      .asString();
+    if (redisUrl) {
+      return redisUrl;
+    }
+
+    const legacyRedisUrl = get('REDIS_URL')
+      .asString();
+    if (legacyRedisUrl) {
+      displayCLIWarning('REDIS_URL is deprecated and will be removed, please use CUBEJS_REDIS_URL.');
+
+      return legacyRedisUrl;
+    }
+
+    return undefined;
+  },
+  redisTls: () => {
+    const redisTls = get('CUBEJS_REDIS_TLS')
+      .asBoolStrict();
+    if (redisTls) {
+      return redisTls;
+    }
+
+    const legacyRedisTls = get('REDIS_TLS')
+      .asBoolStrict();
+    if (legacyRedisTls) {
+      displayCLIWarning('REDIS_TLS is deprecated and will be removed, please use CUBEJS_REDIS_TLS.');
+
+      return legacyRedisTls;
+    }
+
+    return false;
+  },
   dbSsl: () => get('CUBEJS_DB_SSL')
     .default('false')
     .asBoolStrict(),
@@ -132,14 +192,11 @@ const variables = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
-  redisPassword: () => get('REDIS_PASSWORD')
-    .asString(),
-  redisTls: () => get('REDIS_TLS')
-    .default('false')
-    .asBoolStrict(),
   jwkKey: () => get('CUBEJS_JWK_KEY')
     .asUrlString(),
   jwkUrl: () => get('CUBEJS_JWK_URL')
+    .asString(),
+  jwtKey: () => get('CUBEJS_JWT_KEY')
     .asUrlString(),
   jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
     .asArray(','),
@@ -156,13 +213,16 @@ const variables = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  livePreview: () => get('CUBEJS_LIVE_PREVIEW')
+    .default('false')
+    .asBoolStrict(),
 };
 
 type Vars = typeof variables;
 
-export function getEnv<T extends keyof Vars>(key: T): ReturnType<Vars[T]> {
+export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
-    return <any>variables[key]();
+    return <any>variables[key](opts);
   }
 
   throw new Error(

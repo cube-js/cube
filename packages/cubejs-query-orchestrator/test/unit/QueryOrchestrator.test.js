@@ -568,4 +568,88 @@ describe('QueryOrchestrator', () => {
 
     expect(firstResolve).toBe('query');
   });
+
+  test('in memory cache', async () => {
+    const query = {
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        refreshKeyRenewalThresholds: [21600, 120],
+        queries: [
+          ['SELECT NOW()', []],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', []]
+        ]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d20201103',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT NOW() as now', []]],
+        refreshKeyRenewalThresholds: [86400]
+      }],
+      requestId: 'in memory cache',
+    };
+    await queryOrchestrator.fetchQuery(query);
+    await queryOrchestrator.fetchQuery(query);
+    await queryOrchestrator.fetchQuery(query);
+    expect(
+      queryOrchestrator.queryCache.memoryCache.has(
+        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[0])
+      )
+    ).toBe(true);
+    expect(
+      queryOrchestrator.queryCache.memoryCache.has(
+        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[1])
+      )
+    ).toBe(false);
+    expect(
+      queryOrchestrator.queryCache.memoryCache.has(
+        queryOrchestrator.queryCache.queryRedisKey(query.preAggregations[0].invalidateKeyQueries[0])
+      )
+    ).toBe(true);
+  });
+
+  test('load cache should respect external flag', async () => {
+    const preAggregationsLoadCacheByDataSource = {};
+    const externalPreAggregation = {
+      preAggregationsLoadCacheByDataSource,
+      query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
+      values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        external: true,
+      }],
+      renewQuery: true,
+      requestId: 'load cache should respect external flag'
+    };
+    const internalPreAggregation = {
+      preAggregationsLoadCacheByDataSource,
+      query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
+      values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.internal',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.internal AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+      }],
+      renewQuery: true,
+      requestId: 'load cache should respect external flag'
+    };
+    await queryOrchestrator.fetchQuery(internalPreAggregation);
+    await queryOrchestrator.fetchQuery(externalPreAggregation);
+    await queryOrchestrator.fetchQuery(internalPreAggregation);
+    console.log(mockDriver.tables);
+    expect(mockDriver.tables.length).toBe(2);
+  });
 });

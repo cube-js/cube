@@ -82,6 +82,16 @@ const DbTypeValueMatcher = {
 };
 
 export class BaseDriver {
+  /**
+   * Workaround for Type 'BaseDriver' has no construct signatures.
+   *
+   * @param {Object} [options]
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  constructor(options) {
+    //
+  }
+
   informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
@@ -168,8 +178,8 @@ export class BaseDriver {
   /**
    * @abstract
    * @param {string} query
-   * @param {Array<unknown>} values
-   * @return {Promise<Array<unknown>>}
+   * @param {Array<unknown>} [values]
+   * @return {Promise<Array<any>>}
    */
   async query(query, values) {
     throw new Error('Not implemented');
@@ -381,6 +391,13 @@ export class BaseDriver {
         error: (error.stack || error).toString()
       });
     }
+  }
+
+  /**
+   * @public
+   */
+  async release() {
+    // override, if it's needed
   }
 
   capabilities() {

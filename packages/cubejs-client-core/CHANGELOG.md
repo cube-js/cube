@@ -3,6 +3,124 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+
+
+
+
+## [0.26.102](https://github.com/cube-js/cube.js/compare/v0.26.101...v0.26.102) (2021-04-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** add type definition to the categories method ([#2585](https://github.com/cube-js/cube.js/issues/2585)) ([4112b2d](https://github.com/cube-js/cube.js/commit/4112b2ddf956537dd1fc3d08b249bef8d07f7645))
+
+
+
+
+
+## [0.26.94](https://github.com/cube-js/cube.js/compare/v0.26.93...v0.26.94) (2021-04-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** WebSocket response check ([7af1b45](https://github.com/cube-js/cube.js/commit/7af1b458a9f2d7390e80805241d108b895d5c2cc))
+
+
+
+
+
+## [0.26.93](https://github.com/cube-js/cube.js/compare/v0.26.92...v0.26.93) (2021-04-12)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** make query reactive ([#2539](https://github.com/cube-js/cube.js/issues/2539)) ([9bce6ba](https://github.com/cube-js/cube.js/commit/9bce6ba964d71f0cba0e4d4e4e21a973309d77d4))
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** display request status code ([b6108c9](https://github.com/cube-js/cube.js/commit/b6108c9285ffe177439b2310c201d19f19819206))
+
+
+
+
+
+## [0.26.82](https://github.com/cube-js/cube.js/compare/v0.26.81...v0.26.82) (2021-04-07)
+
+
+### Features
+
+* **@cubejs-client/playground:** run query button, disable query auto triggering ([#2476](https://github.com/cube-js/cube.js/issues/2476)) ([92a5d45](https://github.com/cube-js/cube.js/commit/92a5d45eca00e88e925e547a12c3f69b05bfafa6))
+
+
+
+
+
+## [0.26.73](https://github.com/cube-js/cube.js/compare/v0.26.72...v0.26.73) (2021-04-01)
+
+
+### Features
+
+* Introduce ITransportResponse for HttpTransport/WSTransport, fix [#2439](https://github.com/cube-js/cube.js/issues/2439) ([756bcb8](https://github.com/cube-js/cube.js/commit/756bcb8ae9cd6075382c01a88e46415dd7d024b3))
+
+
+
+
+
+## [0.26.70](https://github.com/cube-js/cube.js/compare/v0.26.69...v0.26.70) (2021-03-26)
+
+
+### Features
+
+* Vue chart renderers ([#2428](https://github.com/cube-js/cube.js/issues/2428)) ([bc2cbab](https://github.com/cube-js/cube.js/commit/bc2cbab22fee860cfc846d1207f6a83899198dd8))
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Updated totalRow within ResultSet ([#2410](https://github.com/cube-js/cube.js/issues/2410)) ([91e51be](https://github.com/cube-js/cube.js/commit/91e51be6e5690dfe6ba294f75e768406fcc9d4a1))
+
+
+
+
+
+## [0.26.63](https://github.com/cube-js/cube.js/compare/v0.26.62...v0.26.63) (2021-03-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/ngx:** wrong type reference ([#2407](https://github.com/cube-js/cube.js/issues/2407)) ([d6c4183](https://github.com/cube-js/cube.js/commit/d6c41838df53d18eae23b2d38f86435626568ccf))
+
+
+
+
+
+## [0.26.61](https://github.com/cube-js/cube.js/compare/v0.26.60...v0.26.61) (2021-03-18)
+
+
+### Features
+
+* **@cubejs-client/vue:** vue query builder ([#1824](https://github.com/cube-js/cube.js/issues/1824)) ([06ee13f](https://github.com/cube-js/cube.js/commit/06ee13f72ef33372385567ed5e1795087b4f5f53))
+
+
+
+
+
 ## [0.26.60](https://github.com/cube-js/cube.js/compare/v0.26.59...v0.26.60) (2021-03-16)
 
 

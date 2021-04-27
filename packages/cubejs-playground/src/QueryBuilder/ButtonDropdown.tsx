@@ -1,6 +1,6 @@
 import { Dropdown } from 'antd';
 
-import { Button } from '../components';
+import { Button } from '../atoms';
 
 const ButtonDropdown = ({ overlay, disabled = false, ...buttonProps }: any) => {
   return (
@@ -10,7 +10,7 @@ const ButtonDropdown = ({ overlay, disabled = false, ...buttonProps }: any) => {
       placement="bottomLeft"
       trigger={['click']}
     >
-      <Button {...buttonProps} disabled={disabled} data-iddd={111} />
+      <Button {...buttonProps} disabled={disabled} />
     </Dropdown>
   );
 };

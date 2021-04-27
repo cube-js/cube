@@ -3,6 +3,103 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+
+### Features
+
+* Add CUBEJS_ prefix for REDIS_URL/REDIS_TLS ([#2312](https://github.com/cube-js/cube.js/issues/2312)) ([b5e7099](https://github.com/cube-js/cube.js/commit/b5e7099da90d0f8c6def0af648b45b18c1e56569))
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+
+### Bug Fixes
+
+* Typo JWK_KEY -> JWT_KEY ([#2516](https://github.com/cube-js/cube.js/issues/2516)) ([7bdb576](https://github.com/cube-js/cube.js/commit/7bdb576e2130c61eec87e88575fdb96c55d6b4a6)), closes [#ch449](https://github.com/cube-js/cube.js/issues/ch449)
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+
+### Bug Fixes
+
+* **playground:** Test connection in Connection Wizard ([715fa1c](https://github.com/cube-js/cube.js/commit/715fa1c0ab6667017e12851cbd97e97cf6807d60))
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+
+### Bug Fixes
+
+* **cubestore:** Something wrong with downloading Cube Store before running it. ([208dd31](https://github.com/cube-js/cube.js/commit/208dd31f20aa64a5c79e143d40055ac2658d0745))
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+
+### Features
+
+* Dev mode and live preview  ([#2440](https://github.com/cube-js/cube.js/issues/2440)) ([1a7cde8](https://github.com/cube-js/cube.js/commit/1a7cde816ee231ea00d1a952f5000dcc5a8c0ca4))
+* Introduce databricks-jdbc-driver ([bb0b31f](https://github.com/cube-js/cube.js/commit/bb0b31fb333f2aa379f11f6733c4efc17ec12dde))
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+
+### Features
+
+* Check Node.js version in dev-server/server ([d20e9c2](https://github.com/cube-js/cube.js/commit/d20e9c217e0acd894ecbfbf91e24c3d12cfba1c1))
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+
+### Features
+
+* Introduce @cubejs-backend/maven ([#2432](https://github.com/cube-js/cube.js/issues/2432)) ([6dc6034](https://github.com/cube-js/cube.js/commit/6dc6034c3cdcc8e2c2b0568c218228a18b64f44b))
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+
+### Bug Fixes
+
+* Warning/skip Cube Store on unsupported platforms ([c187e11](https://github.com/cube-js/cube.js/commit/c187e119b8747e1f6bb3fe2bd84f66ae3822ac7d))
+
+
+
+
+
 ## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
 
 **Note:** Version bump only for package @cubejs-backend/shared

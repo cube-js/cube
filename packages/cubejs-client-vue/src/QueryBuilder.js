@@ -7,6 +7,7 @@ import {
   getOrderMembersFromOrder,
   moveItemInArray,
   movePivotItem,
+  areQueriesEqual
 } from '@cubejs-client/core';
 import { clone, equals } from 'ramda';
 
@@ -18,13 +19,6 @@ const toOrderMember = (member) => ({
   id: member.name,
   title: member.title,
 });
-
-const areQueriesEqual = (query1, query2) => {
-  return (
-    equals(Object.entries(query1.order || {}), Object.entries(query2.order || {})) &&
-    equals(query1, query2)
-  );
-};
 
 const reduceOrderMembers = (array) =>
   array.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []);
@@ -219,6 +213,11 @@ export default {
           builderProps,
         },
         scopedSlots: this.$scopedSlots,
+        on: {
+          queryStatus: (event) => {
+            this.$emit('queryStatus', event);
+          }
+        }
       },
       children
     );
@@ -320,7 +319,10 @@ export default {
       ) {
         const heuristicsFn = this.stateChangeHeuristics || defaultHeuristics;
         const { query, chartType, shouldApplyHeuristicOrder, pivotConfig } = heuristicsFn(
-          validatedQuery,
+          {
+            query: validatedQuery,
+            chartType: this.chartType
+          },
           this.prevValidatedQuery,
           {
             meta: this.meta,
@@ -614,14 +616,14 @@ export default {
     },
     query: {
       deep: true,
-      handler() {
+      handler(query) {
         if (!this.meta) {
           // this is ok as if meta has not been loaded by the time query prop has changed,
           // then the promise for loading meta (found in mounted()) will call
           // copyQueryFromProps and will therefore update anyway.
           return;
         }
-        this.copyQueryFromProps();
+        this.copyQueryFromProps(query);
       },
     },
     pivotConfig: {

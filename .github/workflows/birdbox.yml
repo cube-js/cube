@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, macos-10.15, windows-2019]
-        node-version: [15.x]
+        node-version: [14.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -27,8 +27,35 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Create project
-        run: npx cubejs-cli@${{ github.event.inputs.version }} create new-project -d postgres
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: |
+            ~/.npm
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-14.x-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Birdbox
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        run: |
+          cd packages/cubejs-testing/
+          npx cubejs-cli@${{ github.event.inputs.version }} create birdbox-test-project -d postgres
+          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
+          yarn run dataset:minimal
+          yarn run birdbox:cli:postgresql
       - name: Slack Failure
         if: failure()
         uses: voxmedia/github-action-slack-notify-build@v1
@@ -78,6 +105,7 @@ jobs:
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
+          yarn run dataset:minimal
           yarn run birdbox:${{ matrix.target }}
       - name: Slack Failure
         if: failure()
@@ -126,11 +154,14 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CYPRESS_BROWSER=${{ matrix.browser }}
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
           yarn run cypress:install
+          yarn run dataset:minimal
           yarn run cypress:birdbox
       - name: Slack Failure
         if: failure()

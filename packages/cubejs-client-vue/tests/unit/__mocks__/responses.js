@@ -722,6 +722,7 @@ export default (body = {}, status = 200) => () => ({
       {
         status,
         json: async () => body,
+        ok: status >= 200 && status <= 399
       },
       () => this.subscribe(callback)
     );

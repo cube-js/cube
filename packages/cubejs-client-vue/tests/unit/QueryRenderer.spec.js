@@ -43,7 +43,7 @@ describe('QueryRenderer.vue', () => {
 
       await flushPromises();
 
-      expect(wrapper.text()).toContain('error message');
+      expect(wrapper.text()).toContain('error');
       expect(cube.request.mock.calls.length).toBe(1);
     });
 

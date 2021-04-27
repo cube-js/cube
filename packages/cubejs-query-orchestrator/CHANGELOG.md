@@ -3,6 +3,156 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+
+### Bug Fixes
+
+* concurrency lock driver instance & release on error ([dd60f5d](https://github.com/cube-js/cube.js/commit/dd60f5d1be59012ed33958d5889276afcc0639af))
+
+
+
+
+
+## [0.26.101](https://github.com/cube-js/cube.js/compare/v0.26.100...v0.26.101) (2021-04-20)
+
+
+### Bug Fixes
+
+* QueryQueue - broken queuing on any error (TimeoutError: ResourceRequest timed out) ([ebe2c71](https://github.com/cube-js/cube.js/commit/ebe2c716d4ec0aa5cbc60529567f39672c199720))
+
+
+
+
+
+## [0.26.99](https://github.com/cube-js/cube.js/compare/v0.26.98...v0.26.99) (2021-04-16)
+
+
+### Bug Fixes
+
+* Continuous refresh during Scheduled Refresh in case of both external and internal pre-aggregations are defined for the same data source ([#2566](https://github.com/cube-js/cube.js/issues/2566)) ([dcd2894](https://github.com/cube-js/cube.js/commit/dcd2894453d7afda3ea50b2592ae6610b231f5c5))
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+
+### Bug Fixes
+
+* **playground:** Test connection in Connection Wizard ([715fa1c](https://github.com/cube-js/cube.js/commit/715fa1c0ab6667017e12851cbd97e97cf6807d60))
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+
+### Bug Fixes
+
+* Manage stream connection release by orchestrator instead of driver ([adf059e](https://github.com/cube-js/cube.js/commit/adf059ec52e31e3ebc055b60a1ac6236c57251f8))
+
+
+
+
+
+## [0.26.88](https://github.com/cube-js/cube.js/compare/v0.26.87...v0.26.88) (2021-04-10)
+
+
+### Features
+
+* Mysql Cube Store streaming ingests ([#2528](https://github.com/cube-js/cube.js/issues/2528)) ([0b36a6f](https://github.com/cube-js/cube.js/commit/0b36a6faa184766873ec3792785eb1aa5ca582af))
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+
+### Features
+
+* Introduce databricks-jdbc-driver ([bb0b31f](https://github.com/cube-js/cube.js/commit/bb0b31fb333f2aa379f11f6733c4efc17ec12dde))
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+
+### Bug Fixes
+
+* sqlAlias on non partitioned rollups ([0675925](https://github.com/cube-js/cube.js/commit/0675925efb61a6492344b28179b7647eabb01a1d))
+
+
+
+
+
+## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
+
+
+### Bug Fixes
+
+* Reduce Redis traffic for Refresh Scheduler by introducing single pre-aggregations load cache for a whole refresh cycle ([bdb69d5](https://github.com/cube-js/cube.js/commit/bdb69d55ee15e7d9ecca69a8e237d40ee666d051))
+
+
+
+
+
+## [0.26.76](https://github.com/cube-js/cube.js/compare/v0.26.75...v0.26.76) (2021-04-03)
+
+
+### Bug Fixes
+
+* Reduce Redis traffic while querying immutable pre-aggregation partitions by introducing LRU in memory cache for refresh keys ([#2484](https://github.com/cube-js/cube.js/issues/2484)) ([76ea3c1](https://github.com/cube-js/cube.js/commit/76ea3c1a5227cfa8eda5b0ad6a09f41b71826866))
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
 ## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
 
 

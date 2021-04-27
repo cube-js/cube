@@ -30,8 +30,10 @@ use log::{debug, error};
 use mockall::automock;
 use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
+use std::fmt::Display;
 use std::future::Future;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
 use tokio::sync::broadcast;
@@ -85,9 +87,8 @@ impl CubeServices {
                 ClusterImpl::listen_on_metastore_port(cluster).await
             }));
             let scheduler = self.scheduler.clone();
-            futures.push(tokio::spawn(async move {
-                SchedulerImpl::run_scheduler(scheduler).await
-            }));
+            futures.extend(SchedulerImpl::spawn_processing_loops(scheduler));
+
             if self.injector.has_service_typed::<MySqlServer>().await {
                 let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
                 futures.push(tokio::spawn(
@@ -103,6 +104,10 @@ impl CubeServices {
             futures.push(tokio::spawn(async move {
                 ClusterImpl::listen_on_worker_port(cluster).await
             }));
+            let cluster = self.cluster.clone();
+            futures.push(tokio::spawn(
+                async move { cluster.warmup_select_worker().await },
+            ))
         }
         futures.push(tokio::spawn(async move {
             start_track_event_loop().await;
@@ -149,7 +154,7 @@ impl CubeServices {
 pub enum FileStoreProvider {
     Local,
     Filesystem {
-        remote_dir: PathBuf,
+        remote_dir: Option<PathBuf>,
     },
     S3 {
         region: String,
@@ -162,6 +167,7 @@ pub enum FileStoreProvider {
     },
 }
 
+#[derive(Clone)]
 pub struct Config {
     config_obj: Arc<ConfigObjImpl>,
     injector: Arc<Injector>,
@@ -208,6 +214,14 @@ pub trait ConfigObj: DIService {
     fn server_name(&self) -> &String;
 
     fn max_ingestion_data_frames(&self) -> usize;
+
+    fn upload_to_remote(&self) -> bool;
+
+    fn enable_topk(&self) -> bool;
+
+    fn enable_startup_warmup(&self) -> bool;
+
+    fn malloc_trim_every_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -223,6 +237,8 @@ pub struct ConfigObjImpl {
     pub bind_address: Option<String>,
     pub http_bind_address: Option<String>,
     pub query_timeout: u64,
+    /// Must be set to 2*query_timeout in prod, only for overrides in tests.
+    pub not_used_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
@@ -232,6 +248,10 @@ pub struct ConfigObjImpl {
     pub connection_timeout: u64,
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
+    pub upload_to_remote: bool,
+    pub enable_topk: bool,
+    pub enable_startup_warmup: bool,
+    pub malloc_trim_every_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -275,7 +295,7 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn not_used_timeout(&self) -> u64 {
-        self.query_timeout * 2
+        self.not_used_timeout
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -317,6 +337,21 @@ impl ConfigObj for ConfigObjImpl {
     fn max_ingestion_data_frames(&self) -> usize {
         self.max_ingestion_data_frames
     }
+
+    fn upload_to_remote(&self) -> bool {
+        self.upload_to_remote
+    }
+
+    fn enable_topk(&self) -> bool {
+        self.enable_topk
+    }
+
+    fn enable_startup_warmup(&self) -> bool {
+        self.enable_startup_warmup
+    }
+    fn malloc_trim_every_secs(&self) -> u64 {
+        self.malloc_trim_every_secs
+    }
 }
 
 lazy_static! {
@@ -329,8 +364,37 @@ lazy_static! {
         tokio::sync::RwLock::new(false);
 }
 
+fn env_bool(name: &str, default: bool) -> bool {
+    env::var(name)
+        .ok()
+        .map(|x| match x.as_str() {
+            "0" => false,
+            "1" => true,
+            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+        })
+        .unwrap_or(default)
+}
+
+fn env_parse<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    env::var(name)
+        .ok()
+        .map(|x| match x.parse::<T>() {
+            Ok(v) => v,
+            Err(e) => panic!("could not parse value for '{}': {}", name, e),
+        })
+        .unwrap_or(default)
+}
+
 impl Config {
     pub fn default() -> Config {
+        let query_timeout = env::var("CUBESTORE_QUERY_TIMEOUT")
+            .ok()
+            .map(|v| v.parse::<u64>().unwrap())
+            .unwrap_or(120);
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -355,12 +419,10 @@ impl Config {
                         }
                     } else if let Ok(remote_dir) = env::var("CUBESTORE_REMOTE_DIR") {
                         FileStoreProvider::Filesystem {
-                            remote_dir: PathBuf::from(remote_dir),
+                            remote_dir: Some(PathBuf::from(remote_dir)),
                         }
                     } else {
-                        FileStoreProvider::Filesystem {
-                            remote_dir: env::current_dir().unwrap().join("upstream"),
-                        }
+                        FileStoreProvider::Filesystem { remote_dir: None }
                     }
                 },
                 select_worker_pool_size: env::var("CUBESTORE_SELECT_WORKERS")
@@ -379,10 +441,8 @@ impl Config {
                         .map(|v| v.parse::<u16>().unwrap())
                         .unwrap_or(3030u16)),
                 )),
-                query_timeout: env::var("CUBESTORE_QUERY_TIMEOUT")
-                    .ok()
-                    .map(|v| v.parse::<u64>().unwrap())
-                    .unwrap_or(120),
+                query_timeout,
+                not_used_timeout: 2 * query_timeout,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -412,11 +472,16 @@ impl Config {
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
                     .unwrap_or("localhost".to_string()),
+                upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
+                enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
+                malloc_trim_every_secs: env_parse::<u64>("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
             }),
         }
     }
 
     pub fn test(name: &str) -> Config {
+        let query_timeout = 15;
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -427,15 +492,18 @@ impl Config {
                 compaction_chunks_count_threshold: 1,
                 compaction_chunks_total_size_threshold: 10,
                 store_provider: FileStoreProvider::Filesystem {
-                    remote_dir: env::current_dir()
-                        .unwrap()
-                        .join(format!("{}-upstream", name)),
+                    remote_dir: Some(
+                        env::current_dir()
+                            .unwrap()
+                            .join(format!("{}-upstream", name)),
+                    ),
                 },
                 select_worker_pool_size: 0,
                 job_runners_count: 4,
                 bind_address: None,
                 http_bind_address: None,
-                query_timeout: 15,
+                query_timeout,
+                not_used_timeout: 2 * query_timeout,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,
@@ -446,6 +514,10 @@ impl Config {
                 wal_split_threshold: 262144,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
+                upload_to_remote: true,
+                enable_topk: true,
+                enable_startup_warmup: true,
+                malloc_trim_every_secs: 0,
             }),
         }
     }
@@ -463,16 +535,14 @@ impl Config {
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         self.start_test_with_options(true, test_fn).await
     }
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         self.start_test_with_options(false, test_fn).await
     }
@@ -482,8 +552,7 @@ impl Config {
         clean_remote: bool,
         test_fn: impl FnOnce(CubeServices) -> T,
     ) where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -531,8 +600,7 @@ impl Config {
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        T: Future<Output = ()> + Send,
     {
         Self::test(name).start_test(test_fn).await;
     }
@@ -547,7 +615,7 @@ impl Config {
 
     pub fn remote_dir(&self) -> &PathBuf {
         match &self.config_obj.store_provider {
-            FileStoreProvider::Filesystem { remote_dir } => remote_dir,
+            FileStoreProvider::Filesystem { remote_dir } => remote_dir.as_ref().unwrap(),
             x => panic!("Remote dir called on {:?}", x),
         }
     }
@@ -731,13 +799,14 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
 
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(i.get_service_typed().await)
+                QueryPlannerImpl::new(i.get_service_typed().await, i.get_service_typed().await)
             })
             .await;
 
@@ -780,9 +849,13 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
+                    Duration::from_secs(
+                        i.get_service_typed::<dyn ConfigObj>().await.query_timeout(),
+                    ),
                 )
             })
             .await;
@@ -859,7 +932,7 @@ impl Config {
         self.cube_services().await
     }
 
-    pub fn configure_worker(&self) {
+    pub fn configure_worker_services() {
         let mut services = WORKER_SERVICES.write().unwrap();
         *services = Some(WorkerServices {
             query_executor: Arc::new(QueryExecutorImpl),
