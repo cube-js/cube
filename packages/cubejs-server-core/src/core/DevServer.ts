@@ -394,7 +394,8 @@ export class DevServer {
       fs.writeFileSync('.env', variables.join('\n'));
 
       dotenv.config({ override: true });
-      await this.cubejsServer.resetDatabaseDriver();
+
+      await this.cubejsServer.resetInstanceState();
 
       res.status(200).json(req.body.variables || {});
     }));

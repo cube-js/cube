@@ -1,4 +1,4 @@
-/* eslint-disable global-require */
+/* eslint-disable global-require,no-return-assign */
 import crypto from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
@@ -17,7 +17,7 @@ import {
 
 import type { Application as ExpressApplication } from 'express';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import type { Constructor } from '@cubejs-backend/shared';
+import type { Constructor, Required } from '@cubejs-backend/shared';
 import type { CubeStoreDevDriver, CubeStoreHandler, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
 import type {
   ContextToAppIdFn,
@@ -34,7 +34,7 @@ import type {
 } from './types';
 
 import { FileRepository, SchemaFileRepository } from './FileRepository';
-import { RefreshScheduler } from './RefreshScheduler';
+import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
 import { DevServer } from './DevServer';
@@ -64,13 +64,7 @@ const checkEnvForPlaceholders = () => {
   }
 };
 
-type RequireOne<T, K extends keyof T> = {
-  [X in Exclude<keyof T, K>]?: T[X]
-} & {
-  [P in K]-?: T[P]
-};
-
-export type ServerCoreInitializedOptions = RequireOne<
+export type ServerCoreInitializedOptions = Required<
   CreateOptions,
   // This fields are required, because we add default values in constructor
   'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'logger' | 'dashboardAppPath' | 'dashboardAppPort' |
@@ -96,7 +90,7 @@ export class CubejsServerCore {
 
   protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
-  protected readonly contextToDbType: DbTypeFn;
+  protected contextToDbType: DbTypeFn;
 
   protected contextToExternalDbType: ExternalDbTypeFn;
 
@@ -171,23 +165,7 @@ export class CubejsServerCore {
       );
     }
 
-    const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
-      this.options.scheduledRefreshTimer,
-    );
-    if (scheduledRefreshTimer) {
-      this.scheduledRefreshTimerInterval = createCancelableInterval(
-        () => this.handleScheduledRefreshInterval({}),
-        {
-          interval: scheduledRefreshTimer,
-          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
-            error: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
-          }),
-          onDuplicatedStateResolved: (intervalId, elapsed) => this.logger('Refresh Scheduler Long Execution', {
-            warning: `Interval #${intervalId} finished after ${formatDuration(elapsed)}`
-          })
-        }
-      );
-    }
+    this.startScheduledRefreshTimer();
 
     this.event = async (name, props) => {
       if (!this.options.telemetry) {
@@ -277,6 +255,56 @@ export class CubejsServerCore {
     }
   }
 
+  protected getDbType(opts: CreateOptions, ctx: RequestContext) {
+    if (opts.dbType) {
+      if (typeof opts.dbType === 'function') {
+        return opts.dbType(ctx);
+      }
+
+      return opts.dbType;
+    }
+
+    return <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
+  }
+
+  protected isReadyForQueryProcessing(): boolean {
+    const dbType = this.options.dbType || <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
+
+    return typeof dbType !== 'undefined';
+  }
+
+  public startScheduledRefreshTimer(): [boolean, string|null] {
+    if (!this.isReadyForQueryProcessing()) {
+      return [false, 'Instance is not ready for query processing, refresh scheduler is disabled'];
+    }
+
+    if (this.scheduledRefreshTimerInterval) {
+      return [true, null];
+    }
+
+    const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
+      this.options.scheduledRefreshTimer,
+    );
+    if (scheduledRefreshTimer) {
+      this.scheduledRefreshTimerInterval = createCancelableInterval(
+        () => this.handleScheduledRefreshInterval({}),
+        {
+          interval: scheduledRefreshTimer,
+          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
+            error: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
+          }),
+          onDuplicatedStateResolved: (intervalId, elapsed) => this.logger('Refresh Scheduler Long Execution', {
+            warning: `Interval #${intervalId} finished after ${formatDuration(elapsed)}`
+          })
+        }
+      );
+
+      return [true, null];
+    }
+
+    return [false, 'Instance configured without scheduler refresh timer, refresh scheduler is disabled'];
+  }
+
   private requireCubeStoreDriver = () => requireFromPackage<{
     isCubeStoreSupported: typeof isCubeStoreSupported,
     CubeStoreHandler: typeof CubeStoreHandler,
@@ -289,11 +317,8 @@ export class CubejsServerCore {
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     optionsValidate(opts);
 
-    function getDbType() {
-      return opts.dbType || <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
-    }
-
     const externalDbType = opts.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
+
     const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
     const logger: LoggerFn = opts.logger || (
       process.env.NODE_ENV !== 'production'
@@ -348,10 +373,17 @@ export class CubejsServerCore {
     }
 
     const options: ServerCoreInitializedOptions = {
-      dbType: getDbType(),
+      dbType: <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE,
       externalDbType,
       devServer,
-      driverFactory: () => typeof getDbType() === 'string' && CubejsServerCore.createDriver(<DatabaseType>getDbType()),
+      driverFactory: (ctx) => {
+        const dbType = this.contextToDbType(ctx);
+        if (dbType) {
+          return CubejsServerCore.createDriver(dbType);
+        }
+
+        return null;
+      },
       dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
       externalDriverFactory,
@@ -435,6 +467,14 @@ export class CubejsServerCore {
     return options;
   }
 
+  protected reloadEnvVariables() {
+    this.options.dbType = this.options.dbType || <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
+    this.options.externalDbType = this.options.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
+
+    this.contextToDbType = wrapToFnIfNeeded(this.options.dbType);
+    this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
+  }
+
   public configFileExists(): boolean {
     return (Boolean(process.env.CUBEJS_DB_TYPE) || fs.existsSync('./cube.js'));
   }
@@ -506,28 +546,29 @@ export class CubejsServerCore {
     return apiGateway.initSubscriptionServer(sendMessage);
   }
 
-  protected apiGateway() {
-    if (!this.apiGatewayInstance) {
-      this.apiGatewayInstance = new ApiGateway(
-        this.options.apiSecret,
-        this.getCompilerApi.bind(this),
-        this.getOrchestratorApi.bind(this),
-        this.logger, {
-          standalone: this.standalone,
-          dataSourceStorage: this.orchestratorStorage,
-          basePath: this.options.basePath,
-          checkAuthMiddleware: this.options.checkAuthMiddleware,
-          checkAuth: this.options.checkAuth,
-          queryTransformer: this.options.queryTransformer,
-          extendContext: this.options.extendContext,
-          playgroundAuthSecret: getEnv('playgroundAuthSecret'),
-          jwt: this.options.jwt,
-          refreshScheduler: () => new RefreshScheduler(this),
-        }
-      );
+  protected apiGateway(): ApiGateway {
+    if (this.apiGatewayInstance) {
+      return this.apiGatewayInstance;
     }
 
-    return this.apiGatewayInstance;
+    return this.apiGatewayInstance = new ApiGateway(
+      this.options.apiSecret,
+      this.getCompilerApi.bind(this),
+      this.getOrchestratorApi.bind(this),
+      this.logger,
+      {
+        standalone: this.standalone,
+        dataSourceStorage: this.orchestratorStorage,
+        basePath: this.options.basePath,
+        checkAuthMiddleware: this.options.checkAuthMiddleware,
+        checkAuth: this.options.checkAuth,
+        queryTransformer: this.options.queryTransformer,
+        extendContext: this.options.extendContext,
+        playgroundAuthSecret: getEnv('playgroundAuthSecret'),
+        jwt: this.options.jwt,
+        refreshScheduler: () => new RefreshScheduler(this),
+      }
+    );
   }
 
   public getCompilerApi(context: RequestContext) {
@@ -557,9 +598,15 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
-  public async resetDatabaseDriver() {
+  public async resetInstanceState() {
     await this.orchestratorStorage.releaseConnections();
+
     this.orchestratorStorage.clear();
+    this.compilerCache.reset();
+
+    this.reloadEnvVariables();
+
+    this.startScheduledRefreshTimer();
   }
 
   public getOrchestratorApi(context: RequestContext): OrchestratorApi {
@@ -694,8 +741,11 @@ export class CubejsServerCore {
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public async runScheduledRefresh(context: UserBackgroundContext|null, queryingOptions?: any) {
-    return this.getRefreshScheduler().runScheduledRefresh(this.migrateBackgroundContext(context), queryingOptions);
+  public async runScheduledRefresh(context: UserBackgroundContext|null, queryingOptions?: ScheduledRefreshOptions) {
+    return this.getRefreshScheduler().runScheduledRefresh(
+      this.migrateBackgroundContext(context),
+      queryingOptions
+    );
   }
 
   protected warningBackgroundContextShow: boolean = false;

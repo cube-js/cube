@@ -89,16 +89,18 @@ export interface CancelableInterval {
   cancel: (waitExecution?: boolean) => Promise<void>,
 }
 
+export interface CancelableIntervalOptions {
+  interval: number,
+  onDuplicatedStateResolved?: (intervalId: number, elapsedTime: number) => any,
+  onDuplicatedExecution?: (intervalId: number) => any,
+}
+
 /**
  * It's helps to create an interval that can be canceled with awaiting latest execution
  */
 export function createCancelableInterval<T>(
   fn: (token: CancelToken) => Promise<T>,
-  options: {
-    interval: number,
-    onDuplicatedStateResolved?: (intervalId: number, elapsedTime: number) => any,
-    onDuplicatedExecution?: (intervalId: number) => any,
-  },
+  options: CancelableIntervalOptions,
 ): CancelableInterval {
   let execution: CancelablePromise<T>|null = null;
   let startTime: number|null = null;
