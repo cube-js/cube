@@ -54,11 +54,8 @@ and deployment instructions for Cube Store.
 
 ## Supported architectures and platforms
 
-<!-- prettier-ignore-start -->
-[[info | ]]
-| If your platform/architecture is not supported, you can launch Cube Store
-| using Docker.
-<!-- prettier-ignore-end -->
+> If your platform/architecture is not supported, you can launch Cube Store
+> using Docker.
 
 |          | `linux-gnu` | `linux-musl` | `darwin` | `win32` |
 | -------- | :---------: | :----------: | :------: | :-----: |
