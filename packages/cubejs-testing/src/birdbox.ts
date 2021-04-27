@@ -7,7 +7,7 @@ import { pausePromise } from '@cubejs-backend/shared';
 import fsExtra from 'fs-extra';
 
 import { PostgresDBRunner } from './db/postgres';
-// import { getLocalHostnameByOs } from './utils';
+import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
@@ -19,7 +19,7 @@ export interface BirdBox {
     playgroundUrl: string;
     apiUrl: string;
     wsUrl: string;
-    env?: Record<string, unknown>;
+    env?: Record<string, string>;
   };
 }
 
@@ -52,7 +52,6 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 
   const host = '127.0.0.1';
   const port = env.getContainer('birdbox-cube').getMappedPort(4000);
-  const dbPort = env.getContainer('birdbox-db').getMappedPort(5432);
   const playgroundPort = process.env.TEST_PLAYGROUND_PORT ? process.env.TEST_PLAYGROUND_PORT : port;
 
   let proxyServer: HttpProxy | null = null;
@@ -91,9 +90,6 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     }
   }
 
-  console.log('[Birdbox:debug]', 'process.env.TEST_PLAYGROUND_PORT', process.env.TEST_PLAYGROUND_PORT);
-  console.log('[Birdbox:debug]', 'env.getContainer(\'birdbox-db\').getHost()', env.getContainer('birdbox-db').getHost());
-
   return {
     stop: async () => {
       console.log('[Birdbox] Closing');
@@ -108,8 +104,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
-        CUBEJS_DB_PORT: dbPort,
-        CUBEJS_DB_HOST: 'db'
+        ...(process.env.TEST_PLAYGROUND_PORT ? { CUBEJS_DB_HOST: getLocalHostnameByOs() } : null),
       },
     },
   };
@@ -157,7 +152,7 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     }
   }
 
-  const testDir = path.join(process.cwd(), 'birdbox-test-project');
+  const testDir = path.join(process.cwd(), 'birdbox-test-project-2');
 
   if (fs.existsSync(path.join(testDir, '.env'))) {
     fs.unlinkSync(path.join(testDir, '.env'));

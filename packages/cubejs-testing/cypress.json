@@ -2,6 +2,6 @@
   "baseUrl": "http://localhost:3080",
   "chromeWebSecurity": false,
   "viewportWidth": 1600,
-  "viewportHeight": 1000,
+  "viewportHeight": 1400,
   "projectId": "zv1vfg"
 }

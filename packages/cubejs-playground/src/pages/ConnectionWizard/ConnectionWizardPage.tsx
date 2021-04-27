@@ -165,7 +165,7 @@ export default function ConnectionWizardPage({ history }) {
                 </Space>
               </Col>
 
-              {['MySQL', 'PostgreSQL', 'Druid', 'Clickhouse'].includes(
+              {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse'].includes(
                 db?.title || ''
               ) && (
                 <Col span={12}>

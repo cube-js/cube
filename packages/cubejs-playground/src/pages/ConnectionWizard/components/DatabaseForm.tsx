@@ -73,21 +73,16 @@ export default function DatabaseForm({
           </Form.Item>
         )
       )}
-      <Space>
-        <Button
-          data-testid="wizard-form-submit-btn"
-          type="primary"
-          htmlType="submit"
-          loading={loading}
-          disabled={disabled}
-        >
-          Apply
-        </Button>
 
-        <Button onClick={onCancel} data-qa="SetUpLater">
-          Set Up Later
-        </Button>
-      </Space>
+      <Button
+        data-testid="wizard-form-submit-btn"
+        type="primary"
+        htmlType="submit"
+        loading={loading}
+        disabled={disabled}
+      >
+        Apply
+      </Button>
     </Form>
   );
 }
