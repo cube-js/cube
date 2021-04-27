@@ -1,9 +1,24 @@
 import R from 'ramda';
 import uuid from 'uuid/v4';
+import { Required } from '@cubejs-backend/shared';
 
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
 import { RequestContext } from './types';
+
+export interface ScheduledRefreshOptions {
+  timezone?: string,
+  timezones?: string[],
+  throwErrors?: boolean;
+  preAggregationsWarmup?: boolean;
+  concurrency?: number,
+  queryIteratorState?: any;
+  workerIndices?: number[];
+}
+
+type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concurrency' | 'workerIndices'> & {
+  timezones: string[]
+};
 
 export class RefreshScheduler {
   public constructor(
@@ -11,7 +26,12 @@ export class RefreshScheduler {
   ) {
   }
 
-  protected async refreshQueriesForPreAggregation(context, compilerApi: CompilerApi, preAggregation, queryingOptions) {
+  protected async refreshQueriesForPreAggregation(
+    context,
+    compilerApi: CompilerApi,
+    preAggregation,
+    queryingOptions: ScheduledRefreshQueryingOptions
+  ) {
     const compilers = await compilerApi.getCompilers();
     const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity) {
@@ -90,9 +110,13 @@ export class RefreshScheduler {
     }
   }
 
-  public async runScheduledRefresh(ctx: RequestContext | null, queryingOptions) {
-    queryingOptions = { timezones: [queryingOptions.timezone || 'UTC'], ...queryingOptions };
-    const { throwErrors, ...restOptions } = queryingOptions;
+  public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
+    const queryingOptions: ScheduledRefreshQueryingOptions = {
+      timezones: [options.timezone || 'UTC'],
+      ...options,
+      concurrency: options.concurrency || 1,
+      workerIndices: options.workerIndices || R.range(0, options.concurrency || 1),
+    };
 
     const context: RequestContext = {
       authInfo: null,
@@ -109,11 +133,11 @@ export class RefreshScheduler {
     try {
       const compilerApi = this.serverCore.getCompilerApi(context);
       if (queryingOptions.preAggregationsWarmup) {
-        await this.refreshPreAggregations(context, compilerApi, restOptions);
+        await this.refreshPreAggregations(context, compilerApi, queryingOptions);
       } else {
         await Promise.all([
-          this.refreshCubesRefreshKey(context, compilerApi, restOptions),
-          this.refreshPreAggregations(context, compilerApi, restOptions)
+          this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
+          this.refreshPreAggregations(context, compilerApi, queryingOptions)
         ]);
       }
       return {
@@ -127,14 +151,19 @@ export class RefreshScheduler {
           requestId: context.requestId
         });
       }
-      if (throwErrors) {
+
+      if (options.throwErrors) {
         throw e;
       }
     }
     return { finished: false };
   }
 
-  protected async refreshCubesRefreshKey(context: RequestContext, compilerApi: CompilerApi, queryingOptions) {
+  protected async refreshCubesRefreshKey(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    queryingOptions: ScheduledRefreshQueryingOptions
+  ) {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
@@ -259,12 +288,14 @@ export class RefreshScheduler {
     };
   }
 
-  protected async refreshPreAggregations(context: RequestContext, compilerApi: CompilerApi, queryingOptions) {
+  protected async refreshPreAggregations(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    queryingOptions: ScheduledRefreshQueryingOptions
+  ) {
     const { securityContext } = context;
-    const { queryIteratorState } = queryingOptions;
-    let { concurrency, workerIndices } = queryingOptions;
-    concurrency = concurrency || 1;
-    workerIndices = workerIndices || R.range(0, concurrency);
+    const { queryIteratorState, concurrency, workerIndices } = queryingOptions;
+
     const preAggregationsLoadCacheByDataSource = {};
     return Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)

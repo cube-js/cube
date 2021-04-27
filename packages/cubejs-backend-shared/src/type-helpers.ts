@@ -7,3 +7,10 @@ export type ResolveAwait<T> = T extends {
 } ? U : T;
 
 export type Constructor<T> = new (...args: any[]) => T;
+
+// Make some fields required from, if they are optional
+export type Required<T, K extends keyof T> = {
+  [X in Exclude<keyof T, K>]?: T[X]
+} & {
+  [P in K]-?: T[P]
+};

@@ -319,6 +319,7 @@ export class BaseDriver {
 
   async tableColumnTypes(table) {
     const [schema, name] = table.split('.');
+
     const columns = await this.query(
       `SELECT columns.column_name,
              columns.table_name,
@@ -328,6 +329,7 @@ export class BaseDriver {
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name, schema]
     );
+
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
