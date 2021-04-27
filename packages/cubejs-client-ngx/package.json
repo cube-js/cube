@@ -37,7 +37,7 @@
     "@angular/cli": "^10.2.3",
     "@angular/compiler": "^10.2.4",
     "@angular/compiler-cli": "^10.2.4",
-    "@angular/core": "^10.2.4",
+    "@angular/core": "^11.2.11",
     "ng-packagr": "^10.1.2",
     "npm-watch": "^0.7.0",
     "tsickle": "^0.39.1",
