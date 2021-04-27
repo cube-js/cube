@@ -255,18 +255,6 @@ export class CubejsServerCore {
     }
   }
 
-  protected getDbType(opts: CreateOptions, ctx: RequestContext) {
-    if (opts.dbType) {
-      if (typeof opts.dbType === 'function') {
-        return opts.dbType(ctx);
-      }
-
-      return opts.dbType;
-    }
-
-    return <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
-  }
-
   protected isReadyForQueryProcessing(): boolean {
     const dbType = this.options.dbType || <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
 
