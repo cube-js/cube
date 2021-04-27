@@ -1,5 +1,5 @@
 import { Col, Row, Space, Typography } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import envVarsDatabaseMap from '../../shared/env-vars-db-map';
@@ -63,8 +63,6 @@ async function saveConnection(variables: Record<string, string>) {
       variables,
     }),
   });
-
-  await fetch('/restart');
 }
 
 export type Database = {
@@ -74,10 +72,17 @@ export type Database = {
 };
 
 export default function ConnectionWizardPage({ history }) {
+  const [hostname, setHostname] = useState<string>('');
   const [isLoading, setLoading] = useState(false);
   const [isTestConnectionLoading, setTestConnectionLoading] = useState(false);
   const [testConnectionResult, setTestConnectionResult] = useState<any>(null);
   const [db, selectDatabase] = useState<Database | null>(null);
+
+  useEffect(() => {
+    setTestConnectionLoading(false);
+    setTestConnectionResult(null);
+    setHostname('');
+  }, [db?.title]);
 
   return (
     <Layout>
@@ -85,86 +90,88 @@ export default function ConnectionWizardPage({ history }) {
 
       {db ? (
         <>
-          <Space direction="vertical" size="large">
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
             <Space size="middle">
               <SelectedDatabaseCard db={db} />
 
-              <Button type="link" onClick={() => selectDatabase(null)}>
+              <Button
+                data-testid="wizard-change-db-btn"
+                type="link"
+                onClick={() => selectDatabase(null)}
+              >
                 Change
               </Button>
             </Space>
 
+            <Typography>
+              {db.instructions ? (
+                <p>
+                  <span dangerouslySetInnerHTML={{ __html: db.instructions }} />
+                </p>
+              ) : (
+                <p>
+                  Enter database credentials to connect to your database. <br />
+                  Cube.js will store your credentials into the .env file for
+                  future use.
+                </p>
+              )}
+            </Typography>
+
             <Row gutter={[40, 12]}>
-              <Col span={24}>
-                <Typography>
-                  {db.instructions ? (
-                    <p>
-                      <span
-                        dangerouslySetInnerHTML={{ __html: db.instructions }}
-                      />
-                    </p>
-                  ) : (
-                    <p>
-                      Enter database credentials to connect to your database.{' '}
-                      <br />
-                      Cube.js will store your credentials into the .env file for
-                      future use.
-                    </p>
-                  )}
-                </Typography>
-              </Col>
-
               <Col span={12}>
-                <DatabaseForm
-                  db={db}
-                  deployment={{}}
-                  loading={isLoading}
-                  disabled={isTestConnectionLoading}
-                  onCancel={() => undefined}
-                  onSubmit={async (variables) => {
-                    try {
-                      setTestConnectionResult(null);
-                      setTestConnectionLoading(true);
+                <Space
+                  direction="vertical"
+                  size="large"
+                  style={{ width: '100%' }}
+                >
+                  <DatabaseForm
+                    db={db}
+                    deployment={{}}
+                    loading={isLoading}
+                    disabled={isTestConnectionLoading}
+                    hostname={hostname}
+                    onCancel={() => selectDatabase(null)}
+                    onSubmit={async (variables) => {
+                      try {
+                        setTestConnectionResult(null);
+                        setTestConnectionLoading(true);
 
-                      await testConnection(variables);
+                        await testConnection(variables);
 
-                      setTestConnectionResult({
-                        success: true,
-                      });
+                        setTestConnectionResult({
+                          success: true,
+                        });
 
-                      setLoading(true);
-                      await saveConnection(variables);
-                      setLoading(false);
+                        setLoading(true);
+                        await saveConnection(variables);
+                        setLoading(false);
 
-                      history.push('/schema');
-                    } catch (error) {
-                      setTestConnectionResult({
-                        success: false,
-                        error,
-                      });
-                    }
+                        history.push('/schema');
+                      } catch (error) {
+                        setTestConnectionResult({
+                          success: false,
+                          error,
+                        });
+                      }
 
-                    setTestConnectionLoading(false);
-                  }}
-                />
+                      setTestConnectionLoading(false);
+                    }}
+                  />
+
+                  <ConnectionTest
+                    loading={isTestConnectionLoading}
+                    result={testConnectionResult}
+                  />
+                </Space>
               </Col>
 
-              {['MySQL', 'PostgreSQL', 'Druid', 'Clickhouse'].includes(
+              {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse'].includes(
                 db?.title || ''
               ) && (
                 <Col span={12}>
-                  <LocalhostTipBox />
+                  <LocalhostTipBox onHostnameCopy={setHostname} />
                 </Col>
               )}
-            </Row>
-
-            <Row>
-              <Col span={12}>
-                <ConnectionTest
-                  loading={isTestConnectionLoading}
-                  result={testConnectionResult}
-                />
-              </Col>
             </Row>
           </Space>
         </>

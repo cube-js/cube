@@ -1,0 +1,21 @@
+{
+  "postgresql": {
+    "cubejsEnvVars": ["CUBEJS_DB_HOST", "CUBEJS_DB_PORT", "CUBEJS_DB_NAME", "CUBEJS_DB_USER", "CUBEJS_DB_PASS"],
+    "credentials": {
+      "valid": {
+        "CUBEJS_DB_PORT": "5432",
+        "CUBEJS_DB_HOST": "db",
+        "CUBEJS_DB_NAME": "test",
+        "CUBEJS_DB_USER": "test",
+        "CUBEJS_DB_PASS": "test"
+      },
+      "invalid": {
+        "CUBEJS_DB_HOST": "localhost",
+        "CUBEJS_DB_PORT": "100500",
+        "CUBEJS_DB_NAME": "test100",
+        "CUBEJS_DB_USER": "test100",
+        "CUBEJS_DB_PASS": "test100"
+      }
+    }
+  }
+}

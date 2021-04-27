@@ -2,7 +2,6 @@ import { Alert, Button, Form, Input, Space, Typography } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
 import { InputProps } from 'antd/lib/input/Input';
-
 import { copyToClipboard } from '../../../utils';
 
 const IconButton: typeof Button = styled(Button)`
@@ -31,13 +30,20 @@ const StyledForm: typeof Form = styled(Form)`
 
 type TCopiableInputProps = {
   label?: string;
+  onCopyClick: (value: string) => void;
 } & InputProps;
 
-function CopiableInput({ label, value, ...props }: TCopiableInputProps) {
+function CopiableInput({
+  label,
+  value,
+  onCopyClick,
+  ...props
+}: TCopiableInputProps) {
   const suffix = (
     <IconButton
+      data-testid={`localhost-tipbox-${label?.toLowerCase()}-copy-btn`}
       icon={<CopyOutlined />}
-      onClick={() => copyToClipboard(value)}
+      onClick={() => value && onCopyClick(value.toString())}
     />
   );
 
@@ -47,14 +53,24 @@ function CopiableInput({ label, value, ...props }: TCopiableInputProps) {
       labelCol={{ span: 24 }}
       wrapperCol={{ span: 24 }}
     >
-      <Input value={value} suffix={suffix} {...props} />
+      <Input
+        data-testid={`localhost-tipbox-${label?.toLowerCase()}-input`}
+        value={value}
+        suffix={suffix}
+        {...props}
+      />
     </Form.Item>
   );
 }
 
-export function LocalhostTipBox() {
+type TLocalhostTipBoxProps = {
+  onHostnameCopy: (value: string) => void;
+};
+
+export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
   return (
     <StyledAlert
+      data-testid="wizard-localhost-tipbox"
       type="warning"
       message={
         <Space direction="vertical" size="middle">
@@ -64,23 +80,41 @@ export function LocalhostTipBox() {
           </Typography.Text>
 
           <StyledForm>
-            <CopiableInput label="Mac" value="host.docker.internal" />
+            <CopiableInput
+              label="Mac"
+              value="host.docker.internal"
+              onCopyClick={onHostnameCopy}
+            />
 
-            <CopiableInput label="Windows" value="docker.for.win.localhost" />
+            <CopiableInput
+              label="Windows"
+              value="docker.for.win.localhost"
+              onCopyClick={onHostnameCopy}
+            />
 
-            <CopiableInput label="Linux" value="localhost" />
+            <CopiableInput
+              label="Linux"
+              value="localhost"
+              onCopyClick={onHostnameCopy}
+            />
 
             <Space direction="vertical" size="middle">
               <Typography.Text>
                 Please note, for Linux, you need to run Cube.js Docker container
                 in the{' '}
-                <Typography.Link href="https://docs.docker.com/network/host/" target="_blank">
+                <Typography.Link
+                  href="https://docs.docker.com/network/host/"
+                  target="_blank"
+                >
                   network mode "host"
                 </Typography.Link>{' '}
                 to be able to connect to the database running on localhost.
               </Typography.Text>
 
-              <CopiableInput value="docker run --network host" />
+              <CopiableInput
+                value="docker run --network host"
+                onCopyClick={(value) => copyToClipboard(value)}
+              />
             </Space>
           </StyledForm>
         </Space>

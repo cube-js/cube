@@ -1,4 +1,6 @@
 import { Button, Form, Input, Space } from 'antd';
+import { useEffect } from 'react';
+
 import Base64Upload from './Base64Upload';
 
 export default function DatabaseForm({
@@ -6,41 +8,50 @@ export default function DatabaseForm({
   deployment,
   loading = false,
   disabled = false,
+  hostname = '',
   onSubmit,
   onCancel,
 }) {
   const [form] = Form.useForm();
 
-  const defaultValue = (deployment.envVariables || []).reduce((obj, envVar) => {
-    obj[envVar.name] = envVar.value;
-    return obj;
-  }, {});
+  useEffect(() => {
+    form.setFieldsValue({ CUBEJS_DB_HOST: hostname });
+  }, [hostname]);
+
+  const defaultValues = (deployment.envVariables || []).reduce(
+    (obj, envVar) => {
+      obj[envVar.name] = envVar.value;
+      return obj;
+    },
+    {}
+  );
 
   return (
     <Form
+      data-testid="wizard-db-form"
       form={form}
       layout="vertical"
       onFinish={(v) => {
         v['CUBEJS_DB_TYPE'] = db.driver;
         onSubmit(v);
       }}
-      initialValues={defaultValue}
+      initialValues={defaultValues}
     >
       {db.settings.map((param) =>
         param.type === 'base64upload' ? (
-            <Base64Upload
-              onInput={({ raw, encoded }) => {
-                if (param.uploadTarget) {
-                  form.setFieldsValue({ [param.uploadTarget]: encoded });
-                }
-                if (param.extractField) {
-                  form.setFieldsValue({
-                    [param.extractField.formField]:
-                      raw[param.extractField.jsonField],
-                  });
-                }
-              }}
-            />
+          <Base64Upload
+            onInput={({ raw, encoded }) => {
+              if (param.uploadTarget) {
+                form.setFieldsValue({ [param.uploadTarget]: encoded });
+              }
+              if (param.extractField) {
+                form.setFieldsValue({
+                  [param.extractField.formField]:
+                    raw[param.extractField.jsonField],
+                });
+              }
+            }}
+          />
         ) : (
           <Form.Item
             key={param.env}
@@ -48,9 +59,10 @@ export default function DatabaseForm({
             name={param.env}
           >
             {param.title ? (
-              <Input />
+              <Input data-testid={param.env} />
             ) : (
               <Input.TextArea
+                data-testid={param.env}
                 rows={1}
                 style={{
                   overflow: 'hidden',
@@ -61,20 +73,16 @@ export default function DatabaseForm({
           </Form.Item>
         )
       )}
-      <Space>
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={loading}
-          disabled={disabled}
-        >
-          Apply
-        </Button>
 
-        <Button onClick={onCancel} data-qa="SetUpLater">
-          Set Up Later
-        </Button>
-      </Space>
+      <Button
+        data-testid="wizard-form-submit-btn"
+        type="primary"
+        htmlType="submit"
+        loading={loading}
+        disabled={disabled}
+      >
+        Apply
+      </Button>
     </Form>
   );
 }

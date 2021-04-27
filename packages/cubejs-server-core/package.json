@@ -36,6 +36,7 @@
     "@cubejs-backend/schema-compiler": "^0.27.0",
     "@cubejs-backend/shared": "^0.27.0",
     "@cubejs-backend/templates": "^0.27.0",
+    "@cubejs-backend/dotenv": "^9.0.2",
     "@hapi/joi": "^15.1.1",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",

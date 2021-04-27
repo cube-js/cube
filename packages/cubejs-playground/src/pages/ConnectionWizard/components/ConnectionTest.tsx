@@ -1,13 +1,26 @@
-import { Spin, Typography, Alert } from 'antd';
+import { Spin, Typography, Alert, Space } from 'antd';
 import { CheckCircleFilled } from '@ant-design/icons';
 
-export default function ConnectionTest({ loading, result }) {
+type TConnectionTestResult = {
+  success: boolean;
+  error: Error | null;
+};
+
+type TConnectionTestProps = {
+  loading: boolean;
+  result: TConnectionTestResult | null;
+};
+
+export default function ConnectionTest({
+  loading,
+  result,
+}: TConnectionTestProps) {
   if (loading) {
     return (
-      <>
-        <Spin />
-        &nbsp;&nbsp;Testing database connection
-      </>
+      <Space align="center" size="middle">
+        <Spin data-testid="wizard-test-connection-spinner"/>
+        <Typography.Text>Testing database connection</Typography.Text>
+      </Space>
     );
   }
 
@@ -29,6 +42,7 @@ export default function ConnectionTest({ loading, result }) {
         </Typography.Text>
 
         <Alert
+          data-testid="wizard-connection-error"
           style={{ marginTop: 20 }}
           message="Runtime Error"
           type="error"

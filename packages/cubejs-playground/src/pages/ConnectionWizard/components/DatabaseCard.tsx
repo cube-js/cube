@@ -5,7 +5,7 @@ import { Database } from '../ConnectionWizardPage';
 
 export function DatabaseCard({ db }) {
   return (
-    <Card>
+    <Card data-testid="wizard-db-card">
       <Row align="middle" justify="space-between">
         <Col flex="40px">
           <Image src={db.logo} preview={false} />

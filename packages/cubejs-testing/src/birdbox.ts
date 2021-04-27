@@ -1,24 +1,26 @@
 import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
-
+import HttpProxy from 'http-proxy';
 import { DockerComposeEnvironment } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import fsExtra from 'fs-extra';
 
 import { PostgresDBRunner } from './db/postgres';
+import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
-  name: string
+  name: string;
 }
 
 export interface BirdBox {
-  stop: () => Promise<void>,
+  stop: () => Promise<void>;
   configuration: {
-    playgroundUrl: string,
-    apiUrl: string,
-    wsUrl: string,
-  }
+    playgroundUrl: string;
+    apiUrl: string;
+    wsUrl: string;
+    env?: Record<string, string>;
+  };
 }
 
 export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions): Promise<BirdBox> {
@@ -50,13 +52,30 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 
   const host = '127.0.0.1';
   const port = env.getContainer('birdbox-cube').getMappedPort(4000);
+  const playgroundPort = process.env.TEST_PLAYGROUND_PORT ? process.env.TEST_PLAYGROUND_PORT : port;
+
+  let proxyServer: HttpProxy | null = null;
+
+  if (process.env.TEST_PLAYGROUND_PORT) {
+    console.log(`[Birdbox] Creating a proxy server 4000->${port} for local testing`);
+    // As local Playground proxies requests to the 4000 port
+    proxyServer = HttpProxy.createProxyServer({ target: `http://localhost:${port}` }).listen(4000);
+
+    proxyServer.on('error', async (err, req, res) => {
+      console.log('[Proxy Server] error:', err);
+
+      if (!res.headersSent) {
+        res.writeHead(500, { 'content-type': 'application/json' });
+      }
+
+      res.end(JSON.stringify({ error: err.message }));
+    });
+  }
 
   {
     console.log('[Birdbox] Executing load.sh script');
 
-    const { output, exitCode } = await env.getContainer('birdbox-db').exec([
-      '/scripts/load.sh'
-    ]);
+    const { output, exitCode } = await env.getContainer('birdbox-db').exec(['/scripts/load.sh']);
 
     if (exitCode === 0) {
       console.log('[Birdbox] Script load.sh finished successfully');
@@ -76,19 +95,23 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       console.log('[Birdbox] Closing');
 
       await env.down();
+      proxyServer?.close();
 
       console.log('[Birdbox] Closed');
     },
     configuration: {
-      playgroundUrl: `http://${host}:${port}`,
+      playgroundUrl: `http://${host}:${playgroundPort}`,
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
       wsUrl: `ws://${host}:${port}`,
+      env: {
+        ...(process.env.TEST_PLAYGROUND_PORT ? { CUBEJS_DB_HOST: getLocalHostnameByOs() } : null),
+      },
     },
   };
 }
 
 export interface StartCliWithEnvOptions {
-  dbType: string
+  dbType: string;
 }
 
 export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
@@ -107,16 +130,14 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
         source: path.join(__dirname, '..', '..', 'birdbox-fixtures', options.dbType, 'scripts'),
         target: '/scripts',
         bindMode: 'ro',
-      }
-    ]
+      },
+    ],
   });
 
   {
     console.log('[Birdbox] Executing load.sh script');
 
-    const { output, exitCode } = await db.exec([
-      '/scripts/load.sh'
-    ]);
+    const { output, exitCode } = await db.exec(['/scripts/load.sh']);
 
     if (exitCode === 0) {
       console.log('[Birdbox] Script load.sh finished successfully');
@@ -157,8 +178,8 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
       CUBEJS_DB_PASS: 'test',
       CUBEJS_DEV_MODE: 'true',
       CUBEJS_WEB_SOCKETS: 'true',
-      CUBEJS_API_SECRET: 'mysupersecret'
-    }
+      CUBEJS_API_SECRET: 'mysupersecret',
+    },
   });
   // cli.stdout.on('data', (msg) => {
   //   console.log(msg.toString());

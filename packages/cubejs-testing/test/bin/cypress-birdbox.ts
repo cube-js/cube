@@ -38,7 +38,9 @@ import { startBirdBoxFromContainer } from '../../src';
         requestTimeout: 10 * 1000,
         taskTimeout: 10 * 1000,
       },
-      env: {},
+      env: {
+        ...birdbox.configuration.env
+      },
     };
 
     const { BIRDBOX_CYPRESS_UPDATE_SCREENSHOTS } = process.env;
@@ -61,14 +63,19 @@ import { startBirdBoxFromContainer } from '../../src';
       console.log('[Cypress] Recording enabled');
     }
 
-    const results = await cypress.run(options);
+    if (process.env.TEST_PLAYGROUND_PORT) {
+      console.log(`[Cypress] Testing local Playground at ${birdbox.configuration.playgroundUrl}`);
+      await cypress.open(options);
+    } else {
+      const results = await cypress.run(options);
 
-    if (results.status === 'failed') {
-      throw new Error('Cypress failed');
-    }
+      if (results.status === 'failed') {
+        throw new Error('Cypress failed');
+      }
 
-    if (results.status === 'finished' && results.totalFailed > 0) {
-      throw new Error('Cypress failed');
+      if (results.status === 'finished' && results.totalFailed > 0) {
+        throw new Error('Cypress failed');
+      }
     }
   } catch (e) {
     cypressFailed = true;
@@ -81,7 +88,9 @@ import { startBirdBoxFromContainer } from '../../src';
   console.log('[Birdbox] Cleaning');
 
   try {
-    await birdbox.stop();
+    if (process.env.TEST_PLAYGROUND_PORT == null) {
+      await birdbox.stop();
+    }
   } catch (e) {
     console.log(e);
     process.exit(1);

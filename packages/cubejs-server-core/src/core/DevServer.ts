@@ -1,5 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import type { ChildProcess } from 'child_process';
+import dotenv from '@cubejs-backend/dotenv';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -371,12 +372,6 @@ export class DevServer {
       }
     }));
 
-    app.get('/restart', catchErrors(async (_, res) => {
-      process.kill(process.pid, 'SIGUSR1');
-
-      return res.json('Restarting...');
-    }));
-
     app.post('/playground/env', catchErrors(async (req, res) => {
       let { variables = {} } = req.body || {};
 
@@ -396,7 +391,10 @@ export class DevServer {
 
       fs.writeFileSync('.env', variables.join('\n'));
 
-      res.status(200).json('ok');
+      dotenv.config({ override: true });
+      await this.cubejsServer.resetDatabaseDriver();
+
+      res.status(200).json(process.env);
     }));
 
     app.post('/playground/token', catchErrors(async (req, res) => {
