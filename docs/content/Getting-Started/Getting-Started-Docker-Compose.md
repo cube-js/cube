@@ -59,7 +59,7 @@ be created and populated with the same credentials.
   style="text-align: center"
 >
   <img
-  src="connection-wizard-1.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Getting-Started/connection-wizard-1.png"
   style="border: none"
   width="100%"
   />
@@ -72,7 +72,7 @@ credentials:
   style="text-align: center"
 >
   <img
-  src="connection-wizard-2.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Getting-Started/connection-wizard-2.png"
   style="border: none"
   width="100%"
   />
