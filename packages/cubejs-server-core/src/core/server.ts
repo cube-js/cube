@@ -430,7 +430,7 @@ export class CubejsServerCore {
   }
 
   public configFileExists(): boolean {
-    return (fs.existsSync('./.env') || fs.existsSync('./cube.js'));
+    return (Boolean(process.env.CUBEJS_DB_TYPE) || fs.existsSync('./cube.js'));
   }
 
   protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number | false {

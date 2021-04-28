@@ -394,7 +394,7 @@ export class DevServer {
       dotenv.config({ override: true });
       await this.cubejsServer.resetDatabaseDriver();
 
-      res.status(200).json(process.env);
+      res.status(200).json(req.body.variables || {});
     }));
 
     app.post('/playground/token', catchErrors(async (req, res) => {
