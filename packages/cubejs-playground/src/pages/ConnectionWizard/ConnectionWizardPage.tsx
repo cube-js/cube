@@ -9,6 +9,7 @@ import { DatabaseCard, SelectedDatabaseCard } from './components/DatabaseCard';
 import DatabaseForm from './components/DatabaseForm';
 import { Button } from '../../atoms';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
+import { event, playgroundAction } from '../../events';
 
 const { Title, Paragraph } = Typography;
 
@@ -79,6 +80,10 @@ export default function ConnectionWizardPage({ history }) {
   const [db, selectDatabase] = useState<Database | null>(null);
 
   useEffect(() => {
+    playgroundAction('connection_wizard_page');
+  }, []);
+
+  useEffect(() => {
     setTestConnectionLoading(false);
     setTestConnectionResult(null);
     setHostname('');
@@ -146,12 +151,16 @@ export default function ConnectionWizardPage({ history }) {
                         await saveConnection(variables);
                         setLoading(false);
 
+                        event('test_database_connection_success');
+
                         history.push('/schema');
                       } catch (error) {
                         setTestConnectionResult({
                           success: false,
                           error,
                         });
+
+                        event('test_database_connection_error');
                       }
 
                       setTestConnectionLoading(false);
