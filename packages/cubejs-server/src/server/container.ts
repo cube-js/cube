@@ -229,7 +229,7 @@ export class ServerContainer {
       try {
         const { version, port } = await server.listen();
 
-        console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+        console.log(`🚀 Cube.js server (${version}) is listening on port ${port}.`);
       } catch (e) {
         console.error('Fatal error during server start: ');
         console.error(e.stack || e);

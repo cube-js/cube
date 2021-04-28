@@ -344,7 +344,7 @@ export class CubejsServerCore {
       const cubeStorePackage = this.requireCubeStoreDriver();
       if (cubeStorePackage) {
         if (cubeStorePackage.isCubeStoreSupported()) {
-          console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
+          console.log(`🔥 Cube Store (${version}) is assigned to port 3030.`);
 
           const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
             stdout: (data) => {
