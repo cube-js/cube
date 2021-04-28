@@ -68,7 +68,8 @@ export class DevServer {
         coreServerVersion: this.cubejsServer.coreServerVersion,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
-        livePreview: options.livePreview
+        livePreview: options.livePreview,
+        isDocker: isDocker()
       });
     }));
 
@@ -381,17 +382,13 @@ export class DevServer {
 
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
-      if (fs.existsSync('./.env')) {
-        fs.removeSync('./.env');
-      }
-
       const repositoryPath = path.join(process.cwd(), options.schemaPath);
 
       if (!fs.existsSync(repositoryPath)) {
         fs.mkdirSync(repositoryPath);
       }
 
-      fs.writeFileSync('.env', variables.join('\n'));
+      fs.writeFileSync(path.join(process.cwd(), '.env'), variables.join('\n'));
 
       dotenv.config({ override: true });
 
