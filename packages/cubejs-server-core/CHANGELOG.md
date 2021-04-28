@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.2](https://github.com/cube-js/cube.js/compare/v0.27.1...v0.27.2) (2021-04-28)
+
+
+### Bug Fixes
+
+* Disable Scheduling when querying is not ready (before connection Wizard) ([b518ccd](https://github.com/cube-js/cube.js/commit/b518ccdd66a2f51af541bc54de2df816e138bac5))
+* Error: ENOENT: no such file or directory, scandir '/cube/conf/schema' ([dc96084](https://github.com/cube-js/cube.js/commit/dc9608419f53dd823a7f59fcb18141b0f18f002b))
+* Move Prettier & Jest to dev dep (reduce size) ([da59584](https://github.com/cube-js/cube.js/commit/da5958426b701b8a81506e8d74070b2977e3df56))
+* **@cubejs-server/core:** config file check ([1c16af1](https://github.com/cube-js/cube.js/commit/1c16af18ea024239a66f096113157d72eb1065b0))
+
+
+
+
+
 ## [0.27.1](https://github.com/cube-js/cube.js/compare/v0.27.0...v0.27.1) (2021-04-27)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

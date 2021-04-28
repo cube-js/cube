@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.2](https://github.com/cube-js/cube.js/compare/v0.27.1...v0.27.2) (2021-04-28)
+
+
+### Bug Fixes
+
+* Error: ENOENT: no such file or directory, scandir '/cube/conf/schema' ([dc96084](https://github.com/cube-js/cube.js/commit/dc9608419f53dd823a7f59fcb18141b0f18f002b))
+
+
+
+
+
 ## [0.27.1](https://github.com/cube-js/cube.js/compare/v0.27.0...v0.27.1) (2021-04-27)
 
 **Note:** Version bump only for package @cubejs-client/playground
