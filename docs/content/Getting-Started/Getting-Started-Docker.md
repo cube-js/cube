@@ -15,11 +15,17 @@ This guide will help you get Cube.js running using Docker.
 
 ## 1. Run Cube.js with Docker CLI
 
+<!-- prettier-ignore-start -->
+[[info |]]
+| Using Windows? Remember to use [PowerShell][link-powershell] to run the
+| command below!
+<!-- prettier-ignore-end -->
+
 In a new folder for your project, run the following command:
 
 ```bash
 docker run -p 4000:4000 \
-  -v ${pwd}:/cube/conf \
+  -v ${PWD}:/cube/conf \
   -e CUBEJS_DEV_MODE=true \
   cubejs/cube
 ```
@@ -78,6 +84,7 @@ Learn how to [query Cube.js with REST API][ref-rest-api] or [use our Javascript
 client library and integrations with frontend
 frameworks][ref-frontend-introduction].
 
+[link-powershell]: https://docs.microsoft.com/en-us/powershell/scripting/overview?view=powershell-7.1
 [ref-config]: /config
 [ref-connecting-to-the-database]: /connecting-to-the-database
 [ref-cubejs-schema]: /getting-started-cubejs-schema
