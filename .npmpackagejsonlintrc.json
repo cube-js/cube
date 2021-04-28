@@ -3,6 +3,9 @@
     "require-author": "error",
     "require-engines": "error",
     "require-license": "error",
-    "require-name": "error"
+    "require-name": "error",
+    "bin-type": "error",
+    "dependencies-type": "error",
+    "devDependencies-type": "error"
   }
 }
