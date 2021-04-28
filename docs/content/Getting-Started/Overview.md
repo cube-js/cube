@@ -13,7 +13,7 @@ Choose a platform to get started with below:
       <a href="getting-started/docker">
         <div class="gettingStartedItemContent">
           <div class="gettingStartedItemImage">
-            <img src="docker-logo.svg" alt="Docker" />
+            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Getting-Started/docker-logo.svg" alt="Docker" />
           </div>
           <div class="gettingStartedItemLink">Docker</div>
         </div>
@@ -23,7 +23,7 @@ Choose a platform to get started with below:
       <div class="gettingStartedItemContent">
         <a href="getting-started/nodejs">
           <div class="gettingStartedItemImage">
-            <img src="nodejs-logo.svg" alt="Node.js" />
+            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Getting-Started/nodejs-logo.svg" alt="Node.js" />
           </div>
           <div class="gettingStartedItemLink">Node.js</div>
         </a>
