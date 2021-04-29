@@ -170,7 +170,7 @@ function PreAggregationStatus({
         renderTime()
       )}
 
-      <Typography.Link href="http://cube.dev" target="_blank">
+      <Typography.Link href="https://cube.dev/docs/caching/pre-aggregations/getting-started" target="_blank">
         Query was not accelerated with pre-aggregation {'->'}
       </Typography.Link>
 
