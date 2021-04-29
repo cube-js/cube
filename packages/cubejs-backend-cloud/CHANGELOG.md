@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.3](https://github.com/cube-js/cube.js/compare/v0.27.2...v0.27.3) (2021-04-29)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cloud:** Missed dependency ([#2626](https://github.com/cube-js/cube.js/issues/2626)) ([0d396bf](https://github.com/cube-js/cube.js/commit/0d396bf7bd41c5d9acb8d84ae62bdd4ee33fc2a3))
+
+
+
+
+
 ## [0.27.2](https://github.com/cube-js/cube.js/compare/v0.27.1...v0.27.2) (2021-04-28)
 
 **Note:** Version bump only for package @cubejs-backend/cloud
