@@ -1,0 +1,56 @@
+version: 2
+updates:
+- package-ecosystem: npm
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "13:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: chrono-node
+    versions:
+    - 2.1.10
+    - 2.1.11
+    - 2.2.0
+    - 2.2.1
+    - 2.2.3
+    - 2.2.4
+    - 2.2.5
+    - 2.2.6
+  - dependency-name: chalk
+    versions:
+    - 4.1.0
+  - dependency-name: testcontainers
+    versions:
+    - 6.4.2
+    - 7.2.0
+    - 7.4.0
+    - 7.5.0
+    - 7.6.0
+    - 7.6.2
+    - 7.7.0
+  - dependency-name: gatsby-transformer-remark
+    versions:
+    - 2.16.1
+  - dependency-name: socket.io
+    versions:
+    - 2.4.1
+  - dependency-name: commander
+    versions:
+    - 7.0.0
+    - 7.1.0
+  - dependency-name: fs-extra
+    versions:
+    - 9.1.0
+  - dependency-name: "@babel/parser"
+    versions:
+    - 7.13.4
+  - dependency-name: uuidv4
+    versions:
+    - 6.2.6
+  - dependency-name: sqlite3
+    versions:
+    - 5.0.1
+  - dependency-name: less-loader
+    versions:
+    - 7.2.1
