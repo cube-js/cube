@@ -5,6 +5,10 @@ permalink: /getting-started/docker/compose
 
 This guide will help you get Cube.js running using Docker Compose.
 
+<div class="block-video" style="position: relative; padding-bottom: 56.25%; height: 0;">
+  <iframe src="https://www.loom.com/embed/268bc36e80a34f8790c805d33d6accf5" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+</div>
+
 ## 1. Create a Docker Compose file
 
 Create a `docker-compose.yml` file with the following content:
