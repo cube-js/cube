@@ -93,6 +93,10 @@ pub fn rewrite_plan<R: PlanRewriter>(
             n: *n,
             input: Arc::new(rewrite_plan(input, ctx, f)?),
         },
+        LogicalPlan::Skip { n, input } => LogicalPlan::Skip {
+            n: *n,
+            input: Arc::new(rewrite_plan(input, ctx, f)?),
+        },
         p @ LogicalPlan::CreateExternalTable { .. } => p.clone(),
         LogicalPlan::Explain {
             verbose,

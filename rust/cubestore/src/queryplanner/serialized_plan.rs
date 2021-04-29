@@ -127,6 +127,10 @@ pub enum SerializedLogicalPlan {
         n: usize,
         input: Arc<SerializedLogicalPlan>,
     },
+    Skip {
+        n: usize,
+        input: Arc<SerializedLogicalPlan>,
+    },
     Repartition {
         input: Arc<SerializedLogicalPlan>,
         partitioning_scheme: SerializePartitioning,
@@ -232,6 +236,10 @@ impl SerializedLogicalPlan {
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
+                n: *n,
+                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+            },
+            SerializedLogicalPlan::Skip { n, input } => LogicalPlan::Skip {
                 n: *n,
                 input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
             },
@@ -595,6 +603,10 @@ impl SerializedPlan {
                 expr: expr.iter().map(|e| Self::serialized_expr(e)).collect(),
             },
             LogicalPlan::Limit { n, input } => SerializedLogicalPlan::Limit {
+                input: Arc::new(Self::serialized_logical_plan(input)),
+                n: *n,
+            },
+            LogicalPlan::Skip { n, input } => SerializedLogicalPlan::Skip {
                 input: Arc::new(Self::serialized_logical_plan(input)),
                 n: *n,
             },

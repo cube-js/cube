@@ -71,6 +71,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_3_table_joins", planning_3_table_joins),
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
+        t("offset", offset),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2098,6 +2099,62 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
                     TableValue::Decimal(i.to_string()),
                 ]
             })
+            .collect_vec()
+    }
+}
+
+async fn offset(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(t text)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data1(t) VALUES ('a'), ('b'), ('c'), ('z')")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(t text)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(t) VALUES ('f'), ('g'), ('h')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT t FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2)\
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["a", "b", "c", "f", "g", "h", "z"]));
+    let r = service
+        .exec_query(
+            "SELECT t FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2)\
+             ORDER BY 1 \
+             LIMIT 3 \
+             OFFSET 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["c", "f", "g"]));
+
+    let r = service
+        .exec_query(
+            "SELECT t FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2)\
+             ORDER BY 1 DESC \
+             LIMIT 3 \
+             OFFSET 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["h", "g", "f"]));
+
+    fn rows(a: &[&str]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|s| vec![TableValue::String(s.to_string())])
             .collect_vec()
     }
 }

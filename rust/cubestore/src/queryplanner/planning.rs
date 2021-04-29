@@ -528,6 +528,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
         LogicalPlan::Aggregate { .. }
         | LogicalPlan::Sort { .. }
         | LogicalPlan::Limit { .. }
+        | LogicalPlan::Skip { .. }
         | LogicalPlan::Repartition { .. } => return Ok(p),
         // We can always pull cluster send for these nodes.
         LogicalPlan::Projection { input, .. } | LogicalPlan::Filter { input, .. } => {

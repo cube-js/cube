@@ -150,6 +150,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 }
                 LogicalPlan::EmptyRelation { .. } => self.output += "Empty",
                 LogicalPlan::Limit { .. } => self.output += "Limit",
+                LogicalPlan::Skip { .. } => self.output += "Skip",
                 LogicalPlan::CreateExternalTable { .. } => self.output += "CreateExternalTable",
                 LogicalPlan::Explain { .. } => self.output += "Explain",
                 LogicalPlan::Extension { node } => {
