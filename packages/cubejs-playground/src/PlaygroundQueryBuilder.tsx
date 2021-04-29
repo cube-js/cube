@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, RefObject } from 'react';
-import { Col, Row, Divider } from 'antd';
-import { LockOutlined, CloudOutlined } from '@ant-design/icons';
+import { Col, Row, Divider, Typography, Space } from 'antd';
+import Icon, { LockOutlined, CloudOutlined } from '@ant-design/icons';
 import {
   QueryBuilder,
   SchemaChangeProps,
@@ -24,7 +24,7 @@ import LivePreviewBar from './components/LivePreviewContext/LivePreviewBar';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { SectionHeader, SectionRow } from './components';
 import ChartContainer from './ChartContainer';
-import { dispatchPlaygroundEvent } from './utils';
+import { dispatchPlaygroundEvent, formatNumber } from './utils';
 import {
   useDeepCompareMemoize,
   useSecurityContext,
@@ -33,6 +33,7 @@ import {
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
 import DashboardSource from './DashboardSource';
+import { LightningIcon } from './shared/icons/LightningIcon';
 
 const Section = styled.div`
   display: flex;
@@ -129,6 +130,56 @@ type THandleRunButtonClickProps = {
   pivotConfig?: PivotConfig;
   chartType: ChartType;
 };
+
+type PreAggregationStatusProps = {
+  time: number;
+  isAggregated: boolean;
+};
+
+const Label = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(251, 188, 5, 0.1);
+`;
+
+function PreAggregationStatus({
+  time,
+  isAggregated,
+}: PreAggregationStatusProps) {
+  const renderTime = () => (
+    <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
+      {formatNumber(time)} ms
+    </Typography.Text>
+  );
+
+  return (
+    <Space style={{ marginLeft: 'auto' }}>
+      {isAggregated ? (
+        <Label>
+          <Space size={4}>
+            <Icon
+              style={{ color: '#ffc42e' }}
+              component={() => <LightningIcon />}
+            />
+            {renderTime()}
+          </Space>
+        </Label>
+      ) : (
+        renderTime()
+      )}
+
+      <Typography.Link href="http://cube.dev" target="_blank">
+        Query was not accelerated with pre-aggregation {'->'}
+      </Typography.Link>
+
+      <Typography.Text>
+        Query was accelerated with pre-aggregation
+      </Typography.Text>
+    </Space>
+  );
+}
 
 export type TPlaygroundQueryBuilderProps = {
   apiUrl: string;
@@ -267,28 +318,29 @@ export default function PlaygroundQueryBuilder({
                     >
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
-                    {livePreviewContext && !livePreviewContext.livePreviewDisabled && (
-                      <Button
-                        data-testid="live-preview-btn"
-                        icon={<CloudOutlined />}
-                        size="small"
-                        type={
-                          livePreviewContext.statusLivePreview.active
-                            ? 'primary'
-                            : 'default'
-                        }
-                        onClick={() =>
-                          livePreviewContext.statusLivePreview.active
-                            ? livePreviewContext.stopLivePreview()
-                            : livePreviewContext.startLivePreview()
-                        }
-                      >
-                        {livePreviewContext.statusLivePreview.active
-                          ? 'Stop'
-                          : 'Start'}{' '}
-                        Live Preview
-                      </Button>
-                    )}
+                    {livePreviewContext &&
+                      !livePreviewContext.livePreviewDisabled && (
+                        <Button
+                          data-testid="live-preview-btn"
+                          icon={<CloudOutlined />}
+                          size="small"
+                          type={
+                            livePreviewContext.statusLivePreview.active
+                              ? 'primary'
+                              : 'default'
+                          }
+                          onClick={() =>
+                            livePreviewContext.statusLivePreview.active
+                              ? livePreviewContext.stopLivePreview()
+                              : livePreviewContext.startLivePreview()
+                          }
+                        >
+                          {livePreviewContext.statusLivePreview.active
+                            ? 'Stop'
+                            : 'Start'}{' '}
+                          Live Preview
+                        </Button>
+                      )}
                   </Button.Group>
                 </Card>
               </Col>
@@ -395,8 +447,8 @@ export default function PlaygroundQueryBuilder({
 
                 <SectionRow
                   style={{
-                    marginTop: 16,
-                    marginLeft: 16,
+                    margin: 16,
+                    marginBottom: 0,
                   }}
                 >
                   <SelectChartType
@@ -429,6 +481,8 @@ export default function PlaygroundQueryBuilder({
                     onMove={updatePivotConfig.moveItem}
                     onUpdate={updatePivotConfig.update}
                   />
+
+                  <PreAggregationStatus time={1200} isAggregated />
                 </SectionRow>
               </Col>
             </Row>

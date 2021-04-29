@@ -16,7 +16,7 @@ const GlobalStyles = createGlobalStyle`
     padding: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: #f6f6f8;
+    background: var(--layout-body-background);
     overflow-x: hidden;
   }
 
@@ -49,6 +49,11 @@ const GlobalStyles = createGlobalStyle`
   
   .schema-sidebar .ant-menu {
     border: 0;
+  }
+  
+  .ant-layout {
+    height: 100%;
+    background: var(--layout-body-background);
   }
   
   .ant-layout-header .ant-menu {

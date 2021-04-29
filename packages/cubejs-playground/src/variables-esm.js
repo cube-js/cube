@@ -9,7 +9,7 @@ const colors = {
   'dark-03': '114, 114, 144',
   'dark-04': '161, 161, 181',
   'dark-05': '213, 213, 226',
-  light: '243, 243, 251',
+  light: '1, 2, 251',
 };
 
 function color(name, opacity = 1) {
