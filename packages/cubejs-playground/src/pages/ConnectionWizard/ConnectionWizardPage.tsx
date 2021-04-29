@@ -130,7 +130,6 @@ export default function ConnectionWizardPage({ history }) {
                     loading={isLoading}
                     disabled={isTestConnectionLoading}
                     hostname={hostname}
-                    onCancel={() => selectDatabase(null)}
                     onSubmit={async (variables) => {
                       try {
                         setTestConnectionResult(null);

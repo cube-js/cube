@@ -1,4 +1,4 @@
-import { Button, Form, Input, Space } from 'antd';
+import { Button, Form, Input } from 'antd';
 import { useEffect } from 'react';
 
 import Base64Upload from './Base64Upload';
@@ -10,7 +10,6 @@ export default function DatabaseForm({
   disabled = false,
   hostname = '',
   onSubmit,
-  onCancel,
 }) {
   const [form] = Form.useForm();
 
@@ -59,7 +58,11 @@ export default function DatabaseForm({
             name={param.env}
           >
             {param.title ? (
-              <Input data-testid={param.env} />
+              param.env === 'CUBEJS_DB_PASS' ? (
+                <Input.Password data-testid={param.env} />
+              ) : (
+                <Input data-testid={param.env} />
+              )
             ) : (
               <Input.TextArea
                 data-testid={param.env}

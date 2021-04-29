@@ -88,7 +88,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
 
             <CopiableInput
               label="Windows"
-              value="docker.for.win.localhost"
+              value="host.docker.internal"
               onCopyClick={onHostnameCopy}
             />
 
