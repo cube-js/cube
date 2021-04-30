@@ -9,6 +9,7 @@ import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 import { Button, CubeLoader } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
+import { QueryStatus } from '../../PlaygroundQueryBuilder';
 
 const { Text } = Typography;
 
@@ -69,7 +70,7 @@ export type TQueryLoadResult = {
   isLoading: boolean;
   resultSet?: ResultSet;
   error?: Error | null;
-};
+} & Partial<QueryStatus>;
 
 type TChartRendererProps = {
   query: Query;
@@ -99,7 +100,7 @@ export default function ChartRenderer({
   onChartRendererReadyChange,
   onQueryStatusChange,
   onRunButtonClick,
-  onQueryChange
+  onQueryChange,
 }: TChartRendererProps) {
   const runButtonRef = useRef<HTMLButtonElement>(null);
   const [slowQuery, setSlowQuery] = useState(false);
@@ -121,19 +122,23 @@ export default function ChartRenderer({
 
   useEffect(() => {
     onQueryChange();
-  }, [areQueriesEqual])
+  }, [areQueriesEqual]);
 
   useEffect(() => {
     setResultSet(false);
   }, [framework]);
 
   useLayoutEffect(() => {
+    let queryStartTime: number;
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
       onQueryStart: () => {
+        queryStartTime = Date.now();
         onQueryStatusChange({ isLoading: true });
       },
       onQueryLoad: ({ resultSet, error }: TQueryLoadResult) => {
+        let isAggregated;
+        const timeElapsed = Date.now() - queryStartTime;
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
 
@@ -141,13 +146,25 @@ export default function ChartRenderer({
           Boolean(loadResponse.slowQuery) && setSlowQuery(false);
           setResultSet(true);
 
-          const servedByPreAggregation = Object.keys(loadResponse.results[0]?.usedPreAggregations || {}).length > 0;
+          isAggregated =
+            Object.keys(loadResponse.results[0]?.usedPreAggregations || {})
+              .length > 0;
 
-          event(servedByPreAggregation ? 'load_request_success_aggregated:frontend' : 'load_request_success:frontend');
+          event(
+            isAggregated
+              ? 'load_request_success_aggregated:frontend'
+              : 'load_request_success:frontend'
+          );
         }
 
         if (resultSet || error) {
-          onQueryStatusChange({ resultSet, error, isLoading: false });
+          onQueryStatusChange({
+            resultSet,
+            error,
+            isLoading: false,
+            timeElapsed,
+            isAggregated
+          });
         }
       },
       onQueryProgress: (progress) => {

@@ -88,7 +88,7 @@ class App extends Component<RouteComponentProps, TAppState> {
     }
 
     return (
-      <Layout style={{ height: '100%' }}>
+      <Layout>
         <GlobalStyles />
         <Header selectedKeys={selectedTab(location.pathname)} />
         <Layout.Content style={{ height: '100%' }}>

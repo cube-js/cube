@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { Alert as AntdAlert } from 'antd';
 
-const TYPES = {
+export const TYPES = {
   error: {
     border: '#FFCCC7',
     background: 'rgb(255, 100, 109, 0.05)',
@@ -21,7 +21,7 @@ const TYPES = {
   },
 };
 
-const StyledAlert: any = styled(AntdAlert)`
+export const Alert: typeof AntdAlert = styled(AntdAlert)`
   && {
     background: ${(props) => TYPES[props.type || 'info'].background};
     border: 1px solid ${(props) => TYPES[props.type || 'info'].border};
@@ -30,5 +30,3 @@ const StyledAlert: any = styled(AntdAlert)`
     border-radius: 2px;
   }
 `;
-
-export { StyledAlert as Alert };

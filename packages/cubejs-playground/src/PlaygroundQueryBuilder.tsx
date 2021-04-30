@@ -33,6 +33,7 @@ import {
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
 import DashboardSource from './DashboardSource';
+import { PreAggregationStatus } from './components/PlaygroundQueryBuilder/components';
 
 const Section = styled.div`
   display: flex;
@@ -124,6 +125,24 @@ function PivotChangeEmitter({
   return null;
 }
 
+type QueryChangeEmitterProps = {
+  query1: Query | null;
+  query2: Query | null;
+  onChange: () => void;
+};
+
+function QueryChangeEmitter({
+  query1,
+  query2,
+  onChange,
+}: QueryChangeEmitterProps) {
+  useEffect(() => {
+    onChange();
+  }, [areQueriesEqual(query1, query2)]);
+
+  return null;
+}
+
 type THandleRunButtonClickProps = {
   query: Query;
   pivotConfig?: PivotConfig;
@@ -141,6 +160,11 @@ export type TPlaygroundQueryBuilderProps = {
   onSchemaChange?: (props: SchemaChangeProps) => void;
 };
 
+export type QueryStatus = {
+  timeElapsed: number;
+  isAggregated: boolean;
+};
+
 export default function PlaygroundQueryBuilder({
   apiUrl,
   cubejsToken,
@@ -154,6 +178,7 @@ export default function PlaygroundQueryBuilder({
   const ref = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
 
+  const [queryStatus, setQueryStatus] = useState<QueryStatus | null>(null);
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
@@ -267,28 +292,29 @@ export default function PlaygroundQueryBuilder({
                     >
                       {token ? 'Edit' : 'Add'} Security Context
                     </Button>
-                    {livePreviewContext && !livePreviewContext.livePreviewDisabled && (
-                      <Button
-                        data-testid="live-preview-btn"
-                        icon={<CloudOutlined />}
-                        size="small"
-                        type={
-                          livePreviewContext.statusLivePreview.active
-                            ? 'primary'
-                            : 'default'
-                        }
-                        onClick={() =>
-                          livePreviewContext.statusLivePreview.active
-                            ? livePreviewContext.stopLivePreview()
-                            : livePreviewContext.startLivePreview()
-                        }
-                      >
-                        {livePreviewContext.statusLivePreview.active
-                          ? 'Stop'
-                          : 'Start'}{' '}
-                        Live Preview
-                      </Button>
-                    )}
+                    {livePreviewContext &&
+                      !livePreviewContext.livePreviewDisabled && (
+                        <Button
+                          data-testid="live-preview-btn"
+                          icon={<CloudOutlined />}
+                          size="small"
+                          type={
+                            livePreviewContext.statusLivePreview.active
+                              ? 'primary'
+                              : 'default'
+                          }
+                          onClick={() =>
+                            livePreviewContext.statusLivePreview.active
+                              ? livePreviewContext.stopLivePreview()
+                              : livePreviewContext.startLivePreview()
+                          }
+                        >
+                          {livePreviewContext.statusLivePreview.active
+                            ? 'Stop'
+                            : 'Start'}{' '}
+                          Live Preview
+                        </Button>
+                      )}
                   </Button.Group>
                 </Card>
               </Col>
@@ -395,8 +421,8 @@ export default function PlaygroundQueryBuilder({
 
                 <SectionRow
                   style={{
-                    marginTop: 16,
-                    marginLeft: 16,
+                    margin: 16,
+                    marginBottom: 0,
                   }}
                 >
                   <SelectChartType
@@ -429,6 +455,13 @@ export default function PlaygroundQueryBuilder({
                     onMove={updatePivotConfig.moveItem}
                     onUpdate={updatePivotConfig.update}
                   />
+
+                  {queryStatus ? (
+                    <PreAggregationStatus
+                      timeElapsed={queryStatus.timeElapsed}
+                      isAggregated={queryStatus.isAggregated}
+                    />
+                  ) : null}
                 </SectionRow>
               </Col>
             </Row>
@@ -515,12 +548,22 @@ export default function PlaygroundQueryBuilder({
                             isLoading,
                             resultSet,
                             error,
+                            isAggregated,
+                            timeElapsed,
                           }) => {
                             if (resultSet) {
                               setQueryError(null);
+
+                              if (isAggregated != null && timeElapsed != null) {
+                                setQueryStatus({
+                                  isAggregated,
+                                  timeElapsed,
+                                });
+                              }
                             }
                             if (error) {
                               setQueryError(error);
+                              setQueryStatus(null);
                             }
 
                             setQueryLoading(isLoading);
@@ -554,6 +597,12 @@ export default function PlaygroundQueryBuilder({
             </Row>
 
             <PivotChangeEmitter iframeRef={ref} pivotConfig={pivotConfig} />
+
+            <QueryChangeEmitter
+              query1={query}
+              query2={queryRef.current}
+              onChange={() => setQueryStatus(null)}
+            />
           </>
         );
       }}
