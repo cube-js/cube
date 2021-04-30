@@ -447,7 +447,7 @@ impl fmt::Display for Column {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum ImportFormat {
     CSV,
 }

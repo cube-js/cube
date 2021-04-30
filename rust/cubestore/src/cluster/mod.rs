@@ -99,7 +99,11 @@ pub trait Cluster: DIService + Send + Sync {
 
     fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String;
 
-    async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError>;
+    async fn node_name_for_import(
+        &self,
+        table_id: u64,
+        location: &str,
+    ) -> Result<String, CubeError>;
 
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage;
 
@@ -276,12 +280,19 @@ impl Cluster for ClusterImpl {
         workers[(hasher.finish() % workers.len() as u64) as usize].clone()
     }
 
-    async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError> {
+    async fn node_name_for_import(
+        &self,
+        table_id: u64,
+        location: &str,
+    ) -> Result<String, CubeError> {
         let workers = self.config_obj.select_workers();
         if workers.is_empty() {
             return Ok(self.server_name.to_string());
         }
-        Ok(workers[(table_id % workers.len() as u64) as usize].to_string())
+        let mut hasher = DefaultHasher::new();
+        table_id.hash(&mut hasher);
+        location.hash(&mut hasher);
+        Ok(workers[(hasher.finish() % workers.len() as u64) as usize].to_string())
     }
 
     async fn warmup_partition(
@@ -538,6 +549,16 @@ impl JobRunner {
                     let table_id = *table_id;
                     tokio::spawn(async move { import_service.import_table(table_id).await })
                         .await??
+                } else {
+                    Self::fail_job_row_key(job);
+                }
+            }
+            JobType::TableImportCSV(location) => {
+                if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
+                    self.import_service
+                        .clone()
+                        .import_table_part(*table_id, location)
+                        .await?
                 } else {
                     Self::fail_job_row_key(job);
                 }

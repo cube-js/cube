@@ -160,8 +160,8 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::Insert(TableId::Tables, row_id) = event {
             let table = self.meta_store.get_table_by_id(row_id).await?;
-            if table.get_row().locations().is_some() {
-                self.schedule_table_import(row_id).await?;
+            if let Some(locations) = table.get_row().locations() {
+                self.schedule_table_import(row_id, &locations).await?;
             }
         }
         if let MetaStoreEvent::Delete(TableId::WALs, row_id) = event {
@@ -239,19 +239,25 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    async fn schedule_table_import(&self, table_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.node_name_for_import(table_id).await?;
-        let job = self
-            .meta_store
-            .add_job(Job::new(
-                RowKey::Table(TableId::Tables, table_id),
-                JobType::TableImport,
-                node.to_string(),
-            ))
-            .await?;
-        if job.is_some() {
-            // TODO queue failover
-            self.cluster.notify_job_runner(node).await?;
+    async fn schedule_table_import(
+        &self,
+        table_id: u64,
+        locations: &[&String],
+    ) -> Result<(), CubeError> {
+        for &l in locations {
+            let node = self.cluster.node_name_for_import(table_id, &l).await?;
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, table_id),
+                    JobType::TableImportCSV(l.clone()),
+                    node.to_string(),
+                ))
+                .await?;
+            if job.is_some() {
+                // TODO queue failover
+                self.cluster.notify_job_runner(node).await?;
+            }
         }
         Ok(())
     }
