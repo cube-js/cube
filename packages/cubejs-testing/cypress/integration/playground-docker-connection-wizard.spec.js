@@ -54,7 +54,7 @@ context('Playground: Connection Wizard', () => {
       cy.getByTestId('wizard-localhost-tipbox').should('exist');
     });
 
-    it('fails to connect to the DB with wrong crednetials', () => {
+    it('fails to connect to the DB with wrong credentials', () => {
       cy.visit('/');
       cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
       cy.fixture('databases.json').then(({ postgresql }) => {

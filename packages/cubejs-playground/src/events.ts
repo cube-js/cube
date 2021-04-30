@@ -3,13 +3,16 @@ import cookie from 'component-cookie';
 import uuidv4 from 'uuid/v4';
 
 let flushPromise = null;
-let trackEvents: string[] = [];
-let baseProps = {};
+let trackEvents: BaseEvent[] = [];
+let baseProps = {
+  sentFrom: 'frontend'
+};
 
 const track = async (event) => {
   if (!cookie('playground_anonymous')) {
     cookie('playground_anonymous', uuidv4());
   }
+
   trackEvents.push({
     ...baseProps,
     ...event,
@@ -17,22 +20,21 @@ const track = async (event) => {
     clientAnonymousId: cookie('playground_anonymous'),
     clientTimestamp: new Date().toJSON(),
   });
-  const flush = async (toFlush?: string[], retries?: number) => {
+
+  const flush = async (toFlush?: BaseEvent[], retries: number = 10) => {
     if (!toFlush) {
       toFlush = trackEvents;
       trackEvents = [];
     }
+
     if (!toFlush.length) {
       return null;
     }
-    if (retries == null) {
-      retries = 10;
-    }
+
     try {
       const sentAt = new Date().toJSON();
       const result = await fetch('https://track.cube.dev/track', {
         method: 'post',
-        // @ts-ignore
         body: JSON.stringify(toFlush.map((r) => ({ ...r, sentAt }))),
         headers: { 'Content-Type': 'application/json' },
       });
@@ -43,7 +45,6 @@ const track = async (event) => {
       if (retries > 0) {
         return flush(toFlush, retries - 1);
       }
-      // console.log(e);
     }
     return null;
   };
@@ -60,15 +61,20 @@ const track = async (event) => {
 };
 
 export const setAnonymousId = (anonymousId, props) => {
-  baseProps = props;
+  baseProps = {
+    ...baseProps,
+    ...props
+  };
   track({ event: 'identify', anonymousId, ...props });
 };
 
-export const event = (name, params) => {
+type BaseEvent = Record<string, any>;
+
+export const event = (name: string, params: BaseEvent = {}) => {
   track({ event: name, ...params });
 };
 
-export const playgroundAction = (name, options = {}) => {
+export const playgroundAction = (name: string, options: BaseEvent = {}) => {
   event('Playground Action', { name, ...options });
 };
 
