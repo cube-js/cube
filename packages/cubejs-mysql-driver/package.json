@@ -14,8 +14,8 @@
   "main": "driver/MySqlDriver.js",
   "typings": "driver/index.d.ts",
   "scripts": {
-    "integration": "jest",
-    "integration:mysql": "jest",
+    "integration": "npm run integration:mysql",
+    "integration:mysql": "jest --verbose",
     "lint": "eslint driver/*.js test/*.js"
   },
   "dependencies": {
@@ -27,7 +27,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "^0.27.0",
     "jest": "^26.6.3",
-    "testcontainers": "^2.4.0"
+    "testcontainers": "^7.6.2"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
