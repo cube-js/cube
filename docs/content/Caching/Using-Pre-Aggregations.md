@@ -142,135 +142,6 @@ incremental refreshes; when configured, Cube.js will only refresh partitions as
 necessary. Without incremental refreshing, Cube.js will re-calculate the entire
 pre-aggregation whenever [the refresh key][ref-preaggs-refresh-key] changes.
 
-## Pre-Aggregations Storage
-
-Cube.js can store pre-aggregations on the source database or on a separate,
-**external** database.
-
-When using **external** pre-aggregations, Cube.js will store pre-aggregations
-inside its own purpose-built storage layer: Cube Store.
-
-Alternatively, you can store external pre-aggregations in a different database,
-such MySQL or Postgres. In order to make this work, you should set the
-[`externalDriverFactory`][ref-config-extdriverfactory] and
-[`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
-configuration file. These properties can also be set through the environment
-variables.
-
-```bash
-CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_EXT_DB_PORT=<YOUR_DB_PORT_HERE>
-CUBEJS_EXT_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
-```
-
-### Known limitations of MySQL/Postgres as external database
-
-<!-- prettier-ignore-start -->
-[[warning |]]
-| Please be aware of the limitations when using MySQL/Postgres as an external
-| database for pre-aggregations.
-<!-- prettier-ignore-end -->
-
-Some known limitations are listed below.
-
-**Performance issues with high cardinality rollups:** Queries over billions of
-datapoints or higher start exhibiting severe latency issues, negatively
-impacting end-user experience.
-
-**Lack of HyperLogLog support:** The HyperLogLog algorithm makes fast work of
-distinct counts in queries, a common analytical operation. Unfortunately,
-support between database vendors varies greatly, and therefore cannot be
-guaranteed.
-
-**Degraded performance for big `UNION ALL` queries:** A practical example of
-this would be when querying over a date range using a pre-aggregation with a
-`partitionGranularity`. The query would use several partitioned tables to
-deliver the result set, and therefore needs to join all valid partitions.
-
-**Poor JOIN performance across rolled up tables:** This often affects workloads
-which require cross database joins.
-
-**Table/schema name length mismatches:** A common issue when working across
-different database types is that different databases have different length
-limits on table names. Cube.js allows working around the issue with `sqlAlias`
-but this becomes cumbersome with lots of pre-aggregations.
-
-**SQL type differences between source and external database:** Different
-databases often specify types differently, which can cause type mismatch issues.
-This is also a common issue and source of frustration which Cube Store resolves.
-
-## External vs Internal
-
-In Cube.js, pre-aggregations are called **external** when they are flagged with
-`external: true` which instructs Cube.js to store pre-aggregations inside its
-own storage - Cube Store.
-
-If pre-aggregations aren't flagged `external: true` they are considered
-**internal** and will be saved to and queried from the source database.
-
-<!-- prettier-ignore-start -->
-[[info | ]]
-| We recommend always using **external** pre-aggregations for better concurrency and performance.
-<!-- prettier-ignore-end -->
-
-You should use external pre-aggregations for scenarios where you need high
-throughput for a big data backend. It allows downloading rollups and original
-SQL pre-aggregations prepared in big data backends such as AWS Athena, BigQuery,
-Presto, Hive and others to Cube Store for low latency and high throughput
-querying.
-
-While big data backends aren't very suitable for handling massive amounts of
-concurrent queries even on pre-aggregated data, Cube.js pre-aggregations storage
-can do it very well.
-
-To set it up, simply add the `external` property to your pre-aggregation:
-
-```javascript
-cube(`Orders`, {
-  sql: `select * from orders`,
-
-  //...
-
-  preAggregations: {
-    categoryAndDate: {
-      type: `rollup`,
-      measureReferences: [Orders.count, revenue],
-      dimensionReferences: [category],
-      timeDimensionReference: createdAt,
-      granularity: `day`,
-      partitionGranularity: `month`,
-      external: true,
-    },
-  },
-});
-```
-
-Note that by default, Cube.js materializes the pre-aggregation query results as
-new tables in the source database. For external pre-aggregations, these source
-tables are temporary - once downloaded and uploaded to the external database,
-they are cleaned up.
-
-### Known limitations of internal pre-aggregations
-
-Internal pre-aggregations are not considered production-ready due to several
-shortcomings, as noted below.
-
-**Concurrency:** Databases (especially RDBMs) generally cannot handle high
-concurrency without special configuration. Application databases such as MySQL
-and Postgres do support concurrency, but often cannot cope with the demands of
-analytical queries without significant tuning. On the other hand, data
-warehousing solutions such as Athena and BigQuery often limit the number of
-concurrent connections too.
-
-**Latency:** Data warehousing solutions (such as BigQuery or Redshift) are often
-slow to return results.
-
-**Cost:** Some databases charge by the amount of data scanned for each query
-(such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
-rack up costs.
 
 ## Garbage Collection
 
@@ -493,6 +364,81 @@ services:
     volumes:
       - ./schema:/cube/conf/schema
 ```
+
+## Pre-Aggregations Storage
+
+The default pre-aggregations storage in Cube.js is its own purpose-built storage layer: Cube Store.
+
+Alternatively, you can store pre-aggregations either **internally** in the source database, or **externally**  in databases such as MySQL or Postgres.
+
+In order to make external pre-aggregations work outside of Cube Store, you should set the
+[`externalDriverFactory`][ref-config-extdriverfactory] and
+[`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
+configuration file. These properties can also be set through the environment
+variables.
+
+```bash
+CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
+CUBEJS_EXT_DB_PORT=<YOUR_DB_PORT_HERE>
+CUBEJS_EXT_DB_NAME=<YOUR_DB_NAME_HERE>
+CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
+CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
+CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
+```
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| Please be aware of the limitations when using internal and external (outside of Cube Store) pre-aggregations.
+<!-- prettier-ignore-end -->
+
+![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-aggregations.png)
+
+#### Some known limitations when using Postgres/MySQL as a storage layer listed below.
+
+**Performance issues with high cardinality rollups:** Queries over billions of
+datapoints or higher start exhibiting severe latency issues, negatively
+impacting end-user experience.
+
+**Lack of HyperLogLog support:** The HyperLogLog algorithm makes fast work of
+distinct counts in queries, a common analytical operation. Unfortunately,
+support between database vendors varies greatly, and therefore cannot be
+guaranteed.
+
+**Degraded performance for big `UNION ALL` queries:** A practical example of
+this would be when querying over a date range using a pre-aggregation with a
+`partitionGranularity`. The query would use several partitioned tables to
+deliver the result set, and therefore needs to join all valid partitions.
+
+**Poor JOIN performance across rolled up tables:** This often affects workloads
+which require cross database joins.
+
+**Table/schema name length mismatches:** A common issue when working across
+different database types is that different databases have different length
+limits on table names. Cube.js allows working around the issue with `sqlAlias`
+but this becomes cumbersome with lots of pre-aggregations.
+
+**SQL type differences between source and external database:** Different
+databases often specify types differently, which can cause type mismatch issues.
+This is also a common issue and source of frustration which Cube Store resolves.
+
+#### Internal pre-aggregations
+
+Internal pre-aggregations are not considered production-ready due to several
+shortcomings, as noted below.
+
+**Concurrency:** Databases (especially RDBMs) generally cannot handle high
+concurrency without special configuration. Application databases such as MySQL
+and Postgres do support concurrency, but often cannot cope with the demands of
+analytical queries without significant tuning. On the other hand, data
+warehousing solutions such as Athena and BigQuery often limit the number of
+concurrent connections too.
+
+**Latency:** Data warehousing solutions (such as BigQuery or Redshift) are often
+slow to return results.
+
+**Cost:** Some databases charge by the amount of data scanned for each query
+(such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
+rack up costs.
 
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
 [ref-config-env]: /reference/environment-variables#cube-store
