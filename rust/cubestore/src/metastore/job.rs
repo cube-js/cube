@@ -10,10 +10,21 @@ use std::io::{Cursor, Write};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum JobType {
-    WalPartitioning = 1,
+    WalPartitioning,
     PartitionCompaction,
     TableImport,
     Repartition,
+    TableImportCSV(/*location*/ String),
+}
+
+fn get_job_type_index(j: &JobType) -> u32 {
+    match j {
+        JobType::WalPartitioning => 1,
+        JobType::PartitionCompaction => 2,
+        JobType::TableImport => 3,
+        JobType::Repartition => 4,
+        JobType::TableImportCSV(_) => 5,
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
@@ -122,7 +133,15 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
             JobIndexKey::RowReference(row_key, job_type) => {
                 let mut buf = Cursor::new(Vec::new());
                 buf.write_all(row_key.to_bytes().as_slice()).unwrap();
-                buf.write_u32::<BigEndian>(job_type.clone() as u32).unwrap();
+                buf.write_u32::<BigEndian>(get_job_type_index(job_type))
+                    .unwrap();
+                match job_type {
+                    JobType::TableImportCSV(l) => {
+                        buf.write_u64::<BigEndian>(l.len() as u64).unwrap();
+                        buf.write(l.as_bytes()).unwrap();
+                    }
+                    _ => {}
+                }
                 buf.into_inner()
             }
             JobIndexKey::ScheduledByShard(shard) => {
