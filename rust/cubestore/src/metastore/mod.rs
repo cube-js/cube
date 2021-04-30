@@ -1856,15 +1856,20 @@ impl RocksMetaStore {
             v?;
         }
 
-        let current_metastore_file = remote_fs.local_file("metastore-current").await?;
+        let uploads_dir = remote_fs.uploads_dir().await?;
+        let (file, file_path) = tokio::task::spawn_blocking(move || {
+            tempfile::Builder::new()
+                .prefix("metastore-current")
+                .tempfile_in(uploads_dir)
+        })
+        .await??
+        .into_parts();
 
-        {
-            let mut file = File::create(&current_metastore_file).await?;
-            tokio::io::AsyncWriteExt::write_all(&mut file, remote_path.as_bytes()).await?;
-        }
+        tokio::io::AsyncWriteExt::write_all(&mut fs::File::from_std(file), remote_path.as_bytes())
+            .await?;
 
         remote_fs
-            .upload_file(&current_metastore_file, "metastore-current")
+            .upload_file(file_path.keep()?.to_str().unwrap(), "metastore-current")
             .await?;
 
         Ok(())
