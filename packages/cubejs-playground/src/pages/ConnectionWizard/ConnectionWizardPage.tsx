@@ -80,7 +80,7 @@ export default function ConnectionWizardPage({ history }) {
   const [db, selectDatabase] = useState<Database | null>(null);
 
   useEffect(() => {
-    playgroundAction('connection_wizard_page');
+    playgroundAction('connection_wizard_open');
   }, []);
 
   useEffect(() => {
