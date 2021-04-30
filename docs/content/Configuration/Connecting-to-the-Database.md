@@ -192,6 +192,14 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/key-file.json | base64)
 You can learn more about acquiring Google BigQuery credentials
 [here][link-bigquery-getting-started] and [here][link-bigquery-credentials].
 
+You can set the dataset location `CUBEJS_DB_BQ_LOCATION` environment variable.
+
+```dotenv
+CUBEJS_DB_BQ_LOCATION=us-central1
+```
+
+You can find more supported regions [here][link-bigquery-regional-locations].
+
 ### MSSQL
 
 To connect to a MSSQL database using Windows Authentication (also sometimes
@@ -271,3 +279,5 @@ https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/READM
 [ref-cubejs-cli]: /using-the-cubejs-cli
 [ref-enabling-ssl]: #enabling-ssl
 [ref-env-var]: /reference/environment-variables#database-connection
+[link-bigquery-regional-locations]:
+  https://cloud.google.com/bigquery/docs/locations#regional-locations
