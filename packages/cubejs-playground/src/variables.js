@@ -10,6 +10,8 @@ const colors = {
   'dark-04': '161, 161, 181',
   'dark-05': '213, 213, 226',
   light: '243, 243, 251',
+  green: '65, 181, 111',
+  yellow: '251, 188, 5',
 };
 
 function color(name, opacity = 1) {
@@ -33,6 +35,11 @@ const VARIABLES = {
   'remove-btn-bg': color('purple', 0.1),
   'remove-btn-hover-bg': color('purple', 0.2),
   'primary-color': color('purple'),
+
+  'success-bg-color': color('green', 0.1),
+  'success-color': color('green', 0.9),
+  'warning-bg-color': color('yellow', 0.1),
+  'warning-color': color('yellow', 0.9),
 
   'pink-8': color('pink', 0.2),
   'pink-9': color('pink', 0.1),

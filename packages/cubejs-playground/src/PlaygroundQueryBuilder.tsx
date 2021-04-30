@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, RefObject } from 'react';
-import { Col, Row, Divider, Typography, Space } from 'antd';
-import Icon, { LockOutlined, CloudOutlined } from '@ant-design/icons';
+import { Col, Row, Divider } from 'antd';
+import { LockOutlined, CloudOutlined } from '@ant-design/icons';
 import {
   QueryBuilder,
   SchemaChangeProps,
@@ -24,7 +24,7 @@ import LivePreviewBar from './components/LivePreviewContext/LivePreviewBar';
 import ChartRenderer from './components/ChartRenderer/ChartRenderer';
 import { SectionHeader, SectionRow } from './components';
 import ChartContainer from './ChartContainer';
-import { dispatchPlaygroundEvent, formatNumber } from './utils';
+import { dispatchPlaygroundEvent } from './utils';
 import {
   useDeepCompareMemoize,
   useSecurityContext,
@@ -33,7 +33,7 @@ import {
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
 import DashboardSource from './DashboardSource';
-import { LightningIcon } from './shared/icons/LightningIcon';
+import { PreAggregationStatus } from './components/PlaygroundQueryBuilder/components';
 
 const Section = styled.div`
   display: flex;
@@ -125,61 +125,29 @@ function PivotChangeEmitter({
   return null;
 }
 
+type QueryChangeEmitterProps = {
+  query1: Query | null;
+  query2: Query | null;
+  onChange: () => void;
+};
+
+function QueryChangeEmitter({
+  query1,
+  query2,
+  onChange,
+}: QueryChangeEmitterProps) {
+  useEffect(() => {
+    onChange();
+  }, [areQueriesEqual(query1, query2)]);
+
+  return null;
+}
+
 type THandleRunButtonClickProps = {
   query: Query;
   pivotConfig?: PivotConfig;
   chartType: ChartType;
 };
-
-type PreAggregationStatusProps = {
-  time: number;
-  isAggregated: boolean;
-};
-
-const Label = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 2px 4px;
-  border-radius: 4px;
-  background: rgba(251, 188, 5, 0.1);
-`;
-
-function PreAggregationStatus({
-  time,
-  isAggregated,
-}: PreAggregationStatusProps) {
-  const renderTime = () => (
-    <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
-      {formatNumber(time)} ms
-    </Typography.Text>
-  );
-
-  return (
-    <Space style={{ marginLeft: 'auto' }}>
-      {isAggregated ? (
-        <Label>
-          <Space size={4}>
-            <Icon
-              style={{ color: '#ffc42e' }}
-              component={() => <LightningIcon />}
-            />
-            {renderTime()}
-          </Space>
-        </Label>
-      ) : (
-        renderTime()
-      )}
-
-      <Typography.Link href="https://cube.dev/docs/caching/pre-aggregations/getting-started" target="_blank">
-        Query was not accelerated with pre-aggregation {'->'}
-      </Typography.Link>
-
-      <Typography.Text>
-        Query was accelerated with pre-aggregation
-      </Typography.Text>
-    </Space>
-  );
-}
 
 export type TPlaygroundQueryBuilderProps = {
   apiUrl: string;
@@ -190,6 +158,11 @@ export type TPlaygroundQueryBuilderProps = {
   initialVizState?: VizState;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
+};
+
+export type QueryStatus = {
+  timeElapsed: number;
+  isAggregated: boolean;
 };
 
 export default function PlaygroundQueryBuilder({
@@ -205,6 +178,7 @@ export default function PlaygroundQueryBuilder({
   const ref = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
 
+  const [queryStatus, setQueryStatus] = useState<QueryStatus | null>(null);
   const [framework, setFramework] = useState('react');
   const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
   const [isChartRendererReady, setChartRendererReady] = useState(false);
@@ -482,7 +456,12 @@ export default function PlaygroundQueryBuilder({
                     onUpdate={updatePivotConfig.update}
                   />
 
-                  <PreAggregationStatus time={1200} isAggregated />
+                  {queryStatus ? (
+                    <PreAggregationStatus
+                      timeElapsed={queryStatus.timeElapsed}
+                      isAggregated={queryStatus.isAggregated}
+                    />
+                  ) : null}
                 </SectionRow>
               </Col>
             </Row>
@@ -569,12 +548,22 @@ export default function PlaygroundQueryBuilder({
                             isLoading,
                             resultSet,
                             error,
+                            isAggregated,
+                            timeElapsed,
                           }) => {
                             if (resultSet) {
                               setQueryError(null);
+
+                              if (isAggregated != null && timeElapsed != null) {
+                                setQueryStatus({
+                                  isAggregated,
+                                  timeElapsed,
+                                });
+                              }
                             }
                             if (error) {
                               setQueryError(error);
+                              setQueryStatus(null);
                             }
 
                             setQueryLoading(isLoading);
@@ -608,6 +597,12 @@ export default function PlaygroundQueryBuilder({
             </Row>
 
             <PivotChangeEmitter iframeRef={ref} pivotConfig={pivotConfig} />
+
+            <QueryChangeEmitter
+              query1={query}
+              query2={queryRef.current}
+              onChange={() => setQueryStatus(null)}
+            />
           </>
         );
       }}
