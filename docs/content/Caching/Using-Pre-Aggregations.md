@@ -385,7 +385,7 @@ CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-aggregations.png)
 
-#### Some known limitations of using Postgres/MySQL as a storage layer listed below.
+#### Some known limitations when using Postgres/MySQL as a storage layer listed below.
 
 **Performance issues with high cardinality rollups:** Queries over billions of
 datapoints or higher start exhibiting severe latency issues, negatively
