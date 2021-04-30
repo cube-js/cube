@@ -135,7 +135,6 @@ export default function ConnectionWizardPage({ history }) {
                     loading={isLoading}
                     disabled={isTestConnectionLoading}
                     hostname={hostname}
-                    onCancel={() => selectDatabase(null)}
                     onSubmit={async (variables) => {
                       try {
                         setTestConnectionResult(null);
@@ -151,7 +150,7 @@ export default function ConnectionWizardPage({ history }) {
                         await saveConnection(variables);
                         setLoading(false);
 
-                        event('test_database_connection_success');
+                        event('test_database_connection_success:frontend');
 
                         history.push('/schema');
                       } catch (error) {
@@ -160,7 +159,7 @@ export default function ConnectionWizardPage({ history }) {
                           error,
                         });
 
-                        event('test_database_connection_error');
+                        event('test_database_connection_error:frontend');
                       }
 
                       setTestConnectionLoading(false);

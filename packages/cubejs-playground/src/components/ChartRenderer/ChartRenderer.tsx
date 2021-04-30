@@ -143,7 +143,7 @@ export default function ChartRenderer({
 
           const servedByPreAggregation = Object.keys(loadResponse.results[0]?.usedPreAggregations || {}).length > 0;
 
-          event(servedByPreAggregation ? 'load_request_success_aggregated' : 'load_request_success');
+          event(servedByPreAggregation ? 'load_request_success_aggregated:frontend' : 'load_request_success:frontend');
         }
 
         if (resultSet || error) {
