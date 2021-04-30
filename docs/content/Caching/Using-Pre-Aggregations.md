@@ -413,7 +413,7 @@ but this becomes cumbersome with lots of pre-aggregations.
 databases often specify types differently, which can cause type mismatch issues.
 This is also a common issue and source of frustration which Cube Store resolves.
 
-#### Known limitations of internal pre-aggregations.
+#### Internal pre-aggregations
 
 Internal pre-aggregations are not considered production-ready due to several
 shortcomings, as noted below.
