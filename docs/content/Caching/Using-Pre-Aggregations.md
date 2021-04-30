@@ -361,7 +361,7 @@ services:
 
 The default pre-aggregations storage in Cube.js is its own purpose-built storage layer: Cube Store.
 
-Alternatively, you can store pre-aggregations either **internally**, in the source database, or **externally**,  in databases, such as MySQL or Postgres.
+Alternatively, you can store pre-aggregations either **internally** in the source database, or **externally**  in databases such as MySQL or Postgres.
 
 In order to make external pre-aggregations work outside of Cube Store, you should set the
 [`externalDriverFactory`][ref-config-extdriverfactory] and
@@ -431,4 +431,3 @@ slow to return results.
 **Cost:** Some databases charge by the amount of data scanned for each query
 (such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
 rack up costs.
-
