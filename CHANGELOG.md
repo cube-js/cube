@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.4](https://github.com/cube-js/cube.js/compare/v0.27.3...v0.27.4) (2021-04-29)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** cache pane crash ([#2635](https://github.com/cube-js/cube.js/issues/2635)) ([405b80b](https://github.com/cube-js/cube.js/commit/405b80b4f9b14b98eb6d47803b0f1e519ce1e0c9))
+* **@cubejs-client/playground:** pass field, win host ([e3144e9](https://github.com/cube-js/cube.js/commit/e3144e9110f4d572aca56cf9393a558e4c0817d1))
+* **cubestore:** make top-k scan less batches ([486ee32](https://github.com/cube-js/cube.js/commit/486ee328f7625fd9fb2c490ec68e1fcd2c4c8a50))
+* **cubestore-driver:** Ping connection only when it's OPEN ([d80e157](https://github.com/cube-js/cube.js/commit/d80e157e5865318c14be534a7f8a1bc39b0ad851))
+* Show warning for deprecated variables only once ([fecbda4](https://github.com/cube-js/cube.js/commit/fecbda456b2b66005fb230e093b117db76c4919e))
+
+
+
+
+
 ## [0.27.3](https://github.com/cube-js/cube.js/compare/v0.27.2...v0.27.3) (2021-04-29)
 
 

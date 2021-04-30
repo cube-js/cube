@@ -52,13 +52,12 @@ impl RemoteFs for GCSRemoteFs {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let file = File::open(temp_upload_path).await?;
-        let size = file.metadata().await?.len();
         let stream = FramedRead::new(file, BytesCodec::new());
         let stream = stream.map(|r| r.map(|b| b.to_vec()));
         Object::create_streamed(
             self.bucket.as_str(),
             stream,
-            Some(size),
+            None,
             self.gcs_path(remote_path).as_str(),
             "application/octet-stream",
         )

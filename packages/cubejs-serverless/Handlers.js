@@ -34,6 +34,7 @@ class Handlers {
   constructor(options) {
     options = {
       ...options,
+      serverless: true,
       orchestratorOptions: (context) => ({
         ...(options && options.orchestratorOptions),
         queryCacheOptions: {

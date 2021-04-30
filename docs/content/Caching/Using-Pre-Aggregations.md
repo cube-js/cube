@@ -193,7 +193,7 @@ Next, run Cube.js and tell it to connect to Cube Store running on `localhost`
 ```bash
 docker run -p 4000:4000 \
   -e CUBEJS_CUBESTORE_HOST=localhost \
-  -v ~/cube-conf:/cube/conf \
+  -v ${PWD}:/cube/conf \
   cubejs/cube
 ```
 
@@ -207,6 +207,10 @@ version: '2.2'
 services:
   cubestore:
     image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
 
   cube:
     image: cubejs/cube:latest
@@ -251,6 +255,12 @@ variables; worker nodes **must** specify the `CUBESTORE_WORKER_PORT` and
 `CUBESTORE_META_ADDR` environment variables. More information about these
 variables can be found [in the Environment Variables reference][ref-config-env].
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| To fully take advantage of the worker nodes in the cluster, we **strongly**
+| recommend using [partitioned pre-aggregations][self-partitioning].
+<!-- prettier-ignore-end -->
+
 A sample Docker Compose stack setting this up might look like:
 
 ```yaml
@@ -264,10 +274,12 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_router:9999
       - CUBESTORE_META_PORT=9999
       - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
+      - CUBESTORE_REMOTE_DIR=/cube/data
     expose:
       - 9999 # This exposes the Metastore endpoint
-      - 3306 # This exposes the MySQL endpoint
       - 3030 # This exposes the HTTP endpoint for CubeJS
+    volumes:
+      - .cubestore:/cube/data
   cubestore_worker_1:
     restart: always
     image: cubejs/cubestore:latest
@@ -275,10 +287,13 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
       - CUBESTORE_WORKER_PORT=9001
       - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
     expose:
       - 9001
+    volumes:
+      - .cubestore:/cube/data
   cubestore_worker_2:
     restart: always
     image: cubejs/cubestore:latest
@@ -286,11 +301,13 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_2:9001
       - CUBESTORE_WORKER_PORT=9001
       - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
     expose:
       - 9001
-
+    volumes:
+      - .cubestore:/cube/data
   cube:
     image: cubejs/cube:latest
     ports:
@@ -316,7 +333,7 @@ Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
 and Google Cloud, or if desired, a local path on the server.
 
-A simplified example with Docker Compose might look like:
+A simplified example using Google Cloud might look like:
 
 ```yaml
 version: '2.2'
@@ -324,11 +341,13 @@ services:
   cubestore:
     image: cubejs/cubestore:latest
     environment:
-      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_ON_S3>
-      - CUBESTORE_S3_REGION=<AWS_REGION>
-      - CUBESTORE_S3_SUB_PATH=/
+      - CUBESTORE_GCS_BUCKET=<BUCKET_NAME_IN_GCS>
+      - CUBESTORE_GCS_SUB_PATH=/
       - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
       - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
   cube:
     image: cubejs/cube:latest
     ports:
@@ -336,6 +355,8 @@ services:
     environment:
       - CUBEJS_CUBESTORE_HOST=localhost
       - CUBEJS_CUBESTORE_PORT=3030
+      # For better performance, specify an export bucket
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=<EXPORT_BUCKET_NAME_IN_GCS>
     depends_on:
       - cubestore
     links:
@@ -343,19 +364,6 @@ services:
     volumes:
       - ./schema:/cube/conf/schema
 ```
-
-[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
-[ref-config-env]: /reference/environment-variables#cube-store
-[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
-[ref-preaggs]: /pre-aggregations
-[ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
-[ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
-[ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
-[ref-config-extdbtype]: /config#options-reference-external-db-type
-[ref-config-driverfactory]: /config#options-reference-driver-factory
-[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
-[ref-production-checklist-refresh]:
-  /deployment/production-checklist#set-up-refresh-worker
 
 ## Pre-Aggregations Storage
 
@@ -431,3 +439,17 @@ slow to return results.
 **Cost:** Some databases charge by the amount of data scanned for each query
 (such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
 rack up costs.
+
+[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
+[ref-config-env]: /reference/environment-variables#cube-store
+[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
+[ref-preaggs]: /pre-aggregations
+[ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
+[ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
+[ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
+[ref-config-extdbtype]: /config#options-reference-external-db-type
+[ref-config-driverfactory]: /config#options-reference-driver-factory
+[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
+[ref-production-checklist-refresh]:
+  /deployment/production-checklist#set-up-refresh-worker
+[self-partitioning]: #partitioning

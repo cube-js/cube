@@ -321,10 +321,10 @@ export class BaseDriver {
     const [schema, name] = table.split('.');
 
     const columns = await this.query(
-      `SELECT columns.column_name,
-             columns.table_name,
-             columns.table_schema,
-             columns.data_type
+      `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type  as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name, schema]

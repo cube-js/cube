@@ -84,9 +84,9 @@ const CachePane = ({ query }) => (
                   title: 'Refresh Key Value',
                   key: 'value',
                   render: (text, record) =>
-                    loadResponse?.usedPreAggregations[
+                    loadResponse?.usedPreAggregations?.[
                       record.tableName
-                    ].refreshKeyValues.map((k) => (
+                    ]?.refreshKeyValues.map((k) => (
                       <PrismCode
                         key={JSON.stringify(k)}
                         code={JSON.stringify(k, null, 2)}

@@ -131,6 +131,7 @@ declare module '@cubejs-client/core' {
     lastRefreshTime: string;
     query: Query;
     data: T[];
+    usedPreAggregations?: Record<string, any>;
   };
 
   export type LoadResponse<T> = {
