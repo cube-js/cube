@@ -55,6 +55,7 @@ class App extends Component<RouteComponentProps, TAppState> {
     setAnonymousId(context.anonymousId, {
       coreServerVersion: context.coreServerVersion,
       projectFingerprint: context.projectFingerprint,
+      isDocker: Boolean(context.isDocker)
     });
     this.setState({ context }, () => {
       if (context.shouldStartConnectionWizardFlow) {

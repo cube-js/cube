@@ -8,6 +8,7 @@ import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 
 import { Button, CubeLoader } from '../../atoms';
 import { UIFramework } from '../../types';
+import { event } from '../../events';
 
 const { Text } = Typography;
 
@@ -139,6 +140,10 @@ export default function ChartRenderer({
           setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
           Boolean(loadResponse.slowQuery) && setSlowQuery(false);
           setResultSet(true);
+
+          const servedByPreAggregation = Object.keys(loadResponse.results[0]?.usedPreAggregations || {}).length > 0;
+
+          event(servedByPreAggregation ? 'load_request_success_aggregated:frontend' : 'load_request_success:frontend');
         }
 
         if (resultSet || error) {

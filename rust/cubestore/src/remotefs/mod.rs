@@ -43,6 +43,20 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
         self.local_file(&format!("uploads/{}", remote_path)).await
     }
 
+    /// Convention is to use this directory for creating files to be uploaded later.
+    async fn uploads_dir(&self) -> Result<String, CubeError> {
+        // Call to `temp_upload_path` ensures we created the uploads dir.
+        let file_in_dir = self
+            .temp_upload_path("never_created_remote_fs_file")
+            .await?;
+        Ok(Path::new(&file_in_dir)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned())
+    }
+
     /// In addition to uploading this file to the remote filesystem, this function moves the file
     /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
     async fn upload_file(&self, temp_upload_path: &str, remote_path: &str)

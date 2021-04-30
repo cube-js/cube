@@ -69,6 +69,10 @@ function asBoolOrTime(input: string, envName: string): number|boolean {
   );
 }
 
+let legacyRedisPasswordAlerted: boolean = false;
+let legacyRedisUrlAlerted: boolean = false;
+let legacyRedisTlsAlerted: boolean = false;
+
 const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
@@ -115,6 +119,15 @@ const variables: Record<string, (...args: any) => any> = {
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
+  // Cube Store
+  cubeStoreHost: () => get('CUBEJS_CUBESTORE_HOST')
+    .asString(),
+  cubeStorePort: () => get('CUBEJS_CUBESTORE_PORT')
+    .asPortNumber(),
+  cubeStoreUser: () => get('CUBEJS_CUBESTORE_USER')
+    .asString(),
+  cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
+    .asString(),
   // Databricks
   databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
     .required()
@@ -141,7 +154,11 @@ const variables: Record<string, (...args: any) => any> = {
     const legacyRedisPassword = get('REDIS_PASSWORD')
       .asString();
     if (legacyRedisPassword) {
-      displayCLIWarning('REDIS_PASSWORD is deprecated and will be removed, please use CUBEJS_REDIS_PASSWORD.');
+      if (!legacyRedisPasswordAlerted) {
+        displayCLIWarning('REDIS_PASSWORD is deprecated and will be removed, please use CUBEJS_REDIS_PASSWORD.');
+
+        legacyRedisPasswordAlerted = true;
+      }
 
       return legacyRedisPassword;
     }
@@ -158,7 +175,11 @@ const variables: Record<string, (...args: any) => any> = {
     const legacyRedisUrl = get('REDIS_URL')
       .asString();
     if (legacyRedisUrl) {
-      displayCLIWarning('REDIS_URL is deprecated and will be removed, please use CUBEJS_REDIS_URL.');
+      if (!legacyRedisUrlAlerted) {
+        displayCLIWarning('REDIS_URL is deprecated and will be removed, please use CUBEJS_REDIS_URL.');
+
+        legacyRedisUrlAlerted = true;
+      }
 
       return legacyRedisUrl;
     }
@@ -175,7 +196,11 @@ const variables: Record<string, (...args: any) => any> = {
     const legacyRedisTls = get('REDIS_TLS')
       .asBoolStrict();
     if (legacyRedisTls) {
-      displayCLIWarning('REDIS_TLS is deprecated and will be removed, please use CUBEJS_REDIS_TLS.');
+      if (!legacyRedisTlsAlerted) {
+        displayCLIWarning('REDIS_TLS is deprecated and will be removed, please use CUBEJS_REDIS_TLS.');
+
+        legacyRedisTlsAlerted = true;
+      }
 
       return legacyRedisTls;
     }

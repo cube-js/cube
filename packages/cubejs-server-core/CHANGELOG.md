@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.4](https://github.com/cube-js/cube.js/compare/v0.27.3...v0.27.4) (2021-04-29)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Ping connection only when it's OPEN ([d80e157](https://github.com/cube-js/cube.js/commit/d80e157e5865318c14be534a7f8a1bc39b0ad851))
+
+
+
+
+
+## [0.27.3](https://github.com/cube-js/cube.js/compare/v0.27.2...v0.27.3) (2021-04-29)
+
+
+### Bug Fixes
+
+* **@cubejs-server/core:** env file path ([#2622](https://github.com/cube-js/cube.js/issues/2622)) ([b9abb19](https://github.com/cube-js/cube.js/commit/b9abb195b5c73b3a0077801302721bf8ae2bdaa0))
+
+
+
+
+
 ## [0.27.2](https://github.com/cube-js/cube.js/compare/v0.27.1...v0.27.2) (2021-04-28)
 
 
