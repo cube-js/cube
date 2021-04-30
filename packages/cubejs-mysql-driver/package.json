@@ -32,6 +32,9 @@
   "eslintConfig": {
     "extends": "../cubejs-linter"
   },
+  "jest": {
+    "testEnvironment": "node"
+  },
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
