@@ -1,5 +1,7 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
-const { createDriver, startContainer } = require('./mysql.db.runner');
+const { MysqlDBRunner } = require('@cubejs-backend/testing');
+
+const { createDriver } = require('./mysql.db.runner');
 
 describe('MySqlDriver', () => {
   let container;
@@ -8,7 +10,7 @@ describe('MySqlDriver', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    container = await startContainer();
+    container = await MysqlDBRunner.startContainer({});
     mySqlDriver = createDriver(container);
     mySqlDriver.setLogger((msg, event) => console.log(`${msg}: ${JSON.stringify(event)}`));
 
@@ -19,6 +21,7 @@ describe('MySqlDriver', () => {
 
   afterAll(async () => {
     await mySqlDriver.release();
+
     if (container) {
       await container.stop();
     }
