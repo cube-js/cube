@@ -1,11 +1,13 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
-const { createDriver, startContainer } = require('./mysql.db.runner');
+const { MysqlDBRunner } = require('@cubejs-backend/testing');
+
+const { createDriver } = require('./mysql.db.runner');
 
 describe('MySqlDriver Pool', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   test('database pool error', async () => {
-    const poolErrorContainer = await startContainer();
+    const poolErrorContainer = await MysqlDBRunner.startContainer({});
 
     let databasePoolErrorLogged = false;
 
@@ -26,6 +28,8 @@ describe('MySqlDriver Pool', () => {
 
       try {
         await poolErrorDriver.query('SELECT 1');
+
+        throw new Error('Pool must throw an exception');
       } catch (e) {
         console.log(e);
         expect(e.toString()).toContain('ResourceRequest timed out');
