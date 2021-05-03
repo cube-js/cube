@@ -19,7 +19,7 @@ class HttpTransport {
     );
 
     let url = `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`;
-    
+
     this.method = this.method || (url.length < 2000 ? 'GET' : 'POST');
     if (this.method === 'POST') {
       url = `${this.apiUrl}/${method}`;
@@ -37,6 +37,16 @@ class HttpTransport {
       },
       credentials: this.credentials,
       body: this.method === 'POST' ? JSON.stringify(params) : null
+    }).then((res) => {
+      if (!res.ok) {
+        return new Promise((_, reject) => {
+          res.json().then((json) => {
+            reject(json.error?.toString() || JSON.stringify(json));
+          });
+        });
+      }
+
+      return res;
     });
 
     return {

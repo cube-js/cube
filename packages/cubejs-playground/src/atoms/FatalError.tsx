@@ -8,16 +8,19 @@ const { Text, Paragraph } = Typography;
 const Code = styled.pre`
   padding: 0.4em 0.8em;
   font-size: 13px;
+  white-space: pre-wrap;
 `;
 
 type TFatalErrorProps = {
-  error: Error
-}
+  error: Error;
+};
 
 export function FatalError({ error }: TFatalErrorProps) {
   return (
     <Space direction="vertical">
-      <Text strong style={{ fontSize: 18 }}>Error 😢</Text>
+      <Text strong style={{ fontSize: 18 }}>
+        Error 😢
+      </Text>
 
       <Paragraph>
         Ask about it in{' '}
@@ -33,7 +36,13 @@ export function FatalError({ error }: TFatalErrorProps) {
 
       <Alert
         type="error"
-        message={<Code>{error.stack?.toString() || error.toString()}</Code>}
+        message={
+          <Code
+            dangerouslySetInnerHTML={{
+              __html: error.toString(),
+            }}
+          />
+        }
       />
     </Space>
   );

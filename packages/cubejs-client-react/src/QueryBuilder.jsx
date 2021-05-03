@@ -9,8 +9,10 @@ import {
   movePivotItem,
   defaultHeuristics,
 } from '@cubejs-client/core';
+
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
+import { generateAnsiHTML } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
@@ -139,7 +141,7 @@ export default class QueryBuilder extends React.Component {
     this.setState(
       {
         meta,
-        metaError,
+        metaError: metaError ? new Error(generateAnsiHTML(metaError?.toString() || '')) : null,
         isFetchingMeta: false,
       },
       () => {
@@ -452,9 +454,8 @@ export default class QueryBuilder extends React.Component {
           });
         }
       } catch (error) {
-        console.error(error);
         this.setState({
-          queryError: error,
+          queryError: new Error(generateAnsiHTML(error.stack?.toString() || error.toString())),
         });
       }
     }
