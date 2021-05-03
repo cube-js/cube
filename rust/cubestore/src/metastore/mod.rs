@@ -1534,7 +1534,7 @@ impl RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
-        opts.set_merge_operator("meta_store merge", meta_store_merge, None);
+        opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
 
         let db = DB::open(&opts, path).unwrap();
         let db_arc = Arc::new(db);
