@@ -50,11 +50,11 @@ class SqliteDriver extends BaseDriver {
       main: tables.reduce((acc, table) => ({
         ...acc,
         [table.name]: table.sql
-        // remove EOL for next .match to read full string
+          // remove EOL for next .match to read full string
           .replace(/\n/g, '')
           // extract fields
           .match(/\((.*)\)/)[1]
-        // split fields
+          // split fields
           .split(',')
           .map((nameAndType) => {
             const match = nameAndType

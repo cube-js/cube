@@ -1,6 +1,6 @@
-import { MysqlQuery } from './MysqlQuery';
+import moment from 'moment-timezone';
 
-const moment = require('moment-timezone');
+import { MysqlQuery } from './MysqlQuery';
 
 export class MongoBiQuery extends MysqlQuery {
   convertTz(field) {
