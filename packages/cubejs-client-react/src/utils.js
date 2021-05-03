@@ -39,29 +39,29 @@ export function generateAnsiHTML(txt) {
   let open = false;
   for (let index = 0; index < arr.length; ++index) {
     const c = arr[index];
-    const content = c.content;
-    const fg = c.fg;
+    const { content } = c;
+    const { fg } = c;
 
     const contentParts = content.split('\n');
-    for (let _index = 0; _index < contentParts.length; ++_index) {
+    for (let j = 0; j < contentParts.length; ++j) {
       if (!open) {
         result += '<span data-ansi-line="true">';
         open = true;
       }
-      const part = contentParts[_index].replace('\r', '');
+      const part = contentParts[j].replace('\r', '');
       const color = colors[anserMap[fg]];
 
       if (color != null) {
-        result += '<span style="color: ' + color + ';">' + part + '</span>';
+        result += `<span style="color: ${color};">${part}</span>`;
       } else {
         if (fg != null) {
           console.log('Missing color mapping: ', fg);
         }
 
-        result += '<span>' + part + '</span>';
+        result += `<span>${part}</span>`;
       }
 
-      if (_index < contentParts.length - 1) {
+      if (j < contentParts.length - 1) {
         result += '</span>';
         open = false;
         result += '<br/>';

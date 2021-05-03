@@ -42,7 +42,7 @@ class HttpTransport {
         return new Promise((_, reject) => {
           res.json().then((json) => {
             reject(json.error?.toString() || JSON.stringify(json));
-          })
+          });
         });
       }
 
