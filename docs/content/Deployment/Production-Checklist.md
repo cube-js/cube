@@ -96,7 +96,7 @@ Follow the [instructions here][ref-caching-cubestore] to set it up. If you are
 using another [external database][ref-pre-aggregations], you'll need to
 configure it.
 
-[ref-caching-cubestore]: /caching/using-pre-aggregations#running-in-production
+[ref-caching-cubestore]: /caching/running-in-production
 [ref-pre-aggregations]: /pre-aggregations#external-pre-aggregations
 
 By default, Cube.js will use `prod_pre_aggregations` as the schema name for
