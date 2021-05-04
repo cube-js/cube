@@ -54,7 +54,7 @@ databases:
 | MS SQL                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_DOMAIN`                                                                                                                    |
 | ClickHouse                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_CLICKHOUSE_READONLY`                                                                                      |
 | AWS Athena                                             | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION`                                                                                                                                     |
-| Google BigQuery                                        | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`                                                                                                                                                  |
+| Google BigQuery                                        | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`, `CUBEJS_DB_BQ_LOCATION`                                                                                                                                                  |
 | MongoDB                                                | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE`                        |
 | Snowflake                                              | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS` |
 | Presto                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                 |
@@ -192,6 +192,14 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/key-file.json | base64)
 You can learn more about acquiring Google BigQuery credentials
 [here][link-bigquery-getting-started] and [here][link-bigquery-credentials].
 
+You can set the dataset location using the `CUBEJS_DB_BQ_LOCATION` environment variable.
+
+```dotenv
+CUBEJS_DB_BQ_LOCATION=us-central1
+```
+
+You can find more supported regions [here][link-bigquery-regional-locations].
+
 ### MSSQL
 
 To connect to a MSSQL database using Windows Authentication (also sometimes
@@ -271,3 +279,5 @@ https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/READM
 [ref-cubejs-cli]: /using-the-cubejs-cli
 [ref-enabling-ssl]: #enabling-ssl
 [ref-env-var]: /reference/environment-variables#database-connection
+[link-bigquery-regional-locations]:
+  https://cloud.google.com/bigquery/docs/locations#regional-locations
