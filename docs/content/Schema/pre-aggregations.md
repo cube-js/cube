@@ -470,9 +470,14 @@ cube(`Orders`, {
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
 `updateWindow` from the current time. In the provided example, it will refresh
-today's and the last 7 days of partitions. Partitions before the `7 day`
+today's and the last 7 days of partitions once a day. Partitions before the `7 day`
 interval **will not** be refreshed once they are built unless the rollup SQL is
 changed.
+
+Partition tables are refreshed as a whole.
+When new partition table is available it replaces the old one.
+Old partition tables are collected by [Garbage Collection][ref-garbage-collection].
+Append is never used to add new rows to the existing tables.
 
 An original SQL pre-aggregation can also be used with time partitioning and
 incremental `refreshKey`. It requires using `FILTER_PARAMS` inside the Cube's
@@ -699,3 +704,4 @@ cube(`Orders`, {
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions
 [ref-orig-sql]: #use-original-sql-pre-aggregations
+[ref-garbage-collection]: /using-pre-aggregations#garbage-collection
