@@ -192,7 +192,7 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/key-file.json | base64)
 You can learn more about acquiring Google BigQuery credentials
 [here][link-bigquery-getting-started] and [here][link-bigquery-credentials].
 
-You can set the dataset location `CUBEJS_DB_BQ_LOCATION` environment variable.
+You can set the dataset location using the `CUBEJS_DB_BQ_LOCATION` environment variable.
 
 ```dotenv
 CUBEJS_DB_BQ_LOCATION=us-central1
