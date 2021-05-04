@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.7](https://github.com/cube-js/cube.js/compare/v0.27.6...v0.27.7) (2021-05-04)
+
+
+### Bug Fixes
+
+* ECONNREFUSED 127.0.0.1:3030 on health checks in production mode without Cube Store ([7ccfbe1](https://github.com/cube-js/cube.js/commit/7ccfbe1524f11b3b88c90aa2e49969596cb0aa48))
+* TypeError: moment is not a function ([39662e4](https://github.com/cube-js/cube.js/commit/39662e468ed001a5b472a2c09fc9fa2d48af03d2))
+
+
+
+
+
 ## [0.27.6](https://github.com/cube-js/cube.js/compare/v0.27.5...v0.27.6) (2021-05-03)
 
 
