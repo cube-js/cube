@@ -704,4 +704,4 @@ cube(`Orders`, {
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions
 [ref-orig-sql]: #use-original-sql-pre-aggregations
-[ref-garbage-collection]: /using-pre-aggregations#garbage-collection
+[ref-garbage-collection]: /caching/using-pre-aggregations#garbage-collection
