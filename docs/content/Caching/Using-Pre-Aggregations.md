@@ -58,7 +58,8 @@ cube(`Orders`, {
 ## Background Refresh
 
 You can refresh pre-aggregations in the background by setting
-`scheduledRefresh: true`.
+`scheduledRefresh: true`. You can find more information about this setting in
+the [Pre-Aggregation Reference][ref-preagg-sched-refresh].
 
 In development mode, Cube.js enables background refresh by default and will
 refresh all pre-aggregations marked with the
@@ -142,7 +143,6 @@ incremental refreshes; when configured, Cube.js will only refresh partitions as
 necessary. Without incremental refreshing, Cube.js will re-calculate the entire
 pre-aggregation whenever [the refresh key][ref-preaggs-refresh-key] changes.
 
-
 ## Garbage Collection
 
 When pre-aggregations are refreshed, Cube.js will create new pre-aggregation
@@ -170,12 +170,14 @@ folder in the project root during development.
 
 ## Pre-Aggregations Storage
 
-The default pre-aggregations storage in Cube.js is its own purpose-built storage layer: Cube Store.
+The default pre-aggregations storage in Cube.js is its own purpose-built storage
+layer: Cube Store.
 
-Alternatively, you can store pre-aggregations either **internally** in the source database, or **externally**  in databases such as MySQL or Postgres.
+Alternatively, you can store pre-aggregations either **internally** in the
+source database, or **externally** in databases such as MySQL or Postgres.
 
-In order to make external pre-aggregations work outside of Cube Store, you should set the
-[`externalDriverFactory`][ref-config-extdriverfactory] and
+In order to make external pre-aggregations work outside of Cube Store, you
+should set the [`externalDriverFactory`][ref-config-extdriverfactory] and
 [`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
 configuration file. These properties can also be set through the environment
 variables.
@@ -247,6 +249,7 @@ rack up costs.
 [ref-config-env]: /reference/environment-variables#cube-store
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
 [ref-preaggs]: /pre-aggregations
+[ref-preagg-sched-refresh]: /pre-aggregations#scheduled-refresh
 [ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
 [ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
 [ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
