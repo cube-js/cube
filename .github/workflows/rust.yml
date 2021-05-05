@@ -101,6 +101,7 @@ jobs:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
+          - aarch64-apple-darwin
         include:
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
@@ -129,8 +130,14 @@ jobs:
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
-          - os: macos-latest
+          - os: macos-10.15
             target: x86_64-apple-darwin
+            executable_name: cubestored
+            cross: false
+            strip: true
+            compress: true
+          - os: macos-11
+            target: aarch64-apple-darwin
             executable_name: cubestored
             cross: false
             strip: true
