@@ -75,6 +75,66 @@ describe('index.test', () => {
       .toBeInstanceOf(CubejsServerCore);
   });
 
+  const getCreateOrchestratorOptionsFromServer = (options: CreateOptions) => {
+    const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+
+    const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
+    cubejsServerCore.getOrchestratorApi({
+      requestId: 'XXX',
+      authInfo: null,
+      securityContext: null,
+    });
+
+    expect(createOrchestratorApiSpy.mock.calls.length).toEqual(1);
+    return createOrchestratorApiSpy.mock.calls[0];
+  };
+
+  test('dbType should return string, failure', async () => {
+    const options: CreateOptions = { dbType: () => <any>null };
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+
+    try {
+      await driverFactory('mongo');
+
+      throw new Error('driverFactory will call dbType and dbType must throw an exception');
+    } catch (e) {
+      expect(e.message).toEqual('Unexpected return type, dbType must return string (dataSource: "mongo"), actual: null');
+    }
+  });
+
+  test('driverFactory should return driver, failure', async () => {
+    const options: CreateOptions = { dbType: () => <any>'mongo', driverFactory: () => <any>null, };
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+
+    try {
+      await driverFactory('default');
+
+      throw new Error('driverFactory will call dbType and dbType must throw an exception');
+    } catch (e) {
+      expect(e.message).toEqual('Unexpected return type, driverFactory must return driver (dataSource: "default"), actual: null');
+    }
+  });
+
+  test('externalDriverFactory should return driver, failure', async () => {
+    const options: CreateOptions = { dbType: () => <any>'mongo', externalDriverFactory: () => <any>null, };
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+
+    try {
+      await orchestratorOptions.externalDriverFactory();
+
+      throw new Error('driverFactory will call dbType and dbType must throw an exception');
+    } catch (e) {
+      expect(e.message).toEqual('Unexpected return type, externalDriverFactory must return driver, actual: null');
+    }
+  });
+
   test('Should create instance of CubejsServerCore, pass all options', async () => {
     const queueOptions = {
       concurrency: 3,
