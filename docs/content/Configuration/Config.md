@@ -403,16 +403,16 @@ necessary security contexts prior to running the scheduled refreshes.
 
 ```javascript
 module.exports = {
-  // scheduledRefreshContexts should return array of objects, which can declare authInfo
+  // scheduledRefreshContexts should return an array of `securityContext`s
   scheduledRefreshContexts: async () => [
     {
-      authInfo: {
+      securityContext: {
         myappid: 'demoappid',
         bucket: 'demo',
       },
     },
     {
-      authInfo: {
+      securityContext: {
         myappid: 'demoappid2',
         bucket: 'demo2',
       },
