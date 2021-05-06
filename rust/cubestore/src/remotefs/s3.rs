@@ -29,7 +29,7 @@ impl S3RemoteFs {
     pub fn new(
         dir: PathBuf,
         region: String,
-        path_style:bool,
+        path_style: bool,
         endpoint: Option<String>,
         bucket_name: String,
         sub_path: Option<String>,
@@ -41,16 +41,16 @@ impl S3RemoteFs {
             None,
             None,
         )?;
-        let bucket = if path_style==true {
+        let bucket = if path_style == true {
             Bucket::new_with_path_style(
                 &bucket_name,
                 Region::Custom {
-                    endpoint:endpoint.unwrap(),
+                    endpoint: endpoint.unwrap(),
                     region,
                 },
-                credentials
+                credentials,
             )?
-        } else{
+        } else {
             Bucket::new(&bucket_name, region.parse()?, credentials)?
         };
         Ok(Arc::new(Self {
