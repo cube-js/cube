@@ -413,7 +413,7 @@ impl Config {
                             bucket_name: bucket_name,
                             region: env::var("CUBESTORE_S3_REGION").unwrap(),
                             endpoint: env::var("CUBESTORE_S3_ENDPOINT").ok(),
-                            path_style: env_bool("CURBSTONE_S3_PATH_STYLE", false),
+                            path_style: env_bool("CUBESTORE_S3_PATH_STYLE", false),
                             sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
                         }
                     } else if let Ok(bucket_name) = env::var("CUBESTORE_GCS_BUCKET") {
@@ -656,7 +656,7 @@ impl Config {
                 let region = region.to_string();
                 let bucket_name = bucket_name.to_string();
                 let endpoint = endpoint.clone();
-                let path_style = path_style.to_owned();
+                let path_style = path_style.clone();
                 let sub_path = sub_path.clone();
                 self.injector
                     .register("original_remote_fs", async move |_| {
