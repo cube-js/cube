@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
-use s3::Bucket;
+use s3::{Bucket, Region};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -29,6 +29,8 @@ impl S3RemoteFs {
     pub fn new(
         dir: PathBuf,
         region: String,
+        path_style:bool,
+        endpoint: Option<String>,
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
@@ -39,7 +41,18 @@ impl S3RemoteFs {
             None,
             None,
         )?;
-        let bucket = Bucket::new(&bucket_name, region.parse()?, credentials)?;
+        let bucket = if path_style==true {
+            Bucket::new_with_path_style(
+                &bucket_name,
+                Region::Custom {
+                    endpoint:endpoint.unwrap(),
+                    region,
+                },
+                credentials
+            )?
+        } else{
+            Bucket::new(&bucket_name, region.parse()?, credentials)?
+        };
         Ok(Arc::new(Self {
             dir,
             bucket,
