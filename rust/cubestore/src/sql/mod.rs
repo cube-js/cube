@@ -1241,8 +1241,8 @@ mod tests {
                 c.compaction_chunks_count_threshold = 100;
                 c.store_provider = FileStoreProvider::S3 {
                     region: "us-west-2".to_string(),
-                    endpoint:None,
-                    path_style:false,
+                    endpoint: None,
+                    path_style: false,
                     bucket_name: "cube-store-ci-test".to_string(),
                     sub_path: Some("high_frequency_inserts_s3".to_string()),
                 };
@@ -1258,8 +1258,8 @@ mod tests {
                         c.server_name = "127.0.0.1:4306".to_string();
                         c.store_provider = FileStoreProvider::S3 {
                             region: "us-west-2".to_string(),
-                            endpoint:None,
-                            path_style:false,
+                            endpoint: None,
+                            path_style: false,
                             bucket_name: "cube-store-ci-test".to_string(),
                             sub_path: Some("high_frequency_inserts_s3".to_string()),
                         };
