@@ -38,7 +38,6 @@ use std::sync::Arc;
 use std::{env, fs};
 use tokio::sync::broadcast;
 use tokio::time::{timeout_at, Duration, Instant};
-use std::env::VarError;
 
 #[derive(Clone)]
 pub struct CubeServices {
