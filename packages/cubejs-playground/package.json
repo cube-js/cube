@@ -44,7 +44,7 @@
     "less": "^3.10.3",
     "moment": "^2.24.0",
     "prettier": "^2.0.5",
-    "prismjs": "^1.21.0",
+    "prismjs": "^1.23.0",
     "react-beautiful-dnd": "^13.0.0",
     "react-chartjs-2": "^2.7.4",
     "react-helmet": "^6.1.0",
