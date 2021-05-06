@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.8](https://github.com/cube-js/cube.js/compare/v0.27.7...v0.27.8) (2021-05-06)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** prevent the browser to freeze on large SQL highlighting ([3285008](https://github.com/cube-js/cube.js/commit/32850086901c65a375e4aca625cc649956d6161f))
+
+
+
+
+
 ## [0.27.7](https://github.com/cube-js/cube.js/compare/v0.27.6...v0.27.7) (2021-05-04)
 
 
