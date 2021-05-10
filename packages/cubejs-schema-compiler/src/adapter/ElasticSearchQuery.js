@@ -55,7 +55,7 @@ export class ElasticSearchQuery extends BaseQuery {
     return `TIMESTAMP_DIFF('seconds', '1970-01-01T00:00:00.000Z'::datetime, CURRENT_TIMESTAMP())`;
   }
 
-  groupByClause() {
+  groupByClause(isKeysSubquery = false) {
     if (this.ungrouped) {
       return '';
     }

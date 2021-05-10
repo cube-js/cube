@@ -88,10 +88,15 @@ export class MssqlQuery extends BaseQuery {
     return this.rowLimit === null ? '' : ` TOP ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
   }
 
-  groupByClause() {
+  groupByClause(isKeysSubquery = false) {
     const dimensionsForSelect = this.dimensionsForSelect();
-    const dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql()))
+    let dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql()))
       .filter(s => !!s);
+
+    if (isKeysSubquery) {
+      dimensionColumns = this.dimensionColumns(this.escapeColumnName('keys'));
+    }
+
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 

@@ -48,7 +48,7 @@ export class AWSElasticSearchQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  groupByClause() {
+  groupByClause(isKeysSubquery = false) {
     if (this.ungrouped) {
       return '';
     }

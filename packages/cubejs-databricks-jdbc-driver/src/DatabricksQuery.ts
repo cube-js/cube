@@ -98,7 +98,7 @@ export class DatabricksQuery extends BaseQuery {
     return null;
   }
 
-  public groupByClause() {
+  public groupByClause(isKeysSubquery = false) {
     const dimensionsForSelect = this.dimensionsForSelect();
     const dimensionColumns = R.flatten(
       dimensionsForSelect.map((s: any) => s.selectColumns() && s.aliasName())
