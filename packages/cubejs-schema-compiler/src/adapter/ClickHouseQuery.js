@@ -137,7 +137,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
-  groupByClause() {
+  groupByClause(isKeysSubquery = false) {
     //
     // ClickHouse doesn't support group by index column, so map these to the alias names
     //

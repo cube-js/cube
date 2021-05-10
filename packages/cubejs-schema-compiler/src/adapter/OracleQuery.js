@@ -50,7 +50,7 @@ export class OracleQuery extends BaseQuery {
    * Oracle doesn't support group by index,
    * using forSelect dimensions for grouping
    */
-  groupByClause() {
+  groupByClause(isKeysSubquery = false) {
     const dimensions = this.forSelect().filter(item => !!item.dimension);
     if (!dimensions.length) {
       return '';

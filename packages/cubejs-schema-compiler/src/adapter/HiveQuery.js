@@ -80,7 +80,7 @@ export class HiveQuery extends BaseQuery {
     return `SELECT ${this.timeStampCast('dates.f')} date_from, ${this.timeStampCast('dates.t')} date_to FROM (${values}) AS dates`;
   }
 
-  groupByClause() {
+  groupByClause(isKeysSubquery = false) {
     const dimensionsForSelect = this.dimensionsForSelect();
     const dimensionColumns =
       R.flatten(dimensionsForSelect.map(
