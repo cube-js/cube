@@ -17,6 +17,12 @@ Cube Store is enabled by default when running Cube.js in development mode. In
 production, Cube Store **must** run as a separate process. The easiest way to do
 this is to use the official Docker images for Cube.js and Cube Store.
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| Using Windows? We **strongly** recommend using
+| [WSL2 for Windows 10][link-wsl2] to run the following commands.
+<!-- prettier-ignore-end -->
+
 You can run Cube Store with Docker with the following command:
 
 ```bash
@@ -210,5 +216,6 @@ services:
       - cubestore_router
 ```
 
+[link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/environment-variables#cube-store
