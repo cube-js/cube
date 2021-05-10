@@ -1,7 +1,13 @@
+# Based on top of ubuntu 20.04
+# https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.x86_64-unknown-linux-musl
 FROM rustembedded/cross:x86_64-unknown-linux-musl
 
 RUN apt-get update && apt-get -y upgrade && \
-    apt-get install -y curl pkg-config wget llvm libclang-dev musl-tools clang
+    apt-get install -y curl pkg-config wget musl-tools libc6-dev apt-transport-https ca-certificates && \
+    echo 'deb https://apt.llvm.org/focal/ llvm-toolchain-focal-9 main' >> /etc/apt/sources.list && \
+    curl -JL http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add - && \
+    apt-get update && \
+    apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
     ln -s /usr/include/asm-generic /usr/include/x86_64-linux-musl/asm-generic && \
