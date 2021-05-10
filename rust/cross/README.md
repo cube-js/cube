@@ -1,7 +1,6 @@
 Cross Build Images
 ==================
 
-<<<<<<< HEAD
 > Docker images, which is used to build Cube Store via cross
 
 Host only:
