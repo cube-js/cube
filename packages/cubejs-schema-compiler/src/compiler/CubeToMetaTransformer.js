@@ -129,6 +129,6 @@ export class CubeToMetaTransformer {
   }
 
   titleize(name) {
-    return inflection.titleize(inflection.underscore(name));
+    return inflection.titleize(inflection.capitalize(name));
   }
 }
