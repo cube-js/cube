@@ -1,5 +1,6 @@
 import inflection from 'inflection';
 import R from 'ramda';
+import camelCase from 'camelcase';
 
 import { UserError } from './UserError';
 import { BaseMeasure } from '../adapter';
@@ -129,6 +130,6 @@ export class CubeToMetaTransformer {
   }
 
   titleize(name) {
-    return inflection.titleize(inflection.capitalize(name));
+    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })))
   }
 }
