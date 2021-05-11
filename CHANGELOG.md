@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.9](https://github.com/cube-js/cube.js/compare/v0.27.8...v0.27.9) (2021-05-11)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/schema-compiler:** titleize fix ([#2695](https://github.com/cube-js/cube.js/issues/2695)) ([d997f49](https://github.com/cube-js/cube.js/commit/d997f4978de9f4b25b606ba6c17b225f3e6a6cb1))
+* **mssql-driver:** Cannot read property 'readOnly' of undefined, fix [#2659](https://github.com/cube-js/cube.js/issues/2659) ([d813594](https://github.com/cube-js/cube.js/commit/d81359498e5d57cc855354ef2dae41653dadbea2))
+
+
+### Features
+
+* **cubestore:** Support x86_64-pc-windows-msvc ([407f1bd](https://github.com/cube-js/cube.js/commit/407f1bdda7fdb24c7863163b6157624ab6c9b7ee))
+
+
+
+
+
 ## [0.27.8](https://github.com/cube-js/cube.js/compare/v0.27.7...v0.27.8) (2021-05-06)
 
 

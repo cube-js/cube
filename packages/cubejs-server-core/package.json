@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.27.8",
+  "version": "0.27.9",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -34,7 +34,7 @@
     "@cubejs-backend/cloud": "^0.27.5",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.27.5",
-    "@cubejs-backend/schema-compiler": "^0.27.7",
+    "@cubejs-backend/schema-compiler": "^0.27.9",
     "@cubejs-backend/shared": "^0.27.5",
     "@cubejs-backend/templates": "^0.27.0",
     "@hapi/joi": "^15.1.1",
@@ -54,9 +54,9 @@
     "uuid": "^3.3.3"
   },
   "devDependencies": {
-    "@cubejs-backend/cubestore-driver": "^0.27.7",
+    "@cubejs-backend/cubestore-driver": "^0.27.9",
     "@cubejs-backend/linter": "^0.27.0",
-    "@cubejs-client/playground": "^0.27.8",
+    "@cubejs-client/playground": "^0.27.9",
     "@types/cross-spawn": "^6.0.2",
     "@types/express": "^4.17.9",
     "@types/fs-extra": "^9.0.8",
