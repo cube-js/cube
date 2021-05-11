@@ -54,7 +54,7 @@ export default {
     let controls = createElement('div', {});
     const onlyDefault = !('empty' in this.$slots) && !('error' in this.$slots);
 
-    if ($slots.builder) {
+    if ($slots.builder && this.builderProps.measures) {
       controls = $slots.builder({ ...this.builderProps });
     }
 
