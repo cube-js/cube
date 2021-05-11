@@ -14,10 +14,16 @@ import isDocker from 'is-docker';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
+import { ExternalDbTypeFn } from './types';
 
 const repo = {
   owner: 'cube-js',
   name: 'cubejs-playground-templates'
+};
+
+type DevServerOptions = {
+  dockerVersion?: string,
+  externalDbTypeFn: ExternalDbTypeFn
 };
 
 export class DevServer {
@@ -29,6 +35,7 @@ export class DevServer {
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
+    protected readonly options?: DevServerOptions
   ) {
   }
 
@@ -66,6 +73,12 @@ export class DevServer {
         basePath: options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
+        dockerVersion: this.options?.dockerVersion || null,
+        externalDbType: this.options?.externalDbTypeFn({
+          authInfo: null,
+          securityContext: null,
+          requestId: getRequestIdFromRequest(req),
+        }) || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
         livePreview: options.livePreview,
