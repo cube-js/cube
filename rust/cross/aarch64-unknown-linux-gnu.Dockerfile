@@ -3,7 +3,7 @@
 FROM rustembedded/cross:aarch64-unknown-linux-gnu
 
 RUN apt-get update && \
-    apt-get install --assume-yes -y wget make git automake autoconf ca-certificates libc6-arm64-cross libc6-dev-arm64-cross apt-transport-https ca-certificates && \
+    apt-get install --assume-yes -y wget make git automake autoconf ca-certificates libc6-arm64-cross libc6-dev libc6-dev-arm64-cross apt-transport-https ca-certificates && \
     echo 'deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main' >> /etc/apt/sources.list && \
     curl -JL http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add - && \
     apt-get update && \
