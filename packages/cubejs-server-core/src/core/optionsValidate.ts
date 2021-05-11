@@ -71,6 +71,7 @@ const schemaOptions = Joi.object().keys({
     Joi.object().keys({
       redisPrefix: Joi.string().allow(''),
       continueWaitTimeout: Joi.number().min(0).integer(),
+      skipExternalCacheAndQueue: Joi.boolean(),
       queryCacheOptions: Joi.object().keys({
         refreshKeyRenewalThreshold: Joi.number().min(0).integer(),
         backgroundRenew: Joi.boolean(),
@@ -87,6 +88,7 @@ const schemaOptions = Joi.object().keys({
   allowJsDuplicatePropsInSchema: Joi.boolean(),
   scheduledRefreshContexts: Joi.func(),
   sqlCache: Joi.boolean(),
+  gracefulShutdown: Joi.number().min(0).integer(),
 });
 
 export default (options: any) => {
