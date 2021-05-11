@@ -7,8 +7,9 @@ import {
   getOrderMembersFromOrder,
   moveItemInArray,
   movePivotItem,
-  areQueriesEqual
+  areQueriesEqual,
 } from '@cubejs-client/core';
+import { h } from 'vue';
 import { clone, equals } from 'ramda';
 
 import QueryRenderer from './QueryRenderer';
@@ -83,7 +84,7 @@ export default {
     };
   },
 
-  render(createElement) {
+  render() {
     const {
       chartType,
       cubejsApi,
@@ -199,27 +200,20 @@ export default {
       });
     }
 
-    // Pass parent slots to child QueryRenderer component
-    const children = Object.keys(this.$slots).map((slot) =>
-      createElement('template', { slot }, this.$slots[slot])
-    );
-
-    return createElement(
+    return h(
       QueryRenderer,
       {
-        props: {
-          query: this.validatedQuery,
-          cubejsApi,
-          builderProps,
-        },
-        scopedSlots: this.$scopedSlots,
+        query: this.validatedQuery,
+        cubejsApi,
+        builderProps,
+        slots: this.$slots,
         on: {
           queryStatus: (event) => {
             this.$emit('queryStatus', event);
-          }
-        }
+          },
+        },
       },
-      children
+      this.$slots
     );
   },
   computed: {
@@ -321,7 +315,7 @@ export default {
         const { query, chartType, shouldApplyHeuristicOrder, pivotConfig } = heuristicsFn(
           {
             query: validatedQuery,
-            chartType: this.chartType
+            chartType: this.chartType,
           },
           this.prevValidatedQuery,
           {
