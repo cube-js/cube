@@ -107,8 +107,12 @@ fn main() {
                         c
                     })
                     .start_test_worker(|_| async move {
-                        // TODO ensures that port is ready and can be connected. Somehow waiting for bind isn't enough and socket isn't actually ready outside of a process?
-                        TcpStream::connect(worker_addr.to_string()).await.unwrap();
+                        // TODO ensures that port is ready and can be connected. Somehow waiting for bind isn't enough and socket isn't actually ready?
+                        for _ in 0..100 {
+                            if TcpStream::connect(worker_addr.to_string()).await.is_ok() {
+                                break;
+                            }
+                        }
                         init.signal().await;
                         done.wait_completion().await;
                     })
