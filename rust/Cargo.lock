@@ -1113,6 +1113,7 @@ dependencies = [
  "itertools 0.9.0",
  "lazy_static",
  "log",
+ "lru",
  "mockall",
  "msql-srv",
  "mysql_common 0.26.0",
@@ -2294,6 +2295,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
  "cfg-if 0.1.10",
+]
+
+[[package]]
+name = "lru"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f374d42cdfc1d7dbf3d3dec28afab2eb97ffbf43a3234d795b5986dbf4b90ba"
+dependencies = [
+ "hashbrown 0.9.1",
 ]
 
 [[package]]
@@ -4758,7 +4768,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04f8ab788026715fa63b31960869617cba39117e520eb415b0139543e325ab59"
 dependencies = [
  "cfg-if 0.1.10",
- "rand 0.6.5",
+ "rand 0.7.3",
  "static_assertions",
 ]
 

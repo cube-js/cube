@@ -1,3 +1,4 @@
+pub mod cache;
 pub(crate) mod parser;
 
 use log::trace;
@@ -28,6 +29,7 @@ use crate::import::Ingestion;
 use crate::metastore::job::JobType;
 use crate::queryplanner::query_executor::QueryExecutor;
 use crate::remotefs::RemoteFs;
+use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
 use crate::table::data::{MutRows, Rows, TableValueR};
@@ -55,13 +57,13 @@ use tracing_futures::WithSubscriber;
 
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
-    async fn exec_query(&self, query: &str) -> Result<DataFrame, CubeError>;
+    async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError>;
 
     async fn exec_query_with_context(
         &self,
         context: SqlQueryContext,
         query: &str,
-    ) -> Result<DataFrame, CubeError>;
+    ) -> Result<Arc<DataFrame>, CubeError>;
 
     /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
@@ -94,6 +96,7 @@ pub struct SqlServiceImpl {
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
     query_timeout: Duration,
+    cache: SqlResultCache,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -120,6 +123,7 @@ impl SqlServiceImpl {
             rows_per_chunk,
             query_timeout,
             remote_fs,
+            cache: SqlResultCache::new(10000), // TODO config
         })
     }
 
@@ -305,7 +309,7 @@ impl Dialect for MySqlDialectWithBackTicks {
 
 #[async_trait]
 impl SqlService for SqlServiceImpl {
-    async fn exec_query(&self, q: &str) -> Result<DataFrame, CubeError> {
+    async fn exec_query(&self, q: &str) -> Result<Arc<DataFrame>, CubeError> {
         self.exec_query_with_context(SqlQueryContext::default(), q)
             .await
     }
@@ -314,16 +318,16 @@ impl SqlService for SqlServiceImpl {
     async fn exec_query_with_context(
         &self,
         _context: SqlQueryContext,
-        q: &str,
-    ) -> Result<DataFrame, CubeError> {
-        if !q.to_lowercase().starts_with("insert") {
-            trace!("Query: '{}'", q);
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError> {
+        if !query.to_lowercase().starts_with("insert") {
+            trace!("Query: '{}'", query);
         }
-        if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(q) {
-            return Ok(data_frame);
+        if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
+            return Ok(Arc::new(data_frame));
         }
         let ast = {
-            let replaced_quote = q.replace("\\'", "''");
+            let replaced_quote = query.replace("\\'", "''");
             let mut parser = CubeStoreParser::new(&replaced_quote)?;
             parser.parse_statement()?
         };
@@ -331,22 +335,26 @@ impl SqlService for SqlServiceImpl {
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
                 match variable.value.to_lowercase() {
-                    s if s == "schemas" => Ok(DataFrame::from(self.db.get_schemas().await?)),
-                    s if s == "tables" => Ok(DataFrame::from(self.db.get_tables().await?)),
-                    s if s == "chunks" => {
-                        Ok(DataFrame::from(self.db.chunks_table().all_rows().await?))
+                    s if s == "schemas" => {
+                        Ok(Arc::new(DataFrame::from(self.db.get_schemas().await?)))
                     }
-                    s if s == "indexes" => {
-                        Ok(DataFrame::from(self.db.index_table().all_rows().await?))
+                    s if s == "tables" => {
+                        Ok(Arc::new(DataFrame::from(self.db.get_tables().await?)))
                     }
-                    s if s == "partitions" => {
-                        Ok(DataFrame::from(self.db.partition_table().all_rows().await?))
-                    }
+                    s if s == "chunks" => Ok(Arc::new(DataFrame::from(
+                        self.db.chunks_table().all_rows().await?,
+                    ))),
+                    s if s == "indexes" => Ok(Arc::new(DataFrame::from(
+                        self.db.index_table().all_rows().await?,
+                    ))),
+                    s if s == "partitions" => Ok(Arc::new(DataFrame::from(
+                        self.db.partition_table().all_rows().await?,
+                    ))),
                     x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
-                Ok(DataFrame::new(vec![], vec![]))
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CubeStoreStatement::CreateSchema {
                 schema_name,
@@ -354,7 +362,7 @@ impl SqlService for SqlServiceImpl {
             } => {
                 let name = schema_name.to_string();
                 let res = self.create_schema(name, if_not_exists).await?;
-                Ok(DataFrame::from(vec![res]))
+                Ok(Arc::new(DataFrame::from(vec![res])))
             }
             CubeStoreStatement::CreateTable {
                 create_table:
@@ -387,7 +395,7 @@ impl SqlService for SqlServiceImpl {
                         indexes,
                     )
                     .await?;
-                Ok(DataFrame::from(vec![res]))
+                Ok(Arc::new(DataFrame::from(vec![res])))
             }
             CubeStoreStatement::Statement(Statement::CreateIndex {
                 name,
@@ -423,7 +431,7 @@ impl SqlService for SqlServiceImpl {
                             .collect::<Result<Vec<_>, _>>()?,
                     )
                     .await?;
-                Ok(DataFrame::from(vec![res]))
+                Ok(Arc::new(DataFrame::from(vec![res])))
             }
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
@@ -441,7 +449,7 @@ impl SqlService for SqlServiceImpl {
                     }
                     _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
                 }
-                Ok(DataFrame::new(vec![], vec![]))
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CubeStoreStatement::Statement(Statement::Insert {
                 table_name,
@@ -453,20 +461,20 @@ impl SqlService for SqlServiceImpl {
                 } else {
                     return Err(CubeError::user(format!(
                         "Data should be present in query. Your query was '{}'",
-                        q
+                        query
                     )));
                 };
 
                 let nv = &table_name.0;
                 if nv.len() != 2 {
-                    return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", q)));
+                    return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", query)));
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
 
                 self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
                     .await?;
-                Ok(DataFrame::new(vec![], vec![]))
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
@@ -476,13 +484,17 @@ impl SqlService for SqlServiceImpl {
                 // TODO distribute and combine
                 let res = match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
-                        self.query_planner.execute_meta_plan(logical_plan).await?
+                        Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
                     QueryPlan::Select(serialized) => {
+                        let cluster = self.cluster.clone();
+                        let executor = self.query_executor.clone();
                         timeout(
                             self.query_timeout,
-                            self.query_executor
-                                .execute_router_plan(serialized, self.cluster.clone())
+                            self.cache
+                                .get(query, serialized, async move |plan| {
+                                    executor.execute_router_plan(plan, cluster).await
+                                })
                                 .with_current_subscriber(),
                         )
                         .await??
@@ -490,7 +502,7 @@ impl SqlService for SqlServiceImpl {
                 };
                 Ok(res)
             }
-            _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", q))),
+            _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
 
