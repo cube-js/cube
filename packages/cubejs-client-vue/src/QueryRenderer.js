@@ -55,7 +55,7 @@ export default {
     const onlyDefault = !('empty' in this.$slots) && !('error' in this.$slots);
 
     if ($slots.builder) {
-      controls = $slots.builder();
+      controls = $slots.builder({ ...this.builderProps });
     }
 
     if ((!loading && resultSet && !error) || onlyDefault) {
