@@ -124,9 +124,10 @@ impl CubeServices {
             started_rx.await?;
 
             let cluster = self.cluster.clone();
-            futures.push(tokio::spawn(
-                async move { cluster.warmup_select_worker().await },
-            ))
+            futures.push(tokio::spawn(async move {
+                cluster.warmup_select_worker().await;
+                Ok(())
+            }))
         }
         futures.push(tokio::spawn(async move {
             start_track_event_loop().await;

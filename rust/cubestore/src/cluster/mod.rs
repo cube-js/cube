@@ -7,6 +7,7 @@ pub mod worker_pool;
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
 
+use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::DIService;
@@ -1123,25 +1124,28 @@ impl ClusterImpl {
     ///
     /// Can take awhile, use the passed cancellation token to stop the worker before it finishes.
     /// Designed to run in the background.
-    pub async fn warmup_select_worker(&self) -> Result<(), CubeError> {
+    pub async fn warmup_select_worker(&self) {
         if self.config_obj.select_workers().len() == 0 {
-            return Err(CubeError::internal(
-                "no select workers specified".to_owned(),
-            ));
+            log::error!("No select workers specified");
+            return;
         }
         if !self.config_obj.select_workers().contains(&self.server_name) {
-            return Err(CubeError::internal(
-                "current node is not a select worker".to_owned(),
-            ));
+            log::error!("Current node is not a select worker");
+            return;
         }
-
         if !self.config_obj.enable_startup_warmup() {
             log::info!("Startup warmup disabled");
-            return Ok(());
+            return;
         }
 
         log::debug!("Requesting partitions for startup warmup");
-        let partitions = self.meta_store.get_warmup_partitions().await?;
+        let partitions = match self.meta_store.get_warmup_partitions().await {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Failed to get warmup partitions: {}", e);
+                return;
+            }
+        };
         log::debug!("Got {} partitions, running the warmup", partitions.len());
 
         for (p, chunks) in partitions {
@@ -1151,20 +1155,22 @@ impl ClusterImpl {
             if let Some(file) = partition_file_name(p.parent_partition_id, p.partition_id) {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
-                    return Ok(());
+                    return;
                 }
-                self.remote_fs.download_file(&file).await?;
+                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
+                //       so they are not errors most of the time.
+                ack_error!(self.remote_fs.download_file(&file).await);
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
-                    return Ok(());
+                    return;
                 }
-                self.remote_fs.download_file(&chunk_file_name(c)).await?;
+                ack_error!(self.remote_fs.download_file(&chunk_file_name(c)).await);
             }
         }
         log::debug!("Startup warmup finished");
-        return Ok(());
+        return;
     }
 }
 
