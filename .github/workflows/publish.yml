@@ -263,6 +263,7 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
         include:
           - os: ubuntu-latest
@@ -282,6 +283,13 @@ jobs:
             target: x86_64-pc-windows-gnu
             executable_name: cubestored.exe
             cross: true
+            strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
+            compress: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            executable_name: cubestored.exe
+            cross: false
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
@@ -309,11 +317,19 @@ jobs:
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
-      #- name: Install dependencies Windows
-      #  run: vcpkg integrate install; vcpkg install openssl:x64-windows
-      #  if: matrix.os == 'windows-latest'
-      #  env:
-      #    VCPKG_ROOT: 'C:\vcpkg'
+      - name: Install OpenSSL for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: vcpkg integrate install; vcpkg install openssl:x64-windows
+      - name: Instal LLVM for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: choco install -y llvm --version 9.0.1
+      - name: Set Env Variables for Windows
+        uses: allenevans/set-env@v2.0.0
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        with:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+          OPENSSL_STATIC: "true"
+          OPENSSL_DIR: "C:/vcpkg/packages/openssl_x64-windows"
       - name: Set Env Variables for Darwin
         uses: allenevans/set-env@v2.0.0
         if: ${{ matrix.target == 'x86_64-apple-darwin' }}
