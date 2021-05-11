@@ -130,6 +130,6 @@ export class CubeToMetaTransformer {
   }
 
   titleize(name) {
-    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })))
+    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
   }
 }
