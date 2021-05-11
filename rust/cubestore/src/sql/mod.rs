@@ -331,7 +331,7 @@ impl SqlService for SqlServiceImpl {
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
                 match variable.value.to_lowercase() {
-                    s if s == "schemas" => Ok(DataFrame::from(self.db.get_schemas().await?)),
+                    s if ["schemas", "databases"].contains(&s.as_str()) => Ok(DataFrame::from(self.db.get_schemas().await?)),
                     s if s == "tables" => Ok(DataFrame::from(self.db.get_tables().await?)),
                     s if s == "chunks" => {
                         Ok(DataFrame::from(self.db.chunks_table().all_rows().await?))
@@ -1110,6 +1110,25 @@ mod tests {
 
             assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Boolean(false), TableValue::Int(21177)]));
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(3823)]));
+        }).await;
+    }
+    #[tokio::test]
+    async fn create_database_test() {
+        Config::run_test("select", async move |services| {
+           let service = services.sql_service;
+           let dbs = ["foo", "bar"];
+
+           for db in dbs.iter() {
+              let _ = service.exec_query(&format!("CREATE DATABASE {}", &db)).await.unwrap();
+           }
+
+           let result = service.exec_query("SHOW DATABASES").await.unwrap();
+           let mut index = 0;
+           for db in dbs.iter() {
+              assert_eq!(result.get_rows()[index], Row::new(vec![TableValue::Int((index + 1) as i64),
+                  TableValue::String(db.to_string())]));
+              index += 1;
+           }
         }).await;
     }
 
