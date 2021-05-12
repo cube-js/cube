@@ -355,8 +355,6 @@ export class CubejsServerCore {
       if (!definedExtDBVariables.length) {
         const cubeStorePackage = this.requireCubeStoreDriver();
         if (cubeStorePackage.isCubeStoreSupported()) {
-          console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
-
           const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
             stdout: (data) => {
               console.log(data.toString().trim());
@@ -368,6 +366,17 @@ export class CubejsServerCore {
               warning: `Instance exit with ${code}, restarting`,
             }),
           });
+
+          console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
+
+          // Start Cube Store on startup in official docker images
+          if (isDockerImage()) {
+            cubeStoreHandler.acquire().catch(
+              (e) => this.logger('Cube Store Start Error', {
+                error: e.message,
+              })
+            );
+          }
 
           // Lazy loading for Cube Store
           externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
