@@ -331,6 +331,9 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         with:
           OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
+          # This paths are required to work with static linking
+          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
+          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
       # https://github.com/actions-rs/cargo/issues/6
       #- uses: actions-rs/cargo@v1
       - uses: marcopolo/cargo@master
@@ -353,10 +356,15 @@ jobs:
           file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
-      - name: Create archive for release
+      - name: Create folder for archive
         run: |
           mkdir cubestore-archive
           mkdir cubestore-archive/bin
+      - name: Copy/paste OpenSSL to Archive (hotfix for Windows)
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
+      - name: Create archive for release
+        run: |
           mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
