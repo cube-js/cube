@@ -13,7 +13,7 @@
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-dropzone": "^11.0.3",
-    "react-hotkeys-hook": "^2.2.2",
+    "react-hotkeys-hook": "^2.4.1",
     "react-scripts": "^3.4.4"
   },
   "scripts": {
