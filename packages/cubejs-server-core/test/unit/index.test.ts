@@ -123,14 +123,19 @@ describe('index.test', () => {
         rollupOnlyMode: false
       },
       allowJsDuplicatePropsInSchema: true,
-      jwk: {
-        claimsNamespace: 'http://localhost:4000',
-        jwkUrl: () => '',
+      jwt: {
+        // JWK options
         jwkRetry: 5,
         jwkDefaultExpire: 5 * 60,
+        jwkUrl: () => '',
+        jwkRefetchWindow: 5 * 60,
+        // JWT options
+        key: 'string',
         algorithms: ['RS256'],
+        issuer: ['http://localhost:4000'],
         audience: 'http://localhost:4000/v1',
-        issuer: 'http://localhost:4000',
+        subject: 'http://localhost:4000',
+        claimsNamespace: 'http://localhost:4000',
       },
       livePreview: true
     };

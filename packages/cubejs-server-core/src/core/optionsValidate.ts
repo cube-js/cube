@@ -12,15 +12,21 @@ const schemaQueueOptions = Joi.object().keys({
 });
 
 const jwtOptions = Joi.object().keys({
+  // JWK options
   jwkRetry: Joi.number().min(1).max(5).integer(),
+  jwkDefaultExpire: Joi.number().min(0),
   jwkUrl: Joi.alternatives().try(
     Joi.string(),
     Joi.func()
   ),
+  jwkRefetchWindow: Joi.number().min(0),
+  // JWT options
+  key: Joi.string(),
   algorithms: Joi.array().items(Joi.string()),
   issuer: Joi.array().items(Joi.string()),
   audience: Joi.string(),
   subject: Joi.string(),
+  claimsNamespace: Joi.string(),
 });
 
 const dbTypes = Joi.alternatives().try(
@@ -29,16 +35,23 @@ const dbTypes = Joi.alternatives().try(
 );
 
 const schemaOptions = Joi.object().keys({
+  // server CreateOptions
+  initApp: Joi.func(),
+  webSockets: Joi.boolean(),
+  http: Joi.object().keys({
+    cors: Joi.object(),
+  }),
+  gracefulShutdown: Joi.number().min(0).integer(),
+  // Additional from WebSocketServerOptions
+  processSubscriptionsInterval: Joi.number(),
+  webSocketsBasePath: Joi.string(),
+  // server-core CoreCreateOptions
   dbType: dbTypes,
   externalDbType: dbTypes,
   schemaPath: Joi.string(),
   basePath: Joi.string(),
-  webSocketsBasePath: Joi.string(),
   devServer: Joi.boolean(),
   apiSecret: Joi.string(),
-  webSockets: Joi.boolean(),
-  processSubscriptionsInterval: Joi.number(),
-  initApp: Joi.func(),
   logger: Joi.func(),
   driverFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
@@ -88,15 +101,13 @@ const schemaOptions = Joi.object().keys({
   allowJsDuplicatePropsInSchema: Joi.boolean(),
   scheduledRefreshContexts: Joi.func(),
   sqlCache: Joi.boolean(),
-  gracefulShutdown: Joi.number().min(0).integer(),
+  livePreview: Joi.boolean(),
+  // Additional system flags
+  serverless: Joi.boolean(),
 });
 
 export default (options: any) => {
-  const { error } = Joi.validate(options, schemaOptions, {
-    abortEarly: false,
-    // http configuration from server is not a part of server-core, we dont needed to get an error
-    allowUnknown: true,
-  });
+  const { error } = Joi.validate(options, schemaOptions, { abortEarly: false, });
   if (error) {
     throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
   }
