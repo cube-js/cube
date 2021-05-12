@@ -89,7 +89,10 @@ jobs:
 
   cross:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      RUSTFLAGS: '-Ctarget-feature=+crt-static'
+      OPENSSL_STATIC: 1
     strategy:
       matrix:
         target:
@@ -160,14 +163,7 @@ jobs:
         uses: allenevans/set-env@v2.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
         with:
-          RUSTFLAGS: "-C target-feature=+crt-static"
-          OPENSSL_STATIC: "true"
-          OPENSSL_DIR: "C:/vcpkg/packages/openssl_x64-windows"
-      - name: Set Env Variables for Darwin
-        uses: allenevans/set-env@v2.0.0
-        if: ${{ matrix.target == 'x86_64-apple-darwin' }}
-        with:
-          OPENSSL_STATIC: "true"
+          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
       # https://github.com/actions-rs/cargo/issues/6
       #- uses: actions-rs/cargo@v1
       - uses: marcopolo/cargo@master
@@ -196,4 +192,9 @@ jobs:
           mkdir cubestore-archive/bin
           mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          tar cv * | gzip --best  > cubestored-${{ matrix.target }}.tar.gz
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
+      - uses: actions/upload-artifact@v2
+        with:
+          path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
+          name: cubestored-${{ matrix.target }}.tar.gz
+          retention-days: 1
