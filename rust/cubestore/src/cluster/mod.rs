@@ -671,64 +671,78 @@ impl ClusterImpl {
             .await
     }
 
-    pub async fn listen_on_worker_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
-        if let Some(address) = cluster.config_obj.worker_bind_address() {
-            ClusterImpl::listen_on_port(
-                "Worker",
-                address,
-                cluster.clone(),
-                async move |c, mut socket| {
-                    let m = match NetworkMessage::receive(&mut socket).await {
-                        Ok(m) => m,
-                        Err(e) => {
-                            error!("Network error: {}", e);
-                            return;
-                        }
-                    };
+    pub async fn listen_on_worker_port(
+        cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
+    ) -> Result<(), CubeError> {
+        let address = match cluster.config_obj.worker_bind_address() {
+            Some(a) => a,
+            None => {
+                let _ = on_socket_bound.send(());
+                return Ok(());
+            }
+        };
+        ClusterImpl::listen_on_port(
+            "Worker",
+            address,
+            cluster.clone(),
+            on_socket_bound,
+            async move |c, mut socket| {
+                let m = match NetworkMessage::receive(&mut socket).await {
+                    Ok(m) => m,
+                    Err(e) => {
+                        error!("Network error: {}", e);
+                        return;
+                    }
+                };
 
-                    if !m.is_streaming_request() {
-                        let response = c.process_message_on_worker(m).await;
-                        if let Err(e) = response.send(&mut socket).await {
-                            error!("Network error: {}", e);
-                            return;
-                        }
-                    } else {
-                        let mut p = c.start_stream_on_worker(m).await;
-                        loop {
-                            let (response, finished) = p.next().await;
-                            match response.maybe_send(&mut socket).await {
-                                // All ok, continue streaming.
-                                Ok(true) => {}
-                                // Connection closed by client, stop streaming.
-                                Ok(false) => {
-                                    break;
-                                }
-                                Err(e) => {
-                                    error!("Network error: {}", e);
-                                    return;
-                                }
-                            }
-                            if finished {
+                if !m.is_streaming_request() {
+                    let response = c.process_message_on_worker(m).await;
+                    if let Err(e) = response.send(&mut socket).await {
+                        error!("Network error: {}", e);
+                        return;
+                    }
+                } else {
+                    let mut p = c.start_stream_on_worker(m).await;
+                    loop {
+                        let (response, finished) = p.next().await;
+                        match response.maybe_send(&mut socket).await {
+                            // All ok, continue streaming.
+                            Ok(true) => {}
+                            // Connection closed by client, stop streaming.
+                            Ok(false) => {
                                 break;
                             }
+                            Err(e) => {
+                                error!("Network error: {}", e);
+                                return;
+                            }
+                        }
+                        if finished {
+                            break;
                         }
                     }
-                },
-            )
-            .await?;
-        }
-        Ok(())
+                }
+            },
+        )
+        .await
     }
 
-    pub async fn listen_on_metastore_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
+    pub async fn listen_on_metastore_port(
+        cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
+    ) -> Result<(), CubeError> {
         if let Some(address) = cluster.config_obj.metastore_bind_address() {
             ClusterImpl::process_on_port(
                 "Meta store",
                 address,
                 cluster.clone(),
+                on_socket_bound,
                 async move |c, m| c.process_metastore_message(m).await,
             )
             .await?;
+        } else {
+            let _ = on_socket_bound.send(());
         }
         Ok(())
     }
@@ -737,9 +751,11 @@ impl ClusterImpl {
         name: &str,
         address: &str,
         cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
         process_fn: impl Fn(Arc<ClusterImpl>, TcpStream) -> F + Send + Sync + Clone + 'static,
     ) -> Result<(), CubeError> {
         let listener = TcpListener::bind(address.clone()).await?;
+        let _ = on_socket_bound.send(());
 
         info!("{} port open on {}", name, address);
 
@@ -776,27 +792,34 @@ impl ClusterImpl {
         name: &str,
         address: &str,
         cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
         process_fn: impl Fn(Arc<ClusterImpl>, NetworkMessage) -> F + Send + Sync + Clone + 'static,
     ) -> Result<(), CubeError> {
-        Self::listen_on_port(name, address, cluster, move |c, mut socket| {
-            let cluster = c.clone();
-            let process_fn = process_fn.clone();
-            async move {
-                let request = NetworkMessage::receive(&mut socket).await;
-                let response;
-                match request {
-                    Ok(m) => response = process_fn(cluster.clone(), m).await,
-                    Err(e) => {
-                        error!("Network error: {}", e);
-                        return;
+        Self::listen_on_port(
+            name,
+            address,
+            cluster,
+            on_socket_bound,
+            move |c, mut socket| {
+                let cluster = c.clone();
+                let process_fn = process_fn.clone();
+                async move {
+                    let request = NetworkMessage::receive(&mut socket).await;
+                    let response;
+                    match request {
+                        Ok(m) => response = process_fn(cluster.clone(), m).await,
+                        Err(e) => {
+                            error!("Network error: {}", e);
+                            return;
+                        }
+                    }
+
+                    if let Err(e) = response.send(&mut socket).await {
+                        error!("Network error: {}", e)
                     }
                 }
-
-                if let Err(e) = response.send(&mut socket).await {
-                    error!("Network error: {}", e)
-                }
-            }
-        })
+            },
+        )
         .await
     }
 
