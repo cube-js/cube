@@ -37,6 +37,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tokio::time::{timeout_at, Duration, Instant};
 
 #[derive(Clone)]
@@ -57,9 +58,9 @@ pub struct WorkerServices {
 
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
-        let services = self.clone();
+        let futures = self.spawn_processing_loops().await?;
         tokio::spawn(async move {
-            if let Err(e) = services.wait_processing_loops().await {
+            if let Err(e) = Self::wait_loops(futures).await {
                 error!("Error in processing loop: {}", e);
             }
         });
@@ -67,6 +68,18 @@ impl CubeServices {
     }
 
     pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
+        Self::wait_loops(self.spawn_processing_loops().await?).await
+    }
+
+    async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
+        join_all(loops)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
+    }
+
+    async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
         let cluster = self.cluster.clone();
         futures.push(tokio::spawn(async move {
@@ -83,9 +96,12 @@ impl CubeServices {
                 Ok(())
             }));
             let cluster = self.cluster.clone();
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
             futures.push(tokio::spawn(async move {
-                ClusterImpl::listen_on_metastore_port(cluster).await
+                ClusterImpl::listen_on_metastore_port(cluster, started_tx).await
             }));
+            started_rx.await?;
+
             let scheduler = self.scheduler.clone();
             futures.extend(SchedulerImpl::spawn_processing_loops(scheduler));
 
@@ -101,9 +117,12 @@ impl CubeServices {
             }
         } else {
             let cluster = self.cluster.clone();
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
             futures.push(tokio::spawn(async move {
-                ClusterImpl::listen_on_worker_port(cluster).await
+                ClusterImpl::listen_on_worker_port(cluster, started_tx).await
             }));
+            started_rx.await?;
+
             let cluster = self.cluster.clone();
             futures.push(tokio::spawn(
                 async move { cluster.warmup_select_worker().await },
@@ -113,13 +132,7 @@ impl CubeServices {
             start_track_event_loop().await;
             Ok(())
         }));
-        join_all(futures)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(())
+        Ok(futures)
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
@@ -943,3 +956,5 @@ impl Config {
         WORKER_SERVICES.read().unwrap().as_ref().unwrap().clone()
     }
 }
+
+type LoopHandle = JoinHandle<Result<(), CubeError>>;
