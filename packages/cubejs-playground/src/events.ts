@@ -7,8 +7,15 @@ let trackEvents: BaseEvent[] = [];
 let baseProps = {
   sentFrom: 'frontend'
 };
+let telemetry: boolean | undefined;
+
+export const setTelemetry = (isAllowed) => telemetry = isAllowed;
 
 const track = async (event) => {
+  if (telemetry !== true) {
+    return;
+  }
+
   if (!cookie('playground_anonymous')) {
     cookie('playground_anonymous', uuidv4());
   }
@@ -38,6 +45,7 @@ const track = async (event) => {
         body: JSON.stringify(toFlush.map((r) => ({ ...r, sentAt }))),
         headers: { 'Content-Type': 'application/json' },
       });
+
       if (result.status !== 200 && retries > 0) {
         return flush(toFlush, retries - 1);
       }
