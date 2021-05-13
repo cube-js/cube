@@ -74,9 +74,9 @@ class SnowflakeDriver extends BaseDriver {
       database: process.env.CUBEJS_DB_NAME,
       username: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      authenticator: process.env.CUBEJS_DB_AUTHENTICATOR,
-      privateKeyPath: process.env.CUBEJS_DB_PRIVATE_KEY_PATH,
-      privateKeyPass: process.env.CUBEJS_DB_PRIVATE_KEY_PASS,
+      authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
+      privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
+      privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
       ...config
     };
     const connection = snowflake.createConnection(this.config);
@@ -95,9 +95,9 @@ class SnowflakeDriver extends BaseDriver {
       'CUBEJS_DB_SNOWFLAKE_WAREHOUSE',
       'CUBEJS_DB_SNOWFLAKE_ROLE',
       'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
-      'CUBEJS_DB_AUTHENTICATOR',
-      'CUBEJS_DB_PRIVATE_KEY_PATH',
-      'CUBEJS_DB_PRIVATE_KEY_PASS'
+      'CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR',
+      'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH',
+      'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS'
     ];
   }
 
