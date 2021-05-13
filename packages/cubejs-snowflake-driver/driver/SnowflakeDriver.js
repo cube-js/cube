@@ -73,8 +73,8 @@ class SnowflakeDriver extends BaseDriver {
       clientSessionKeepAlive: process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE === 'true',
       database: process.env.CUBEJS_DB_NAME,
       username: process.env.CUBEJS_DB_USER,
+      authenticator: process.env.CUBEJS_DB_AUTHENTICATOR,
       password: process.env.CUBEJS_DB_PASS,
-      privateKey: process.env.CUBEJS_DB_PRIVATE_KEY,
       privateKeyPath: process.env.CUBEJS_DB_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_PRIVATE_KEY_PASS,
       ...config
