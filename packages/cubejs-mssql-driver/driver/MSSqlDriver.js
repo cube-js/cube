@@ -30,7 +30,6 @@ class MSSqlDriver extends BaseDriver {
     };
     this.connectionPool = new sql.ConnectionPool(this.config);
     this.initialConnectPromise = this.connectionPool.connect();
-    this.config = config;
   }
 
   static driverEnvVariables() {

@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+
+### Features
+
+* **cubestore:** Use MSVC build for Windows ([d472bcd](https://github.com/cube-js/cube.js/commit/d472bcdbd2c19beb433f79fab8d6a7abc23c8c05))
+
+
+
+
+
+## [0.27.11](https://github.com/cube-js/cube.js/compare/v0.27.10...v0.27.11) (2021-05-12)
+
+
+### Bug Fixes
+
+* **cubestore:** do not stop startup warmup on errors ([90350a3](https://github.com/cube-js/cube.js/commit/90350a34d7c7519d052174432fdcb5a3c07e4359))
+
+
+### Features
+
+* **cubestore:** import separate CSV files in parallel ([ca896b3](https://github.com/cube-js/cube.js/commit/ca896b3aa3e54d923a3054f55aaf7d4b5735a64d))
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+
+### Features
+
+* Move External Cache And Queue serving to Cube Store ([#2702](https://github.com/cube-js/cube.js/issues/2702)) ([37e4268](https://github.com/cube-js/cube.js/commit/37e4268869a23c07f922a039873d349b733bf577))
+
+
+
+
+
 ## [0.27.5](https://github.com/cube-js/cube.js/compare/v0.27.4...v0.27.5) (2021-05-03)
 
 

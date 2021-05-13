@@ -214,7 +214,10 @@ export class CubejsServerCore {
     }
 
     if (this.options.devServer) {
-      this.devServer = new DevServer(this);
+      this.devServer = new DevServer(this, {
+        dockerVersion: getEnv('dockerImageVersion'),
+        externalDbTypeFn: this.contextToExternalDbType
+      });
       const oldLogger = this.logger;
       this.logger = ((msg, params) => {
         if (
@@ -343,6 +346,7 @@ export class CubejsServerCore {
         password: process.env.CUBEJS_EXT_DB_PASS,
       })
     );
+
     let externalDialectFactory = () => typeof externalDbType === 'string' &&
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
@@ -396,7 +400,7 @@ export class CubejsServerCore {
       externalDriverFactory,
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
-      telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
+      telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],

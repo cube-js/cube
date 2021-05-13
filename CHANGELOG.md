@@ -3,6 +3,87 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** response error handling ([#2703](https://github.com/cube-js/cube.js/issues/2703)) ([de31373](https://github.com/cube-js/cube.js/commit/de31373d9829a6924d7edc04b96464ffa417d920))
+* **@cubejs-client/playground:** telemetry ([#2727](https://github.com/cube-js/cube.js/issues/2727)) ([366435a](https://github.com/cube-js/cube.js/commit/366435aeae5ed2d30d520cd0ced2fb6d6b6bbe29))
+
+
+### Features
+
+* **cubestore:** Use MSVC build for Windows ([d472bcd](https://github.com/cube-js/cube.js/commit/d472bcdbd2c19beb433f79fab8d6a7abc23c8c05))
+
+
+
+
+
+## [0.27.12](https://github.com/cube-js/cube.js/compare/v0.27.11...v0.27.12) (2021-05-13)
+
+
+### Bug Fixes
+
+* Out of memory on intensive pre-aggregation warmup: use intervals instead of promises cycles ([51149cb](https://github.com/cube-js/cube.js/commit/51149cbd56281cdd89072cfc7a5e449422793bc4))
+
+
+
+
+
+## [0.27.11](https://github.com/cube-js/cube.js/compare/v0.27.10...v0.27.11) (2021-05-12)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Support ungrouped query, fix [#2717](https://github.com/cube-js/cube.js/issues/2717) ([#2719](https://github.com/cube-js/cube.js/issues/2719)) ([82efc98](https://github.com/cube-js/cube.js/commit/82efc987c574960c4989b41b92776ba928a2f22b))
+* Compress archive with Cube Store for Windows ([f09589b](https://github.com/cube-js/cube.js/commit/f09589b8b4836f1ffa15a54ee6d848bf02f1671b))
+* **cubestore:** Built-in in archive OpenSSL for Windows (msvc) ([dbdeb6d](https://github.com/cube-js/cube.js/commit/dbdeb6da1850b25ce094ffdf70b6f7ae27a4066a))
+* **cubestore:** do not stop startup warmup on errors ([90350a3](https://github.com/cube-js/cube.js/commit/90350a34d7c7519d052174432fdcb5a3c07e4359))
+
+
+### Features
+
+* **cubestore:** import separate CSV files in parallel ([ca896b3](https://github.com/cube-js/cube.js/commit/ca896b3aa3e54d923a3054f55aaf7d4b5735a64d))
+* Strict validatation for configuration ([eda24b8](https://github.com/cube-js/cube.js/commit/eda24b8f97fa1d406b75cf2496f77295af5e9e1a))
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+
+### Bug Fixes
+
+* titleize case ([6acc100](https://github.com/cube-js/cube.js/commit/6acc100a6d50bf6970010843d0472e981399a602))
+
+
+### Features
+
+* Move External Cache And Queue serving to Cube Store ([#2702](https://github.com/cube-js/cube.js/issues/2702)) ([37e4268](https://github.com/cube-js/cube.js/commit/37e4268869a23c07f922a039873d349b733bf577))
+
+
+
+
+
+## [0.27.9](https://github.com/cube-js/cube.js/compare/v0.27.8...v0.27.9) (2021-05-11)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/schema-compiler:** titleize fix ([#2695](https://github.com/cube-js/cube.js/issues/2695)) ([d997f49](https://github.com/cube-js/cube.js/commit/d997f4978de9f4b25b606ba6c17b225f3e6a6cb1))
+* **mssql-driver:** Cannot read property 'readOnly' of undefined, fix [#2659](https://github.com/cube-js/cube.js/issues/2659) ([d813594](https://github.com/cube-js/cube.js/commit/d81359498e5d57cc855354ef2dae41653dadbea2))
+
+
+### Features
+
+* **cubestore:** Support x86_64-pc-windows-msvc ([407f1bd](https://github.com/cube-js/cube.js/commit/407f1bdda7fdb24c7863163b6157624ab6c9b7ee))
+
+
+
+
+
 ## [0.27.8](https://github.com/cube-js/cube.js/compare/v0.27.7...v0.27.8) (2021-05-06)
 
 

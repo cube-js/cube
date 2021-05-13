@@ -92,9 +92,10 @@ impl ClusterTransport for ClusterTransportImpl {
     ) -> Result<Box<dyn WorkerConnection>, CubeError> {
         let stream = tokio::time::timeout(
             Duration::from_secs(self.config.connection_timeout()),
-            TcpStream::connect(worker_node),
+            TcpStream::connect(worker_node.to_string()),
         )
-        .await??;
+        .await?
+        .map_err(|e| CubeError::internal(format!("Can't connect to {}: {}", worker_node, e)))?;
         Ok(Box::new(Connection { stream }))
     }
 }

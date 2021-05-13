@@ -43,6 +43,7 @@ export class QueryCache {
       continueWaitTimeout?: number;
       cacheAndQueueDriver?: 'redis' | 'memory';
       maxInMemoryCacheEntries?: number;
+      skipExternalCacheAndQueue?: boolean;
     } = {}
   ) {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
@@ -75,7 +76,7 @@ export class QueryCache {
 
     const expireSecs = this.getExpireSecs(queryBody);
 
-    if (!cacheKeyQueries) {
+    if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
       return {
         data: await this.queryWithRetryAndRelease(query, values, {
           cacheKey: [query, values],
@@ -245,6 +246,7 @@ export class QueryCache {
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
+          skipQueue: this.options.skipExternalCacheAndQueue,
           ...this.options.externalQueueOptions
         }
       );
