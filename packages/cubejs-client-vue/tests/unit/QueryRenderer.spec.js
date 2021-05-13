@@ -36,7 +36,7 @@ describe('QueryRenderer.vue', () => {
           },
           cubejsApi: cube,
         },
-        scopedSlots: {
+        slots: {
           error: `<div>{{props.error}}</div>`,
         },
       });
@@ -58,7 +58,7 @@ describe('QueryRenderer.vue', () => {
           },
           cubejsApi: cube,
         },
-        scopedSlots: {
+        slots: {
           default: `<div>Result set is loaded</div>`,
         },
       });
