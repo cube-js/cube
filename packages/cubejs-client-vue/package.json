@@ -25,25 +25,26 @@
   ],
   "dependencies": {
     "@cubejs-client/core": "^0.27.6",
-    "@vue/compiler-sfc": "^3.0.11",
     "core-js": "^3.6.5",
     "flush-promises": "^1.0.2",
     "ramda": "^0.27.0",
-    "vue-loader": "^16.2.0"
+    "vue-loader": "^15.9.7"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^3.5.0",
-    "@vue/cli-plugin-eslint": "^4.2.3",
-    "@vue/cli-plugin-unit-jest": "^4.2.3",
-    "@vue/cli-service": "^4.2.3",
+    "@vue/cli-plugin-babel": "~4.5.0",
+    "@vue/cli-plugin-eslint": "~4.5.0",
+    "@vue/cli-plugin-unit-jest": "^4.5.13",
+    "@vue/cli-service": "~4.5.0",
+    "@vue/compiler-sfc": "^3.0.0",
     "@vue/test-utils": "^2.0.0-0",
-    "vue-jest": "^5.0.0-0",
     "babel-core": "7.0.0-bridge.0",
     "babel-eslint": "^10.1.0",
     "babel-jest": "^23.6.0",
-    "eslint": "^7.21.0",
-    "eslint-plugin-vue": "^6.2.1",
-    "vue": "^3.0.11"
+    "eslint": "^6.7.2",
+    "eslint-plugin-vue": "^7.0.0",
+    "typescript": "~3.9.3",
+    "vue": "^3.0.11",
+    "vue-jest": "^5.0.0-0"
   },
   "eslintConfig": {
     "root": true,
