@@ -17,6 +17,12 @@ Cube Store is enabled by default when running Cube.js in development mode. In
 production, Cube Store **must** run as a separate process. The easiest way to do
 this is to use the official Docker images for Cube.js and Cube Store.
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| Using Windows? We **strongly** recommend using
+| [WSL2 for Windows 10][link-wsl2] to run the following commands.
+<!-- prettier-ignore-end -->
+
 You can run Cube Store with Docker with the following command:
 
 ```bash
@@ -181,37 +187,35 @@ Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
 and Google Cloud, or if desired, a local path on the server.
 
-A simplified example using Google Cloud might look like:
+A simplified example using AWS S3 might look like:
 
 ```yaml
 version: '2.2'
 services:
-  cubestore:
+  cubestore_router:
     image: cubejs/cubestore:latest
     environment:
-      - CUBESTORE_GCS_BUCKET=<BUCKET_NAME_IN_GCS>
-      - CUBESTORE_GCS_SUB_PATH=/
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
+      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
+      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
       - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
       - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
-      - CUBESTORE_REMOTE_DIR=/cube/data
-    volumes:
-      - .cubestore:/cube/data
-  cube:
-    image: cubejs/cube:latest
-    ports:
-      - 4000:4000
+  cubestore_worker_1:
+    image: cubejs/cubestore:latest
     environment:
-      - CUBEJS_CUBESTORE_HOST=localhost
-      - CUBEJS_CUBESTORE_PORT=3030
-      # For better performance, specify an export bucket
-      - CUBEJS_DB_BQ_EXPORT_BUCKET=<EXPORT_BUCKET_NAME_IN_GCS>
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
+      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
+      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
     depends_on:
-      - cubestore
-    links:
-      - cubestore
-    volumes:
-      - ./schema:/cube/conf/schema
+      - cubestore_router
 ```
 
+[link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/environment-variables#cube-store

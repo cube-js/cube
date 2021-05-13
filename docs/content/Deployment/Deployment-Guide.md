@@ -216,10 +216,10 @@ serverless logs -t -f cubejsProcess
 
 ### Passing server core options for serverless
 
-[Server core options][link-server-core-opts] can be passed by instantiating the
-appropriate `Handlers` class directly. For example:
+[Server options][ref-config] can be passed by instantiating the appropriate
+`Handlers` class directly, for example:
 
-[link-server-core-opts]: /@cubejs-backend-server-core#options-reference
+[ref-config]: /config
 
 **index.js:**
 
@@ -378,7 +378,7 @@ heroku config:set CUBEJS_REDIS_URL=<YOUR-REDIS-URL> -a cubejs-heroku-demo
 ```
 
 Note that Cube.js requires at least 15 concurrent connections allowed by Redis
-server. Please [setup connection pool](deployment#production-mode-redis-pool)
+server. Please [setup connection pool](/deployment#production-mode-redis-pool)
 according to your Redis server's maximum connections.
 
 ### Building Docker Images with Heroku
@@ -416,19 +416,22 @@ For more details, take a look at the
 ## Cube Cloud
 
 <!-- prettier-ignore-start -->
-[[info |]]
+[[info |]] 
 | [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
 | an account yet, you can [sign up to the waitlist here][link-cube-cloud].
- <!-- prettier-ignore-end -->
+<!-- prettier-ignore-end -->
 
 [link-cube-cloud]: https://cube.dev/cloud
 
-Cube Cloud is a purpose-built platform to run Cube.js applications in production.
-It is made by the creators of Cube.js and incorporates all the best practices of
-running and scaling Cube.js applications.
+Cube Cloud is a purpose-built platform to run Cube.js applications in
+production. It is made by the creators of Cube.js and incorporates all the best
+practices of running and scaling Cube.js applications.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Deployment/how-cube-cloud-works.png)
 
-Cube Cloud can be integrated with your GitHub to automatically deploy from the specified production branch (`master` by default). It also can create staging and preview APIs based on the branches in the repository.
+Cube Cloud can be integrated with your GitHub to automatically deploy from the
+specified production branch (`master` by default). It can also create staging
+and preview APIs based on the branches in the repository.
 
-You can learn more about [deployment with Cube Cloud](/cloud/deploys) in its documentation.
+You can learn more about [deployment with Cube Cloud](/cloud/deploys) in its
+documentation.

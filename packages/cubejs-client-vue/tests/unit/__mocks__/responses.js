@@ -722,6 +722,10 @@ export default (body = {}, status = 200) => () => ({
       {
         status,
         json: async () => body,
+        text: async () => JSON.stringify(body),
+        clone: function() {
+          return this;
+        },
         ok: status >= 200 && status <= 399
       },
       () => this.subscribe(callback)

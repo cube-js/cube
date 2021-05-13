@@ -138,6 +138,9 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   groupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
     //
     // ClickHouse doesn't support group by index column, so map these to the alias names
     //

@@ -150,7 +150,9 @@ export default function ConnectionWizardPage({ history }) {
                         await saveConnection(variables);
                         setLoading(false);
 
-                        event('test_database_connection_success:frontend');
+                        event('test_database_connection_success:frontend', {
+                          database: db.title
+                        });
 
                         history.push('/schema');
                       } catch (error) {
@@ -159,7 +161,9 @@ export default function ConnectionWizardPage({ history }) {
                           error,
                         });
 
-                        event('test_database_connection_error:frontend');
+                        event('test_database_connection_error:frontend', {
+                          error
+                        });
                       }
 
                       setTestConnectionLoading(false);

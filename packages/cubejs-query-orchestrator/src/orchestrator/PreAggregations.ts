@@ -176,16 +176,20 @@ class PreAggregationLoadCache {
       throw new Error('Please install @cubejs-backend/cubestore-driver in order to use external pre-aggregations.');
     }
 
-    const client = preAggregation.external ?
-      await this.externalDriverFactory() :
-      await this.driverFactory();
-    const newTables = await client.getTablesQuery(preAggregation.preAggregationsSchema);
+    const newTables = await this.fetchTablesNoCache(preAggregation);
     await this.cacheDriver.set(
       this.tablesRedisKey(preAggregation),
       newTables,
       this.preAggregations.options.preAggregationsSchemaCacheExpire || 60 * 60
     );
     return newTables;
+  }
+
+  private async fetchTablesNoCache(preAggregation) {
+    const client = preAggregation.external ?
+      await this.externalDriverFactory() :
+      await this.driverFactory();
+    return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
   protected tablesRedisKey(preAggregation) {
@@ -195,7 +199,9 @@ class PreAggregationLoadCache {
   protected async getTablesQuery(preAggregation) {
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.tables[redisKey]) {
-      this.tables[redisKey] = await this.tablesFromCache(preAggregation);
+      this.tables[redisKey] = this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external ?
+        await this.fetchTablesNoCache(preAggregation) :
+        await this.tablesFromCache(preAggregation);
     }
     return this.tables[redisKey];
   }
@@ -822,6 +828,7 @@ type PreAggregationsOptions = {
   redisPool?: any;
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: 'redis' | 'memory';
+  skipExternalCacheAndQueue?: boolean;
 };
 
 export class PreAggregations {

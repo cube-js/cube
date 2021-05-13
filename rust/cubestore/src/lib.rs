@@ -276,6 +276,27 @@ impl From<tokio::sync::watch::error::SendError<bool>> for CubeError {
     }
 }
 
+impl
+    From<
+        tokio::sync::watch::error::SendError<
+            std::option::Option<Result<std::sync::Arc<store::DataFrame>, CubeError>>,
+        >,
+    > for CubeError
+{
+    fn from(
+        v: tokio::sync::watch::error::SendError<
+            std::option::Option<Result<std::sync::Arc<store::DataFrame>, CubeError>>,
+        >,
+    ) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<tokio::sync::watch::error::RecvError> for CubeError {
+    fn from(v: tokio::sync::watch::error::RecvError) -> Self {
+        CubeError::from_error(v)
+    }
+}
 impl From<ParseIntError> for CubeError {
     fn from(v: ParseIntError) -> Self {
         CubeError::from_error(v)

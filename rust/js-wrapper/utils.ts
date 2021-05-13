@@ -54,7 +54,7 @@ export function getTarget(): string {
   if (process.arch === 'x64') {
     switch (process.platform) {
       case 'win32':
-        return 'x86_64-pc-windows-gnu';
+        return 'x86_64-pc-windows-msvc';
       case 'linux':
         return `x86_64-unknown-linux-${detectLibc()}`;
       case 'darwin':

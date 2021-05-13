@@ -77,6 +77,7 @@ flatbuffers = "0.7.0"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
+lru = "0.6.5"
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"
