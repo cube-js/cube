@@ -23,6 +23,15 @@ class WebSocketTransportResult {
   public async json() {
     return this.result;
   }
+
+  public clone() {
+    // no need to actually clone it
+    return this;
+  }
+
+  public async text() {
+    return typeof this.result === 'string' ? this.result : JSON.stringify(this.result);
+  }
 }
 
 type WebSocketTransportOptions = {
