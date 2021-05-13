@@ -42,7 +42,7 @@ class Meta {
   }
 
   membersForQuery(query, memberType) {
-    return unnest(this.cubes.map(c => c[memberType])).sort((a, b) => a.title > b.title ? 1 : -1);
+    return unnest(this.cubes.map(c => c[memberType])).sort((a, b) => (a.title > b.title ? 1 : -1));
   }
 
   resolveMember(memberName, memberType) {
