@@ -219,6 +219,12 @@ services:
       - cubestore_router
 ```
 
+## Security
+
+Cube Store currently does not have any in-built authentication mechanisms. For
+this reason, we recommend running your Cube Store cluster on a network that only
+allows requests from the Cube.js deployment.
+
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/environment-variables#cube-store
