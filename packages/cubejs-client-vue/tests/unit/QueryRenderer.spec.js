@@ -38,12 +38,11 @@ describe('QueryRenderer.vue', () => {
           cubejsApi: cube,
         },
         slots: {
-          error: h(`div`, {}, `{{props.error}}`),
+          error: (props) => h(`div`, {}, `${props.error}`),
         },
       });
 
       await flushPromises();
-
       expect(wrapper.text()).toContain('error');
       expect(cube.request.mock.calls.length).toBe(1);
     });
