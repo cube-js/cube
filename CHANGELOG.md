@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** stop processing query once it has changed ([#2731](https://github.com/cube-js/cube.js/issues/2731)) ([3aed740](https://github.com/cube-js/cube.js/commit/3aed7408d5fc43bd51356869956c5d0d18c6424f))
+* **schema-compiler:** Time-series query with minute/second granularity ([c4a6044](https://github.com/cube-js/cube.js/commit/c4a6044702df39629044802b0b5d9e1636cc99d0))
+* Add missing validators for configuration values ([6ac6350](https://github.com/cube-js/cube.js/commit/6ac6350d2e7a892122a3cbbe1cfae822ba483f3b))
+
+
+### Features
+
+* **@cubejs-client/core:** member sorting ([#2733](https://github.com/cube-js/cube.js/issues/2733)) ([fae3b29](https://github.com/cube-js/cube.js/commit/fae3b293a2ce84ea518567f38546f14acc587e0d))
+* Compile Cube.ts configuration in-memory ([3490d1f](https://github.com/cube-js/cube.js/commit/3490d1f2a5b3fb9af617e3add8993f351e82f1b1))
+
+
+
+
+
 ## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
 
 
