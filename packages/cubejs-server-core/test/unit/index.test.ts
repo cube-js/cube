@@ -89,7 +89,9 @@ describe('index.test', () => {
       apiSecret: 'randomstring',
       logger: () => {},
       driverFactory: () => {},
+      dialectFactory: () => {},
       externalDriverFactory: () => {},
+      externalDialectFactory: () => {},
       contextToAppId: () => 'STANDALONE',
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
@@ -99,13 +101,23 @@ describe('index.test', () => {
       preAggregationsSchema: () => {},
       schemaVersion: () => {},
       extendContext: () => {},
-      scheduledRefreshTimer: true,
       compilerCacheSize: 1000,
       maxCompilerCacheKeepAlive: 10,
       updateCompilerCacheKeepAlive: true,
       telemetry: false,
       allowUngroupedWithoutPrimaryKey: true,
+      // scheduled
+      scheduledRefreshTimeZones: ['Europe/Moscow'],
       scheduledRefreshConcurrency: 4,
+      scheduledRefreshTimer: true,
+      scheduledRefreshContexts: () => [{
+        securityContext: {
+          appid: 'test1',
+          u: {
+            prop1: 'value1'
+          }
+        }
+      }],
       orchestratorOptions: {
         continueWaitTimeout: 10,
         redisPrefix: 'some-prefix',
@@ -137,6 +149,8 @@ describe('index.test', () => {
         subject: 'http://localhost:4000',
         claimsNamespace: 'http://localhost:4000',
       },
+      dashboardAppPath: 'string',
+      dashboardAppPort: 4444,
       livePreview: true
     };
 

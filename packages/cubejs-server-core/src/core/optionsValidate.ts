@@ -53,11 +53,16 @@ const schemaOptions = Joi.object().keys({
   devServer: Joi.boolean(),
   apiSecret: Joi.string(),
   logger: Joi.func(),
+  // source
+  dialectFactory: Joi.func(),
   driverFactory: Joi.func(),
+  // external
+  externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
+  //
   contextToAppId: Joi.func(),
-  contextToDataSourceId: Joi.func(),
   contextToOrchestratorId: Joi.func(),
+  contextToDataSourceId: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
   checkAuthMiddleware: Joi.func(),
@@ -69,20 +74,32 @@ const schemaOptions = Joi.object().keys({
   ),
   schemaVersion: Joi.func(),
   extendContext: Joi.func(),
+  // Scheduled refresh
   scheduledRefreshTimer: Joi.alternatives().try(
     Joi.boolean(),
     Joi.number().min(0).integer()
   ),
-  compilerCacheSize: Joi.number().min(0).integer(),
-  maxCompilerCacheKeepAlive: Joi.number().min(0).integer(),
+  scheduledRefreshTimeZones: Joi.array().items(Joi.string()),
+  scheduledRefreshContexts: Joi.func(),
   scheduledRefreshConcurrency: Joi.number().min(1).integer(),
+  // Compiler cache
+  compilerCacheSize: Joi.number().min(0).integer(),
   updateCompilerCacheKeepAlive: Joi.boolean(),
+  maxCompilerCacheKeepAlive: Joi.number().min(0).integer(),
   telemetry: Joi.boolean(),
   allowUngroupedWithoutPrimaryKey: Joi.boolean(),
   orchestratorOptions: Joi.alternatives().try(
     Joi.func(),
     Joi.object().keys({
       redisPrefix: Joi.string().allow(''),
+      redisPoolOptions: Joi.object().keys({
+        poolMin: Joi.number().min(0),
+        poolMax: Joi.number().min(0),
+        idleTimeoutSeconds: Joi.number().min(0),
+        softIdleTimeoutSeconds: Joi.number().min(0),
+        createClient: Joi.func(),
+        destroyClient: Joi.func(),
+      }),
       continueWaitTimeout: Joi.number().min(0).integer(),
       skipExternalCacheAndQueue: Joi.boolean(),
       queryCacheOptions: Joi.object().keys({
@@ -99,7 +116,8 @@ const schemaOptions = Joi.object().keys({
     })
   ),
   allowJsDuplicatePropsInSchema: Joi.boolean(),
-  scheduledRefreshContexts: Joi.func(),
+  dashboardAppPath: Joi.string(),
+  dashboardAppPort: Joi.number(),
   sqlCache: Joi.boolean(),
   livePreview: Joi.boolean(),
   // Additional system flags
