@@ -15,7 +15,6 @@ import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import { ExternalDbTypeFn } from './types';
-import { getEnv } from '@cubejs-backend/shared';
 
 const repo = {
   owner: 'cube-js',
