@@ -604,7 +604,6 @@ export default function PlaygroundQueryBuilder({
               query1={query}
               query2={queryRef.current}
               onChange={() => {
-                console.log({ loading: false });
                 setQueryLoading(false);
                 setQueryStatus(null);
 
