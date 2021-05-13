@@ -3,8 +3,9 @@ import { getEnv } from '@cubejs-backend/shared';
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 
-let flushPromise = null;
 const trackEvents = [];
+let agentInterval = null;
+let lastEvent;
 
 export default async (event, endpointUrl, logger) => {
   trackEvents.push({
@@ -12,6 +13,7 @@ export default async (event, endpointUrl, logger) => {
     id: crypto.randomBytes(16).toString('hex'),
     timestamp: new Date().toJSON()
   });
+  lastEvent = new Date();
   const flush = async (toFlush, retries) => {
     if (!toFlush) {
       toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
@@ -42,18 +44,14 @@ export default async (event, endpointUrl, logger) => {
     }
     return true;
   };
-  const flushCycle = async () => {
-    for (let i = 0; i < 1000; i++) {
-      if (!await flush()) {
-        return;
+  if (!agentInterval) {
+    agentInterval = setInterval(async () => {
+      if (trackEvents.length) {
+        await flush();
+      } else if (new Date().getTime() - lastEvent.getTime() > 3000) {
+        clearInterval(agentInterval);
+        agentInterval = null;
       }
-    }
-  };
-  if (!flushPromise) {
-    flushPromise = flushCycle().then(() => {
-      flushPromise = null;
-    });
+    }, 1000);
   }
-
-  return flushPromise;
 };
