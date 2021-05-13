@@ -8,7 +8,7 @@ import { RouteComponentProps, withRouter } from 'react-router';
 import Header from './components/Header';
 import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
-import { event, setAnonymousId } from './events';
+import { event, setAnonymousId, setTelemetry } from './events';
 import './index.less';
 
 const selectedTab = (pathname) => {
@@ -52,6 +52,8 @@ class App extends Component<RouteComponentProps, TAppState> {
 
     const res = await fetch('/playground/context');
     const context = await res.json();
+
+    setTelemetry(context.telemetry);
     setAnonymousId(context.anonymousId, {
       coreServerVersion: context.coreServerVersion,
       projectFingerprint: context.projectFingerprint,
