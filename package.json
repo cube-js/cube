@@ -56,7 +56,7 @@
     "http-server": "^0.12.1",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",
-    "lerna": "^3.13.1",
+    "lerna": "^4.0.0",
     "less": "^4.1.1",
     "npm-package-json-lint": "^5.1.0",
     "postcss": "^8.2.8",
