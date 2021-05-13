@@ -16,12 +16,19 @@ export class TypescriptCompiler {
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
   };
 
-  public compileConfiguration = () => {
+  public compileConfiguration = (): string => {
     const files = [
       path.join(process.cwd(), 'cube.ts')
     ];
 
+    // In-memory emit to protect override of cube.js when we compile cube.ts
+    const createdFiles: Record<string, string> = {};
+
     const host = ts.createCompilerHost(this.options);
+    host.writeFile = (fileName: string, contents: string) => {
+      createdFiles[path.basename(fileName)] = contents;
+    };
+
     const program = ts.createProgram(files, this.options, host);
 
     const diagnostics = ts.getPreEmitDiagnostics(program);
@@ -38,5 +45,7 @@ export class TypescriptCompiler {
       console.log('Unable to compile configuration file.');
       process.exit(1);
     }
+
+    return createdFiles['cube.js'];
   };
 }
