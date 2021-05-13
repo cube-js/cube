@@ -38,14 +38,12 @@ environment variables on the **Settings - Env Vars page**.
 When setting up a new deployment, simply select the SSL checkbox when entering
 database credentials:
 
-<!-- https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/ -->
-
 <div
   style="text-align: center"
 >
   <img
   alt="Cube Cloud Database Connection Screen"
-  src="ssl-wizard.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/ssl-wizard.png"
   style="border: none"
   width="100%"
   />
@@ -68,7 +66,7 @@ the **Env vars** tab in **Settings**:
 >
   <img
   alt="Cube Cloud Database Connection Screen"
-  src="ssl-custom.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/ssl-custom.png"
   style="border: none"
   width="100%"
   />
