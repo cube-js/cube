@@ -426,6 +426,30 @@ module.exports = {
 Option to extend the `RequestContext` with custom values. This method is called
 on each request. Can be async.
 
+The function should return an object which gets appended to the
+[`RequestContext`][ref-opts-req-ctx]. Make sure to register your value using
+[`contextToAppId`][ref-opts-ctx-to-appid] to use cache context for all possible
+values that your extendContext object key can have.
+
+```javascript
+module.exports = {
+  contextToAppId: (context) => `CUBEJS_APP_${context.activeOrganization}`,
+  extendContext: (req) => {
+    return { activeOrganization: req.headers.activeOrganization };
+  },
+};
+```
+
+You can use the custom value from extend context in your data schema like this:
+
+```javascript
+const { activeOrganization } = COMPILE_CONTEXT;
+
+cube(`Users`, {
+  sql: `SELECT * FROM users where organization_id=${activeOrganization}`,
+});
+```
+
 ### compilerCacheSize
 
 Maximum number of compiled schemas to persist with in-memory cache. Defaults to
@@ -651,6 +675,7 @@ the additional transpiler for check duplicates.
 [ref-cube-ctx-sec-ctx]: /cube#context-variables-security-context
 [ref-multitenancy]: /multitenancy-setup
 [ref-ext-driverfactory]: #external-driver-factory
+[ref-opts-req-ctx]: #request-context
 [ref-opts-checkauth]: #options-reference-check-auth
 [ref-opts-ctx-to-appid]: #options-reference-context-to-app-id
 [ref-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
