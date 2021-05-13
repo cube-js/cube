@@ -76,7 +76,7 @@ services:
       - ./schema:/cube/conf/schema
 ```
 
-### Scaling
+## Scaling
 
 <!-- prettier-ignore-start -->
 [[warning | ]]
@@ -178,7 +178,7 @@ services:
       - .:/cube/conf
 ```
 
-### Storage
+## Storage
 
 <!-- prettier-ignore-start -->
 [[warning | ]]
