@@ -23,10 +23,94 @@ describe('SQL Generation', () => {
           type: 'number',
           sql: 'id',
           primaryKey: true
-        }
+        },
+        createdAt: {
+          type: 'time',
+          sql: 'created_at'
+        },
       }
     }) 
     `);
+
+  it('Test time series with different granularity', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.count'
+      ],
+      timeDimensions: [],
+      filters: [],
+    });
+
+    {
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'day',
+        dateRange: ['2021-01-01', '2021-01-02']
+      });
+      expect(timeDimension.timeSeries()).toEqual([
+        ['2021-01-01T00:00:00.000', '2021-01-01T23:59:59.999'],
+        ['2021-01-02T00:00:00.000', '2021-01-02T23:59:59.999']
+      ]);
+    }
+
+    {
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'day',
+        dateRange: ['2021-01-01', '2021-01-02']
+      });
+      expect(timeDimension.timeSeries()).toEqual([
+        ['2021-01-01T00:00:00.000', '2021-01-01T23:59:59.999'],
+        ['2021-01-02T00:00:00.000', '2021-01-02T23:59:59.999']
+      ]);
+    }
+
+    {
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'hour',
+        dateRange: ['2021-01-01', '2021-01-01']
+      });
+      expect(timeDimension.timeSeries()).toEqual(
+        new Array(24).fill(null).map((v, index) => [
+          `2021-01-01T${index.toString().padStart(2, '0')}:00:00.000`,
+          `2021-01-01T${index.toString().padStart(2, '0')}:59:59.999`
+        ])
+      );
+    }
+
+    {
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'minute',
+        // for 1 hour only
+        dateRange: ['2021-01-01T00:00:00.000', '2021-01-01T00:59:59.999']
+      });
+      expect(timeDimension.timeSeries()).toEqual(
+        new Array(60).fill(null).map((v, index) => [
+          `2021-01-01T00:${index.toString().padStart(2, '0')}:00.000`,
+          `2021-01-01T00:${index.toString().padStart(2, '0')}:59.999`
+        ])
+      );
+    }
+
+    {
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'second',
+        // for 1 minute only
+        dateRange: ['2021-01-01T00:00:00.000', '2021-01-01T00:00:59.000']
+      });
+      expect(timeDimension.timeSeries()).toEqual(
+        new Array(60).fill(null).map((v, index) => [
+          `2021-01-01T00:00:${index.toString().padStart(2, '0')}.000`,
+          `2021-01-01T00:00:${index.toString().padStart(2, '0')}.999`
+        ])
+      );
+    }
+  });
 
   it('Test for everyRefreshKeySql', async () => {
     await compiler.compile();
