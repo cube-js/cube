@@ -1,5 +1,6 @@
 import { shallowMount } from '@vue/test-utils';
 import flushPromises from 'flush-promises';
+import { h } from 'vue';
 
 import QueryRenderer from '../../src/QueryRenderer';
 import fetchMock, { load } from './__mocks__/responses';
@@ -12,12 +13,12 @@ describe('QueryRenderer.vue', () => {
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
       const wrapper = shallowMount(QueryRenderer, {
-        propsData: {
+        props: {
           query: {},
           cubejsApi: cube,
         },
         slots: {
-          empty: `<div>i'm empty</div>`,
+          empty: h(`div`, {}, `i'm empty`),
         },
       });
 
@@ -37,7 +38,7 @@ describe('QueryRenderer.vue', () => {
           cubejsApi: cube,
         },
         slots: {
-          error: `<div>{{props.error}}</div>`,
+          error: h(`div`, {}, `{{props.error}}`),
         },
       });
 
@@ -52,19 +53,18 @@ describe('QueryRenderer.vue', () => {
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
       const wrapper = shallowMount(QueryRenderer, {
-        propsData: {
+        props: {
           query: {
             measures: ['Stories.count'],
           },
           cubejsApi: cube,
         },
         slots: {
-          default: `<div>Result set is loaded</div>`,
+          default: h(`div`, {}, 'Result set is loaded'),
         },
       });
 
       await flushPromises();
-
       expect(wrapper.text()).toContain('Result set is loaded');
       expect(cube.request.mock.calls.length).toBe(1);
     });
