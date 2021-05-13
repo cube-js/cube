@@ -84,7 +84,7 @@ export class DevServer {
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
         livePreview: options.livePreview,
         isDocker: isDocker(),
-        telemetry: getEnv('telemetry'),
+        telemetry: options.telemetry,
       });
     }));
 
