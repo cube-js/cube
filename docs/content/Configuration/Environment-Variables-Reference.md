@@ -115,6 +115,9 @@ databases [in this guide][link-connecting-to-db].
 | `CUBEJS_DB_SNOWFLAKE_ROLE`                      | Snowflake            | The Snowflake role to use when connecting to the database                                                                                                                                                   | A valid Snowflake role for the account                           |
 | `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`                 | Snowflake            | The Snowflake warehouse to use when connecting to the database                                                                                                                                              | A valid Snowflake warehouse for the account                      |
 | `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE` | Snowflake            | If `true`, (keep the Snowflake connection alive indefinitely)[link-snowflake-connection-options]                                                                                                            | `true`, `false`                                                  |
+| `CUBEJS_DB_AUTHENTICATOR`                       | Snowflake            | The type of authenticator to use to create connection with Snowflake. <br/> `Username + Password` -> `CUBEJS_DB_AUTHENTICATOR=SNOWFLAKE`<br/> `Key-Pair` -> `CUBEJS_DB_AUTHENTICATOR=SNOWFLAKE_JWT`<br/> If this variable is not provided, `CUBEJS_DB_AUTHENTICATOR` default to `SNOWFLAKE` 
+| `SNOWFLAKE`, `SNOWFLAKE_JWT`                    
+
 | `CUBEJS_DB_DATABRICKS_URL`                      | Databricks           | The URL for a JDBC connection                                                                                                                                                                               | A valid JDBC URL                                                 |
 
 ## Cube Store
