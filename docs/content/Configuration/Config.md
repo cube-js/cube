@@ -341,8 +341,15 @@ module.exports = {
 
 ### scheduledRefreshTimer
 
+<!-- prettier-ignore-start -->
 [[warning | Note]]
-| This is merely a refresh worker heart beat. It doesn't affect freshness of pre-aggregations or refresh keys. Setting this value to 30s doesn't mean pre-aggregatioins would be refreshed every 30s but rather checked for freshness every 30s. Please see [pre-aggregations refreshKey][ref-pre-aggregations-refresh-key] documentation on how to set refresh intervals for pre-aggregations.
+| This is merely a refresh worker heart beat. It doesn't affect freshness of
+| pre-aggregations or refresh keys. Setting this value to `30s` doesn't mean
+| pre-aggregations would be refreshed every 30 seconds but rather checked for
+| freshness every 30 seconds. Please consult the
+| [`refreshKey` documentation][ref-pre-aggregations-refresh-key] on how to set
+| refresh intervals for pre-aggregations.
+<!-- prettier-ignore-end -->
 
 Cube.js enables background refresh by default. You can specify an interval as a
 number in seconds or as a string format e.g. `30s`, `1m`. Can be also set using
