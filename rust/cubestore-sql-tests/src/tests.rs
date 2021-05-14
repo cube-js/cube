@@ -1694,7 +1694,7 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         .plan_query(
             "SELECT id, amount \
                  FROM s.Orders \
-                 WHERE id > 10\
+                 WHERE id > 10 \
                  LIMIT 10",
         )
         .await

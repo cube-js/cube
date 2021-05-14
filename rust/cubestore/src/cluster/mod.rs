@@ -49,8 +49,8 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::Weak;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::time::SystemTime;
 use tokio::fs;
@@ -361,7 +361,7 @@ impl Cluster for ClusterImpl {
 }
 
 #[async_trait]
-pub trait MessageStream: Send {
+pub trait MessageStream: Send + Sync {
     async fn next(&mut self) -> (NetworkMessage, /*finished*/ bool);
 }
 
@@ -1065,7 +1065,7 @@ impl ClusterImpl {
         return Ok(Box::pin(SelectStream {
             schema,
             connection: Some(c),
-            pending: None,
+            pending: Mutex::new(None),
             finished: false,
         }));
 
@@ -1073,8 +1073,15 @@ impl ClusterImpl {
         struct SelectStream {
             schema: SchemaRef,
             connection: Option<ConnPtr>,
-            pending: Option<
-                Pin<Box<dyn Future<Output = (Result<NetworkMessage, CubeError>, ConnPtr)> + Send>>,
+            pending: Mutex<
+                Option<
+                    Pin<
+                        Box<
+                            dyn Future<Output = (Result<NetworkMessage, CubeError>, ConnPtr)>
+                                + Send,
+                        >,
+                    >,
+                >,
             >,
             finished: bool,
         }
@@ -1090,18 +1097,26 @@ impl ClusterImpl {
                     return Poll::Ready(None);
                 }
 
-                if self.pending.is_none() {
+                if self.pending.lock().unwrap().is_none() {
                     let mut connection = self.as_mut().connection.take().unwrap();
-                    self.pending = Some(Box::pin(async move {
+                    *self.pending.lock().unwrap() = Some(Box::pin(async move {
                         let res = connection.receive().await;
                         (res, connection)
                     }));
                 }
-                let (message, connection) = match self.pending.as_mut().unwrap().as_mut().poll(cx) {
+                let (message, connection) = match self
+                    .pending
+                    .lock()
+                    .unwrap()
+                    .as_mut()
+                    .unwrap()
+                    .as_mut()
+                    .poll(cx)
+                {
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(r) => r,
                 };
-                self.pending = None;
+                *self.pending.lock().unwrap() = None;
                 self.connection = Some(connection);
 
                 let r = match message {

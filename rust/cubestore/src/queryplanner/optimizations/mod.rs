@@ -45,11 +45,12 @@ impl QueryPlanner for CubeQueryPlanner {
         logical_plan: &LogicalPlan,
         ctx_state: &ExecutionContextState,
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
-        let p = DefaultPhysicalPlanner::with_extension_planner(Arc::new(CubeExtensionPlanner {
-            cluster: self.cluster.clone(),
-            serialized_plan: self.serialized_plan.clone(),
-        }))
-        .create_physical_plan(logical_plan, ctx_state)?;
+        let p =
+            DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(CubeExtensionPlanner {
+                cluster: self.cluster.clone(),
+                serialized_plan: self.serialized_plan.clone(),
+            })])
+            .create_physical_plan(logical_plan, ctx_state)?;
         // TODO: assert there is only a single ClusterSendExec in the plan.
         finalize_physical_plan(p)
     }

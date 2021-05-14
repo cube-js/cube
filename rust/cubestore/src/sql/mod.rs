@@ -343,7 +343,13 @@ impl SqlService for SqlServiceImpl {
         // trace!("AST is: {:?}", ast);
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
-                match variable.value.to_lowercase() {
+                if variable.len() != 1 {
+                    return Err(CubeError::user(format!(
+                        "Only one variable supported in SHOW, but got {}",
+                        variable.len()
+                    )));
+                }
+                match variable[0].value.to_lowercase() {
                     s if s == "schemas" => {
                         Ok(Arc::new(DataFrame::from(self.db.get_schemas().await?)))
                     }
@@ -464,6 +470,7 @@ impl SqlService for SqlServiceImpl {
                 table_name,
                 columns,
                 source,
+                ..
             }) => {
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
@@ -598,7 +605,8 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 | DataType::Char(_)
                 | DataType::Varchar(_)
                 | DataType::Clob(_)
-                | DataType::Text => ColumnType::String,
+                | DataType::Text
+                | DataType::String => ColumnType::String,
                 DataType::Uuid
                 | DataType::Binary(_)
                 | DataType::Varbinary(_)
@@ -701,7 +709,7 @@ fn parse_hyper_log_log<'a>(
 
 fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a [u8], CubeError> {
     match v {
-        Value::Number(s) => Ok(s.as_bytes()),
+        Value::Number(s, _) => Ok(s.as_bytes()),
         // We interpret strings of the form '0f 0a 14 ff' as a list of hex-encoded bytes.
         // MySQL will store bytes of the string itself instead and we should do the same.
         // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
@@ -753,14 +761,13 @@ fn extract_data<'a>(
             }
             ColumnType::Int => {
                 let val_int = match cell {
-                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
-                        v.parse::<i64>()
-                    }
+                    Expr::Value(Value::Number(v, _))
+                    | Expr::Value(Value::SingleQuotedString(v)) => v.parse::<i64>(),
                     Expr::UnaryOp {
                         op: UnaryOperator::Minus,
                         expr,
                     } => {
-                        if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+                        if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
                             v.parse::<i64>().map(|v| v * -1)
                         } else {
                             return Err(CubeError::user(format!(
@@ -862,14 +869,14 @@ fn parse_time(s: &str, format: &[chrono::format::Item]) -> ParseResult<Parsed> {
 
 fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
     let decimal_val = match cell {
-        Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
+        Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
             v.parse::<f64>()
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
             expr,
         } => {
-            if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+            if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
                 v.parse::<f64>().map(|v| v * -1.0)
             } else {
                 return Err(CubeError::user(format!(
