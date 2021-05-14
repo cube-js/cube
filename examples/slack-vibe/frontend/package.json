@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@amcharts/amcharts4": "^4.9.34",
+    "@amcharts/amcharts4": "^4.10.17",
     "@amcharts/amcharts4-geodata": "^4.1.17",
     "@cubejs-client/core": "^0.26.94",
     "moment": "^2.27.0",
