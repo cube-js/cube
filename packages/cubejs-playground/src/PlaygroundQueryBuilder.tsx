@@ -137,7 +137,9 @@ function QueryChangeEmitter({
   onChange,
 }: QueryChangeEmitterProps) {
   useEffect(() => {
-    onChange();
+    if (!areQueriesEqual(query1, query2)) {
+      onChange();
+    }
   }, [areQueriesEqual(query1, query2)]);
 
   return null;
@@ -506,7 +508,12 @@ export default function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}
-                    setFramework={setFramework}
+                    setFramework={(currentFramework) => {
+                      if (currentFramework !== framework) {
+                        setQueryLoading(false);
+                        setFramework(currentFramework);
+                      }
+                    }}
                     setChartLibrary={(value) => {
                       if (ref.current) {
                         dispatchPlaygroundEvent(
@@ -582,11 +589,6 @@ export default function PlaygroundQueryBuilder({
                               });
                             }
                           }}
-                          onQueryChange={() => {
-                            if (queryError) {
-                              setQueryError(null);
-                            }
-                          }}
                         />
                       );
                     }}
@@ -601,7 +603,14 @@ export default function PlaygroundQueryBuilder({
             <QueryChangeEmitter
               query1={query}
               query2={queryRef.current}
-              onChange={() => setQueryStatus(null)}
+              onChange={() => {
+                setQueryLoading(false);
+                setQueryStatus(null);
+
+                if (queryError) {
+                  setQueryError(null);
+                }
+              }}
             />
           </>
         );
