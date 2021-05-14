@@ -159,6 +159,21 @@ class MySqlDriver extends BaseDriver {
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }
 
+  async streamTable(table, options) {
+    // eslint-disable-next-line no-underscore-dangle
+    const conn = await this.pool._factory.create();
+    await this.setTimeZone(conn);
+
+    return {
+      // eslint-disable-next-line no-underscore-dangle
+      rowStream: conn.query(`SELECT * FROM ${table}`).stream(),
+      release: async () => {
+        // eslint-disable-next-line no-underscore-dangle
+        await this.pool._factory.destroy(conn);
+      }
+    };
+  }
+
   async downloadQueryResults(query, values, options) {
     if (!this.config.database) {
       throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
