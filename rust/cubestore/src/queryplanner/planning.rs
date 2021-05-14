@@ -501,8 +501,8 @@ impl UserDefinedLogicalNode for ClusterSendNode {
 
     fn from_template(
         &self,
-        exprs: &Vec<Expr>,
-        inputs: &Vec<LogicalPlan>,
+        exprs: &[Expr],
+        inputs: &[LogicalPlan],
     ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
         assert!(exprs.is_empty());
         assert_eq!(inputs.len(), 1);
@@ -555,7 +555,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 }
                 union_snapshots.extend(send.snapshots.concat());
                 // Code after 'match' will wrap `p` in ClusterSend.
-                *i = send.input.clone();
+                *i = send.input.as_ref().clone();
             }
             snapshots = vec![union_snapshots];
         }
@@ -601,22 +601,25 @@ impl ExtensionPlanner for CubeExtensionPlanner {
     fn plan_extension(
         &self,
         node: &dyn UserDefinedLogicalNode,
-        inputs: Vec<Arc<dyn ExecutionPlan>>,
+        inputs: &[Arc<dyn ExecutionPlan>],
         state: &ExecutionContextState,
-    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
         if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
-            self.plan_cluster_send(input, &cs.snapshots, cs.schema().clone(), false, usize::MAX)
+            Ok(Some(self.plan_cluster_send(
+                input.clone(),
+                &cs.snapshots,
+                cs.schema().clone(),
+                false,
+                usize::MAX,
+            )?))
         } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
-            plan_topk(self, topk, input, state)
+            Ok(Some(plan_topk(self, topk, input.clone(), state)?))
         } else {
-            Err(DataFusionError::Plan(format!(
-                "unknown extension node {:?}",
-                node
-            )))
+            Ok(None)
         }
     }
 }
@@ -746,6 +749,7 @@ pub mod tests {
     use crate::queryplanner::{pretty_printers, CubeTableLogical};
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::CubeError;
+    use datafusion::catalog::TableReference;
 
     #[tokio::test]
     pub async fn test_choose_index() {
@@ -1084,12 +1088,20 @@ pub mod tests {
     }
 
     impl ContextProvider for TestIndices {
-        fn get_table_provider(&self, name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
-            let name = name.strip_prefix("s.")?;
+        fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
+            let name = match name {
+                TableReference::Partial { schema, table } => {
+                    if schema != "s" {
+                        return None;
+                    }
+                    table
+                }
+                TableReference::Bare { .. } | TableReference::Full { .. } => return None,
+            };
             self.tables
                 .iter()
                 .find_position(|t| t.get_table_name() == name)
-                .map(|(id, t)| -> Arc<dyn TableProvider + Send + Sync> {
+                .map(|(id, t)| -> Arc<dyn TableProvider> {
                     let schema = Arc::new(ArrowSchema::new(
                         t.get_columns()
                             .iter()

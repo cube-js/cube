@@ -47,11 +47,8 @@ use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
 use log::trace;
-use parquet::basic::Repetition;
-use parquet::{
-    basic::{LogicalType, Type},
-    schema::types,
-};
+use parquet::basic::{ConvertedType, Repetition};
+use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
 use rocksdb::checkpoint::Checkpoint;
@@ -348,21 +345,21 @@ impl From<&Column> for parquet::schema::types::Type {
         match column.get_column_type() {
             crate::metastore::ColumnType::String => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::BYTE_ARRAY)
-                    .with_logical_type(LogicalType::UTF8)
+                    .with_converted_type(ConvertedType::UTF8)
                     .with_repetition(Repetition::OPTIONAL)
                     .build()
                     .unwrap()
             }
             crate::metastore::ColumnType::Int => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::INT64)
-                    .with_logical_type(LogicalType::INT_64)
+                    .with_converted_type(ConvertedType::INT_64)
                     .with_repetition(Repetition::OPTIONAL)
                     .build()
                     .unwrap()
             }
             crate::metastore::ColumnType::Decimal { precision, .. } => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::INT64)
-                    .with_logical_type(LogicalType::DECIMAL)
+                    .with_converted_type(ConvertedType::DECIMAL)
                     .with_precision(*precision)
                     .with_scale(column.get_column_type().target_scale())
                     .with_repetition(Repetition::OPTIONAL)
@@ -371,7 +368,7 @@ impl From<&Column> for parquet::schema::types::Type {
             }
             crate::metastore::ColumnType::Bytes | ColumnType::HyperLogLog(_) => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::BYTE_ARRAY)
-                    .with_logical_type(LogicalType::NONE)
+                    .with_converted_type(ConvertedType::NONE)
                     .with_repetition(Repetition::OPTIONAL)
                     .build()
                     .unwrap()
@@ -379,7 +376,7 @@ impl From<&Column> for parquet::schema::types::Type {
             crate::metastore::ColumnType::Timestamp => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::INT64)
                     //TODO MICROS?
-                    .with_logical_type(LogicalType::TIMESTAMP_MICROS)
+                    .with_converted_type(ConvertedType::TIMESTAMP_MICROS)
                     .with_repetition(Repetition::OPTIONAL)
                     .build()
                     .unwrap()

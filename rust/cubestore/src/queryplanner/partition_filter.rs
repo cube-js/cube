@@ -473,6 +473,7 @@ mod tests {
     use super::*;
     use crate::sql::parser::{CubeStoreParser, Statement as CubeStatement};
     use arrow::datatypes::Field;
+    use datafusion::catalog::TableReference;
     use datafusion::datasource::TableProvider;
     use datafusion::logical_plan::ToDFSchema;
     use datafusion::physical_plan::udaf::AggregateUDF;
@@ -1019,7 +1020,7 @@ mod tests {
 
     pub struct NoContextProvider {}
     impl ContextProvider for NoContextProvider {
-        fn get_table_provider(&self, _name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
+        fn get_table_provider(&self, _name: TableReference) -> Option<Arc<dyn TableProvider>> {
             None
         }
 

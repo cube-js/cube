@@ -35,8 +35,7 @@ use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::{
-    collect, ExecutionPlan, OptimizerHints, Partitioning, RecordBatchStream,
-    SendableRecordBatchStream,
+    collect, ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
 };
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
@@ -49,7 +48,6 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
@@ -345,6 +343,7 @@ impl CubeTable {
                     predicate.clone(),
                     batch_size,
                     1,
+                    None, // TODO: propagate limit
                 )?);
                 partition_execs.push(arc);
             }
@@ -362,6 +361,7 @@ impl CubeTable {
                     predicate.clone(),
                     batch_size,
                     1,
+                    None, // TODO: propagate limit
                 )?);
                 partition_execs.push(node);
             }
@@ -516,7 +516,7 @@ impl ExecutionPlan for CubeTableExec {
     async fn execute(
         &self,
         partition: usize,
-    ) -> Result<Pin<Box<dyn RecordBatchStream + Send>>, DataFusionError> {
+    ) -> Result<SendableRecordBatchStream, DataFusionError> {
         self.partition_execs[partition].execute(0).await
     }
 }
@@ -671,6 +671,7 @@ impl TableProvider for CubeTable {
         projection: &Option<Vec<usize>>,
         batch_size: usize,
         filters: &[Expr],
+        _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         let res = self.async_scan(projection, batch_size, filters)?;
         Ok(res)
