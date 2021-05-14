@@ -55,6 +55,7 @@ const StyledButton: typeof Button = styled(Button)`
     
     &.ant-btn-sm {
       padding: 0 8px;
+      height: 24px !important;
     }
   }
 `;

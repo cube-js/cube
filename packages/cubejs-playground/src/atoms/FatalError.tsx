@@ -5,10 +5,11 @@ import { Alert } from './Alert';
 
 const { Text, Paragraph } = Typography;
 
-const Code = styled.pre`
+export const Code = styled.pre`
   padding: 0.4em 0.8em;
   font-size: 13px;
   white-space: pre-wrap;
+  margin: 0;
 `;
 
 type TFatalErrorProps = {
@@ -39,7 +40,7 @@ export function FatalError({ error }: TFatalErrorProps) {
         message={
           <Code
             dangerouslySetInnerHTML={{
-              __html: error.toString(),
+              __html: error.toString().replace(/(Error:\s){2,}/g, ''),
             }}
           />
         }
