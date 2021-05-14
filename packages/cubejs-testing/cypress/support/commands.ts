@@ -27,7 +27,7 @@
 // Cypress.Commands.overwrite("visit", (originalFn, url, options) => { ... })
 
 Cypress.Commands.add('getByTestId', (selector, ...args) => {
-  return cy.get(`[data-testid=${selector}]`, ...args);
+  return cy.get(`[data-testid='${selector}']`, ...args);
 });
 
 Cypress.Commands.add('setQuery', (query, ...args) => {
@@ -51,10 +51,10 @@ Cypress.Commands.add('runQuery', () => {
 
 Cypress.Commands.add('addMeasure', (name) => {
   cy.getByTestId('Measure').click();
-  cy.get('body').contains(name).click();
+  cy.getByTestId(name).click();
 });
 
 Cypress.Commands.add('addDimension', (name) => {
   cy.getByTestId('Dimension').click();
-  cy.get('body').contains(name).click();
+  cy.getByTestId(name).click();
 });
