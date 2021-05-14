@@ -825,11 +825,38 @@ declare module '@cubejs-client/core' {
     queryOrder: Array<{ [k: string]: QueryOrder }>;
   };
 
+  export type Cube = {
+    name: string;
+    title: string;
+    measures: TCubeMeasure[];
+    dimensions: TCubeDimension[];
+    segments: TCubeSegment[];
+  };
+
+  export type MetaResponse = {
+    cubes: Cube[]
+  }
+
   /**
    * Contains information about available cubes and it's members.
    * @order 4
    */
   export class Meta {
+    /**
+     * Raw meta response
+     */
+    meta: MetaResponse;
+
+    /**
+     * An array of all available cubes with their members
+     */
+    cubes: Cube[];
+
+    /**
+     * A map of all cubes where the key is a cube name
+     */
+    cubesMap: Record<string, Pick<Cube, 'dimensions' | 'measures' | 'segments'>>;
+
     /**
      * Get all members of a specific type for a given query.
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
