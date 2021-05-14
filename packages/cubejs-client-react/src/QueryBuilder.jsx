@@ -141,7 +141,7 @@ export default class QueryBuilder extends React.Component {
     this.setState(
       {
         meta,
-        metaError: metaError ? new Error(generateAnsiHTML(metaError?.toString() || '')) : null,
+        metaError: metaError ? new Error(generateAnsiHTML(metaError.message || metaError.toString())) : null,
         isFetchingMeta: false,
       },
       () => {
@@ -496,7 +496,7 @@ export default class QueryBuilder extends React.Component {
         }
       } catch (error) {
         this.setState({
-          queryError: new Error(generateAnsiHTML(error.stack?.toString() || error.toString())),
+          queryError: new Error(generateAnsiHTML(error.message || error.toString())),
         });
       }
     }

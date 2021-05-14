@@ -6,7 +6,7 @@ import { ResultSet } from '@cubejs-client/core';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 
-import { Button, CubeLoader } from '../../atoms';
+import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
 import { QueryStatus } from '../../PlaygroundQueryBuilder';
@@ -196,7 +196,7 @@ export default function ChartRenderer({
 
   const renderExtras = () => {
     if (queryError) {
-      return <div>{queryError?.toString()}</div>;
+      return <FatalError error={queryError} />;
     }
 
     if (queryHasMissingMembers) {
