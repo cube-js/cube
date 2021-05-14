@@ -1185,10 +1185,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/normalize.css/-/normalize.css-10.1.0.tgz#f0950bba18819512d42f7197e56c518aa491cf18"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cubejs-client/core@^0.19.56":
-  version "0.19.56"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.19.56.tgz#4248fb05f7ef8c4623bc853829cce7859f2cc18a"
-  integrity sha512-8EFDgBrLt+ZD4MKNBafM5uyQ1mnL2Q2anzECLUu/FTG8hk1BWjujZ9Knwsm8DY2kLV5KQbyOFK+6JaLkjrTB7A==
+"@cubejs-client/core@^0.26.94":
+  version "0.26.102"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.26.102.tgz#8cb4e7c35ee117b69aeb02df2da053fc0df8c886"
+  integrity sha512-fi1oH+xz56D2BgNuqNdxKNEscufOVeSEzr1i4zuD7xjELVewHRiMX/N1FIjwtOmxSm3eZNzBFHcG3fjQ5cCM4Q==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
