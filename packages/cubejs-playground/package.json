@@ -46,7 +46,7 @@
     "prettier": "^2.0.5",
     "prismjs": "^1.23.0",
     "react-beautiful-dnd": "^13.0.0",
-    "react-chartjs-2": "^2.7.4",
+    "react-chartjs-2": "^3.0.3",
     "react-helmet": "^6.1.0",
     "react-hotkeys-hook": "^3.3.0",
     "react-is": "^16.8.4",
