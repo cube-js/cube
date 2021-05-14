@@ -7,7 +7,7 @@
     "@amcharts/amcharts4-geodata": "^4.1.17",
     "@cubejs-client/core": "^0.26.94",
     "moment": "^2.27.0",
-    "moment-timezone": "^0.5.31",
+    "moment-timezone": "^0.5.33",
     "node-emoji": "^1.10.0",
     "prop-types": "^15.7.2",
     "react": "^16.13.1",
