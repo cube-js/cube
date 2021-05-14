@@ -296,8 +296,8 @@ export default class QueryBuilder extends React.Component {
           members: [
             ...indexedMeasures[name]?.members,
             ...indexedDimensions[name]?.members,
-          ].sort((a, b) => a.shortTitle > b.shortTitle ? 1 : -1)
-        }
+          ].sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1))
+        };
       });
     }
 
