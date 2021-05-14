@@ -1,32 +1,6 @@
 import Anser from 'anser';
 import { encode } from 'html-entities';
 
-export function getGroupedCubeMembers(meta) {
-  const memberKeys = ['measures', 'dimensions', 'segments'];
-
-  return meta.cubes.reduce(
-    (memo, cube) => {
-      memberKeys.forEach((key) => {
-        memo[key] = [
-          ...memo[key],
-          {
-            cubeName: cube.name,
-            cubeTitle: cube.title,
-            members: cube[key],
-          },
-        ];
-      });
-
-      return memo;
-    },
-    {
-      measures: [],
-      dimensions: [],
-      segments: [],
-    }
-  );
-}
-
 const colors = {
   reset: 'orange',
   black: 'black',
