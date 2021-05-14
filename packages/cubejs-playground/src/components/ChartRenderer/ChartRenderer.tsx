@@ -86,7 +86,6 @@ type TChartRendererProps = {
   onQueryStatusChange: (result: TQueryLoadResult) => void;
   onChartRendererReadyChange: (isReady: boolean) => void;
   onRunButtonClick: () => void;
-  onQueryChange: () => void;
 };
 
 export default function ChartRenderer({
@@ -100,7 +99,6 @@ export default function ChartRenderer({
   onChartRendererReadyChange,
   onQueryStatusChange,
   onRunButtonClick,
-  onQueryChange,
 }: TChartRendererProps) {
   const runButtonRef = useRef<HTMLButtonElement>(null);
   const [slowQuery, setSlowQuery] = useState(false);
@@ -121,10 +119,6 @@ export default function ChartRenderer({
   }, []);
 
   useEffect(() => {
-    onQueryChange();
-  }, [areQueriesEqual]);
-
-  useEffect(() => {
     setResultSet(false);
   }, [framework]);
 
@@ -139,6 +133,7 @@ export default function ChartRenderer({
       onQueryLoad: ({ resultSet, error }: TQueryLoadResult) => {
         let isAggregated;
         const timeElapsed = Date.now() - queryStartTime;
+
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
 
@@ -186,7 +181,6 @@ export default function ChartRenderer({
   }, [framework, onChartRendererReadyChange]);
 
   const loading: boolean =
-    !isChartRendererReady ||
     queryHasMissingMembers ||
     isQueryLoading ||
     isPreAggregationBuildInProgress;
@@ -243,7 +237,7 @@ export default function ChartRenderer({
               ref={runButtonRef}
               size="large"
               type="primary"
-              loading={isQueryLoading}
+              loading={!isChartRendererReady}
               icon={<PlaySquareOutlined />}
               onClick={onRunButtonClick}
             >

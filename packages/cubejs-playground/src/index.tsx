@@ -16,7 +16,8 @@ import { SecurityContextProvider } from './components/SecurityContext/SecurityCo
 
 const history = createHashHistory();
 history.listen((location) => {
-  page(location);
+  const { search, ...props } = location;
+  page(props);
 });
 
 async function getToken(payload: string = '') {

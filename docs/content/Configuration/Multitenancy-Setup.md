@@ -398,6 +398,13 @@ need to configure [`scheduledRefreshTimeZones`][ref-config-refresh-tz].
 | generate a context without the required input.
 <!-- prettier-ignore-end -->
 
+## Connecting to Redis
+
+When configured for multitenancy, Cube.js uses a separate connection pool
+for each configured tenant. This means that the `CUBEJS_REDIS_POOL_MIN` and
+`CUBEJS_REDIS_POOL_MAX` environment variables specify the minimum and
+maximum number of Redis connections **per-tenant**.
+
 [npm-cubejs-sls-aws]:
   https://www.npmjs.com/package/@cubejs-backend/serverless-aws
 [ref-config]: /config

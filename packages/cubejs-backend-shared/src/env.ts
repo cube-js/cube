@@ -241,6 +241,9 @@ const variables: Record<string, (...args: any) => any> = {
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('false')
     .asBoolStrict(),
+  telemetry: () => get('CUBEJS_TELEMETRY')
+    .default('true')
+    .asBoolStrict(),
 };
 
 type Vars = typeof variables;

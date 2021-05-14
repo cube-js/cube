@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
+
+
+### Bug Fixes
+
+* **schema-compiler:** Time-series query with minute/second granularity ([c4a6044](https://github.com/cube-js/cube.js/commit/c4a6044702df39629044802b0b5d9e1636cc99d0))
+
+
+
+
+
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.27.11](https://github.com/cube-js/cube.js/compare/v0.27.10...v0.27.11) (2021-05-12)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Support ungrouped query, fix [#2717](https://github.com/cube-js/cube.js/issues/2717) ([#2719](https://github.com/cube-js/cube.js/issues/2719)) ([82efc98](https://github.com/cube-js/cube.js/commit/82efc987c574960c4989b41b92776ba928a2f22b))
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+
+### Bug Fixes
+
+* titleize case ([6acc100](https://github.com/cube-js/cube.js/commit/6acc100a6d50bf6970010843d0472e981399a602))
+
+
+
+
+
 ## [0.27.9](https://github.com/cube-js/cube.js/compare/v0.27.8...v0.27.9) (2021-05-11)
 
 

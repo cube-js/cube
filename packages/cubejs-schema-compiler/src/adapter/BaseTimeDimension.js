@@ -1,8 +1,10 @@
+import Moment from 'moment-timezone';
+import { extendMoment } from 'moment-range';
+
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 
-const momentRange = require('moment-range');
-const moment = momentRange.extendMoment(require('moment-timezone'));
+const moment = extendMoment(Moment);
 
 const TIME_SERIES = {
   day: (range) => Array.from(range.snapTo('day').by('day'))
@@ -14,9 +16,9 @@ const TIME_SERIES = {
   hour: (range) => Array.from(range.snapTo('hour').by('hour'))
     .map(d => [d.format('YYYY-MM-DDTHH:00:00.000'), d.format('YYYY-MM-DDTHH:59:59.999')]),
   minute: (range) => Array.from(range.snapTo('minute').by('minute'))
-    .map(d => [d.format('YYYY-MM-DDTHH:MM:00.000'), d.format('YYYY-MM-DDTHH:MM:59.999')]),
+    .map(d => [d.format('YYYY-MM-DDTHH:mm:00.000'), d.format('YYYY-MM-DDTHH:mm:59.999')]),
   second: (range) => Array.from(range.snapTo('second').by('second'))
-    .map(d => [d.format('YYYY-MM-DDTHH:MM:SS.000'), d.format('YYYY-MM-DDTHH:MM:SS.999')]),
+    .map(d => [d.format('YYYY-MM-DDTHH:mm:ss.000'), d.format('YYYY-MM-DDTHH:mm:ss.999')]),
   week: (range) => Array.from(range.snapTo('isoweek').by('week'))
     .map(d => [d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoweek').format('YYYY-MM-DDT23:59:59.999')])
 };
@@ -102,6 +104,7 @@ export class BaseTimeDimension extends BaseFilter {
     if (!this.dateFromFormattedValue) {
       this.dateFromFormattedValue = this.formatFromDate(this.dateRange[0]);
     }
+
     return this.dateFromFormattedValue;
   }
 
@@ -109,6 +112,7 @@ export class BaseTimeDimension extends BaseFilter {
     if (!this.dateFromValue) {
       this.dateFromValue = this.inDbTimeZoneDateFrom(this.dateRange[0]);
     }
+
     return this.dateFromValue;
   }
 
@@ -173,15 +177,19 @@ export class BaseTimeDimension extends BaseFilter {
     if (!this.dateRange) {
       throw new UserError('Time series queries without dateRange aren\'t supported');
     }
+
     if (!this.granularity) {
       return [
         [this.dateFromFormatted(), this.dateToFormatted()]
       ];
     }
-    const range = moment.range(this.dateFromFormatted(), this.dateToFormatted());
+
     if (!TIME_SERIES[this.granularity]) {
       throw new UserError(`Unsupported time granularity: ${this.granularity}`);
     }
+
+    const range = moment.range(this.dateFromFormatted(), this.dateToFormatted());
+
     return TIME_SERIES[this.granularity](range);
   }
 }

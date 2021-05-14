@@ -400,7 +400,7 @@ export class CubejsServerCore {
       externalDriverFactory,
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
-      telemetry: process.env.CUBEJS_TELEMETRY !== 'false',
+      telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],

@@ -3,6 +3,61 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
+
+
+### Bug Fixes
+
+* Add missing validators for configuration values ([6ac6350](https://github.com/cube-js/cube.js/commit/6ac6350d2e7a892122a3cbbe1cfae822ba483f3b))
+
+
+
+
+
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** telemetry ([#2727](https://github.com/cube-js/cube.js/issues/2727)) ([366435a](https://github.com/cube-js/cube.js/commit/366435aeae5ed2d30d520cd0ced2fb6d6b6bbe29))
+
+
+
+
+
+## [0.27.12](https://github.com/cube-js/cube.js/compare/v0.27.11...v0.27.12) (2021-05-13)
+
+
+### Bug Fixes
+
+* Out of memory on intensive pre-aggregation warmup: use intervals instead of promises cycles ([51149cb](https://github.com/cube-js/cube.js/commit/51149cbd56281cdd89072cfc7a5e449422793bc4))
+
+
+
+
+
+## [0.27.11](https://github.com/cube-js/cube.js/compare/v0.27.10...v0.27.11) (2021-05-12)
+
+
+### Features
+
+* Strict validatation for configuration ([eda24b8](https://github.com/cube-js/cube.js/commit/eda24b8f97fa1d406b75cf2496f77295af5e9e1a))
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+
+### Features
+
+* Move External Cache And Queue serving to Cube Store ([#2702](https://github.com/cube-js/cube.js/issues/2702)) ([37e4268](https://github.com/cube-js/cube.js/commit/37e4268869a23c07f922a039873d349b733bf577))
+
+
+
+
+
 ## [0.27.9](https://github.com/cube-js/cube.js/compare/v0.27.8...v0.27.9) (2021-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

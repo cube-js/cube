@@ -82,7 +82,8 @@ export class DevServer {
         projectFingerprint: this.cubejsServer.projectFingerprint,
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
         livePreview: options.livePreview,
-        isDocker: isDocker()
+        isDocker: isDocker(),
+        telemetry: options.telemetry,
       });
     }));
 

@@ -77,10 +77,12 @@ export interface Request extends ExpressRequest {
 }
 
 export interface JWTOptions {
+  // JWK options
   jwkRetry?: number,
   jwkDefaultExpire?: number,
   jwkUrl?: ((payload: any) => string) | string,
   jwkRefetchWindow?: number,
+  // JWT options
   key?: string,
   algorithms?: string[],
   issuer?: string[],

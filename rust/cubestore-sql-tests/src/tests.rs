@@ -1110,13 +1110,13 @@ async fn empty_crash(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * from s.Table WHERE id = 1 AND s = 15")
         .await
         .unwrap();
-    assert_eq!(r.get_rows().len(), 0);
+    assert_eq!(r.get_rows(), &vec![]);
 
     let r = service
         .exec_query("SELECT id, sum(s) from s.Table WHERE id = 1 AND s = 15 GROUP BY 1")
         .await
         .unwrap();
-    assert_eq!(r.get_rows().len(), 0);
+    assert_eq!(r.get_rows(), &vec![]);
 }
 
 async fn bytes(service: Box<dyn SqlClient>) {
@@ -1607,8 +1607,7 @@ async fn topk_large_inputs(service: Box<dyn SqlClient>) {
                      ORDER BY 2 DESC \
                      LIMIT 10";
 
-    let data_frame = service.exec_query(query).await.unwrap();
-    let rows = data_frame.get_rows();
+    let rows = service.exec_query(query).await.unwrap().get_rows().clone();
     assert_eq!(rows.len(), 10);
     for i in 0..10 {
         match &rows[i].values()[0] {

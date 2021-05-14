@@ -179,14 +179,23 @@ impl SqlServiceImpl {
                     indexes_to_create,
                 )
                 .await?;
-            let import_res = listener
-                .wait_for_job_result(
-                    RowKey::Table(TableId::Tables, table.get_id()),
-                    JobType::TableImport,
-                )
-                .await?;
-            if let JobEvent::Error(_, _, e) = import_res {
-                return Err(CubeError::user(format!("Create table failed: {}", e)));
+            let wait_for = table
+                .get_row()
+                .locations()
+                .unwrap()
+                .iter()
+                .map(|&l| {
+                    (
+                        RowKey::Table(TableId::Tables, table.get_id()),
+                        JobType::TableImportCSV(l.clone()),
+                    )
+                })
+                .collect();
+            let imports = listener.wait_for_job_results(wait_for).await?;
+            for r in imports {
+                if let JobEvent::Error(_, _, e) = r {
+                    return Err(CubeError::user(format!("Create table failed: {}", e)));
+                }
             }
 
             let mut futures = Vec::new();
