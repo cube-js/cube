@@ -192,7 +192,7 @@ impl QueryExecutor for QueryExecutorImpl {
             );
         }
         // TODO: stream results as they become available.
-        let results = regroup_batches(results.unwrap(), max_batch_rows)?;
+        let results = regroup_batches(results?, max_batch_rows)?;
         Ok((worker_plan.schema().to_schema_ref(), results))
     }
 
