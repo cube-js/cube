@@ -47,11 +47,13 @@ export class DevServer {
     const cubejsToken = jwt.sign({}, options.apiSecret || 'secret', { expiresIn: '1d' });
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.');
+      console.log('Cube.js is running in development mode: https://cube.dev/docs/configuration/overview#development-mode');
+      console.log('🔓 Authentication checks are disabled. Unset CUBEJS_DEV_MODE=true to enable.');
     } else {
-      console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
+      console.log('Cube.js is running in production mode.');
+      console.log(`🔒 Your temporary API token: ${cubejsToken}`);
     }
-    console.log(`🦅 Dev environment available at ${apiUrl}`);
+    console.log(`🦅 Developer Playground is available at ${apiUrl}`);
     this.cubejsServer.event('Dev Server Start');
     const serveStatic = require('serve-static');
 
