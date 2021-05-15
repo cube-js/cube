@@ -94,11 +94,27 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
           {menuOrderResolved.map((item) => {
             const subcategoryData = props.items[item];
             const subCategoryNames = Object.keys(subcategoryData);
+
+            const filteredSubcategoryData = subCategoryNames.reduce((result, subCategoryName) => {
+              // Filter by cloud or not cloud
+              const items = subcategoryData[subCategoryName].filter(i => {
+                  return i.frontmatter.permalink.match(isCloudDocs ? /^\/cloud\// : /^(?!\/cloud\/)/);
+              });
+
+              if (items.length > 0) {
+                return {
+                  ...result,
+                  [subCategoryName]: items,
+                }
+              }
+              return result;
+            }, {} as typeof subcategoryData);
+
             if (
               subCategoryNames.length === 1 &&
-              subcategoryData[subCategoryNames[0]].length === 1
+              filteredSubcategoryData[subCategoryNames[0]].length === 1
             ) {
-              return nodeParser(subcategoryData[subCategoryNames[0]][0]);
+              return nodeParser(filteredSubcategoryData[subCategoryNames[0]][0]);
             }
             return (
               <Menu.SubMenu
@@ -106,9 +122,9 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
                 title={getMenuTitle(item)}
                 className={styles.antSubMenu}
               >
-                {Object.keys(subcategoryData).map((subCategory) => {
+                {Object.keys(filteredSubcategoryData).map((subCategory) => {
                   if (subCategory === 'nocat') {
-                    const subItems = subcategoryData[subCategory].filter(
+                    const subItems = filteredSubcategoryData[subCategory].filter(
                       (subItem: MarkdownNode) => {
                         return (
                           !subItem.frontmatter.frameworkOfChoice ||
@@ -122,7 +138,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
                   }
                   return (
                     <Menu.ItemGroup key={subCategory} title={subCategory}>
-                      {subcategoryData[subCategory].map(nodeParser)}
+                      {filteredSubcategoryData[subCategory].map(nodeParser)}
                     </Menu.ItemGroup>
                   );
                 })}
