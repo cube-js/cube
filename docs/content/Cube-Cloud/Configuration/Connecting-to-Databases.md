@@ -1,7 +1,7 @@
 ---
 title: Connecting to Databases
 permalink: /cloud/configuration/connecting-to-databases
-category: Configuring Cube Cloud
+category: Configuration
 menuOrder: 1
 ---
 
