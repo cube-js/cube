@@ -1,10 +1,13 @@
-import { types, Pool, PoolConfig } from 'pg';
-import moment from 'moment';
+import { types, Pool, PoolConfig, PoolClient } from 'pg';
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { TypeId, TypeFormat } from 'pg-types';
+import * as moment from 'moment';
 import {
   BaseDriver,
-  DownloadQueryResults, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure,
+  DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
+  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes,
 } from '@cubejs-backend/query-orchestrator';
+import { QueryStream } from './QueryStream';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
@@ -24,8 +27,18 @@ const timestampTypeParser = (val: any) => moment.utc(val).format(moment.HTML5_FM
 export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
   executionTimeout?: number,
-  readOnly?: number,
+  readOnly?: boolean,
 };
+
+function getTypeParser(dataType: TypeId, format: TypeFormat|undefined) {
+  const isTimestamp = timestampDataTypes.includes(dataType);
+  if (isTimestamp) {
+    return timestampTypeParser;
+  }
+
+  const parser = types.getTypeParser(dataType, format);
+  return (val: any) => parser(val);
+}
 
 export class PostgresDriver extends BaseDriver implements DriverInterface {
   protected readonly pool: Pool;
@@ -63,33 +76,66 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  protected async queryResponse(query: string, values: unknown[]) {
-    const client = await this.pool.connect();
+  protected async prepareConnection(conn: PoolClient) {
+    await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
+
+    const statementTimeout: number = this.config.executionTimeout ? this.config.executionTimeout * 1000 : 600000;
+    await conn.query(`set statement_timeout to ${statementTimeout}`);
+  }
+
+  public async stream(
+    query: string,
+    values: unknown[],
+    { batchSize, highWaterMark }: StreamOptions
+  ): Promise<StreamTableDataWithTypes> {
+    const conn = await this.pool.connect();
+
     try {
-      await client.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
+      await this.prepareConnection(conn);
 
-      const statementTimeout: number = this.config.executionTimeout ? this.config.executionTimeout * 1000 : 600000;
-      await client.query(`set statement_timeout to ${statementTimeout}`);
+      const queryStream = new QueryStream(query, values, {
+        types: {
+          getTypeParser,
+        },
+        batchSize,
+        highWaterMark
+      });
+      const rowStream: QueryStream = await conn.query(queryStream);
+      const meta = await rowStream.fields();
 
-      const res = await client.query({
+      return {
+        rowStream,
+        types: meta.map((f: any) => ({
+          name: f.name,
+          type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+        })),
+        release: async () => {
+          await conn.release();
+        }
+      };
+    } catch (e) {
+      await conn.release();
+
+      throw e;
+    }
+  }
+
+  protected async queryResponse(query: string, values: unknown[]) {
+    const conn = await this.pool.connect();
+
+    try {
+      await this.prepareConnection(conn);
+
+      const res = await conn.query({
         text: query,
         values: values || [],
         types: {
-          getTypeParser: (dataType, format) => {
-            const isTimestamp = timestampDataTypes.indexOf(dataType) > -1;
-            let parser = types.getTypeParser(dataType, format);
-
-            if (isTimestamp) {
-              parser = timestampTypeParser;
-            }
-
-            return (val: any) => parser(val);
-          },
+          getTypeParser,
         },
       });
       return res;
     } finally {
-      await client.release();
+      await conn.release();
     }
   }
 
@@ -98,7 +144,11 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
     return result.rows;
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResults) {
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
+    if (options.streamImport) {
+      return this.stream(query, values, options);
+    }
+
     const res = await this.queryResponse(query, values);
     return {
       rows: res.rows,
@@ -113,7 +163,12 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
     return !!this.config.readOnly;
   }
 
-  public async uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableMemoryData, indexesSql: IndexesSQL) {
+  public async uploadTableWithIndexes(
+    table: string,
+    columns: TableStructure,
+    tableData: DownloadTableMemoryData,
+    indexesSql: IndexesSQL
+  ) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }

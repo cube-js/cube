@@ -10,7 +10,7 @@ import { QueryCache } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
-import { BaseDriver } from '../driver';
+import { BaseDriver, StreamOptions } from '../driver';
 import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 
@@ -710,6 +710,7 @@ class PreAggregationLoader {
       params, {
         ...this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry),
         ...capabilities,
+        ...this.getStreamingOptions(),
       }
     ));
 
@@ -722,6 +723,10 @@ class PreAggregationLoader {
     }
 
     await this.loadCache.fetchTables(this.preAggregation);
+  }
+
+  protected getStreamingOptions(): StreamOptions {
+    return { batchSize: 1000, highWaterMark: 2000 }
   }
 
   /**
@@ -743,8 +748,8 @@ class PreAggregationLoader {
     const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
     const tableData = await saveCancelFn(
-      capabilities.streamImport && client.streamTable
-        ? client.streamTable(table, capabilities)
+      capabilities.streamImport && client.stream
+        ? client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
         : client.downloadTable(table, capabilities)
     );
     tableData.types = await saveCancelFn(client.tableColumnTypes(table));

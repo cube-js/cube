@@ -19,10 +19,20 @@ export interface DownloadTableCSVData {
 export interface StreamTableData {
   rowStream: NodeJS.ReadableStream;
   /**
-   * Optional function
+   * Some drivers know types of response
+   */
+  types?: TableStructure;
+  /**
+   * Optional function to release stream/cursor/connection
    */
   release?: () => Promise<void>;
 }
+export type StreamTableDataWithTypes = StreamTableData & {
+  /**
+   * Some drivers know types of response
+   */
+  types: TableStructure;
+};
 
 export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData;
 
@@ -30,7 +40,16 @@ export interface ExternalDriverCompatibilities {
   csvImport?: true,
   streamImport?: true,
 }
-export type DownloadQueryResults = ExternalDriverCompatibilities;
+export type StreamOptions = {
+  batchSize: number
+  highWaterMark: number
+};
+
+export interface DownloadQueryResultsBase {
+  types: TableStructure
+}
+
+export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities;
 
 export type IndexesSQL = {
   sql: [string, unknown[]];
@@ -42,8 +61,10 @@ export interface DriverInterface {
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
-  // Download whole table in memory
+  // Download data from Query (for readOnly)
+  downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData)>;
+  // Download table
   downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
-  // Some drivers can implement streaming, which don't load the whole table to the memory
-  streamTable?: (table: string, options: ExternalDriverCompatibilities) => Promise<StreamTableData>;
+  // Some drivers can implement streaming from SQL
+  stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
 }
