@@ -50,7 +50,6 @@ function memberMenu(onClick, availableMembers) {
   const [search, setSearch] = useState<string>('');
   const [filteredMembers, setFilteredMembers] = useState<null | any[]>(null);
   const [flattendMembers, setFlattendMembers] = useState<null | any[]>(null);
-  const [selectedIndex, setSelectedIndex] = useState<null | number>(null);
 
   const hasMembers = availableMembers.some((cube) => cube.members.length > 0);
   const [cubeName, memberName] = search.split('.');
