@@ -238,11 +238,14 @@ const variables: Record<string, (...args: any) => any> = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  telemetry: () => get('CUBEJS_TELEMETRY')
+    .default('true'),
+  // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('false')
     .asBoolStrict(),
-  telemetry: () => get('CUBEJS_TELEMETRY')
-    .default('true')
+  externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
+    .default('false')
     .asBoolStrict(),
 };
 

@@ -1,4 +1,6 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
+
 import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
@@ -112,15 +114,23 @@ export class PreAggregations {
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
+
+    // eslint-disable-next-line prefer-destructuring
+    let external = preAggregation.external;
+
+    if (external === undefined) {
+      external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
+    }
+
     return {
-      preAggregationsSchema: this.query.preAggregationSchema(),
       tableName,
+      external,
+      preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
       dataSource: this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dataSource,
       invalidateKeyQueries: refreshKeyQueries.queries,
       refreshKeyRenewalThresholds: refreshKeyQueries.refreshKeyRenewalThresholds,
-      external: preAggregation.external,
       indexesSql: Object.keys(preAggregation.indexes || {}).map(
         index => {
           // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName

@@ -18,7 +18,7 @@ import { Query, ResultSet } from '@cubejs-client/core';
 import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
-import { Button, Card } from './atoms';
+import { Button, Card, FatalError } from './atoms';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
@@ -87,9 +87,12 @@ type TChartContainerProps = {
   error?: Error;
   resultSet?: ResultSet;
   [k: string]: any;
-}
+};
 
-class ChartContainer extends Component<TChartContainerProps & RouteComponentProps, any> {
+class ChartContainer extends Component<
+  TChartContainerProps & RouteComponentProps,
+  any
+> {
   static defaultProps = {
     query: {},
     hideActions: false,
@@ -431,6 +434,10 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
           </h2>
         );
       } else if (showCode === 'code') {
+        if (error) {
+          return <FatalError error={error} />
+        }
+
         return <PrismCode code={codeExample} />;
       } else if (showCode === 'query') {
         return <PrismCode code={queryText} />;
@@ -439,12 +446,14 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
           <QueryRenderer
             loadSql="only"
             query={query}
-            render={({ sqlQuery }) => {
+            render={({ sqlQuery, error }) => {
+              if (error) {
+                return <FatalError error={error} />
+              }
+
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
-              return (
-                <PrismCode code={query && format(query.sql())} />
-              );
+              return <PrismCode code={query && format(query.sql())} />;
             }}
           />
         );
@@ -458,12 +467,13 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
 
     if (showCode === 'code') {
       title = (
-        <SectionRow>
-          <div>Query</div>
+        <SectionRow style={{ alignItems: 'center' }}>
+          <div>Code</div>
           <Button
             data-testid="copy-code-btn"
             icon={<CopyOutlined />}
             size="small"
+            disabled={Boolean(error)}
             onClick={async () => {
               await copyToClipboard(codeExample);
               playgroundAction('Copy Code to Clipboard');
@@ -494,6 +504,8 @@ class ChartContainer extends Component<TChartContainerProps & RouteComponentProp
       );
     } else if (showCode === 'sql') {
       title = 'SQL';
+    } else if (showCode === 'cache') {
+      title = 'Cache';
     } else {
       title = 'Chart';
     }

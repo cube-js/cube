@@ -13,6 +13,7 @@ import {
   ChartType,
 } from '@cubejs-client/core';
 import styled from 'styled-components';
+import { indexBy, prop, uniq } from 'ramda';
 
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
@@ -242,18 +243,14 @@ export default function PlaygroundQueryBuilder({
         chartType,
         updateChartType,
         measures,
-        availableMeasures,
         updateMeasures,
         dimensions,
-        availableDimensions,
         updateDimensions,
         segments,
-        availableSegments,
         updateSegments,
         filters,
         updateFilters,
         timeDimensions,
-        availableTimeDimensions,
         updateTimeDimensions,
         orderMembers,
         updateOrder,
@@ -262,6 +259,8 @@ export default function PlaygroundQueryBuilder({
         missingMembers,
         isFetchingMeta,
         dryRunResponse,
+        availableMembers,
+        availableFilterMembers,
       }) => {
         let parsedDateRange;
 
@@ -346,7 +345,7 @@ export default function PlaygroundQueryBuilder({
                       <MemberGroup
                         disabled={isFetchingMeta}
                         members={measures}
-                        availableMembers={availableMeasures}
+                        availableMembers={availableMembers?.measures || []}
                         missingMembers={missingMembers}
                         addMemberName="Measure"
                         updateMethods={playgroundActionUpdateMethods(
@@ -361,7 +360,7 @@ export default function PlaygroundQueryBuilder({
                       <MemberGroup
                         disabled={isFetchingMeta}
                         members={dimensions}
-                        availableMembers={availableDimensions}
+                        availableMembers={availableMembers?.dimensions || []}
                         missingMembers={missingMembers}
                         addMemberName="Dimension"
                         updateMethods={playgroundActionUpdateMethods(
@@ -376,7 +375,7 @@ export default function PlaygroundQueryBuilder({
                       <MemberGroup
                         disabled={isFetchingMeta}
                         members={segments}
-                        availableMembers={availableSegments}
+                        availableMembers={availableMembers?.segments || []}
                         missingMembers={missingMembers}
                         addMemberName="Segment"
                         updateMethods={playgroundActionUpdateMethods(
@@ -391,7 +390,9 @@ export default function PlaygroundQueryBuilder({
                       <TimeGroup
                         disabled={isFetchingMeta}
                         members={timeDimensions}
-                        availableMembers={availableTimeDimensions}
+                        availableMembers={
+                          availableMembers?.timeDimensions || []
+                        }
                         missingMembers={missingMembers}
                         addMemberName="Time"
                         updateMethods={playgroundActionUpdateMethods(
@@ -407,9 +408,7 @@ export default function PlaygroundQueryBuilder({
                       <FilterGroup
                         disabled={isFetchingMeta}
                         members={filters}
-                        availableMembers={availableDimensions.concat(
-                          availableMeasures as any
-                        )}
+                        availableMembers={availableFilterMembers}
                         missingMembers={missingMembers}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(

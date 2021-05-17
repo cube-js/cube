@@ -4,12 +4,17 @@ import { QueryRenderer } from '@cubejs-client/react';
 import { format } from 'sql-formatter';
 
 import PrismCode from '../PrismCode';
+import { FatalError } from '../atoms';
 
 const CachePane = ({ query }) => (
   <QueryRenderer
     loadSql
     query={{ ...query, renewQuery: true }}
-    render={({ sqlQuery, resultSet }) => {
+    render={({ sqlQuery, resultSet, error }) => {
+      if (error) {
+        return <FatalError error={error} />
+      }
+
       const { loadResponse } = resultSet?.serialize() || {};
       const rawQuery = sqlQuery?.rawQuery();
 

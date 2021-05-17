@@ -43,7 +43,7 @@ database credentials:
 >
   <img
   alt="Cube Cloud Database Connection Screen"
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/ssl-wizard.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Configuration/ssl-wizard.png"
   style="border: none"
   width="100%"
   />
@@ -66,7 +66,7 @@ the **Env vars** tab in **Settings**:
 >
   <img
   alt="Cube Cloud Database Connection Screen"
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/ssl-custom.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Configuration/ssl-custom.png"
   style="border: none"
   width="100%"
   />

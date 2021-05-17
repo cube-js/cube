@@ -52,7 +52,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 
   const host = '127.0.0.1';
   const port = env.getContainer('birdbox-cube').getMappedPort(4000);
-  const playgroundPort = process.env.TEST_PLAYGROUND_PORT ? process.env.TEST_PLAYGROUND_PORT : port;
+  const playgroundPort = process.env.TEST_PLAYGROUND_PORT ?? port;
 
   let proxyServer: HttpProxy | null = null;
 

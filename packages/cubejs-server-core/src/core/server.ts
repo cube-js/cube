@@ -329,7 +329,7 @@ export class CubejsServerCore {
       (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
-    const devServer = process.env.NODE_ENV !== 'production' || process.env.CUBEJS_DEV_MODE === 'true';
+    const devServer = process.env.NODE_ENV !== 'production' || getEnv('devMode');
     const logger: LoggerFn = opts.logger || (
       process.env.NODE_ENV !== 'production'
         ? devLogger(process.env.CUBEJS_LOG_LEVEL)
@@ -351,12 +351,16 @@ export class CubejsServerCore {
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
       CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
 
-    if (externalDbType === 'cubestore' && getEnv('devMode') && !opts.serverless) {
+    if (!devServer && getEnv('externalDefault') && !externalDbType) {
+      displayCLIWarning(
+        'Cube Store is not found. Please follow this documentation to configure Cube Store https://cube.dev/docs/caching/running-in-production'
+      );
+    }
+
+    if (externalDbType === 'cubestore' && devServer && !opts.serverless) {
       if (!definedExtDBVariables.length) {
         const cubeStorePackage = this.requireCubeStoreDriver();
         if (cubeStorePackage.isCubeStoreSupported()) {
-          console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
-
           const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
             stdout: (data) => {
               console.log(data.toString().trim());
@@ -368,6 +372,17 @@ export class CubejsServerCore {
               warning: `Instance exit with ${code}, restarting`,
             }),
           });
+
+          console.log(`🔥 Cube Store (${version}) is assigned to 3030 port.`);
+
+          // Start Cube Store on startup in official docker images
+          if (isDockerImage()) {
+            cubeStoreHandler.acquire().catch(
+              (e) => this.logger('Cube Store Start Error', {
+                error: e.message,
+              })
+            );
+          }
 
           // Lazy loading for Cube Store
           externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);

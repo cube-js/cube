@@ -244,6 +244,9 @@ declare module '@cubejs-client/react' {
     segments: (TCubeSegment & { index: number })[];
     timeDimensions: (TimeDimensionWithExtraFields & { index: number })[];
 
+    availableMembers: AvailableMembers;
+
+    availableFilterMembers: Array<AvailableCube<TCubeMeasure> | AvailableCube<TCubeDimension>>;
     /**
      * An array of available measures to select. They are loaded via the API from Cube.js Backend.
      */
@@ -303,6 +306,20 @@ declare module '@cubejs-client/react' {
     missingMembers: string[];
     dryRunResponse?: TDryRunResponse;
   };
+
+  type AvailableMembers = {
+    measures: AvailableCube<TCubeMeasure>[];
+    dimensions: AvailableCube<TCubeDimension>[];
+    segments: AvailableCube<TCubeSegment>[];
+    timeDimensions: AvailableCube<TCubeDimension>[];
+  }
+
+  type AvailableCube<T> = {
+    cubeName: string,
+    cubeTitle: string,
+    members: T[]
+  };
+
 
   /**
    * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.

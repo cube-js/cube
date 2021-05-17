@@ -76,7 +76,7 @@ services:
       - ./schema:/cube/conf/schema
 ```
 
-### Scaling
+## Scaling
 
 <!-- prettier-ignore-start -->
 [[warning | ]]
@@ -105,7 +105,7 @@ reference][ref-config-env].
 | ----------------------- | ------------------ | ------------------ |
 | `CUBESTORE_SERVER_NAME` | Yes                | Yes                |
 | `CUBESTORE_META_PORT`   | Yes                | -                  |
-| `CUBESTORE_WORKERS`     | Yes                | -                  |
+| `CUBESTORE_WORKERS`     | Yes                | Yes                |
 | `CUBESTORE_WORKER_PORT` | -                  | Yes                |
 | `CUBESTORE_META_ADDR`   | -                  | Yes                |
 
@@ -141,6 +141,7 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
       - CUBESTORE_WORKER_PORT=9001
       - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
       - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
@@ -155,6 +156,7 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_2:9001
       - CUBESTORE_WORKER_PORT=9001
       - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
       - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
@@ -176,7 +178,7 @@ services:
       - .:/cube/conf
 ```
 
-### Storage
+## Storage
 
 <!-- prettier-ignore-start -->
 [[warning | ]]
@@ -208,6 +210,7 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
       - CUBESTORE_WORKER_PORT=9001
       - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
       - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
       - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
       - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
@@ -215,6 +218,12 @@ services:
     depends_on:
       - cubestore_router
 ```
+
+## Security
+
+Cube Store currently does not have any in-built authentication mechanisms. For
+this reason, we recommend running your Cube Store cluster on a network that only
+allows requests from the Cube.js deployment.
 
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning

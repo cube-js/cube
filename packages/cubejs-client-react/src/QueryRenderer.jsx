@@ -3,6 +3,7 @@ import { equals, toPairs, fromPairs } from 'ramda';
 import { isQueryPresent } from '@cubejs-client/core';
 
 import CubeContext from './CubeContext';
+import { generateAnsiHTML } from './utils';
 
 export default class QueryRenderer extends React.Component {
   static isQueryPresent(query) {
@@ -67,6 +68,7 @@ export default class QueryRenderer extends React.Component {
     });
     const { loadSql } = this.props;
     const cubejsApi = this.cubejsApi();
+
     if (query && QueryRenderer.isQueryPresent(query)) {
       if (loadSql === 'only') {
         cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
@@ -131,15 +133,18 @@ export default class QueryRenderer extends React.Component {
       error, queries, resultSet, isLoading, sqlQuery
     } = this.state;
     const { render } = this.props;
+
     const loadState = {
-      error,
+      error: error ? new Error(generateAnsiHTML(error.message || error.toString())) : null,
       resultSet: queries ? (resultSet || {}) : resultSet,
       loadingState: { isLoading },
       sqlQuery
     };
+
     if (render) {
       return render(loadState);
     }
+
     return null;
   }
 }

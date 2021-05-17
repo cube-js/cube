@@ -1,5 +1,5 @@
 import React from 'react';
-import { prop, uniqBy, equals, pick, clone } from 'ramda';
+import { prop, uniqBy, equals, pick, clone, indexBy, uniq } from 'ramda';
 import {
   ResultSet,
   moveItemInArray,
@@ -141,7 +141,7 @@ export default class QueryBuilder extends React.Component {
     this.setState(
       {
         meta,
-        metaError: metaError ? new Error(generateAnsiHTML(metaError?.toString() || '')) : null,
+        metaError: metaError ? new Error(generateAnsiHTML(metaError.message || metaError.toString())) : null,
         isFetchingMeta: false,
       },
       () => {
@@ -258,9 +258,48 @@ export default class QueryBuilder extends React.Component {
       ...meta.resolveMember(m, 'segments'),
     }));
 
-    const availableMeasures = meta ? meta.membersForQuery(query, 'measures') : [];
-    const availableDimensions = meta ? meta.membersForQuery(query, 'dimensions') : [];
-    const availableSegments = meta ? meta.membersForQuery(query, 'segments') : [];
+    let availableMeasures = [];
+    let availableDimensions = [];
+    let availableSegments = [];
+    let availableFilterMembers = [];
+
+    const availableMembers = meta?.membersGroupedByCube() || {
+      measures: [],
+      dimensions: [],
+      segments: [],
+      timeDimensions: [],
+    };
+
+    if (meta) {
+      availableMeasures = meta.membersForQuery(query, 'measures');
+      availableDimensions = meta.membersForQuery(query, 'dimensions');
+      availableSegments = meta.membersForQuery(query, 'segments');
+
+      const indexedMeasures = indexBy(
+        prop('cubeName'),
+        availableMembers.measures
+      );
+      const indexedDimensions = indexBy(
+        prop('cubeName'),
+        availableMembers.dimensions
+      );
+      const cubeNames = uniq([
+        ...Object.keys(indexedMeasures),
+        ...Object.keys(indexedDimensions),
+      ]).sort();
+
+      availableFilterMembers = cubeNames.map((name) => {
+        const cube = (indexedMeasures[name] || indexedDimensions[name]);
+
+        return {
+          ...cube,
+          members: [
+            ...indexedMeasures[name]?.members,
+            ...indexedDimensions[name]?.members,
+          ].sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1))
+        };
+      });
+    }
 
     let orderMembers = uniqBy(prop('id'), [
       ...(Array.isArray(query.order) ? query.order : Object.entries(query.order || {})).map(([id, order]) => ({
@@ -300,6 +339,8 @@ export default class QueryBuilder extends React.Component {
       availableDimensions,
       availableTimeDimensions: availableDimensions.filter((m) => m.type === 'time'),
       availableSegments,
+      availableMembers,
+      availableFilterMembers,
       updateQuery: (queryUpdate) => this.updateQuery(queryUpdate),
       updateMeasures: updateMethods('measures'),
       updateDimensions: updateMethods('dimensions'),
@@ -455,7 +496,7 @@ export default class QueryBuilder extends React.Component {
         }
       } catch (error) {
         this.setState({
-          queryError: new Error(generateAnsiHTML(error.stack?.toString() || error.toString())),
+          queryError: new Error(generateAnsiHTML(error.message || error.toString())),
         });
       }
     }

@@ -5,6 +5,7 @@ import color from '@oclif/color';
 import dotenv from '@cubejs-backend/dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import {
+  displayCLIWarning,
   getEnv,
   isDockerImage,
   packageExists,
@@ -175,9 +176,7 @@ export class ServerContainer {
       // eslint-disable-next-line no-restricted-syntax
       for (const [pkgName] of Object.entries(manifest.dependencies)) {
         if (isDevPackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
-          throw new Error(
-            `"${pkgName}" package must be installed in devDependencies`
-          );
+          displayCLIWarning(`"${pkgName}" package must be installed in devDependencies`);
         }
       }
     }
@@ -263,8 +262,8 @@ export class ServerContainer {
       return this.loadConfigurationFromFile();
     }
 
-    console.log(
-      `${color.yellow('warning')} There is no cube.js file. Continue with environment variables`
+    displayCLIWarning(
+      'There is no cube.js file. Continue with environment variables'
     );
 
     return {};
