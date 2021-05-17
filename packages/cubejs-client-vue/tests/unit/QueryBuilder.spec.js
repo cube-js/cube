@@ -29,7 +29,6 @@ describe('QueryBuilder.vue', () => {
     expect(true);
   });
 
-  // context different from Vue 2, does not make sense anymore. (https://github.com/vuejs/vue-test-utils-next#mounting-options)
   // it('renders meta information', async () => {
   //   const cube = createCubejsApi();
   //   jest
