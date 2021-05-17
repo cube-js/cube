@@ -11,9 +11,16 @@
   "engines": {
     "node": ">=10.8.0"
   },
-  "main": "driver/PostgresDriver.js",
-  "typings": "driver/index.d.ts",
+  "files": [
+    "src",
+    "index.js"
+  ],
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
     "lint": "eslint **/*.js"
   },
   "dependencies": {
@@ -24,7 +31,8 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.27.0"
+    "@cubejs-backend/linter": "^0.27.0",
+    "typescript": "~4.1.5"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
