@@ -49,7 +49,7 @@ const dayRange = (from, to) => ({
 
     return results;
   },
-  snapTo: (value) => dayRange(dayjs(from).startOf(value).toString(), dayjs(to).endOf(value)),
+  snapTo: (value) => dayRange(dayjs(from).startOf(value).toString(), dayjs(to).endOf(value).toString()),
   from: dayjs(from),
   to: dayjs(to),
 });
