@@ -2,13 +2,14 @@
 
 export type GenericDataBaseType = string;
 
-export interface TableStructure {
+export interface TableColumn {
   name: string;
   type: GenericDataBaseType;
 }
+export type TableStructure = TableColumn[];
 
 export interface DownloadTableMemoryData {
-  rows: object[];
+  rows: Record<string, unknown>[];
 }
 
 export interface DownloadTableCSVData {
@@ -29,9 +30,15 @@ export interface ExternalDriverCompatibilities {
   csvImport?: true,
   streamImport?: true,
 }
+export type DownloadQueryResults = ExternalDriverCompatibilities;
+
+export type IndexesSQL = {
+  sql: [string, unknown[]];
+}[];
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
+  uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;

@@ -185,7 +185,7 @@ export class BaseDriver {
     throw new Error('Not implemented');
   }
 
-  async downloadQueryResults(query, values) {
+  async downloadQueryResults(query, values, options) {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
       throw new Error(
