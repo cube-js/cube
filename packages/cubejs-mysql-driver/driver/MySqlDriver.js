@@ -159,19 +159,27 @@ class MySqlDriver extends BaseDriver {
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }
 
-  async streamTable(table, options) {
+  async stream(query, values, { highWaterMark }) {
     // eslint-disable-next-line no-underscore-dangle
     const conn = await this.pool._factory.create();
-    await this.setTimeZone(conn);
 
-    return {
-      // eslint-disable-next-line no-underscore-dangle
-      rowStream: conn.query(`SELECT * FROM ${table}`).stream(),
-      release: async () => {
+    try {
+      await this.setTimeZone(conn);
+
+      return {
         // eslint-disable-next-line no-underscore-dangle
-        await this.pool._factory.destroy(conn);
-      }
-    };
+        rowStream: conn.query(query).stream({ highWaterMark }),
+        release: async () => {
+          // eslint-disable-next-line no-underscore-dangle
+          await this.pool._factory.destroy(conn);
+        }
+      };
+    } catch (e) {
+      // eslint-disable-next-line no-underscore-dangle
+      await this.pool._factory.destroy(conn);
+
+      throw e;
+    }
   }
 
   async downloadQueryResults(query, values, options) {
