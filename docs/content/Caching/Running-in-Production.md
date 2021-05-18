@@ -128,8 +128,6 @@ services:
       - CUBESTORE_META_PORT=9999
       - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
       - CUBESTORE_REMOTE_DIR=/cube/data
-    expose:
-      - 3030 # This exposes the HTTP endpoint for CubeJS
     volumes:
       - .cubestore:/cube/data
   cubestore_worker_1:
@@ -143,8 +141,6 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
-    expose:
-      - 9001
     volumes:
       - .cubestore:/cube/data
   cubestore_worker_2:
@@ -158,8 +154,6 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
-    expose:
-      - 9001
     volumes:
       - .cubestore:/cube/data
   cube:
