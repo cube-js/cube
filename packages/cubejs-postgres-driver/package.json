@@ -21,7 +21,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint **/*.js"
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.27.16",

@@ -693,6 +693,8 @@ class PreAggregationLoader {
   protected async refreshImplStreamExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+
+    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
     if (!client.downloadQueryResults) {
       throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadQueryResults()');
     }
@@ -726,14 +728,17 @@ class PreAggregationLoader {
   }
 
   protected getStreamingOptions(): StreamOptions {
-    return { batchSize: 1000, highWaterMark: 2000 }
+    return {
+      // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
+      highWaterMark: 10000
+    };
   }
 
   /**
    * Create table (for db with write permissions) and extract data via memory/stream/unload
    */
   protected async downloadTempExternalPreAggregation(client: DriverInterface, newVersionEntry, saveCancelFn) {
-    // @todo Absolute, before remove we need to add checks for factoryDriver, that it extends from BaseDriver
+    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
     if (!client.downloadTable) {
       throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
     }
@@ -752,7 +757,10 @@ class PreAggregationLoader {
         ? client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
         : client.downloadTable(table, capabilities)
     );
-    tableData.types = await saveCancelFn(client.tableColumnTypes(table));
+
+    if (!tableData.types) {
+      tableData.types = await saveCancelFn(client.tableColumnTypes(table));
+    }
 
     return tableData;
   }

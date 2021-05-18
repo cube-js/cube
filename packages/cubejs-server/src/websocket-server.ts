@@ -1,10 +1,10 @@
 import WebSocket from 'ws';
 import crypto from 'crypto';
 import util from 'util';
+import { CancelableInterval, createCancelableInterval } from '@cubejs-backend/shared';
 import type { CubejsServerCore } from '@cubejs-backend/server-core';
 import type http from 'http';
 import type https from 'https';
-import { CancelableInterval, createCancelableInterval } from '@cubejs-backend/shared';
 
 export interface WebSocketServerOptions {
   processSubscriptionsInterval?: number,
