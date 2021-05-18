@@ -67,7 +67,6 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_CUBESTORE_HOST=localhost
-      - CUBEJS_CUBESTORE_PORT=3030
     depends_on:
       - cubestore
     links:
