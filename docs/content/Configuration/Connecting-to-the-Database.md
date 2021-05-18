@@ -48,19 +48,19 @@ CUBEJS_API_SECRET=secret
 The table below shows which environment variables are used for different
 databases:
 
-| Database                                               | Credentials                                                                                                                                                                                                                     |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PostgreSQL, MySQL, AWS Redshift, Hive/SparkSQL, Oracle | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                        |
-| MS SQL                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_DOMAIN`                                                                                                                    |
-| ClickHouse                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_CLICKHOUSE_READONLY`                                                                                      |
-| AWS Athena                                             | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION`                                                                                                                                     |
-| Google BigQuery                                        | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`, `CUBEJS_DB_BQ_LOCATION`                                                                                                                                                  |
-| MongoDB                                                | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE`                        |
+| Database                                               | Credentials                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL, MySQL, AWS Redshift, Hive/SparkSQL, Oracle | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                                                                                                                                             |
+| MS SQL                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_DOMAIN`                                                                                                                                                                                                                                         |
+| ClickHouse                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_CLICKHOUSE_READONLY`                                                                                                                                                                                                           |
+| AWS Athena                                             | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION`                                                                                                                                                                                                                                                          |
+| Google BigQuery                                        | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`, `CUBEJS_DB_BQ_LOCATION`                                                                                                                                                                                                                                              |
+| MongoDB                                                | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE`                                                                                                                                             |
 | Snowflake                                              | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`, `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`, `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS` |
-| Presto                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                 |
-| Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`                                                                                                                                                            |
-| SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                |
-| Databricks                                             | `CUBEJS_DB_NAME`, `CUBEJS_DB_DATABRICKS_URL`                                                                                                                                                                                    |
+| Presto                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                                                                                                                      |
+| Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`                                                                                                                                                                                                                                                                                 |
+| SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                                                                                                                                     |
+| Databricks                                             | `CUBEJS_DB_NAME`, `CUBEJS_DB_DATABRICKS_URL`                                                                                                                                                                                                                                                                                                         |
 
 ## Multiple Databases
 
@@ -192,7 +192,8 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/key-file.json | base64)
 You can learn more about acquiring Google BigQuery credentials
 [here][link-bigquery-getting-started] and [here][link-bigquery-credentials].
 
-You can set the dataset location using the `CUBEJS_DB_BQ_LOCATION` environment variable.
+You can set the dataset location using the `CUBEJS_DB_BQ_LOCATION` environment
+variable.
 
 ```dotenv
 CUBEJS_DB_BQ_LOCATION=us-central1
@@ -241,11 +242,10 @@ You can connect to a ClickHouse database when your user's permissions are
 
 ### Databricks JDBC
 
-Starting with `v0.26.83` Cube.js provides a driver for Databricks. It's based on the JDBC driver from DataBricks, which requires
-
-[installation of Java with JDK][link-java-guide]. You'll need to specify the JDBC url via `CUBEJS_DB_DATABRICKS_URL`.
-
-Example:
+Starting with `v0.26.83` Cube.js provides a driver for Databricks. It's based on
+the JDBC driver from DataBricks, which requires [installation of Java with
+JDK][link-java-guide]. You'll need to specify the JDBC url via
+`CUBEJS_DB_DATABRICKS_URL`:
 
 ```
 CUBEJS_DB_TYPE=databricks-jdbc
@@ -256,7 +256,7 @@ CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/
 ```
 
 [link-java-guide]:
-https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
+  https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 [link-cubejs-driver-guide]:
   https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver
 [link-aws-athena-access]:
