@@ -10,6 +10,7 @@ import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
 import { QueryStatus } from '../../PlaygroundQueryBuilder';
+import { useAppContext } from '../AppContext';
 
 const { Text } = Typography;
 
@@ -106,6 +107,8 @@ export default function ChartRenderer({
   const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
 
+  const { dbType } = useAppContext();
+
   // for you, ovr :)
   useHotkeys('cmd+enter', () => {
     runButtonRef.current?.click();
@@ -148,7 +151,8 @@ export default function ChartRenderer({
           event(
             isAggregated
               ? 'load_request_success_aggregated:frontend'
-              : 'load_request_success:frontend'
+              : 'load_request_success:frontend',
+            { dbType }
           );
         }
 
@@ -178,7 +182,7 @@ export default function ChartRenderer({
         onChartRendererReadyChange(true);
       },
     };
-  }, [framework, onChartRendererReadyChange]);
+  }, [framework, dbType, onChartRendererReadyChange]);
 
   const loading: boolean =
     queryHasMissingMembers ||

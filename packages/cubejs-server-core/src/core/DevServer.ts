@@ -84,6 +84,7 @@ export class DevServer {
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
+        dbType: options.dbType
       });
     }));
 

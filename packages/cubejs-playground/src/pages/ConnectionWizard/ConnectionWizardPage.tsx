@@ -162,7 +162,8 @@ export default function ConnectionWizardPage({ history }) {
                         });
 
                         event('test_database_connection_error:frontend', {
-                          error: error.message || error.toString()
+                          error: error.message || error.toString(),
+                          database: db.title
                         });
                       }
 
