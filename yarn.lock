@@ -21826,7 +21826,7 @@ snapdragon@^0.8.1:
     source-map-resolve "^0.5.0"
     use "^3.1.0"
 
-snowflake-sdk@^1.1.15:
+snowflake-sdk@^1.6.1:
   version "1.6.1"
   resolved "https://registry.yarnpkg.com/snowflake-sdk/-/snowflake-sdk-1.6.1.tgz#371a19bc04922c437ef72b62f1a59b5c5999d577"
   integrity sha512-w56tIP8mXyD2pXFzeV78sQjiBZBdPshKII2K/9E6Wo++eM+JMcY2qszq3jIjyIsXSWKDcUlKUR2ENcG7WDWeUQ==

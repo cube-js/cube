@@ -19,7 +19,7 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.27.15",
     "date-fns-timezone": "^0.1.4",
-    "snowflake-sdk": "^1.1.15"
+    "snowflake-sdk": "^1.6.1"
   },
   "license": "Apache-2.0",
   "publishConfig": {
