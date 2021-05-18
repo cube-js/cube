@@ -124,14 +124,10 @@ services:
     restart: always
     image: cubejs/cubestore:latest
     environment:
-      - CUBESTORE_LOG_LEVEL=trace
       - CUBESTORE_SERVER_NAME=cubestore_router:9999
       - CUBESTORE_META_PORT=9999
       - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
       - CUBESTORE_REMOTE_DIR=/cube/data
-    expose:
-      - 9999 # This exposes the Metastore endpoint
-      - 3030 # This exposes the HTTP endpoint for CubeJS
     volumes:
       - .cubestore:/cube/data
   cubestore_worker_1:
@@ -145,8 +141,6 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
-    expose:
-      - 9001
     volumes:
       - .cubestore:/cube/data
   cubestore_worker_2:
@@ -160,18 +154,14 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
     depends_on:
       - cubestore_router
-    expose:
-      - 9001
     volumes:
       - .cubestore:/cube/data
   cube:
     image: cubejs/cube:latest
     ports:
       - 4000:4000
-      - 9999
     environment:
       - CUBEJS_CUBESTORE_HOST=cubestore_router
-      - CUBEJS_CUBESTORE_PORT=9999
     depends_on:
       - cubestore_router
     volumes:
