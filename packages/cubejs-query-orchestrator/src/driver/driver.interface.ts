@@ -41,7 +41,6 @@ export interface ExternalDriverCompatibilities {
   streamImport?: true,
 }
 export type StreamOptions = {
-  batchSize: number
   highWaterMark: number
 };
 

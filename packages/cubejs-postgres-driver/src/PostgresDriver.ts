@@ -86,7 +86,7 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
   public async stream(
     query: string,
     values: unknown[],
-    { batchSize, highWaterMark }: StreamOptions
+    { highWaterMark }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
     const conn = await this.pool.connect();
 
@@ -97,7 +97,6 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
         types: {
           getTypeParser,
         },
-        batchSize,
         highWaterMark
       });
       const rowStream: QueryStream = await conn.query(queryStream);
