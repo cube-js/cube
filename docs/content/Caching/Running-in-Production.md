@@ -125,6 +125,7 @@ services:
     image: cubejs/cubestore:latest
     environment:
       - CUBESTORE_SERVER_NAME=cubestore_router:9999
+      - CUBESTORE_META_PORT=9999
       - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
       - CUBESTORE_REMOTE_DIR=/cube/data
     expose:
