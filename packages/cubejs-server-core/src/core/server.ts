@@ -398,8 +398,6 @@ export class CubejsServerCore {
       }
     }
 
-    console.log('getEnv(\'telemetry\')', getEnv('telemetry'))
-
     const options: ServerCoreInitializedOptions = {
       dbType: <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE,
       externalDbType,
