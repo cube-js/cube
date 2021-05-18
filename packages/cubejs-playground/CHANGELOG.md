@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** display error message on all tabs ([#2741](https://github.com/cube-js/cube.js/issues/2741)) ([0b9b597](https://github.com/cube-js/cube.js/commit/0b9b597f8e936c9daf287c5ed2e03ecdf5af2a0b))
+
+
+### Features
+
+* **@cubejs-client/playground:** member grouping ([#2736](https://github.com/cube-js/cube.js/issues/2736)) ([7659438](https://github.com/cube-js/cube.js/commit/76594383e08e44354c5966f8e60107d65e05ddab))
+
+
+
+
+
 ## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
 
 

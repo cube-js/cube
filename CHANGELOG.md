@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+
+### Bug Fixes
+
+* upgrade @amcharts/amcharts4 from 4.10.10 to 4.10.17 ([#2707](https://github.com/cube-js/cube.js/issues/2707)) ([56c7f5a](https://github.com/cube-js/cube.js/commit/56c7f5af29daf3007e56bbd64e4506f23d6e6f59))
+* upgrade @cubejs-client/core from 0.19.56 to 0.26.94 ([#2706](https://github.com/cube-js/cube.js/issues/2706)) ([93dd7d9](https://github.com/cube-js/cube.js/commit/93dd7d92181ad0f2ab60bf8dc07db4b2d2ee4ced))
+* upgrade react-dropzone from 11.2.4 to 11.3.2 ([#2708](https://github.com/cube-js/cube.js/issues/2708)) ([a16a83b](https://github.com/cube-js/cube.js/commit/a16a83bc93598a4b5eb788f9a69429382b0e162b))
+* **@cubejs-client/core:** compareDateRange pivot fix ([#2752](https://github.com/cube-js/cube.js/issues/2752)) ([653ad84](https://github.com/cube-js/cube.js/commit/653ad84f57cc7d5e004c92fe717246ce33d7dcad))
+* **@cubejs-client/core:** Meta types fixes ([#2746](https://github.com/cube-js/cube.js/issues/2746)) ([cd17755](https://github.com/cube-js/cube.js/commit/cd17755a07fe19fbebe44d0193330d43a66b757d))
+* **@cubejs-client/playground:** display error message on all tabs ([#2741](https://github.com/cube-js/cube.js/issues/2741)) ([0b9b597](https://github.com/cube-js/cube.js/commit/0b9b597f8e936c9daf287c5ed2e03ecdf5af2a0b))
+
+
+### Features
+
+* **@cubejs-client/playground:** member grouping ([#2736](https://github.com/cube-js/cube.js/issues/2736)) ([7659438](https://github.com/cube-js/cube.js/commit/76594383e08e44354c5966f8e60107d65e05ddab))
+* Enable external pre-aggregations by default for new users ([22de035](https://github.com/cube-js/cube.js/commit/22de0358ec35017c45e6a716faaacf176c49c652))
+* Replace diagnostic error for devPackages to warning ([b65c1f5](https://github.com/cube-js/cube.js/commit/b65c1f56329998cbcafa27512de3acc9da3b62c5))
+* Start Cube Store on startup in devMode for official images ([5e216a8](https://github.com/cube-js/cube.js/commit/5e216a8df0e5df2168d007bac32102cf78ba26e3))
+
+
+
+
+
 ## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
 
 

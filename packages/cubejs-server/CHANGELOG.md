@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+
+### Features
+
+* Replace diagnostic error for devPackages to warning ([b65c1f5](https://github.com/cube-js/cube.js/commit/b65c1f56329998cbcafa27512de3acc9da3b62c5))
+
+
+
+
+
 ## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
 
 
