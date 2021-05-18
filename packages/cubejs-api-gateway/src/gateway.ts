@@ -3,6 +3,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
+import compression from 'compression';
 import { getRealType } from '@cubejs-backend/shared';
 
 import type {
@@ -234,6 +235,8 @@ export class ApiGateway {
       this.requestContextMiddleware,
       this.requestLoggerMiddleware
     ];
+
+    app.use(compression());
 
     // @todo Should we pass requestLoggerMiddleware?
     const guestMiddlewares = [];
