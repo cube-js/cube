@@ -1,10 +1,18 @@
 /* eslint-disable no-restricted-syntax */
-import snowflake, { Column, Connection } from 'snowflake-sdk';
-import { BaseDriver, DriverInterface, GenericDataBaseType } from '@cubejs-backend/query-orchestrator';
+import snowflake, { Column, Connection, Statement } from 'snowflake-sdk';
+import {
+  BaseDriver,
+  DriverInterface,
+  GenericDataBaseType,
+  StreamTableData,
+} from '@cubejs-backend/query-orchestrator';
 import { formatToTimeZone } from 'date-fns-timezone';
+import { HydrationMap, HydrationStream } from './HydrationStream';
+
+type HydrationConfiguration = { types: string[], toValue: (column: Column) => ((value: any) => any)|null }[];
 
 // It's not possible to declare own map converters by passing config to snowflake-sdk
-const hydrators: { types: string[], toValue: (column: Column) => ((value: any) => any)|null }[] = [
+const hydrators: HydrationConfiguration = [
   {
     types: ['fixed', 'real'],
     toValue: (column) => {
@@ -69,6 +77,7 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
+  rowStreamHighWaterMark?: number,
 }
 
 /**
@@ -77,7 +86,7 @@ interface SnowflakeDriverOptions {
  * Similar to data in response, column_name will be COLUMN_NAME
  */
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
-  protected readonly initialConnectPromise: Promise<Connection>;
+  protected connection: Promise<Connection>|null = null;
 
   protected readonly config: SnowflakeDriverOptions;
 
@@ -98,10 +107,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
       ...config
     };
-    const connection = snowflake.createConnection(this.config);
-    this.initialConnectPromise = new Promise(
-      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-    );
   }
 
   public static driverEnvVariables() {
@@ -124,10 +129,92 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1 as number');
   }
 
+  protected async getConnection(): Promise<Connection> {
+    if (this.connection) {
+      return this.connection;
+    }
+
+    // eslint-disable-next-line no-return-assign
+    return this.connection = (async () => {
+      try {
+        const connection = snowflake.createConnection(this.config);
+        await new Promise(
+          (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+        );
+
+        await this.execute(connection, `ALTER SESSION SET TIMEZONE = 'UTC'`, [], false);
+        await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
+
+        return connection;
+      } catch (e) {
+        this.connection = null;
+
+        throw e;
+      }
+    })();
+  }
+
   public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
-    return this.initialConnectPromise.then((connection) => this.execute(connection, `ALTER SESSION SET TIMEZONE = 'UTC'`, [], false)
-      .then(() => this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false))
-      .then(() => this.execute<R>(connection, query, values)));
+    return this.getConnection().then((connection) => this.execute<R>(connection, query, values));
+  }
+
+  public async stream(
+    query: string,
+    values: unknown[],
+  ): Promise<StreamTableData> {
+    const connection = await this.getConnection();
+
+    const stmt = await new Promise<Statement>((resolve, reject) => connection.execute({
+      sqlText: query,
+      binds: <string[]|undefined>values,
+      fetchAsString: ['Number'],
+      streamResult: true,
+      complete: (err, statement) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        resolve(statement);
+      }
+    }));
+
+    const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+    if (Object.keys(hydrationMap).length) {
+      const rowStream = new HydrationStream(hydrationMap);
+      stmt.streamRows().pipe(rowStream);
+
+      return {
+        rowStream,
+        release: async () => {
+          //
+        }
+      };
+    }
+
+    return {
+      rowStream: stmt.streamRows(),
+      release: async () => {
+        //
+      }
+    };
+  }
+
+  protected generateHydrationMap(columns: Column[]): HydrationMap {
+    const hydrationMap: Record<string, any> = {};
+
+    for (const column of columns) {
+      for (const hydrator of hydrators) {
+        if (hydrator.types.includes(column.getType())) {
+          const fnOrNull = hydrator.toValue(column);
+          if (fnOrNull) {
+            hydrationMap[column.getName()] = fnOrNull;
+          }
+        }
+      }
+    }
+
+    return hydrationMap;
   }
 
   protected async execute<R = unknown>(
@@ -147,20 +234,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         }
 
         if (rehydrate && rows?.length) {
-          const hydrationMap: Record<string, any> = {};
-          const columns = stmt.getColumns();
-
-          for (const column of columns) {
-            for (const hydrator of hydrators) {
-              if (hydrator.types.includes(column.getType())) {
-                const fnOrNull = hydrator.toValue(column);
-                if (fnOrNull) {
-                  hydrationMap[column.getName()] = fnOrNull;
-                }
-              }
-            }
-          }
-
+          const hydrationMap = this.generateHydrationMap(stmt.getColumns());
           if (Object.keys(hydrationMap).length) {
             for (const row of rows) {
               for (const [field, toValue] of Object.entries(hydrationMap)) {
@@ -188,10 +262,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
      `;
   }
 
-  public async release() {
-    return this.initialConnectPromise.then((connection) => new Promise<void>(
-      (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
-    ));
+  public async release(): Promise<void> {
+    if (this.connection) {
+      this.connection.then((connection) => new Promise<void>(
+        (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
+      ));
+    }
   }
 
   public toGenericType(columnType: string) {
