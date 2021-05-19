@@ -247,14 +247,47 @@ impl Builder<'_> {
                     continue;
                 }
             };
-            if PartitionFilter::SIZE_LIMIT < res.len() + r.len() {
-                // TODO: keep some information.
-                return Vec::new();
-            }
             res.extend(r);
+            if PartitionFilter::SIZE_LIMIT < res.len() {
+                Self::fold_or_inplace(res);
+            }
         }
 
         res.unwrap_or_default()
+    }
+
+    /// Reduces the number of stored [MinMaxCondition]s, loosing some information.
+    fn fold_or_inplace(cs: &mut Vec<MinMaxCondition>) {
+        assert!(!cs.is_empty());
+        let (r, tail) = cs.split_first_mut().unwrap();
+
+        for c in tail {
+            for i in 0..r.min.len() {
+                if r.min[i].is_none() {
+                    continue;
+                }
+                if c.min[i].is_none()
+                    || cmp_same_types(c.min[i].as_ref().unwrap(), &r.min[i].as_ref().unwrap())
+                        < Ordering::Equal
+                {
+                    r.min[i] = c.min[i].clone();
+                }
+            }
+
+            for i in 0..r.max.len() {
+                if r.max[i].is_none() {
+                    continue;
+                }
+                if c.max[i].is_none()
+                    || cmp_same_types(&r.max[i].as_ref().unwrap(), c.max[i].as_ref().unwrap())
+                        < Ordering::Equal
+                {
+                    r.max[i] = c.max[i].clone();
+                }
+            }
+        }
+
+        cs.truncate(1);
     }
 
     fn extract_column_compare(
@@ -964,7 +997,13 @@ mod tests {
 
         let f = extract("(a <= 1 or b <= 2) and (a <= 2 or b <= 3) and (a <= 4 or b <= 5) and (a <= 6 or b <= 7) and (a <= 8 or b <= 9) and (a <= 10 or b <= 11)");
         // Must bail out to avoid too much compute.
-        assert_eq!(f.min_max.len(), 0)
+        assert_eq!(
+            f.min_max,
+            vec![MinMaxCondition {
+                min: vec![None, None],
+                max: vec![None, None],
+            }]
+        );
     }
 
     #[test]
@@ -1014,7 +1053,27 @@ mod tests {
             Some(&vec![TableValue::Int(1); 5]),
             Some(&vec![TableValue::Int(1); 5])
         ));
-        assert!(filter.can_match(Some(&vals(&[9, 1, 1, 7, 2])), Some(&vals(&[9, 1, 1, 7, 2]))));
+        let max_row = &[9, 1, 1, 7, 2];
+        assert!(filter.can_match(Some(&vals(max_row)), Some(&vals(max_row))));
+
+        // Check we keep information about min and max values for each field.
+        for i in 0..s.fields().len() {
+            let mut row_before = vec![1; 5];
+            row_before[i] -= 1;
+            assert!(
+                !filter.can_match(Some(&vals(&row_before)), Some(&vals(&row_before))),
+                "must not match {:?}",
+                row_before
+            );
+
+            let mut row_after = max_row.to_vec();
+            row_after[i] += 1;
+            assert!(
+                !filter.can_match(Some(&vals(&row_after)), Some(&vals(&row_after))),
+                "must not match {:?}",
+                row_after
+            );
+        }
 
         fn vals(is: &[i64]) -> Vec<TableValue> {
             is.iter().map(|i| TableValue::Int(*i)).collect()
