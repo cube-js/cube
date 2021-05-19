@@ -177,6 +177,7 @@ impl SqlServiceImpl {
                     locations,
                     Some(ImportFormat::CSV),
                     indexes_to_create,
+                    false,
                 )
                 .await?;
             let wait_for = table
@@ -213,6 +214,9 @@ impl SqlServiceImpl {
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
+
+            self.db.table_ready(table.get_id(), true).await?;
+
             Ok(table)
         } else {
             self.db
@@ -223,6 +227,7 @@ impl SqlServiceImpl {
                     None,
                     None,
                     indexes_to_create,
+                    true,
                 )
                 .await
         }
@@ -1003,7 +1008,7 @@ mod tests {
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
-                meta_store,
+                meta_store.clone(),
                 chunk_store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1036,8 +1041,9 @@ mod tests {
                 TableValue::String("[{\"name\":\"PersonID\",\"column_type\":\"Int\",\"column_index\":0},{\"name\":\"LastName\",\"column_type\":\"String\",\"column_index\":1},{\"name\":\"FirstName\",\"column_type\":\"String\",\"column_index\":2},{\"name\":\"Address\",\"column_type\":\"String\",\"column_index\":3},{\"name\":\"City\",\"column_type\":\"String\",\"column_index\":4}]".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
-                TableValue::String("NULL".to_string()),
                 TableValue::String("false".to_string()),
+                TableValue::String("true".to_string()),
+                TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
             ]));
         }
         let _ = DB::destroy(&Options::default(), path);

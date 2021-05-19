@@ -3980,7 +3980,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.9.0"
-source = "git+https://github.com/ilya-biryukov/sqlparser-rs?tag=v0.9.0-cube#2e8d6b4e677477befb713497c78422b62e5d1e69"
+source = "git+https://github.com/cube-js/sqlparser-rs?tag=v0.9.0-cube#2e8d6b4e677477befb713497c78422b62e5d1e69"
 dependencies = [
  "log",
 ]

@@ -668,7 +668,9 @@ pub trait MetaStore: DIService + Send + Sync {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
+        is_ready: bool,
     ) -> Result<IdRow<Table>, CubeError>;
+    async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
     async fn get_table(
         &self,
         schema_name: String,
@@ -2258,6 +2260,7 @@ impl MetaStore for RocksMetaStore {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
+        is_ready: bool,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_table = TableRocksTable::new(db_ref.clone());
@@ -2274,6 +2277,7 @@ impl MetaStore for RocksMetaStore {
                 columns,
                 locations,
                 import_format,
+                is_ready,
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
             for index_def in indexes.into_iter() {
@@ -2317,6 +2321,14 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let rocks_table = TableRocksTable::new(db_ref.clone());
+            Ok(rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?)
+        })
+        .await
+    }
+
     async fn get_table(
         &self,
         schema_name: String,
@@ -2340,7 +2352,11 @@ impl MetaStore for RocksMetaStore {
 
     async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError> {
         self.read_operation(|db_ref| {
-            let tables = TableRocksTable::new(db_ref.clone()).all_rows()?;
+            let tables = TableRocksTable::new(db_ref.clone())
+                .all_rows()?
+                .into_iter()
+                .filter(|t| t.get_row().is_ready())
+                .collect::<Vec<_>>();
             let schemas = SchemaRocksTable::new(db_ref);
             Ok(schemas.build_path_rows(
                 tables,
@@ -3379,6 +3395,7 @@ mod tests {
                     None,
                     None,
                     vec![],
+                    true,
                 )
                 .await
                 .unwrap();
@@ -3392,7 +3409,8 @@ mod tests {
                     columns.clone(),
                     None,
                     None,
-                    vec![]
+                    vec![],
+                    true
                 )
                 .await
                 .is_err());
