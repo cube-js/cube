@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+
+### Features
+
+* **cubestore:** Allow to query tables only when they imported and ready ([#2775](https://github.com/cube-js/cube.js/issues/2775)) ([02cf69a](https://github.com/cube-js/cube.js/commit/02cf69ac9477d87e898a34ac1b8acad829dd120e))
+* **cubestore:** update datafusion and sqlparser-rs ([a020c07](https://github.com/cube-js/cube.js/commit/a020c070cea053983ccd28c5d47e3f805364b713))
+
+
+
+
+
 ## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

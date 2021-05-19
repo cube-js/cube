@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+
+### Features
+
+* **@cubejs-client/playground:** member search ([#2764](https://github.com/cube-js/cube.js/issues/2764)) ([8ba6eed](https://github.com/cube-js/cube.js/commit/8ba6eed02a0bfed877f89eb42c035ef71617b483))
+
+
+
+
+
 ## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
 
 

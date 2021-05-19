@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+
+### Bug Fixes
+
+* Optimize high load Cube Store serve track: do not use Redis while fetching pre-aggregation tables ([#2776](https://github.com/cube-js/cube.js/issues/2776)) ([a3bc0b8](https://github.com/cube-js/cube.js/commit/a3bc0b8079373394e6a6a4fca12ddd46195d5b7d))
+
+
+
+
+
 ## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

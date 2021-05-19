@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+
+### Bug Fixes
+
+* Optimize high load Cube Store serve track: do not use Redis while fetching pre-aggregation tables ([#2776](https://github.com/cube-js/cube.js/issues/2776)) ([a3bc0b8](https://github.com/cube-js/cube.js/commit/a3bc0b8079373394e6a6a4fca12ddd46195d5b7d))
+
+
+### Features
+
+* **@cubejs-client/playground:** member search ([#2764](https://github.com/cube-js/cube.js/issues/2764)) ([8ba6eed](https://github.com/cube-js/cube.js/commit/8ba6eed02a0bfed877f89eb42c035ef71617b483))
+* **cubestore:** Allow to query tables only when they imported and ready ([#2775](https://github.com/cube-js/cube.js/issues/2775)) ([02cf69a](https://github.com/cube-js/cube.js/commit/02cf69ac9477d87e898a34ac1b8acad829dd120e))
+* **cubestore:** update datafusion and sqlparser-rs ([a020c07](https://github.com/cube-js/cube.js/commit/a020c070cea053983ccd28c5d47e3f805364b713))
+* **snowflake-driver:** Support 'key-pair' authentication ([#2724](https://github.com/cube-js/cube.js/issues/2724)) ([4dc55b4](https://github.com/cube-js/cube.js/commit/4dc55b40e47f62e6b82d8a6549d2823dee0ed9cb))
+
+
+
+
+
 ## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
 
 
