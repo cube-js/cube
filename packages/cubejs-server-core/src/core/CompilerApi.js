@@ -135,4 +135,8 @@ export class CompilerApi {
   async metaConfig(options) {
     return (await this.getCompilers(options)).metaTransformer.cubes;
   }
+
+  async preAggregationDefinitions(options) {
+    return (await this.getCompilers(options)).metaTransformer.compilePreAggregations();
+  }
 }

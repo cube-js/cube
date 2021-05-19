@@ -22,6 +22,14 @@ export class CubeToMetaTransformer {
       .filter(c => !!c);
   }
 
+  getPreAggregations() {
+    return this.cubeSymbols.cubeList
+      .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
+      .map((v) => this.transformPreAgg(v))
+      .flat()
+      .filter(c => !!c);
+  }
+
   // eslint-disable-next-line no-unused-vars
   transform(cube, errorReporter) {
     const cubeTitle = cube.title || this.titleize(cube.name);
@@ -65,6 +73,23 @@ export class CubeToMetaTransformer {
         )(cube.segments || {})
       }
     };
+  }
+
+  transformPreAgg(cube) {
+    if (!cube.preAggregations) return [];
+    const cubeTitle = cube.title || this.titleize(cube.name);
+
+    return Object.keys(cube.preAggregations)
+      .map(name => ({
+        name,
+        title: this.titleize(name),
+        cubeName: cube.name,
+        cubeTitle,
+        definition: {
+          ...cube.preAggregations[name],
+          ...this.cubeEvaluator.evaluatePreAggregationReferences(cube.name, cube.preAggregations[name])
+        }
+      }));
   }
 
   queriesForContext(contextId) {

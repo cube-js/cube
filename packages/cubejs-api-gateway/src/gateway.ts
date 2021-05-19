@@ -160,6 +160,7 @@ export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
   refreshScheduler: any;
+  scheduledRefreshContexts?: any;
   basePath: string;
   extendContext?: ExtendContextFn;
   checkAuth?: CheckAuthFn;
@@ -175,6 +176,8 @@ export interface ApiGatewayOptions {
 
 export class ApiGateway {
   protected readonly refreshScheduler: any;
+
+  protected readonly scheduledRefreshContexts: any;
 
   protected readonly basePath: string;
 
@@ -211,6 +214,7 @@ export class ApiGateway {
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
+    this.scheduledRefreshContexts = options.scheduledRefreshContexts;
     this.standalone = options.standalone;
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
@@ -307,6 +311,19 @@ export class ApiGateway {
 
     if (this.playgroundAuthSecret) {
       app.get('/cubejs-system/v1/context', userMiddlewares, this.createSystemContextHandler(this.basePath));
+
+      app.get('/cubejs-system/v1/pre-aggregations', userMiddlewares, (async (req, res) => {
+        await this.getPreAggregationList({
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
+  
+      app.get('/cubejs-system/v1/security-contexts', userMiddlewares, (async (req, res) => {
+        this.resToResultFn(res)({
+          securityContexts: await this.scheduledRefreshContexts()
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -348,6 +365,19 @@ export class ApiGateway {
       const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
       const cubes = metaConfig.map(c => c.config);
       res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationList({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+    try {
+      const preAggregations = await this.getCompilerApi(context)
+        .preAggregationDefinitions({ requestId: context.requestId });
+      res({ preAggregations });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
