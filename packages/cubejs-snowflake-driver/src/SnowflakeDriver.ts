@@ -1,10 +1,10 @@
 /* eslint-disable no-restricted-syntax */
-const snowflake = require('snowflake-sdk');
-const { formatToTimeZone } = require('date-fns-timezone');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+import snowflake, { Column, Connection } from 'snowflake-sdk';
+import { BaseDriver, DriverInterface, GenericDataBaseType } from '@cubejs-backend/query-orchestrator';
+import { formatToTimeZone } from 'date-fns-timezone';
 
 // It's not possible to declare own map converters by passing config to snowflake-sdk
-const hydrators = [
+const hydrators: { types: string[], toValue: (column: Column) => ((value: any) => any)|null }[] = [
   {
     types: ['fixed', 'real'],
     toValue: (column) => {
@@ -52,28 +52,47 @@ const hydrators = [
   }
 ];
 
-const SnowflakeToGenericType = {
+const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   number: 'decimal',
   timestamp_ntz: 'timestamp'
 };
+
+interface SnowflakeDriverOptions {
+  account: string,
+  username: string,
+  password: string,
+  region?: string,
+  warehouse?: string,
+  role?: string,
+  clientSessionKeepAlive?: boolean,
+  database?: string,
+  authenticator?: string,
+  privateKeyPath?: string,
+  privateKeyPass?: string,
+}
 
 /**
  * Attention:
  * Snowflake is using UPPER_CASE for table, schema and column names
  * Similar to data in response, column_name will be COLUMN_NAME
  */
-class SnowflakeDriver extends BaseDriver {
-  constructor(config) {
+export class SnowflakeDriver extends BaseDriver implements DriverInterface {
+  protected readonly initialConnectPromise: Promise<Connection>;
+
+  protected readonly config: SnowflakeDriverOptions;
+
+  public constructor(config: Partial<SnowflakeDriverOptions> = {}) {
     super();
+
     this.config = {
-      account: process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
+      account: <string>process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
       region: process.env.CUBEJS_DB_SNOWFLAKE_REGION,
       warehouse: process.env.CUBEJS_DB_SNOWFLAKE_WAREHOUSE,
       role: process.env.CUBEJS_DB_SNOWFLAKE_ROLE,
       clientSessionKeepAlive: process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE === 'true',
       database: process.env.CUBEJS_DB_NAME,
-      username: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      username: <string>process.env.CUBEJS_DB_USER,
+      password: <string>process.env.CUBEJS_DB_PASS,
       authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
       privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
@@ -85,7 +104,7 @@ class SnowflakeDriver extends BaseDriver {
     );
   }
 
-  static driverEnvVariables() {
+  public static driverEnvVariables() {
     return [
       'CUBEJS_DB_NAME',
       'CUBEJS_DB_USER',
@@ -101,20 +120,25 @@ class SnowflakeDriver extends BaseDriver {
     ];
   }
 
-  testConnection() {
-    return this.query('SELECT 1 as number');
+  public async testConnection() {
+    await this.query('SELECT 1 as number');
   }
 
-  query(query, values) {
-    return this.initialConnectPromise.then((connection) => this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false)
+  public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
+    return this.initialConnectPromise.then((connection) => this.execute(connection, `ALTER SESSION SET TIMEZONE = 'UTC'`, [], false)
       .then(() => this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false))
-      .then(() => this.execute(connection, query, values)));
+      .then(() => this.execute<R>(connection, query, values)));
   }
 
-  async execute(connection, query, values, rehydrate = true) {
+  protected async execute<R = unknown>(
+    connection: Connection,
+    query: string,
+    values?: unknown[],
+    rehydrate: boolean = true
+  ): Promise<R> {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
-      binds: values,
+      binds: <string[]|undefined>values,
       fetchAsString: ['Number'],
       complete: (err, stmt, rows) => {
         if (err) {
@@ -122,8 +146,8 @@ class SnowflakeDriver extends BaseDriver {
           return;
         }
 
-        if (rehydrate && rows.length) {
-          const hydrationMap = {};
+        if (rehydrate && rows?.length) {
+          const hydrationMap: Record<string, any> = {};
           const columns = stmt.getColumns();
 
           for (const column of columns) {
@@ -148,12 +172,12 @@ class SnowflakeDriver extends BaseDriver {
           }
         }
 
-        resolve(rows);
+        resolve(<any>rows);
       }
     }));
   }
 
-  informationSchemaQuery() {
+  public informationSchemaQuery() {
     return `
         SELECT columns.column_name as "column_name",
                columns.table_name as "table_name",
@@ -164,20 +188,20 @@ class SnowflakeDriver extends BaseDriver {
      `;
   }
 
-  async release() {
-    return this.initialConnectPromise.then((connection) => new Promise(
-      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+  public async release() {
+    return this.initialConnectPromise.then((connection) => new Promise<void>(
+      (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
     ));
   }
 
-  toGenericType(columnType) {
+  public toGenericType(columnType: string) {
     return SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 
-  async tableColumnTypes(table) {
+  public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
 
-    const columns = await this.query(
+    const columns = await this.query<{ COLUMN_NAME: string, DATA_TYPE: string }[]>(
       `SELECT columns.column_name,
              columns.table_name,
              columns.table_schema,
@@ -190,10 +214,8 @@ class SnowflakeDriver extends BaseDriver {
     return columns.map(c => ({ name: c.COLUMN_NAME, type: this.toGenericType(c.DATA_TYPE) }));
   }
 
-  async getTablesQuery(schemaName) {
+  public async getTablesQuery(schemaName: string) {
     const tables = await super.getTablesQuery(schemaName.toUpperCase());
     return tables.map(t => ({ table_name: t.TABLE_NAME && t.TABLE_NAME.toLowerCase() }));
   }
 }
-
-module.exports = SnowflakeDriver;

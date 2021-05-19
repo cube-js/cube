@@ -32,6 +32,9 @@
       "path": "packages/cubejs-postgres-driver"
     },
     {
+      "path": "packages/cubejs-snowflake-driver"
+    },
+    {
       "path": "packages/cubejs-jdbc-driver"
     },
     {

@@ -11,10 +11,14 @@
   "engines": {
     "node": ">=10.8.0"
   },
-  "main": "driver/SnowflakeDriver.js",
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
-    "lint": "eslint driver/*",
-    "lint:fix": "eslint --fix driver/*"
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.27.16",
@@ -29,6 +33,8 @@
     "extends": "../cubejs-linter"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.27.0"
+    "@cubejs-backend/linter": "^0.27.0",
+    "@types/snowflake-sdk": "^1.5.1",
+    "typescript": "~4.1.5"
   }
 }
