@@ -2,6 +2,7 @@ use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
+use cubestore::sql::timestamp_from_string;
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use itertools::Itertools;
@@ -73,6 +74,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("topk_decimals", topk_decimals),
         t("offset", offset),
         t("having", having),
+        t("rolling_window_join", rolling_window_join),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2228,6 +2230,94 @@ async fn having(service: Box<dyn SqlClient>) {
     fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
         a.iter()
             .map(|(s, n)| vec![TableValue::String(s.to_string()), TableValue::Int(*n)])
+            .collect_vec()
+    }
+}
+
+async fn rolling_window_join(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day timestamp, name text, n int)")
+        .await
+        .unwrap();
+    let raw_query = "SELECT date_to, name, sum(n)  FROM (\
+               SELECT to_timestamp('2020-01-01T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-01T23:59:59.999') date_to \
+               UNION ALL \
+               SELECT to_timestamp('2020-01-02T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-02T23:59:59.999') date_to \
+               UNION ALL \
+               SELECT to_timestamp('2020-01-03T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-03T23:59:59.999') date_to \
+               UNION ALL \
+               SELECT to_timestamp('2020-01-04T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-04T23:59:59.999') date_to\
+            )\
+            LEFT JOIN (\
+               SELECT date_trunc('day', CONVERT_TZ(day,'+00:00')) `day`, name, sum(n) `n` \
+               FROM s.Data \
+               GROUP BY 1, 2 \
+            ) ON day <= date_to \
+            GROUP BY 1, 2";
+    let query = raw_query.to_string() + " ORDER BY 1, 2, 3";
+    let query_sort_subquery = format!("SELECT * FROM ({}) ORDER BY 1,2,3", raw_query);
+
+    for q in &[query.as_str(), query_sort_subquery.as_str()] {
+        let plan = service.plan_query(q).await.unwrap().worker;
+        assert_eq!(
+            pp_phys_plan(plan.as_ref()),
+            "Sort\
+       \n  CrossJoinAgg, on: day <= date_to\
+       \n    Projection, [day, name, SUM(n):n]\
+       \n      FinalHashAggregate\
+       \n        Worker\
+       \n          PartialHashAggregate\
+       \n            Merge\
+       \n              Scan, index: default:1:[1], fields: *\
+       \n                Empty"
+        );
+    }
+
+    service
+        .exec_query("INSERT INTO s.Data(day, name, n) VALUES ('2020-01-01T01:00:00.000', 'john', 10), \
+                                                             ('2020-01-01T01:00:00.000', 'sara', 7), \
+                                                             ('2020-01-03T02:00:00.000', 'sara', 3), \
+                                                             ('2020-01-03T03:00:00.000', 'john', 9), \
+                                                             ('2020-01-03T03:00:00.000', 'john', 11), \
+                                                             ('2020-01-04T05:00:00.000', 'timmy', 5)")
+        .await
+        .unwrap();
+    let r = service.exec_query(&query).await.unwrap(); // TODO: qualified identifiers
+
+    let mut jan = (1..=4)
+        .map(|d| timestamp_from_string(&format!("2020-01-{:02}T23:59:59.999", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], "john", 10),
+            (jan[1], "sara", 7),
+            (jan[2], "john", 10),
+            (jan[2], "sara", 7),
+            (jan[3], "john", 30),
+            (jan[3], "sara", 10),
+            (jan[4], "john", 30),
+            (jan[4], "sara", 10),
+            (jan[4], "timmy", 5)
+        ])
+    );
+
+    fn rows(a: &[(TimestampValue, &str, i64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(t, s, n)| {
+                vec![
+                    TableValue::Timestamp(*t),
+                    TableValue::String(s.to_string()),
+                    TableValue::Int(*n),
+                ]
+            })
             .collect_vec()
     }
 }

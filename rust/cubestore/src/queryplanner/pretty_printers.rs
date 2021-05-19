@@ -20,6 +20,8 @@ use crate::queryplanner::serialized_plan::IndexSnapshot;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
+use datafusion::cube_ext::join::CrossJoinExec;
+use datafusion::cube_ext::joinagg::CrossJoinAggExec;
 use datafusion::physical_plan::alias::AliasedSchemaExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::merge::MergeExec;
@@ -300,7 +302,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             };
             *out += &format!("{}{}Aggregate", mode, strat);
             if o.show_aggregations {
-                *out += &format!(", agg")
+                *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
         } else if let Some(l) = a.downcast_ref::<LocalLimitExec>() {
             *out += &format!("LocalLimit, n: {}", l.limit());
@@ -368,6 +370,13 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     .map(|(l, r)| format!("{} = {}", l, r))
                     .join(", ")
             );
+        } else if let Some(j) = a.downcast_ref::<CrossJoinExec>() {
+            *out += &format!("CrossJoin, on: {}", j.on)
+        } else if let Some(j) = a.downcast_ref::<CrossJoinAggExec>() {
+            *out += &format!("CrossJoinAgg, on: {}", j.join.on);
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", j.agg_expr)
+            }
         } else if let Some(_) = a.downcast_ref::<UnionExec>() {
             *out += "Union";
         } else if let Some(_) = a.downcast_ref::<AliasedSchemaExec>() {

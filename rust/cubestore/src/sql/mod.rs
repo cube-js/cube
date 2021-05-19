@@ -47,6 +47,7 @@ use hex::FromHex;
 use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::str::from_utf8_unchecked;
@@ -549,11 +550,11 @@ impl SqlService for SqlServiceImpl {
                                 .flat_map(|i| i.partitions.iter().map(|p| p.partition.get_id()))
                                 .collect(),
                         );
-                        let mocked_names = worker_plan
-                            .files_to_download()
-                            .iter()
-                            .map(|f| (f.clone(), f.clone()))
-                            .collect();
+                        let mut mocked_names = HashMap::new();
+                        for f in worker_plan.files_to_download() {
+                            let name = self.remote_fs.local_file(&f).await?;
+                            mocked_names.insert(f, name);
+                        }
                         return Ok(QueryPlans {
                             router: self
                                 .query_executor
