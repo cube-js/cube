@@ -543,6 +543,10 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             *input = send.input.clone();
         }
         LogicalPlan::Union { inputs, .. } => {
+            // Handle UNION over constants, e.g. inline data series.
+            if inputs.iter().all(|p| try_extract_cluster_send(p).is_none()) {
+                return Ok(p);
+            }
             let mut union_snapshots = Vec::new();
             for i in inputs {
                 let send;
