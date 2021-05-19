@@ -974,6 +974,7 @@ pub mod tests {
             customers_cols.clone(),
             None,
             None,
+            true,
         ));
         i.indices.push(
             Index::try_new(
@@ -998,6 +999,7 @@ pub mod tests {
             orders_cols.clone(),
             None,
             None,
+            true,
         ));
         i.indices.push(
             Index::try_new(
@@ -1024,6 +1026,7 @@ pub mod tests {
             int_columns(&["product_id", "product_name"]),
             None,
             None,
+            true,
         ));
 
         i
