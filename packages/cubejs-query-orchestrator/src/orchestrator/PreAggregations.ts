@@ -209,20 +209,23 @@ class PreAggregationLoadCache {
   protected async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.versionEntries[redisKey]) {
-      const entries = tablesToVersionEntries(
+      let versionEntries = tablesToVersionEntries(
         preAggregation.preAggregationsSchema,
         await this.getTablesQuery(preAggregation)
       );
-      // eslint-disable-next-line
-      const [active, toProcess, queries] = await this.fetchQueryStageState();
-      const targetTableNamesInQueue = (Object.keys(queries))
-        // eslint-disable-next-line no-use-before-define
-        .map(q => PreAggregations.targetTableName(queries[q].query.newVersionEntry));
+      // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
+      if (!preAggregation.external) {
+        // eslint-disable-next-line
+        const [active, toProcess, queries] = await this.fetchQueryStageState();
+        const targetTableNamesInQueue = (Object.keys(queries))
+          // eslint-disable-next-line no-use-before-define
+          .map(q => PreAggregations.targetTableName(queries[q].query.newVersionEntry));
 
-      const versionEntries = entries.filter(
-        // eslint-disable-next-line no-use-before-define
-        e => targetTableNamesInQueue.indexOf(PreAggregations.targetTableName(e)) === -1
-      );
+        versionEntries = versionEntries.filter(
+          // eslint-disable-next-line no-use-before-define
+          e => targetTableNamesInQueue.indexOf(PreAggregations.targetTableName(e)) === -1
+        );
+      }
 
       const byContent: { [key: string]: VersionEntry } = {};
       const byStructure: { [key: string]: VersionEntry } = {};
