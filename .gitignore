@@ -16,3 +16,4 @@ yarn-error.log
 **/coverage
 lerna-debug.log
 tsconfig.tsbuildinfo
+.tool-versions

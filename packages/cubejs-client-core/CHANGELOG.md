@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** compareDateRange pivot fix ([#2752](https://github.com/cube-js/cube.js/issues/2752)) ([653ad84](https://github.com/cube-js/cube.js/commit/653ad84f57cc7d5e004c92fe717246ce33d7dcad))
+* **@cubejs-client/core:** Meta types fixes ([#2746](https://github.com/cube-js/cube.js/issues/2746)) ([cd17755](https://github.com/cube-js/cube.js/commit/cd17755a07fe19fbebe44d0193330d43a66b757d))
+
+
+### Features
+
+* **@cubejs-client/playground:** member grouping ([#2736](https://github.com/cube-js/cube.js/issues/2736)) ([7659438](https://github.com/cube-js/cube.js/commit/76594383e08e44354c5966f8e60107d65e05ddab))
+
+
+
+
+
 ## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
 
 

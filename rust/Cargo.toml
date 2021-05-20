@@ -9,4 +9,4 @@ members = [
 ]
 
 [patch.crates-io]
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs', branch = 'cubestore-2021-01-05' }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs', tag = 'v0.9.0-cube' }

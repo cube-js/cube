@@ -6,7 +6,7 @@ use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::Accumulator;
+use datafusion::physical_plan::{Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::smallvec;
@@ -84,7 +84,8 @@ impl CubeScalarUDF for HllCardinality {
             return_type: Arc::new(|_| Ok(Arc::new(DataType::UInt64))),
             fun: Arc::new(|a| {
                 assert_eq!(a.len(), 1);
-                let sketches = a[0]
+                let sketches = a[0].clone().into_array(1);
+                let sketches = sketches
                     .as_any()
                     .downcast_ref::<BinaryArray>()
                     .expect("expected binary data");
@@ -102,7 +103,7 @@ impl CubeScalarUDF for HllCardinality {
                         }
                     }
                 }
-                return Ok(Arc::new(r.finish()));
+                return Ok(ColumnarValue::Array(Arc::new(r.finish())));
             }),
         };
     }
@@ -146,7 +147,7 @@ impl Accumulator for HllMergeAccumulator {
         return Ok(smallvec![self.evaluate()?]);
     }
 
-    fn update(&mut self, row: &Vec<ScalarValue>) -> Result<(), DataFusionError> {
+    fn update(&mut self, row: &[ScalarValue]) -> Result<(), DataFusionError> {
         assert_eq!(row.len(), 1);
         let data;
         if let ScalarValue::Binary(v) = &row[0] {
@@ -164,7 +165,7 @@ impl Accumulator for HllMergeAccumulator {
         return self.merge_sketch(read_sketch(&data)?);
     }
 
-    fn merge(&mut self, states: &Vec<ScalarValue>) -> Result<(), DataFusionError> {
+    fn merge(&mut self, states: &[ScalarValue]) -> Result<(), DataFusionError> {
         assert_eq!(states.len(), 1);
 
         let data;

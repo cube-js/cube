@@ -1,4 +1,4 @@
-use sqlparser::ast::{ObjectName, Statement as SQLStatement};
+use sqlparser::ast::{HiveDistributionStyle, ObjectName, Statement as SQLStatement};
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
@@ -77,7 +77,8 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
-        let statement = self.parser.parse_create_table(false)?;
+        // Note that we disable hive extensions as they clash with `location`.
+        let statement = self.parser.parse_create_table_ext(false, false, false)?;
         if let SQLStatement::CreateTable {
             name,
             columns,
@@ -88,6 +89,8 @@ impl<'a> CubeStoreParser<'a> {
             query,
             without_rowid,
             or_replace,
+            table_properties,
+            like,
             ..
         } = statement
         {
@@ -112,6 +115,9 @@ impl<'a> CubeStoreParser<'a> {
                     name,
                     columns,
                     constraints,
+                    hive_distribution: HiveDistributionStyle::NONE,
+                    hive_formats: None,
+                    table_properties,
                     with_options,
                     if_not_exists,
                     external: locations.is_some(),
@@ -119,6 +125,8 @@ impl<'a> CubeStoreParser<'a> {
                     location: None,
                     query,
                     without_rowid,
+                    temporary: false,
+                    like,
                 },
                 indexes,
                 locations,

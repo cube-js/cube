@@ -20,10 +20,11 @@ use crate::queryplanner::serialized_plan::IndexSnapshot;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
+use datafusion::physical_plan::alias::AliasedSchemaExec;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::expressions::AliasedSchemaExec;
-use datafusion::physical_plan::merge::{MergeExec, UnionExec};
+use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::union::UnionExec;
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {

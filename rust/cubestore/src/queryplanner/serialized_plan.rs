@@ -118,6 +118,7 @@ pub enum SerializedLogicalPlan {
         projected_schema: DFSchemaRef,
         filters: Vec<SerializedExpr>,
         alias: Option<String>,
+        limit: Option<usize>,
     },
     EmptyRelation {
         produce_one_row: bool,
@@ -198,11 +199,8 @@ impl SerializedLogicalPlan {
             } => LogicalPlan::Union {
                 inputs: inputs
                     .iter()
-                    .map(|p| -> Result<Arc<LogicalPlan>, CubeError> {
-                        Ok(Arc::new(p.logical_plan(
-                            remote_to_local_names,
-                            worker_partition_ids,
-                        )?))
+                    .map(|p| -> Result<LogicalPlan, CubeError> {
+                        Ok(p.logical_plan(remote_to_local_names, worker_partition_ids)?)
                     })
                     .collect::<Result<Vec<_>, _>>()?,
                 schema: schema.clone(),
@@ -215,6 +213,7 @@ impl SerializedLogicalPlan {
                 projected_schema,
                 filters,
                 alias,
+                limit,
             } => LogicalPlan::TableScan {
                 table_name: table_name.clone(),
                 source: match source {
@@ -227,6 +226,7 @@ impl SerializedLogicalPlan {
                 projected_schema: projected_schema.clone(),
                 filters: filters.iter().map(|e| e.expr()).collect(),
                 alias: alias.clone(),
+                limit: limit.clone(),
             },
             SerializedLogicalPlan::EmptyRelation {
                 produce_one_row,
@@ -328,6 +328,10 @@ pub enum SerializedExpr {
         expr: Box<SerializedExpr>,
         data_type: DataType,
     },
+    TryCast {
+        expr: Box<SerializedExpr>,
+        data_type: DataType,
+    },
     Sort {
         expr: Box<SerializedExpr>,
         asc: bool,
@@ -374,6 +378,10 @@ impl SerializedExpr {
             SerializedExpr::IsNotNull(e) => Expr::IsNotNull(Box::new(e.expr())),
             SerializedExpr::IsNull(e) => Expr::IsNull(Box::new(e.expr())),
             SerializedExpr::Cast { expr, data_type } => Expr::Cast {
+                expr: Box::new(expr.expr()),
+                data_type: data_type.clone(),
+            },
+            SerializedExpr::TryCast { expr, data_type } => Expr::TryCast {
                 expr: Box::new(expr.expr()),
                 data_type: data_type.clone(),
             },
@@ -559,6 +567,7 @@ impl SerializedPlan {
                 projected_schema,
                 projection,
                 filters,
+                limit,
             } => SerializedLogicalPlan::TableScan {
                 table_name: table_name.clone(),
                 source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTable>() {
@@ -570,6 +579,7 @@ impl SerializedPlan {
                 projected_schema: projected_schema.clone(),
                 projection: projection.clone(),
                 filters: filters.iter().map(|e| Self::serialized_expr(e)).collect(),
+                limit: limit.clone(),
             },
             LogicalPlan::Projection {
                 input,
@@ -698,6 +708,10 @@ impl SerializedPlan {
             Expr::IsNotNull(e) => SerializedExpr::IsNotNull(Box::new(Self::serialized_expr(&e))),
             Expr::IsNull(e) => SerializedExpr::IsNull(Box::new(Self::serialized_expr(&e))),
             Expr::Cast { expr, data_type } => SerializedExpr::Cast {
+                expr: Box::new(Self::serialized_expr(&expr)),
+                data_type: data_type.clone(),
+            },
+            Expr::TryCast { expr, data_type } => SerializedExpr::TryCast {
                 expr: Box::new(Self::serialized_expr(&expr)),
                 data_type: data_type.clone(),
             },

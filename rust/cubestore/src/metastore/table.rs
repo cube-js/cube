@@ -10,6 +10,8 @@ use crate::rocks_table_impl;
 use crate::store::DataFrame;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
+use chrono::DateTime;
+use chrono::Utc;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
@@ -21,13 +23,15 @@ pub struct Table {
     table_name: String,
     schema_id: u64,
     columns: Vec<Column>,
-    // TODO remove once we figure out how to drop fields without failing deserialization
-    location: Option<String>,
     #[serde(default)]
     locations: Option<Vec<String>>,
     import_format: Option<ImportFormat>,
     #[serde(default)]
-    has_data: bool
+    has_data: bool,
+    #[serde(default="Table::is_ready_default")]
+    is_ready: bool,
+    #[serde(default)]
+    created_at: Option<DateTime<Utc>>
 }
 }
 
@@ -52,15 +56,17 @@ impl Table {
         columns: Vec<Column>,
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
+        is_ready: bool,
     ) -> Table {
         Table {
             table_name,
             schema_id,
             columns,
-            location: None,
             locations,
             import_format,
             has_data: false,
+            is_ready,
+            created_at: Some(Utc::now()),
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -76,10 +82,7 @@ impl Table {
     }
 
     pub fn locations(&self) -> Option<Vec<&String>> {
-        self.location
-            .as_ref()
-            .map(|l| vec![l])
-            .or_else(|| self.locations.as_ref().map(|l| l.iter().collect()))
+        self.locations.as_ref().map(|l| l.iter().collect())
     }
 
     pub fn get_table_name(&self) -> &String {
@@ -91,15 +94,27 @@ impl Table {
     }
 
     pub fn update_has_data(&self, has_data: bool) -> Self {
-        Self {
-            table_name: self.table_name.clone(),
-            schema_id: self.schema_id,
-            columns: self.columns.clone(),
-            location: self.location.clone(),
-            locations: self.locations.clone(),
-            import_format: self.import_format.clone(),
-            has_data,
-        }
+        let mut table = self.clone();
+        table.has_data = has_data;
+        table
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.is_ready
+    }
+
+    pub fn update_is_ready(&self, is_ready: bool) -> Self {
+        let mut table = self.clone();
+        table.is_ready = is_ready;
+        table
+    }
+
+    pub fn is_ready_default() -> bool {
+        true
+    }
+
+    pub fn created_at(&self) -> &Option<DateTime<Utc>> {
+        &self.created_at
     }
 }
 

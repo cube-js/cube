@@ -656,12 +656,28 @@ fn cmp_same_types(l: &ScalarValue, r: &ScalarValue, nulls_first: bool, asc: bool
         (ScalarValue::UInt16(Some(l)), ScalarValue::UInt16(Some(r))) => l.cmp(r),
         (ScalarValue::UInt32(Some(l)), ScalarValue::UInt32(Some(r))) => l.cmp(r),
         (ScalarValue::UInt64(Some(l)), ScalarValue::UInt64(Some(r))) => l.cmp(r),
-        (ScalarValue::Binary(Some(l)), ScalarValue::Binary(Some(r))) => l.cmp(r),
         (ScalarValue::Utf8(Some(l)), ScalarValue::Utf8(Some(r))) => l.cmp(r),
         (ScalarValue::LargeUtf8(Some(l)), ScalarValue::LargeUtf8(Some(r))) => l.cmp(r),
+        (ScalarValue::Binary(Some(l)), ScalarValue::Binary(Some(r))) => l.cmp(r),
+        (ScalarValue::LargeBinary(Some(l)), ScalarValue::LargeBinary(Some(r))) => l.cmp(r),
         (ScalarValue::Date32(Some(l)), ScalarValue::Date32(Some(r))) => l.cmp(r),
-        (ScalarValue::TimeMicrosecond(Some(l)), ScalarValue::TimeMicrosecond(Some(r))) => l.cmp(r),
-        (ScalarValue::TimeNanosecond(Some(l)), ScalarValue::TimeNanosecond(Some(r))) => l.cmp(r),
+        (ScalarValue::Date64(Some(l)), ScalarValue::Date64(Some(r))) => l.cmp(r),
+        (ScalarValue::TimestampSecond(Some(l)), ScalarValue::TimestampSecond(Some(r))) => l.cmp(r),
+        (
+            ScalarValue::TimestampMillisecond(Some(l)),
+            ScalarValue::TimestampMillisecond(Some(r)),
+        ) => l.cmp(r),
+        (
+            ScalarValue::TimestampMicrosecond(Some(l)),
+            ScalarValue::TimestampMicrosecond(Some(r)),
+        ) => l.cmp(r),
+        (ScalarValue::TimestampNanosecond(Some(l)), ScalarValue::TimestampNanosecond(Some(r))) => {
+            l.cmp(r)
+        }
+        (ScalarValue::IntervalYearMonth(Some(l)), ScalarValue::IntervalYearMonth(Some(r))) => {
+            l.cmp(r)
+        }
+        (ScalarValue::IntervalDayTime(Some(l)), ScalarValue::IntervalDayTime(Some(r))) => l.cmp(r),
         (ScalarValue::List(_, _), ScalarValue::List(_, _)) => {
             panic!("list as accumulator result is not supported")
         }
@@ -752,6 +768,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
     use arrow::error::ArrowError;
     use arrow::record_batch::RecordBatch;
+    use datafusion::catalog::catalog::MemoryCatalogList;
     use datafusion::error::DataFusionError;
     use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
     use datafusion::logical_plan::{DFField, DFSchema, Expr};
@@ -1116,7 +1133,7 @@ mod tests {
             DFSchema::new(key_fields.iter().cloned().chain(input_agg_fields).collect())?;
 
         let ctx = ExecutionContextState {
-            datasources: Default::default(),
+            catalog_list: Arc::new(MemoryCatalogList::new()),
             scalar_functions: Default::default(),
             var_provider: Default::default(),
             aggregate_functions: Default::default(),

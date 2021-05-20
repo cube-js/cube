@@ -26,6 +26,7 @@ use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
 use core::fmt;
+use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
@@ -148,11 +149,17 @@ impl MetaStoreSchemaProvider {
 }
 
 impl ContextProvider for MetaStoreSchemaProvider {
-    fn get_table_provider(&self, name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
+    fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
+        let name = match name {
+            TableReference::Partial { schema, table } => format!("{}.{}", schema, table),
+            TableReference::Bare { .. } | TableReference::Full { .. } => return None,
+        };
+        let name = name.as_str();
+
         let res = self
             .tables
             .get(name)
-            .map(|table| -> Arc<dyn TableProvider + Send + Sync> {
+            .map(|table| -> Arc<dyn TableProvider> {
                 let schema = Arc::new(Schema::new(
                     table
                         .table
@@ -281,6 +288,7 @@ impl TableProvider for InfoSchemaTableProvider {
         _projection: &Option<Vec<usize>>,
         _batch_size: usize,
         _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let exec = InfoSchemaTableExec {
             meta_store: self.meta_store.clone(),
@@ -366,6 +374,7 @@ impl TableProvider for CubeTableLogical {
         _projection: &Option<Vec<usize>>,
         _batch_size: usize,
         _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         panic!("scan has been called on CubeTableLogical: serialized plan wasn't preprocessed for select");
     }

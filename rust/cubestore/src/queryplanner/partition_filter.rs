@@ -236,19 +236,22 @@ impl Builder<'_> {
         rs: Iter,
     ) -> Vec<MinMaxCondition> {
         let mut res = None;
-        for mut r in rs {
+        for r in rs {
             if r.is_empty() {
                 return Vec::new();
             }
-            if res.is_none() {
-                res = Some(r);
-                continue;
+            let res = match &mut res {
+                Some(res) => res,
+                res @ None => {
+                    *res = Some(r);
+                    continue;
+                }
+            };
+            if PartitionFilter::SIZE_LIMIT < res.len() + r.len() {
+                // TODO: keep some information.
+                return Vec::new();
             }
-            if PartitionFilter::SIZE_LIMIT < res.as_mut().unwrap().len() + r.len() {
-                assert!(r.len() <= PartitionFilter::SIZE_LIMIT);
-                r.truncate(PartitionFilter::SIZE_LIMIT - r.len());
-            }
-            res.as_mut().unwrap().extend(r);
+            res.extend(r);
         }
 
         res.unwrap_or_default()
@@ -473,6 +476,7 @@ mod tests {
     use super::*;
     use crate::sql::parser::{CubeStoreParser, Statement as CubeStatement};
     use arrow::datatypes::Field;
+    use datafusion::catalog::TableReference;
     use datafusion::datasource::TableProvider;
     use datafusion::logical_plan::ToDFSchema;
     use datafusion::physical_plan::udaf::AggregateUDF;
@@ -960,7 +964,7 @@ mod tests {
 
         let f = extract("(a <= 1 or b <= 2) and (a <= 2 or b <= 3) and (a <= 4 or b <= 5) and (a <= 6 or b <= 7) and (a <= 8 or b <= 9) and (a <= 10 or b <= 11)");
         // Must bail out to avoid too much compute.
-        assert_eq!(f.min_max.len(), 50)
+        assert_eq!(f.min_max.len(), 0)
     }
 
     #[test]
@@ -985,6 +989,36 @@ mod tests {
                 max: vec![Some(TableValue::Int(1))],
             }]
         );
+    }
+
+    #[test]
+    fn test_limits_no_panic() {
+        let s = schema(&[
+            ("a", DataType::Int64),
+            ("b", DataType::Int64),
+            ("c", DataType::Int64),
+            ("d", DataType::Int64),
+            ("e", DataType::Int64),
+        ]);
+        let extract = |sql| PartitionFilter::extract(&s, &[parse(sql, &s)]);
+
+        let filter = extract(
+            "a IN (1,2,3,4,5,6,7,8,9) \
+                 AND b = 1 \
+                 AND c = 1 \
+                 AND d IN (1,2,3,4,5,6,7) \
+                 AND e IN (1, 2)",
+        );
+        assert_ne!(filter.min_max.len(), 0);
+        assert!(filter.can_match(
+            Some(&vec![TableValue::Int(1); 5]),
+            Some(&vec![TableValue::Int(1); 5])
+        ));
+        assert!(filter.can_match(Some(&vals(&[9, 1, 1, 7, 2])), Some(&vals(&[9, 1, 1, 7, 2]))));
+
+        fn vals(is: &[i64]) -> Vec<TableValue> {
+            is.iter().map(|i| TableValue::Int(*i)).collect()
+        }
     }
 
     fn schema(s: &[(&str, DataType)]) -> Schema {
@@ -1019,7 +1053,7 @@ mod tests {
 
     pub struct NoContextProvider {}
     impl ContextProvider for NoContextProvider {
-        fn get_table_provider(&self, _name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
+        fn get_table_provider(&self, _name: TableReference) -> Option<Arc<dyn TableProvider>> {
             None
         }
 
