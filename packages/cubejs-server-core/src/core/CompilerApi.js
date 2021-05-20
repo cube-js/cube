@@ -107,6 +107,11 @@ export class CompilerApi {
     }
   }
 
+  async preAggregations() {
+    const { cubeEvaluator } = await this.getCompilers();
+    return cubeEvaluator.preAggregations();
+  }
+
   async scheduledPreAggregations() {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.scheduledPreAggregations();
@@ -134,9 +139,5 @@ export class CompilerApi {
 
   async metaConfig(options) {
     return (await this.getCompilers(options)).metaTransformer.cubes;
-  }
-
-  async preAggregationDefinitions(options) {
-    return (await this.getCompilers(options)).metaTransformer.compilePreAggregations();
   }
 }

@@ -46,6 +46,20 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
+  preAggregations() {
+    // TODO: fix dry, see this.scheduledPreAggregations
+    return Object.keys(this.evaluatedCubes).map(cube => {
+      const preAggregations = this.preAggregationsForCube(cube);
+      return Object.keys(preAggregations)
+        .map(preAggregationName => ({
+          preAggregationName,
+          preAggregation: preAggregations[preAggregationName],
+          cube,
+          references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName])
+        }));
+    }).reduce((a, b) => a.concat(b), []);
+  }
+
   scheduledPreAggregations() {
     return Object.keys(this.evaluatedCubes).map(cube => {
       const preAggregations = this.preAggregationsForCube(cube);

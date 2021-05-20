@@ -1002,4 +1002,13 @@ export class PreAggregations {
 
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
+
+  public async getAllStructureVersion(preAggregation) {
+    const client = preAggregation.external ?
+      await this.externalDriverFactory() :
+      await this.driverFactory(preAggregation.dataSource);
+
+    const actualTables = await client.getTablesQuery(preAggregation.preAggregationsSchema);
+    return tablesToVersionEntries(preAggregation.preAggregationsSchema, actualTables);
+  }
 }

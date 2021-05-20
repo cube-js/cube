@@ -591,6 +591,7 @@ export class CubejsServerCore {
         queryTransformer: this.options.queryTransformer,
         extendContext: this.options.extendContext,
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
+        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
