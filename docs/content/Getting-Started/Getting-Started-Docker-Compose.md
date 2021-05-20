@@ -26,7 +26,8 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      - 4000:4000
+      - 4000:4000  # Cube.js API
+      - 3000:3000  # Dashboard app, when created  
     environment:
       - CUBEJS_DEV_MODE=true
     volumes:
