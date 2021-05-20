@@ -26,11 +26,7 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      # 4000 is the port for the Cube.js API
       - 4000:4000
-      # 3000 is the port for the Developer Playground, and is available only in
-      # development mode
-      - 3000:3000
     environment:
       - CUBEJS_DEV_MODE=true
     volumes:
