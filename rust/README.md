@@ -113,11 +113,8 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      # 4000 is a port for Cube.js API
-      - 4000:4000
-      # 3000 is a port for Playground web server
-      # it is available only in dev mode
-      - 3000:3000
+      - 4000:4000  # Cube.js API and Developer Playground
+      - 3000:3000  # Dashboard app, if created
     env_file: .env
     depends_on:
       - cubestore
