@@ -582,6 +582,7 @@ export class ApiGateway {
           annotation,
           dataSource: response.dataSource,
           dbType: response.dbType,
+          external: response.external,
           slowQuery: Boolean(response.slowQuery)
         };
       }));

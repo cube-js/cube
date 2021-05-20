@@ -58,22 +58,21 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      if (Array.isArray(data)) {
-        return data.map((item) => {
-          return {
-            ...item,
-            dbType: this.contextToDbType({
-              ...query.context,
-              dataSource: item.dataSource
-            })
-          }
+      const extractDbType = (response) => (
+        this.contextToDbType({
+          ...query.context,
+          dataSource: response.dataSource,
         })
+      );
+
+      if (Array.isArray(data)) {
+        return data.map((item) => ({
+          ...item,
+          dbType: extractDbType(item)
+        }));
       }
 
-      data.dbType = this.contextToDbType({
-        ...query.context,
-        dataSource: data.dataSource
-      });
+      data.dbType = extractDbType(data);
 
       return data;
     } catch (err) {

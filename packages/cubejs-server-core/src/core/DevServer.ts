@@ -74,7 +74,7 @@ export class DevServer {
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options?.dockerVersion || null,
-        externalDbType: this.options?.externalDbTypeFn({
+        extDbType: this.options?.externalDbTypeFn({
           authInfo: null,
           securityContext: null,
           requestId: getRequestIdFromRequest(req),

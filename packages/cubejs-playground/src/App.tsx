@@ -60,7 +60,6 @@ class App extends Component<RouteComponentProps, TAppState> {
       projectFingerprint: context.projectFingerprint,
       isDocker: Boolean(context.isDocker),
       dockerVersion: context.dockerVersion,
-      externalDbType: context.externalDbType,
     });
 
     this.setState({ context }, () => {
@@ -120,7 +119,7 @@ function ContextSetter({ context }: Pick<TAppState, 'context'>) {
 
   useEffect(() => {
     if (context !== null) {
-      setContext({ dbType: context.dbType });
+      setContext({ extDbType: context.extDbType });
     }
   }, [context]);
 

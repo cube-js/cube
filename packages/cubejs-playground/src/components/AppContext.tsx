@@ -5,7 +5,7 @@ import {
 } from 'react';
 
 export type ContextProps = {
-  dbType?: string;
+  extDbType?: string;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
 
