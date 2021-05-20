@@ -54,6 +54,10 @@ export type IndexesSQL = {
   sql: [string, unknown[]];
 }[];
 
+export type UnloadOptions = {
+  maxFileSize: number,
+};
+
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
   uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL): Promise<void>;
@@ -66,4 +70,8 @@ export interface DriverInterface {
   downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
   // Some drivers can implement streaming from SQL
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
+  // Some drivers can implement UNLOAD data to external storage
+  unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
+  // Some drivers can implement UNLOAD data to external storage
+  isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
 }

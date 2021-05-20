@@ -1,12 +1,18 @@
 /* eslint-disable no-restricted-syntax */
 import snowflake, { Column, Connection, Statement } from 'snowflake-sdk';
 import {
-  BaseDriver,
+  BaseDriver, DownloadTableCSVData,
   DriverInterface,
   GenericDataBaseType,
   StreamTableData,
+  UnloadOptions,
 } from '@cubejs-backend/query-orchestrator';
+import * as crypto from 'crypto';
 import { formatToTimeZone } from 'date-fns-timezone';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getEnv } from '@cubejs-backend/shared';
+
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 type HydrationConfiguration = { types: string[], toValue: (column: Column) => ((value: any) => any)|null }[];
@@ -65,6 +71,15 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   timestamp_ntz: 'timestamp'
 };
 
+// User can create own stage to pass permission restrictions.
+interface SnowflakeDriverExportAWS {
+  bucketType: 's3',
+  bucketName: string,
+  keyId: string,
+  secretKey: string,
+  region: string,
+}
+
 interface SnowflakeDriverOptions {
   account: string,
   username: string,
@@ -77,7 +92,7 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
-  rowStreamHighWaterMark?: number,
+  exportBucket?: SnowflakeDriverExportAWS,
 }
 
 /**
@@ -105,8 +120,44 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
       privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
+      exportBucket: this.getExportBucket(),
       ...config
     };
+  }
+
+  /**
+   * @todo Move to BaseDriver in the future?
+   */
+  protected getExportBucket(): SnowflakeDriverExportAWS|undefined {
+    const exportBucket: Partial<SnowflakeDriverExportAWS> = {
+      bucketType: getEnv('dbExportBucketType'),
+      bucketName: getEnv('dbExportBucket'),
+      keyId: getEnv('dbExportBucketAwsKey'),
+      secretKey: getEnv('dbExportBucketAwsSecret'),
+      region: getEnv('dbExportBucketAwsRegion'),
+    };
+
+    if (exportBucket.bucketType) {
+      const supportedBucketTypes = ['s3'];
+
+      if (!supportedBucketTypes.includes(exportBucket.bucketType)) {
+        throw new Error(
+          `Unsupported EXPORT_BUCKET_TYPE, supported: ${supportedBucketTypes.join(',')}`
+        );
+      }
+
+      const emptyKeys = Object.keys(exportBucket)
+        .filter((key: string) => exportBucket[<keyof SnowflakeDriverExportAWS>key] === undefined);
+      if (emptyKeys.length) {
+        throw new Error(
+          `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyKeys.join(',')}`
+        );
+      }
+
+      return <SnowflakeDriverExportAWS>exportBucket;
+    }
+
+    return undefined;
   }
 
   public static driverEnvVariables() {
@@ -142,7 +193,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
         );
 
-        await this.execute(connection, `ALTER SESSION SET TIMEZONE = 'UTC'`, [], false);
+        await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
         await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
 
         return connection;
@@ -156,6 +207,73 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
     return this.getConnection().then((connection) => this.execute<R>(connection, query, values));
+  }
+
+  public async isUnloadSupported() {
+    if (!this.config.exportBucket) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+    const connection = await this.getConnection();
+
+    if (!this.config.exportBucket) {
+      throw new Error('Unload is not configured');
+    }
+
+    const { bucketType, bucketName, keyId, secretKey, region } = this.config.exportBucket;
+
+    const exportPathName = crypto.randomBytes(10).toString('hex');
+
+    const optionsToExport = {
+      HEADER: 'true',
+      INCLUDE_QUERY_ID: 'true',
+      MAX_FILE_SIZE: options.maxFileSize,
+      CREDENTIALS: `(AWS_KEY_ID = '${keyId}' AWS_SECRET_KEY = '${secretKey}')`,
+      FILE_FORMAT: '(TYPE = CSV, COMPRESSION = GZIP)',
+    };
+    const optionsPart = Object.entries(optionsToExport)
+      .map(([key, value]) => `${key} = ${value}`)
+      .join(' ');
+
+    await this.execute(
+      connection,
+      `COPY INTO '${bucketType}://${bucketName}/${exportPathName}/' FROM ${tableName} ${optionsPart}`,
+      [],
+      false
+    );
+
+    const client = new S3({
+      credentials: {
+        accessKeyId: keyId,
+        secretAccessKey: secretKey,
+      },
+      region,
+    });
+    const list = await client.listObjectsV2({
+      Bucket: bucketName,
+      Prefix: exportPathName,
+    });
+    if (list && list.Contents) {
+      const csvFile = await Promise.all(
+        list.Contents.map(async (file) => {
+          const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: file.Key,
+          });
+          return getSignedUrl(client, command, { expiresIn: 3600 });
+        })
+      );
+
+      return {
+        csvFile,
+      };
+    }
+
+    throw new Error('Unable to UNLOAD table to S3');
   }
 
   public async stream(

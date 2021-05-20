@@ -116,6 +116,18 @@ const variables: Record<string, (...args: any) => any> = {
   dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
     .required(required)
     .asString(),
+  // Export Bucket options
+  dbExportBucketType: () => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
+    .asEnum(['s3']),
+  dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
+    .asString(),
+  // Export bucket options for AWS S3
+  dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
+    .asString(),
+  dbExportBucketAwsSecret: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET')
+    .asString(),
+  dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
+    .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
