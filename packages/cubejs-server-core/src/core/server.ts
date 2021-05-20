@@ -404,6 +404,8 @@ export class CubejsServerCore {
       devServer,
       driverFactory: (ctx) => {
         const dbType = this.contextToDbType(ctx);
+        console.log('driverFactory: (ctx) => {', { dbType }, ctx)
+        // console.log({ ctx, dbType });
         if (dbType) {
           return CubejsServerCore.createDriver(dbType);
         }
@@ -653,7 +655,7 @@ export class CubejsServerCore {
 
         // eslint-disable-next-line no-return-assign
         return driverPromise[dataSource] = (async () => {
-          let driver: BaseDriver|null = null;
+          let driver: BaseDriver | null = null;
 
           try {
             driver = await this.options.driverFactory({ ...context, dataSource });
@@ -731,11 +733,16 @@ export class CubejsServerCore {
   }
 
   protected createOrchestratorApi(options: any = {}): OrchestratorApi {
-    return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
-      redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
-      externalDriverFactory: options.getExternalDriverFactory,
-      ...(options.orchestratorOptions || this.options.orchestratorOptions)
-    });
+    return new OrchestratorApi(
+      options.getDriver || this.getDriver.bind(this),
+      this.logger,
+      {
+        redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
+        externalDriverFactory: options.getExternalDriverFactory,
+        ...(options.orchestratorOptions || this.options.orchestratorOptions),
+        contextToDbType: this.contextToDbType.bind(this)
+      }
+    );
   }
 
   /**
