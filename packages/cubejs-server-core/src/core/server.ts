@@ -404,8 +404,7 @@ export class CubejsServerCore {
       devServer,
       driverFactory: (ctx) => {
         const dbType = this.contextToDbType(ctx);
-        console.log('driverFactory: (ctx) => {', { dbType }, ctx)
-        // console.log({ ctx, dbType });
+
         if (dbType) {
           return CubejsServerCore.createDriver(dbType);
         }
