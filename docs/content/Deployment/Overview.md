@@ -153,7 +153,7 @@ Cube Store uses a distributed query engine architecture. In every Cube Store clu
 ![](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png)
 
 ### Scaling
-Although Cube Store can be run in a single instance mode, this is usually unsuitable for production deployments. For high concurrency and data throughput, we strongly recommend running Cube Store as a cluster of multiple instances instead.
+Although Cube Store _can_ be run in single-instance mode, this is often unsuitable for production deployments. For high concurrency and data throughput, we **strongly** recommend running Cube Store as a cluster of multiple instances instead.
 Because the storage layer is decoupled from the query processing engine, you can horizontally scale your Cube Store cluster for as much concurrency as you require.
 
 Both router and worker use [Cube Store docker image](https://hub.docker.com/r/cubejs/cubestore). The environment variables should be used to manage the roles:
@@ -285,4 +285,3 @@ If you want to run Cube.js in production without Redis, you can use
 | Serverless and clustered deployments can't be run without Redis as it is used
 | to manage the query queue.
 <!-- prettier-ignore-end -->
-
