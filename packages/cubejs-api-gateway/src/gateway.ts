@@ -929,6 +929,8 @@ export class ApiGateway {
   }
 
   protected createCheckAuthFn(options: ApiGatewayOptions): CheckAuthFn {
+    this.signedWithPlaygroundAuthSecret = false;
+
     const mainCheckAuthFn = options.checkAuth
       ? this.wrapCheckAuth(options.checkAuth)
       : this.createDefaultCheckAuth(options.jwt);
