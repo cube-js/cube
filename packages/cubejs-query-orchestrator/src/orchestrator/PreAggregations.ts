@@ -582,7 +582,9 @@ class PreAggregationLoader {
   }
 
   protected preAggregationQueryKey(invalidationKeys) {
-    return [this.preAggregation.loadSql, invalidationKeys];
+    return this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
+      [this.preAggregation.loadSql, this.preAggregation.indexesSql, invalidationKeys] :
+      [this.preAggregation.loadSql, invalidationKeys];
   }
 
   protected targetTableName(versionEntry) {
