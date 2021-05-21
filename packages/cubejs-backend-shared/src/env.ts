@@ -222,7 +222,7 @@ const variables: Record<string, (...args: any) => any> = {
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
-    .asUrlString(),
+    .asString(),
   jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
     .asArray(','),
   jwtAudience: () => get('CUBEJS_JWT_AUDIENCE')
