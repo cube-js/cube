@@ -2,7 +2,6 @@ import styled from 'styled-components';
 import { Space, Typography } from 'antd';
 import Icon from '@ant-design/icons';
 
-import { formatNumber } from '../../../utils';
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 
 type PreAggregationStatusProps = {
@@ -19,29 +18,26 @@ const Badge = styled.div`
 `;
 
 export function PreAggregationStatus({
-  timeElapsed,
   isAggregated,
 }: PreAggregationStatusProps) {
-  const renderTime = () => (
-    <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
-      {formatNumber(timeElapsed)} ms
-    </Typography.Text>
-  );
+  // hide it for the time being
+  // const renderTime = () => (
+  //   <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
+  //     {formatNumber(timeElapsed)} ms
+  //   </Typography.Text>
+  // );
 
   return (
     <Space style={{ marginLeft: 'auto' }}>
-      {isAggregated ? (
+      {isAggregated && (
         <Badge>
           <Space size={4}>
             <Icon
               style={{ color: 'var(--warning-color)' }}
               component={() => <LightningIcon />}
             />
-            {renderTime()}
           </Space>
         </Badge>
-      ) : (
-        renderTime()
       )}
 
       {isAggregated ? (

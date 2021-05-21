@@ -132,6 +132,8 @@ declare module '@cubejs-client/core' {
     query: Query;
     data: T[];
     usedPreAggregations?: Record<string, any>;
+    external: boolean | null;
+    dbType: string;
   };
 
   export type LoadResponse<T> = {

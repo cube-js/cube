@@ -52,7 +52,10 @@ export class QueryOrchestrator {
     this.driverFactory = driverFactory;
 
     this.queryCache = new QueryCache(
-      this.redisPrefix, this.driverFactory, this.logger, {
+      this.redisPrefix,
+      this.driverFactory,
+      this.logger,
+      {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
@@ -74,7 +77,7 @@ export class QueryOrchestrator {
     );
   }
 
-  public async fetchQuery(queryBody: any) {
+  public async fetchQuery(queryBody: any): Promise<any> {
     const preAggregationsTablesToTempTables = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
     const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
@@ -89,11 +92,15 @@ export class QueryOrchestrator {
     }
 
     const result = await this.queryCache.cachedQueryResult(
-      queryBody, preAggregationsTablesToTempTables
+      queryBody,
+      preAggregationsTablesToTempTables
     );
 
     return {
       ...result,
+      dataSource: queryBody.dataSource,
+      // 0 - no pre-agg was used
+      external: queryBody.external === 0 ? null : queryBody.external,
       usedPreAggregations
     };
   }

@@ -551,7 +551,8 @@ export class ApiGateway {
           values: sqlQuery.sql[1],
           continueWait: true,
           renewQuery: normalizedQuery.renewQuery,
-          requestId: context.requestId
+          requestId: context.requestId,
+          context
         };
 
         const response = await this.getAdapterApi(context).executeQuery(toExecute);
@@ -579,6 +580,9 @@ export class ApiGateway {
             usedPreAggregations: response.usedPreAggregations
           }),
           annotation,
+          dataSource: response.dataSource,
+          dbType: response.dbType,
+          external: response.external,
           slowQuery: Boolean(response.slowQuery)
         };
       }));

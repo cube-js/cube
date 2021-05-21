@@ -239,7 +239,8 @@ const variables: Record<string, (...args: any) => any> = {
     .default('200')
     .asInt(),
   telemetry: () => get('CUBEJS_TELEMETRY')
-    .default('true'),
+    .default('true')
+    .asBool(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('false')

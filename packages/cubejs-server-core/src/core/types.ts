@@ -86,7 +86,7 @@ export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseD
 
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type DbTypeFn = (context: RequestContext) => DatabaseType;
+export type DbTypeFn = (context: DriverContext) => DatabaseType;
 
 export type LoggerFn = (msg: string, params: any) => void;
 
