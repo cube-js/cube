@@ -3,7 +3,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
-import { getRealType } from '@cubejs-backend/shared';
+import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
   Response, NextFunction,
@@ -201,6 +201,8 @@ export class ApiGateway {
   protected readonly releaseListeners: (() => any)[] = [];
 
   protected readonly playgroundAuthSecret?: string;
+
+  protected signedWithPlaygroundAuthSecret: boolean = false;
 
   public constructor(
     protected readonly apiSecret: string,
@@ -401,7 +403,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || this.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -486,7 +488,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || this.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -938,10 +940,13 @@ export class ApiGateway {
       });
 
       return async (ctx, authorization) => {
+        this.signedWithPlaygroundAuthSecret = false;
+
         try {
           await mainCheckAuthFn(ctx, authorization);
         } catch (error) {
           await playgroundCheckAuthFn(ctx, authorization);
+          this.signedWithPlaygroundAuthSecret = true;
         }
       };
     }
