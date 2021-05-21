@@ -984,11 +984,11 @@ export class ApiGateway {
       : this.createDefaultCheckAuth(options.jwt);
 
     if (this.playgroundAuthSecret) {
+      const systemCheckAuthFn = this.createCheckAuthSystemFn();
       return async (ctx, authorization) => {
         try {
           await mainCheckAuthFn(ctx, authorization);
         } catch (error) {
-          const systemCheckAuthFn = this.createCheckAuthSystemFn();
           await systemCheckAuthFn(ctx, authorization);
         }
       };
