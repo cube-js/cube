@@ -34,7 +34,7 @@ API instances and Refresh Worker can be configured via [environment variables](/
 
 Cube Store cluster can be configured via environment variables.
 
-Below you can find example Docker Compose configuration for Cube.js cluster.
+Below you can find an example Docker Compose configuration for a Cube.js cluster:
 
 ```yaml
 version: '2.2'
