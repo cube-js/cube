@@ -82,6 +82,7 @@ export class CubeSymbols {
 
   transform(cubeName, errorReporter) {
     const cube = this.getCubeDefinition(cubeName);
+
     const duplicateNames = R.compose(
       R.map(nameToDefinitions => nameToDefinitions[0]),
       R.toPairs,
@@ -94,6 +95,7 @@ export class CubeSymbols {
     if (duplicateNames.length > 0) {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
+
     return Object.assign(
       { cubeName: () => cube.name },
       cube.measures || {},

@@ -392,7 +392,7 @@ export class PreAggregations {
     return R.pipe(
       R.toPairs,
       // eslint-disable-next-line no-unused-vars
-      R.filter(([k, a]) => a.type === 'rollup' || a.type === 'rollupJoin'),
+      R.filter(([k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || !a.type),
       R.map(([preAggregationName, preAggregation]) => {
         const preAggObj = this.evaluatedPreAggregationObj(
           cube, preAggregationName, preAggregation, canUsePreAggregation

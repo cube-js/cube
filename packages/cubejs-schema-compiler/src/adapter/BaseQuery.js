@@ -1842,7 +1842,7 @@ export class BaseQuery {
           return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
             collectOriginalSqlPreAggregations
           });
-        } else if (preAggregation.type === 'rollup') {
+        } else if (preAggregation.type === 'rollup' || !preAggregation.type) {
           const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
           return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
             collectOriginalSqlPreAggregations
@@ -1867,7 +1867,7 @@ export class BaseQuery {
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {
       return this.preAggregations.autoRollupPreAggregationQuery(cube, preAggregation);
-    } else if (preAggregation.type === 'rollup') {
+    } else if (preAggregation.type === 'rollup' || !preAggregation.type) {
       return this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
     } else if (preAggregation.type === 'originalSql') {
       return this;

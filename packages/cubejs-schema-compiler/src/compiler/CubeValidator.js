@@ -227,13 +227,13 @@ const cubeSchema = Joi.object().keys({
       rollupReferences: Joi.func().required(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
+      type: Joi.any().valid('rollup').optional(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func()
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
+      type: Joi.any().valid('rollup').optional(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
