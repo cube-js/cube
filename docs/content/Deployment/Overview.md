@@ -22,7 +22,8 @@ Refresh Worker and Cube Store cluster.
 ![](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/4f6d753e-77d2-4d46-964f-8d2512ff9a18.png)
 
 **API instances** process incoming API requests and query either Cube
-Store for pre-aggregated data or connected database(s) for raw data. **Refresh
+Store for pre-aggregated data or connected database(s) for raw data. The **refresh
+worker** builds and refreshes pre-aggregations in the background. **Cube Store**
 Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
 ingests pre-aggregations built by Refresh Worker and responds to queries from
 API instances. **Redis** is used to manage the queue and query-level cache.
