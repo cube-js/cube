@@ -158,9 +158,12 @@ Cube Store uses a distributed query engine architecture. In every Cube Store clu
 Although Cube Store _can_ be run in single-instance mode, this is often unsuitable for production deployments. For high concurrency and data throughput, we **strongly** recommend running Cube Store as a cluster of multiple instances instead.
 Because the storage layer is decoupled from the query processing engine, you can horizontally scale your Cube Store cluster for as much concurrency as you require.
 
-Both router and worker use [Cube Store docker image](https://hub.docker.com/r/cubejs/cubestore). The environment variables should be used to manage the roles:
-* **router** node handles incoming client connections, manages database metadata and serves simple queries
-*  multiple **worker** nodes which execute SQL queries
+
+Cube Store has two "kinds" of nodes:
+- The **router** node handles incoming client connections, manages database metadata and serves simple queries
+ - Multiple **worker** nodes which execute SQL queries received from Cube.js
+
+Both the router and worker use the [Cube Store Docker image](https://hub.docker.com/r/cubejs/cubestore). The following environment variables should be used to manage the roles:
 
 | Environment Variable    | Specify on Router? | Specify on Worker? |
 | ----------------------- | ------------------ | ------------------ |
