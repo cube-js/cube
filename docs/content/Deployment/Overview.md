@@ -6,7 +6,7 @@ menuOrder: 1
 ---
 
 This section contains a general overview of deploying Cube.js cluster in
-production. You can find platforms specific guides on the [Deployment guides
+production. You can find platform-specific guides on the [Deployment guides
 page.][link-deployment-guides]
 
 If you are moving Cube.js to production, check this guide:
