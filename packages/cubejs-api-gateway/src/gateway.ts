@@ -156,12 +156,18 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
   return row;
 }));
 
+export type UserBackgroundContext = {
+  // @deprecated Renamed to securityContext, please use securityContext.
+  authInfo?: any;
+  securityContext: any;
+};
+
 export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
   refreshScheduler: any;
-  scheduledRefreshContexts?: any;
-  scheduledRefreshTimeZones?: any;
+  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
+  scheduledRefreshTimeZones?: String[];
   basePath: string;
   extendContext?: ExtendContextFn;
   checkAuth?: CheckAuthFn;
@@ -178,9 +184,9 @@ export interface ApiGatewayOptions {
 export class ApiGateway {
   protected readonly refreshScheduler: any;
 
-  protected readonly scheduledRefreshContexts: any;
+  protected readonly scheduledRefreshContexts: ApiGatewayOptions['scheduledRefreshContexts'];
 
-  protected readonly scheduledRefreshTimeZones: any;
+  protected readonly scheduledRefreshTimeZones: ApiGatewayOptions['scheduledRefreshTimeZones'];
 
   protected readonly basePath: string;
 
@@ -333,7 +339,7 @@ export class ApiGateway {
       }));
 
       app.get('/cubejs-system/v1/pre-aggregations/security-contexts', systemMiddlewares, (async (req, res) => {
-        const contexts = await this.scheduledRefreshContexts();
+        const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
         this.resToResultFn(res)({
           securityContexts: contexts.map(context => context.securityContext)
         });
