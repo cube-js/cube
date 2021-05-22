@@ -12,8 +12,7 @@
     "node": ">=10.8.0"
   },
   "files": [
-    "src",
-    "dist",
+    "dist/src",
     "index.js"
   ],
   "main": "index.js",
