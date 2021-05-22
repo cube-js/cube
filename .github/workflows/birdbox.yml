@@ -1,4 +1,4 @@
-name: Bird 📦
+name: 'Bird: Release E2E tests 📦'
 on:
   workflow_dispatch:
     inputs:
