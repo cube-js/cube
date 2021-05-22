@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.18](https://github.com/cube-js/cube.js/compare/v0.27.17...v0.27.18) (2021-05-22)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/postgres-driver:** Cannot find module './dist/src' ([d4cd657](https://github.com/cube-js/cube.js/commit/d4cd657c465875b1c609c0d0f1e05b6d50e7df96))
+
+
+
+
+
 ## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
 
 
