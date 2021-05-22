@@ -123,7 +123,7 @@ describe('drill down query', () => {
       timeDimensions: [
         {
           dimension: 'Orders.ts',
-          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.999'],
+          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.000'],
         },
       ],
       timezone: 'UTC',
@@ -148,7 +148,7 @@ describe('drill down query', () => {
       timeDimensions: [
         {
           dimension: 'Orders.ts',
-          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.999'],
+          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.000'],
         },
       ],
       timezone: 'America/Los_Angeles',
@@ -178,7 +178,7 @@ describe('drill down query', () => {
       timeDimensions: [
         {
           dimension: 'Orders.ts',
-          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.999'],
+          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.000'],
         },
       ],
       timezone: 'UTC',

@@ -50,8 +50,8 @@ const dayRange = (from, to) => ({
     return results;
   },
   snapTo: (value) => dayRange(dayjs(from).startOf(value).toString(), dayjs(to).endOf(value).toString()),
-  from: dayjs(from),
-  to: dayjs(to),
+  start: dayjs(from),
+  end: dayjs(to),
 });
 
 export const QUERY_TYPE = {
