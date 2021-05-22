@@ -13,6 +13,7 @@
   },
   "files": [
     "src",
+    "dist",
     "index.js"
   ],
   "main": "index.js",
