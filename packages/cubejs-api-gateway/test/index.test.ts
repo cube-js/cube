@@ -33,35 +33,33 @@ const preAggregationsResultFactory = () => ([
   }
 ]);
 
-const preAggregationPartitionsResultFactory = () => ([
-  {
-    timezone: 'Asia/Omsk',
-    preAggregation: preAggregationsResultFactory()[0],
-    partitions: [
-      {
-        timezone: 'Asia/Omsk',
-        dimensions: [
-          'Usage.deploymentId',
-          'Usage.tenantId'
-        ],
-        measures: [
-          'Usage.count'
-        ],
-        timeDimensions: [
-          {
-            dimension: 'Usage.createdAt',
-            granularity: 'day',
-            dateRange: [
-              '2021-04-30T00:00:00.000',
-              '2021-04-30T23:59:59.999'
-            ]
-          }
-        ],
-        rollups: []
-      }
-    ]
-  }
-]);
+const preAggregationPartitionsResultFactory = () => ({
+  timezone: 'Asia/Omsk',
+  preAggregation: preAggregationsResultFactory()[0],
+  partitions: [
+    {
+      timezone: 'Asia/Omsk',
+      dimensions: [
+        'Usage.deploymentId',
+        'Usage.tenantId'
+      ],
+      measures: [
+        'Usage.count'
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Usage.createdAt',
+          granularity: 'day',
+          dateRange: [
+            '2021-04-30T00:00:00.000',
+            '2021-04-30T23:59:59.999'
+          ]
+        }
+      ],
+      rollups: []
+    }
+  ]
+});
 
 export const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
@@ -104,7 +102,7 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
 }));
 
 const refreshScheduler = {
-  async preAggregationPartions() {
+  async preAggregationPartitions() {
     return preAggregationPartitionsResultFactory();
   }
 };

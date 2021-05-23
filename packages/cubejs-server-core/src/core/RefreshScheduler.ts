@@ -74,6 +74,7 @@ export class RefreshScheduler {
       };
       const partitionQuery = compilerApi.createQueryByDataSource(compilers, baseQuery);
       const { partitionDimension } = partitionQuery.preAggregations.partitionDimension(preAggregation);
+      
       return partitionDimension.timeSeries().map(range => ({
         ...baseQuery,
         timeDimensions: [{
@@ -202,8 +203,7 @@ export class RefreshScheduler {
     }));
   }
 
-  // TODO: Other way to find out partitions list??
-  public async preAggregationPartions(
+  public async preAggregationPartitions(
     cube: String,
     preAggregationName: String,
     context,
@@ -211,22 +211,33 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const { timezone } = queryingOptions;
-    const preAggregationsFilter = { cubes: [cube], preAggregationName: [preAggregationName] };
-    const preAggregations = await compilerApi.preAggregations(preAggregationsFilter);
-
-    return Promise.all(preAggregations.map(async (preAggregation) => {
-      const partitions = await this.refreshQueriesForPreAggregation(
-        context,
-        compilerApi,
-        preAggregation,
-        queryingOptions
-      );
-      return {
-        timezone,
-        preAggregation,
-        partitions
-      };
-    }));
+    const preAggregationsFilter = { cubes: [cube], preAggregationNames: [preAggregationName] };
+    const [preAggregation] = await compilerApi.preAggregations(preAggregationsFilter);
+    const queriesForPreAggregation = preAggregation && await this.refreshQueriesForPreAggregation(
+      context,
+      compilerApi,
+      preAggregation,
+      queryingOptions
+    );
+    
+    const partitions: any = queriesForPreAggregation && await Promise.all(
+      queriesForPreAggregation.map(
+        query => compilerApi
+          .getSql(query)
+          .then(sql => (
+            {
+              ...query,
+              sql: sql.preAggregations[0]
+            }
+          ))
+      )
+    );
+    
+    return {
+      timezone,
+      preAggregation,
+      partitions
+    };
   }
 
   protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions) {

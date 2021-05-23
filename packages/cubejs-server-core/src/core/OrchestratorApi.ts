@@ -153,4 +153,8 @@ export class OrchestratorApi {
   public addDataSeenSource(dataSource) {
     this.seenDataSources[dataSource] = true;
   }
+
+  public getPreAggregationVersionEntries(preAggregation, partitions) {
+    return this.orchestrator.getPreAggregationVersionEntries(preAggregation, partitions);
+  }
 }

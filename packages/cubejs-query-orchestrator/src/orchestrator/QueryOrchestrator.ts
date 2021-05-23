@@ -162,4 +162,17 @@ export class QueryOrchestrator {
   public async cleanup() {
     return this.queryCache.cleanup();
   }
+
+  public async getPreAggregationVersionEntries(preAggregation, partitions) {
+    const versionEntries = await this.preAggregations.getPreAggregationVersionEntries(preAggregation);
+    const partitionsByTableName = partitions.reduce((obj, partition) => {
+      obj[partition.sql.tableName] = partition;
+      return obj;
+    }, {});
+
+    return versionEntries.filter(versionEntrie => {
+      const partition = partitionsByTableName[versionEntrie.table_name];
+      return partition && versionEntrie.structure_version === PreAggregations.structureVersion(partition.sql);
+    });
+  }
 }

@@ -364,18 +364,18 @@ export class ApiGateway {
         });
       }));
 
-      // app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/version-entries', systemMiddlewares, (async (req, res) => {
-      //   const { timezone } = req.query;
-      //   const { cube, preAggregationName } = req.params;
+      app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/version-entries', systemMiddlewares, (async (req, res) => {
+        const { timezone } = req.query;
+        const { cube, preAggregationName } = req.params;
 
-      //   await this.getPreAggregationPartitions({
-      //     timezone,
-      //     cube,
-      //     preAggregationName,
-      //     context: req.context,
-      //     res: this.resToResultFn(res)
-      //   });
-      // }));
+        await this.getPreAggregationVersionEntries({
+          timezone,
+          cube,
+          preAggregationName,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -452,7 +452,7 @@ export class ApiGateway {
     try {
       const compilerApi = this.getCompilerApi(context);
       const preAggregationPartitions = await this.refreshScheduler()
-        .preAggregationPartions(
+        .preAggregationPartitions(
           cube,
           preAggregationName,
           context,
@@ -461,6 +461,45 @@ export class ApiGateway {
         );
 
       res({ preAggregationPartitions });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationVersionEntries(
+    {
+      timezone,
+      cube,
+      preAggregationName,
+      context,
+      res
+    }: { timezone: String, cube: String, preAggregationName: String, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      const orchestratorApi = this.getAdapterApi(context);
+      const compilerApi = this.getCompilerApi(context);
+
+      const { preAggregation, partitions } = await this.refreshScheduler()
+        .preAggregationPartitions(
+          cube,
+          preAggregationName,
+          context,
+          compilerApi,
+          { timezone }
+        );
+      
+      const preAggregationVersionEntries = preAggregation && await orchestratorApi.getPreAggregationVersionEntries(
+        {
+          ...preAggregation,
+          preAggregationsSchema: compilerApi.preAggregationsSchema,
+        },
+        partitions
+      );
+
+      res({ preAggregationVersionEntries });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
