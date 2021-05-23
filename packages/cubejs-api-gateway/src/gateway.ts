@@ -578,11 +578,11 @@ export class ApiGateway {
             normalizedQuery,
             queryType
           ),
-          lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
-          ...(process.env.NODE_ENV === 'production' ? undefined : {
+          lastRefreshTime: response.lastRefreshTime?.toISOString(),
+          ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations
-          }),
+          } : null),
           annotation,
           dataSource: response.dataSource,
           dbType: response.dbType,
