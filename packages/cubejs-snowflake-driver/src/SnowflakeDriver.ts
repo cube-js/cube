@@ -15,10 +15,16 @@ import { getEnv } from '@cubejs-backend/shared';
 
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
-type HydrationConfiguration = { types: string[], toValue: (column: Column) => ((value: any) => any)|null }[];
+type HydrationConfiguration = {
+  types: string[], toValue: (column: Column) => ((value: any) => any)|null
+};
+type UnloadResponse = {
+  // eslint-disable-next-line camelcase
+  rows_unloaded: string
+};
 
 // It's not possible to declare own map converters by passing config to snowflake-sdk
-const hydrators: HydrationConfiguration = [
+const hydrators: HydrationConfiguration[] = [
   {
     types: ['fixed', 'real'],
     toValue: (column) => {
@@ -239,12 +245,21 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       .map(([key, value]) => `${key} = ${value}`)
       .join(' ');
 
-    await this.execute(
+    const result = await this.execute<UnloadResponse[]>(
       connection,
       `COPY INTO '${bucketType}://${bucketName}/${exportPathName}/' FROM ${tableName} ${optionsPart}`,
       [],
       false
     );
+    if (!result) {
+      throw new Error('Snowflake doesn\'t return anything on UNLOAD operation');
+    }
+
+    if (result[0].rows_unloaded === '0') {
+      return {
+        csvFile: [],
+      };
+    }
 
     const client = new S3({
       credentials: {
@@ -273,7 +288,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       };
     }
 
-    throw new Error('Unable to UNLOAD table to S3');
+    throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
   }
 
   public async stream(

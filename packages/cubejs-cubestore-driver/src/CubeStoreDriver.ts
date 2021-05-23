@@ -137,10 +137,19 @@ export class CubeStoreDriver extends BaseDriver {
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
-    // eslint-disable-next-line no-unused-vars
-    const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
-    await this.query(createTableSqlWithLocation, files).catch(e => {
-      e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+
+    if (files.length > 0) {
+      // eslint-disable-next-line no-unused-vars
+      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
+      return this.query(createTableSqlWithLocation, files).catch(e => {
+        e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+        throw e;
+      });
+    }
+
+    const createTableSqlWithoutLocation = `${createTableSql} ${indexes}`;
+    return this.query(createTableSqlWithoutLocation, []).catch(e => {
+      e.message = `Error during create table: ${createTableSqlWithoutLocation}: ${e.message}`;
       throw e;
     });
   }
