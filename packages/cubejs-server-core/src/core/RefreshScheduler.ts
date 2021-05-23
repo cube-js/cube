@@ -17,7 +17,8 @@ export interface ScheduledRefreshOptions {
 }
 
 type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concurrency' | 'workerIndices'> & {
-  timezones: string[]
+  timezones: string[],
+  dateRange?: [string, string]
 };
 
 export class RefreshScheduler {
@@ -38,27 +39,31 @@ export class RefreshScheduler {
       const dataSource = query.cubeDataSource(preAggregation.cube);
 
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-      const [startDate, endDate] =
-        await Promise.all(
-          compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
-            .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
-            .map(sql => orchestratorApi.executeQuery({
-              query: sql[0],
-              values: sql[1],
-              continueWait: true,
-              cacheKeyQueries: [],
-              dataSource,
-              scheduledRefresh: true,
-            }))
-        );
 
-      const extractDate = ({ data }: any) => {
-        // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
-        data = JSON.parse(JSON.stringify(data));
-        return data[0] && data[0][Object.keys(data[0])[0]];
-      };
+      let { dateRange } = queryingOptions;
+      if (!dateRange) {
+        const [startDate, endDate] =
+          await Promise.all(
+            compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
+              .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
+              .map(sql => orchestratorApi.executeQuery({
+                query: sql[0],
+                values: sql[1],
+                continueWait: true,
+                cacheKeyQueries: [],
+                dataSource,
+                scheduledRefresh: true,
+              }))
+          );
 
-      const dateRange = [extractDate(startDate), extractDate(endDate)];
+        const extractDate = ({ data }: any) => {
+          // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
+          data = JSON.parse(JSON.stringify(data));
+          return data[0] && data[0][Object.keys(data[0])[0]];
+        };
+        dateRange = [extractDate(startDate), extractDate(endDate)];
+      }
+
       if (!dateRange[0] || !dateRange[1]) {
         // Empty table. Nothing to refresh.
         return [];

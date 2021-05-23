@@ -166,6 +166,13 @@ export type UserBackgroundContext = {
   securityContext: any;
 };
 
+export type PreAggregationFilter = {
+  cube: String;
+  preAggregationName: String;
+  timezone: String;
+  dateRange: [String, String]
+};
+
 export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
@@ -356,26 +363,22 @@ export class ApiGateway {
       }));
 
       app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/partitions', systemMiddlewares, (async (req, res) => {
-        const { timezone } = req.query;
-        const { cube, preAggregationName } = req.params;
-
         await this.getPreAggregationPartitions({
-          timezone,
-          cube,
-          preAggregationName,
+          preAggregationFilter: {
+            ...req.query,
+            ...req.params
+          },
           context: req.context,
           res: this.resToResultFn(res)
         });
       }));
 
       app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/version-entries', systemMiddlewares, (async (req, res) => {
-        const { timezone } = req.query;
-        const { cube, preAggregationName } = req.params;
-
         await this.getPreAggregationVersionEntries({
-          timezone,
-          cube,
-          preAggregationName,
+          preAggregationFilter: {
+            ...req.query,
+            ...req.params
+          },
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -445,23 +448,24 @@ export class ApiGateway {
 
   public async getPreAggregationPartitions(
     {
-      timezone,
-      cube,
-      preAggregationName,
+      preAggregationFilter,
       context,
       res
-    }: { timezone: String, cube: String, preAggregationName: String, context: RequestContext, res: ResponseResultFn }
+    }: { preAggregationFilter: PreAggregationFilter, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
     try {
       const compilerApi = this.getCompilerApi(context);
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
-          cube,
-          preAggregationName,
+          preAggregationFilter.cube,
+          preAggregationFilter.preAggregationName,
           context,
           compilerApi,
-          { timezone }
+          {
+            timezone: preAggregationFilter.timezone,
+            dateRange: preAggregationFilter.dateRange
+          }
         );
 
       res({ preAggregationPartitions });
@@ -474,12 +478,10 @@ export class ApiGateway {
 
   public async getPreAggregationVersionEntries(
     {
-      timezone,
-      cube,
-      preAggregationName,
+      preAggregationFilter,
       context,
       res
-    }: { timezone: String, cube: String, preAggregationName: String, context: RequestContext, res: ResponseResultFn }
+    }: { preAggregationFilter: PreAggregationFilter, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
     try {
@@ -488,11 +490,14 @@ export class ApiGateway {
 
       const { preAggregation, partitions } = await this.refreshScheduler()
         .preAggregationPartitions(
-          cube,
-          preAggregationName,
+          preAggregationFilter.cube,
+          preAggregationFilter.preAggregationName,
           context,
           compilerApi,
-          { timezone }
+          {
+            timezone: preAggregationFilter.timezone,
+            dateRange: preAggregationFilter.dateRange
+          }
         );
       
       const preAggregationVersionEntries = preAggregation && await orchestratorApi.getPreAggregationVersionEntries(

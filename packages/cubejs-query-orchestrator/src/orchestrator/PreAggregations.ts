@@ -50,6 +50,14 @@ function version(cacheKey) {
   return result;
 }
 
+function getStructureVersion(preAggregation) {
+  return version(
+    preAggregation.indexesSql && preAggregation.indexesSql.length ?
+      [preAggregation.loadSql, preAggregation.indexesSql] :
+      preAggregation.loadSql
+  );
+}
+
 type VersionEntry = {
   // eslint-disable-next-line camelcase
   table_name: string,
@@ -372,7 +380,7 @@ class PreAggregationLoader {
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
     if (notLoadedKey && !this.waitForRenew) {
-      const structureVersion = this.structureVersion();
+      const structureVersion = getStructureVersion(this.preAggregation);
 
       const getVersionsStarted = new Date();
       const { byStructure } = await this.loadCache.getVersionEntries(this.preAggregation);
@@ -423,7 +431,7 @@ class PreAggregationLoader {
   protected async loadPreAggregationWithKeys() {
     const invalidationKeys = await this.getInvalidationKeyValues();
     const contentVersion = this.contentVersion(invalidationKeys);
-    const structureVersion = this.structureVersion();
+    const structureVersion = getStructureVersion(this.preAggregation);
 
     const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation);
 
@@ -518,14 +526,6 @@ class PreAggregationLoader {
       this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
         [this.preAggregation.loadSql, this.preAggregation.indexesSql, invalidationKeys] :
         [this.preAggregation.loadSql, invalidationKeys]
-    );
-  }
-
-  protected structureVersion() {
-    return version(
-      this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
-        [this.preAggregation.loadSql, this.preAggregation.indexesSql] :
-        this.preAggregation.loadSql
     );
   }
 
@@ -1068,11 +1068,7 @@ export class PreAggregations {
   }
 
   public static structureVersion(preAggregation) {
-    return version(
-      preAggregation.indexesSql && preAggregation.indexesSql.length ?
-        [preAggregation.loadSql, preAggregation.indexesSql] :
-        preAggregation.loadSql
-    );
+    return getStructureVersion(preAggregation);
   }
 
   public async getPreAggregationVersionEntries(preAggregation) {
