@@ -33,6 +33,36 @@ const preAggregationsResultFactory = () => ([
   }
 ]);
 
+const preAggregationPartitionsResultFactory = () => ([
+  {
+    timezone: 'Asia/Omsk',
+    preAggregation: preAggregationsResultFactory()[0],
+    partitions: [
+      {
+        timezone: 'Asia/Omsk',
+        dimensions: [
+          'Usage.deploymentId',
+          'Usage.tenantId'
+        ],
+        measures: [
+          'Usage.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'Usage.createdAt',
+            granularity: 'day',
+            dateRange: [
+              '2021-04-30T00:00:00.000',
+              '2021-04-30T23:59:59.999'
+            ]
+          }
+        ],
+        rollups: []
+      }
+    ]
+  }
+]);
+
 export const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
     return {
@@ -73,6 +103,11 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
   }
 }));
 
+const refreshScheduler = {
+  async preAggregationPartions() {
+    return preAggregationPartitionsResultFactory();
+  }
+};
 export class DataSourceStorageMock {
   public $testConnectionsDone: boolean = false;
 
@@ -530,6 +565,7 @@ describe('API Gateway', () => {
         {
           basePath: 'awesomepathtotest',
           playgroundAuthSecret,
+          refreshScheduler: () => refreshScheduler,
           scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
           scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
         }
@@ -582,7 +618,8 @@ describe('API Gateway', () => {
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },
       { route: 'pre-aggregations', successResult: { preAggregations: preAggregationsResultFactory() } },
       { route: 'pre-aggregations/security-contexts', successResult: { securityContexts: scheduledRefreshContextsFactory().map(obj => obj.securityContext) } },
-      { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } }
+      { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } },
+      { route: 'pre-aggregations/cube/preAggregationName/partitions', successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() } }
     ];
 
     testConfigs.forEach(({ route, successResult }) => {

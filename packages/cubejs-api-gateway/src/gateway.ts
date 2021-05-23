@@ -350,6 +350,19 @@ export class ApiGateway {
           timezones: this.scheduledRefreshTimeZones
         });
       }));
+
+      app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/partitions', systemMiddlewares, (async (req, res) => {
+        const { timezone } = req.query;
+        const { cube, preAggregationName } = req.params;
+
+        await this.getPreAggregationPartitions({
+          timezone,
+          cube,
+          preAggregationName,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -406,6 +419,35 @@ export class ApiGateway {
         .preAggregations({ requestId: context.requestId });
 
       res({ preAggregations });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationPartitions(
+    {
+      timezone,
+      cube,
+      preAggregationName,
+      context,
+      res
+    }: { timezone: String, cube: String, preAggregationName: String, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      const compilerApi = this.getCompilerApi(context);
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartions(
+          cube,
+          preAggregationName,
+          context,
+          compilerApi,
+          { timezone }
+        );
+
+      res({ preAggregationPartitions });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted

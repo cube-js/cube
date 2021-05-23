@@ -202,6 +202,33 @@ export class RefreshScheduler {
     }));
   }
 
+  // TODO: Other way to find out partitions list??
+  public async preAggregationPartions(
+    cube: String,
+    preAggregationName: String,
+    context,
+    compilerApi: CompilerApi,
+    queryingOptions: ScheduledRefreshQueryingOptions
+  ) {
+    const { timezone } = queryingOptions;
+    const preAggregationsFilter = { cubes: [cube], preAggregationName: [preAggregationName] };
+    const preAggregations = await compilerApi.preAggregations(preAggregationsFilter);
+
+    return Promise.all(preAggregations.map(async (preAggregation) => {
+      const partitions = await this.refreshQueriesForPreAggregation(
+        context,
+        compilerApi,
+        preAggregation,
+        queryingOptions
+      );
+      return {
+        timezone,
+        preAggregation,
+        partitions
+      };
+    }));
+  }
+
   protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions) {
     const { timezones, preAggregationsWarmup } = queryingOptions;
     const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();

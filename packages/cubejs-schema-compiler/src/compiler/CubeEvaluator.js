@@ -46,22 +46,29 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
-  preAggregations(onlyScheduled = false) {
-    return Object.keys(this.evaluatedCubes).map(cube => {
-      const preAggregations = this.preAggregationsForCube(cube);
-      return Object.keys(preAggregations)
-        .filter(name => !onlyScheduled || preAggregations[name].scheduledRefresh)
-        .map(preAggregationName => ({
-          preAggregationName,
-          preAggregation: preAggregations[preAggregationName],
-          cube,
-          references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName])
-        }));
-    }).reduce((a, b) => a.concat(b), []);
+  preAggregations(filter) {
+    const { scheduled, cubes, preAggregationNames } = filter || {};
+    return Object.keys(this.evaluatedCubes)
+      .filter(cube => !cubes || cubes.includes(cube))
+      .map(cube => {
+        const preAggregations = this.preAggregationsForCube(cube);
+        return Object.keys(preAggregations)
+          .filter(
+            name => (!scheduled || preAggregations[name].scheduledRefresh) &&
+              (!preAggregationNames || preAggregationNames.includes(name))
+          )
+          .map(preAggregationName => ({
+            preAggregationName,
+            preAggregation: preAggregations[preAggregationName],
+            cube,
+            references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName])
+          }));
+      })
+      .reduce((a, b) => a.concat(b), []);
   }
 
   scheduledPreAggregations() {
-    return this.preAggregations(true);
+    return this.preAggregations({ scheduled: true });
   }
 
   cubeNames() {
