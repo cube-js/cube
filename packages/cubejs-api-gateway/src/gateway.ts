@@ -363,6 +363,19 @@ export class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+
+      // app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/version-entries', systemMiddlewares, (async (req, res) => {
+      //   const { timezone } = req.query;
+      //   const { cube, preAggregationName } = req.params;
+
+      //   await this.getPreAggregationPartitions({
+      //     timezone,
+      //     cube,
+      //     preAggregationName,
+      //     context: req.context,
+      //     res: this.resToResultFn(res)
+      //   });
+      // }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
