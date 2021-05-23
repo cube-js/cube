@@ -10,7 +10,7 @@ import { QueryCache } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
-import { BaseDriver, StreamOptions } from '../driver';
+import { BaseDriver, StreamOptions, UnloadOptions } from '../driver';
 import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 
@@ -729,6 +729,13 @@ class PreAggregationLoader {
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
+  protected getUnloadOptions(): UnloadOptions {
+    return {
+      // Default: 16mb for Snowflake
+      maxFileSize: 64 * 1000000
+    };
+  }
+
   protected getStreamingOptions(): StreamOptions {
     return {
       // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
@@ -754,11 +761,17 @@ class PreAggregationLoader {
     const externalDriver = await this.externalDriverFactory();
     const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
-    const tableData = await saveCancelFn(
-      capabilities.streamImport && client.stream
-        ? client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
-        : client.downloadTable(table, capabilities)
-    );
+    let loadFn;
+
+    if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+      loadFn = client.unload(table, this.getUnloadOptions());
+    } else if (capabilities.streamImport && client.stream) {
+      loadFn = client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions());
+    } else {
+      loadFn = client.downloadTable(table, capabilities);
+    }
+
+    const tableData = await saveCancelFn(loadFn);
 
     if (!tableData.types) {
       tableData.types = await saveCancelFn(client.tableColumnTypes(table));

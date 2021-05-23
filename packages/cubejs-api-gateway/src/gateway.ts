@@ -3,7 +3,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
-import { getRealType } from '@cubejs-backend/shared';
+import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
   Response, NextFunction,
@@ -40,6 +40,10 @@ type MetaConfig = {
     name: string,
     title: string
   }
+};
+
+type CheckAuthInternalOptions = {
+  isPlaygroundCheckAuth: boolean;
 };
 
 const toConfigMap = (metaConfig: MetaConfig[]) => R.fromPairs(
@@ -553,7 +557,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -638,7 +642,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -849,6 +853,7 @@ export class ApiGateway {
       securityContext,
       // Deprecated, but let's allow it for now.
       authInfo: securityContext,
+      signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
       ...extensions
     };
@@ -990,7 +995,7 @@ export class ApiGateway {
     };
   }
 
-  protected createDefaultCheckAuth(options?: JWTOptions): CheckAuthFn {
+  protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
     type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
@@ -1060,6 +1065,7 @@ export class ApiGateway {
       if (auth) {
         try {
           req.securityContext = await checkAuthFn(auth, secret);
+          req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e) {
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
@@ -1098,10 +1104,13 @@ export class ApiGateway {
   }
 
   protected createCheckAuthSystemFn(): CheckAuthFn {
-    const systemCheckAuthFn = this.createDefaultCheckAuth({
-      key: this.playgroundAuthSecret,
-      algorithms: ['HS256']
-    });
+    const systemCheckAuthFn = this.createDefaultCheckAuth(
+      {
+        key: this.playgroundAuthSecret,
+        algorithms: ['HS256']
+      },
+      { isPlaygroundCheckAuth: true }
+    );
 
     return async (ctx, authorization) => {
       await systemCheckAuthFn(ctx, authorization);

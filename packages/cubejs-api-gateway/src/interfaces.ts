@@ -63,6 +63,7 @@ export interface NormalizedQuery extends Query {
 export interface RequestContext {
   securityContext: any;
   requestId: string;
+  signedWithPlaygroundAuthSecret?: boolean;
 }
 
 export type RequestExtension = Record<string, any>;
@@ -74,6 +75,7 @@ export interface Request extends ExpressRequest {
   authInfo?: any,
   // New one, replace authInfo
   securityContext?: any,
+  signedWithPlaygroundAuthSecret?: boolean;
 }
 
 export interface JWTOptions {

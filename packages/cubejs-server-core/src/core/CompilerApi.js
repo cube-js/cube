@@ -57,12 +57,13 @@ export class CompilerApi {
     return this.dialectClass && this.dialectClass({ dataSource: dataSource || 'default', dbType });
   }
 
-  async getSql(query, options) {
-    options = options || {};
+  async getSql(query, options = {}) {
     const { includeDebugInfo } = options;
+
     const dbType = this.getDbType();
     const compilers = await this.getCompilers({ requestId: query.requestId });
     let sqlGenerator = this.createQueryByDataSource(compilers, query);
+
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
