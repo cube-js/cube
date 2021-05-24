@@ -338,7 +338,7 @@ export class BaseDriver {
       [name, schema]
     );
 
-    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericTypeFromColumn(c) }));
   }
 
   createTable(quotedTableName, columns) {
@@ -352,6 +352,13 @@ export class BaseDriver {
   createTableSql(quotedTableName, columns) {
     columns = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`);
     return `CREATE TABLE ${quotedTableName} (${columns.join(', ')})`;
+  }
+
+  /**
+   * @param {object} column
+   */
+  toGenericTypeFromColumn(column) {
+    return this.toGenericType(column.data_type);
   }
 
   /**

@@ -72,8 +72,21 @@ const hydrators: HydrationConfiguration[] = [
   }
 ];
 
+type NumberColumn = {
+  NAME: string,
+  TYPE: 'NUMBER',
+  NUMERIC_PRECISION: string,
+  NUMERIC_SCALE: string,
+};
+type CommonColumn = {
+  NAME: string,
+  TYPE: string,
+  NUMERIC_PRECISION: null,
+  NUMERIC_SCALE: null,
+};
+type ColumnInfo = NumberColumn | CommonColumn;
+
 const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
-  number: 'decimal',
   timestamp_ntz: 'timestamp'
 };
 
@@ -407,20 +420,33 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 
+  public toGenericTypeFromColumn(column: ColumnInfo) {
+    if (column.TYPE === 'NUMBER') {
+      // 2^64 = 18446744073709551616
+      if (column.NUMERIC_SCALE === '0' && parseInt(column.NUMERIC_PRECISION, 10) <= 19) {
+        return 'bigint';
+      }
+
+      return `DECIMAL(${column.NUMERIC_PRECISION}, ${column.NUMERIC_SCALE})`;
+    }
+
+    return SnowflakeToGenericType[column.TYPE.toLowerCase()] || super.toGenericType(column.TYPE);
+  }
+
   public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
 
-    const columns = await this.query<{ COLUMN_NAME: string, DATA_TYPE: string }[]>(
-      `SELECT columns.column_name,
-             columns.table_name,
-             columns.table_schema,
-             columns.data_type
+    const columns = await this.query<ColumnInfo[]>(
+      `SELECT columns.column_name as name,
+             columns.data_type as type,
+             columns.numeric_precision,
+             columns.numeric_scale
       FROM information_schema.columns
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name.toUpperCase(), schema.toUpperCase()]
     );
 
-    return columns.map(c => ({ name: c.COLUMN_NAME, type: this.toGenericType(c.DATA_TYPE) }));
+    return columns.map((c) => ({ name: c.NAME, type: this.toGenericTypeFromColumn(c) }));
   }
 
   public async getTablesQuery(schemaName: string) {

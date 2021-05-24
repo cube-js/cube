@@ -5,11 +5,8 @@ import { unlink } from 'fs-extra';
 import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
 import {
-  BaseDriver,
-  DownloadTableCSVData,
-  DownloadTableData,
-  DownloadTableMemoryData,
-  StreamTableData,
+  BaseDriver, DownloadTableCSVData, DownloadTableMemoryData,
+  DriverInterface, IndexesSQL, StreamTableData, TableStructure,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql } from 'sqlstring';
@@ -24,12 +21,7 @@ const GenericTypeToCubeStore: Record<string, string> = {
   text: 'varchar(255)'
 };
 
-type Column = {
-  type: string;
-  name: string;
-};
-
-export class CubeStoreDriver extends BaseDriver {
+export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   protected readonly config: any;
 
   protected readonly connection: WebSocketConnection;
@@ -89,7 +81,7 @@ export class CubeStoreDriver extends BaseDriver {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: any) {
+  public async uploadTableWithIndexes(table: string, columns: TableStructure, tableData: any, indexesSql: IndexesSQL) {
     const indexes =
       indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
 
@@ -104,7 +96,12 @@ export class CubeStoreDriver extends BaseDriver {
     }
   }
 
-  private async importRows(table: string, columns: Column[], indexesSql: any, tableData: DownloadTableMemoryData) {
+  private async importRows(
+    table: string,
+    columns: TableStructure,
+    indexesSql: IndexesSQL,
+    tableData: DownloadTableMemoryData
+  ) {
     await this.createTable(table, columns);
     try {
       for (let i = 0; i < indexesSql.length; i++) {
@@ -134,7 +131,7 @@ export class CubeStoreDriver extends BaseDriver {
     }
   }
 
-  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes) {
+  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: TableStructure, indexes) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
 
@@ -154,7 +151,7 @@ export class CubeStoreDriver extends BaseDriver {
     });
   }
 
-  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes) {
+  private async importStream(columns: TableStructure, tableData: StreamTableData, table: string, indexes) {
     const writer = csvWriter({ headers: columns.map(c => c.name) });
     const gzipStream = createGzip();
     const tempFile = tempy.file();
