@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+
+### Bug Fixes
+
+* Dont publish source files for snowflake/postgresql ([cd2c90f](https://github.com/cube-js/cube.js/commit/cd2c90f51bd02cd9b918c64e116207b75af95d3d))
+* **snowflake-driver:** Handle UNLOAD for empty tables ([f5f69ff](https://github.com/cube-js/cube.js/commit/f5f69ff79371bdd33526ffa0cc8634a0f30fc9f4))
+
+
+### Features
+
+* Make rollup default for preAggregation.type ([4875fa1](https://github.com/cube-js/cube.js/commit/4875fa1be360372e7ed9dcaf9ded8b28bb348e2f))
+* Pre-aggregations Meta API, part 1 ([#2801](https://github.com/cube-js/cube.js/issues/2801)) ([2245a77](https://github.com/cube-js/cube.js/commit/2245a7774666a3a8bd36703b2b4001b20789b943))
+* **@cubejs-client/playground:** pre-agg helper ([#2807](https://github.com/cube-js/cube.js/issues/2807)) ([44f09c3](https://github.com/cube-js/cube.js/commit/44f09c39ce3b2a8c6a2ce2fb66b75a0c288eb1da))
+
+
+
+
+
 ## [0.27.18](https://github.com/cube-js/cube.js/compare/v0.27.17...v0.27.18) (2021-05-22)
 
 

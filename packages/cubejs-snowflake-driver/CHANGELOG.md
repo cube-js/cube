@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+
+### Bug Fixes
+
+* Dont publish source files for snowflake/postgresql ([cd2c90f](https://github.com/cube-js/cube.js/commit/cd2c90f51bd02cd9b918c64e116207b75af95d3d))
+* **snowflake-driver:** Handle UNLOAD for empty tables ([f5f69ff](https://github.com/cube-js/cube.js/commit/f5f69ff79371bdd33526ffa0cc8634a0f30fc9f4))
+
+
+
+
+
 ## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
 
 
