@@ -126,14 +126,28 @@ declare module '@cubejs-client/core' {
 
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
 
+  export type TransformedQuery = {
+    allFiltersWithinSelectedDimensions: boolean;
+    granularityHierarchies: Record<string, string[]>;
+    hasMultipliedMeasures: boolean;
+    hasNoTimeDimensionsWithoutGranularity: boolean;
+    isAdditive: boolean;
+    leafMeasureAdditive: boolean;
+    leafMeasures: string[];
+    measures: string[];
+    sortedDimensions: string[];
+    sortedTimeDimensions: [[string, string]];
+  };
+
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
     query: Query;
     data: T[];
-    usedPreAggregations?: Record<string, any>;
     external: boolean | null;
     dbType: string;
+    usedPreAggregations?: Record<string, any>;
+    transformedQuery?: TransformedQuery;
   };
 
   export type LoadResponse<T> = {

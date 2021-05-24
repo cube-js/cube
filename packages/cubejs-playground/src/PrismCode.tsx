@@ -3,8 +3,9 @@ import Prism from 'prismjs';
 
 type TPrismCodeProps = {
   code: string;
-  style?: CSSProperties
-}
+  language?: string;
+  style?: CSSProperties;
+};
 
 export default class PrismCode extends Component<TPrismCodeProps> {
   componentDidMount() {
@@ -18,7 +19,9 @@ export default class PrismCode extends Component<TPrismCodeProps> {
   render() {
     return (
       <pre data-testid="prism-code" style={this.props.style}>
-        <code className="language-javascript">{this.props.code}</code>
+        <code className={`language-${this.props.language || 'javascript'}`}>
+          {this.props.code}
+        </code>
       </pre>
     );
   }

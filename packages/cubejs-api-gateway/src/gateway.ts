@@ -639,7 +639,8 @@ export class ApiGateway {
           lastRefreshTime: response.lastRefreshTime?.toISOString(),
           ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations
+            usedPreAggregations: response.usedPreAggregations,
+            transformedQuery: sqlQuery.canUseTransformedQuery,
           } : null),
           annotation,
           dataSource: response.dataSource,
