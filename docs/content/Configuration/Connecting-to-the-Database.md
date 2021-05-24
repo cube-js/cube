@@ -54,7 +54,7 @@ databases:
 | MS SQL                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_DOMAIN`                                                                                                                                                                                                                                         |
 | ClickHouse                                             | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_CLICKHOUSE_READONLY`                                                                                                                                                                                                           |
 | AWS Athena                                             | `CUBEJS_AWS_KEY`, `CUBEJS_AWS_SECRET`, `CUBEJS_AWS_REGION`, `CUBEJS_AWS_S3_OUTPUT_LOCATION`                                                                                                                                                                                                                                                          |
-| Google BigQuery                                        | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`, `CUBEJS_DB_BQ_LOCATION`                                                                                                                                                                                                                                              |
+| Google BigQuery                                        | `CUBEJS_DB_BQ_PROJECT_ID`, `CUBEJS_DB_BQ_KEY_FILE or CUBEJS_DB_BQ_CREDENTIALS`, `CUBEJS_DB_BQ_LOCATION`, `CUBEJS_DB_BQ_EXPORT_BUCKET`                                                                                                                                                                                                                |
 | MongoDB                                                | `CUBEJS_DB_HOST`, `CUBEJS_DB_NAME`, `CUBEJS_DB_PORT`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`, `CUBEJS_DB_SSL_CA`, `CUBEJS_DB_SSL_CERT`, `CUBEJS_DB_SSL_CIPHERS`, `CUBEJS_DB_SSL_PASSPHRASE`                                                                                                                                             |
 | Snowflake                                              | `CUBEJS_DB_SNOWFLAKE_ACCOUNT`, `CUBEJS_DB_SNOWFLAKE_REGION`, `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`, `CUBEJS_DB_SNOWFLAKE_ROLE`, `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`, `CUBEJS_DB_NAME`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`, `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`, `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS` |
 | Presto                                                 | `CUBEJS_DB_HOST`, `CUBEJS_DB_PORT`, `CUBEJS_DB_CATALOG`, `CUBEJS_DB_SCHEMA`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`                                                                                                                                                                                                                                      |
@@ -201,6 +201,15 @@ CUBEJS_DB_BQ_LOCATION=us-central1
 
 You can find more supported regions [here][link-bigquery-regional-locations].
 
+If your pre-aggregations dataset is too big to fit in memory, we **strongly**
+recommend configuring `CUBEJS_DB_BQ_EXPORT_BUCKET`. This will allow Cube.js to
+materialize results on an "export" bucket which are then loaded into BigQuery,
+providing better performance.
+
+```dotenv
+CUBEJS_DB_BQ_EXPORT_BUCKET=export_data_58148478376
+```
+
 ### MSSQL
 
 To connect to a MSSQL database using Windows Authentication (also sometimes
@@ -244,10 +253,10 @@ You can connect to a ClickHouse database when your user's permissions are
 
 Starting with `v0.26.83` Cube.js provides a driver for Databricks. It's based on
 the JDBC driver from DataBricks, which requires [installation of Java with
-JDK][link-java-guide]. You'll need to specify the JDBC url via
+JDK][link-java-guide]. You'll need to specify the JDBC URL via
 `CUBEJS_DB_DATABRICKS_URL`:
 
-```
+```dotenv
 CUBEJS_DB_TYPE=databricks-jdbc
 # CUBEJS_DB_NAME is an optional value
 CUBEJS_DB_NAME=default
