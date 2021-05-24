@@ -5,152 +5,15 @@ import jwt from 'jsonwebtoken';
 
 import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
 import { generateAuthToken } from './utils';
-
-const preAggregationsResultFactory = () => ([
-  {
-    preAggregationName: 'usages',
-    preAggregation: {
-      type: 'rollup',
-      scheduledRefresh: true,
-    },
-    cube: 'Usage',
-    references: {
-      dimensions: [
-        'Usage.deploymentId',
-        'Usage.tenantId'
-      ],
-      measures: [
-        'Usage.count'
-      ],
-      timeDimensions: [
-        {
-          dimension: 'Usage.createdAt',
-          granularity: 'day'
-        }
-      ],
-      rollups: []
-    }
-  }
-]);
-
-const preAggregationPartitionsResultFactory = () => ({
-  timezone: 'Asia/Omsk',
-  preAggregation: preAggregationsResultFactory()[0],
-  partitions: [
-    {
-      timezone: 'Asia/Omsk',
-      dimensions: [
-        'Usage.deploymentId',
-        'Usage.tenantId'
-      ],
-      measures: [
-        'Usage.count'
-      ],
-      timeDimensions: [
-        {
-          dimension: 'Usage.createdAt',
-          granularity: 'day',
-          dateRange: [
-            '2021-04-30T00:00:00.000',
-            '2021-04-30T23:59:59.999'
-          ]
-        }
-      ],
-      rollups: []
-    }
-  ]
-});
-
-export const compilerApi = jest.fn().mockImplementation(() => ({
-  async getSql() {
-    return {
-      sql: ['SELECT * FROM test', []],
-      aliasNameToMember: {
-        foo__bar: 'Foo.bar',
-        foo__time: 'Foo.time',
-      },
-      order: [{ id: 'id', desc: true, }]
-    };
-  },
-
-  async metaConfig() {
-    return [
-      {
-        config: {
-          name: 'Foo',
-          measures: [
-            {
-              name: 'Foo.bar',
-            },
-          ],
-          dimensions: [
-            {
-              name: 'Foo.id',
-            },
-            {
-              name: 'Foo.time',
-            },
-          ],
-        },
-      },
-    ];
-  },
-
-  async preAggregations() {
-    return preAggregationsResultFactory();
-  }
-}));
-
-const refreshScheduler = {
-  async preAggregationPartitions() {
-    return preAggregationPartitionsResultFactory();
-  }
-};
-export class DataSourceStorageMock {
-  public $testConnectionsDone: boolean = false;
-
-  public $testOrchestratorConnectionsDone: boolean = false;
-
-  public async testConnections() {
-    this.$testConnectionsDone = true;
-
-    return [];
-  }
-
-  public async testOrchestratorConnections() {
-    this.$testOrchestratorConnectionsDone = true;
-
-    return [];
-  }
-}
-
-export class AdapterApiMock {
-  public $testConnectionsDone: boolean = false;
-
-  public $testOrchestratorConnectionsDone: boolean = false;
-
-  public async testConnection() {
-    this.$testConnectionsDone = true;
-
-    return [];
-  }
-
-  public async testOrchestratorConnections() {
-    this.$testOrchestratorConnectionsDone = true;
-
-    return [];
-  }
-
-  public async executeQuery() {
-    return {
-      data: [{ foo__bar: 42 }]
-    };
-  }
-
-  public addDataSeenSource() {
-    return undefined;
-  }
-}
+import {
+  preAggregationsResultFactory,
+  preAggregationPartitionsResultFactory,
+  preAggregationVersionEntriesResultFactory,
+  compilerApi,
+  RefreshSchedulerMock,
+  DataSourceStorageMock,
+  AdapterApiMock
+} from './mocks';
 
 const logger = (type, message) => console.log({ type, ...message });
 
@@ -563,7 +426,7 @@ describe('API Gateway', () => {
         {
           basePath: 'awesomepathtotest',
           playgroundAuthSecret,
-          refreshScheduler: () => refreshScheduler,
+          refreshScheduler: () => new RefreshSchedulerMock(),
           scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
           scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
         }
@@ -617,7 +480,14 @@ describe('API Gateway', () => {
       { route: 'pre-aggregations', successResult: { preAggregations: preAggregationsResultFactory() } },
       { route: 'pre-aggregations/security-contexts', successResult: { securityContexts: scheduledRefreshContextsFactory().map(obj => obj.securityContext) } },
       { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } },
-      { route: 'pre-aggregations/cube/preAggregationName/partitions', successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() } }
+      {
+        route: 'pre-aggregations/cube/preAggregationName/partitions',
+        successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() }
+      },
+      {
+        route: 'pre-aggregations/cube/preAggregationName/version-entries',
+        successResult: { preAggregationVersionEntries: preAggregationVersionEntriesResultFactory() }
+      }
     ];
 
     testConfigs.forEach(({ route, successResult }) => {
