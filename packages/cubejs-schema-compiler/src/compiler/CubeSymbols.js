@@ -46,29 +46,35 @@ export class CubeSymbols {
     const cubeObject = Object.assign({
       allDefinitions(type) {
         let superDefinitions = {};
+
         if (cubeDefinition.extends) {
           superDefinitions = super.allDefinitions(type);
         }
+
         return Object.assign({}, superDefinitions, cubeDefinition[type]);
       },
       get measures() {
         return this.allDefinitions('measures');
       },
-      // eslint-disable-next-line no-empty-function,@typescript-eslint/no-empty-function
-      set measures(v) {},
+      set measures(v) {
+        // Dont allow to modify
+      },
 
       get dimensions() {
         return this.allDefinitions('dimensions');
       },
-      // eslint-disable-next-line no-empty-function,@typescript-eslint/no-empty-function
-      set dimensions(v) {},
+      set dimensions(v) {
+        // Dont allow to modify
+      },
 
       get segments() {
         return this.allDefinitions('segments');
       },
-      // eslint-disable-next-line no-empty-function,@typescript-eslint/no-empty-function
-      set segments(v) {}
+      set segments(v) {
+        // Dont allow to modify
+      }
     }, cubeDefinition);
+
     if (cubeDefinition.extends) {
       const superCube = this.resolveSymbolsCall(cubeDefinition.extends, (name) => this.cubeReferenceProxy(name));
       Object.setPrototypeOf(
@@ -77,6 +83,7 @@ export class CubeSymbols {
         superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube
       );
     }
+
     return cubeObject;
   }
 
@@ -94,6 +101,11 @@ export class CubeSymbols {
     if (duplicateNames.length > 0) {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
+
+    if (cube.preAggregations) {
+      this.transformPreAggregations(cube.preAggregations);
+    }
+
     return Object.assign(
       { cubeName: () => cube.name },
       cube.measures || {},
@@ -101,6 +113,16 @@ export class CubeSymbols {
       cube.segments || {},
       cube.preAggregations || {}
     );
+  }
+
+  transformPreAggregations(preAggregations) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const preAggregation of Object.values(preAggregations)) {
+      // Rollup is a default type for pre-aggregations
+      if (!preAggregation.type) {
+        preAggregation.type = 'rollup';
+      }
+    }
   }
 
   resolveSymbolsCall(func, nameResolver, context) {
