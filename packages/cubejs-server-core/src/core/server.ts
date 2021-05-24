@@ -5,7 +5,7 @@ import path from 'path';
 import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
 
-import { ApiGateway } from '@cubejs-backend/api-gateway';
+import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
   createCancelableInterval, displayCLIWarning, formatDuration,
@@ -29,7 +29,6 @@ import type {
   PreAggregationsSchemaFn,
   RequestContext,
   DriverContext,
-  UserBackgroundContext,
   LoggerFn,
 } from './types';
 
@@ -594,6 +593,8 @@ export class CubejsServerCore {
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
+        scheduledRefreshContexts: this.options.scheduledRefreshContexts,
+        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones
       }
     );
   }

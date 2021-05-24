@@ -1,4 +1,4 @@
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions } from '@cubejs-backend/api-gateway';
+import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
@@ -37,12 +37,6 @@ export interface RequestContext {
   securityContext: any;
   requestId: string;
 }
-
-export type UserBackgroundContext = {
-  // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo?: any;
-  securityContext: any;
-};
 
 export interface DriverContext extends RequestContext {
   dataSource: string;
