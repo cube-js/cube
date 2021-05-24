@@ -153,7 +153,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#b533877c20f7d2c161f04f53ebb9c070124d533d"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#3a32e08e7665bf0f191089912adae59420748cf3"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#b533877c20f7d2c161f04f53ebb9c070124d533d"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#3a32e08e7665bf0f191089912adae59420748cf3"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -1101,6 +1101,7 @@ dependencies = [
  "futures 0.3.13",
  "ipc-channel",
  "itertools 0.9.0",
+ "log",
  "pretty_assertions",
  "procspawn",
  "scopeguard",
@@ -1120,7 +1121,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#b533877c20f7d2c161f04f53ebb9c070124d533d"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#3a32e08e7665bf0f191089912adae59420748cf3"
 dependencies = [
  "ahash 0.7.2",
  "arrow",
@@ -2908,7 +2909,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#b533877c20f7d2c161f04f53ebb9c070124d533d"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#3a32e08e7665bf0f191089912adae59420748cf3"
 dependencies = [
  "arrow",
  "base64 0.12.3",
