@@ -11,6 +11,10 @@
   "engines": {
     "node": ">=10.8.0"
   },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
   "main": "index.js",
   "typings": "dist/src/index.d.ts",
   "scripts": {
