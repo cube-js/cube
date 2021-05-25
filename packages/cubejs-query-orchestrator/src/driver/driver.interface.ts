@@ -58,10 +58,14 @@ export type UnloadOptions = {
   maxFileSize: number,
 };
 
+export type QueryOptions = {};
+
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
   uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
+  //
+  query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
   // Download data from Query (for readOnly)
