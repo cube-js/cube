@@ -47,7 +47,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   preAggregations(filter) {
-    const { scheduled, cubes, preAggregationNames } = filter || {};
+    const { scheduled, cubes, preAggregationIds } = filter || {};
     return Object.keys(this.evaluatedCubes)
       .filter(cube => !cubes || cubes.includes(cube))
       .map(cube => {
@@ -55,7 +55,7 @@ export class CubeEvaluator extends CubeSymbols {
         return Object.keys(preAggregations)
           .filter(
             name => (!scheduled || preAggregations[name].scheduledRefresh) &&
-              (!preAggregationNames || preAggregationNames.includes(name))
+              (!preAggregationIds || preAggregationIds.includes(`${cube}.${name}`))
           )
           .map(preAggregationName => ({
             preAggregationName,

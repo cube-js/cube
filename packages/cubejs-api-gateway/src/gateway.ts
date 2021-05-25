@@ -139,7 +139,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
     // @ts-ignore
     R.unnest,
     R.fromPairs
-  // @ts-ignore
+    // @ts-ignore
   )(r);
 
   // @ts-ignore
@@ -167,10 +167,10 @@ export type UserBackgroundContext = {
 };
 
 export type PreAggregationFilter = {
-  cube: String;
-  preAggregationName: String;
+  preAggregationIds: String[];
+  cubes: String[];
   timezone: String;
-  dateRange: [String, String]
+  scheduleRange: [String, String]
 };
 
 export interface ApiGatewayOptions {
@@ -362,22 +362,10 @@ export class ApiGateway {
         });
       }));
 
-      app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/partitions', systemMiddlewares, (async (req, res) => {
+      app.get('/cubejs-system/v1/pre-aggregations/partitions', systemMiddlewares, (async (req, res) => {
         await this.getPreAggregationPartitions({
           preAggregationFilter: {
-            ...req.query,
-            ...req.params
-          },
-          context: req.context,
-          res: this.resToResultFn(res)
-        });
-      }));
-
-      app.get('/cubejs-system/v1/pre-aggregations/:cube/:preAggregationName/version-entries', systemMiddlewares, (async (req, res) => {
-        await this.getPreAggregationVersionEntries({
-          preAggregationFilter: {
-            ...req.query,
-            ...req.params
+            ...req.query
           },
           context: req.context,
           res: this.resToResultFn(res)
@@ -455,61 +443,52 @@ export class ApiGateway {
   ) {
     const requestStarted = new Date();
     try {
-      const compilerApi = this.getCompilerApi(context);
-      const preAggregationPartitions = await this.refreshScheduler()
-        .preAggregationPartitions(
-          preAggregationFilter.cube,
-          preAggregationFilter.preAggregationName,
-          context,
-          compilerApi,
-          {
-            timezone: preAggregationFilter.timezone,
-            dateRange: preAggregationFilter.dateRange
-          }
-        );
-
-      res({ preAggregationPartitions });
-    } catch (e) {
-      this.handleError({
-        e, context, res, requestStarted
-      });
-    }
-  }
-
-  public async getPreAggregationVersionEntries(
-    {
-      preAggregationFilter,
-      context,
-      res
-    }: { preAggregationFilter: PreAggregationFilter, context: RequestContext, res: ResponseResultFn }
-  ) {
-    const requestStarted = new Date();
-    try {
       const orchestratorApi = this.getAdapterApi(context);
       const compilerApi = this.getCompilerApi(context);
 
-      const { preAggregation, partitions } = await this.refreshScheduler()
+      // TODO: rename dateRange to scheduleRange
+      const { timezone = 'UTC', scheduleRange } = preAggregationFilter;
+      const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
-          preAggregationFilter.cube,
-          preAggregationFilter.preAggregationName,
+          preAggregationFilter,
           context,
           compilerApi,
           {
-            timezone: preAggregationFilter.timezone,
-            dateRange: preAggregationFilter.dateRange
+            timezone,
+            scheduleRange
           }
         );
-      
-      const preAggregationVersionEntries = preAggregation && await orchestratorApi.getPreAggregationVersionEntries(
-        {
-          ...preAggregation,
-          preAggregationsSchema: compilerApi.preAggregationsSchema,
-        },
-        partitions
-      );
+        
+      res({
+        preAggregationPartitions: await Promise.all(preAggregationPartitions.map(
+          async ({ preAggregation, partitions }) => {
+            const preAggregationVersionEntries = preAggregation &&
+              await orchestratorApi.getPreAggregationVersionEntries(
+                {
+                  ...preAggregation,
+                  preAggregationsSchema: compilerApi.preAggregationsSchema,
+                },
+                partitions
+              );
+            const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntrie) => {
+              if (!obj[versionEntrie.table_name]) obj[versionEntrie.table_name] = [];
+              obj[versionEntrie.table_name].push(versionEntrie);
+              return obj;
+            }, {});
 
-      res({ preAggregationVersionEntries });
+            return {
+              timezone,
+              preAggregation,
+              partitions: partitions.map(partition => {
+                partition.versionEntries = preAggregationVersionEntriesByName[partition.sql.tableName];
+                return partition;
+              }),
+            };
+          }
+        ))
+      });
     } catch (e) {
+      console.log(e);
       this.handleError({
         e, context, res, requestStarted
       });
@@ -1001,7 +980,7 @@ export class ApiGateway {
   }
 
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
-    type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
+    type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
@@ -1031,7 +1010,7 @@ export class ApiGateway {
       }
 
       checkAuthFn = async (auth) => {
-        const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
+        const decoded = <Record<string, any> | null>jwt.decode(auth, { complete: true });
         if (!decoded) {
           throw new CubejsHandlerError(
             403,

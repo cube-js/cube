@@ -18,7 +18,7 @@ export interface ScheduledRefreshOptions {
 
 type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concurrency' | 'workerIndices'> & {
   timezones: string[],
-  dateRange?: [string, string]
+  scheduleRange?: [string, string]
 };
 
 export class RefreshScheduler {
@@ -40,7 +40,7 @@ export class RefreshScheduler {
 
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
 
-      let { dateRange } = queryingOptions;
+      let dateRange = queryingOptions.scheduleRange;
       if (!dateRange) {
         const [startDate, endDate] =
           await Promise.all(
@@ -209,40 +209,41 @@ export class RefreshScheduler {
   }
 
   public async preAggregationPartitions(
-    cube: String,
-    preAggregationName: String,
+    preAggregationsFilter: any,
     context,
     compilerApi: CompilerApi,
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const { timezone } = queryingOptions;
-    const preAggregationsFilter = { cubes: [cube], preAggregationNames: [preAggregationName] };
-    const [preAggregation] = await compilerApi.preAggregations(preAggregationsFilter);
-    const queriesForPreAggregation = preAggregation && await this.refreshQueriesForPreAggregation(
-      context,
-      compilerApi,
-      preAggregation,
-      queryingOptions
-    );
-    
-    const partitions: any = queriesForPreAggregation && await Promise.all(
-      queriesForPreAggregation.map(
-        query => compilerApi
-          .getSql(query)
-          .then(sql => (
-            {
-              ...query,
-              sql: sql.preAggregations[0]
-            }
-          ))
-      )
-    );
-    
-    return {
-      timezone,
-      preAggregation,
-      partitions
-    };
+    const preAggregations = await compilerApi.preAggregations(preAggregationsFilter);
+
+    return Promise.all(preAggregations.map(async preAggregation => {
+      const queriesForPreAggregation = preAggregation && await this.refreshQueriesForPreAggregation(
+        context,
+        compilerApi,
+        preAggregation,
+        queryingOptions
+      );
+
+      const partitions: any = queriesForPreAggregation && await Promise.all(
+        queriesForPreAggregation.map(
+          query => compilerApi
+            .getSql(query)
+            .then(sql => (
+              {
+                ...query,
+                sql: sql.preAggregations[0]
+              }
+            ))
+        )
+      );
+      
+      return {
+        timezone,
+        preAggregation,
+        partitions
+      };
+    }));
   }
 
   protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions) {

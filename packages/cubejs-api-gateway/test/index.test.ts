@@ -8,7 +8,6 @@ import { generateAuthToken } from './utils';
 import {
   preAggregationsResultFactory,
   preAggregationPartitionsResultFactory,
-  preAggregationVersionEntriesResultFactory,
   compilerApi,
   RefreshSchedulerMock,
   DataSourceStorageMock,
@@ -481,12 +480,8 @@ describe('API Gateway', () => {
       { route: 'pre-aggregations/security-contexts', successResult: { securityContexts: scheduledRefreshContextsFactory().map(obj => obj.securityContext) } },
       { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } },
       {
-        route: 'pre-aggregations/cube/preAggregationName/partitions',
+        route: 'pre-aggregations/partitions',
         successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() }
-      },
-      {
-        route: 'pre-aggregations/cube/preAggregationName/version-entries',
-        successResult: { preAggregationVersionEntries: preAggregationVersionEntriesResultFactory() }
       }
     ];
 
