@@ -5,7 +5,7 @@ import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes,
+  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes, QueryOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { QueryStream } from './QueryStream';
 
@@ -138,7 +138,7 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async query(query: string, values: unknown[]) {
+  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const result = await this.queryResponse(query, values);
     return result.rows;
   }
