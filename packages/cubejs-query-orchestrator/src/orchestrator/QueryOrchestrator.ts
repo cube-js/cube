@@ -163,14 +163,33 @@ export class QueryOrchestrator {
     return this.queryCache.cleanup();
   }
 
-  public async getPreAggregationVersionEntries(preAggregation, partitions) {
-    const versionEntries = await this.preAggregations.getPreAggregationVersionEntries(preAggregation);
-    const partitionsByTableName = partitions.reduce((obj, partition) => {
+  public async getPreAggregationVersionEntries(
+    preAggregations: { preAggregation: any, partitions: any[]}[],
+    preAggregationsSchema: String
+  ) {
+    const preAggregationsByUniqueSource = preAggregations.reduce((obj, p) => {
+      const { dataSource, external } = p.preAggregation;
+      const key = JSON.stringify({ dataSource, external });
+      if (!obj.set.has(key)) {
+        obj.set.add(key);
+        obj.array.push(p.preAggregation);
+      }
+      return obj;
+    }, { set: new Set(), array: [] });
+
+    const versionEntries = await Promise.all(
+      preAggregationsByUniqueSource.array
+        .map(p => this.preAggregations.getPreAggregationVersionEntries(
+          p.preAggregation,
+          preAggregationsSchema
+        ))
+    );
+    const partitionsByTableName = preAggregations.map(p => p.partitions).flat().reduce((obj, partition) => {
       obj[partition.sql.tableName] = partition;
       return obj;
     }, {});
 
-    return versionEntries.filter(versionEntrie => {
+    return versionEntries.flat().filter((versionEntrie: any) => {
       const partition = partitionsByTableName[versionEntrie.table_name];
       return partition && versionEntrie.structure_version === PreAggregations.structureVersion(partition.sql);
     });

@@ -1071,12 +1071,12 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public async getPreAggregationVersionEntries(preAggregation) {
+  public async getPreAggregationVersionEntries(preAggregation, preAggregationsSchema): Promise<VersionEntry[]> {
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory(preAggregation.dataSource);
 
-    const actualTables = await client.getTablesQuery(preAggregation.preAggregationsSchema);
-    return tablesToVersionEntries(preAggregation.preAggregationsSchema, actualTables);
+    const actualTables = await client.getTablesQuery(preAggregationsSchema);
+    return tablesToVersionEntries(preAggregationsSchema, actualTables);
   }
 }

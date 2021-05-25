@@ -446,7 +446,6 @@ export class ApiGateway {
       const orchestratorApi = this.getAdapterApi(context);
       const compilerApi = this.getCompilerApi(context);
 
-      // TODO: rename dateRange to scheduleRange
       const { timezone = 'UTC', scheduleRange } = preAggregationFilter;
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
@@ -458,34 +457,32 @@ export class ApiGateway {
             scheduleRange
           }
         );
-        
-      res({
-        preAggregationPartitions: await Promise.all(preAggregationPartitions.map(
-          async ({ preAggregation, partitions }) => {
-            const preAggregationVersionEntries = preAggregation &&
-              await orchestratorApi.getPreAggregationVersionEntries(
-                {
-                  ...preAggregation,
-                  preAggregationsSchema: compilerApi.preAggregationsSchema,
-                },
-                partitions
-              );
-            const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntrie) => {
-              if (!obj[versionEntrie.table_name]) obj[versionEntrie.table_name] = [];
-              obj[versionEntrie.table_name].push(versionEntrie);
-              return obj;
-            }, {});
 
-            return {
-              timezone,
-              preAggregation,
-              partitions: partitions.map(partition => {
-                partition.versionEntries = preAggregationVersionEntriesByName[partition.sql.tableName];
-                return partition;
-              }),
-            };
-          }
-        ))
+      const preAggregationVersionEntries = preAggregationPartitions &&
+        await orchestratorApi.getPreAggregationVersionEntries(
+          preAggregationPartitions,
+          compilerApi.preAggregationsSchema
+        );
+
+      const mergePartitionsAndVersionEntries = () => {
+        const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntrie) => {
+          if (!obj[versionEntrie.table_name]) obj[versionEntrie.table_name] = [];
+          obj[versionEntrie.table_name].push(versionEntrie);
+          return obj;
+        }, {});
+
+        return ({ preAggregation, partitions, ...props }) => ({
+          ...props,
+          preAggregation,
+          partitions: partitions.map(partition => {
+            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql.tableName];
+            return partition;
+          }),
+        });
+      };
+
+      res({
+        preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
       });
     } catch (e) {
       console.log(e);

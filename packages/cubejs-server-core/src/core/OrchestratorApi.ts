@@ -154,7 +154,7 @@ export class OrchestratorApi {
     this.seenDataSources[dataSource] = true;
   }
 
-  public getPreAggregationVersionEntries(preAggregation, partitions) {
-    return this.orchestrator.getPreAggregationVersionEntries(preAggregation, partitions);
+  public getPreAggregationVersionEntries(preAggregations, preAggregationsSchema) {
+    return this.orchestrator.getPreAggregationVersionEntries(preAggregations, preAggregationsSchema);
   }
 }
