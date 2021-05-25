@@ -365,7 +365,9 @@ export class ApiGateway {
       app.get('/cubejs-system/v1/pre-aggregations/partitions', systemMiddlewares, (async (req, res) => {
         await this.getPreAggregationPartitions({
           preAggregationFilter: {
-            ...req.query
+            ...req.query,
+            preAggregationIds: req.query.preAggregationIds && req.query.preAggregationIds.split(','),
+            scheduleRange: req.query.scheduleRange && req.query.scheduleRange.split(',')
           },
           context: req.context,
           res: this.resToResultFn(res)
