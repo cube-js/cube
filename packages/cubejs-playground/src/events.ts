@@ -1,30 +1,34 @@
 import { fetch } from 'whatwg-fetch';
-import cookie from 'component-cookie';
+import cookie from 'js-cookie';
 import uuidv4 from 'uuid/v4';
 
 let flushPromise = null;
 let trackEvents: BaseEvent[] = [];
 let baseProps = {
-  sentFrom: 'frontend'
+  sentFrom: 'frontend',
 };
 let telemetry: boolean | undefined;
 
-export const setTelemetry = (isAllowed) => telemetry = isAllowed;
+export const setTelemetry = (isAllowed) => (telemetry = isAllowed);
 
 const track = async (event) => {
   if (telemetry !== true) {
     return;
   }
 
-  if (!cookie('playground_anonymous')) {
-    cookie('playground_anonymous', uuidv4());
+  let clientAnonymousId: string | null = localStorage.getItem('playground_anonymous');
+
+  if (!clientAnonymousId) {
+    clientAnonymousId = <string>(cookie.get('playground_anonymous') || uuidv4().toString());
+    localStorage.setItem('playground_anonymous', clientAnonymousId);
+    cookie.remove('playground_anonymous');
   }
 
   trackEvents.push({
     ...baseProps,
     ...event,
     id: uuidv4(),
-    clientAnonymousId: cookie('playground_anonymous'),
+    clientAnonymousId,
     clientTimestamp: new Date().toJSON(),
   });
 
@@ -71,7 +75,7 @@ const track = async (event) => {
 export const setAnonymousId = (anonymousId, props) => {
   baseProps = {
     ...baseProps,
-    ...props
+    ...props,
   };
   track({ event: 'identify', anonymousId, ...props });
 };
