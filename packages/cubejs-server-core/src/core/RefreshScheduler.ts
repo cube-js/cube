@@ -224,30 +224,45 @@ export class RefreshScheduler {
         const preAggregation = scheduledPreAggregations[preAggregationIndex];
         queriesCache[key] = this.refreshQueriesForPreAggregation(
           context, compilerApi, preAggregation, { ...queryingOptions, timezone }
-        );
+        ).catch(e => {
+          delete queriesCache[key];
+          throw e;
+        });
       }
       return queriesCache[key];
     };
 
     const advance = async () => {
-      preAggregationCursor += 1;
-      if (preAggregationCursor >= scheduledPreAggregations.length) {
-        preAggregationCursor = 0;
-        timezoneCursor += 1;
-      }
+      const initialPreAggregationCursor = preAggregationCursor;
+      const initialTimezoneCursor = timezoneCursor;
+      const initialPartitionCursor = partitionCursor;
+      const initialPartitionCounter = partitionCounter;
+      try {
+        preAggregationCursor += 1;
+        if (preAggregationCursor >= scheduledPreAggregations.length) {
+          preAggregationCursor = 0;
+          timezoneCursor += 1;
+        }
 
-      if (timezoneCursor >= timezones.length) {
-        timezoneCursor = 0;
-        partitionCursor += 1;
-      }
+        if (timezoneCursor >= timezones.length) {
+          timezoneCursor = 0;
+          partitionCursor += 1;
+        }
 
-      const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
-      if (partitionCursor < queries.length) {
-        partitionCounter += 1;
-        return true;
-      } else {
-        finishedPartitions[`${preAggregationCursor}_${timezoneCursor}`] = true;
-        return false;
+        const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
+        if (partitionCursor < queries.length) {
+          partitionCounter += 1;
+          return true;
+        } else {
+          finishedPartitions[`${preAggregationCursor}_${timezoneCursor}`] = true;
+          return false;
+        }
+      } catch (e) {
+        preAggregationCursor = initialPreAggregationCursor;
+        timezoneCursor = initialTimezoneCursor;
+        partitionCursor = initialPartitionCursor;
+        partitionCounter = initialPartitionCounter;
+        throw e;
       }
     };
 
