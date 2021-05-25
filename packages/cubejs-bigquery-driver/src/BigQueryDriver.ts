@@ -4,11 +4,12 @@ import { BigQuery, BigQueryOptions, Dataset, Job, QueryRowsResponse } from '@goo
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver, DownloadTableCSVData,
-  DriverInterface, QueryOptions, UnloadOptions,
+  DriverInterface, QueryOptions, StreamOptions, StreamTableData, StreamTableDataWithTypes, UnloadOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import { Table } from '@google-cloud/bigquery/build/src/table';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
+import { HydrationStream } from './HydrationStream';
 
 const suffixTableRegex = /^(.*?)([0-9_]+)$/;
 
@@ -24,7 +25,7 @@ interface BigQueryDriverOptions extends BigQueryOptions {
 
 type BigQueryDriverOptionsInitialized = Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
 
-class BigQueryDriver extends BaseDriver implements DriverInterface {
+export class BigQueryDriver extends BaseDriver implements DriverInterface {
   protected readonly options: BigQueryDriverOptionsInitialized;
 
   protected readonly bigquery: BigQuery;
@@ -175,7 +176,7 @@ class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  async tableColumnTypes(table: string) {
+  public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
     const [bigQueryTable] = await this.bigquery.dataset(schema).table(name).getMetadata();
     return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
@@ -187,6 +188,26 @@ class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async isUnloadSupported(options: UnloadOptions) {
     return this.bucket !== null;
+  }
+
+  public async stream(
+    query: string,
+    values: unknown[],
+    { highWaterMark }: StreamOptions
+  ): Promise<StreamTableData> {
+    const stream = await this.bigquery.createQueryStream({
+      query,
+      params: values,
+      parameterMode: 'positional',
+      useLegacySql: false
+    });
+
+    const rowStream = new HydrationStream();
+    stream.pipe(rowStream);
+
+    return {
+      rowStream,
+    };
   }
 
   public async unload(table: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
@@ -283,5 +304,3 @@ class BigQueryDriver extends BaseDriver implements DriverInterface {
     }).join('.');
   }
 }
-
-module.exports = BigQueryDriver;
