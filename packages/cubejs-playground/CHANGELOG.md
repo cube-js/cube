@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
+
+
+### Features
+
+* **@cubejs-client/playground:** sticky search bar, search improvements ([#2815](https://github.com/cube-js/cube.js/issues/2815)) ([343c52b](https://github.com/cube-js/cube.js/commit/343c52bf42fd1809360135243be9a5020beea19b))
+
+
+
+
+
 ## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
 
 

@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** reorder reset ([#2810](https://github.com/cube-js/cube.js/issues/2810)) ([2d22683](https://github.com/cube-js/cube.js/commit/2d22683e7f02447f22a74db5fc2e0a122939f7e8))
+
+
+### Features
+
+* **@cubejs-client/playground:** sticky search bar, search improvements ([#2815](https://github.com/cube-js/cube.js/issues/2815)) ([343c52b](https://github.com/cube-js/cube.js/commit/343c52bf42fd1809360135243be9a5020beea19b))
+* **cubestore:** support aliases for right side of joins ([42a7d41](https://github.com/cube-js/cube.js/commit/42a7d4120af19e45751d683389d8003691a807e7))
+* **cubestore:** support SQL for rolling window queries ([03ff70a](https://github.com/cube-js/cube.js/commit/03ff70ac9be7805b9332d3382707b42ebf625be9))
+
+
+
+
+
 ## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
 
 
