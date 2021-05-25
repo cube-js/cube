@@ -46,6 +46,6 @@
     "@types/generic-pool": "^3.1.9",
     "@types/node": "^10.17.55",
     "@types/sqlstring": "^2.3.0",
-    "typescript": "~4.1.5"
+    "typescript": "~4.2.4"
   }
 }

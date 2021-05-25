@@ -26,6 +26,6 @@
     "@cubejs-backend/snowflake-driver": "^0.27.19",
     "@cubejs-backend/sqlite-driver": "^0.27.17",
     "cubejs-cli": "^0.27.19",
-    "typescript": "~4.1.5"
+    "typescript": "~4.2.4"
   }
 }

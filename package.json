@@ -68,7 +68,7 @@
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "rollup-plugin-postcss": "^4.0.0",
     "rollup-plugin-uglify": "^6.0.4",
-    "typescript": "~4.1.5"
+    "typescript": "~4.2.4"
   },
   "repository": {
     "type": "git",
