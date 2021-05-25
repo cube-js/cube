@@ -23,7 +23,7 @@
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
-    "postinstall": "CUBESTORE_SKIP_POST_INSTALL=true lerna link"
+    "postinstall": "CUBESTORE_SKIP_POST_INSTALL=true lerna link && patch-package"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
@@ -59,6 +59,7 @@
     "lerna": "^3.13.1",
     "less": "^4.1.1",
     "npm-package-json-lint": "^5.1.0",
+    "patch-package": "^6.4.7",
     "postcss": "^8.2.8",
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
