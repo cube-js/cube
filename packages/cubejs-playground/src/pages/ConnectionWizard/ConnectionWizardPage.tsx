@@ -120,7 +120,7 @@ export default function ConnectionWizardPage({ history }) {
               )}
 
               <Typography.Paragraph>
-                For advanced configuration use cube.js configuration file inside
+                For advanced configuration, use the <code>cube.js</code> configuration file inside
                 mount volume or environment variables.<br />
                 <Typography.Link href="https://cube.dev/docs/connecting-to-the-database" target="_blank">
                   Learn more about connecting to the databases in the docs.
