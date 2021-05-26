@@ -165,7 +165,8 @@ export class QueryOrchestrator {
 
   public async getPreAggregationVersionEntries(
     preAggregations: { preAggregation: any, partitions: any[]}[],
-    preAggregationsSchema: String
+    preAggregationsSchema: string,
+    requestId: string,
   ) {
     const preAggregationsByUniqueSource = preAggregations.reduce((obj, p) => {
       const { dataSource, external } = p.preAggregation;
@@ -183,7 +184,8 @@ export class QueryOrchestrator {
           {
             ...p.preAggregation,
             preAggregationsSchema
-          }
+          },
+          requestId
         ))
     );
     const partitionsByTableName = preAggregations.map(p => p.partitions).flat().reduce((obj, partition) => {

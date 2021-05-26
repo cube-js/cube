@@ -443,6 +443,7 @@ export class ApiGateway {
 
       const preAggregationVersionEntries = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
+          context,
           preAggregationPartitions,
           compilerApi.preAggregationsSchema
         );

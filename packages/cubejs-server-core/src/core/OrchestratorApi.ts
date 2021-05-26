@@ -2,7 +2,7 @@
 import pt from 'promise-timeout';
 import { QueryOrchestrator, ContinueWaitError } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeFn } from './types';
+import { DbTypeFn, RequestContext } from './types';
 
 export class OrchestratorApi {
   private seenDataSources: { [dataSource: string]: boolean } = {};
@@ -154,7 +154,11 @@ export class OrchestratorApi {
     this.seenDataSources[dataSource] = true;
   }
 
-  public getPreAggregationVersionEntries(preAggregations, preAggregationsSchema) {
-    return this.orchestrator.getPreAggregationVersionEntries(preAggregations, preAggregationsSchema);
+  public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema) {
+    return this.orchestrator.getPreAggregationVersionEntries(
+      preAggregations,
+      preAggregationsSchema,
+      context.requestId
+    );
   }
 }

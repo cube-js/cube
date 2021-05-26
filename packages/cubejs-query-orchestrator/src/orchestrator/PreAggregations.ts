@@ -1071,7 +1071,7 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public async getPreAggregationVersionEntries(preAggregation): Promise<VersionEntry[]> {
+  public async getPreAggregationVersionEntries(preAggregation, requestId): Promise<VersionEntry[]> {
     const { dataSource } = preAggregation;
     const loadCache = new PreAggregationLoadCache(
       this.redisPrefix,
@@ -1080,7 +1080,7 @@ export class PreAggregations {
       this,
       {
         // TODO: skip requestId?
-        requestId: undefined,
+        requestId,
         dataSource
       }
     );
