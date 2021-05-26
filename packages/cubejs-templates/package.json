@@ -37,6 +37,6 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.27.0",
-    "typescript": "~4.1.5"
+    "typescript": "~4.2.4"
   }
 }

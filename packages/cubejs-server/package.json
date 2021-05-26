@@ -71,7 +71,7 @@
     "@types/ws": "^7.2.9",
     "@types/yarnpkg__lockfile": "^1.1.4",
     "jest": "^26.0.0",
-    "typescript": "~4.1.5"
+    "typescript": "~4.2.4"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
