@@ -72,7 +72,7 @@
     "@types/react-router": "^5.1.12",
     "@types/react-router-dom": "^5.1.7",
     "@types/styled-components": "5.1.9",
-    "antd": "4.13.0",
+    "antd": "4.16.0",
     "eslint-config-airbnb": "^18.1.0",
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
