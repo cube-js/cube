@@ -2214,18 +2214,31 @@ async fn having(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("a", 2), ("b", 1)]));
 
+    // We diverge from datafusion here, which resolve `n` in the HAVING to `sum(n)` and fail.
+    // At the moment CubeJS sends requests like this, though, so we choose to remove support for
+    // filtering on aliases in the same query.
     let r = service
         .exec_query(
-            "SELECT `data`.id, count(`data`.n) `cnt` \
+            "SELECT `data`.id, sum(n) AS n \
              FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
-             WHERE n != 2 \
              GROUP BY 1 \
-             HAVING cnt = 2 \
+             HAVING sum(n) > 5 \
              ORDER BY 1",
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("a", 2), ("c", 2)]));
+    assert_eq!(to_rows(&r), rows(&[("b", 7), ("c", 9)]));
+    // Since we do not resolve aliases, this will fail.
+    let err = service
+        .exec_query(
+            "SELECT `data`.id, sum(n) AS n \
+             FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
+             GROUP BY 1 \
+             HAVING n = 2 \
+             ORDER BY 1",
+        )
+        .await;
+    assert!(err.is_err());
 
     fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
         a.iter()
