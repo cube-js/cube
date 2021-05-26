@@ -29,9 +29,12 @@ use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::table::data::{MutRows, Rows};
 use crate::table::{Row, TableValue};
+use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
+use num::ToPrimitive;
+use std::convert::TryFrom;
 use tempfile::TempPath;
 
 pub mod limits;
@@ -113,10 +116,11 @@ impl ImportFormat {
                                         .parse()
                                         .map(|v| TableValue::Int(v))
                                         .unwrap_or(TableValue::Null),
-                                    ColumnType::Decimal { .. } => {
-                                        BigDecimal::from_str_radix(value, 10)
-                                            .map(|d| TableValue::Decimal(d.to_string()))
-                                            .unwrap_or(TableValue::Null)
+                                    t @ ColumnType::Decimal { .. } => {
+                                        TableValue::Decimal(parse_decimal(
+                                            value,
+                                            u8::try_from(t.target_scale()).unwrap(),
+                                        )?)
                                     }
                                     ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
                                     ColumnType::HyperLogLog(f) => {
@@ -146,6 +150,26 @@ impl ImportFormat {
             }
         }
     }
+}
+
+pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError> {
+    // TODO: parse into Decimal directly.
+    let bd = BigDecimal::from_str_radix(value, 10)?;
+    let raw_value = match bd
+        .with_scale(scale as i64)
+        .into_bigint_and_exponent()
+        .0
+        .to_i64()
+    {
+        Some(d) => d,
+        None => {
+            return Err(CubeError::user(format!(
+                "cannot represent '{}' with scale {} without loosing precision",
+                value, scale
+            )))
+        }
+    };
+    Ok(Decimal::new(raw_value))
 }
 
 struct CsvLineParser<'a> {

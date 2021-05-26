@@ -18,6 +18,7 @@
 //!
 //! To iterate over produced rows use [RowsView], also see [`Rows::view`].
 use crate::table::{Row, TableValue, TimestampValue};
+use crate::util::decimal::Decimal;
 use crate::util::ordfloat::OrdF64;
 use bumpalo::Bump;
 use itertools::Itertools;
@@ -31,7 +32,7 @@ pub enum TableValueR<'a> {
     Null,
     String(&'a str),
     Int(i64),
-    Decimal(&'a str), // TODO bincode is incompatible with BigDecimal
+    Decimal(Decimal),
     Float(OrdF64),
     Bytes(&'a [u8]),
     Timestamp(TimestampValue),
@@ -44,7 +45,7 @@ impl TableValueR<'_> {
             TableValue::Null => TableValueR::Null,
             TableValue::String(s) => TableValueR::String(&s),
             TableValue::Int(i) => TableValueR::Int(*i),
-            TableValue::Decimal(d) => TableValueR::Decimal(&d),
+            TableValue::Decimal(d) => TableValueR::Decimal(*d),
             TableValue::Float(f) => TableValueR::Float(*f),
             TableValue::Bytes(b) => TableValueR::Bytes(&b),
             TableValue::Timestamp(v) => TableValueR::Timestamp(v.clone()),
@@ -366,7 +367,7 @@ impl<'a> InsertedRow<'a> {
         *target = match source {
             TableValueR::Boolean(v) => TableValueR::Boolean(v),
             TableValueR::Bytes(s) => TableValueR::Bytes(arena.alloc_slice_copy(s)),
-            TableValueR::Decimal(s) => TableValueR::Decimal(arena.alloc_str(s)),
+            TableValueR::Decimal(d) => TableValueR::Decimal(d),
             TableValueR::Float(v) => TableValueR::Float(v),
             TableValueR::Int(v) => TableValueR::Int(v),
             TableValueR::Null => TableValueR::Null,
@@ -442,7 +443,7 @@ pub fn convert_row_to_heap_allocated(r: &RowR) -> Row {
                 TableValueR::Null => TableValue::Null,
                 TableValueR::String(s) => TableValue::String(s.to_string()),
                 TableValueR::Int(i) => TableValue::Int(*i),
-                TableValueR::Decimal(d) => TableValue::Decimal(d.to_string()),
+                TableValueR::Decimal(d) => TableValue::Decimal(*d),
                 TableValueR::Float(f) => TableValue::Float(*f),
                 TableValueR::Bytes(b) => TableValue::Bytes(b.to_vec()),
                 TableValueR::Timestamp(v) => TableValue::Timestamp(v.clone()),

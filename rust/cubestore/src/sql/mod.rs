@@ -33,6 +33,7 @@ use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
 use crate::table::data::{MutRows, Rows, TableValueR};
+use crate::util::decimal::Decimal;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
 use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
@@ -48,9 +49,8 @@ use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::Write;
+use std::convert::TryFrom;
 use std::path::Path;
-use std::str::from_utf8_unchecked;
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::instrument;
@@ -798,11 +798,9 @@ fn extract_data<'a>(
                 }
                 TableValueR::Int(val_int.unwrap())
             }
-            ColumnType::Decimal { .. } => {
-                let decimal_val = parse_decimal(cell)?;
-                buffer.clear();
-                buffer.write_fmt(format_args!("{}", decimal_val)).unwrap();
-                TableValueR::Decimal(unsafe { from_utf8_unchecked(buffer) })
+            t @ ColumnType::Decimal { .. } => {
+                let d = parse_decimal(cell, u8::try_from(t.target_scale()).unwrap())?;
+                TableValueR::Decimal(d)
             }
             ColumnType::Bytes => {
                 let val;
@@ -845,10 +843,7 @@ fn extract_data<'a>(
                     )))
                 }
             },
-            ColumnType::Float => {
-                let decimal_val = parse_decimal(cell)?;
-                TableValueR::Float(decimal_val.into())
-            }
+            ColumnType::Float => TableValueR::Float(parse_float(cell)?.into()),
         }
     };
     Ok(res)
@@ -879,38 +874,35 @@ fn parse_time(s: &str, format: &[chrono::format::Item]) -> ParseResult<Parsed> {
     Ok(p)
 }
 
-fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
-    let decimal_val = match cell {
+fn parse_float(cell: &Expr) -> Result<f64, CubeError> {
+    match cell {
         Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
-            v.parse::<f64>()
+            Ok(v.parse::<f64>()?)
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
-            expr,
-        } => {
-            if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
-                v.parse::<f64>().map(|v| v * -1.0)
-            } else {
-                return Err(CubeError::user(format!(
-                    "Can't parse decimal from, {:?}",
-                    cell
-                )));
-            }
-        }
-        _ => {
-            return Err(CubeError::user(format!(
-                "Can't parse decimal from, {:?}",
-                cell
-            )))
-        }
-    };
-    if let Err(e) = decimal_val {
-        return Err(CubeError::user(format!(
-            "Can't parse decimal from, {:?}: {}",
-            cell, e
-        )));
+            expr: box Expr::Value(Value::Number(v, _)),
+        } => Ok(-v.parse::<f64>()?),
+        _ => Err(CubeError::user(format!(
+            "Can't parse float from, {:?}",
+            cell
+        ))),
     }
-    Ok(decimal_val?)
+}
+fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
+    match cell {
+        Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
+            crate::import::parse_decimal(v, scale)
+        }
+        Expr::UnaryOp {
+            op: UnaryOperator::Minus,
+            expr: box Expr::Value(Value::Number(v, _)),
+        } => Ok(crate::import::parse_decimal(v, scale)?.negate()),
+        _ => Err(CubeError::user(format!(
+            "Can't parse decimal from, {:?}",
+            cell
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -1083,35 +1075,35 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("7.61".to_string()), TableValue::Decimal("59.92".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(761000)), TableValue::Decimal(Decimal::new(5992))]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) from foo.values where dec_value > 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Decimal("58.92".to_string())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(16061000)), TableValue::Decimal(Decimal::new(5892))]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value > 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("160.61".to_string()), TableValue::Float(5.892.into())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(16061000)), TableValue::Float(5.892.into())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float(0.45.into())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Float(0.45.into())]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < '10'")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal("-132.99".to_string()), TableValue::Float(0.45.into())]));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Float(0.45.into())]));
         })
             .await;
     }

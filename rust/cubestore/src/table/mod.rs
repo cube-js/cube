@@ -1,4 +1,5 @@
 use crate::table::data::{Rows, RowsView};
+use crate::util::decimal::Decimal;
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
 use chrono::{SecondsFormat, TimeZone, Utc};
@@ -13,7 +14,7 @@ pub enum TableValue {
     Null,
     String(String),
     Int(i64),
-    Decimal(String), // TODO bincode is incompatible with BigDecimal
+    Decimal(Decimal),
     Float(OrdF64),
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),

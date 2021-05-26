@@ -1,3 +1,4 @@
+pub mod decimal;
 pub mod error;
 pub mod lock;
 mod malloc_trim_loop;
