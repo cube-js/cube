@@ -215,7 +215,7 @@ class PreAggregationLoadCache {
     return this.tables[redisKey];
   }
 
-  protected async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
+  public async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.versionEntries[redisKey]) {
       let versionEntries = tablesToVersionEntries(
@@ -1071,12 +1071,22 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public async getPreAggregationVersionEntries(preAggregation, preAggregationsSchema): Promise<VersionEntry[]> {
-    const client = preAggregation.external ?
-      await this.externalDriverFactory() :
-      await this.driverFactory(preAggregation.dataSource);
+  public async getPreAggregationVersionEntries(preAggregation): Promise<VersionEntry[]> {
+    const { dataSource } = preAggregation;
+    const loadCache = new PreAggregationLoadCache(
+      this.redisPrefix,
+      () => this.driverFactory(dataSource),
+      this.queryCache,
+      this,
+      {
+        // TODO: skip requestId?
+        requestId: undefined,
+        dataSource
+      }
+    );
 
-    const actualTables = await client.getTablesQuery(preAggregationsSchema);
-    return tablesToVersionEntries(preAggregationsSchema, actualTables);
+    const data = await loadCache.getVersionEntries(preAggregation);
+
+    return data.versionEntries;
   }
 }

@@ -180,8 +180,10 @@ export class QueryOrchestrator {
     const versionEntries = await Promise.all(
       preAggregationsByUniqueSource.array
         .map(p => this.preAggregations.getPreAggregationVersionEntries(
-          p.preAggregation,
-          preAggregationsSchema
+          {
+            ...p.preAggregation,
+            preAggregationsSchema
+          }
         ))
     );
     const partitionsByTableName = preAggregations.map(p => p.partitions).flat().reduce((obj, partition) => {

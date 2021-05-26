@@ -228,5 +228,8 @@ export const normalizeQueryPreAggregations = (query) => {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  return query;
+  return {
+    timezone: query.timezone || 'UTC',
+    preAggregations: query.preAggregations
+  };
 };
