@@ -284,7 +284,7 @@ impl DataFrameValue<String> for Option<Row> {
                             TableValue::Timestamp(t) => format!("{:?}", t),
                             TableValue::Bytes(b) => format!("{:?}", b),
                             TableValue::Boolean(b) => format!("{:?}", b),
-                            TableValue::Decimal(v) => format!("{}", v),
+                            TableValue::Decimal(v) => format!("{}", v.raw_value()),
                             TableValue::Float(v) => format!("{}", v),
                         })
                         .join(", ")

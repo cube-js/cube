@@ -5,6 +5,7 @@ use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
 use cubestore::sql::timestamp_from_string;
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
+use cubestore::util::decimal::Decimal;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -285,11 +286,11 @@ async fn group_by_decimal(service: Box<dyn SqlClient>) {
         result.get_rows(),
         &vec![
             Row::new(vec![
-                TableValue::Decimal("100".to_string()),
+                TableValue::Decimal(Decimal::new(100 * 100_000)),
                 TableValue::Int(3)
             ]),
             Row::new(vec![
-                TableValue::Decimal("200".to_string()),
+                TableValue::Decimal(Decimal::new(200 * 100_000)),
                 TableValue::Int(2)
             ])
         ]
@@ -2108,7 +2109,7 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
             .map(|(s, i)| {
                 vec![
                     TableValue::String(s.to_string()),
-                    TableValue::Decimal(i.to_string()),
+                    TableValue::Decimal(Decimal::new(*i * 100_000)),
                 ]
             })
             .collect_vec()
