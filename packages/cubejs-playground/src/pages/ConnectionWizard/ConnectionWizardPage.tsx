@@ -1,4 +1,4 @@
-import { Col, Row, Space, Typography } from 'antd';
+import { Alert, Col, Row, Space, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 
@@ -110,16 +110,29 @@ export default function ConnectionWizardPage({ history }) {
 
             <Typography>
               {db.instructions ? (
-                <p>
-                  <span dangerouslySetInnerHTML={{ __html: db.instructions }} />
-                </p>
+                <div dangerouslySetInnerHTML={{ __html: db.instructions }} />
               ) : (
-                <p>
+                <Typography.Paragraph>
                   Enter database credentials to connect to your database. <br />
-                  Cube.js will store your credentials into the .env file for
-                  future use.
-                </p>
+                  Cube.js will store your credentials into the <b><code>.env</code></b> file
+                  for future use.
+                </Typography.Paragraph>
               )}
+
+              <Typography.Paragraph>
+                For advanced configuration, use the <code>cube.js</code> configuration file inside
+                mount volume or environment variables.<br />
+                <Typography.Link href="https://cube.dev/docs/connecting-to-the-database" target="_blank">
+                  Learn more about connecting to databases in the documentation.
+                </Typography.Link>
+              </Typography.Paragraph>
+
+              {db.title === 'MongoDB' ? (
+                <Alert
+                  message="The MongoDB Connector for BI is required to connect to MongoDB."
+                  type="info"
+                />
+              ) : null}
             </Typography>
 
             <Row gutter={[40, 12]}>
@@ -151,7 +164,7 @@ export default function ConnectionWizardPage({ history }) {
                         setLoading(false);
 
                         event('test_database_connection_success:frontend', {
-                          database: db.title
+                          database: db.title,
                         });
 
                         history.push('/schema');
@@ -163,7 +176,7 @@ export default function ConnectionWizardPage({ history }) {
 
                         event('test_database_connection_error:frontend', {
                           error: error.message || error.toString(),
-                          database: db.title
+                          database: db.title,
                         });
                       }
 
