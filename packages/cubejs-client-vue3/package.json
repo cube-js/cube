@@ -44,7 +44,8 @@
     "babel-jest": "^23.6.0",
     "eslint": "^7.21.0",
     "eslint-plugin-vue": "^6.2.1",
-    "vue": "^3.0.11"
+    "vue": "^3.0.11",
+    "vue-template-compiler": "^2.6.12"
   },
   "eslintConfig": {
     "root": true,
