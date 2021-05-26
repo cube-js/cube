@@ -18,7 +18,15 @@ export interface ScheduledRefreshOptions {
 
 type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concurrency' | 'workerIndices'> & {
   timezones: string[],
-  scheduleRange?: [string, string]
+  refreshRange?: [string, string]
+};
+
+type PreAggregationsQueryingOptions = {
+  timezone: string,
+  preAggregations: {
+    id: string,
+    refreshRange?: [string, string]
+  }[]
 };
 
 export class RefreshScheduler {
@@ -40,7 +48,7 @@ export class RefreshScheduler {
 
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
 
-      let dateRange = queryingOptions.scheduleRange;
+      let dateRange = queryingOptions.refreshRange;
       if (!dateRange) {
         const [startDate, endDate] =
           await Promise.all(
@@ -209,20 +217,34 @@ export class RefreshScheduler {
   }
 
   public async preAggregationPartitions(
-    preAggregationsFilter: any,
     context,
     compilerApi: CompilerApi,
-    queryingOptions: ScheduledRefreshQueryingOptions
+    queryingOptions: PreAggregationsQueryingOptions
   ) {
-    const { timezone } = queryingOptions;
-    const preAggregations = await compilerApi.preAggregations(preAggregationsFilter);
+    const preAggregationsQueringOptions = queryingOptions.preAggregations.reduce((obj, p) => {
+      obj[p.id] = p;
+      return obj;
+    }, {});
+
+    const preAggregations = await compilerApi.preAggregations({
+      preAggregationIds: Object.keys(preAggregationsQueringOptions)
+    });
 
     return Promise.all(preAggregations.map(async preAggregation => {
+      const { timezone } = queryingOptions;
+      const { refreshRange } = preAggregationsQueringOptions[preAggregation.id] || {};
       const queriesForPreAggregation = preAggregation && await this.refreshQueriesForPreAggregation(
         context,
         compilerApi,
         preAggregation,
-        queryingOptions
+        // TODO: timezones, concurrency, workerIndices???
+        {
+          timezones: undefined,
+          concurrency: undefined,
+          workerIndices: undefined,
+          timezone,
+          refreshRange
+        }
       );
 
       const partitions: any = queriesForPreAggregation && await Promise.all(

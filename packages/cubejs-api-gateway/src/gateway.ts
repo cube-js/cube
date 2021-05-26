@@ -17,7 +17,7 @@ import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
+import { getPivotQuery, getQueryGranularity, normalizeQuery, normalizeQueryPreAggregations, QUERY_TYPE } from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -170,7 +170,7 @@ export type PreAggregationFilter = {
   preAggregationIds: String[];
   cubes: String[];
   timezone: String;
-  scheduleRange: [String, String]
+  refreshRange: [String, String]
 };
 
 export interface ApiGatewayOptions {
@@ -362,13 +362,9 @@ export class ApiGateway {
         });
       }));
 
-      app.get('/cubejs-system/v1/pre-aggregations/partitions', systemMiddlewares, (async (req, res) => {
+      app.post('/cubejs-system/v1/pre-aggregations/partitions', jsonParser, systemMiddlewares, (async (req, res) => {
         await this.getPreAggregationPartitions({
-          preAggregationFilter: {
-            ...req.query,
-            preAggregationIds: req.query.preAggregationIds && req.query.preAggregationIds.split(','),
-            scheduleRange: req.query.scheduleRange && req.query.scheduleRange.split(',')
-          },
+          query: req.body.query,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -437,27 +433,19 @@ export class ApiGateway {
   }
 
   public async getPreAggregationPartitions(
-    {
-      preAggregationFilter,
-      context,
-      res
-    }: { preAggregationFilter: PreAggregationFilter, context: RequestContext, res: ResponseResultFn }
+    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
     try {
+      query = normalizeQueryPreAggregations(this.parseQueryParam(query));
       const orchestratorApi = this.getAdapterApi(context);
       const compilerApi = this.getCompilerApi(context);
 
-      const { timezone = 'UTC', scheduleRange } = preAggregationFilter;
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
-          preAggregationFilter,
           context,
           compilerApi,
-          {
-            timezone,
-            scheduleRange
-          }
+          query
         );
 
       const preAggregationVersionEntries = preAggregationPartitions &&

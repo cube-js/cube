@@ -436,42 +436,42 @@ describe('API Gateway', () => {
       return { app, token, tokenUser };
     };
     
-    const notAllowedTestFactory = (route: String) => async () => {
+    const notAllowedTestFactory = ({ route, method = 'get' }) => async () => {
       const { app } = appPrepareFactory();
-      return request(app)
-        .get(`/cubejs-system/v1/${route}`)
+      return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(403);
     };
 
-    const notAllowedWithUserTokenTestFactory = (route: String) => async () => {
+    const notAllowedWithUserTokenTestFactory = ({ route, method = 'get' }) => async () => {
       const { app, tokenUser } = appPrepareFactory();
 
-      return request(app)
-        .get(`/cubejs-system/v1/${route}`)
+      return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .set('Authorization', `Bearer ${tokenUser}`)
         .expect(403);
     };
 
-    const notExistsTestFactory = (route: String) => async () => {
+    const notExistsTestFactory = ({ route, method = 'get' }) => async () => {
       const { app } = createApiGateway();
 
-      return request(app)
-        .get(`/cubejs-system/v1/${route}`)
+      return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(404);
     };
 
-    const successTestFactory = (route: String, result: any) => async () => {
+    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult }) => async () => {
       const { app, token } = appPrepareFactory();
-      const res = await request(app)
-        .get(`/cubejs-system/v1/${route}`)
+
+      const req = request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body).toMatchObject(result);
+      if (method === 'post') req.send(successBody);
+
+      const res = await req;
+      expect(res.body).toMatchObject(successResult);
     };
 
     const testConfigs = [
@@ -481,16 +481,31 @@ describe('API Gateway', () => {
       { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } },
       {
         route: 'pre-aggregations/partitions',
+        method: 'post',
+        successBody: {
+          query: {
+            timezone: 'UTC',
+            preAggregations: [
+              {
+                id: 'cube.preAggregationName',
+                refreshRange: [
+                  '2020-01-01T00:00:00.000',
+                  '2020-01-01T23:59:59.999'
+                ]
+              }
+            ]
+          }
+        },
         successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() }
       }
     ];
 
-    testConfigs.forEach(({ route, successResult }) => {
-      describe(`/cubejs-system/v1/${route}`, () => {
-        test('not allowed', notAllowedTestFactory(route));
-        test('not allowed with user token', notAllowedWithUserTokenTestFactory(route));
-        test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(route));
-        test('success', successTestFactory(route, successResult));
+    testConfigs.forEach((config) => {
+      describe(`/cubejs-system/v1/${config.route}`, () => {
+        test('not allowed', notAllowedTestFactory(config));
+        test('not allowed with user token', notAllowedWithUserTokenTestFactory(config));
+        test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(config));
+        test('success', successTestFactory(config));
       });
     });
   });
