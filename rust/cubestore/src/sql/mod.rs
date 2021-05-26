@@ -47,6 +47,7 @@ use hex::FromHex;
 use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::str::from_utf8_unchecked;
@@ -177,6 +178,7 @@ impl SqlServiceImpl {
                     locations,
                     Some(ImportFormat::CSV),
                     indexes_to_create,
+                    false,
                 )
                 .await?;
             let wait_for = table
@@ -213,6 +215,9 @@ impl SqlServiceImpl {
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
+
+            self.db.table_ready(table.get_id(), true).await?;
+
             Ok(table)
         } else {
             self.db
@@ -223,6 +228,7 @@ impl SqlServiceImpl {
                     None,
                     None,
                     indexes_to_create,
+                    true,
                 )
                 .await
         }
@@ -343,7 +349,13 @@ impl SqlService for SqlServiceImpl {
         // trace!("AST is: {:?}", ast);
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
-                match variable.value.to_lowercase() {
+                if variable.len() != 1 {
+                    return Err(CubeError::user(format!(
+                        "Only one variable supported in SHOW, but got {}",
+                        variable.len()
+                    )));
+                }
+                match variable[0].value.to_lowercase() {
                     s if s == "schemas" => {
                         Ok(Arc::new(DataFrame::from(self.db.get_schemas().await?)))
                     }
@@ -464,6 +476,7 @@ impl SqlService for SqlServiceImpl {
                 table_name,
                 columns,
                 source,
+                ..
             }) => {
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
@@ -537,11 +550,11 @@ impl SqlService for SqlServiceImpl {
                                 .flat_map(|i| i.partitions.iter().map(|p| p.partition.get_id()))
                                 .collect(),
                         );
-                        let mocked_names = worker_plan
-                            .files_to_download()
-                            .iter()
-                            .map(|f| (f.clone(), f.clone()))
-                            .collect();
+                        let mut mocked_names = HashMap::new();
+                        for f in worker_plan.files_to_download() {
+                            let name = self.remote_fs.local_file(&f).await?;
+                            mocked_names.insert(f, name);
+                        }
                         return Ok(QueryPlans {
                             router: self
                                 .query_executor
@@ -598,7 +611,8 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 | DataType::Char(_)
                 | DataType::Varchar(_)
                 | DataType::Clob(_)
-                | DataType::Text => ColumnType::String,
+                | DataType::Text
+                | DataType::String => ColumnType::String,
                 DataType::Uuid
                 | DataType::Binary(_)
                 | DataType::Varbinary(_)
@@ -701,7 +715,7 @@ fn parse_hyper_log_log<'a>(
 
 fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a [u8], CubeError> {
     match v {
-        Value::Number(s) => Ok(s.as_bytes()),
+        Value::Number(s, _) => Ok(s.as_bytes()),
         // We interpret strings of the form '0f 0a 14 ff' as a list of hex-encoded bytes.
         // MySQL will store bytes of the string itself instead and we should do the same.
         // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
@@ -753,14 +767,13 @@ fn extract_data<'a>(
             }
             ColumnType::Int => {
                 let val_int = match cell {
-                    Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
-                        v.parse::<i64>()
-                    }
+                    Expr::Value(Value::Number(v, _))
+                    | Expr::Value(Value::SingleQuotedString(v)) => v.parse::<i64>(),
                     Expr::UnaryOp {
                         op: UnaryOperator::Minus,
                         expr,
                     } => {
-                        if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+                        if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
                             v.parse::<i64>().map(|v| v * -1)
                         } else {
                             return Err(CubeError::user(format!(
@@ -862,14 +875,14 @@ fn parse_time(s: &str, format: &[chrono::format::Item]) -> ParseResult<Parsed> {
 
 fn parse_decimal(cell: &Expr) -> Result<f64, CubeError> {
     let decimal_val = match cell {
-        Expr::Value(Value::Number(v)) | Expr::Value(Value::SingleQuotedString(v)) => {
+        Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
             v.parse::<f64>()
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
             expr,
         } => {
-            if let Expr::Value(Value::Number(v)) = expr.as_ref() {
+            if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
                 v.parse::<f64>().map(|v| v * -1.0)
             } else {
                 return Err(CubeError::user(format!(
@@ -996,7 +1009,7 @@ mod tests {
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
-                meta_store,
+                meta_store.clone(),
                 chunk_store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1029,8 +1042,9 @@ mod tests {
                 TableValue::String("[{\"name\":\"PersonID\",\"column_type\":\"Int\",\"column_index\":0},{\"name\":\"LastName\",\"column_type\":\"String\",\"column_index\":1},{\"name\":\"FirstName\",\"column_type\":\"String\",\"column_index\":2},{\"name\":\"Address\",\"column_type\":\"String\",\"column_index\":3},{\"name\":\"City\",\"column_type\":\"String\",\"column_index\":4}]".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
-                TableValue::String("NULL".to_string()),
                 TableValue::String("false".to_string()),
+                TableValue::String("true".to_string()),
+                TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
             ]));
         }
         let _ = DB::destroy(&Options::default(), path);

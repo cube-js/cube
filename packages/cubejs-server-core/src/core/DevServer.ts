@@ -1,5 +1,4 @@
 /* eslint-disable global-require,no-restricted-syntax */
-import type { ChildProcess } from 'child_process';
 import dotenv from '@cubejs-backend/dotenv';
 import spawn from 'cross-spawn';
 import path from 'path';
@@ -7,9 +6,10 @@ import fs from 'fs-extra';
 import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
 import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
-import type { Application as ExpressApplication } from 'express';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
+import type { Application as ExpressApplication } from 'express';
+import type { ChildProcess } from 'child_process';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
@@ -74,7 +74,7 @@ export class DevServer {
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options?.dockerVersion || null,
-        externalDbType: this.options?.externalDbTypeFn({
+        extDbType: this.options?.externalDbTypeFn({
           authInfo: null,
           securityContext: null,
           requestId: getRequestIdFromRequest(req),
@@ -84,6 +84,7 @@ export class DevServer {
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
+        dbType: options.dbType
       });
     }));
 

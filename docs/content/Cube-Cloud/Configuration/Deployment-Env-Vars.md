@@ -1,7 +1,7 @@
 ---
 title: Environment Variables
 permalink: /cloud/configuration/env-vars
-category: Configuring Cube Cloud
+category: Configuration
 menuOrder: 3
 ---
 

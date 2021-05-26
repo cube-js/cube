@@ -13,6 +13,7 @@ import {
   IndexPage,
 } from './pages';
 import { SecurityContextProvider } from './components/SecurityContext/SecurityContextProvider';
+import { AppContextProvider } from './components/AppContext';
 
 const history = createHashHistory();
 history.listen((location) => {
@@ -36,32 +37,34 @@ async function getToken(payload: string = '') {
 
 ReactDOM.render(
   <Router history={history}>
-    <App>
-      <Route key="index" exact path="/" component={IndexPage} />
-      <Route
-        key="build"
-        path="/build"
-        component={(props) => {
-          return (
-            <SecurityContextProvider getToken={getToken}>
-              <ExplorePage {...props} />
-            </SecurityContextProvider>
-          );
-        }}
-      />
-      <Route key="schema" path="/schema" component={SchemaPage} />
-      <Route
-        key="connection"
-        path="/connection"
-        component={() => <ConnectionWizardPage history={history} />}
-      />
-      <Route key="dashboard" path="/dashboard" component={DashboardPage} />
-      <Route
-        key="template-gallery"
-        path="/template-gallery"
-        component={TemplateGalleryPage}
-      />
-    </App>
+    <AppContextProvider>
+      <App>
+        <Route key="index" exact path="/" component={IndexPage} />
+        <Route
+          key="build"
+          path="/build"
+          component={(props) => {
+            return (
+              <SecurityContextProvider getToken={getToken}>
+                <ExplorePage {...props} />
+              </SecurityContextProvider>
+            );
+          }}
+        />
+        <Route key="schema" path="/schema" component={SchemaPage} />
+        <Route
+          key="connection"
+          path="/connection"
+          component={() => <ConnectionWizardPage history={history} />}
+        />
+        <Route key="dashboard" path="/dashboard" component={DashboardPage} />
+        <Route
+          key="template-gallery"
+          path="/template-gallery"
+          component={TemplateGalleryPage}
+        />
+      </App>
+    </AppContextProvider>
   </Router>,
   // eslint-disable-next-line no-undef
   document.getElementById('playground-root')

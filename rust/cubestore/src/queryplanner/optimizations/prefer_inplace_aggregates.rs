@@ -1,13 +1,14 @@
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use datafusion::error::DataFusionError;
-use datafusion::physical_plan::expressions::AliasedSchemaExec;
+use datafusion::physical_plan::alias::AliasedSchemaExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::{AggregateStrategy, HashAggregateExec};
-use datafusion::physical_plan::merge::{MergeExec, UnionExec};
+use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::planner::compute_aggregation_strategy;
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::ExecutionPlan;
 use std::sync::Arc;
 
@@ -39,6 +40,7 @@ pub fn try_switch_to_inplace_aggregates(
         agg.group_expr().into(),
         agg.aggr_expr().into(),
         new_input,
+        agg.input_schema().clone(),
     )?))
 }
 

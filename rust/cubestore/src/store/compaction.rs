@@ -285,6 +285,7 @@ mod tests {
                 None,
                 None,
                 vec![],
+                true,
             )
             .await
             .unwrap();

@@ -274,6 +274,7 @@ pub fn plan_topk(
         group_expr,
         initial_aggregate_expr.clone(),
         input,
+        physical_input_schema,
     )?);
 
     let aggregate_schema = aggregate.as_ref().schema();
@@ -294,11 +295,7 @@ pub fn plan_topk(
             )
         })
         .collect::<Result<Vec<_>, DataFusionError>>()?;
-    let sort = Arc::new(SortExec::try_new(
-        sort_expr,
-        aggregate,
-        ctx.config.concurrency,
-    )?);
+    let sort = Arc::new(SortExec::try_new(sort_expr, aggregate)?);
     let sort_schema = sort.schema();
 
     // Send results to router.

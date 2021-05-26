@@ -416,7 +416,7 @@ For more details, take a look at the
 ## Cube Cloud
 
 <!-- prettier-ignore-start -->
-[[info |]] 
+[[info | ]]
 | [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
 | an account yet, you can [sign up to the waitlist here][link-cube-cloud].
 <!-- prettier-ignore-end -->

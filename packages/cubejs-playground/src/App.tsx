@@ -1,5 +1,5 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import { Component } from 'react';
+import { Component, useEffect } from 'react';
 import '@ant-design/compatible/assets/index.css';
 import { Layout, Alert } from 'antd';
 import { fetch } from 'whatwg-fetch';
@@ -9,6 +9,7 @@ import Header from './components/Header';
 import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
 import { event, setAnonymousId, setTelemetry } from './events';
+import { useAppContext } from './components/AppContext';
 import './index.less';
 
 const selectedTab = (pathname) => {
@@ -21,7 +22,7 @@ const selectedTab = (pathname) => {
 
 type TAppState = {
   fatalError: Error | null;
-  context: any;
+  context: Record<string, any> | null;
   showLoader: boolean;
 };
 
@@ -59,8 +60,8 @@ class App extends Component<RouteComponentProps, TAppState> {
       projectFingerprint: context.projectFingerprint,
       isDocker: Boolean(context.isDocker),
       dockerVersion: context.dockerVersion,
-      externalDbType: context.externalDbType,
     });
+
     this.setState({ context }, () => {
       if (context.shouldStartConnectionWizardFlow) {
         history.push('/connection');
@@ -106,9 +107,23 @@ class App extends Component<RouteComponentProps, TAppState> {
             children
           )}
         </Layout.Content>
+
+        <ContextSetter context={context} />
       </Layout>
     );
   }
+}
+
+function ContextSetter({ context }: Pick<TAppState, 'context'>) {
+  const { setContext } = useAppContext();
+
+  useEffect(() => {
+    if (context !== null) {
+      setContext({ extDbType: context.extDbType });
+    }
+  }, [context]);
+
+  return null;
 }
 
 export default withRouter(App);

@@ -101,8 +101,8 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
 
     fn from_template(
         &self,
-        exprs: &Vec<Expr>,
-        inputs: &Vec<LogicalPlan>,
+        exprs: &[Expr],
+        inputs: &[LogicalPlan],
     ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
         let num_groups = self.group_expr.len();
         let num_aggs = self.aggregate_expr.len();

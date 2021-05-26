@@ -29,6 +29,12 @@
       "path": "packages/cubejs-druid-driver"
     },
     {
+      "path": "packages/cubejs-postgres-driver"
+    },
+    {
+      "path": "packages/cubejs-snowflake-driver"
+    },
+    {
       "path": "packages/cubejs-jdbc-driver"
     },
     {

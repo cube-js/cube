@@ -52,7 +52,7 @@ pub fn rewrite_plan<R: PlanRewriter>(
             inputs: {
                 let mut new_inputs = Vec::new();
                 for i in inputs.iter() {
-                    new_inputs.push(Arc::new(rewrite_plan(i, ctx, f)?))
+                    new_inputs.push(rewrite_plan(i, ctx, f)?)
                 }
                 new_inputs
             },
@@ -109,7 +109,16 @@ pub fn rewrite_plan<R: PlanRewriter>(
             stringified_plans: stringified_plans.clone(),
             schema: schema.clone(),
         },
-        p @ LogicalPlan::Extension { .. } => p.clone(),
+        LogicalPlan::Extension { node } => LogicalPlan::Extension {
+            node: node.from_template(
+                &node.expressions(),
+                &node
+                    .inputs()
+                    .into_iter()
+                    .map(|p| rewrite_plan(p, ctx, f))
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+        },
     };
 
     // Update the resulting plan.

@@ -1,7 +1,7 @@
 ---
 title: Cube IDE
 permalink: /cloud/cube-ide
-category: Cube IDE
+category: Developer Tools
 menuOrder: 1
 ---
 

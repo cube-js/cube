@@ -1,5 +1,5 @@
-import type { Request, Response } from 'express';
 import uuid from 'uuid/v4';
+import type { Request, Response } from 'express';
 
 interface RequestParserResult {
   path: string;
