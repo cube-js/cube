@@ -469,7 +469,6 @@ export class ApiGateway {
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
       });
     } catch (e) {
-      console.log(e);
       this.handleError({
         e, context, res, requestStarted
       });
