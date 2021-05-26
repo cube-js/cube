@@ -25,7 +25,7 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "^0.27.14",
+    "@cubejs-client/core": "^0.27.19",
     "@vue/compiler-sfc": "^3.0.11",
     "core-js": "^3.6.5",
     "flush-promises": "^1.0.2",
