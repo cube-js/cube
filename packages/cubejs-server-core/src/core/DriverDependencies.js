@@ -7,7 +7,7 @@ module.exports = {
   jdbc: '@cubejs-backend/jdbc-driver',
   mongobi: '@cubejs-backend/mongobi-driver',
   bigquery: '@cubejs-backend/bigquery-driver',
-  redshift: '@cubejs-backend/postgres-driver',
+  redshift: '@cubejs-backend/redshift-driver',
   clickhouse: '@cubejs-backend/clickhouse-driver',
   hive: '@cubejs-backend/hive-driver',
   snowflake: '@cubejs-backend/snowflake-driver',
