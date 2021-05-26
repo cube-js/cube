@@ -139,7 +139,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
     // @ts-ignore
     R.unnest,
     R.fromPairs
-    // @ts-ignore
+  // @ts-ignore
   )(r);
 
   // @ts-ignore
@@ -164,13 +164,6 @@ export type UserBackgroundContext = {
   // @deprecated Renamed to securityContext, please use securityContext.
   authInfo?: any;
   securityContext: any;
-};
-
-export type PreAggregationFilter = {
-  preAggregationIds: String[];
-  cubes: String[];
-  timezone: String;
-  refreshRange: [String, String]
 };
 
 export interface ApiGatewayOptions {
