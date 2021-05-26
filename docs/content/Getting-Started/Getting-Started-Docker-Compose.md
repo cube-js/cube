@@ -26,11 +26,8 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      # 4000 is the port for the Cube.js API
-      - 4000:4000
-      # 3000 is the port for the Developer Playground, and is available only in
-      # development mode
-      - 3000:3000
+      - 4000:4000  # Cube.js API and Developer Playground
+      - 3000:3000  # Dashboard app, if created
     environment:
       - CUBEJS_DEV_MODE=true
     volumes:
@@ -38,6 +35,12 @@ services:
 ```
 
 ## 2. Run Cube.js
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| Using Windows? Remember to use [PowerShell][link-powershell] or
+| [WSL2][link-wsl2] to run the command below.
+<!-- prettier-ignore-end -->
 
 ```bash
 $ docker-compose up -d
@@ -96,6 +99,8 @@ Learn how to [query Cube.js with REST API][ref-rest-api] or [use our Javascript
 client library and integrations with frontend
 frameworks][ref-frontend-introduction].
 
+[link-powershell]: https://docs.microsoft.com/en-us/powershell/scripting/overview?view=powershell-7.1
+[link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-config]: /config
 [ref-connecting-to-the-database]: /connecting-to-the-database
 [ref-cubejs-schema]: /getting-started-cubejs-schema

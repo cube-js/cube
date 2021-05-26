@@ -4,7 +4,12 @@ import { createWriteStream, createReadStream } from 'fs';
 import { unlink } from 'fs-extra';
 import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import {
+  BaseDriver,
+  DownloadTableCSVData,
+  DownloadTableMemoryData,
+  StreamTableData,
+} from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
@@ -98,7 +103,7 @@ export class CubeStoreDriver extends BaseDriver {
     }
   }
 
-  private async importRows(table: string, columns: Column[], indexesSql: any, tableData: any) {
+  private async importRows(table: string, columns: Column[], indexesSql: any, tableData: DownloadTableMemoryData) {
     await this.createTable(table, columns);
     try {
       for (let i = 0; i < indexesSql.length; i++) {
@@ -128,18 +133,27 @@ export class CubeStoreDriver extends BaseDriver {
     }
   }
 
-  private async importCsvFile(tableData: any, table: string, columns: Column[], indexes) {
+  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
-    // eslint-disable-next-line no-unused-vars
-    const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
-    await this.query(createTableSqlWithLocation, files).catch(e => {
-      e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+
+    if (files.length > 0) {
+      // eslint-disable-next-line no-unused-vars
+      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
+      return this.query(createTableSqlWithLocation, files).catch(e => {
+        e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+        throw e;
+      });
+    }
+
+    const createTableSqlWithoutLocation = `${createTableSql} ${indexes}`;
+    return this.query(createTableSqlWithoutLocation, []).catch(e => {
+      e.message = `Error during create table: ${createTableSqlWithoutLocation}: ${e.message}`;
       throw e;
     });
   }
 
-  private async importStream(columns: Column[], tableData: any, table: string, indexes) {
+  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes) {
     const writer = csvWriter({ headers: columns.map(c => c.name) });
     const gzipStream = createGzip();
     const tempFile = tempy.file();

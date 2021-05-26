@@ -34,6 +34,6 @@ export class SnowflakeQuery extends BaseQuery {
   }
 
   nowTimestampSql() {
-    return `CURRENT_TIMESTAMP`;
+    return 'CURRENT_TIMESTAMP';
   }
 }

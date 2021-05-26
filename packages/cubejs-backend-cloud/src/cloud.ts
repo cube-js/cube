@@ -1,6 +1,6 @@
 import rp, { RequestPromiseOptions } from 'request-promise';
 import path from 'path';
-import { ReadStream } from 'node:fs';
+import { ReadStream } from 'fs';
 
 export type AuthObject = {
   auth: string,

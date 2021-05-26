@@ -1,9 +1,11 @@
 import path from 'path';
 import fs from 'fs';
+import vm from 'vm';
 import color from '@oclif/color';
 import dotenv from '@cubejs-backend/dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import {
+  displayCLIWarning,
   getEnv,
   isDockerImage,
   packageExists,
@@ -174,9 +176,7 @@ export class ServerContainer {
       // eslint-disable-next-line no-restricted-syntax
       for (const [pkgName] of Object.entries(manifest.dependencies)) {
         if (isDevPackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
-          throw new Error(
-            `"${pkgName}" package must be installed in devDependencies`
-          );
+          displayCLIWarning(`"${pkgName}" package must be installed in devDependencies`);
         }
       }
     }
@@ -253,21 +253,54 @@ export class ServerContainer {
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
-      this.getTypeScriptCompiler().compileConfiguration();
+      return this.loadConfigurationFromMemory(
+        this.getTypeScriptCompiler().compileConfiguration()
+      );
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.js'))) {
-      return this.loadConfiguration();
+      return this.loadConfigurationFromFile();
     }
 
-    console.log(
-      `${color.yellow('warning')} There is no cube.js file. Continue with environment variables`
+    displayCLIWarning(
+      'There is no cube.js file. Continue with environment variables'
     );
 
     return {};
   }
 
-  protected async loadConfiguration(): Promise<CreateOptions> {
+  protected async loadConfigurationFromMemory(content: string): Promise<CreateOptions> {
+    if (this.configuration.debug) {
+      console.log('Loaded configuration from memory', content);
+    }
+
+    const exports: Record<string, any> = {};
+
+    const script = new vm.Script(content, {
+      displayErrors: true,
+    });
+    script.runInNewContext(
+      {
+        require,
+        console,
+        // Workaround for ES5 exports
+        exports
+      },
+      {
+        filename: 'cube.js',
+      }
+    );
+
+    if (exports.default) {
+      return exports.default;
+    }
+
+    throw new Error(
+      'Configure file must export configuration as default.'
+    );
+  }
+
+  protected async loadConfigurationFromFile(): Promise<CreateOptions> {
     const file = await import(
       path.join(process.cwd(), 'cube.js')
     );

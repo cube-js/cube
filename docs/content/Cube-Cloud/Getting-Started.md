@@ -1,12 +1,18 @@
 ---
-title: Quickstart
-permalink: /cloud/quickstart
-category: Quickstart
+title: Getting Started
+permalink: /cloud/getting-started
+category: Cube Cloud Getting Started
 menuOrder: 1
+redirect_from:
+  - /cloud/quickstart
 ---
 
 This guide walks you through setting up Cube Cloud and connecting to your
 database.
+
+<div class="block-video" style="position: relative; padding-bottom: 56.25%; height: 0;">
+  <iframe src="https://www.loom.com/embed/8ad76276b9d74e8283b7c319a22e4411" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+</div>
 
 ## Step 1: Create Deployment
 
@@ -40,7 +46,7 @@ npx cubejs-cli deploy --token <TOKEN>
 >
   <img
   alt="Cube Cloud Upload Project Screen"
-  src="https://cube.dev/downloads/images/cube-cloud-quickstart-2.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/getting-started-2.png"
   style="border: none"
   width="100%"
   />
@@ -60,11 +66,24 @@ databases][link-connecting-to-databases] guide for more details.
   style="border: none"
   width="100%"
   />
+
 </div>
 
 ## Step 4: Try out Cube Cloud
 
 Now you can navigate to Playground to try out your queries or connect your
 application to Cube Cloud API.
+
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Cube Cloud Playground"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/getting-started-4.png"
+  style="border: none"
+  width="100%"
+  />
+
+</div>
 
 [link-connecting-to-databases]: /cloud/configuration/connecting-to-databases

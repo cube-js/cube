@@ -11,6 +11,7 @@ import {
   PivotConfig,
   Query,
   ChartType,
+  TransformedQuery,
 } from '@cubejs-client/core';
 import styled from 'styled-components';
 
@@ -137,7 +138,9 @@ function QueryChangeEmitter({
   onChange,
 }: QueryChangeEmitterProps) {
   useEffect(() => {
-    onChange();
+    if (!areQueriesEqual(query1, query2)) {
+      onChange();
+    }
   }, [areQueriesEqual(query1, query2)]);
 
   return null;
@@ -163,6 +166,7 @@ export type TPlaygroundQueryBuilderProps = {
 export type QueryStatus = {
   timeElapsed: number;
   isAggregated: boolean;
+  transformedQuery?: TransformedQuery;
 };
 
 export default function PlaygroundQueryBuilder({
@@ -240,18 +244,14 @@ export default function PlaygroundQueryBuilder({
         chartType,
         updateChartType,
         measures,
-        availableMeasures,
         updateMeasures,
         dimensions,
-        availableDimensions,
         updateDimensions,
         segments,
-        availableSegments,
         updateSegments,
         filters,
         updateFilters,
         timeDimensions,
-        availableTimeDimensions,
         updateTimeDimensions,
         orderMembers,
         updateOrder,
@@ -260,6 +260,8 @@ export default function PlaygroundQueryBuilder({
         missingMembers,
         isFetchingMeta,
         dryRunResponse,
+        availableMembers,
+        availableFilterMembers,
       }) => {
         let parsedDateRange;
 
@@ -344,7 +346,7 @@ export default function PlaygroundQueryBuilder({
                       <MemberGroup
                         disabled={isFetchingMeta}
                         members={measures}
-                        availableMembers={availableMeasures}
+                        availableMembers={availableMembers?.measures || []}
                         missingMembers={missingMembers}
                         addMemberName="Measure"
                         updateMethods={playgroundActionUpdateMethods(
@@ -359,7 +361,7 @@ export default function PlaygroundQueryBuilder({
                       <MemberGroup
                         disabled={isFetchingMeta}
                         members={dimensions}
-                        availableMembers={availableDimensions}
+                        availableMembers={availableMembers?.dimensions || []}
                         missingMembers={missingMembers}
                         addMemberName="Dimension"
                         updateMethods={playgroundActionUpdateMethods(
@@ -374,7 +376,7 @@ export default function PlaygroundQueryBuilder({
                       <MemberGroup
                         disabled={isFetchingMeta}
                         members={segments}
-                        availableMembers={availableSegments}
+                        availableMembers={availableMembers?.segments || []}
                         missingMembers={missingMembers}
                         addMemberName="Segment"
                         updateMethods={playgroundActionUpdateMethods(
@@ -389,7 +391,9 @@ export default function PlaygroundQueryBuilder({
                       <TimeGroup
                         disabled={isFetchingMeta}
                         members={timeDimensions}
-                        availableMembers={availableTimeDimensions}
+                        availableMembers={
+                          availableMembers?.timeDimensions || []
+                        }
                         missingMembers={missingMembers}
                         addMemberName="Time"
                         updateMethods={playgroundActionUpdateMethods(
@@ -405,9 +409,7 @@ export default function PlaygroundQueryBuilder({
                       <FilterGroup
                         disabled={isFetchingMeta}
                         members={filters}
-                        availableMembers={availableDimensions.concat(
-                          availableMeasures as any
-                        )}
+                        availableMembers={availableFilterMembers}
                         missingMembers={missingMembers}
                         addMemberName="Filter"
                         updateMethods={playgroundActionUpdateMethods(
@@ -460,6 +462,7 @@ export default function PlaygroundQueryBuilder({
                     <PreAggregationStatus
                       timeElapsed={queryStatus.timeElapsed}
                       isAggregated={queryStatus.isAggregated}
+                      transformedQuery={queryStatus.transformedQuery}
                     />
                   ) : null}
                 </SectionRow>
@@ -506,7 +509,12 @@ export default function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}
-                    setFramework={setFramework}
+                    setFramework={(currentFramework) => {
+                      if (currentFramework !== framework) {
+                        setQueryLoading(false);
+                        setFramework(currentFramework);
+                      }
+                    }}
                     setChartLibrary={(value) => {
                       if (ref.current) {
                         dispatchPlaygroundEvent(
@@ -552,15 +560,20 @@ export default function PlaygroundQueryBuilder({
                             timeElapsed,
                           }) => {
                             if (resultSet) {
+                              const response = resultSet.serialize();
                               setQueryError(null);
 
                               if (isAggregated != null && timeElapsed != null) {
                                 setQueryStatus({
                                   isAggregated,
                                   timeElapsed,
+                                  transformedQuery:
+                                    response.loadResponse.results[0]
+                                      .transformedQuery,
                                 });
                               }
                             }
+
                             if (error) {
                               setQueryError(error);
                               setQueryStatus(null);
@@ -582,11 +595,6 @@ export default function PlaygroundQueryBuilder({
                               });
                             }
                           }}
-                          onQueryChange={() => {
-                            if (queryError) {
-                              setQueryError(null);
-                            }
-                          }}
                         />
                       );
                     }}
@@ -601,7 +609,14 @@ export default function PlaygroundQueryBuilder({
             <QueryChangeEmitter
               query1={query}
               query2={queryRef.current}
-              onChange={() => setQueryStatus(null)}
+              onChange={() => {
+                setQueryLoading(false);
+                setQueryStatus(null);
+
+                if (queryError) {
+                  setQueryError(null);
+                }
+              }}
             />
           </>
         );

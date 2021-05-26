@@ -2,6 +2,7 @@ use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
+use cubestore::sql::timestamp_from_string;
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use itertools::Itertools;
@@ -72,6 +73,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
         t("offset", offset),
+        t("having", having),
+        t("rolling_window_join", rolling_window_join),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -1080,7 +1083,16 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) {
         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
         .await
         .unwrap();
-    service.exec_query(&format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url)).await.unwrap();
+    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url);
+    let (_, query_result) = tokio::join!(
+        service.exec_query(&create_table_sql),
+        service.exec_query("SELECT count(*) from foo.bikes")
+    );
+    assert!(
+        query_result.is_err(),
+        "Table shouldn't be ready but querying returns {:?}",
+        query_result
+    );
 
     let result = service
         .exec_query("SELECT count(*) from foo.bikes")
@@ -1110,13 +1122,13 @@ async fn empty_crash(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * from s.Table WHERE id = 1 AND s = 15")
         .await
         .unwrap();
-    assert_eq!(r.into_rows(), vec![]);
+    assert_eq!(r.get_rows(), &vec![]);
 
     let r = service
         .exec_query("SELECT id, sum(s) from s.Table WHERE id = 1 AND s = 15 GROUP BY 1")
         .await
         .unwrap();
-    assert_eq!(r.into_rows(), vec![]);
+    assert_eq!(r.get_rows(), &vec![]);
 }
 
 async fn bytes(service: Box<dyn SqlClient>) {
@@ -1607,7 +1619,7 @@ async fn topk_large_inputs(service: Box<dyn SqlClient>) {
                      ORDER BY 2 DESC \
                      LIMIT 10";
 
-    let rows = service.exec_query(query).await.unwrap().into_rows();
+    let rows = service.exec_query(query).await.unwrap().get_rows().clone();
     assert_eq!(rows.len(), 10);
     for i in 0..10 {
         match &rows[i].values()[0] {
@@ -1694,7 +1706,7 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         .plan_query(
             "SELECT id, amount \
                  FROM s.Orders \
-                 WHERE id > 10\
+                 WHERE id > 10 \
                  LIMIT 10",
         )
         .await
@@ -2155,6 +2167,185 @@ async fn offset(service: Box<dyn SqlClient>) {
     fn rows(a: &[&str]) -> Vec<Vec<TableValue>> {
         a.iter()
             .map(|s| vec![TableValue::String(s.to_string())])
+            .collect_vec()
+    }
+}
+
+async fn having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(id text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data1(id, n) VALUES ('a', 1), ('b', 2), ('c', 3)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(id text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id, n) VALUES ('a', 4), ('b', 5), ('c', 6)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, count(n) FROM s.Data1 \
+             WHERE id != 'c' \
+             GROUP BY 1 \
+             HAVING 2 <= sum(n)",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 1)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `data`.id, count(`data`.n) \
+             FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
+             WHERE n != 2 \
+             GROUP BY 1 \
+             HAVING sum(n) <= 5 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("a", 2), ("b", 1)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `data`.id, count(`data`.n) `cnt` \
+             FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
+             WHERE n != 2 \
+             GROUP BY 1 \
+             HAVING cnt = 2 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("a", 2), ("c", 2)]));
+
+    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(s, n)| vec![TableValue::String(s.to_string()), TableValue::Int(*n)])
+            .collect_vec()
+    }
+}
+
+async fn rolling_window_join(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day timestamp, name text, n int)")
+        .await
+        .unwrap();
+    let raw_query = "SELECT Series.date_to, Table.name, sum(Table.n) as n FROM (\
+               SELECT to_timestamp('2020-01-01T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-01T23:59:59.999') date_to \
+               UNION ALL \
+               SELECT to_timestamp('2020-01-02T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-02T23:59:59.999') date_to \
+               UNION ALL \
+               SELECT to_timestamp('2020-01-03T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-03T23:59:59.999') date_to \
+               UNION ALL \
+               SELECT to_timestamp('2020-01-04T00:00:00.000') date_from, \
+                      to_timestamp('2020-01-04T23:59:59.999') date_to\
+            ) AS `Series` \
+            LEFT JOIN (\
+               SELECT date_trunc('day', CONVERT_TZ(day,'+00:00')) `day`, name, sum(n) `n` \
+               FROM s.Data \
+               GROUP BY 1, 2 \
+            ) AS `Table` ON `Table`.day <= `Series`.date_to \
+            GROUP BY 1, 2";
+    let query = raw_query.to_string() + " ORDER BY 1, 2, 3";
+    let query_sort_subquery = format!(
+        "SELECT q0.date_to, q0.name, q0.n FROM ({}) as q0 ORDER BY 1,2,3",
+        raw_query
+    );
+
+    let plan = service.plan_query(&query).await.unwrap().worker;
+    assert_eq!(
+        pp_phys_plan(plan.as_ref()),
+        "Sort\
+      \n  Projection, [date_to, name, SUM(n):n]\
+      \n    CrossJoinAgg, on: day <= date_to\
+      \n      Alias\
+      \n        Projection, [day, name, SUM(n):n]\
+      \n          FinalHashAggregate\
+      \n            Worker\
+      \n              PartialHashAggregate\
+      \n                Merge\
+      \n                  Scan, index: default:1:[1], fields: *\
+      \n                    Empty"
+    );
+
+    let plan = service
+        .plan_query(&query_sort_subquery)
+        .await
+        .unwrap()
+        .worker;
+    assert_eq!(
+        pp_phys_plan(plan.as_ref()),
+        "Sort\
+        \n  Projection, [date_to, name, n]\
+        \n    Alias\
+        \n      Projection, [date_to, name, SUM(n):n]\
+        \n        CrossJoinAgg, on: day <= date_to\
+        \n          Alias\
+        \n            Projection, [day, name, SUM(n):n]\
+        \n              FinalHashAggregate\
+        \n                Worker\
+        \n                  PartialHashAggregate\
+        \n                    Merge\
+        \n                      Scan, index: default:1:[1], fields: *\
+        \n                        Empty"
+    );
+
+    service
+        .exec_query("INSERT INTO s.Data(day, name, n) VALUES ('2020-01-01T01:00:00.000', 'john', 10), \
+                                                             ('2020-01-01T01:00:00.000', 'sara', 7), \
+                                                             ('2020-01-03T02:00:00.000', 'sara', 3), \
+                                                             ('2020-01-03T03:00:00.000', 'john', 9), \
+                                                             ('2020-01-03T03:00:00.000', 'john', 11), \
+                                                             ('2020-01-04T05:00:00.000', 'timmy', 5)")
+        .await
+        .unwrap();
+
+    let mut jan = (1..=4)
+        .map(|d| timestamp_from_string(&format!("2020-01-{:02}T23:59:59.999", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    for q in &[query.as_str(), query_sort_subquery.as_str()] {
+        log::info!("Testing query {}", q);
+        let r = service.exec_query(q).await.unwrap();
+        assert_eq!(
+            to_rows(&r),
+            rows(&[
+                (jan[1], "john", 10),
+                (jan[1], "sara", 7),
+                (jan[2], "john", 10),
+                (jan[2], "sara", 7),
+                (jan[3], "john", 30),
+                (jan[3], "sara", 10),
+                (jan[4], "john", 30),
+                (jan[4], "sara", 10),
+                (jan[4], "timmy", 5)
+            ])
+        );
+    }
+
+    fn rows(a: &[(TimestampValue, &str, i64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(t, s, n)| {
+                vec![
+                    TableValue::Timestamp(*t),
+                    TableValue::String(s.to_string()),
+                    TableValue::Int(*n),
+                ]
+            })
             .collect_vec()
     }
 }

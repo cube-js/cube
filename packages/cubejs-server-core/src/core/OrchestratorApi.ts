@@ -2,28 +2,40 @@
 import pt from 'promise-timeout';
 import { QueryOrchestrator, ContinueWaitError } from '@cubejs-backend/query-orchestrator';
 
+import { DbTypeFn } from './types';
+
 export class OrchestratorApi {
   private seenDataSources: { [dataSource: string]: boolean } = {};
-  
+
   protected readonly orchestrator: QueryOrchestrator;
-  
+
   protected readonly externalDriverFactory: any;
 
   protected readonly continueWaitTimeout: number;
-  
+
+  protected readonly contextToDbType: DbTypeFn;
+
   public constructor(protected driverFactory, protected logger, protected options: any = {}) {
-    const { externalDriverFactory } = options;
+    const { externalDriverFactory, contextToDbType } = options;
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
-    this.orchestrator = new QueryOrchestrator(options.redisPrefix || 'STANDALONE', driverFactory, logger, options);
+
+    this.orchestrator = new QueryOrchestrator(
+      options.redisPrefix || 'STANDALONE',
+      driverFactory,
+      logger,
+      options
+    );
+
     this.driverFactory = driverFactory;
     this.externalDriverFactory = externalDriverFactory;
+    this.contextToDbType = contextToDbType;
     this.logger = logger;
   }
 
   public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
-    
+
     try {
       this.logger('Query started', {
         query: queryForLog,
@@ -45,6 +57,22 @@ export class OrchestratorApi {
         params: query.values,
         requestId: query.requestId
       });
+
+      const extractDbType = (response) => (
+        this.contextToDbType({
+          ...query.context,
+          dataSource: response.dataSource,
+        })
+      );
+
+      if (Array.isArray(data)) {
+        return data.map((item) => ({
+          ...item,
+          dbType: extractDbType(item)
+        }));
+      }
+
+      data.dbType = extractDbType(data);
 
       return data;
     } catch (err) {

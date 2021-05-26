@@ -108,11 +108,14 @@ class CubejsApi {
         return continueWait(true);
       }
 
-      if (response.status < 200 || response.status > 299) {
-        throw new Error(`Request error. Response status: ${response.status}`);
+      let body = {};
+
+      try {
+        body = await response.clone().json();
+      } catch (_) {
+        body.error = await response.text();
       }
 
-      const body = await response.json();
       if (body.error === 'Continue wait') {
         await checkMutex();
         if (options.progressCallback) {
@@ -120,6 +123,7 @@ class CubejsApi {
         }
         return continueWait();
       }
+
       if (response.status !== 200) {
         await checkMutex();
         if (!options.subscribe && requestInstance.unsubscribe) {
@@ -231,7 +235,7 @@ class CubejsApi {
 
 export default (apiToken, options) => new CubejsApi(apiToken, options);
 
-export { HttpTransport, ResultSet };
+export { CubejsApi, HttpTransport, ResultSet };
 export {
   areQueriesEqual,
   defaultHeuristics,

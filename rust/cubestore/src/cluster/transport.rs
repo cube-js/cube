@@ -10,7 +10,7 @@ use tokio::net::TcpStream;
 /// Client-side connection for exchanging messages between the server and the client.
 /// Created by [ClusterTransport].
 #[async_trait]
-pub trait WorkerConnection: Send {
+pub trait WorkerConnection: Send + Sync {
     /// If connection is open, send the message to the server and return true.
     /// If connection is closed, return false.
     async fn maybe_send(&mut self, m: NetworkMessage) -> Result<bool, CubeError>;
@@ -92,9 +92,10 @@ impl ClusterTransport for ClusterTransportImpl {
     ) -> Result<Box<dyn WorkerConnection>, CubeError> {
         let stream = tokio::time::timeout(
             Duration::from_secs(self.config.connection_timeout()),
-            TcpStream::connect(worker_node),
+            TcpStream::connect(worker_node.to_string()),
         )
-        .await??;
+        .await?
+        .map_err(|e| CubeError::internal(format!("Can't connect to {}: {}", worker_node, e)))?;
         Ok(Box::new(Connection { stream }))
     }
 }

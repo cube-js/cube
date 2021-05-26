@@ -3,6 +3,66 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+
+### Bug Fixes
+
+* Dont publish source files for snowflake/postgresql ([cd2c90f](https://github.com/cube-js/cube.js/commit/cd2c90f51bd02cd9b918c64e116207b75af95d3d))
+* **snowflake-driver:** Handle UNLOAD for empty tables ([f5f69ff](https://github.com/cube-js/cube.js/commit/f5f69ff79371bdd33526ffa0cc8634a0f30fc9f4))
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+
+### Features
+
+* **snowflake-driver:** Introduce streaming ([4119a79](https://github.com/cube-js/cube.js/commit/4119a79c20e710bb31c418d0ffd6bb6b8f736319))
+* **snowflake-driver:** Migrate to TypeScript ([c63a0ae](https://github.com/cube-js/cube.js/commit/c63a0ae1cd446ff4a0e336dd71c1874f99a5dfdb))
+* **snowflake-driver:** Support UNLOAD to S3 ([d984f97](https://github.com/cube-js/cube.js/commit/d984f973547d1ff339dbf6ba26f0e363bddf2e98))
+
+
+
+
+
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+
+### Features
+
+* **snowflake-driver:** Support 'key-pair' authentication ([#2724](https://github.com/cube-js/cube.js/issues/2724)) ([4dc55b4](https://github.com/cube-js/cube.js/commit/4dc55b40e47f62e6b82d8a6549d2823dee0ed9cb))
+
+
+
+
+
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
 ## [0.27.5](https://github.com/cube-js/cube.js/compare/v0.27.4...v0.27.5) (2021-05-03)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

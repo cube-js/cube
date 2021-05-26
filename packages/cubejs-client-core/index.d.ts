@@ -126,12 +126,28 @@ declare module '@cubejs-client/core' {
 
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
 
+  export type TransformedQuery = {
+    allFiltersWithinSelectedDimensions: boolean;
+    granularityHierarchies: Record<string, string[]>;
+    hasMultipliedMeasures: boolean;
+    hasNoTimeDimensionsWithoutGranularity: boolean;
+    isAdditive: boolean;
+    leafMeasureAdditive: boolean;
+    leafMeasures: string[];
+    measures: string[];
+    sortedDimensions: string[];
+    sortedTimeDimensions: [[string, string]];
+  };
+
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
     query: Query;
     data: T[];
+    external: boolean | null;
+    dbType: string;
     usedPreAggregations?: Record<string, any>;
+    transformedQuery?: TransformedQuery;
   };
 
   export type LoadResponse<T> = {
@@ -825,11 +841,38 @@ declare module '@cubejs-client/core' {
     queryOrder: Array<{ [k: string]: QueryOrder }>;
   };
 
+  export type Cube = {
+    name: string;
+    title: string;
+    measures: TCubeMeasure[];
+    dimensions: TCubeDimension[];
+    segments: TCubeSegment[];
+  };
+
+  export type MetaResponse = {
+    cubes: Cube[]
+  }
+
   /**
    * Contains information about available cubes and it's members.
    * @order 4
    */
   export class Meta {
+    /**
+     * Raw meta response
+     */
+    meta: MetaResponse;
+
+    /**
+     * An array of all available cubes with their members
+     */
+    cubes: Cube[];
+
+    /**
+     * A map of all cubes where the key is a cube name
+     */
+    cubesMap: Record<string, Pick<Cube, 'dimensions' | 'measures' | 'segments'>>;
+
     /**
      * Get all members of a specific type for a given query.
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.

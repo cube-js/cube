@@ -116,6 +116,18 @@ const variables: Record<string, (...args: any) => any> = {
   dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
     .required(required)
     .asString(),
+  // Export Bucket options
+  dbExportBucketType: ({ supported }: { supported: ('s3' | 'gcp' | 'azure')[] }) => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
+    .asEnum(supported),
+  dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
+    .asString(),
+  // Export bucket options for AWS S3
+  dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
+    .asString(),
+  dbExportBucketAwsSecret: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET')
+    .asString(),
+  dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
+    .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
@@ -222,7 +234,7 @@ const variables: Record<string, (...args: any) => any> = {
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
-    .asUrlString(),
+    .asString(),
   jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
     .asArray(','),
   jwtAudience: () => get('CUBEJS_JWT_AUDIENCE')
@@ -238,7 +250,14 @@ const variables: Record<string, (...args: any) => any> = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  telemetry: () => get('CUBEJS_TELEMETRY')
+    .default('true')
+    .asBool(),
+  // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
+    .default('false')
+    .asBoolStrict(),
+  externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('false')
     .asBoolStrict(),
 };

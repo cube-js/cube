@@ -7,6 +7,7 @@ pub mod worker_pool;
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
 
+use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::DIService;
@@ -48,8 +49,8 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::Weak;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::time::SystemTime;
 use tokio::fs;
@@ -98,7 +99,11 @@ pub trait Cluster: DIService + Send + Sync {
 
     fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String;
 
-    async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError>;
+    async fn node_name_for_import(
+        &self,
+        table_id: u64,
+        location: &str,
+    ) -> Result<String, CubeError>;
 
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage;
 
@@ -275,12 +280,19 @@ impl Cluster for ClusterImpl {
         workers[(hasher.finish() % workers.len() as u64) as usize].clone()
     }
 
-    async fn node_name_for_import(&self, table_id: u64) -> Result<String, CubeError> {
+    async fn node_name_for_import(
+        &self,
+        table_id: u64,
+        location: &str,
+    ) -> Result<String, CubeError> {
         let workers = self.config_obj.select_workers();
         if workers.is_empty() {
             return Ok(self.server_name.to_string());
         }
-        Ok(workers[(table_id % workers.len() as u64) as usize].to_string())
+        let mut hasher = DefaultHasher::new();
+        table_id.hash(&mut hasher);
+        location.hash(&mut hasher);
+        Ok(workers[(hasher.finish() % workers.len() as u64) as usize].to_string())
     }
 
     async fn warmup_partition(
@@ -349,7 +361,7 @@ impl Cluster for ClusterImpl {
 }
 
 #[async_trait]
-pub trait MessageStream: Send {
+pub trait MessageStream: Send + Sync {
     async fn next(&mut self) -> (NetworkMessage, /*finished*/ bool);
 }
 
@@ -541,6 +553,16 @@ impl JobRunner {
                     Self::fail_job_row_key(job);
                 }
             }
+            JobType::TableImportCSV(location) => {
+                if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
+                    self.import_service
+                        .clone()
+                        .import_table_part(*table_id, location)
+                        .await?
+                } else {
+                    Self::fail_job_row_key(job);
+                }
+            }
         }
         Ok(())
     }
@@ -671,64 +693,78 @@ impl ClusterImpl {
             .await
     }
 
-    pub async fn listen_on_worker_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
-        if let Some(address) = cluster.config_obj.worker_bind_address() {
-            ClusterImpl::listen_on_port(
-                "Worker",
-                address,
-                cluster.clone(),
-                async move |c, mut socket| {
-                    let m = match NetworkMessage::receive(&mut socket).await {
-                        Ok(m) => m,
-                        Err(e) => {
-                            error!("Network error: {}", e);
-                            return;
-                        }
-                    };
+    pub async fn listen_on_worker_port(
+        cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
+    ) -> Result<(), CubeError> {
+        let address = match cluster.config_obj.worker_bind_address() {
+            Some(a) => a,
+            None => {
+                let _ = on_socket_bound.send(());
+                return Ok(());
+            }
+        };
+        ClusterImpl::listen_on_port(
+            "Worker",
+            address,
+            cluster.clone(),
+            on_socket_bound,
+            async move |c, mut socket| {
+                let m = match NetworkMessage::receive(&mut socket).await {
+                    Ok(m) => m,
+                    Err(e) => {
+                        error!("Network error: {}", e);
+                        return;
+                    }
+                };
 
-                    if !m.is_streaming_request() {
-                        let response = c.process_message_on_worker(m).await;
-                        if let Err(e) = response.send(&mut socket).await {
-                            error!("Network error: {}", e);
-                            return;
-                        }
-                    } else {
-                        let mut p = c.start_stream_on_worker(m).await;
-                        loop {
-                            let (response, finished) = p.next().await;
-                            match response.maybe_send(&mut socket).await {
-                                // All ok, continue streaming.
-                                Ok(true) => {}
-                                // Connection closed by client, stop streaming.
-                                Ok(false) => {
-                                    break;
-                                }
-                                Err(e) => {
-                                    error!("Network error: {}", e);
-                                    return;
-                                }
-                            }
-                            if finished {
+                if !m.is_streaming_request() {
+                    let response = c.process_message_on_worker(m).await;
+                    if let Err(e) = response.send(&mut socket).await {
+                        error!("Network error: {}", e);
+                        return;
+                    }
+                } else {
+                    let mut p = c.start_stream_on_worker(m).await;
+                    loop {
+                        let (response, finished) = p.next().await;
+                        match response.maybe_send(&mut socket).await {
+                            // All ok, continue streaming.
+                            Ok(true) => {}
+                            // Connection closed by client, stop streaming.
+                            Ok(false) => {
                                 break;
                             }
+                            Err(e) => {
+                                error!("Network error: {}", e);
+                                return;
+                            }
+                        }
+                        if finished {
+                            break;
                         }
                     }
-                },
-            )
-            .await?;
-        }
-        Ok(())
+                }
+            },
+        )
+        .await
     }
 
-    pub async fn listen_on_metastore_port(cluster: Arc<ClusterImpl>) -> Result<(), CubeError> {
+    pub async fn listen_on_metastore_port(
+        cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
+    ) -> Result<(), CubeError> {
         if let Some(address) = cluster.config_obj.metastore_bind_address() {
             ClusterImpl::process_on_port(
                 "Meta store",
                 address,
                 cluster.clone(),
+                on_socket_bound,
                 async move |c, m| c.process_metastore_message(m).await,
             )
             .await?;
+        } else {
+            let _ = on_socket_bound.send(());
         }
         Ok(())
     }
@@ -737,9 +773,11 @@ impl ClusterImpl {
         name: &str,
         address: &str,
         cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
         process_fn: impl Fn(Arc<ClusterImpl>, TcpStream) -> F + Send + Sync + Clone + 'static,
     ) -> Result<(), CubeError> {
         let listener = TcpListener::bind(address.clone()).await?;
+        let _ = on_socket_bound.send(());
 
         info!("{} port open on {}", name, address);
 
@@ -776,27 +814,34 @@ impl ClusterImpl {
         name: &str,
         address: &str,
         cluster: Arc<ClusterImpl>,
+        on_socket_bound: oneshot::Sender<()>,
         process_fn: impl Fn(Arc<ClusterImpl>, NetworkMessage) -> F + Send + Sync + Clone + 'static,
     ) -> Result<(), CubeError> {
-        Self::listen_on_port(name, address, cluster, move |c, mut socket| {
-            let cluster = c.clone();
-            let process_fn = process_fn.clone();
-            async move {
-                let request = NetworkMessage::receive(&mut socket).await;
-                let response;
-                match request {
-                    Ok(m) => response = process_fn(cluster.clone(), m).await,
-                    Err(e) => {
-                        error!("Network error: {}", e);
-                        return;
+        Self::listen_on_port(
+            name,
+            address,
+            cluster,
+            on_socket_bound,
+            move |c, mut socket| {
+                let cluster = c.clone();
+                let process_fn = process_fn.clone();
+                async move {
+                    let request = NetworkMessage::receive(&mut socket).await;
+                    let response;
+                    match request {
+                        Ok(m) => response = process_fn(cluster.clone(), m).await,
+                        Err(e) => {
+                            error!("Network error: {}", e);
+                            return;
+                        }
+                    }
+
+                    if let Err(e) = response.send(&mut socket).await {
+                        error!("Network error: {}", e)
                     }
                 }
-
-                if let Err(e) = response.send(&mut socket).await {
-                    error!("Network error: {}", e)
-                }
-            }
-        })
+            },
+        )
         .await
     }
 
@@ -1020,7 +1065,7 @@ impl ClusterImpl {
         return Ok(Box::pin(SelectStream {
             schema,
             connection: Some(c),
-            pending: None,
+            pending: Mutex::new(None),
             finished: false,
         }));
 
@@ -1028,8 +1073,15 @@ impl ClusterImpl {
         struct SelectStream {
             schema: SchemaRef,
             connection: Option<ConnPtr>,
-            pending: Option<
-                Pin<Box<dyn Future<Output = (Result<NetworkMessage, CubeError>, ConnPtr)> + Send>>,
+            pending: Mutex<
+                Option<
+                    Pin<
+                        Box<
+                            dyn Future<Output = (Result<NetworkMessage, CubeError>, ConnPtr)>
+                                + Send,
+                        >,
+                    >,
+                >,
             >,
             finished: bool,
         }
@@ -1045,18 +1097,26 @@ impl ClusterImpl {
                     return Poll::Ready(None);
                 }
 
-                if self.pending.is_none() {
+                if self.pending.lock().unwrap().is_none() {
                     let mut connection = self.as_mut().connection.take().unwrap();
-                    self.pending = Some(Box::pin(async move {
+                    *self.pending.lock().unwrap() = Some(Box::pin(async move {
                         let res = connection.receive().await;
                         (res, connection)
                     }));
                 }
-                let (message, connection) = match self.pending.as_mut().unwrap().as_mut().poll(cx) {
+                let (message, connection) = match self
+                    .pending
+                    .lock()
+                    .unwrap()
+                    .as_mut()
+                    .unwrap()
+                    .as_mut()
+                    .poll(cx)
+                {
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(r) => r,
                 };
-                self.pending = None;
+                *self.pending.lock().unwrap() = None;
                 self.connection = Some(connection);
 
                 let r = match message {
@@ -1100,25 +1160,28 @@ impl ClusterImpl {
     ///
     /// Can take awhile, use the passed cancellation token to stop the worker before it finishes.
     /// Designed to run in the background.
-    pub async fn warmup_select_worker(&self) -> Result<(), CubeError> {
+    pub async fn warmup_select_worker(&self) {
         if self.config_obj.select_workers().len() == 0 {
-            return Err(CubeError::internal(
-                "no select workers specified".to_owned(),
-            ));
+            log::error!("No select workers specified");
+            return;
         }
         if !self.config_obj.select_workers().contains(&self.server_name) {
-            return Err(CubeError::internal(
-                "current node is not a select worker".to_owned(),
-            ));
+            log::error!("Current node is not a select worker");
+            return;
         }
-
         if !self.config_obj.enable_startup_warmup() {
             log::info!("Startup warmup disabled");
-            return Ok(());
+            return;
         }
 
         log::debug!("Requesting partitions for startup warmup");
-        let partitions = self.meta_store.get_warmup_partitions().await?;
+        let partitions = match self.meta_store.get_warmup_partitions().await {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Failed to get warmup partitions: {}", e);
+                return;
+            }
+        };
         log::debug!("Got {} partitions, running the warmup", partitions.len());
 
         for (p, chunks) in partitions {
@@ -1128,20 +1191,22 @@ impl ClusterImpl {
             if let Some(file) = partition_file_name(p.parent_partition_id, p.partition_id) {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
-                    return Ok(());
+                    return;
                 }
-                self.remote_fs.download_file(&file).await?;
+                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
+                //       so they are not errors most of the time.
+                ack_error!(self.remote_fs.download_file(&file).await);
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
-                    return Ok(());
+                    return;
                 }
-                self.remote_fs.download_file(&chunk_file_name(c)).await?;
+                ack_error!(self.remote_fs.download_file(&chunk_file_name(c)).await);
             }
         }
         log::debug!("Startup warmup finished");
-        return Ok(());
+        return;
     }
 }
 

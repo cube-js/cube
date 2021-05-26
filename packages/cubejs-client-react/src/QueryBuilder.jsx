@@ -1,5 +1,5 @@
 import React from 'react';
-import { prop, uniqBy, equals, pick, clone } from 'ramda';
+import { prop, uniqBy, equals, pick, clone, indexBy, uniq } from 'ramda';
 import {
   ResultSet,
   moveItemInArray,
@@ -99,6 +99,7 @@ export default class QueryBuilder extends React.Component {
     };
 
     this.mutexObj = {};
+    this.reorderTriggered = false;
   }
 
   async componentDidMount() {
@@ -141,7 +142,7 @@ export default class QueryBuilder extends React.Component {
     this.setState(
       {
         meta,
-        metaError: metaError ? new Error(generateAnsiHTML(metaError?.toString() || '')) : null,
+        metaError: metaError ? new Error(generateAnsiHTML(metaError.message || metaError.toString())) : null,
         isFetchingMeta: false,
       },
       () => {
@@ -258,9 +259,48 @@ export default class QueryBuilder extends React.Component {
       ...meta.resolveMember(m, 'segments'),
     }));
 
-    const availableMeasures = meta ? meta.membersForQuery(query, 'measures') : [];
-    const availableDimensions = meta ? meta.membersForQuery(query, 'dimensions') : [];
-    const availableSegments = meta ? meta.membersForQuery(query, 'segments') : [];
+    let availableMeasures = [];
+    let availableDimensions = [];
+    let availableSegments = [];
+    let availableFilterMembers = [];
+
+    const availableMembers = meta?.membersGroupedByCube() || {
+      measures: [],
+      dimensions: [],
+      segments: [],
+      timeDimensions: [],
+    };
+
+    if (meta) {
+      availableMeasures = meta.membersForQuery(query, 'measures');
+      availableDimensions = meta.membersForQuery(query, 'dimensions');
+      availableSegments = meta.membersForQuery(query, 'segments');
+
+      const indexedMeasures = indexBy(
+        prop('cubeName'),
+        availableMembers.measures
+      );
+      const indexedDimensions = indexBy(
+        prop('cubeName'),
+        availableMembers.dimensions
+      );
+      const cubeNames = uniq([
+        ...Object.keys(indexedMeasures),
+        ...Object.keys(indexedDimensions),
+      ]).sort();
+
+      availableFilterMembers = cubeNames.map((name) => {
+        const cube = (indexedMeasures[name] || indexedDimensions[name]);
+
+        return {
+          ...cube,
+          members: [
+            ...indexedMeasures[name]?.members,
+            ...indexedDimensions[name]?.members,
+          ].sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1))
+        };
+      });
+    }
 
     let orderMembers = uniqBy(prop('id'), [
       ...(Array.isArray(query.order) ? query.order : Object.entries(query.order || {})).map(([id, order]) => ({
@@ -269,18 +309,26 @@ export default class QueryBuilder extends React.Component {
         title: meta ? meta.resolveMember(id, ['measures', 'dimensions']).title : '',
       })),
       // uniqBy prefers first, so these will only be added if not already in the query
-      ...[...measures, ...dimensions].map(({ name, title }) => ({ id: name, title, order: 'none' })),
+      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: 'none' })),
     ]);
 
     // Preserve order until the members change or manually re-ordered
     // This is needed so that when an order member becomes active, it doesn't jump to the top of the list
     const orderMemberOrderKey = JSON.stringify(orderMembers.map(({ id }) => id).sort());
-    if (this.orderMemberOrderKey && this.orderMemberOrder && orderMemberOrderKey === this.orderMemberOrderKey) {
+
+    if (
+      this.orderMemberOrderKey
+      && this.orderMemberOrder
+      && orderMemberOrderKey === this.orderMemberOrderKey
+      && !this.reorderTriggered
+    ) {
       orderMembers = this.orderMemberOrder.map((id) => orderMembers.find((member) => member.id === id));
     } else {
       this.orderMemberOrderKey = orderMemberOrderKey;
       this.orderMemberOrder = orderMembers.map(({ id }) => id);
     }
+
+    this.reorderTriggered = false;
 
     return {
       meta,
@@ -300,6 +348,8 @@ export default class QueryBuilder extends React.Component {
       availableDimensions,
       availableTimeDimensions: availableDimensions.filter((m) => m.type === 'time'),
       availableSegments,
+      availableMembers,
+      availableFilterMembers,
       updateQuery: (queryUpdate) => this.updateQuery(queryUpdate),
       updateMeasures: updateMethods('measures'),
       updateDimensions: updateMethods('dimensions'),
@@ -327,6 +377,8 @@ export default class QueryBuilder extends React.Component {
           if (sourceIndex == null || destinationIndex == null) {
             return;
           }
+
+          this.reorderTriggered = true;
 
           this.updateQuery({
             order: moveItemInArray(orderMembers, sourceIndex, destinationIndex).reduce(
@@ -391,7 +443,8 @@ export default class QueryBuilder extends React.Component {
         // Don't run callbacks more than once unless the viz state has changed since last time
         if (!vizStateSent || !equals(vizStateSent, newVizState)) {
           onVizStateChanged(newVizState);
-          vizStateSent = clone(newVizState); // use clone to make sure we don't save object references
+          // use clone to make sure we don't save object references
+          vizStateSent = clone(newVizState);
         }
       }
     };
@@ -455,7 +508,7 @@ export default class QueryBuilder extends React.Component {
         }
       } catch (error) {
         this.setState({
-          queryError: new Error(generateAnsiHTML(error.stack?.toString() || error.toString())),
+          queryError: new Error(generateAnsiHTML(error.message || error.toString())),
         });
       }
     }

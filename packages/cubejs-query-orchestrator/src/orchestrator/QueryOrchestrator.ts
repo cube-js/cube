@@ -14,6 +14,7 @@ interface QueryOrchestratorOptions {
   preAggregationsOptions?: any;
   rollupOnlyMode?: boolean;
   continueWaitTimeout?: number;
+  skipExternalCacheAndQueue?: boolean;
 }
 
 export class QueryOrchestrator {
@@ -46,16 +47,20 @@ export class QueryOrchestrator {
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
-    const { externalDriverFactory, continueWaitTimeout } = options;
+    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
     this.driverFactory = driverFactory;
 
     this.queryCache = new QueryCache(
-      this.redisPrefix, this.driverFactory, this.logger, {
+      this.redisPrefix,
+      this.driverFactory,
+      this.logger,
+      {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
         continueWaitTimeout,
+        skipExternalCacheAndQueue,
         ...options.queryCacheOptions,
       }
     );
@@ -66,12 +71,13 @@ export class QueryOrchestrator {
         cacheAndQueueDriver,
         redisPool,
         continueWaitTimeout,
+        skipExternalCacheAndQueue,
         ...options.preAggregationsOptions
       }
     );
   }
 
-  public async fetchQuery(queryBody: any) {
+  public async fetchQuery(queryBody: any): Promise<any> {
     const preAggregationsTablesToTempTables = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
     const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
@@ -86,11 +92,15 @@ export class QueryOrchestrator {
     }
 
     const result = await this.queryCache.cachedQueryResult(
-      queryBody, preAggregationsTablesToTempTables
+      queryBody,
+      preAggregationsTablesToTempTables
     );
 
     return {
       ...result,
+      dataSource: queryBody.dataSource,
+      // 0 - no pre-agg was used
+      external: queryBody.external === 0 ? null : queryBody.external,
       usedPreAggregations
     };
   }

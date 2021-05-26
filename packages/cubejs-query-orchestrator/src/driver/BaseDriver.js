@@ -16,12 +16,9 @@ const sortByKeys = (unordered) => {
 
 const DbTypeToGenericType = {
   'timestamp without time zone': 'timestamp',
-  integer: 'int',
-  int8: 'int',
-  int4: 'int',
-  int2: 'int',
   'character varying': 'text',
   varchar: 'text',
+  integer: 'int',
   nvarchar: 'text',
   text: 'text',
   string: 'text',
@@ -30,7 +27,14 @@ const DbTypeToGenericType = {
   time: 'string',
   datetime: 'timestamp',
   date: 'date',
-  'double precision': 'decimal'
+  'double precision': 'double',
+  // PostgreSQL aliases, but maybe another databases support it
+  int8: 'bigint',
+  int4: 'int',
+  int2: 'int',
+  bool: 'boolean',
+  float4: 'float',
+  float8: 'double',
 };
 
 const DB_BIG_INT_MAX = BigInt('9223372036854775807');
@@ -178,17 +182,25 @@ export class BaseDriver {
   /**
    * @abstract
    * @param {string} query
-   * @param {Array<unknown>} [values]
+   * @param {Array<unknown>} values
+   * @param {any} [options]
    * @return {Promise<Array<any>>}
    */
-  async query(query, values) {
+  async query(query, values, options) {
     throw new Error('Not implemented');
   }
 
-  async downloadQueryResults(query, values) {
+  /**
+   * @public
+   * @return {Promise<any>}
+   */
+  async downloadQueryResults(query, values, options) {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
-      throw new Error('Unable to detect column types for pre-aggregation on empty values in readOnly mode');
+      throw new Error(
+        'Unable to detect column types for pre-aggregation on empty values in readOnly mode. \n' +
+        'https://cube.dev/docs/caching/using-pre-aggregations#read-only-data-source'
+      );
     }
 
     const fields = Object.keys(rows[0]);
@@ -292,6 +304,7 @@ export class BaseDriver {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
+
     await this.createTable(table, columns);
     try {
       for (let i = 0; i < tableData.rows.length; i++) {

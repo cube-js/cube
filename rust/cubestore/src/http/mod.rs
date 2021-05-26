@@ -332,7 +332,7 @@ pub struct HttpMessage {
 #[derive(Debug)]
 pub enum HttpCommand {
     Query { query: String },
-    ResultSet { data_frame: DataFrame },
+    ResultSet { data_frame: Arc<DataFrame> },
     Error { error: String },
 }
 

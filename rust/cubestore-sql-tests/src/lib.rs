@@ -20,7 +20,7 @@ mod tests;
 
 #[async_trait]
 pub trait SqlClient: Send + Sync {
-    async fn exec_query(&self, query: &str) -> Result<DataFrame, CubeError>;
+    async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError>;
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
 }
 
@@ -55,7 +55,7 @@ pub fn run_sql_tests(
 
 #[async_trait]
 impl SqlClient for Arc<dyn SqlService> {
-    async fn exec_query(&self, query: &str) -> Result<DataFrame, CubeError> {
+    async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError> {
         self.as_ref().exec_query(query).await
     }
 

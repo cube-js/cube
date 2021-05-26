@@ -1,18 +1,40 @@
 /* eslint-disable no-underscore-dangle */
-const R = require('ramda');
-const { BigQuery } = require('@google-cloud/bigquery');
-const { Storage } = require('@google-cloud/storage');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
-const { getEnv } = require('@cubejs-backend/shared');
-
-function pause(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+import R from 'ramda';
+import { BigQuery, BigQueryOptions, Dataset, Job, QueryRowsResponse } from '@google-cloud/bigquery';
+import { Bucket, Storage } from '@google-cloud/storage';
+import {
+  BaseDriver, DownloadTableCSVData,
+  DriverInterface, QueryOptions, StreamOptions, StreamTableData, StreamTableDataWithTypes, UnloadOptions,
+} from '@cubejs-backend/query-orchestrator';
+import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+import { Table } from '@google-cloud/bigquery/build/src/table';
+import { Query } from '@google-cloud/bigquery/build/src/bigquery';
+import { HydrationStream } from './HydrationStream';
 
 const suffixTableRegex = /^(.*?)([0-9_]+)$/;
 
-class BigQueryDriver extends BaseDriver {
-  constructor(config = {}) {
+interface BigQueryDriverOptions extends BigQueryOptions {
+  readOnly?: boolean
+  projectId?: string,
+  keyFilename?: string,
+  exportBucket?: string,
+  location?: string,
+  pollTimeout?: number,
+  pollMaxInterval?: number,
+}
+
+type BigQueryDriverOptionsInitialized = Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
+
+export class BigQueryDriver extends BaseDriver implements DriverInterface {
+  protected readonly options: BigQueryDriverOptionsInitialized;
+
+  protected readonly bigquery: BigQuery;
+
+  protected readonly storage: Storage|null = null;
+
+  protected readonly bucket: Bucket|null = null;
+
+  public constructor(config: BigQueryDriverOptions = {}) {
     super();
 
     this.options = {
@@ -22,12 +44,16 @@ class BigQueryDriver extends BaseDriver {
       credentials: process.env.CUBEJS_DB_BQ_CREDENTIALS ?
         JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
         undefined,
-      exportBucket: process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
+      exportBucket: getEnv('dbExportBucket') || process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
       location: getEnv('bigQueryLocation'),
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
+
+    getEnv('dbExportBucketType', {
+      supported: ['gcp'],
+    });
 
     this.bigquery = new BigQuery(this.options);
     if (this.options.exportBucket) {
@@ -43,12 +69,12 @@ class BigQueryDriver extends BaseDriver {
     this.toObjectFromId = this.toObjectFromId.bind(this);
   }
 
-  static driverEnvVariables() {
+  public static driverEnvVariables() {
     return ['CUBEJS_DB_BQ_PROJECT_ID', 'CUBEJS_DB_BQ_KEY_FILE'];
   }
 
-  testConnection() {
-    return this.bigquery.query({
+  public async testConnection() {
+    await this.bigquery.query({
       query: 'SELECT ? AS number', params: ['1']
     });
   }
@@ -57,7 +83,7 @@ class BigQueryDriver extends BaseDriver {
     return !!this.options.readOnly;
   }
 
-  async query(query, values, options) {
+  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const data = await this.runQueryJob({
       query,
       params: values,
@@ -65,17 +91,19 @@ class BigQueryDriver extends BaseDriver {
       useLegacySql: false
     }, options);
 
-    return data[0] && data[0].map(
-      row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
+    return <any>(
+      data[0] && data[0].map(
+        row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
+      )
     );
   }
 
-  toObjectFromId(accumulator, currentElement) {
+  protected toObjectFromId(accumulator: any, currentElement: any) {
     accumulator[currentElement.id] = currentElement.data;
     return accumulator;
   }
 
-  reduceSuffixTables(accumulator, currentElement) {
+  protected reduceSuffixTables(accumulator: any, currentElement: any) {
     const suffixMatch = currentElement.id.toString().match(suffixTableRegex);
     if (suffixMatch) {
       accumulator.__suffixMatched = accumulator.__suffixMatched || {};
@@ -87,11 +115,11 @@ class BigQueryDriver extends BaseDriver {
     return accumulator;
   }
 
-  addSuffixTables(accumulator) {
+  protected addSuffixTables(accumulator: any) {
     // eslint-disable-next-line no-restricted-syntax,guard-for-in
     for (const prefix in accumulator.__suffixMatched) {
       const suffixMatched = accumulator.__suffixMatched[prefix];
-      const sorted = suffixMatched.sort((a, b) => b.toString().localeCompare(a.toString()));
+      const sorted = suffixMatched.sort((a: any, b: any) => b.toString().localeCompare(a.toString()));
       for (let i = 0; i < Math.min(10, sorted.length); i++) {
         accumulator[sorted[i].id] = sorted[i].data;
       }
@@ -100,29 +128,29 @@ class BigQueryDriver extends BaseDriver {
     return accumulator;
   }
 
-  flatten(list) {
+  protected flatten(list: any) {
     return list.reduce(
-      (a, b) => a.concat(Array.isArray(b) ? this.flatten(b) : b), []
+      (a: any, b: any) => a.concat(Array.isArray(b) ? this.flatten(b) : b), []
     );
   }
 
-  mapFieldsRecursive(field) {
+  protected mapFieldsRecursive(field: any) {
     if (field.type === "RECORD") {
       return this.flatten(field.fields.map(this.mapFieldsRecursive)).map(
-        (nestedField) => ({ name: `${field.name}.${nestedField.name}`, type: nestedField.type })
+        (nestedField: any) => ({ name: `${field.name}.${nestedField.name}`, type: nestedField.type })
       );
     }
     return field;
   }
 
-  parseDataset(dataset) {
+  protected parseDataset(dataset: Dataset) {
     return dataset.getTables().then(
       (data) => Promise.all(data[0].map(this.parseTableData))
         .then(tables => ({ id: dataset.id, data: this.addSuffixTables(tables.reduce(this.reduceSuffixTables, {})) }))
     );
   }
 
-  parseTableData(table) {
+  protected parseTableData(table: Table) {
     return table.getMetadata().then(
       (data) => ({
         id: table.id,
@@ -131,12 +159,12 @@ class BigQueryDriver extends BaseDriver {
     );
   }
 
-  tablesSchema() {
+  public tablesSchema() {
     return this.bigquery.getDatasets().then((data) => Promise.all(data[0].map(this.parseDataset))
       .then(innerData => innerData.reduce(this.toObjectFromId, {})));
   }
 
-  async getTablesQuery(schemaName) {
+  public async getTablesQuery(schemaName: string) {
     try {
       const dataSet = await this.bigquery.dataset(schemaName);
       if (!dataSet) {
@@ -152,39 +180,71 @@ class BigQueryDriver extends BaseDriver {
     }
   }
 
-  async tableColumnTypes(table) {
+  public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
     const [bigQueryTable] = await this.bigquery.dataset(schema).table(name).getMetadata();
-    return bigQueryTable.schema.fields.map(c => ({ name: c.name, type: this.toGenericType(c.type) }));
+    return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
   }
 
-  async createSchemaIfNotExists(schemaName) {
-    await this.bigquery.dataset(schemaName).get({ autoCreate: true });
+  public async createSchemaIfNotExists(schemaName: string) {
+    return this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }
 
-  async downloadTable(table, options) {
-    if (options && options.csvImport && this.bucket) {
-      const destination = this.bucket.file(`${table}-*.csv.gz`);
-      const [schema, tableName] = table.split('.');
-      const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
-      const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
-      await this.waitForJobResult(job, { table }, false);
-      const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
-      const urls = await Promise.all(files.map(async file => {
-        const [url] = await file.getSignedUrl({
-          action: 'read',
-          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
-        });
-        return url;
-      }));
-      return { csvFile: urls };
+  public async isUnloadSupported(options: UnloadOptions) {
+    return this.bucket !== null;
+  }
+
+  public async stream(
+    query: string,
+    values: unknown[],
+    { highWaterMark }: StreamOptions
+  ): Promise<StreamTableData> {
+    const stream = await this.bigquery.createQueryStream({
+      query,
+      params: values,
+      parameterMode: 'positional',
+      useLegacySql: false
+    });
+
+    const rowStream = new HydrationStream();
+    stream.pipe(rowStream);
+
+    return {
+      rowStream,
+    };
+  }
+
+  public async unload(table: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (!this.bucket) {
+      throw new Error('Unload is not configured');
     }
-    return super.downloadTable(table, options);
+
+    const destination = this.bucket.file(`${table}-*.csv.gz`);
+    const [schema, tableName] = table.split('.');
+    const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
+    const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
+    await this.waitForJobResult(job, { table }, false);
+    const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
+    const urls = await Promise.all(files.map(async file => {
+      const [url] = await file.getSignedUrl({
+        action: 'read',
+        expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+      });
+      return url;
+    }));
+
+    return { csvFile: urls };
   }
 
-  async loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+  public async loadPreAggregationIntoTable(
+    preAggregationTableName: string,
+    loadSql: string,
+    params: any,
+    options: any
+  ): Promise<any> {
     const [dataSet, tableName] = preAggregationTableName.split('.');
-    const bigQueryQuery = {
+
+    const bigQueryQuery: Query = {
       query: loadSql,
       params,
       parameterMode: 'positional',
@@ -192,10 +252,11 @@ class BigQueryDriver extends BaseDriver {
       createDisposition: "CREATE_IF_NEEDED",
       useLegacySql: false
     };
+
     return this.runQueryJob(bigQueryQuery, options, false);
   }
 
-  async awaitForJobStatus(job, options, withResults) {
+  protected async awaitForJobStatus(job: Job, options: any, withResults: boolean) {
     const [result] = await job.getMetadata();
     if (result.status && result.status.state === 'DONE') {
       if (result.status.errorResult) {
@@ -213,12 +274,12 @@ class BigQueryDriver extends BaseDriver {
     return withResults ? job.getQueryResults() : true;
   }
 
-  async runQueryJob(bigQueryQuery, options, withResults = true) {
+  protected async runQueryJob<T = QueryRowsResponse>(bigQueryQuery: Query, options: any, withResults: boolean = true): Promise<T> {
     const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
-    return this.waitForJobResult(job, options, withResults);
+    return <any>this.waitForJobResult(job, options, withResults);
   }
 
-  async waitForJobResult(job, options, withResults) {
+  protected async waitForJobResult(job: Job, options: any, withResults: boolean) {
     const startedTime = Date.now();
 
     for (let i = 0; Date.now() - startedTime <= this.options.pollTimeout; i++) {
@@ -227,7 +288,7 @@ class BigQueryDriver extends BaseDriver {
         return result;
       }
 
-      await pause(
+      await pausePromise(
         Math.min(this.options.pollMaxInterval, 200 * i),
       );
     }
@@ -237,7 +298,7 @@ class BigQueryDriver extends BaseDriver {
     );
   }
 
-  quoteIdentifier(identifier) {
+  public quoteIdentifier(identifier: string) {
     const nestedFields = identifier.split('.');
     return nestedFields.map(name => {
       if (name.match(/^[a-z0-9_]+$/)) {
@@ -247,5 +308,3 @@ class BigQueryDriver extends BaseDriver {
     }).join('.');
   }
 }
-
-module.exports = BigQueryDriver;

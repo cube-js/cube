@@ -3,7 +3,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
-import { getRealType } from '@cubejs-backend/shared';
+import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
   Response, NextFunction,
@@ -40,6 +40,10 @@ type MetaConfig = {
     name: string,
     title: string
   }
+};
+
+type CheckAuthInternalOptions = {
+  isPlaygroundCheckAuth: boolean;
 };
 
 const toConfigMap = (metaConfig: MetaConfig[]) => R.fromPairs(
@@ -156,10 +160,18 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
   return row;
 }));
 
+export type UserBackgroundContext = {
+  // @deprecated Renamed to securityContext, please use securityContext.
+  authInfo?: any;
+  securityContext: any;
+};
+
 export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
   refreshScheduler: any;
+  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
+  scheduledRefreshTimeZones?: String[];
   basePath: string;
   extendContext?: ExtendContextFn;
   checkAuth?: CheckAuthFn;
@@ -176,6 +188,10 @@ export interface ApiGatewayOptions {
 export class ApiGateway {
   protected readonly refreshScheduler: any;
 
+  protected readonly scheduledRefreshContexts: ApiGatewayOptions['scheduledRefreshContexts'];
+
+  protected readonly scheduledRefreshTimeZones: ApiGatewayOptions['scheduledRefreshTimeZones'];
+
   protected readonly basePath: string;
 
   protected readonly queryTransformer: QueryTransformerFn;
@@ -191,6 +207,8 @@ export class ApiGateway {
   protected readonly dataSourceStorage: any;
 
   public readonly checkAuthFn: CheckAuthFn;
+
+  public readonly checkAuthSystemFn: CheckAuthFn;
 
   protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
 
@@ -211,6 +229,8 @@ export class ApiGateway {
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
+    this.scheduledRefreshContexts = options.scheduledRefreshContexts;
+    this.scheduledRefreshTimeZones = options.scheduledRefreshTimeZones;
     this.standalone = options.standalone;
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
@@ -221,6 +241,7 @@ export class ApiGateway {
     this.extendContext = options.extendContext;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
+    this.checkAuthSystemFn = this.createCheckAuthSystemFn();
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
@@ -306,7 +327,33 @@ export class ApiGateway {
     }));
 
     if (this.playgroundAuthSecret) {
-      app.get('/cubejs-system/v1/context', userMiddlewares, this.createSystemContextHandler(this.basePath));
+      const systemMiddlewares: RequestHandler[] = [
+        this.checkAuthSystemMiddleware,
+        this.requestContextMiddleware,
+        this.requestLoggerMiddleware
+      ];
+
+      app.get('/cubejs-system/v1/context', systemMiddlewares, this.createSystemContextHandler(this.basePath));
+
+      app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
+        await this.getPreAggregations({
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
+
+      app.get('/cubejs-system/v1/pre-aggregations/security-contexts', systemMiddlewares, (async (req, res) => {
+        const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
+        this.resToResultFn(res)({
+          securityContexts: contexts.map(context => context.securityContext)
+        });
+      }));
+
+      app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, (async (req, res) => {
+        this.resToResultFn(res)({
+          timezones: this.scheduledRefreshTimeZones
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -348,6 +395,21 @@ export class ApiGateway {
       const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
       const cubes = metaConfig.map(c => c.config);
       res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+    try {
+      const preAggregations = await this
+        .getCompilerApi(context)
+        .preAggregations({ requestId: context.requestId });
+
+      res({ preAggregations });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
@@ -401,7 +463,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -486,7 +548,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -551,7 +613,8 @@ export class ApiGateway {
           values: sqlQuery.sql[1],
           continueWait: true,
           renewQuery: normalizedQuery.renewQuery,
-          requestId: context.requestId
+          requestId: context.requestId,
+          context
         };
 
         const response = await this.getAdapterApi(context).executeQuery(toExecute);
@@ -573,12 +636,16 @@ export class ApiGateway {
             normalizedQuery,
             queryType
           ),
-          lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
-          ...(process.env.NODE_ENV === 'production' ? undefined : {
+          lastRefreshTime: response.lastRefreshTime?.toISOString(),
+          ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations
-          }),
+            usedPreAggregations: response.usedPreAggregations,
+            transformedQuery: sqlQuery.canUseTransformedQuery,
+          } : null),
           annotation,
+          dataSource: response.dataSource,
+          dbType: response.dbType,
+          external: response.external,
           slowQuery: Boolean(response.slowQuery)
         };
       }));
@@ -693,6 +760,7 @@ export class ApiGateway {
       securityContext,
       // Deprecated, but let's allow it for now.
       authInfo: securityContext,
+      signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
       ...extensions
     };
@@ -834,7 +902,7 @@ export class ApiGateway {
     };
   }
 
-  protected createDefaultCheckAuth(options?: JWTOptions): CheckAuthFn {
+  protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
     type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
@@ -904,6 +972,7 @@ export class ApiGateway {
       if (auth) {
         try {
           req.securityContext = await checkAuthFn(auth, secret);
+          req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e) {
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
@@ -928,21 +997,31 @@ export class ApiGateway {
       : this.createDefaultCheckAuth(options.jwt);
 
     if (this.playgroundAuthSecret) {
-      const playgroundCheckAuthFn = this.createDefaultCheckAuth({
-        key: this.playgroundAuthSecret,
-        algorithms: ['HS256']
-      });
-
+      const systemCheckAuthFn = this.createCheckAuthSystemFn();
       return async (ctx, authorization) => {
         try {
           await mainCheckAuthFn(ctx, authorization);
         } catch (error) {
-          await playgroundCheckAuthFn(ctx, authorization);
+          await systemCheckAuthFn(ctx, authorization);
         }
       };
     }
 
     return (ctx, authorization) => mainCheckAuthFn(ctx, authorization);
+  }
+
+  protected createCheckAuthSystemFn(): CheckAuthFn {
+    const systemCheckAuthFn = this.createDefaultCheckAuth(
+      {
+        key: this.playgroundAuthSecret,
+        algorithms: ['HS256']
+      },
+      { isPlaygroundCheckAuth: true }
+    );
+
+    return async (ctx, authorization) => {
+      await systemCheckAuthFn(ctx, authorization);
+    };
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
@@ -958,11 +1037,11 @@ export class ApiGateway {
     return undefined;
   }
 
-  protected checkAuth: RequestHandler = async (req, res, next) => {
+  protected async checkAuthWrapper(checkAuthFn: CheckAuthFn, req: Request, res: Response, next) {
     const token = this.extractAuthorizationHeaderWithSchema(req);
 
     try {
-      await this.checkAuthFn(req, token);
+      await checkAuthFn(req, token);
       if (next) {
         next();
       }
@@ -978,6 +1057,14 @@ export class ApiGateway {
         res.status(500).json({ error: e.toString() });
       }
     }
+  }
+
+  protected checkAuth: RequestHandler = async (req, res, next) => {
+    await this.checkAuthWrapper(this.checkAuthFn, req, res, next);
+  };
+
+  protected checkAuthSystemMiddleware: RequestHandler = async (req, res, next) => {
+    await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
   };
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {

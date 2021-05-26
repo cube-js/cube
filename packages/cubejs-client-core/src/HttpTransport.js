@@ -37,16 +37,6 @@ class HttpTransport {
       },
       credentials: this.credentials,
       body: this.method === 'POST' ? JSON.stringify(params) : null
-    }).then((res) => {
-      if (!res.ok) {
-        return new Promise((_, reject) => {
-          res.json().then((json) => {
-            reject(json.error?.toString() || JSON.stringify(json));
-          });
-        });
-      }
-
-      return res;
     });
 
     return {

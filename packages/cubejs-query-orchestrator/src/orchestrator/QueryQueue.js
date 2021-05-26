@@ -29,10 +29,31 @@ export class QueryQueue {
     this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :
       new LocalQueueDriver(queueDriverOptions);
+    this.skipQueue = options.skipQueue;
   }
 
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
     options = options || {};
+    if (this.skipQueue) {
+      const queryDef = {
+        queryHandler,
+        query,
+        queryKey,
+        stageQueryKey: options.stageQueryKey,
+        priority,
+        requestId: options.requestId,
+        addedToQueueTime: new Date().getTime()
+      };
+      this.logger('Waiting for query', {
+        queueSize: 0,
+        queryKey: queryDef.queryKey,
+        queuePrefix: this.redisQueuePrefix,
+        requestId: options.requestId,
+        waitingForRequestId: queryDef.requestId
+      });
+      const result = await this.processQuerySkipQueue(queryDef);
+      return this.parseResult(result);
+    }
     const redisClient = await this.queueDriver.createConnection();
     try {
       if (priority == null) {
@@ -215,6 +236,64 @@ export class QueryQueue {
     }
 
     return undefined;
+  }
+
+  async processQuerySkipQueue(query) {
+    const startQueryTime = (new Date()).getTime();
+    this.logger('Performing query', {
+      queueSize: 0,
+      queryKey: query.queryKey,
+      queuePrefix: this.redisQueuePrefix,
+      requestId: query.requestId,
+      timeInQueue: 0
+    });
+    let executionResult;
+    let handler;
+
+    try {
+      executionResult = {
+        result: await this.queryTimeout(
+          this.queryHandlers[query.queryHandler](
+            query.query,
+            async (cancelHandler) => {
+              handler = cancelHandler;
+            }
+          )
+        )
+      };
+      this.logger('Performing query completed', {
+        queueSize: 0,
+        duration: ((new Date()).getTime() - startQueryTime),
+        queryKey: query.queryKey,
+        queuePrefix: this.redisQueuePrefix,
+        requestId: query.requestId,
+        timeInQueue: 0
+      });
+    } catch (e) {
+      executionResult = {
+        error: (e.message || e).toString() // TODO error handling
+      };
+      this.logger('Error while querying', {
+        queueSize: 0,
+        duration: ((new Date()).getTime() - startQueryTime),
+        queryKey: query.queryKey,
+        queuePrefix: this.redisQueuePrefix,
+        requestId: query.requestId,
+        timeInQueue: 0,
+        error: (e.stack || e).toString()
+      });
+      if (e instanceof TimeoutError) {
+        if (handler) {
+          this.logger('Cancelling query due to timeout', {
+            queryKey: query.queryKey,
+            queuePrefix: this.redisQueuePrefix,
+            requestId: query.requestId
+          });
+          await handler(query);
+        }
+      }
+    }
+    return executionResult;
   }
 
   async processQuery(queryKey) {
