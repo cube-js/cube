@@ -448,9 +448,9 @@ export class ApiGateway {
         );
 
       const mergePartitionsAndVersionEntries = () => {
-        const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntrie) => {
-          if (!obj[versionEntrie.table_name]) obj[versionEntrie.table_name] = [];
-          obj[versionEntrie.table_name].push(versionEntrie);
+        const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntry) => {
+          if (!obj[versionEntry.table_name]) obj[versionEntry.table_name] = [];
+          obj[versionEntry.table_name].push(versionEntry);
           return obj;
         }, {});
 

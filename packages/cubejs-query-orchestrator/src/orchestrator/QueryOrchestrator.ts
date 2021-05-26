@@ -191,9 +191,11 @@ export class QueryOrchestrator {
       return obj;
     }, {});
 
-    return versionEntries.flat().filter((versionEntrie: any) => {
-      const partition = partitionsByTableName[versionEntrie.table_name];
-      return partition && versionEntrie.structure_version === PreAggregations.structureVersion(partition.sql);
-    });
+    return versionEntries
+      .flat()
+      .filter((versionEntry) => {
+        const partition = partitionsByTableName[versionEntry.table_name];
+        return partition && versionEntry.structure_version === PreAggregations.structureVersion(partition.sql);
+      });
   }
 }
