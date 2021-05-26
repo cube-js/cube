@@ -1,5 +1,6 @@
 import { toPairs, fromPairs } from 'ramda';
 import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
+import { h as createElement } from 'vue';
 
 export default {
   props: {
@@ -46,15 +47,15 @@ export default {
       await this.loadQueries(queries);
     }
   },
-  render(createElement) {
-    const { $scopedSlots, resultSet, error, loading, sqlQuery } = this;
+  render() {
+    const { $slots, resultSet, error, loading, sqlQuery } = this;
     const empty = createElement('div', {});
-    let slot = this.$slots.empty ? this.$slots.empty : empty;
+    let slot = this.$slots.empty ? this.$slots.empty() : empty;
     let controls = createElement('div', {});
-    const onlyDefault = !('empty' in this.$slots) && !('error' in this.$scopedSlots);
+    const onlyDefault = !('empty' in this.$slots) && !('error' in this.$slots);
 
-    if ($scopedSlots.builder && this.builderProps.measures) {
-      controls = $scopedSlots.builder({ ...this.builderProps });
+    if ($slots.builder && this.builderProps.measures) {
+      controls = $slots.builder({ ...this.builderProps });
     }
 
     if ((!loading && resultSet && !error) || onlyDefault) {
@@ -73,10 +74,9 @@ export default {
           ...slotProps,
         };
       }
-
-      slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
+      slot = $slots.default ? $slots.default(slotProps) : slot;
     } else if (error) {
-      slot = $scopedSlots.error ? $scopedSlots.error({ error, sqlQuery }) : slot;
+      slot = $slots.error ? $slots.error({ error, sqlQuery }) : slot;
     }
 
     return createElement('div', {}, [controls, slot]);
