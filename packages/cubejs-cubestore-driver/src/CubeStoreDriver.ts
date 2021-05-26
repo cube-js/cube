@@ -7,7 +7,6 @@ import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
   DownloadTableCSVData,
-  DownloadTableData,
   DownloadTableMemoryData,
   StreamTableData,
 } from '@cubejs-backend/query-orchestrator';

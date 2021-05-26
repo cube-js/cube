@@ -44,12 +44,16 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       credentials: process.env.CUBEJS_DB_BQ_CREDENTIALS ?
         JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
         undefined,
-      exportBucket: process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
+      exportBucket: getEnv('dbExportBucket') || process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
       location: getEnv('bigQueryLocation'),
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
+
+    getEnv('dbExportBucketType', {
+      supported: ['gcp'],
+    });
 
     this.bigquery = new BigQuery(this.options);
     if (this.options.exportBucket) {
