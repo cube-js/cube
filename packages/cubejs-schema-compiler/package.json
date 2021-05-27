@@ -74,7 +74,7 @@
     "@types/uuid": "^3.4.9",
     "antlr4ts-cli": "^0.5.0-alpha.4",
     "jest": "^26.6.3",
-    "mssql": "^6.1.0",
+    "mssql": "^7.1.0",
     "mysql": "^2.18.1",
     "pg-promise": "^10.5.2",
     "request": "^2.88.0",
