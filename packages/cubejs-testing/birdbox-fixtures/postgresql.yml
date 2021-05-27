@@ -18,7 +18,7 @@ services:
     links:
       - db
     volumes:
-      - ./postgresql/single/cube.js:/cube/conf/cube.js
+      - ./postgresql/cube.js:/cube/conf/cube.js
       - ./postgresql/schema:/cube/conf/schema
     ports:
       - 4000
