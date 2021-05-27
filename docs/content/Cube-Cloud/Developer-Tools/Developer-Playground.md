@@ -19,7 +19,7 @@ API will restart and its status will be visible in the Playground:
 >
   <img
   alt="Playground during API restart"
-  src="playground-restart.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Developer-Tools/playground-restart.png"
   style="border: none"
   width="100%"
   />
