@@ -28,7 +28,7 @@
   ],
   "dependencies": {
     "@cubejs-backend/shared": "^0.27.22",
-    "@hapi/joi": "^15.1.1",
+    "@hapi/joi": "^17.1.1",
     "body-parser": "^1.19.0",
     "chrono-node": "^2.2.6",
     "cron-parser": "^2.16.3",
