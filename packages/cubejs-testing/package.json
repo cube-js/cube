@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.27.19",
+  "version": "0.27.22",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -34,8 +34,8 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.27.17",
-    "@cubejs-client/ws-transport": "^0.27.19",
+    "@cubejs-backend/shared": "^0.27.22",
+    "@cubejs-client/ws-transport": "^0.27.22",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.6.1",
@@ -44,7 +44,7 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.27.0",
-    "@cubejs-client/core": "^0.27.19",
+    "@cubejs-client/core": "^0.27.22",
     "@jest/globals": "^26.6.2",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^26.0.22",

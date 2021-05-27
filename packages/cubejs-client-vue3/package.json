@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue3",
-  "version": "0.27.19",
+  "version": "0.27.22",
   "engines": {},
   "repository": {
     "type": "git",
@@ -9,7 +9,10 @@
   },
   "description": "Vue.js 3 components for cube.js",
   "author": "Ricardo Tapia",
-  "contributors": ["Ricardo Tapia", "Cube Dev, Inc."],
+  "contributors": [
+    "Ricardo Tapia",
+    "Cube Dev, Inc."
+  ],
   "scripts": {
     "serve": "vue-cli-service serve",
     "lint": "vue-cli-service lint",
@@ -25,7 +28,7 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "^0.27.19",
+    "@cubejs-client/core": "^0.27.22",
     "@vue/compiler-sfc": "^3.0.11",
     "core-js": "^3.6.5",
     "flush-promises": "^1.0.2",
@@ -35,18 +38,18 @@
   "devDependencies": {
     "@vue/cli-plugin-babel": "~4.5.0",
     "@vue/cli-plugin-eslint": "~4.5.0",
-    "@vue/cli-service": "~4.5.0",
     "@vue/cli-plugin-unit-jest": "^4.2.3",
+    "@vue/cli-service": "~4.5.0",
     "@vue/test-utils": "^2.0.0-rc.6",
-    "vue-jest": "^5.0.0-0",
     "babel-core": "7.0.0-bridge.0",
     "babel-eslint": "^10.1.0",
     "babel-jest": "^23.6.0",
     "eslint": "^7.21.0",
     "eslint-plugin-vue": "^6.2.1",
-    "vue": "^3.0.0"
+    "vue": "^3.0.0",
+    "vue-jest": "^5.0.0-0"
   },
-  "peerDependencies" : {
+  "peerDependencies": {
     "vue": "^3.0.0"
   },
   "eslintConfig": {

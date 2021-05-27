@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue",
-  "version": "0.27.19",
+  "version": "0.27.22",
   "engines": {},
   "repository": {
     "type": "git",
@@ -9,7 +9,10 @@
   },
   "description": "Vue.js components for cube.js",
   "author": "Ricardo Tapia",
-  "contributors": ["Ricardo Tapia", "Cube Dev, Inc."],
+  "contributors": [
+    "Ricardo Tapia",
+    "Cube Dev, Inc."
+  ],
   "scripts": {
     "serve": "vue-cli-service serve",
     "lint": "vue-cli-service lint",
@@ -25,7 +28,7 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "^0.27.19",
+    "@cubejs-client/core": "^0.27.22",
     "core-js": "^3.6.5",
     "ramda": "^0.27.0"
   },
@@ -43,7 +46,7 @@
     "vue": "^2.6.6",
     "vue-template-compiler": "^2.6.12"
   },
-  "peerDependencies" : {
+  "peerDependencies": {
     "vue": "^2.6.6"
   },
   "eslintConfig": {
