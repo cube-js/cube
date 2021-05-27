@@ -4,7 +4,7 @@ import { BigQuery, BigQueryOptions, Dataset, Job, QueryRowsResponse } from '@goo
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver, DownloadTableCSVData,
-  DriverInterface, QueryOptions, StreamOptions, StreamTableData, StreamTableDataWithTypes, UnloadOptions,
+  DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import { Table } from '@google-cloud/bigquery/build/src/table';
@@ -79,7 +79,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  readOnly() {
+  public readOnly() {
     return !!this.options.readOnly;
   }
 
@@ -135,7 +135,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   protected mapFieldsRecursive(field: any) {
-    if (field.type === "RECORD") {
+    if (field.type === 'RECORD') {
       return this.flatten(field.fields.map(this.mapFieldsRecursive)).map(
         (nestedField: any) => ({ name: `${field.name}.${nestedField.name}`, type: nestedField.type })
       );
@@ -190,14 +190,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }
 
-  public async isUnloadSupported(options: UnloadOptions) {
+  public async isUnloadSupported() {
     return this.bucket !== null;
   }
 
   public async stream(
     query: string,
-    values: unknown[],
-    { highWaterMark }: StreamOptions
+    values: unknown[]
   ): Promise<StreamTableData> {
     const stream = await this.bigquery.createQueryStream({
       query,
@@ -214,7 +213,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public async unload(table: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+  public async unload(table: string): Promise<DownloadTableCSVData> {
     if (!this.bucket) {
       throw new Error('Unload is not configured');
     }
@@ -249,7 +248,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       params,
       parameterMode: 'positional',
       destination: this.bigquery.dataset(dataSet).table(tableName),
-      createDisposition: "CREATE_IF_NEEDED",
+      createDisposition: 'CREATE_IF_NEEDED',
       useLegacySql: false
     };
 
@@ -274,9 +273,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return withResults ? job.getQueryResults() : true;
   }
 
-  protected async runQueryJob<T = QueryRowsResponse>(bigQueryQuery: Query, options: any, withResults: boolean = true): Promise<T> {
+  protected async runQueryJob<T = QueryRowsResponse>(
+    bigQueryQuery: Query,
+    options: any,
+    withResults: boolean = true
+  ): Promise<T> {
     const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
-    return <any>this.waitForJobResult(job, options, withResults);
+    return <any> this.waitForJobResult(job, options, withResults);
   }
 
   protected async waitForJobResult(job: Job, options: any, withResults: boolean) {

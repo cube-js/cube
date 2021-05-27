@@ -11,6 +11,13 @@
   "engines": {
     "node": ">=10.8.0"
   },
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
   "files": [
     "dist/src",
     "index.js"
@@ -31,5 +38,8 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   }
 }
