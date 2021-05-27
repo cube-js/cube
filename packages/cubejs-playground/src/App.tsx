@@ -8,7 +8,7 @@ import { RouteComponentProps, withRouter } from 'react-router';
 import Header from './components/Header';
 import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
-import { event, setAnonymousId, setTelemetry } from './events';
+import { event, setAnonymousId, setTracker, setTelemetry, trackImpl } from './events';
 import { useAppContext } from './components/AppContext';
 import './index.less';
 
@@ -40,6 +40,7 @@ class App extends Component<RouteComponentProps, TAppState> {
   async componentDidMount() {
     const { history } = this.props;
 
+
     setTimeout(() => this.setState({ showLoader: true }), 700);
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
@@ -55,6 +56,7 @@ class App extends Component<RouteComponentProps, TAppState> {
     const context = await res.json();
 
     setTelemetry(context.telemetry);
+    setTracker(trackImpl);
     setAnonymousId(context.anonymousId, {
       coreServerVersion: context.coreServerVersion,
       projectFingerprint: context.projectFingerprint,
