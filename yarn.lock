@@ -331,7 +331,7 @@
   dependencies:
     tslib "^2.0.0"
 
-"@aws-sdk/client-s3@^3.16.0":
+"@aws-sdk/client-s3@^3.16.0", "@aws-sdk/client-s3@^3.17.0":
   version "3.17.0"
   resolved "https://registry.yarnpkg.com/@aws-sdk/client-s3/-/client-s3-3.17.0.tgz#fd3cb37fc8bd38fb16ae70d9b334fb5033da0d0b"
   integrity sha512-FQ8OmYBjEMFKNqGSVIcuIm06BvNIYSkAotI6cDN9VodaLNPfGmsMKgqJMqxPuwjhefg0ZanRr0XOvnQfoIeQyg==
@@ -857,7 +857,7 @@
     "@aws-sdk/types" "3.15.0"
     tslib "^2.0.0"
 
-"@aws-sdk/s3-request-presigner@^3.16.0":
+"@aws-sdk/s3-request-presigner@^3.16.0", "@aws-sdk/s3-request-presigner@^3.17.0":
   version "3.17.0"
   resolved "https://registry.yarnpkg.com/@aws-sdk/s3-request-presigner/-/s3-request-presigner-3.17.0.tgz#18f0c48aa8d38ee73d32a08a3300c04bb36f58a1"
   integrity sha512-PhCsdgoxqVoVLYZxEEPc8Tk1yo0EqixgNAeCc9BFeoidqc1Kv2mgZAVe+P/zj2SW/0qfOzacCqX5OSxAk3yEBg==
@@ -5386,22 +5386,13 @@
     "@types/node" "*"
     "@types/pg" "*"
 
-"@types/pg@*":
+"@types/pg@*", "@types/pg@^8.6.0":
   version "8.6.0"
   resolved "https://registry.yarnpkg.com/@types/pg/-/pg-8.6.0.tgz#34233b891a127d6caaad28e177b1baec1a2958d4"
   integrity sha512-3JXFrsl8COoqVB1+2Pqelx6soaiFVXzkT3fkuSNe7GB40ysfT0FHphZFPiqIXpMyTHSFRdLTyZzrFBrJRPAArA==
   dependencies:
     "@types/node" "*"
     pg-protocol "*"
-    pg-types "^2.2.0"
-
-"@types/pg@^7.14.5":
-  version "7.14.11"
-  resolved "https://registry.yarnpkg.com/@types/pg/-/pg-7.14.11.tgz#daf5555504a1f7af4263df265d91f140fece52e3"
-  integrity sha512-EnZkZ1OMw9DvNfQkn2MTJrwKmhJYDEs5ujWrPfvseWNoI95N8B4HzU/Ltrq5ZfYxDX/Zg8mTzwr6UAyTjjFvXA==
-  dependencies:
-    "@types/node" "*"
-    pg-protocol "^1.2.0"
     pg-types "^2.2.0"
 
 "@types/prettier@^2.0.0":
@@ -10671,7 +10662,7 @@ dns-txt@^2.0.2:
   dependencies:
     buffer-indexof "^1.0.0"
 
-docker-compose@^0.23.5, docker-compose@^0.23.8:
+docker-compose@^0.23.10, docker-compose@^0.23.5:
   version "0.23.10"
   resolved "https://registry.yarnpkg.com/docker-compose/-/docker-compose-0.23.10.tgz#369fd2c6429754fb4134d3d29174a8c9569690e8"
   integrity sha512-IzR6LzHrQyUvVwPNZY6F0oszAQLqHKOMNTN43Yu5aE6IBbhN9D/MpHbVUqHXTwzqIWiJM+ImYFjY5RdWWDGgfQ==
@@ -19177,7 +19168,7 @@ pg-promise@^10.5.2:
     pg-minify "1.6.2"
     spex "3.2.0"
 
-pg-protocol@*, pg-protocol@^1.2.0, pg-protocol@^1.5.0:
+pg-protocol@*, pg-protocol@^1.5.0:
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/pg-protocol/-/pg-protocol-1.5.0.tgz#b5dd452257314565e2d54ab3c132adc46565a6a0"
   integrity sha512-muRttij7H8TqRNu/DxrAJQITO4Ac7RmX3Klyr/9mJEOBeIpgnF8f9jAfRz5d3XwQZl5qBjF9gLsUtMPJE0vezQ==
@@ -19200,7 +19191,7 @@ pg-types@^2.1.0, pg-types@^2.2.0:
     postgres-date "~1.0.4"
     postgres-interval "^1.1.0"
 
-pg@8.6.0, pg@^8.2.1:
+pg@8.6.0, pg@^8.6.0:
   version "8.6.0"
   resolved "https://registry.yarnpkg.com/pg/-/pg-8.6.0.tgz#e222296b0b079b280cce106ea991703335487db2"
   integrity sha512-qNS9u61lqljTDFvmk/N66EeGq3n6Ujzj0FFyNMGQr6XuEv4tgNTXvJQTfJdcvGit5p5/DWPu+wj920hAJFI+QQ==
@@ -22182,9 +22173,9 @@ rollup@^1.31.1:
     acorn "^7.1.0"
 
 rollup@^2.40.0, rollup@^2.8.0:
-  version "2.50.1"
-  resolved "https://registry.yarnpkg.com/rollup/-/rollup-2.50.1.tgz#5d52d5c65ade19164d56efec98f16a461c6df38e"
-  integrity sha512-3MQhSdGpms4xjYrtR3WNHMT+VrWWM4oqUxUC770MmLo1FWFR2pr/OL81HSPC/ifmiu0uMFk0qPGLmjkSMRIESw==
+  version "2.50.2"
+  resolved "https://registry.yarnpkg.com/rollup/-/rollup-2.50.2.tgz#640c500c68c698f62efb01857e0ff06fcd18181f"
+  integrity sha512-Ra5JkxSiZPZZFnvE68KWtlrLnZGg5LNaV1n1esq4ch69P7ReeoRVlrTuL/k+L/GJfcowA5An0BEhEq2Hfzwl6w==
   optionalDependencies:
     fsevents "~2.3.1"
 
@@ -24147,16 +24138,16 @@ testcontainers@^6.4.2:
     tar-fs "^2.1.1"
 
 testcontainers@^7.5.0, testcontainers@^7.6.2:
-  version "7.11.0"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-7.11.0.tgz#47291a7e693b6d8f7a4f03cd0fb2a6a741c53458"
-  integrity sha512-wnTS/foBu3lFjLHRCQLv+nSBnzgp20tWRJVCRXFzU6ivDnFwNbyLMZiHhHZr6hpXtCNAToOlBenlueDA5z1L7g==
+  version "7.11.1"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-7.11.1.tgz#b3810badf79433ba02f210683eec1a1c488c107d"
+  integrity sha512-lfZeys5bLkADjOaoXfQy0V0+G8sGKr8ESANz7MhSVBwC+OTTxkP3+FVwP48bW4mwRcQ4Hojwbfw10OYT80QZmQ==
   dependencies:
     "@types/archiver" "^5.1.0"
     "@types/dockerode" "^3.2.1"
     archiver "^5.3.0"
     byline "^5.0.0"
     debug "^4.3.1"
-    docker-compose "^0.23.8"
+    docker-compose "^0.23.10"
     dockerode "^3.2.1"
     get-port "^5.1.1"
     glob "^7.1.7"

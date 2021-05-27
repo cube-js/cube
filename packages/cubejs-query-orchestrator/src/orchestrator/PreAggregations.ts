@@ -731,8 +731,8 @@ class PreAggregationLoader {
 
   protected getUnloadOptions(): UnloadOptions {
     return {
-      // Default: 16mb for Snowflake
-      maxFileSize: 64 * 1000000
+      // Default: 16mb for Snowflake, Should be specified in MBs, because drivers convert it
+      maxFileSize: 64
     };
   }
 

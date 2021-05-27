@@ -26,10 +26,10 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.27.22",
-    "@types/pg": "^7.14.5",
+    "@types/pg": "^8.6.0",
     "@types/pg-query-stream": "^1.0.3",
     "moment": "^2.24.0",
-    "pg": "^8.2.1",
+    "pg": "^8.6.0",
     "pg-query-stream": "^4.1.0"
   },
   "license": "Apache-2.0",
