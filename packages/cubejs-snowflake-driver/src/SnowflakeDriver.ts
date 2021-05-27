@@ -136,7 +136,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    */
   protected getExportBucket(): SnowflakeDriverExportAWS|undefined {
     const exportBucket: Partial<SnowflakeDriverExportAWS> = {
-      bucketType: getEnv('dbExportBucketType'),
+      bucketType: getEnv('dbExportBucketType', {
+        supported: ['s3']
+      }),
       bucketName: getEnv('dbExportBucket'),
       keyId: getEnv('dbExportBucketAwsKey'),
       secretKey: getEnv('dbExportBucketAwsSecret'),

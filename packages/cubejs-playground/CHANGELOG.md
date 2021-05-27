@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.21](https://github.com/cube-js/cube.js/compare/v0.27.20...v0.27.21) (2021-05-26)
+
+
+### Bug Fixes
+
+* Drop NodeJs namespace from @types/styled-components ([343fa8c](https://github.com/cube-js/cube.js/commit/343fa8c3556424461aaf600fc13246ffffa14473))
+
+
+
+
+
 ## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
 
 

@@ -36,7 +36,7 @@ interface CubejsConfiguration {
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
   checkAuth: (req: ExpressRequest, authorization: string) => any;
   queryTransformer: (query: object, context: RequestContext) => object;
-  preAggregationsSchema: string | (context: RequestContext) => string;
+  preAggregationsSchema: string | ((context: RequestContext) => string);
   schemaVersion: (context: RequestContext) => string;
   scheduledRefreshTimer: boolean | number;
   scheduledRefreshTimeZones: string[],
@@ -70,18 +70,20 @@ interface CubejsConfiguration {
   },
   externalDbType: string | ((context: RequestContext) => string);
   externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
-  orchestratorOptions: {
-    redisPrefix: string;
-    queryCacheOptions: {
-      refreshKeyRenewalThreshold: number;
-      backgroundRenew: boolean;
-      queueOptions: QueueOptions;
-    }
-    preAggregationsOptions: {
-      queueOptions: QueueOptions;
-    }
-  },
+  orchestratorOptions: OrchestratorOptions | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
+}
+
+interface OrchestratorOptions {
+  redisPrefix: string;
+  queryCacheOptions: {
+    refreshKeyRenewalThreshold: number;
+    backgroundRenew: boolean;
+    queueOptions: QueueOptions;
+  }
+  preAggregationsOptions: {
+    queueOptions: QueueOptions;
+  }
 }
 
 interface QueueOptions {

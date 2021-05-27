@@ -206,6 +206,13 @@ recommend configuring `CUBEJS_DB_BQ_EXPORT_BUCKET`. This will allow Cube.js to
 materialize results on an "export" bucket which are then loaded into BigQuery,
 providing better performance.
 
+<!-- prettier-ignore-start -->
+[[info |]]
+| When using an export bucket, remember to assign the **Storage Object Admin**
+| role to your BigQuery credentials (`CUBEJS_DB_BQ_KEY_FILE or
+| CUBEJS_DB_BQ_CREDENTIALS`).
+<!-- prettier-ignore-end -->
+
 ```dotenv
 CUBEJS_DB_BQ_EXPORT_BUCKET=export_data_58148478376
 ```
