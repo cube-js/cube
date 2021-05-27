@@ -210,7 +210,7 @@ class ResultSet {
     return axisValues.map(formatValue).join(delimiter || ', ');
   }
 
-  static getNormalizedPivotConfig(query, pivotConfig = null) {
+  static getNormalizedPivotConfig(query = {}, pivotConfig = null) {
     const defaultPivotConfig = {
       x: [],
       y: [],

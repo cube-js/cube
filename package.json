@@ -9,7 +9,8 @@
       "packages/*"
     ],
     "nohoist": [
-      "packages/cubejs-client-ngx/*"
+      "packages/cubejs-client-ngx/*",
+      "**/vue/*"
     ]
   },
   "scripts": {
