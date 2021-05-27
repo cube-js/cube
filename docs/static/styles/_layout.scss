@@ -969,8 +969,32 @@ section[type=h2] h2 {
     .gettingStartedItem {
       @include card-grid-item;
 
+      a {
+        border-bottom: none;
+      }
+
       &.gettingStartedItemAdjacent {
         @include card-grid-item-adjacent;
+      }
+
+      &.gettingStartedItemSlim {
+        .gettingStartedItemContent {
+          min-height: unset;
+          text-align: center;;
+
+          .gettingStartedItemImage {
+            margin-right: 1.25rem;
+
+            > img {
+              margin: unset;
+            }
+          }
+
+          .gettingStartedItemImage,
+          .gettingStartedItemLink {
+            display: inline-block;
+          }
+        }
       }
 
       .gettingStartedItemContent {
