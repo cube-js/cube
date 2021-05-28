@@ -317,7 +317,7 @@ declare module '@cubejs-client/core' {
      * });
      * ```
      */
-    decompose(): Object;
+    decompose(): ResultSet[];
 
     /**
      * @hidden
