@@ -12,7 +12,7 @@ export class BuilderMeta {
   timeDimensions: TCubeDimension[];
   filters: Array<TCubeMeasure | TCubeDimension>;
 
-  constructor(public meta: Meta) {
+  constructor(public readonly meta: Meta) {
     this.mapMeta();
   }
 
