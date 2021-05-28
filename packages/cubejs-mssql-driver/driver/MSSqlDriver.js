@@ -4,8 +4,7 @@ const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const GenericTypeToMSSql = {
   string: 'nvarchar(max)',
   text: 'nvarchar(max)',
-  // should this be timezone aware? use datetimeoffset
-  timestamp: 'datetime',
+  timestamp: 'datetime2',
 };
 
 class MSSqlDriver extends BaseDriver {
