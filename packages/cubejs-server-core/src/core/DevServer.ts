@@ -54,15 +54,13 @@ export class DevServer {
     console.log(`🦅 Dev environment available at ${apiUrl}`);
 
     if (
-      ['mysql', 'postgres'].includes(
-        (
-          this.options?.externalDbTypeFn({
-            authInfo: null,
-            securityContext: null,
-            requestId: '',
-          }) || ''
-        ).toLowerCase()
-      )
+      (
+        this.options?.externalDbTypeFn({
+          authInfo: null,
+          securityContext: null,
+          requestId: '',
+        }) || ''
+      ).toLowerCase() !== 'cubestore'
     ) {
       console.log('⚠️  Large dataset warning placeholder');
     }

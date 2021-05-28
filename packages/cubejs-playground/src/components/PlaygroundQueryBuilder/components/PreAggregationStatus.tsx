@@ -57,7 +57,7 @@ export function PreAggregationStatus({
           </Button>
         )}
 
-        {external && ['mysql', 'postgres'].includes(extDbType || '') ? (
+        {external && extDbType !== 'cubestore' ? (
           <Alert message="Large dataset warning placeholder" type="warning" />
         ) : null}
       </Space>
