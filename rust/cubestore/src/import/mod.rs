@@ -49,7 +49,7 @@ impl ImportFormat {
         match self {
             ImportFormat::CSV => {
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
-                    if location.contains(".csv.gz") {
+                    if location.contains(".gz") {
                         let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
                         Box::pin(CsvLineStream::new(reader))
                     } else {
