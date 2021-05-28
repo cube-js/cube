@@ -2294,7 +2294,7 @@ impl MetaStore for RocksMetaStore {
             let (mut sorted, mut unsorted) =
                 index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
                     match c.get_column_type() {
-                        ColumnType::Decimal { .. } | ColumnType::Bytes | ColumnType::Float => false,
+                        ColumnType::Bytes => false,
                         _ => true,
                     }
                 });
@@ -3386,6 +3386,7 @@ mod tests {
                 },
                 2,
             ));
+            columns.push(Column::new("col4".to_string(), ColumnType::Bytes, 3));
 
             let table1 = meta_store
                 .create_table(

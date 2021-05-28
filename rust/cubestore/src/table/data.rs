@@ -429,6 +429,7 @@ pub fn cmp_same_types(l: &TableValueR, r: &TableValueR) -> Ordering {
         (TableValueR::String(a), TableValueR::String(b)) => a.cmp(b),
         (TableValueR::Int(a), TableValueR::Int(b)) => a.cmp(b),
         (TableValueR::Decimal(a), TableValueR::Decimal(b)) => a.cmp(b),
+        (TableValueR::Float(a), TableValueR::Float(b)) => a.cmp(b),
         (TableValueR::Bytes(a), TableValueR::Bytes(b)) => a.cmp(b),
         (TableValueR::Timestamp(a), TableValueR::Timestamp(b)) => a.cmp(b),
         (TableValueR::Boolean(a), TableValueR::Boolean(b)) => a.cmp(b),
