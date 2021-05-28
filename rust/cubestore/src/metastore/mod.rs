@@ -2270,7 +2270,7 @@ impl MetaStore for RocksMetaStore {
 
             let schema_id =
                 rocks_schema.get_single_row_by_index(&schema_name, &SchemaRocksIndex::Name)?;
-            let index_cols = columns.clone();
+            let table_columns = columns.clone();
             let table = Table::new(
                 table_name,
                 schema_id.get_id(),
@@ -2285,36 +2285,29 @@ impl MetaStore for RocksMetaStore {
                     batch_pipe,
                     &rocks_index,
                     &rocks_partition,
-                    &index_cols,
+                    &table_columns,
                     &table_id,
                     index_def,
                 )?;
             }
-
-            let (mut sorted, mut unsorted) =
-                index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
-                    match c.get_column_type() {
-                        ColumnType::Bytes => false,
-                        _ => true,
-                    }
-                });
-
-            let sorted_key_size = sorted.len() as u64;
-            sorted.append(&mut unsorted);
-
-            let index = Index::try_new(
-                "default".to_string(),
-                table_id.get_id(),
-                sorted
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, c)| c.replace_index(i))
-                    .collect::<Vec<_>>(),
-                sorted_key_size,
+            let def_index_columns = table_columns
+                .iter()
+                .filter_map(|c| match c.get_column_type() {
+                    ColumnType::Bytes => None,
+                    _ => Some(c.get_name().clone()),
+                })
+                .collect_vec();
+            RocksMetaStore::add_index(
+                batch_pipe,
+                &rocks_index,
+                &rocks_partition,
+                &table_columns,
+                &table_id,
+                IndexDef {
+                    name: "default".to_string(),
+                    columns: def_index_columns,
+                },
             )?;
-            let index_id = rocks_index.insert(index, batch_pipe)?;
-            let partition = Partition::new(index_id.id, None, None);
-            let _ = rocks_partition.insert(partition, batch_pipe)?;
 
             Ok(table_id)
         })
