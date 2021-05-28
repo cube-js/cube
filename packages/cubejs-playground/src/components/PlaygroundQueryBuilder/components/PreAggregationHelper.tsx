@@ -6,7 +6,7 @@ import { CodeSnippet } from '../../../atoms';
 const { Paragraph, Link } = Typography;
 
 function preAggregationsCodeString(transformedQuery) {
-  let lines = ['type: `rollup`'];
+  let lines: string[] = [];
 
   if (transformedQuery?.leafMeasures.length) {
     lines.push(

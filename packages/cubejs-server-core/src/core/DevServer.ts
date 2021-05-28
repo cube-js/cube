@@ -52,6 +52,21 @@ export class DevServer {
       console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
     }
     console.log(`🦅 Dev environment available at ${apiUrl}`);
+
+    if (
+      ['mysql', 'postgres'].includes(
+        (
+          this.options?.externalDbTypeFn({
+            authInfo: null,
+            securityContext: null,
+            requestId: '',
+          }) || ''
+        ).toLowerCase()
+      )
+    ) {
+      console.log('⚠️  Large dataset warning placeholder');
+    }
+
     this.cubejsServer.event('Dev Server Start');
     const serveStatic = require('serve-static');
 
@@ -78,7 +93,7 @@ export class DevServer {
           authInfo: null,
           securityContext: null,
           requestId: getRequestIdFromRequest(req),
-        }) || null,
+        }).toLowerCase() || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
         livePreview: options.livePreview,

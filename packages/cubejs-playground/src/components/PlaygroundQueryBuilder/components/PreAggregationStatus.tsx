@@ -1,11 +1,13 @@
 import styled from 'styled-components';
-import { Button, Modal, Space, Typography } from 'antd';
+import { Alert, Button, Modal, Space, Typography } from 'antd';
 import { useState } from 'react';
 import { TransformedQuery } from '@cubejs-client/core';
 import Icon from '@ant-design/icons';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { PreAggregationHelper } from './PreAggregationHelper';
+import { QueryStatus } from '../../../PlaygroundQueryBuilder';
+import { useAppContext } from '../../AppContext';
 
 const Badge = styled.div`
   display: flex;
@@ -15,16 +17,14 @@ const Badge = styled.div`
   background: var(--warning-bg-color);
 `;
 
-type PreAggregationStatusProps = {
-  timeElapsed: number;
-  isAggregated: boolean;
-  transformedQuery?: TransformedQuery;
-};
+type PreAggregationStatusProps = QueryStatus;
 
 export function PreAggregationStatus({
   isAggregated,
   transformedQuery,
+  external,
 }: PreAggregationStatusProps) {
+  const { extDbType } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   // hide it for the time being
   // const renderTime = () => (
@@ -56,6 +56,10 @@ export function PreAggregationStatus({
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
         )}
+
+        {external && ['mysql', 'postgres'].includes(extDbType || '') ? (
+          <Alert message="Large dataset warning placeholder" type="warning" />
+        ) : null}
       </Space>
 
       <Modal
