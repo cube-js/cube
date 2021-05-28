@@ -76,6 +76,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
+        t("decimal_index", decimal_index),
+        t("float_index", float_index),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2358,6 +2360,84 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
                     TableValue::Timestamp(*t),
                     TableValue::String(s.to_string()),
                     TableValue::Int(*n),
+                ]
+            })
+            .collect_vec()
+    }
+}
+
+async fn decimal_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(x decimal, y decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE INDEX reverse on s.Data(y, x)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(x,y) VALUES (1, 2), (2, 3), (3, 4)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY x")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 2), (2, 3), (3, 4)]));
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY y DESC")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3, 4), (2, 3), (1, 2)]));
+
+    fn rows(a: &[(i64, i64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(x, y)| {
+                vec![
+                    TableValue::Decimal(Decimal::new(x * 100000)),
+                    TableValue::Decimal(Decimal::new(y * 100000)),
+                ]
+            })
+            .collect_vec()
+    }
+}
+
+async fn float_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(x float, y float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE INDEX reverse on s.Data(y, x)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(x,y) VALUES (1, 2), (2, 3), (3, 4)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY x")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1., 2.), (2., 3.), (3., 4.)]));
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY y DESC")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+
+    fn rows(a: &[(f64, f64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(x, y)| {
+                vec![
+                    TableValue::Float((*x).into()),
+                    TableValue::Float((*y).into()),
                 ]
             })
             .collect_vec()
