@@ -8,18 +8,23 @@ let baseProps = {
   sentFrom: 'frontend',
 };
 let telemetry: boolean | undefined;
+let track: null | ((event: Record<string, any>, telemetry?: boolean) => Promise<any>) = null;
 
 export const setTelemetry = (isAllowed) => (telemetry = isAllowed);
 
-const track = async (event) => {
+export const trackImpl = async (event) => {
   if (telemetry !== true) {
     return;
   }
 
-  let clientAnonymousId: string | null = localStorage.getItem('playground_anonymous');
+  let clientAnonymousId: string | null = localStorage.getItem(
+    'playground_anonymous'
+  );
 
   if (!clientAnonymousId) {
-    clientAnonymousId = <string>(cookie.get('playground_anonymous') || uuidv4().toString());
+    clientAnonymousId = <string>(
+      (cookie.get('playground_anonymous') || uuidv4().toString())
+    );
     localStorage.setItem('playground_anonymous', clientAnonymousId);
     cookie.remove('playground_anonymous');
   }
@@ -60,6 +65,7 @@ const track = async (event) => {
     }
     return null;
   };
+
   const currentPromise = (flushPromise || Promise.resolve())
     .then(() => flush())
     .then(() => {
@@ -67,23 +73,28 @@ const track = async (event) => {
         flushPromise = null;
       }
     });
+
   // @ts-ignore
   flushPromise = currentPromise;
   return flushPromise;
 };
+
+export const setTracker = (
+  tracker: (props: Record<string, any>) => Promise<any>
+) => (track = tracker);
 
 export const setAnonymousId = (anonymousId, props) => {
   baseProps = {
     ...baseProps,
     ...props,
   };
-  track({ event: 'identify', anonymousId, ...props });
+  track?.({ event: 'identify', anonymousId, ...props }, telemetry);
 };
 
 type BaseEvent = Record<string, any>;
 
 export const event = (name: string, params: BaseEvent = {}) => {
-  track({ event: name, ...params });
+  track?.({ event: name, ...params }, telemetry);
 };
 
 export const playgroundAction = (name: string, options: BaseEvent = {}) => {
@@ -91,5 +102,5 @@ export const playgroundAction = (name: string, options: BaseEvent = {}) => {
 };
 
 export const page = (path) => {
-  track({ event: 'page', ...path });
+  track?.({ event: 'page', ...path }, telemetry);
 };
