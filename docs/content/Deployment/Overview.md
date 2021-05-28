@@ -1,0 +1,300 @@
+---
+title: Overview
+permalink: /deployment/overview
+category: Deployment
+menuOrder: 1
+---
+
+This section contains a general overview of deploying Cube.js cluster in
+production. You can find platform-specific guides on the [Deployment guides
+page.][link-deployment-guides]
+
+If you are moving Cube.js to production, check this guide:
+
+[Production Checklist](/deployment/production-checklist)
+
+[link-deployment-guides]: /deployment/guide
+
+As shown in the diagram below, a typical production Cube.js cluster consists of one or multiple API instances,
+a refresh worker, Redis and a Cube Store cluster.
+Refresh Worker and Cube Store cluster.
+
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Deployment Overview"
+  src="deployment-overview.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
+
+**API Instances** process incoming API requests and query either Cube
+Store for pre-aggregated data or connected database(s) for raw data. The **Refresh
+Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
+ingests pre-aggregations built by Refresh Worker and responds to queries from
+API instances. **Redis** is used to manage the queue and query-level cache.
+
+
+API instances and Refresh Worker can be configured via [environment variables](/reference/environment-variables) or
+[cube.js configuration file](/config). The also need access to the data schema files.
+
+Cube Store cluster can be configured via environment variables.
+
+Below you can find an example Docker Compose configuration for a Cube.js cluster:
+
+```yaml
+version: '2.2'
+
+services:
+  cube_api:
+    image: cubejs/cube
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-k8s-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=cubestore
+
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+
+      - CUBEJS_REDIS_URL=redis://redis:6379
+
+      - CUBEJS_API_SECRET=secret
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_router
+      - cube_refresh_worker
+      - redis
+
+  cube_refresh_worker:
+    image: cubejs/cube
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-k8s-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=cubestore
+
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+
+      - CUBEJS_REDIS_URL=redis://redis:6379
+
+      - CUBEJS_API_SECRET=secret
+
+      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+    volumes:
+      - .:/cube/conf
+
+  cubestore_router:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+    depends_on:
+      - cubestore_worker_1
+      - cubestore_worker_2
+      - cubestore_worker_3
+      - cubestore_worker_4
+
+  cubestore_worker_1:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
+      - CUBESTORE_WORKER_PORT=10001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+
+  cubestore_worker_2:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
+      - CUBESTORE_WORKER_PORT=10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+
+  redis:
+    image: bitnami/redis:latest
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    logging:
+      driver: none 
+
+```
+
+
+## API Instance
+
+API instance is processing incoming API requests and quering either Cube Store for pre-aggregated data or connected database(s) for raw data. It is possible to horizontally scale API instances and use load balancer to balance incoming requests between multiple API instances.
+
+[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for API Instance.
+
+API instance needs to be configured via environment variables, cube.js file and
+has access to the data schema files.
+
+## Refresh Worker
+
+Refresh Worker updates the pre-aggregations and in-memory cache in the
+background.
+
+[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for Refresh Worker too.
+To make service act as a Refresh Worker `CUBEJS_SCHEDULED_REFRESH_TIMER=true` should be set.
+
+## Cube Store
+
+Cube Store is the purpose-built pre-aggregations storage for Cube.js.
+
+Cube Store uses a distributed query engine architecture. In every Cube Store cluster:
+
+* a one or many router nodes handle incoming connections, manages database metadata, builds query plans, and orchestrates their execution
+* multiple worker nodes ingest warmed up data and execute queries in parallel
+* a local or cloud-based blob storage keeps pre-aggregated data in columnar format
+
+![](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png)
+
+### Scaling
+Although Cube Store _can_ be run in single-instance mode, this is often unsuitable for production deployments. For high concurrency and data throughput, we **strongly** recommend running Cube Store as a cluster of multiple instances instead.
+Because the storage layer is decoupled from the query processing engine, you can horizontally scale your Cube Store cluster for as much concurrency as you require.
+
+
+Cube Store has two "kinds" of nodes:
+- The **router** node handles incoming client connections, manages database metadata and serves simple queries
+ - Multiple **worker** nodes which execute SQL queries received from Cube.js
+
+Both the router and worker use the [Cube Store Docker image](https://hub.docker.com/r/cubejs/cubestore). The following environment variables should be used to manage the roles:
+
+| Environment Variable    | Specify on Router? | Specify on Worker? |
+| ----------------------- | ------------------ | ------------------ |
+| `CUBESTORE_SERVER_NAME` | Yes                | Yes                |
+| `CUBESTORE_META_PORT`   | Yes                | -                  |
+| `CUBESTORE_WORKERS`     | Yes                | Yes                |
+| `CUBESTORE_WORKER_PORT` | -                  | Yes                |
+| `CUBESTORE_META_ADDR`   | -                  | Yes                |
+
+A sample Docker Compose stack setting Cube Store cluster up might look like:
+
+```yaml
+version: '2.2'
+
+services:
+  cubestore_router:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+    depends_on:
+      - cubestore_worker_1
+      - cubestore_worker_2
+      - cubestore_worker_3
+      - cubestore_worker_4
+
+  cubestore_worker_1:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
+      - CUBESTORE_WORKER_PORT=10001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+
+  cubestore_worker_2:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
+      - CUBESTORE_WORKER_PORT=10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+```
+
+### Storage
+
+Cube Store makes use of a separate storage layer for storing metadata as well as
+for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
+and Google Cloud, or if desired, a local path on the server.
+
+A simplified example using AWS S3 might look like:
+
+```yaml
+version: '2.2'
+services:
+  cubestore_router:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
+      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
+      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
+      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+  cubestore_worker_1:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
+      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
+      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
+      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+    depends_on:
+      - cubestore_router
+```
+
+
+## Redis
+
+Cube.js uses Redis, an in-memory data structure store, for query caching and queue.
+
+ Set the `CUBEJS_REDIS_URL` environment variable to allow Cube.js API Instances and Refresh Worker to connect to Redis. If your Redis instance also has a password, please set it via the `CUBEJS_REDIS_PASSWORD` environment variable. Set the `CUBEJS_REDIS_TLS` environment variable to true if you want to enable SSL-secured connections. Ensure your Redis cluster allows at least 15 concurrent connections.
+
+### Redis Sentinel
+
+Cube.js supports Redis Sentinel via `CUBEJS_REDIS_USE_IOREDIS=true` environment variable. Then set `CUBEJS_REDIS_URL` to the `redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js to connect to the Redis Sentinel.
+
+Cube.js server instances used by same tenant environments should have same Redis instances. Otherwise they will have different query queues which can lead to incorrect pre-aggregation states and intermittent data access errors.
+
+### Redis Pool
+
+If `CUBEJS_REDIS_URL` is provided Cube.js, will create a Redis connection pool
+with a minimum of 2 and maximum of 1000 concurrent connections, by default. The
+`CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be
+used to tweak pool size limits. To disable connection pooling, and instead
+create connections on-demand, you can set `CUBEJS_REDIS_POOL_MAX` to 0.
+
+If your maximum concurrent connections limit is too low, you may see
+`TimeoutError: ResourceRequest timed out` errors. As a rule of a thumb, you need
+to have `Queue Size * Number of tenants` concurrent connections to ensure the
+best performance possible. If you use clustered deployments, please make sure
+you have enough connections for all Cube.js server instances. A lower number of
+connections still can work, however Redis becomes a performance bottleneck in
+this case.
+
+### Running without Redis
+
+If you want to run Cube.js in production without Redis, you can use
+`CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.
+
+<!-- prettier-ignore-start -->
+[[warning | Note]]
+| Serverless and clustered deployments can't be run without Redis as it is used
+| to manage the query queue.
+<!-- prettier-ignore-end -->
