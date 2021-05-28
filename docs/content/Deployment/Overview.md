@@ -15,8 +15,8 @@ If you are moving Cube.js to production, check this guide:
 
 [link-deployment-guides]: /deployment/guide
 
-As shown in the diagram below, a typical production Cube.js cluster consists of one or multiple API instances,
-a refresh worker, Redis and a Cube Store cluster.
+As shown in the diagram below, a typical production Cube.js cluster consists of
+one or multiple API instances, a refresh worker, Redis and a Cube Store cluster.
 Refresh Worker and Cube Store cluster.
 
 <div
@@ -30,19 +30,21 @@ Refresh Worker and Cube Store cluster.
   />
 </div>
 
-**API Instances** process incoming API requests and query either Cube
-Store for pre-aggregated data or connected database(s) for raw data. The **Refresh
+**API Instances** process incoming API requests and query either Cube Store for
+pre-aggregated data or connected database(s) for raw data. The **Refresh
 Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
 ingests pre-aggregations built by Refresh Worker and responds to queries from
 API instances. **Redis** is used to manage the queue and query-level cache.
 
-
-API instances and Refresh Worker can be configured via [environment variables](/reference/environment-variables) or
-[cube.js configuration file](/config). The also need access to the data schema files.
+API instances and Refresh Worker can be configured via
+[environment variables](/reference/environment-variables) or
+[cube.js configuration file](/config). The also need access to the data schema
+files.
 
 Cube Store cluster can be configured via environment variables.
 
-Below you can find an example Docker Compose configuration for a Cube.js cluster:
+Below you can find an example Docker Compose configuration for a Cube.js
+cluster:
 
 ```yaml
 version: '2.2'
@@ -128,16 +130,18 @@ services:
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     logging:
-      driver: none 
-
+      driver: none
 ```
-
 
 ## API Instance
 
-API instance is processing incoming API requests and quering either Cube Store for pre-aggregated data or connected database(s) for raw data. It is possible to horizontally scale API instances and use load balancer to balance incoming requests between multiple API instances.
+API instance is processing incoming API requests and quering either Cube Store
+for pre-aggregated data or connected database(s) for raw data. It is possible to
+horizontally scale API instances and use load balancer to balance incoming
+requests between multiple API instances.
 
-[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for API Instance.
+[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for API
+Instance.
 
 API instance needs to be configured via environment variables, cube.js file and
 has access to the data schema files.
@@ -147,31 +151,43 @@ has access to the data schema files.
 Refresh Worker updates the pre-aggregations and in-memory cache in the
 background.
 
-[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for Refresh Worker too.
-To make service act as a Refresh Worker `CUBEJS_SCHEDULED_REFRESH_TIMER=true` should be set.
+[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for Refresh
+Worker too. To make service act as a Refresh Worker
+`CUBEJS_SCHEDULED_REFRESH_TIMER=true` should be set.
 
 ## Cube Store
 
 Cube Store is the purpose-built pre-aggregations storage for Cube.js.
 
-Cube Store uses a distributed query engine architecture. In every Cube Store cluster:
+Cube Store uses a distributed query engine architecture. In every Cube Store
+cluster:
 
-* a one or many router nodes handle incoming connections, manages database metadata, builds query plans, and orchestrates their execution
-* multiple worker nodes ingest warmed up data and execute queries in parallel
-* a local or cloud-based blob storage keeps pre-aggregated data in columnar format
+- a one or many router nodes handle incoming connections, manages database
+  metadata, builds query plans, and orchestrates their execution
+- multiple worker nodes ingest warmed up data and execute queries in parallel
+- a local or cloud-based blob storage keeps pre-aggregated data in columnar
+  format
 
 ![](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png)
 
 ### Scaling
-Although Cube Store _can_ be run in single-instance mode, this is often unsuitable for production deployments. For high concurrency and data throughput, we **strongly** recommend running Cube Store as a cluster of multiple instances instead.
-Because the storage layer is decoupled from the query processing engine, you can horizontally scale your Cube Store cluster for as much concurrency as you require.
 
+Although Cube Store _can_ be run in single-instance mode, this is often
+unsuitable for production deployments. For high concurrency and data throughput,
+we **strongly** recommend running Cube Store as a cluster of multiple instances
+instead. Because the storage layer is decoupled from the query processing
+engine, you can horizontally scale your Cube Store cluster for as much
+concurrency as you require.
 
 Cube Store has two "kinds" of nodes:
-- The **router** node handles incoming client connections, manages database metadata and serves simple queries
- - Multiple **worker** nodes which execute SQL queries received from Cube.js
 
-Both the router and worker use the [Cube Store Docker image](https://hub.docker.com/r/cubejs/cubestore). The following environment variables should be used to manage the roles:
+- The **router** node handles incoming client connections, manages database
+  metadata and serves simple queries
+- Multiple **worker** nodes which execute SQL queries received from Cube.js
+
+Both the router and worker use the
+[Cube Store Docker image](https://hub.docker.com/r/cubejs/cubestore). The
+following environment variables should be used to manage the roles:
 
 | Environment Variable    | Specify on Router? | Specify on Worker? |
 | ----------------------- | ------------------ | ------------------ |
@@ -259,18 +275,28 @@ services:
       - cubestore_router
 ```
 
-
 ## Redis
 
-Cube.js uses Redis, an in-memory data structure store, for query caching and queue.
+Cube.js uses Redis, an in-memory data structure store, for query caching and
+queue.
 
- Set the `CUBEJS_REDIS_URL` environment variable to allow Cube.js API Instances and Refresh Worker to connect to Redis. If your Redis instance also has a password, please set it via the `CUBEJS_REDIS_PASSWORD` environment variable. Set the `CUBEJS_REDIS_TLS` environment variable to true if you want to enable SSL-secured connections. Ensure your Redis cluster allows at least 15 concurrent connections.
+Set the `CUBEJS_REDIS_URL` environment variable to allow Cube.js API Instances
+and Refresh Worker to connect to Redis. If your Redis instance also has a
+password, please set it via the `CUBEJS_REDIS_PASSWORD` environment variable.
+Set the `CUBEJS_REDIS_TLS` environment variable to true if you want to enable
+SSL-secured connections. Ensure your Redis cluster allows at least 15 concurrent
+connections.
 
 ### Redis Sentinel
 
-Cube.js supports Redis Sentinel via `CUBEJS_REDIS_USE_IOREDIS=true` environment variable. Then set `CUBEJS_REDIS_URL` to the `redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js to connect to the Redis Sentinel.
+Cube.js supports Redis Sentinel via `CUBEJS_REDIS_USE_IOREDIS=true` environment
+variable. Then set `CUBEJS_REDIS_URL` to the
+`redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js
+to connect to the Redis Sentinel.
 
-Cube.js server instances used by same tenant environments should have same Redis instances. Otherwise they will have different query queues which can lead to incorrect pre-aggregation states and intermittent data access errors.
+Cube.js server instances used by same tenant environments should have same Redis
+instances. Otherwise they will have different query queues which can lead to
+incorrect pre-aggregation states and intermittent data access errors.
 
 ### Redis Pool
 
