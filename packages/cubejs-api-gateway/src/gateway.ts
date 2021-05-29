@@ -413,9 +413,7 @@ export class ApiGateway {
   public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
-      const preAggregations = await this
-        .getCompilerApi(context)
-        .preAggregations({ requestId: context.requestId });
+      const preAggregations = await this.getCompilerApi(context).preAggregations();
 
       res({ preAggregations });
     } catch (e) {

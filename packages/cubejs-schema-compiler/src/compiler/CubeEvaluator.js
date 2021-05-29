@@ -59,13 +59,26 @@ export class CubeEvaluator extends CubeSymbols {
             preAggregationName => (!scheduled || preAggregations[preAggregationName].scheduledRefresh) &&
               (!preAggregationIds || preAggregationIds.includes(idFactory({ cube, preAggregationName })))
           )
-          .map(preAggregationName => ({
-            id: idFactory({ cube, preAggregationName }),
-            preAggregationName,
-            preAggregation: preAggregations[preAggregationName],
-            cube,
-            references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName])
-          }));
+          .map(preAggregationName => {
+            const { indexes } = preAggregations[preAggregationName];
+            return {
+              id: idFactory({ cube, preAggregationName }),
+              preAggregationName,
+              preAggregation: preAggregations[preAggregationName],
+              cube,
+              references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
+              indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
+                obj[indexName] = {
+                  columns: this.evaluateReferences(
+                    cube,
+                    indexes[indexName].columns,
+                    { originalSorting: true }
+                  )
+                };
+                return obj;
+              }, {})
+            };
+          });
       })
       .reduce((a, b) => a.concat(b), []);
   }
