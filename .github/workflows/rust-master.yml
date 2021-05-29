@@ -209,16 +209,17 @@ jobs:
         if: ${{ matrix.target == 'x86_64-apple-darwin' }}
         with:
           OPENSSL_STATIC: "true"
-      # https://github.com/actions-rs/cargo/issues/6
-      #- uses: actions-rs/cargo@v1
-      - uses: marcopolo/cargo@master
-        with:
-          working-directory: rust
-          command: build
-          args: --release --target=${{ matrix.target }}
-          # We need to force it everywhere before using it in cross building
-          #args: --release --locked --target=${{ matrix.target }}
-          use-cross: ${{ matrix.cross }}
+      - name: Build with Cross
+        if: ${{ matrix.cross }}
+        run: |
+          wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
+          chmod +x cross && sudo mv cross /usr/local/bin/cross
+          cd rust
+          cross build --release --target=${{ matrix.target }}
+      - name: Build with Cargo
+        if: ${{ !matrix.cross }}
+        run: |
+          cd rust && cargo build --release --target=${{ matrix.target }}
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}

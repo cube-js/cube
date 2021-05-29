@@ -185,10 +185,17 @@ export class BaseDriver {
     throw new Error('Not implemented');
   }
 
-  async downloadQueryResults(query, values) {
+  /**
+   * @public
+   * @return {Promise<any>}
+   */
+  async downloadQueryResults(query, values, options) {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
-      throw new Error('Unable to detect column types for pre-aggregation on empty values in readOnly mode');
+      throw new Error(
+        'Unable to detect column types for pre-aggregation on empty values in readOnly mode. \n' +
+        'https://cube.dev/docs/caching/using-pre-aggregations#read-only-data-source'
+      );
     }
 
     const fields = Object.keys(rows[0]);
@@ -292,6 +299,7 @@ export class BaseDriver {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
+
     await this.createTable(table, columns);
     try {
       for (let i = 0; i < tableData.rows.length; i++) {

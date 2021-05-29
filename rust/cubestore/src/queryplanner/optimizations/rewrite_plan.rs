@@ -52,7 +52,7 @@ pub fn rewrite_plan<R: PlanRewriter>(
             inputs: {
                 let mut new_inputs = Vec::new();
                 for i in inputs.iter() {
-                    new_inputs.push(Arc::new(rewrite_plan(i, ctx, f)?))
+                    new_inputs.push(rewrite_plan(i, ctx, f)?)
                 }
                 new_inputs
             },

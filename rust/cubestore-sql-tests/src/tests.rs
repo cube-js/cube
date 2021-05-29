@@ -72,6 +72,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
         t("offset", offset),
+        t("having", having),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -1080,7 +1081,16 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) {
         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
         .await
         .unwrap();
-    service.exec_query(&format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url)).await.unwrap();
+    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url);
+    let (_, query_result) = tokio::join!(
+        service.exec_query(&create_table_sql),
+        service.exec_query("SELECT count(*) from foo.bikes")
+    );
+    assert!(
+        query_result.is_err(),
+        "Table shouldn't be ready but querying returns {:?}",
+        query_result
+    );
 
     let result = service
         .exec_query("SELECT count(*) from foo.bikes")
@@ -1694,7 +1704,7 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         .plan_query(
             "SELECT id, amount \
                  FROM s.Orders \
-                 WHERE id > 10\
+                 WHERE id > 10 \
                  LIMIT 10",
         )
         .await
@@ -2155,6 +2165,69 @@ async fn offset(service: Box<dyn SqlClient>) {
     fn rows(a: &[&str]) -> Vec<Vec<TableValue>> {
         a.iter()
             .map(|s| vec![TableValue::String(s.to_string())])
+            .collect_vec()
+    }
+}
+
+async fn having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(id text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data1(id, n) VALUES ('a', 1), ('b', 2), ('c', 3)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(id text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id, n) VALUES ('a', 4), ('b', 5), ('c', 6)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, count(n) FROM s.Data1 \
+             WHERE id != 'c' \
+             GROUP BY 1 \
+             HAVING 2 <= sum(n)",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 1)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `data`.id, count(`data`.n) \
+             FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
+             WHERE n != 2 \
+             GROUP BY 1 \
+             HAVING sum(n) <= 5 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("a", 2), ("b", 1)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `data`.id, count(`data`.n) `cnt` \
+             FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
+             WHERE n != 2 \
+             GROUP BY 1 \
+             HAVING cnt = 2 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("a", 2), ("c", 2)]));
+
+    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(s, n)| vec![TableValue::String(s.to_string()), TableValue::Int(*n)])
             .collect_vec()
     }
 }
