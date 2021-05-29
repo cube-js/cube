@@ -102,12 +102,11 @@ services:
     depends_on:
       - cubestore_worker_1
       - cubestore_worker_2
-      - cubestore_worker_3
-      - cubestore_worker_4
 
   cubestore_worker_1:
     image: cubejs/cubestore:latest
     environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
       - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
       - CUBESTORE_WORKER_PORT=10001
       - CUBESTORE_REMOTE_DIR=/cube/data
@@ -118,6 +117,7 @@ services:
   cubestore_worker_2:
     image: cubejs/cubestore:latest
     environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
       - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
       - CUBESTORE_WORKER_PORT=10002
       - CUBESTORE_REMOTE_DIR=/cube/data
@@ -170,6 +170,11 @@ cluster:
 
 ![](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png)
 
+By default, Cube Store listens on the port `3030` for queries coming from
+Cube.js. The port could be changed by setting `CUBESTORE_HTTP_PORT` environment variable. In a case of
+using custom port, please make sure to change `CUBEJS_CUBESTORE_PORT`
+environment variable for Cube.js API Instances and Refresh Worker.
+
 ### Scaling
 
 Although Cube Store _can_ be run in single-instance mode, this is often
@@ -215,12 +220,11 @@ services:
     depends_on:
       - cubestore_worker_1
       - cubestore_worker_2
-      - cubestore_worker_3
-      - cubestore_worker_4
 
   cubestore_worker_1:
     image: cubejs/cubestore:latest
     environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
       - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
       - CUBESTORE_WORKER_PORT=10001
       - CUBESTORE_REMOTE_DIR=/cube/data
@@ -231,6 +235,7 @@ services:
   cubestore_worker_2:
     image: cubejs/cubestore:latest
     environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
       - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
       - CUBESTORE_WORKER_PORT=10002
       - CUBESTORE_REMOTE_DIR=/cube/data
