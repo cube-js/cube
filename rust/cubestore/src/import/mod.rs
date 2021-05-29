@@ -373,9 +373,23 @@ impl ImportServiceImpl {
     }
 
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
-        let to_download = location.replace("temp://", "temp-uploads/");
+        let to_download = ImportServiceImpl::temp_uploads_path(location);
         let local_file = self.remote_fs.download_file(&to_download).await?;
         Ok(File::open(local_file).await?)
+    }
+
+    fn temp_uploads_path(location: &str) -> String {
+        location.replace("temp://", "temp-uploads/")
+    }
+
+    async fn drop_temp_uploads(&self, location: &str) -> Result<(), CubeError> {
+        // TODO There also should be a process which collects orphaned uploads due to failed imports
+        if location.starts_with("temp://") {
+            self.remote_fs
+                .delete_file(&ImportServiceImpl::temp_uploads_path(location))
+                .await?;
+        }
+        Ok(())
     }
 
     async fn do_import(
@@ -442,8 +456,12 @@ impl ImportService for ImportServiceImpl {
                 "Trying to import table without location: {:?}",
                 table
             )))?;
-        for location in locations.into_iter() {
-            self.do_import(&table, *format, &location).await?;
+        for location in locations.iter() {
+            self.do_import(&table, *format, location).await?;
+        }
+
+        for location in locations.iter() {
+            self.drop_temp_uploads(location).await?;
         }
 
         Ok(())
@@ -473,7 +491,11 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        self.do_import(&table, *format, location).await
+        self.do_import(&table, *format, location).await?;
+
+        self.drop_temp_uploads(&location).await?;
+
+        Ok(())
     }
 }
 

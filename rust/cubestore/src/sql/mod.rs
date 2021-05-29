@@ -75,6 +75,8 @@ pub trait SqlService: DIService + Send + Sync {
         name: String,
         file_path: &Path,
     ) -> Result<(), CubeError>;
+
+    async fn temp_uploads_dir(&self, context: SqlQueryContext) -> Result<String, CubeError>;
 }
 
 pub struct QueryPlans {
@@ -596,6 +598,10 @@ impl SqlService for SqlServiceImpl {
             )
             .await?;
         Ok(())
+    }
+
+    async fn temp_uploads_dir(&self, _context: SqlQueryContext) -> Result<String, CubeError> {
+        self.remote_fs.uploads_dir().await
     }
 }
 

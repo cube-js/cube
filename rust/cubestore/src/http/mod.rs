@@ -251,7 +251,13 @@ impl HttpServer {
         upload_query: UploadQuery,
         mut body: impl Stream<Item = Result<impl warp::Buf, warp::Error>> + Unpin,
     ) -> Result<impl Reply, Rejection> {
-        let temp_file = NamedTempFile::new().map_err(|e| CubeRejection::Internal(e.to_string()))?;
+        let temp_file = NamedTempFile::new_in(
+            sql_service
+                .temp_uploads_dir(sql_query_context.clone())
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?,
+        )
+        .map_err(|e| CubeRejection::Internal(e.to_string()))?;
         {
             let mut file = File::create(temp_file.path())
                 .await
