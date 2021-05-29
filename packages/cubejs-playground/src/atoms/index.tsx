@@ -4,3 +4,4 @@ export * from './FatalError';
 export * from './Button';
 export * from './Card';
 export * from './Popover';
+export * from './CodeSnippet';

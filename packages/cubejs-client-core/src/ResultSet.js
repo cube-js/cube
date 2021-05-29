@@ -49,7 +49,7 @@ const dayRange = (from, to) => ({
 
     return results;
   },
-  snapTo: (value) => dayRange(dayjs(from).startOf(value).toString(), dayjs(to).endOf(value).toString()),
+  snapTo: (value) => dayRange(dayjs(from).startOf(value).toISOString(), dayjs(to).endOf(value).toISOString()),
   start: dayjs(from),
   end: dayjs(to),
 });
@@ -217,7 +217,7 @@ class ResultSet {
     return axisValues.map(formatValue).join(delimiter || ', ');
   }
 
-  static getNormalizedPivotConfig(query, pivotConfig = null) {
+  static getNormalizedPivotConfig(query = {}, pivotConfig = null) {
     const defaultPivotConfig = {
       x: [],
       y: [],

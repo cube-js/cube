@@ -10,6 +10,7 @@ import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
 import { QueryStatus } from '../../PlaygroundQueryBuilder';
+import { useAppContext } from '../AppContext';
 
 const { Text } = Typography;
 
@@ -106,6 +107,8 @@ export default function ChartRenderer({
   const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
 
+  const { extDbType } = useAppContext();
+
   // for you, ovr :)
   useHotkeys('cmd+enter', () => {
     runButtonRef.current?.click();
@@ -136,19 +139,23 @@ export default function ChartRenderer({
 
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
+          const { external, dbType } = loadResponse.results[0] || {};
 
           setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
           Boolean(loadResponse.slowQuery) && setSlowQuery(false);
           setResultSet(true);
 
-          isAggregated =
-            Object.keys(loadResponse.results[0]?.usedPreAggregations || {})
-              .length > 0;
+          isAggregated = external !== null;
 
           event(
             isAggregated
               ? 'load_request_success_aggregated:frontend'
-              : 'load_request_success:frontend'
+              : 'load_request_success:frontend',
+            {
+              dbType,
+              ...(isAggregated ? { external } : null),
+              ...(external ? { extDbType } : null),
+            }
           );
         }
 

@@ -1,0 +1,19 @@
+diff --git a/node_modules/@types/styled-components/index.d.ts b/node_modules/@types/styled-components/index.d.ts
+index 2d59eaf..2c80b6a 100644
+--- a/node_modules/@types/styled-components/index.d.ts
++++ b/node_modules/@types/styled-components/index.d.ts
+@@ -13,14 +13,6 @@
+ //                 Danilo Fuchs <https://github.com/danilofuchs>
+ // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
+ 
+-// forward declarations
+-declare global {
+-    namespace NodeJS {
+-        // tslint:disable-next-line:no-empty-interface
+-        interface ReadableStream {}
+-    }
+-}
+-
+ import * as CSS from 'csstype';
+ import * as React from 'react';
+ import * as hoistNonReactStatics from 'hoist-non-react-statics';

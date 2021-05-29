@@ -99,6 +99,7 @@ export default class QueryBuilder extends React.Component {
     };
 
     this.mutexObj = {};
+    this.reorderTriggered = false;
   }
 
   async componentDidMount() {
@@ -308,18 +309,26 @@ export default class QueryBuilder extends React.Component {
         title: meta ? meta.resolveMember(id, ['measures', 'dimensions']).title : '',
       })),
       // uniqBy prefers first, so these will only be added if not already in the query
-      ...[...measures, ...dimensions].map(({ name, title }) => ({ id: name, title, order: 'none' })),
+      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: 'none' })),
     ]);
 
     // Preserve order until the members change or manually re-ordered
     // This is needed so that when an order member becomes active, it doesn't jump to the top of the list
     const orderMemberOrderKey = JSON.stringify(orderMembers.map(({ id }) => id).sort());
-    if (this.orderMemberOrderKey && this.orderMemberOrder && orderMemberOrderKey === this.orderMemberOrderKey) {
+
+    if (
+      this.orderMemberOrderKey
+      && this.orderMemberOrder
+      && orderMemberOrderKey === this.orderMemberOrderKey
+      && !this.reorderTriggered
+    ) {
       orderMembers = this.orderMemberOrder.map((id) => orderMembers.find((member) => member.id === id));
     } else {
       this.orderMemberOrderKey = orderMemberOrderKey;
       this.orderMemberOrder = orderMembers.map(({ id }) => id);
     }
+
+    this.reorderTriggered = false;
 
     return {
       meta,
@@ -368,6 +377,8 @@ export default class QueryBuilder extends React.Component {
           if (sourceIndex == null || destinationIndex == null) {
             return;
           }
+
+          this.reorderTriggered = true;
 
           this.updateQuery({
             order: moveItemInArray(orderMembers, sourceIndex, destinationIndex).reduce(
@@ -432,7 +443,8 @@ export default class QueryBuilder extends React.Component {
         // Don't run callbacks more than once unless the viz state has changed since last time
         if (!vizStateSent || !equals(vizStateSent, newVizState)) {
           onVizStateChanged(newVizState);
-          vizStateSent = clone(newVizState); // use clone to make sure we don't save object references
+          // use clone to make sure we don't save object references
+          vizStateSent = clone(newVizState);
         }
       }
     };

@@ -28,7 +28,7 @@ connecting your GitHub account, you can keep your data schema under version
 control.
 
 <div class="block-video" style="position: relative; padding-bottom: 60.504201680672274%; height: 0;">
-  <iframe src="https://www.loom.com/embed/101b6291b0ba4d1d8982faa3b8c5bd55" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+  <iframe src="https://www.loom.com/embed/f3965ba65be74374864b2fe5aa5517a7" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
 </div>
 
 ## Run and Scale Cube.js applications

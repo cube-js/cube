@@ -1,30 +1,39 @@
 import { fetch } from 'whatwg-fetch';
-import cookie from 'component-cookie';
+import cookie from 'js-cookie';
 import uuidv4 from 'uuid/v4';
 
 let flushPromise = null;
 let trackEvents: BaseEvent[] = [];
 let baseProps = {
-  sentFrom: 'frontend'
+  sentFrom: 'frontend',
 };
 let telemetry: boolean | undefined;
+let track: null | ((event: Record<string, any>, telemetry?: boolean) => Promise<any>) = null;
 
-export const setTelemetry = (isAllowed) => telemetry = isAllowed;
+export const setTelemetry = (isAllowed) => (telemetry = isAllowed);
 
-const track = async (event) => {
+export const trackImpl = async (event) => {
   if (telemetry !== true) {
     return;
   }
 
-  if (!cookie('playground_anonymous')) {
-    cookie('playground_anonymous', uuidv4());
+  let clientAnonymousId: string | null = localStorage.getItem(
+    'playground_anonymous'
+  );
+
+  if (!clientAnonymousId) {
+    clientAnonymousId = <string>(
+      (cookie.get('playground_anonymous') || uuidv4().toString())
+    );
+    localStorage.setItem('playground_anonymous', clientAnonymousId);
+    cookie.remove('playground_anonymous');
   }
 
   trackEvents.push({
     ...baseProps,
     ...event,
     id: uuidv4(),
-    clientAnonymousId: cookie('playground_anonymous'),
+    clientAnonymousId,
     clientTimestamp: new Date().toJSON(),
   });
 
@@ -56,6 +65,7 @@ const track = async (event) => {
     }
     return null;
   };
+
   const currentPromise = (flushPromise || Promise.resolve())
     .then(() => flush())
     .then(() => {
@@ -63,23 +73,28 @@ const track = async (event) => {
         flushPromise = null;
       }
     });
+
   // @ts-ignore
   flushPromise = currentPromise;
   return flushPromise;
 };
 
+export const setTracker = (
+  tracker: (props: Record<string, any>) => Promise<any>
+) => (track = tracker);
+
 export const setAnonymousId = (anonymousId, props) => {
   baseProps = {
     ...baseProps,
-    ...props
+    ...props,
   };
-  track({ event: 'identify', anonymousId, ...props });
+  track?.({ event: 'identify', anonymousId, ...props }, telemetry);
 };
 
 type BaseEvent = Record<string, any>;
 
 export const event = (name: string, params: BaseEvent = {}) => {
-  track({ event: name, ...params });
+  track?.({ event: name, ...params }, telemetry);
 };
 
 export const playgroundAction = (name: string, options: BaseEvent = {}) => {
@@ -87,5 +102,5 @@ export const playgroundAction = (name: string, options: BaseEvent = {}) => {
 };
 
 export const page = (path) => {
-  track({ event: 'page', ...path });
+  track?.({ event: 'page', ...path }, telemetry);
 };

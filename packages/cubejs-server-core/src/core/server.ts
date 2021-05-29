@@ -5,7 +5,7 @@ import path from 'path';
 import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
 
-import { ApiGateway } from '@cubejs-backend/api-gateway';
+import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
   createCancelableInterval, displayCLIWarning, formatDuration,
@@ -29,7 +29,6 @@ import type {
   PreAggregationsSchemaFn,
   RequestContext,
   DriverContext,
-  UserBackgroundContext,
   LoggerFn,
 } from './types';
 
@@ -404,6 +403,7 @@ export class CubejsServerCore {
       devServer,
       driverFactory: (ctx) => {
         const dbType = this.contextToDbType(ctx);
+
         if (dbType) {
           return CubejsServerCore.createDriver(dbType);
         }
@@ -593,6 +593,8 @@ export class CubejsServerCore {
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
+        scheduledRefreshContexts: this.options.scheduledRefreshContexts,
+        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones
       }
     );
   }
@@ -653,7 +655,7 @@ export class CubejsServerCore {
 
         // eslint-disable-next-line no-return-assign
         return driverPromise[dataSource] = (async () => {
-          let driver: BaseDriver|null = null;
+          let driver: BaseDriver | null = null;
 
           try {
             driver = await this.options.driverFactory({ ...context, dataSource });
@@ -731,11 +733,16 @@ export class CubejsServerCore {
   }
 
   protected createOrchestratorApi(options: any = {}): OrchestratorApi {
-    return new OrchestratorApi(options.getDriver || this.getDriver.bind(this), this.logger, {
-      redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
-      externalDriverFactory: options.getExternalDriverFactory,
-      ...(options.orchestratorOptions || this.options.orchestratorOptions)
-    });
+    return new OrchestratorApi(
+      options.getDriver || this.getDriver.bind(this),
+      this.logger,
+      {
+        redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
+        externalDriverFactory: options.getExternalDriverFactory,
+        ...(options.orchestratorOptions || this.options.orchestratorOptions),
+        contextToDbType: this.contextToDbType.bind(this)
+      }
+    );
   }
 
   /**

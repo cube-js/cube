@@ -16,9 +16,8 @@ use crate::table::data::{
     cmp_row_key, cmp_row_key_heap, convert_row_to_heap_allocated, MutRows, Rows, RowsView,
     TableValueR,
 };
-use bigdecimal::{BigDecimal, Num, ToPrimitive};
+use crate::util::decimal::Decimal;
 use num::integer::div_ceil;
-use num::BigInt;
 use std::sync::Arc;
 
 pub struct ParquetTableStore {
@@ -364,13 +363,7 @@ impl<'a> RowParquetReader<'a> {
                                         result.set_interned(
                                             i,
                                             col_i,
-                                            TableValueR::Decimal(
-                                                &BigDecimal::new(
-                                                    BigInt::from(value),
-                                                    col.get_column_type().target_scale() as i64,
-                                                )
-                                                .to_string(),
-                                            ),
+                                            TableValueR::Decimal(Decimal::new(value)),
                                         );
                                         cur_value_index += 1;
                                     } else {
@@ -672,19 +665,7 @@ impl RowParquetWriter {
                                 {
                                     TableValueR::Int(val) => Ok(*val),
                                     TableValueR::Decimal(val) => match column.get_column_type() {
-                                        ColumnType::Decimal { .. } => {
-                                            Ok((BigDecimal::from_str_radix(val, 10)?)
-                                                .with_scale(
-                                                    column.get_column_type().target_scale() as i64
-                                                )
-                                                .as_bigint_and_exponent()
-                                                .0
-                                                .to_i64()
-                                                .ok_or(CubeError::internal(format!(
-                                                    "Can't convert to i64 decimal: {}",
-                                                    val
-                                                )))?)
-                                        }
+                                        ColumnType::Decimal { .. } => Ok(val.raw_value()),
                                         x => panic!("Unexpected type: {:?}", x),
                                     },
                                     TableValueR::Timestamp(t) => {
@@ -965,10 +946,9 @@ mod tests {
     extern crate test;
 
     use crate::table::data::convert_row_to_heap_allocated;
-    use bigdecimal::BigDecimal;
+    use crate::util::decimal::Decimal;
     use csv::ReaderBuilder;
     use itertools::Itertools;
-    use num::BigInt;
     use parquet::file::reader::FileReader;
     use parquet::file::statistics::Statistics;
     use std::fs::File;
@@ -1020,7 +1000,7 @@ mod tests {
                     },
                     TableValue::Boolean(i % 5 == 0),
                     if i % 5 != 0 {
-                        TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string())
+                        TableValue::Decimal(Decimal::new(i * 10000))
                     } else {
                         TableValue::Null
                     },
@@ -1045,7 +1025,7 @@ mod tests {
                     TableValue::String(format!("Foo {}", i)),
                     TableValue::String(format!("Boo {}", i)),
                     TableValue::Boolean(false),
-                    TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()),
+                    TableValue::Decimal(Decimal::new(i * 10000)),
                 ])
             })
             .collect::<Vec<_>>();
@@ -1083,7 +1063,7 @@ mod tests {
                     TableValue::String(format!("Foo {}", i)),
                     TableValue::String(format!("Boo {}", i)),
                     TableValue::Boolean(false),
-                    TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()),
+                    TableValue::Decimal(Decimal::new(i * 10000)),
                 ])
             })
             .collect::<Vec<_>>();

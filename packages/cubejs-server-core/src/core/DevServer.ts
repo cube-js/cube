@@ -74,7 +74,7 @@ export class DevServer {
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options?.dockerVersion || null,
-        externalDbType: this.options?.externalDbTypeFn({
+        extDbType: this.options?.externalDbTypeFn({
           authInfo: null,
           securityContext: null,
           requestId: getRequestIdFromRequest(req),
@@ -84,6 +84,7 @@ export class DevServer {
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
+        dbType: options.dbType
       });
     }));
 

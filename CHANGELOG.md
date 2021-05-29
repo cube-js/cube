@@ -3,6 +3,135 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** decompose type ([#2849](https://github.com/cube-js/cube.js/issues/2849)) ([60f2596](https://github.com/cube-js/cube.js/commit/60f25964f8f7aecd8a36cc0f1b811445ae12edc6))
+* **cubestore:** Invalid cross-device link (os error 18) during streaming CREATE TABLE ([942f6d0](https://github.com/cube-js/cube.js/commit/942f6d0b1ee7635bf15c17b8d69467385fba4747))
+
+
+
+
+
+## [0.27.23](https://github.com/cube-js/cube.js/compare/v0.27.22...v0.27.23) (2021-05-27)
+
+
+### Bug Fixes
+
+* **bigquery-driver:** Broken package ([8b8c10b](https://github.com/cube-js/cube.js/commit/8b8c10b94a99aca4ce26aab231d0379d434f88f6))
+* **cubestore:** do not resolve aliases in having clause ([caca792](https://github.com/cube-js/cube.js/commit/caca79226d69ff2ca29b731eac9074137bdbb780))
+
+
+
+
+
+## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
+
+
+### Bug Fixes
+
+* **postgresql-driver:** Map bool/float4/float8 to generic type, use bigint for int8 ([ddc1739](https://github.com/cube-js/cube.js/commit/ddc17393dba3067ebe06248d817c8778859020a8))
+
+
+### Features
+
+* **@cubejs-client/vue3:** vue 3 support ([#2827](https://github.com/cube-js/cube.js/issues/2827)) ([6ac2c8c](https://github.com/cube-js/cube.js/commit/6ac2c8c938fee3001f78ef0f8782255799550514))
+* **bigquery-driver:** Migrate to TypeScript ([7c5b254](https://github.com/cube-js/cube.js/commit/7c5b25459cd3265587ddd8ed6dd23c944094254c))
+* **bigquery-driver:** Support CUBEJS_DB_EXPORT_BUCKET ([400c163](https://github.com/cube-js/cube.js/commit/400c1632e978de6c00b4c996088d1b61a9223404))
+* **bigquery-driver:** Support streaming ([8ffeba2](https://github.com/cube-js/cube.js/commit/8ffeba20f9d647438504d735155b0f8cca29fa40))
+
+
+
+
+
+## [0.27.21](https://github.com/cube-js/cube.js/compare/v0.27.20...v0.27.21) (2021-05-26)
+
+
+### Bug Fixes
+
+* Drop NodeJs namespace from @types/styled-components ([343fa8c](https://github.com/cube-js/cube.js/commit/343fa8c3556424461aaf600fc13246ffffa14473))
+* Pre-aggregation warmup stucks if refresh range fetch takes too long ([fe9afd5](https://github.com/cube-js/cube.js/commit/fe9afd5007d2fc2a80fe08e792b3cdb1b29eedee))
+
+
+
+
+
+## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** reorder reset ([#2810](https://github.com/cube-js/cube.js/issues/2810)) ([2d22683](https://github.com/cube-js/cube.js/commit/2d22683e7f02447f22a74db5fc2e0a122939f7e8))
+
+
+### Features
+
+* **@cubejs-client/playground:** sticky search bar, search improvements ([#2815](https://github.com/cube-js/cube.js/issues/2815)) ([343c52b](https://github.com/cube-js/cube.js/commit/343c52bf42fd1809360135243be9a5020beea19b))
+* **cubestore:** support aliases for right side of joins ([42a7d41](https://github.com/cube-js/cube.js/commit/42a7d4120af19e45751d683389d8003691a807e7))
+* **cubestore:** support SQL for rolling window queries ([03ff70a](https://github.com/cube-js/cube.js/commit/03ff70ac9be7805b9332d3382707b42ebf625be9))
+
+
+
+
+
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+
+### Bug Fixes
+
+* Dont publish source files for snowflake/postgresql ([cd2c90f](https://github.com/cube-js/cube.js/commit/cd2c90f51bd02cd9b918c64e116207b75af95d3d))
+* **snowflake-driver:** Handle UNLOAD for empty tables ([f5f69ff](https://github.com/cube-js/cube.js/commit/f5f69ff79371bdd33526ffa0cc8634a0f30fc9f4))
+
+
+### Features
+
+* Make rollup default for preAggregation.type ([4875fa1](https://github.com/cube-js/cube.js/commit/4875fa1be360372e7ed9dcaf9ded8b28bb348e2f))
+* Pre-aggregations Meta API, part 1 ([#2801](https://github.com/cube-js/cube.js/issues/2801)) ([2245a77](https://github.com/cube-js/cube.js/commit/2245a7774666a3a8bd36703b2b4001b20789b943))
+* **@cubejs-client/playground:** pre-agg helper ([#2807](https://github.com/cube-js/cube.js/issues/2807)) ([44f09c3](https://github.com/cube-js/cube.js/commit/44f09c39ce3b2a8c6a2ce2fb66b75a0c288eb1da))
+
+
+
+
+
+## [0.27.18](https://github.com/cube-js/cube.js/compare/v0.27.17...v0.27.18) (2021-05-22)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/postgres-driver:** Cannot find module './dist/src' ([d4cd657](https://github.com/cube-js/cube.js/commit/d4cd657c465875b1c609c0d0f1e05b6d50e7df96))
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+
+### Bug Fixes
+
+* CUBEJS_JWT_KEY - allow string ([1bd9832](https://github.com/cube-js/cube.js/commit/1bd9832ca1f93dc685ff9633482ebe7c8537e11b))
+* Pre-aggregation table is not found if warming up same pre-aggregation with a new index ([b980744](https://github.com/cube-js/cube.js/commit/b9807446174e310cc2981af0fa1bc6b54fa1669d))
+* **cubestore:** fix [#2748](https://github.com/cube-js/cube.js/issues/2748), a crash in partition filter ([f6f0992](https://github.com/cube-js/cube.js/commit/f6f09923c065ac6d2b97c5cbbe42958e51dab251))
+* **cubestore:** improve partition filter accuracy ([ef93d26](https://github.com/cube-js/cube.js/commit/ef93d26bfdb889c34fd267db599cbe071925d507))
+
+
+### Features
+
+* **@cubejs-client/core:** exporting CubejsApi class ([#2773](https://github.com/cube-js/cube.js/issues/2773)) ([03cfaff](https://github.com/cube-js/cube.js/commit/03cfaff83d2ca1c9e49b6088eab3948d081bb9a9))
+* **mysql-driver:** Support streaming ([d694c91](https://github.com/cube-js/cube.js/commit/d694c91370ceb703a50aefdd42ae3a9834e9884c))
+* **postgres-driver:** Introduce streaming ([7685ffd](https://github.com/cube-js/cube.js/commit/7685ffd45640c5ac7b403487476dd799a11db5a0))
+* **postgres-driver:** Migrate driver to TypeScript ([38f4adb](https://github.com/cube-js/cube.js/commit/38f4adbc7d0405b99cada80cc844011dcc504d2f))
+* **snowflake-driver:** Introduce streaming ([4119a79](https://github.com/cube-js/cube.js/commit/4119a79c20e710bb31c418d0ffd6bb6b8f736319))
+* **snowflake-driver:** Migrate to TypeScript ([c63a0ae](https://github.com/cube-js/cube.js/commit/c63a0ae1cd446ff4a0e336dd71c1874f99a5dfdb))
+* **snowflake-driver:** Support UNLOAD to S3 ([d984f97](https://github.com/cube-js/cube.js/commit/d984f973547d1ff339dbf6ba26f0e363bddf2e98))
+* Dont introspect schema, if driver can detect types ([3467b44](https://github.com/cube-js/cube.js/commit/3467b4472e800d8345260a5765542486ed93647b))
+
+
+
+
+
 ## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
 
 

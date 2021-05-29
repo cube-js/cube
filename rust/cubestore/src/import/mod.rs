@@ -29,9 +29,12 @@ use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::table::data::{MutRows, Rows};
 use crate::table::{Row, TableValue};
+use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
+use num::ToPrimitive;
+use std::convert::TryFrom;
 use tempfile::TempPath;
 
 pub mod limits;
@@ -113,10 +116,11 @@ impl ImportFormat {
                                         .parse()
                                         .map(|v| TableValue::Int(v))
                                         .unwrap_or(TableValue::Null),
-                                    ColumnType::Decimal { .. } => {
-                                        BigDecimal::from_str_radix(value, 10)
-                                            .map(|d| TableValue::Decimal(d.to_string()))
-                                            .unwrap_or(TableValue::Null)
+                                    t @ ColumnType::Decimal { .. } => {
+                                        TableValue::Decimal(parse_decimal(
+                                            value,
+                                            u8::try_from(t.target_scale()).unwrap(),
+                                        )?)
                                     }
                                     ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
                                     ColumnType::HyperLogLog(f) => {
@@ -146,6 +150,26 @@ impl ImportFormat {
             }
         }
     }
+}
+
+pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError> {
+    // TODO: parse into Decimal directly.
+    let bd = BigDecimal::from_str_radix(value, 10)?;
+    let raw_value = match bd
+        .with_scale(scale as i64)
+        .into_bigint_and_exponent()
+        .0
+        .to_i64()
+    {
+        Some(d) => d,
+        None => {
+            return Err(CubeError::user(format!(
+                "cannot represent '{}' with scale {} without loosing precision",
+                value, scale
+            )))
+        }
+    };
+    Ok(Decimal::new(raw_value))
 }
 
 struct CsvLineParser<'a> {
@@ -373,9 +397,23 @@ impl ImportServiceImpl {
     }
 
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
-        let to_download = location.replace("temp://", "temp-uploads/");
+        let to_download = ImportServiceImpl::temp_uploads_path(location);
         let local_file = self.remote_fs.download_file(&to_download).await?;
         Ok(File::open(local_file).await?)
+    }
+
+    fn temp_uploads_path(location: &str) -> String {
+        location.replace("temp://", "temp-uploads/")
+    }
+
+    async fn drop_temp_uploads(&self, location: &str) -> Result<(), CubeError> {
+        // TODO There also should be a process which collects orphaned uploads due to failed imports
+        if location.starts_with("temp://") {
+            self.remote_fs
+                .delete_file(&ImportServiceImpl::temp_uploads_path(location))
+                .await?;
+        }
+        Ok(())
     }
 
     async fn do_import(
@@ -442,8 +480,12 @@ impl ImportService for ImportServiceImpl {
                 "Trying to import table without location: {:?}",
                 table
             )))?;
-        for location in locations.into_iter() {
-            self.do_import(&table, *format, &location).await?;
+        for location in locations.iter() {
+            self.do_import(&table, *format, location).await?;
+        }
+
+        for location in locations.iter() {
+            self.drop_temp_uploads(location).await?;
         }
 
         Ok(())
@@ -473,7 +515,11 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        self.do_import(&table, *format, location).await
+        self.do_import(&table, *format, location).await?;
+
+        self.drop_temp_uploads(&location).await?;
+
+        Ok(())
     }
 }
 

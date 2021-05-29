@@ -55,7 +55,7 @@ npx cubejs-cli deploy --token <TOKEN>
 ## Step 3: Connect your Database
 
 Enter credentials to connect to your database. Consult [connecting to
-databases][link-connecting-to-databases] guide for more details.
+databases][ref-cloud-connecting-to-databases] guide for more details.
 
 <div
   style="text-align: center"
@@ -71,7 +71,7 @@ databases][link-connecting-to-databases] guide for more details.
 
 ## Step 4: Try out Cube Cloud
 
-Now you can navigate to Playground to try out your queries or connect your
+Now you can navigate to [the Playground][ref-cloud-playground] to try out your queries or connect your
 application to Cube Cloud API.
 
 <div
@@ -86,4 +86,6 @@ application to Cube Cloud API.
 
 </div>
 
-[link-connecting-to-databases]: /cloud/configuration/connecting-to-databases
+[ref-cloud-connecting-to-databases]:
+  /cloud/configuration/connecting-to-databases
+[ref-cloud-playground]: /cloud/dev-tools/dev-playground

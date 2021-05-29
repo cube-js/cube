@@ -3,6 +3,73 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.27.23](https://github.com/cube-js/cube.js/compare/v0.27.22...v0.27.23) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
+
+
+### Features
+
+* **@cubejs-client/vue3:** vue 3 support ([#2827](https://github.com/cube-js/cube.js/issues/2827)) ([6ac2c8c](https://github.com/cube-js/cube.js/commit/6ac2c8c938fee3001f78ef0f8782255799550514))
+
+
+
+
+
+## [0.27.21](https://github.com/cube-js/cube.js/compare/v0.27.20...v0.27.21) (2021-05-26)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.27.18](https://github.com/cube-js/cube.js/compare/v0.27.17...v0.27.18) (2021-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
 ## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/docker

@@ -3,6 +3,71 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.23](https://github.com/cube-js/cube.js/compare/v0.27.22...v0.27.23) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.21](https://github.com/cube-js/cube.js/compare/v0.27.20...v0.27.21) (2021-05-26)
+
+
+### Bug Fixes
+
+* Pre-aggregation warmup stucks if refresh range fetch takes too long ([fe9afd5](https://github.com/cube-js/cube.js/commit/fe9afd5007d2fc2a80fe08e792b3cdb1b29eedee))
+
+
+
+
+
+## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+
+### Features
+
+* Pre-aggregations Meta API, part 1 ([#2801](https://github.com/cube-js/cube.js/issues/2801)) ([2245a77](https://github.com/cube-js/cube.js/commit/2245a7774666a3a8bd36703b2b4001b20789b943))
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+
+### Features
+
+* Dont introspect schema, if driver can detect types ([3467b44](https://github.com/cube-js/cube.js/commit/3467b4472e800d8345260a5765542486ed93647b))
+
+
+
+
+
 ## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
