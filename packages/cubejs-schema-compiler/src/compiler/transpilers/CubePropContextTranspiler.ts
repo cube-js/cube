@@ -31,9 +31,6 @@ export class CubePropContextTranspiler implements TranspilerInterface {
           // @ts-ignore @todo Unsafely?
         } else if (path.node.callee.name === 'context') {
           args[args.length - 1].traverse(self.sqlAndReferencesFieldVisitor(null));
-          // @ts-ignore @todo Unsafely?
-        } else if (path.node.callee.name === 'dashboardTemplate') {
-          args[args.length - 1].traverse(self.shortNamedReferencesFieldVisitor(null));
         }
       }
     };
@@ -42,13 +39,6 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   protected sqlAndReferencesFieldVisitor(cubeName) {
     return this.knownIdentifiersInjectVisitor(
       /^(sql|measureReferences|dimensionReferences|segmentReferences|timeDimensionReference|rollupReferences|drillMembers|drillMemberReferences|contextMembers|columns)$/,
-      name => this.cubeSymbols.resolveSymbol(cubeName, name) || this.cubeSymbols.isCurrentCube(name)
-    );
-  }
-
-  protected shortNamedReferencesFieldVisitor(cubeName) {
-    return this.knownIdentifiersInjectVisitor(
-      /^.*(measures|dimensions|segments|measure|dimension|segment|member)$/,
       name => this.cubeSymbols.resolveSymbol(cubeName, name) || this.cubeSymbols.isCurrentCube(name)
     );
   }
