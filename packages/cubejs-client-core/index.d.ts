@@ -850,8 +850,13 @@ declare module '@cubejs-client/core' {
   };
 
   export type MetaResponse = {
-    cubes: Cube[]
-  }
+    cubes: Cube[];
+  };
+
+  type FilterOperator = {
+    name: string;
+    title: string;
+  };
 
   /**
    * Contains information about available cubes and it's members.
@@ -901,7 +906,7 @@ declare module '@cubejs-client/core' {
       memberType: T | T[]
     ): { title: string; error: string } | TCubeMemberByType<T>;
     defaultTimeDimensionNameFor(memberName: string): string;
-    filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): any;
+    filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): FilterOperator[];
   }
 
   /**

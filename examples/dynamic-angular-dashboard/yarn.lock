@@ -1144,10 +1144,10 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
-"@cubejs-client/core@^0.20.3":
-  version "0.20.12"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.20.12.tgz#4d92da10efe179e55cd00a33a95c9db9b2944e38"
-  integrity sha512-C0t7BniO1+LLD5VcnjDbijIcW1k240cwldthA+IXIAC+7VFfAuL1ksm0BzoaCDwnpjxI59sEQ6lYf8sWRoneow==
+"@cubejs-client/core@^0.27.22":
+  version "0.27.22"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.27.22.tgz#d676707783fca922e3a392b8e675b047b1008305"
+  integrity sha512-6A63hzeKoIsvJU4X+8jE6hVYhx2tPxlI3G6BlFbAqSGeqKeUdxXxrSeB/Mfd3/LF3tPTaRMCGC+SoKlU7MhH3g==
   dependencies:
     "@babel/runtime" "^7.1.2"
     core-js "^3.6.5"
@@ -1158,11 +1158,12 @@
     url-search-params-polyfill "^7.0.0"
     uuid "^3.4.0"
 
-"@cubejs-client/ngx@^0.22.0":
-  version "0.22.0"
-  resolved "https://registry.yarnpkg.com/@cubejs-client/ngx/-/ngx-0.22.0.tgz#5fbd7fdd549775204f0c6dd830f80a0efba1740f"
-  integrity sha512-vh/iG60qQ5ZXb/EYgZHII0A0z5NoKbsNMoCMiJffOzb29UYn5DNimIp0ikWXSVaMYF3nohnVqo6l0PCIBAXj3w==
+"@cubejs-client/ngx@^0.27.0":
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-client/ngx/-/ngx-0.27.0.tgz#1905600ddc580dbc4700de41cf9299c07192a02b"
+  integrity sha512-pdh43KOBocngq/uSywI6ee4ttA0WDXyvkzENpU0V+n9CC84/kHjhOu+2tD1uPV90sr3l89F9od3CavGN4yp1SA==
   dependencies:
+    fast-deep-equal "^3.1.3"
     tslib "^2.0.0"
 
 "@graphql-typed-document-node/core@^3.0.0":
@@ -4068,7 +4069,7 @@ extsprintf@^1.2.0:
   resolved "https://registry.yarnpkg.com/extsprintf/-/extsprintf-1.4.0.tgz#e2689f8f356fad62cca65a3a91c5df5f9551692f"
   integrity sha1-4mifjzVvrWLMplo6kcXfX5VRaS8=
 
-fast-deep-equal@^3.1.1:
+fast-deep-equal@^3.1.1, fast-deep-equal@^3.1.3:
   version "3.1.3"
   resolved "https://registry.yarnpkg.com/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz#3a7d56b559d6cbc3eb512325244e619a65c6c525"
   integrity sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==
