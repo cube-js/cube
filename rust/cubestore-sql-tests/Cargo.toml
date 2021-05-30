@@ -37,6 +37,7 @@ async-trait = "0.1.36"
 cubestore = { path = "../cubestore" }
 futures = "0.3.5"
 itertools = "0.9.0"
+log = "0.4.11"
 pretty_assertions = "0.7.1"
 scopeguard = "1.1.0"
 serde = "1.0.115"

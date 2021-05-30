@@ -11,9 +11,9 @@ import {
   PivotConfig,
   Query,
   ChartType,
+  TransformedQuery,
 } from '@cubejs-client/core';
 import styled from 'styled-components';
-import { indexBy, prop, uniq } from 'ramda';
 
 import { playgroundAction } from './events';
 import MemberGroup from './QueryBuilder/MemberGroup';
@@ -166,6 +166,7 @@ export type TPlaygroundQueryBuilderProps = {
 export type QueryStatus = {
   timeElapsed: number;
   isAggregated: boolean;
+  transformedQuery?: TransformedQuery;
 };
 
 export default function PlaygroundQueryBuilder({
@@ -461,6 +462,7 @@ export default function PlaygroundQueryBuilder({
                     <PreAggregationStatus
                       timeElapsed={queryStatus.timeElapsed}
                       isAggregated={queryStatus.isAggregated}
+                      transformedQuery={queryStatus.transformedQuery}
                     />
                   ) : null}
                 </SectionRow>
@@ -558,15 +560,20 @@ export default function PlaygroundQueryBuilder({
                             timeElapsed,
                           }) => {
                             if (resultSet) {
+                              const response = resultSet.serialize();
                               setQueryError(null);
 
                               if (isAggregated != null && timeElapsed != null) {
                                 setQueryStatus({
                                   isAggregated,
                                   timeElapsed,
+                                  transformedQuery:
+                                    response.loadResponse.results[0]
+                                      .transformedQuery,
                                 });
                               }
                             }
+
                             if (error) {
                               setQueryError(error);
                               setQueryStatus(null);

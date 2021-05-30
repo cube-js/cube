@@ -1,4 +1,5 @@
 use crate::table::data::{Rows, RowsView};
+use crate::util::decimal::Decimal;
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
 use chrono::{SecondsFormat, TimeZone, Utc};
@@ -13,7 +14,7 @@ pub enum TableValue {
     Null,
     String(String),
     Int(i64),
-    Decimal(String), // TODO bincode is incompatible with BigDecimal
+    Decimal(Decimal),
     Float(OrdF64),
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
@@ -116,6 +117,7 @@ pub fn cmp_same_types(l: &TableValue, r: &TableValue) -> Ordering {
         (TableValue::String(a), TableValue::String(b)) => a.cmp(b),
         (TableValue::Int(a), TableValue::Int(b)) => a.cmp(b),
         (TableValue::Decimal(a), TableValue::Decimal(b)) => a.cmp(b),
+        (TableValue::Float(a), TableValue::Float(b)) => a.cmp(b),
         (TableValue::Bytes(a), TableValue::Bytes(b)) => a.cmp(b),
         (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.cmp(b),
         (TableValue::Boolean(a), TableValue::Boolean(b)) => a.cmp(b),

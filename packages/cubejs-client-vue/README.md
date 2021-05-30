@@ -7,6 +7,13 @@
 
 # Cube.js Vue
 
+---
+**NOTE**
+
+This package is only compatible with Vue 2. If you are using Vue 3, consider the `@cubejs-client/vue3` package instead.
+
+---
+
 ## Project setup
 ```
 yarn install

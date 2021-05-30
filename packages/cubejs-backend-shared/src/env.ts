@@ -117,8 +117,8 @@ const variables: Record<string, (...args: any) => any> = {
     .required(required)
     .asString(),
   // Export Bucket options
-  dbExportBucketType: () => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
-    .asEnum(['s3']),
+  dbExportBucketType: ({ supported }: { supported: ('s3' | 'gcp' | 'azure')[] }) => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
+    .asEnum(supported),
   dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
     .asString(),
   // Export bucket options for AWS S3

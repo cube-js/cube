@@ -123,31 +123,49 @@ cube('Bar', {
 class OrchestratorApiMock {
   public createdTables: any = [];
 
-  public constructor() {
-    this.createdTables = [];
-  }
+  public minMaxContinueWait: { [query: string]: boolean } = {};
 
   public async executeQuery(query) {
     console.log('Executing query', query);
     if (query.query && query.query.match(/min\(.*timestamp.*foo/)) {
+      if (!this.minMaxContinueWait[query.query]) {
+        this.minMaxContinueWait[query.query] = true;
+        // eslint-disable-next-line no-throw-literal
+        throw { error: 'Continue wait' };
+      }
       return {
         data: [{
           min: '2020-12-27T00:00:00.000',
         }],
       };
     } else if (query.query && query.query.match(/max\(.*timestamp.*/)) {
+      if (!this.minMaxContinueWait[query.query]) {
+        this.minMaxContinueWait[query.query] = true;
+        // eslint-disable-next-line no-throw-literal
+        throw { error: 'Continue wait' };
+      }
       return {
         data: [{
           max: '2020-12-31T00:00:00.000',
         }],
       };
     } else if (query.query && query.query.match(/min\(.*timestamp.*bar/)) {
+      if (!this.minMaxContinueWait[query.query]) {
+        this.minMaxContinueWait[query.query] = true;
+        // eslint-disable-next-line no-throw-literal
+        throw { error: 'Continue wait' };
+      }
       return {
         data: [{
           min: '2020-12-29T00:00:00.000',
         }],
       };
     } else if (query.query && query.query.match(/max\(.*timestamp.*bar/)) {
+      if (!this.minMaxContinueWait[query.query]) {
+        this.minMaxContinueWait[query.query] = true;
+        // eslint-disable-next-line no-throw-literal
+        throw { error: 'Continue wait' };
+      }
       return {
         data: [{
           max: '2020-12-31T00:00:00.000',
@@ -244,19 +262,28 @@ describe('Refresh Scheduler', () => {
       { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC' },
       { tableName: 'stb_pre_aggregations.foo_second20201227', timezone: 'UTC' },
     ];
+    const queryIteratorState = {};
+
     for (let i = 0; i < 1000; i++) {
-      const refreshResult = await refreshScheduler.runScheduledRefresh(null, { concurrency: 2, workerIndices: [0] });
-      expect(orchestratorApi.createdTables).toEqual(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 0));
+      const refreshResult = await refreshScheduler.runScheduledRefresh(null, {
+        concurrency: 2, workerIndices: [0], queryIteratorState, preAggregationsWarmup: true
+      });
+      console.log(orchestratorApi.createdTables);
+      expect(orchestratorApi.createdTables).toEqual(
+        R.take(orchestratorApi.createdTables.length, result.filter((x, qi) => qi % 2 === 0))
+      );
       if (refreshResult.finished) {
         break;
       }
     }
 
     for (let i = 0; i < 1000; i++) {
-      const refreshResult = await refreshScheduler.runScheduledRefresh(null, { concurrency: 2, workerIndices: [1] });
+      const refreshResult = await refreshScheduler.runScheduledRefresh(null, {
+        concurrency: 2, workerIndices: [1], queryIteratorState, preAggregationsWarmup: true
+      });
       const prevWorkerResult = result.filter((x, qi) => qi % 2 === 0);
       expect(orchestratorApi.createdTables).toEqual(
-        prevWorkerResult.concat(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 1))
+        R.take(orchestratorApi.createdTables.length, prevWorkerResult.concat(result.filter((x, qi) => qi % 2 === 1)))
       );
       if (refreshResult.finished) {
         break;
@@ -298,18 +325,19 @@ describe('Refresh Scheduler', () => {
       { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'America/Los_Angeles' },
       { tableName: 'stb_pre_aggregations.foo_second20201227', timezone: 'America/Los_Angeles' },
     ];
+    const queryIteratorState = {};
     for (let i = 0; i < 1000; i++) {
       const refreshResult = await refreshScheduler.runScheduledRefresh(
         null,
-        { concurrency: 2, workerIndices: [0], timezones: ['UTC', 'America/Los_Angeles'] }
+        { concurrency: 2, workerIndices: [0], timezones: ['UTC', 'America/Los_Angeles'], queryIteratorState }
       );
-      expect(orchestratorApi.createdTables).toEqual(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 0));
+      expect(orchestratorApi.createdTables).toEqual(
+        R.take(orchestratorApi.createdTables.length, result.filter((x, qi) => qi % 2 === 0))
+      );
       if (refreshResult.finished) {
         break;
       }
     }
-
-    const queryIteratorState = {};
 
     for (let i = 0; i < 1000; i++) {
       const refreshResult = await refreshScheduler.runScheduledRefresh(
@@ -318,12 +346,16 @@ describe('Refresh Scheduler', () => {
       );
       const prevWorkerResult = result.filter((x, qi) => qi % 2 === 0);
       expect(orchestratorApi.createdTables).toEqual(
-        prevWorkerResult.concat(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 1))
+        R.take(orchestratorApi.createdTables.length, prevWorkerResult.concat(result.filter((x, qi) => qi % 2 === 1)))
       );
       if (refreshResult.finished) {
         break;
       }
     }
+
+    expect(orchestratorApi.createdTables).toEqual(
+      result.filter((x, qi) => qi % 2 === 0).concat(result.filter((x, qi) => qi % 2 === 1))
+    );
 
     console.log('Running refresh on existing queryIteratorSate');
 
@@ -365,7 +397,9 @@ describe('Refresh Scheduler', () => {
         workerIndices: [0],
         queryIteratorState
       });
-      expect(orchestratorApi.createdTables).toEqual(R.take((i + 1) * 2, result).filter((x, qi) => qi % 2 === 0));
+      expect(orchestratorApi.createdTables).toEqual(
+        R.take(orchestratorApi.createdTables.length, result.filter((x, qi) => qi % 2 === 0))
+      );
       if (refreshResult.finished) {
         break;
       }

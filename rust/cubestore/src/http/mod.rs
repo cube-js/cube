@@ -22,6 +22,7 @@ use log::info;
 use log::trace;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::net::SocketAddr;
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
@@ -251,7 +252,13 @@ impl HttpServer {
         upload_query: UploadQuery,
         mut body: impl Stream<Item = Result<impl warp::Buf, warp::Error>> + Unpin,
     ) -> Result<impl Reply, Rejection> {
-        let temp_file = NamedTempFile::new().map_err(|e| CubeRejection::Internal(e.to_string()))?;
+        let temp_file = NamedTempFile::new_in(
+            sql_service
+                .temp_uploads_dir(sql_query_context.clone())
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?,
+        )
+        .map_err(|e| CubeRejection::Internal(e.to_string()))?;
         {
             let mut file = File::create(temp_file.path())
                 .await
@@ -388,7 +395,7 @@ impl HttpMessage {
                     let mut row_offsets = Vec::with_capacity(data_frame.get_rows().len());
                     for row in data_frame.get_rows().iter() {
                         let mut value_offsets = Vec::with_capacity(row.values().len());
-                        for value in row.values().iter() {
+                        for (i, value) in row.values().iter().enumerate() {
                             let value = match value {
                                 TableValue::Null => HttpColumnValue::create(
                                     &mut builder,
@@ -409,7 +416,14 @@ impl HttpMessage {
                                     )
                                 }
                                 TableValue::Decimal(v) => {
-                                    let string_value = Some(builder.create_string(&v.to_string()));
+                                    let scale = u8::try_from(
+                                        data_frame.get_columns()[i]
+                                            .get_column_type()
+                                            .target_scale(),
+                                    )
+                                    .unwrap();
+                                    let string_value =
+                                        Some(builder.create_string(&v.to_string(scale)));
                                     HttpColumnValue::create(
                                         &mut builder,
                                         &HttpColumnValueArgs { string_value },

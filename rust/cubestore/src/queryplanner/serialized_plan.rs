@@ -10,6 +10,9 @@ use crate::queryplanner::udfs::{
 };
 use crate::CubeError;
 use arrow::datatypes::DataType;
+use datafusion::cube_ext::alias::LogicalAlias;
+use datafusion::cube_ext::join::CrossJoin;
+use datafusion::cube_ext::joinagg::CrossJoinAgg;
 use datafusion::logical_plan::{
     DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning, PlanVisitor,
 };
@@ -136,6 +139,11 @@ pub enum SerializedLogicalPlan {
         input: Arc<SerializedLogicalPlan>,
         partitioning_scheme: SerializePartitioning,
     },
+    Alias {
+        input: Arc<SerializedLogicalPlan>,
+        alias: String,
+        schema: DFSchemaRef,
+    },
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
         snapshots: Vec<Vec<IndexSnapshot>>,
@@ -148,6 +156,22 @@ pub enum SerializedLogicalPlan {
         sort_columns: Vec<SortColumn>,
         schema: DFSchemaRef,
         snapshots: Vec<Vec<IndexSnapshot>>,
+    },
+    CrossJoin {
+        left: Arc<SerializedLogicalPlan>,
+        right: Arc<SerializedLogicalPlan>,
+        on: SerializedExpr,
+        join_schema: DFSchemaRef,
+    },
+    CrossJoinAgg {
+        left: Arc<SerializedLogicalPlan>,
+        right: Arc<SerializedLogicalPlan>,
+        on: SerializedExpr,
+        join_schema: DFSchemaRef,
+
+        group_expr: Vec<SerializedExpr>,
+        agg_expr: Vec<SerializedExpr>,
+        schema: DFSchemaRef,
     },
 }
 
@@ -268,6 +292,17 @@ impl SerializedLogicalPlan {
                     }
                 },
             },
+            SerializedLogicalPlan::Alias {
+                input,
+                alias,
+                schema,
+            } => LogicalPlan::Extension {
+                node: Arc::new(LogicalAlias {
+                    input: input.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                    alias: alias.clone(),
+                    schema: schema.clone(),
+                }),
+            },
             SerializedLogicalPlan::ClusterSend { input, snapshots } => ClusterSendNode {
                 input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
                 snapshots: snapshots.clone(),
@@ -291,6 +326,40 @@ impl SerializedLogicalPlan {
                 snapshots: snapshots.clone(),
             }
             .into_plan(),
+            SerializedLogicalPlan::CrossJoin {
+                left,
+                right,
+                on,
+                join_schema,
+            } => LogicalPlan::Extension {
+                node: Arc::new(CrossJoin {
+                    left: left.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                    right: right.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                    on: on.expr(),
+                    schema: join_schema.clone(),
+                }),
+            },
+            SerializedLogicalPlan::CrossJoinAgg {
+                left,
+                right,
+                on,
+                join_schema,
+                group_expr,
+                agg_expr,
+                schema,
+            } => LogicalPlan::Extension {
+                node: Arc::new(CrossJoinAgg {
+                    join: CrossJoin {
+                        left: left.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                        right: right.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                        on: on.expr(),
+                        schema: join_schema.clone(),
+                    },
+                    group_expr: group_expr.iter().map(|e| e.expr()).collect(),
+                    agg_expr: agg_expr.iter().map(|e| e.expr()).collect(),
+                    schema: schema.clone(),
+                }),
+            },
         })
     }
 }
@@ -646,6 +715,29 @@ impl SerializedPlan {
                         schema: topk.schema.clone(),
                         snapshots: topk.snapshots.clone(),
                     }
+                } else if let Some(j) = node.as_any().downcast_ref::<CrossJoinAgg>() {
+                    SerializedLogicalPlan::CrossJoinAgg {
+                        left: Arc::new(Self::serialized_logical_plan(&j.join.left)),
+                        right: Arc::new(Self::serialized_logical_plan(&j.join.right)),
+                        on: Self::serialized_expr(&j.join.on),
+                        join_schema: j.join.schema.clone(),
+                        group_expr: Self::exprs(&j.group_expr),
+                        agg_expr: Self::exprs(&j.agg_expr),
+                        schema: j.schema.clone(),
+                    }
+                } else if let Some(join) = node.as_any().downcast_ref::<CrossJoin>() {
+                    SerializedLogicalPlan::CrossJoin {
+                        left: Arc::new(Self::serialized_logical_plan(&join.left)),
+                        right: Arc::new(Self::serialized_logical_plan(&join.right)),
+                        on: Self::serialized_expr(&join.on),
+                        join_schema: join.schema.clone(),
+                    }
+                } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
+                    SerializedLogicalPlan::Alias {
+                        input: Arc::new(Self::serialized_logical_plan(&alias.input)),
+                        alias: alias.alias.clone(),
+                        schema: alias.schema.clone(),
+                    }
                 } else {
                     panic!("unknown extension");
                 }
@@ -689,6 +781,10 @@ impl SerializedPlan {
                 },
             },
         }
+    }
+
+    fn exprs<'a>(es: impl IntoIterator<Item = &'a Expr>) -> Vec<SerializedExpr> {
+        es.into_iter().map(|e| Self::serialized_expr(e)).collect()
     }
 
     fn serialized_expr(expr: &Expr) -> SerializedExpr {
