@@ -18,7 +18,6 @@ export class DataSchemaCompiler {
     this.repository = repository;
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
-    this.dashboardTemplateCompilers = options.dashboardTemplateCompilers || [];
     this.transpilers = options.transpilers || [];
     this.preTranspileCubeCompilers = options.preTranspileCubeCompilers || [];
     this.cubeNameCompilers = options.cubeNameCompilers || [];
@@ -64,7 +63,6 @@ export class DataSchemaCompiler {
           .then(() => compilePhase({
             cubeCompilers: this.cubeCompilers,
             contextCompilers: this.contextCompilers,
-            dashboardTemplateCompilers: this.dashboardTemplateCompilers
           }));
       }).then((res) => {
         if (!this.omitErrors) {
@@ -126,7 +124,6 @@ export class DataSchemaCompiler {
     const cubes = [];
     const exports = {};
     const contexts = [];
-    const dashboardTemplates = [];
     const compiledFiles = {};
     const asyncModules = [];
 
@@ -138,7 +135,6 @@ export class DataSchemaCompiler {
           cubes,
           exports,
           contexts,
-          dashboardTemplates,
           toCompile,
           compiledFiles,
           asyncModules
@@ -146,8 +142,7 @@ export class DataSchemaCompiler {
       });
     await asyncModules.reduce((a, b) => a.then(() => b()), Promise.resolve());
     return self.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
-      .then(() => self.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
-      .then(() => self.compileObjects(compilers.dashboardTemplateCompilers || [], dashboardTemplates, errorsReport));
+      .then(() => self.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
   }
 
   throwIfAnyErrors() {
@@ -155,7 +150,7 @@ export class DataSchemaCompiler {
   }
 
   compileFile(
-    file, errorsReport, cubes, exports, contexts, dashboardTemplates, toCompile, compiledFiles, asyncModules
+    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules
   ) {
     const self = this;
     if (compiledFiles[file.fileName]) {
@@ -176,8 +171,6 @@ export class DataSchemaCompiler {
               cubes.push(Object.assign({}, cube, { name, fileName: file.fileName }))
           ),
         context: (name, context) => contexts.push(Object.assign({}, context, { name, fileName: file.fileName })),
-        dashboardTemplate:
-          (name, template) => dashboardTemplates.push(Object.assign({}, template, { name, fileName: file.fileName })),
         addExport: (obj) => {
           exports[file.fileName] = exports[file.fileName] || {};
           exports[file.fileName] = Object.assign(exports[file.fileName], obj);
@@ -206,7 +199,6 @@ export class DataSchemaCompiler {
               cubes,
               exports,
               contexts,
-              dashboardTemplates,
               toCompile,
               compiledFiles
             );
