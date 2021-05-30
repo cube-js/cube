@@ -70,6 +70,14 @@ export class RefreshScheduler {
           return data[0] && data[0][Object.keys(data[0])[0]];
         };
         dateRange = [extractDate(startDate), extractDate(endDate)];
+
+        this.serverCore.logger('PreAggregation Refresh Range', {
+          securityContext: context.securityContext,
+          requestId: context.requestId,
+          preAggregationId: preAggregation.id,
+          timezone: queryingOptions.timezone,
+          refreshRange: dateRange
+        });
       }
 
       if (!dateRange[0] || !dateRange[1]) {

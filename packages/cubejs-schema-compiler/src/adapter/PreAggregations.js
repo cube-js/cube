@@ -123,6 +123,7 @@ export class PreAggregations {
     }
 
     return {
+      preAggregationId: `${cube}.${preAggregationName}`,
       tableName,
       external,
       preAggregationsSchema: this.query.preAggregationSchema(),
