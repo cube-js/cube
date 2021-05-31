@@ -19,7 +19,7 @@
     "tslib": "^2.0.0"
   },
   "peerDependencies": {
-    "@cubejs-client/core": "^0.26.60",
+    "@cubejs-client/core": "^0.27.24",
     "rxjs": "^6.6.0"
   },
   "watch": {
@@ -39,7 +39,7 @@
     "ng-packagr": "^11.2.4",
     "npm-watch": "^0.7.0",
     "tsickle": "^0.39.1",
-    "typescript": "^4.1.5"
+    "typescript": "~4.2.4"
   },
   "publishConfig": {
     "access": "public"
