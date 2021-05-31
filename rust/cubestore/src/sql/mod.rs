@@ -8,8 +8,8 @@ use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
 use crate::metastore::{
-    is_valid_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable,
-    RowKey, Schema, TableId,
+    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
@@ -40,6 +40,7 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
+use cubehll::HllSketch;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -656,6 +657,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
+                        "hll_snowflake" => ColumnType::HyperLogLog(HllFlavour::Snowflake),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
@@ -713,10 +715,27 @@ fn parse_hyper_log_log<'a>(
     v: &'a Value,
     f: HllFlavour,
 ) -> Result<&'a [u8], CubeError> {
-    let bytes = parse_binary_string(buffer, v)?;
-    is_valid_hll(bytes, f)?;
-
-    return Ok(bytes);
+    match f {
+        HllFlavour::Snowflake => {
+            let str = if let Value::SingleQuotedString(str) = v {
+                str
+            } else {
+                return Err(CubeError::user(format!(
+                    "Single quoted string is expected but {:?} found",
+                    v
+                )));
+            };
+            let hll = HllSketch::read_snowflake(str)?;
+            *buffer = hll.write();
+            Ok(buffer)
+        }
+        f => {
+            assert!(f.imports_from_binary());
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_binary_hll_input(bytes, f)?;
+            Ok(bytes)
+        }
+    }
 }
 
 fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a [u8], CubeError> {

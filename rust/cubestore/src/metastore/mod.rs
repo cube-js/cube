@@ -297,10 +297,20 @@ impl DataFrameValue<String> for Option<Row> {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum HllFlavour {
     Airlift,    // Compatible with Presto, Athena, etc.
+    Snowflake,  // Same storage as Airlift, imports from Snowflake JSON.
     ZetaSketch, // Compatible with BigQuery.
 }
 
-pub fn is_valid_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
+impl HllFlavour {
+    pub fn imports_from_binary(&self) -> bool {
+        match self {
+            HllFlavour::Airlift | HllFlavour::ZetaSketch => true,
+            HllFlavour::Snowflake => false,
+        }
+    }
+}
+
+pub fn is_valid_binary_hll_input(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
     // TODO: do no memory allocations for better performance, this is run on hot path.
     match f {
         HllFlavour::Airlift => {
@@ -308,6 +318,9 @@ pub fn is_valid_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
         }
         HllFlavour::ZetaSketch => {
             HyperLogLogPlusPlus::read(data)?;
+        }
+        HllFlavour::Snowflake => {
+            panic!("string formats should be handled separately")
         }
     }
     return Ok(());
@@ -438,6 +451,7 @@ impl fmt::Display for Column {
             ColumnType::Bytes => "BYTES".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Airlift) => "HYPERLOGLOG".to_string(),
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "HYPERLOGLOGPP".to_string(),
+            ColumnType::HyperLogLog(HllFlavour::Snowflake) => "HLL_SNOWFLAKE".to_string(),
             ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))

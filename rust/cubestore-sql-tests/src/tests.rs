@@ -64,6 +64,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
+        t("hyperloglog_snowflake", hyperloglog_snowflake),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
@@ -1356,6 +1357,36 @@ async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
             vec![TableValue::Int(2), TableValue::Int(2)],
         ]
     )
+}
+
+async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(id int, hll HLL_SNOWFLAKE) ")
+        .await
+        .unwrap();
+    service.exec_query(r#"INSERT INTO s.Data(id, hll) VALUES (1, '{"precision": 12,
+                          "sparse": {
+                            "indices": [223,736,976,1041,1256,1563,1811,2227,2327,2434,2525,2656,2946,2974,3256,3745,3771,4066],
+                            "maxLzCounts": [1,2,1,4,2,2,3,1,1,2,4,2,1,1,2,3,2,1]
+                          },
+                          "version": 4
+                        }')"#).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, cardinality(hll) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![TableValue::Int(1), TableValue::Int(18)]]
+    );
+
+    // Does not allow to import HLL in AirLift format.
+    service
+        .exec_query("INSERT INTO s.Data(id, hll) VALUES(2, X'020C0200C02FF58941D5F0C6')")
+        .await
+        .unwrap_err();
 }
 
 async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {

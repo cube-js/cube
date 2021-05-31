@@ -22,7 +22,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
-use crate::metastore::{is_valid_hll, IdRow};
+use crate::metastore::{is_valid_binary_hll_input, HllFlavour, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
@@ -33,6 +33,7 @@ use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
+use cubehll::HllSketch;
 use num::ToPrimitive;
 use std::convert::TryFrom;
 use tempfile::TempPath;
@@ -123,10 +124,14 @@ impl ImportFormat {
                                         )?)
                                     }
                                     ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+                                    ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
+                                        let hll = HllSketch::read_snowflake(value)?;
+                                        TableValue::Bytes(hll.write())
+                                    }
                                     ColumnType::HyperLogLog(f) => {
+                                        assert!(f.imports_from_binary());
                                         let data = base64::decode(value)?;
-                                        is_valid_hll(&data, *f)?;
-
+                                        is_valid_binary_hll_input(&data, *f)?;
                                         TableValue::Bytes(data)
                                     }
                                     ColumnType::Timestamp => {

@@ -25,3 +25,9 @@ impl From<std::io::Error> for HllError {
         return HllError::new(err);
     }
 }
+
+impl From<serde_json::Error> for HllError {
+    fn from(err: serde_json::Error) -> Self {
+        return HllError::new(err);
+    }
+}
