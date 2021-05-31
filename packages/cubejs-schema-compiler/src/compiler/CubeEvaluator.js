@@ -41,6 +41,26 @@ export class CubeEvaluator extends CubeSymbols {
         if (preAggregation.external === undefined) {
           preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
         }
+
+        if (preAggregation.timeDimensions) {
+          preAggregation.timeDimensionReference = preAggregation.timeDimensions;
+          delete preAggregation.timeDimensions;
+        }
+
+        if (preAggregation.dimensions) {
+          preAggregation.dimensionReferences = preAggregation.dimensions;
+          delete preAggregation.dimensions;
+        }
+
+        if (preAggregation.measures) {
+          preAggregation.measureReferences = preAggregation.measures;
+          delete preAggregation.measures;
+        }
+
+        if (preAggregation.segments) {
+          preAggregation.segmentReferences = preAggregation.segments;
+          delete preAggregation.segments;
+        }
       }
     }
   }
@@ -175,19 +195,24 @@ export class CubeEvaluator extends CubeSymbols {
     if (!type) {
       throw new Error(`Type can't be undefined for '${path}'`);
     }
+
     if (!path) {
       throw new Error('Path can\'t be undefined');
     }
+
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
     if (!this.evaluatedCubes[cubeAndName[0]]) {
       throw new UserError(`Cube '${cubeAndName[0]}' not found for path '${path}'`);
     }
+
     if (!this.evaluatedCubes[cubeAndName[0]][type]) {
       throw new UserError(`${type} not defined for path '${path}'`);
     }
+
     if (!this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]]) {
       throw new UserError(`'${cubeAndName[1]}' not found for path '${path}'`);
     }
+
     return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 
