@@ -96,6 +96,7 @@ export interface CreateOptions {
   dialectFactory?: (context: DialectContext) => BaseQuery;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
+  cacheAndQueueDriver?: string;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;

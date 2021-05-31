@@ -738,6 +738,7 @@ export class CubejsServerCore {
       this.logger,
       {
         redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
+        cacheAndQueueDriver: options.cacheAndQueueDriver || this.options.cacheAndQueueDriver,
         externalDriverFactory: options.getExternalDriverFactory,
         ...(options.orchestratorOptions || this.options.orchestratorOptions),
         contextToDbType: this.contextToDbType.bind(this)
