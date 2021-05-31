@@ -2227,7 +2227,7 @@ export class BaseQuery {
               allFilters.filter(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
-                if (!filters.length > 0) {
+                if (!filters.length) {
                   return '1 = 1';
                 }
 
