@@ -18,17 +18,40 @@ describe('Schema Testing', () => {
             sql: 'id',
             primaryKey: true
           },
+          type: {
+            type: 'string',
+            sql: 'type',
+          },
           createdAt: {
             type: 'time',
             sql: 'created_at'
           },
         },
+        
+        segments: {
+          sfUsers: {
+            sql: \`\${CUBE}.location = 'San Francisco'\`
+          }
+        },
 
         preAggregations: {
+            main: {
+                type: 'originalSql',
+                timeDimensions: createdAt,
+                partitionGranularity: \`month\`,
+            },
             // Pre-aggregation without type, rollup is used by default
             countCreatedAt: {
                 measureReferences: [count],
                 timeDimensionReference: createdAt,
+                granularity: \`day\`,
+                partitionGranularity: \`month\`
+            },
+            countCreatedAtWithoutReferences: {
+                dimensions: [type],
+                measures: [count],
+                timeDimensions: [createdAt],
+                segments: [sfUsers],
                 granularity: \`day\`,
                 partitionGranularity: \`month\`
             }
@@ -44,12 +67,31 @@ describe('Schema Testing', () => {
     const { cubeEvaluator } = await schemaCompile();
 
     expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+      main: {
+        external: false,
+        scheduledRefresh: false,
+        timeDimensionReference: expect.any(Function),
+        partitionGranularity: 'month',
+        type: 'originalSql',
+      },
       countCreatedAt: {
         external: false,
         scheduledRefresh: false,
         granularity: 'day',
         measureReferences: expect.any(Function),
         timeDimensionReference: expect.any(Function),
+        partitionGranularity: 'month',
+        type: 'rollup',
+      },
+      countCreatedAtWithoutReferences: {
+        // because preview
+        external: false,
+        scheduledRefresh: false,
+        granularity: 'day',
+        measureReferences: expect.any(Function),
+        timeDimensionReference: expect.any(Function),
+        segmentReferences: expect.any(Function),
+        dimensionReferences: expect.any(Function),
         partitionGranularity: 'month',
         type: 'rollup',
       }
@@ -66,12 +108,31 @@ describe('Schema Testing', () => {
     delete process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT;
 
     expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+      main: {
+        external: false,
+        scheduledRefresh: true,
+        timeDimensionReference: expect.any(Function),
+        partitionGranularity: 'month',
+        type: 'originalSql',
+      },
       countCreatedAt: {
         // because preview
         external: true,
         scheduledRefresh: true,
         granularity: 'day',
         measureReferences: expect.any(Function),
+        timeDimensionReference: expect.any(Function),
+        partitionGranularity: 'month',
+        type: 'rollup',
+      },
+      countCreatedAtWithoutReferences: {
+        // because preview
+        external: true,
+        scheduledRefresh: true,
+        granularity: 'day',
+        measureReferences: expect.any(Function),
+        segmentReferences: expect.any(Function),
+        dimensionReferences: expect.any(Function),
         timeDimensionReference: expect.any(Function),
         partitionGranularity: 'month',
         type: 'rollup',
