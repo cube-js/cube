@@ -1,6 +1,12 @@
 const sql = require('mssql');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
+const GenericTypeToMSSql = {
+  string: 'nvarchar(max)',
+  text: 'nvarchar(max)',
+  timestamp: 'datetime2',
+};
+
 class MSSqlDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -96,6 +102,10 @@ class MSSqlDriver extends BaseDriver {
       rows: result,
       types,
     };
+  }
+
+  fromGenericType(columnType) {
+    return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
   }
 
   readOnly() {
