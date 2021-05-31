@@ -80,28 +80,31 @@ const create = async (projectName, options) => {
   logStage('Installing DB driver dependencies');
   const CubejsServer = requireFromPackage<any>('@cubejs-backend/server');
 
-  let driverDependencies = CubejsServer.driverDependencies(options.dbType);
-  if (!driverDependencies) {
+  const driverPackageName = CubejsServer.driverDependencies(options.dbType);
+  if (!driverPackageName) {
     await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
   }
 
-  driverDependencies = Array.isArray(driverDependencies) ? driverDependencies : [driverDependencies];
-  if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
-    // jdbc-driver has peerDependencies
-    driverDependencies.push('jdbc');
-    driverDependencies.push('node-java-maven');
-  }
+  await npmInstall([driverPackageName], options.template === 'docker');
 
-  await npmInstall(driverDependencies, options.template === 'docker');
-
-  if (driverDependencies[0] === '@cubejs-backend/jdbc-driver') {
+  if (driverPackageName === '@cubejs-backend/jdbc-driver') {
     logStage('Installing JDBC dependencies');
 
     // eslint-disable-next-line import/no-dynamic-require,global-require,@typescript-eslint/no-var-requires
     const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
-    const dbTypeDescription = JDBCDriver.dbTypeDescription(options.dbType);
+
+    const { jdbcDriver } = await inquirer.prompt([{
+      type: 'list',
+      name: 'jdbcDriver',
+      message: 'Select JDBC driver',
+      choices: JDBCDriver.getSupportedDrivers(),
+    }]);
+
+    const dbTypeDescription = JDBCDriver.dbTypeDescription(
+      jdbcDriver
+    );
     if (!dbTypeDescription) {
-      await displayError(`Unsupported db type: ${chalk.green(options.dbType)}`, createAppOptions);
+      await displayError(`Unsupported JDBC driver: ${chalk.green(jdbcDriver)}`, createAppOptions);
     }
 
     const newPackageJson = await fs.readJson('package.json');
@@ -119,9 +122,9 @@ const create = async (projectName, options) => {
 
   logStage('Writing files from template');
 
-  const driverClass = requireFromPackage<any>(driverDependencies[0]);
+  const driverClass = requireFromPackage<any>(driverPackageName);
 
-  const driverPackageManifest = await requirePackageManifest(driverDependencies[0]);
+  const driverPackageManifest = await requirePackageManifest(driverPackageName);
   const serverCorePackageManifest = await requirePackageManifest('@cubejs-backend/server-core');
   const serverPackageManifest = await requirePackageManifest('@cubejs-backend/server');
 
@@ -159,10 +162,6 @@ const create = async (projectName, options) => {
     projectName,
     dbType: options.dbType
   });
-
-  // It's placed here, because fail of it can affect whole creation. Let's do it in the end for preview period.
-  logStage('Installing Cube Store driver');
-  await npmInstall(['@cubejs-backend/cubestore-driver'], options.template === 'docker');
 
   logStage(`${chalk.green(projectName)} app has been created 🎉`);
 

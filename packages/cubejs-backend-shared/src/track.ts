@@ -14,6 +14,7 @@ export type Event = BaseEvent & {
   anonymousId: string,
   platform: string,
   nodeVersion: string,
+  sentFrom: 'backend';
 };
 
 let flushPromise: Promise<any>|null = null;
@@ -81,8 +82,10 @@ export async function track(opts: BaseEvent) {
     id: crypto.randomBytes(16).toString('hex'),
     clientTimestamp: new Date().toJSON(),
     platform: process.platform,
+    arch: process.arch,
     nodeVersion: process.version,
     anonymousId,
+    sentFrom: 'backend'
   });
 
   const currentPromise = (flushPromise || Promise.resolve()).then(() => flush()).then(() => {

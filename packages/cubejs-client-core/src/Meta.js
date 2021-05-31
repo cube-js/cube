@@ -4,7 +4,7 @@
 
 import { unnest, fromPairs } from 'ramda';
 
-const memberMap = (memberArray) => fromPairs(memberArray.map(m => [m.name, m]));
+const memberMap = (memberArray) => fromPairs(memberArray.map((m) => [m.name, m]));
 
 const operators = {
   string: [
@@ -13,7 +13,7 @@ const operators = {
     { name: 'equals', title: 'equals' },
     { name: 'notEquals', title: 'does not equal' },
     { name: 'set', title: 'is set' },
-    { name: 'notSet', title: 'is not set' }
+    { name: 'notSet', title: 'is not set' },
   ],
   number: [
     { name: 'equals', title: 'equals' },
@@ -23,8 +23,16 @@ const operators = {
     { name: 'gt', title: '>' },
     { name: 'gte', title: '>=' },
     { name: 'lt', title: '<' },
-    { name: 'lte', title: '<=' }
-  ]
+    { name: 'lte', title: '<=' },
+  ],
+  time: [
+    { name: 'equals', title: 'equals' },
+    { name: 'notEquals', title: 'does not equal' },
+    { name: 'inDateRange', title: 'in date range' },
+    { name: 'notInDateRange', title: 'not in date range' },
+    { name: 'afterDate', title: 'after date' },
+    { name: 'beforeDate', title: 'before date' },
+  ],
 };
 
 /**
@@ -35,28 +43,68 @@ class Meta {
     this.meta = metaResponse;
     const { cubes } = this.meta;
     this.cubes = cubes;
-    this.cubesMap = fromPairs(cubes.map(c => [
-      c.name,
-      { measures: memberMap(c.measures), dimensions: memberMap(c.dimensions), segments: memberMap(c.segments) }
-    ]));
+    this.cubesMap = fromPairs(
+      cubes.map((c) => [
+        c.name,
+        {
+          measures: memberMap(c.measures),
+          dimensions: memberMap(c.dimensions),
+          segments: memberMap(c.segments),
+        },
+      ])
+    );
   }
 
   membersForQuery(query, memberType) {
-    return unnest(this.cubes.map(c => c[memberType]));
+    return unnest(this.cubes.map((c) => c[memberType])).sort((a, b) => (a.title > b.title ? 1 : -1));
   }
-  
+
+  membersGroupedByCube() {
+    const memberKeys = ['measures', 'dimensions', 'segments', 'timeDimensions'];
+
+    return this.cubes.reduce(
+      (memo, cube) => {
+        memberKeys.forEach((key) => {
+          memo[key] = [
+            ...memo[key],
+            {
+              cubeName: cube.name,
+              cubeTitle: cube.title,
+              members: key === 'timeDimensions' ? cube.dimensions.filter((m) => m.type === 'time') : cube[key],
+            },
+          ];
+        });
+
+        return memo;
+      },
+      {
+        measures: [],
+        dimensions: [],
+        segments: [],
+        timeDimensions: [],
+      }
+    );
+  }
+
   resolveMember(memberName, memberType) {
     const [cube] = memberName.split('.');
+
     if (!this.cubesMap[cube]) {
       return { title: memberName, error: `Cube not found ${cube} for path '${memberName}'` };
     }
+
     const memberTypes = Array.isArray(memberType) ? memberType : [memberType];
     const member = memberTypes
-      .map(type => this.cubesMap[cube][type] && this.cubesMap[cube][type][memberName])
-      .find(m => m);
+      .map((type) => this.cubesMap[cube][type] && this.cubesMap[cube][type][memberName])
+      .find((m) => m);
+
     if (!member) {
-      return { title: memberName, error: `Path not found '${memberName}'` };
+      return {
+        title: memberName,
+        error: `Path not found '${memberName}'`,
+      };
     }
+
     return member;
   }
 
@@ -65,12 +113,14 @@ class Meta {
     if (!this.cubesMap[cube]) {
       return null;
     }
-    return Object.keys(this.cubesMap[cube].dimensions || {})
-      .find(d => this.cubesMap[cube].dimensions[d].type === 'time');
+    return Object.keys(this.cubesMap[cube].dimensions || {}).find(
+      (d) => this.cubesMap[cube].dimensions[d].type === 'time'
+    );
   }
 
   filterOperatorsForMember(memberName, memberType) {
     const member = this.resolveMember(memberName, memberType);
+
     return operators[member.type] || operators.string;
   }
 }

@@ -29,7 +29,7 @@ cube(`Events`, {
 
 In this particular cube `date` column will be parsed using `%Y-%m-%d` format.
 Please note that as we do not pass timezone parameter to `PARSE_TIMESTAMP` it'll set default `UTC` timezone.
-You should always set timezone appropriately for parsed timestamp as Statsbot always do timezone conversions according to user settings.
+You should always set timezone appropriately for parsed timestamps as Cube.js always does timezone conversions according to user settings.
 
 Although query performance of big data backends like BigQuery or Presto won't likely suffer from date parsing, performance of RDBMS backends like Postgres most likely will.
 Adding timestamp columns with indexes should be considered in this case.

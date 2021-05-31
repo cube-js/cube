@@ -1,0 +1,103 @@
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4001:4000
+      - 3001:3000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      # TODO: Fill in the values below
+      - CUBEJS_DB_BQ_PROJECT_ID=
+      - CUBEJS_DB_BQ_CREDENTIALS=
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+
+      - CUBEJS_EXT_DB_TYPE=cubestore
+      - CUBEJS_EXT_DB_HOST=cubestore
+      - CUBEJS_EXT_DB_PORT=3030
+
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      
+      - CUBEJS_API_SECRET=SECRET
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - refresh_worker
+      - cubestore
+      - redis
+
+  refresh_worker:
+    image: cubejs/cube:latest
+    environment:
+      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+      - CUBEJS_DB_TYPE=bigquery
+      # TODO: Fill in the values below
+      - CUBEJS_DB_BQ_PROJECT_ID=
+      - CUBEJS_DB_BQ_CREDENTIALS=
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+
+      - CUBEJS_EXT_DB_TYPE=cubestore
+      - CUBEJS_EXT_DB_HOST=cubestore
+      - CUBEJS_EXT_DB_PORT=3030
+
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      
+      - CUBEJS_API_SECRET=SECRET
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore
+      - redis
+
+  cubestore:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002,cubestore_worker_3:10003,cubestore_worker_4:10004
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+    depends_on:
+      - cubestore_worker_1
+      - cubestore_worker_2
+      - cubestore_worker_3
+      - cubestore_worker_4
+
+  cubestore_worker_1:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKER_PORT=10001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+
+  cubestore_worker_2:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKER_PORT=10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+
+  cubestore_worker_3:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKER_PORT=10003
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+
+  cubestore_worker_4:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKER_PORT=10004
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+
+  redis:
+    image: bitnami/redis:latest
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    logging:
+      driver: none 

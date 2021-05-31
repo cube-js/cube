@@ -67,7 +67,7 @@ export class ExploreComponent implements OnInit, OnDestroy {
 
     this.route.queryParams.subscribe((params) => {
       this.itemId = params.id;
-      
+
       if (params.query) {
         this.queryBuilder.deserialize({
           query: params.query && JSON.parse(params.query),
@@ -83,10 +83,10 @@ export class ExploreComponent implements OnInit, OnDestroy {
       this.timeDimensionMembers = this.query.timeDimensions.asArray();
     });
   }
-  
+
   ngOnDestroy() {
     this.queryBuilder.deserialize({
-      query: {}
+      query: {},
     });
   }
 

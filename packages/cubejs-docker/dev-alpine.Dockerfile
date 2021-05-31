@@ -1,4 +1,4 @@
-FROM node:12.20.1-alpine3.12
+FROM node:12.22.1-alpine3.12
 
 ARG IMAGE_VERSION=dev
 
@@ -10,9 +10,7 @@ RUN apk add rxvt-unicode
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
-# Very strange issue with error Command "lerna" not found.
-# I dont have ideas, what is going wrong hear, but let's comment it for now, because it's dev image
-#ENV NODE_ENV production
+ENV NODE_ENV development
 
 WORKDIR /cubejs
 
@@ -20,11 +18,14 @@ COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
 COPY tsconfig.base.json .
+COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
 
+# Backend
 COPY rust/package.json rust/package.json
 COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
+COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
 COPY packages/cubejs-bigquery-driver/package.json packages/cubejs-bigquery-driver/package.json
@@ -48,15 +49,27 @@ COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
 COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/package.json
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
+# Frontend
+COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
+COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
+COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
+COPY packages/cubejs-client-vue/package.json packages/cubejs-client-vue/package.json
+COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/package.json
+COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.json
+COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
+COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
+
+RUN yarn policies set-version v1.22.5
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
 RUN yarn install
 
+# Backend
 COPY rust/ rust/
-COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
+COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
 COPY packages/cubejs-bigquery-driver/ packages/cubejs-bigquery-driver/
@@ -80,8 +93,19 @@ COPY packages/cubejs-server/ packages/cubejs-server/
 COPY packages/cubejs-server-core/ packages/cubejs-server-core/
 COPY packages/cubejs-snowflake-driver/ packages/cubejs-snowflake-driver/
 COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
+# Frontend
+COPY packages/cubejs-templates/ packages/cubejs-templates/
+COPY packages/cubejs-client-core/ packages/cubejs-client-core/
+COPY packages/cubejs-client-react/ packages/cubejs-client-react/
+COPY packages/cubejs-client-vue/ packages/cubejs-client-vue/
+COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
+COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
+COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
+COPY packages/cubejs-playground/ packages/cubejs-playground/
 
+RUN yarn build
 RUN yarn lerna run build
+
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more

@@ -13,6 +13,7 @@ declare module '@cubejs-client/react' {
     CubejsApi,
     Query,
     ResultSet,
+    SqlQuery,
     Filter,
     PivotConfig,
     TCubeMeasure,
@@ -108,7 +109,7 @@ declare module '@cubejs-client/react' {
     resultSet: ResultSet | null;
     error: Error | null;
     loadingState: TLoadingState;
-    sqlQuery: string | null;
+    sqlQuery: SqlQuery | null;
   };
 
   type QueryRendererProps = {
@@ -147,7 +148,7 @@ declare module '@cubejs-client/react' {
    */
   export class QueryRenderer extends React.Component<QueryRendererProps> {}
 
-  type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
+  export type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
 
   type VizState = {
     query?: Query;
@@ -159,7 +160,7 @@ declare module '@cubejs-client/react' {
     /**
      * `CubejsApi` instance to use
      */
-    cubejsApi: CubejsApi;
+    cubejsApi?: CubejsApi;
     /**
      * State for the QueryBuilder to start with. Pass in the value previously saved from onVizStateChanged to restore a session.
      */
@@ -186,7 +187,7 @@ declare module '@cubejs-client/react' {
     /**
      * A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way.
      */
-    stateChangeHeuristics?: (state: QueryBuilderState) => QueryBuilderState;
+    stateChangeHeuristics?: (state: QueryBuilderState, newState: QueryBuilderState) => QueryBuilderState;
     /**
      * @ignore @deprecated Controlled query
      */
@@ -210,7 +211,7 @@ declare module '@cubejs-client/react' {
     /**
      * @hidden
      */
-    onSchemaChange: (props: SchemaChangeProps) => void
+    onSchemaChange?: (props: SchemaChangeProps) => void
   };
 
   /**
@@ -243,6 +244,9 @@ declare module '@cubejs-client/react' {
     segments: (TCubeSegment & { index: number })[];
     timeDimensions: (TimeDimensionWithExtraFields & { index: number })[];
 
+    availableMembers: AvailableMembers;
+
+    availableFilterMembers: Array<AvailableCube<TCubeMeasure> | AvailableCube<TCubeDimension>>;
     /**
      * An array of available measures to select. They are loaded via the API from Cube.js Backend.
      */
@@ -296,9 +300,26 @@ declare module '@cubejs-client/react' {
      * Used for chart type update
      */
     updateChartType: (chartType: ChartType) => void;
+    query: Query;
     validatedQuery: Query;
     refresh: () => void;
+    missingMembers: string[];
+    dryRunResponse?: TDryRunResponse;
   };
+
+  type AvailableMembers = {
+    measures: AvailableCube<TCubeMeasure>[];
+    dimensions: AvailableCube<TCubeDimension>[];
+    segments: AvailableCube<TCubeSegment>[];
+    timeDimensions: AvailableCube<TCubeDimension>[];
+  }
+
+  type AvailableCube<T> = {
+    cubeName: string,
+    cubeTitle: string,
+    members: T[]
+  };
+
 
   /**
    * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
@@ -427,6 +448,7 @@ declare module '@cubejs-client/react' {
     isLoading: boolean;
     resultSet: ResultSet<TData> | null;
     progress: ProgressResponse;
+    refetch: () => void;
   };
 
   /**

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import LRUCache from 'lru-cache';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -13,12 +14,20 @@ type Query = {
   dataSource: string;
 };
 
+type CacheEntry = {
+  time: number;
+  result: any;
+  renewalKey: string;
+};
+
 export class QueryCache {
   protected readonly cacheDriver: CacheDriverInterface;
 
   protected queue: { [dataSource: string]: QueryQueue } = {};
 
   protected externalQueue: QueryQueue|null = null;
+
+  protected memoryCache: LRUCache<string, CacheEntry>;
 
   public constructor(
     protected readonly redisPrefix: string,
@@ -33,11 +42,16 @@ export class QueryCache {
       redisPool?: any;
       continueWaitTimeout?: number;
       cacheAndQueueDriver?: 'redis' | 'memory';
+      maxInMemoryCacheEntries?: number;
+      skipExternalCacheAndQueue?: boolean;
     } = {}
   ) {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver({ pool: options.redisPool }) :
       new LocalCacheDriver();
+    this.memoryCache = new LRUCache<string, CacheEntry>({
+      max: options.maxInMemoryCacheEntries || 10000
+    });
   }
 
   public async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
@@ -62,7 +76,7 @@ export class QueryCache {
 
     const expireSecs = this.getExpireSecs(queryBody);
 
-    if (!cacheKeyQueries) {
+    if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
       return {
         data: await this.queryWithRetryAndRelease(query, values, {
           cacheKey: [query, values],
@@ -188,8 +202,7 @@ export class QueryCache {
     });
   }
 
-  public getQueue(dataSource: string) {
-    dataSource = dataSource || 'default';
+  public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
@@ -232,6 +245,7 @@ export class QueryCache {
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
+          skipQueue: this.options.skipExternalCacheAndQueue,
           ...this.options.externalQueueOptions
         }
       );
@@ -239,8 +253,7 @@ export class QueryCache {
     return this.externalQueue;
   }
 
-  public static createQueue(redisPrefix, clientFactory: DriverFactory, executeFn, options) {
-    options = options || {};
+  public static createQueue(redisPrefix, clientFactory: DriverFactory, executeFn, options: Record<string, any> = {}) {
     const queue: any = new QueryQueue(redisPrefix, {
       queryHandlers: {
         query: async (q, setCancelHandle) => {
@@ -367,11 +380,12 @@ export class QueryCache {
         waitForRenew: !options.skipRefreshKeyWaitForRenew,
         requestId: options.requestId,
         dataSource: options.dataSource,
+        useInMemory: true
       },
     ));
   }
 
-  public cacheQueryResult(query, values, cacheKey, expiration, options: {
+  public async cacheQueryResult(query, values, cacheKey, expiration, options: {
     renewalThreshold?: number,
     renewalKey?: any,
     priority?: number,
@@ -380,6 +394,7 @@ export class QueryCache {
     dataSource: string,
     waitForRenew?: boolean,
     forceNoCache?: boolean,
+    useInMemory?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
@@ -422,46 +437,86 @@ export class QueryCache {
       return fetchNew();
     }
 
-    return this.cacheDriver.get(redisKey).then(res => {
-      if (res) {
-        const parsedResult = res;
-        const renewedAgo = (new Date()).getTime() - parsedResult.time;
-        this.logger('Found cache entry', {
-          cacheKey,
-          time: parsedResult.time,
-          renewedAgo,
-          renewalKey: parsedResult.renewalKey,
-          newRenewalKey: renewalKey,
-          renewalThreshold,
-          requestId: options.requestId
-        });
+    let res;
+
+    const inMemoryCacheDisablePeriod = 5 * 60 * 1000;
+
+    if (options.useInMemory) {
+      const inMemoryValue = this.memoryCache.get(redisKey);
+      if (inMemoryValue) {
+        const renewedAgo = (new Date()).getTime() - inMemoryValue.time;
+
         if (
           renewalKey && (
             !renewalThreshold ||
-            !parsedResult.time ||
-            renewedAgo > renewalThreshold * 1000 ||
-            parsedResult.renewalKey !== renewalKey
+            !inMemoryValue.time ||
+            // Do not cache in memory in last 5 minutes of expiry.
+            // Most likely it'll cause race condition of refreshing data with different refreshKey values.
+            renewedAgo + inMemoryCacheDisablePeriod > renewalThreshold * 1000 ||
+            inMemoryValue.renewalKey !== renewalKey
           )
         ) {
-          if (options.waitForRenew) {
-            this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId });
-            return fetchNew();
-          } else {
-            this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId });
-            fetchNew().catch(e => {
-              if (!(e instanceof ContinueWaitError)) {
-                this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId });
-              }
-            });
-          }
+          this.memoryCache.del(redisKey);
+        } else {
+          this.logger('Found in memory cache entry', {
+            cacheKey,
+            time: inMemoryValue.time,
+            renewedAgo,
+            renewalKey: inMemoryValue.renewalKey,
+            newRenewalKey: renewalKey,
+            renewalThreshold,
+            requestId: options.requestId
+          });
+          res = inMemoryValue;
         }
-        this.logger('Using cache for', { cacheKey, requestId: options.requestId });
-        return parsedResult.result;
-      } else {
-        this.logger('Missing cache for', { cacheKey, requestId: options.requestId });
-        return fetchNew();
       }
-    });
+    }
+
+    if (!res) {
+      res = await this.cacheDriver.get(redisKey);
+    }
+
+    if (res) {
+      const parsedResult = res;
+      const renewedAgo = (new Date()).getTime() - parsedResult.time;
+      this.logger('Found cache entry', {
+        cacheKey,
+        time: parsedResult.time,
+        renewedAgo,
+        renewalKey: parsedResult.renewalKey,
+        newRenewalKey: renewalKey,
+        renewalThreshold,
+        requestId: options.requestId
+      });
+      if (
+        renewalKey && (
+          !renewalThreshold ||
+          !parsedResult.time ||
+          renewedAgo > renewalThreshold * 1000 ||
+          parsedResult.renewalKey !== renewalKey
+        )
+      ) {
+        if (options.waitForRenew) {
+          this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId });
+          return fetchNew();
+        } else {
+          this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId });
+          fetchNew().catch(e => {
+            if (!(e instanceof ContinueWaitError)) {
+              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId });
+            }
+          });
+        }
+      }
+      this.logger('Using cache for', { cacheKey, requestId: options.requestId });
+      if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
+        this.memoryCache.set(redisKey, parsedResult);
+      }
+      return parsedResult.result;
+    } else {
+      this.logger('Missing cache for', { cacheKey, requestId: options.requestId });
+      return fetchNew();
+    }
   }
 
   protected async lastRefreshTime(cacheKey) {

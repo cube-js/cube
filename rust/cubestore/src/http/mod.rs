@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use warp::{Filter, Rejection};
+use warp::{Filter, Rejection, Reply};
 
 use crate::codegen::http_message_generated::{
     get_root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
@@ -13,12 +13,18 @@ use crate::store::DataFrame;
 use crate::table::TableValue;
 use crate::util::WorkerLoop;
 use crate::CubeError;
-use futures::{SinkExt, StreamExt};
+use async_std::fs::File;
+use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
 use hex::ToHex;
 use http_auth_basic::Credentials;
 use log::error;
 use log::info;
+use log::trace;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::net::SocketAddr;
+use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
@@ -36,11 +42,23 @@ pub struct HttpServer {
 crate::di_service!(HttpServer, []);
 
 #[derive(Debug)]
-pub enum WsError {
+pub enum CubeRejection {
     NotAuthorized,
+    Internal(String),
 }
 
-impl Reject for WsError {}
+impl From<CubeError> for warp::reject::Rejection {
+    fn from(e: CubeError) -> Self {
+        warp::reject::custom(CubeRejection::Internal(e.message.to_string()))
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UploadQuery {
+    name: String,
+}
+
+impl Reject for CubeRejection {}
 
 impl HttpServer {
     pub fn new(
@@ -59,7 +77,7 @@ impl HttpServer {
 
     pub async fn run_server(&self) -> Result<(), CubeError> {
         let (tx, mut rx) =
-            mpsc::channel::<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>(10000);
+            mpsc::channel::<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>(100000);
         let auth_service = self.auth.clone();
         let tx_to_move_filter = warp::any().map(move || tx.clone());
 
@@ -71,22 +89,27 @@ impl HttpServer {
                     let res = HttpServer::authorize(auth_service, auth_header).await;
                     match res {
                         Ok(user) => Ok(SqlQueryContext { user }),
-                        Err(_) => Err(warp::reject::custom(WsError::NotAuthorized)),
+                        Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
                     }
                 }
             });
+
+        let context_filter = tx_to_move_filter.and(auth_filter.clone());
+
+        let context_filter_to_move = context_filter.clone();
+
         let query_route = warp::path!("ws")
-            .and(tx_to_move_filter)
-            .and(auth_filter)
+            .and(context_filter_to_move)
             .and(warp::ws::ws())
             .and_then(|tx: mpsc::Sender<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
                 Result::<_, Rejection>::Ok(ws.on_upgrade(async move |mut web_socket| {
-                    let (response_tx, mut response_rx) = mpsc::channel::<HttpMessage>(1000);
+                    let (response_tx, mut response_rx) = mpsc::channel::<HttpMessage>(10000);
                     loop {
                         tokio::select! {
                             Some(res) = response_rx.recv() => {
+                                trace!("Sending web socket response");
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
                                     error!("Websocket message send error: {:?}", e)
@@ -103,8 +126,17 @@ impl HttpServer {
                                             match HttpMessage::read(msg.into_bytes()) {
                                                 Err(e) => error!("Websocket message read error: {:?}", e),
                                                 Ok(msg) => {
-                                                    if let Err(e) = tx_to_move.send((response_tx.clone(), sql_query_context.clone(), msg)).await {
+                                                    trace!("Received web socket message");
+                                                    let message_id = msg.message_id;
+                                                    // TODO use timeout instead of try send for burst control however try_send is safer for now
+                                                    if let Err(e) = tx_to_move.try_send((response_tx.clone(), sql_query_context.clone(), msg)) {
                                                         error!("Websocket channel error: {:?}", e);
+                                                        let send_res = web_socket.send(
+                                                            Message::binary(HttpMessage { message_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
+                                                        ).await;
+                                                        if let Err(e) = send_res {
+                                                            error!("Websocket message send error: {:?}", e)
+                                                        }
                                                         break;
                                                     }
                                                 }
@@ -126,15 +158,22 @@ impl HttpServer {
                         };
                     };
                 }))
-            }).recover(|err: Rejection| async move {
-                if let Some(ws_error) = err.find::<WsError>() {
-                    match ws_error {
-                        WsError::NotAuthorized => Ok(warp::reply::with_status("Not authorized", StatusCode::FORBIDDEN))
-                    }
-                } else {
-                    Err(err)
-                }
+            });
 
+        let auth_filter_to_move = auth_filter.clone();
+        let sql_service = self.sql_service.clone();
+
+        let upload_route = warp::path!("upload-temp-file")
+            .and(auth_filter_to_move)
+            .and(warp::query::query::<UploadQuery>())
+            .and(warp::body::stream())
+            .and_then(move |sql_query_context, upload_query, body| {
+                HttpServer::handle_upload(
+                    sql_service.clone(),
+                    sql_query_context,
+                    upload_query,
+                    body,
+                )
             });
 
         let sql_service = self.sql_service.clone();
@@ -153,34 +192,97 @@ impl HttpServer {
                     command,
                 },
             )| {
-                let res =
-                    HttpServer::process_command(sql_service, sql_query_context, command).await;
-                let message = match res {
-                    Ok(command) => HttpMessage {
-                        message_id,
-                        command,
-                    },
-                    Err(e) => HttpMessage {
-                        message_id,
-                        command: HttpCommand::Error {
-                            error: e.to_string(),
+                tokio::spawn(async move {
+                    let res =
+                        HttpServer::process_command(sql_service, sql_query_context, command).await;
+                    let message = match res {
+                        Ok(command) => HttpMessage {
+                            message_id,
+                            command,
                         },
-                    },
-                };
-                sender
-                    .send(message)
-                    .await
-                    .map_err(|e| CubeError::from_error(e))
+                        Err(e) => HttpMessage {
+                            message_id,
+                            command: HttpCommand::Error {
+                                error: e.to_string(),
+                            },
+                        },
+                    };
+                    if let Err(e) = sender.send(message).await {
+                        error!("Send result channel error: {:?}", e);
+                    }
+                });
+                Ok(())
             },
         );
         let cancel_token = self.cancel_token.clone();
-        let (_, server_future) = warp::serve(
-            query_route, // .or(import_route)
-        )
+        let (_, server_future) = warp::serve(query_route.or(upload_route).recover(
+            |err: Rejection| async move {
+                let mut obj = HashMap::new();
+                if let Some(ws_error) = err.find::<CubeRejection>() {
+                    match ws_error {
+                        CubeRejection::NotAuthorized => {
+                            obj.insert("error".to_string(), "Not authorized".to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::FORBIDDEN,
+                            ))
+                        }
+                        CubeRejection::Internal(e) => {
+                            obj.insert("error".to_string(), e.to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                            ))
+                        }
+                    }
+                } else {
+                    Err(err)
+                }
+            },
+        ))
         .bind_with_graceful_shutdown(addr, async move { cancel_token.cancelled().await });
         let _ = tokio::join!(process_loop, server_future);
 
         Ok(())
+    }
+
+    pub async fn handle_upload(
+        sql_service: Arc<dyn SqlService>,
+        sql_query_context: SqlQueryContext,
+        upload_query: UploadQuery,
+        mut body: impl Stream<Item = Result<impl warp::Buf, warp::Error>> + Unpin,
+    ) -> Result<impl Reply, Rejection> {
+        let temp_file = NamedTempFile::new_in(
+            sql_service
+                .temp_uploads_dir(sql_query_context.clone())
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?,
+        )
+        .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+        {
+            let mut file = File::create(temp_file.path())
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+            while let Some(item) = body.next().await {
+                let item = item.map_err(|e| CubeRejection::Internal(e.to_string()))?;
+                file.write_all(item.chunk())
+                    .await
+                    .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+            }
+            file.flush()
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+            file.close()
+                .await
+                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+        }
+
+        sql_service
+            .upload_temp_file(sql_query_context, upload_query.name, temp_file.path())
+            .await
+            .map_err(|e| CubeRejection::Internal(e.to_string()))?;
+
+        Ok(warp::reply())
     }
 
     pub async fn process_command(
@@ -237,7 +339,7 @@ pub struct HttpMessage {
 #[derive(Debug)]
 pub enum HttpCommand {
     Query { query: String },
-    ResultSet { data_frame: DataFrame },
+    ResultSet { data_frame: Arc<DataFrame> },
     Error { error: String },
 }
 
@@ -293,7 +395,7 @@ impl HttpMessage {
                     let mut row_offsets = Vec::with_capacity(data_frame.get_rows().len());
                     for row in data_frame.get_rows().iter() {
                         let mut value_offsets = Vec::with_capacity(row.values().len());
-                        for value in row.values().iter() {
+                        for (i, value) in row.values().iter().enumerate() {
                             let value = match value {
                                 TableValue::Null => HttpColumnValue::create(
                                     &mut builder,
@@ -314,7 +416,14 @@ impl HttpMessage {
                                     )
                                 }
                                 TableValue::Decimal(v) => {
-                                    let string_value = Some(builder.create_string(&v.to_string()));
+                                    let scale = u8::try_from(
+                                        data_frame.get_columns()[i]
+                                            .get_column_type()
+                                            .target_scale(),
+                                    )
+                                    .unwrap();
+                                    let string_value =
+                                        Some(builder.create_string(&v.to_string(scale)));
                                     HttpColumnValue::create(
                                         &mut builder,
                                         &HttpColumnValueArgs { string_value },

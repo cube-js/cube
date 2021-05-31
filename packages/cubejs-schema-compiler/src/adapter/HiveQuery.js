@@ -36,13 +36,17 @@ export class HiveQuery extends BaseQuery {
     return `from_utc_timestamp(${value}, 'UTC')`; // TODO
   }
 
-  // subtractInterval(date, interval) {
-  //   return `DATE_SUB(${date}, INTERVAL ${interval})`; // TODO
-  // }
+  subtractInterval(date, interval) {
+    const [number, type] = this.parseInterval(interval);
 
-  // addInterval(date, interval) {
-  //   return `DATE_ADD(${date}, INTERVAL ${interval})`; // TODO
-  // }
+    return `(${date} - INTERVAL '${number}' ${type})`;
+  }
+
+  addInterval(date, interval) {
+    const [number, type] = this.parseInterval(interval);
+
+    return `(${date} + INTERVAL '${number}' ${type})`;
+  }
 
   timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);

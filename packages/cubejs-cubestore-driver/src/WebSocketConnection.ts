@@ -4,33 +4,32 @@ import { ConnectionConfig } from './types';
 import { HttpCommand, HttpError, HttpMessage, HttpQuery, HttpResultSet } from '../codegen/HttpMessage';
 
 export class WebSocketConnection {
-  protected readonly config: any;
-
   protected messageCounter: number;
 
   protected webSocket: any;
 
-  public constructor(config?: Partial<ConnectionConfig>) {
-    this.config = config;
+  private url: string;
+
+  public constructor(url: string) {
+    this.url = url;
     this.messageCounter = 1;
   }
 
   protected async initWebSocket() {
     if (!this.webSocket) {
-      const webSocket: any = new WebSocket(
-        this.config.url ||
-        `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/ws`
-      );
+      const webSocket: any = new WebSocket(this.url);
       webSocket.readyPromise = new Promise<WebSocket>((resolve, reject) => {
         webSocket.lastHeartBeat = new Date();
         const pingInterval = setInterval(() => {
-          if (webSocket.readyState !== WebSocket.CLOSED) {
+          if (webSocket.readyState === WebSocket.OPEN) {
             webSocket.ping();
           }
+
           if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > 30000) {
             webSocket.close();
           }
         }, 5000);
+
         webSocket.sendAsync = async (message) => new Promise<void>((resolveSend, rejectSend) => {
           webSocket.send(message, (err) => {
             if (err) {
@@ -52,6 +51,7 @@ export class WebSocketConnection {
         });
         webSocket.on('close', () => {
           clearInterval(pingInterval);
+
           if (Object.keys(webSocket.sentMessages).length) {
             setTimeout(async () => {
               try {

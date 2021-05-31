@@ -7,6 +7,12 @@ menuOrder: 15
 ---
 [comment]: # (DOCUMENT IS PROOFREADED, MAKE CHANGES WITH CONFIDENCE)
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/cohort-retention).
+<!-- prettier-ignore-end -->
+
 This is an advanced topic that assumes good, pre-existing knowledge of SQL and Cube.js.
 
 Whether you’re selling groceries, financial services, or gym memberships, successful recruitment of new customers is only

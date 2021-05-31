@@ -1,6 +1,6 @@
 const { run } = require('@oclif/command');
-const { CubejsServer } = require('./dist/server');
-const { ServerContainer } = require('./dist/server/container');
+const { CubejsServer } = require('./dist/src/server');
+const { ServerContainer } = require('./dist/src/server/container');
 
 /**
  * After 5 years working with TypeScript, now I know

@@ -1,6 +1,7 @@
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions } from '@cubejs-backend/api-gateway';
+import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import type { SchemaFileRepository } from './FileRepository';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -37,12 +38,6 @@ export interface RequestContext {
   requestId: string;
 }
 
-export type UserBackgroundContext = {
-  // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo?: any;
-  securityContext: any;
-};
-
 export interface DriverContext extends RequestContext {
   dataSource: string;
 }
@@ -51,18 +46,10 @@ export interface DialectContext extends DriverContext {
   dbType: string;
 }
 
-export interface FileContent {
-  fileName: string;
-  content: string;
-}
-
-export interface SchemaFileRepository {
-  dataSchemaFiles: () => Promise<FileContent[]>;
-}
-
 export interface DriverFactory {}
 
 export type DatabaseType =
+  | 'cubestore'
   | 'athena'
   | 'bigquery'
   | 'clickhouse'
@@ -93,7 +80,7 @@ export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseD
 
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type DbTypeFn = (context: RequestContext) => DatabaseType;
+export type DbTypeFn = (context: DriverContext) => DatabaseType;
 
 export type LoggerFn = (msg: string, params: any) => void;
 
@@ -135,4 +122,7 @@ export interface CreateOptions {
   dashboardAppPath?: string;
   dashboardAppPort?: number;
   sqlCache?: boolean;
+  livePreview?: boolean;
+  // Internal flag, that we use to detect serverless env
+  serverless?: boolean;
 }

@@ -19,7 +19,7 @@ class HttpTransport {
     );
 
     let url = `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`;
-    
+
     this.method = this.method || (url.length < 2000 ? 'GET' : 'POST');
     if (this.method === 'POST') {
       url = `${this.apiUrl}/${method}`;

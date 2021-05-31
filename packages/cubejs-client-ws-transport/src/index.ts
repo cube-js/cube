@@ -1,4 +1,5 @@
 import WebSocket from 'isomorphic-ws';
+import type { ITransport, ITransportResponse } from '@cubejs-client/core';
 
 /**
  * @title @cubejs-client/ws-transport
@@ -14,13 +15,22 @@ class WebSocketTransportResult {
 
   protected readonly result: unknown;
 
-  constructor({ status, message }: { status: unknown, message: unknown }) {
+  public constructor({ status, message }: { status: unknown, message: unknown }) {
     this.status = status;
     this.result = message;
   }
 
-  async json() {
+  public async json() {
     return this.result;
+  }
+
+  public clone() {
+    // no need to actually clone it
+    return this;
+  }
+
+  public async text() {
+    return typeof this.result === 'string' ? this.result : JSON.stringify(this.result);
   }
 }
 
@@ -36,7 +46,7 @@ type Message = {
   messageId: number,
   requestId: any,
   method: string,
-  params: string,
+  params: Record<string, unknown>,
 };
 
 type Subscription = {
@@ -44,7 +54,7 @@ type Subscription = {
   callback: (result: WebSocketTransportResult) => void,
 };
 
-class WebSocketTransport {
+class WebSocketTransport implements ITransport<WebSocketTransportResult> {
   protected readonly apiUrl: string;
 
   protected readonly heartBeatInterval: number = 60;
@@ -74,6 +84,12 @@ class WebSocketTransport {
   public set authorization(token) {
     this.token = token;
 
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+
+  public async close(): Promise<void> {
     if (this.ws) {
       this.ws.close();
     }
@@ -181,7 +197,10 @@ class WebSocketTransport {
     }, 100);
   }
 
-  public request(method: string, { baseRequestId, ...params }: any) {
+  public request(
+    method: string,
+    { baseRequestId, ...params }: Record<string, unknown>
+  ): ITransportResponse<WebSocketTransportResult> {
     const message: Message = {
       messageId: this.messageCounter++,
       requestId: baseRequestId,
@@ -210,14 +229,16 @@ class WebSocketTransport {
     const transport = this;
 
     return {
-      async subscribe(callback: Function) {
+      async subscribe(callback) {
         transport.sendMessage(message);
-        const result = await new Promise((resolve) => {
+
+        const result = await new Promise<WebSocketTransportResult>((resolve) => {
           nextMessage = resolve;
           if (pendingResults.length) {
             runNextMessage();
           }
         });
+
         return callback(result, () => this.subscribe(callback));
       },
       async unsubscribe() {

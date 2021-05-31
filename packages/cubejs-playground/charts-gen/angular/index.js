@@ -1,18 +1,16 @@
 const fs = require('fs-extra');
 const { TargetSource, utils } = require('@cubejs-templates/core');
 const { pascalCase, paramCase } = require('change-case');
+const {
+  AppContainer,
+  DependencyTree,
+  DevPackageFetcher,
+  executeCommand
+} = require('@cubejs-backend/templates');
 
-const DependencTree = require('../dev/DependencyTree');
-const AppContainer = require('../dev/AppContainer');
-const DevPackageFetcher = require('../dev/DevPackageFetcher');
 const path = require('path');
-const { executeCommand } = require('../dev/utils');
 const { generateCodeChunks } = require('./code-chunks-gen');
-
-const repo = {
-  owner: 'cube-js',
-  name: 'cubejs-playground-templates',
-};
+const { REPOSITORY } = require('../env');
 
 const chartingLibraryTemplates = ['angular-ng2-charts', 'angular-test-charts'];
 
@@ -28,11 +26,11 @@ const distPath = `${rootPath}/charts-dist/angular`;
 const angularChartsPath = `${distPath}/angular-charts`;
 
 (async () => {
-  const fetcher = new DevPackageFetcher(repo);
+  const fetcher = new DevPackageFetcher(REPOSITORY);
   const manifest = await fetcher.manifestJSON();
   const { packagesPath } = await fetcher.downloadPackages();
 
-  const dt = new DependencTree(manifest, packages);
+  const dt = new DependencyTree(manifest, packages);
 
   const appContainer = new AppContainer(
     dt.getRootNode(),

@@ -3,6 +3,228 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.5](https://github.com/cube-js/cube.js/compare/v0.27.4...v0.27.5) (2021-05-03)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.4](https://github.com/cube-js/cube.js/compare/v0.27.3...v0.27.4) (2021-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.2](https://github.com/cube-js/cube.js/compare/v0.27.1...v0.27.2) (2021-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.27.1](https://github.com/cube-js/cube.js/compare/v0.27.0...v0.27.1) (2021-04-27)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.101](https://github.com/cube-js/cube.js/compare/v0.26.100...v0.26.101) (2021-04-20)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.99](https://github.com/cube-js/cube.js/compare/v0.26.98...v0.26.99) (2021-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.88](https://github.com/cube-js/cube.js/compare/v0.26.87...v0.26.88) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.78](https://github.com/cube-js/cube.js/compare/v0.26.77...v0.26.78) (2021-04-05)
+
+
+### Bug Fixes
+
+* **athena-driver:** Wrong escape, Use " for column names, ` for table/schema ([62d8fcf](https://github.com/cube-js/cube.js/commit/62d8fcfb145ac04de72086b354bd583279617481))
+
+
+
+
+
+## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.76](https://github.com/cube-js/cube.js/compare/v0.26.75...v0.26.76) (2021-04-03)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.72](https://github.com/cube-js/cube.js/compare/v0.26.71...v0.26.72) (2021-03-29)
+
+
+### Bug Fixes
+
+* **athena-driver:** Use correct quoteIdentifier, fix [#2363](https://github.com/cube-js/cube.js/issues/2363) ([968b3b7](https://github.com/cube-js/cube.js/commit/968b3b7363b0d2c6c8385c717f3d1f29300c5caf))
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
 ## [0.26.54](https://github.com/cube-js/cube.js/compare/v0.26.53...v0.26.54) (2021-03-12)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

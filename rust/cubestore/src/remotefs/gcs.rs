@@ -1,5 +1,6 @@
 use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use cloud_storage::Object;
@@ -51,19 +52,27 @@ impl RemoteFs for GCSRemoteFs {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let file = File::open(temp_upload_path).await?;
-        let size = file.metadata().await?.len();
         let stream = FramedRead::new(file, BytesCodec::new());
         let stream = stream.map(|r| r.map(|b| b.to_vec()));
         Object::create_streamed(
             self.bucket.as_str(),
             stream,
-            Some(size),
+            None,
             self.gcs_path(remote_path).as_str(),
             "application/octet-stream",
         )
         .await?;
         let local_path = self.dir.as_path().join(remote_path);
         if Path::new(temp_upload_path) != local_path {
+            fs::create_dir_all(local_path.parent().unwrap())
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Create dir {}: {}",
+                        local_path.parent().as_ref().unwrap().to_string_lossy(),
+                        e
+                    ))
+                })?;
             fs::rename(&temp_upload_path, local_path).await?;
         }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
@@ -121,7 +130,7 @@ impl RemoteFs for GCSRemoteFs {
         Object::delete(self.bucket.as_str(), self.gcs_path(remote_path).as_str()).await?;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
 
-        let _guard = self.delete_mut.lock().await;
+        let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
         let local = self.dir.as_path().join(remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;

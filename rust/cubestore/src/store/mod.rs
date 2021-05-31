@@ -22,7 +22,6 @@ use std::{
 };
 
 use crate::config::injection::DIService;
-use crate::sys::malloc::trim_allocs;
 use crate::table::data::{cmp_row_key, cmp_row_key_heap, MutRows, Rows};
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
@@ -31,7 +30,6 @@ use futures::future::join_all;
 use itertools::Itertools;
 use log::trace;
 use mockall::automock;
-use scopeguard::defer;
 use std::cmp::Ordering;
 use tokio::task::JoinHandle;
 
@@ -329,8 +327,6 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError> {
-        defer!(trim_allocs());
-
         let partition = self.meta_store.get_partition(partition_id).await?;
         if partition.get_row().is_active() {
             return Err(CubeError::internal(format!(
@@ -445,8 +441,8 @@ mod tests {
 
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
-                PathBuf::from(remote_store_path.clone()),
             );
             let store = WALStore::new(
                 RocksMetaStore::new(path, remote_fs.clone(), config.config_obj()),
@@ -485,6 +481,7 @@ mod tests {
                     None,
                     None,
                     Vec::new(),
+                    true,
                 )
                 .await
                 .unwrap();
@@ -525,8 +522,8 @@ mod tests {
         let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
         {
             let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
                 PathBuf::from(chunk_store_path.clone()),
-                PathBuf::from(chunk_remote_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
@@ -561,6 +558,7 @@ mod tests {
                     None,
                     None,
                     vec![],
+                    true,
                 )
                 .await
                 .unwrap();
@@ -722,7 +720,6 @@ impl ChunkStore {
         mut rows: Rows,
         columns: &[Column],
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
-        defer!(trim_allocs());
         let mut new_chunks = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();

@@ -36,7 +36,7 @@ interface CubejsConfiguration {
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
   checkAuth: (req: ExpressRequest, authorization: string) => any;
   queryTransformer: (query: object, context: RequestContext) => object;
-  preAggregationsSchema: string | (context: RequestContext) => string;
+  preAggregationsSchema: string | ((context: RequestContext) => string);
   schemaVersion: (context: RequestContext) => string;
   scheduledRefreshTimer: boolean | number;
   scheduledRefreshTimeZones: string[],
@@ -70,18 +70,20 @@ interface CubejsConfiguration {
   },
   externalDbType: string | ((context: RequestContext) => string);
   externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
-  orchestratorOptions: {
-    redisPrefix: string;
-    queryCacheOptions: {
-      refreshKeyRenewalThreshold: number;
-      backgroundRenew: boolean;
-      queueOptions: QueueOptions;
-    }
-    preAggregationsOptions: {
-      queueOptions: QueueOptions;
-    }
-  },
+  orchestratorOptions: OrchestratorOptions | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
+}
+
+interface OrchestratorOptions {
+  redisPrefix: string;
+  queryCacheOptions: {
+    refreshKeyRenewalThreshold: number;
+    backgroundRenew: boolean;
+    queueOptions: QueueOptions;
+  }
+  preAggregationsOptions: {
+    queueOptions: QueueOptions;
+  }
 }
 
 interface QueueOptions {
@@ -167,7 +169,6 @@ module.exports = {
     new PostgresDriver({ database: dataSource }),
 };
 ```
-
 
 ### contextToAppId
 
@@ -275,12 +276,11 @@ where needed.
 ```javascript
 module.exports = {
   queryTransformer: (query, { securityContext }) => {
-    const user = securityContext.u;
-    if (user.filterByRegion) {
+    if (securityContext.filterByRegion) {
       query.filters.push({
         member: 'Regions.id',
         operator: 'equals',
-        values: [user.regionId],
+        values: [securityContext.regionId],
       });
     }
     return query;
@@ -296,16 +296,31 @@ there. Either `String` or `Function` could be passed. Providing a `Function`
 allows to dynamically set the pre-aggregation schema name depending on the
 user's context.
 
+Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
+and `prod_pre_aggregations` in production.
+
+Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| We **strongly** recommend using different pre-aggregation schemas in development and
+| production environments to avoid pre-aggregation tables clashes.
+<!-- prettier-ignore-end -->
+
 Called once per [`appId`][ref-opts-ctx-to-appid].
 
 ```javascript
+// Static usage
+module.exports = {
+  preAggregationsSchema: `my_pre_aggregations`,
+};
+
+// Dynamic usage
 module.exports = {
   preAggregationsSchema: ({ securityContext }) =>
     `pre_aggregations_${securityContext.tenantId}`,
 };
 ```
-
-It is usually used in [Multitenancy Setup][ref-multitenancy].
 
 ### schemaVersion
 
@@ -327,6 +342,16 @@ module.exports = {
 ```
 
 ### scheduledRefreshTimer
+
+<!-- prettier-ignore-start -->
+[[warning | Note]]
+| This is merely a refresh worker heart beat. It doesn't affect freshness of
+| pre-aggregations or refresh keys. Setting this value to `30s` doesn't mean
+| pre-aggregations would be refreshed every 30 seconds but rather checked for
+| freshness every 30 seconds. Please consult the
+| [`refreshKey` documentation][ref-pre-aggregations-refresh-key] on how to set
+| refresh intervals for pre-aggregations.
+<!-- prettier-ignore-end -->
 
 Cube.js enables background refresh by default. You can specify an interval as a
 number in seconds or as a string format e.g. `30s`, `1m`. Can be also set using
@@ -387,16 +412,16 @@ necessary security contexts prior to running the scheduled refreshes.
 
 ```javascript
 module.exports = {
-  // scheduledRefreshContexts should return array of objects, which can declare authInfo
+  // scheduledRefreshContexts should return an array of `securityContext`s
   scheduledRefreshContexts: async () => [
     {
-      authInfo: {
+      securityContext: {
         myappid: 'demoappid',
         bucket: 'demo',
       },
     },
     {
-      authInfo: {
+      securityContext: {
         myappid: 'demoappid2',
         bucket: 'demo2',
       },
@@ -409,6 +434,30 @@ module.exports = {
 
 Option to extend the `RequestContext` with custom values. This method is called
 on each request. Can be async.
+
+The function should return an object which gets appended to the
+[`RequestContext`][ref-opts-req-ctx]. Make sure to register your value using
+[`contextToAppId`][ref-opts-ctx-to-appid] to use cache context for all possible
+values that your extendContext object key can have.
+
+```javascript
+module.exports = {
+  contextToAppId: (context) => `CUBEJS_APP_${context.activeOrganization}`,
+  extendContext: (req) => {
+    return { activeOrganization: req.headers.activeOrganization };
+  },
+};
+```
+
+You can use the custom value from extend context in your data schema like this:
+
+```javascript
+const { activeOrganization } = COMPILE_CONTEXT;
+
+cube(`Users`, {
+  sql: `SELECT * FROM users where organization_id=${activeOrganization}`,
+});
+```
 
 ### compilerCacheSize
 
@@ -464,8 +513,8 @@ using `CUBEJS_JWK_URL`.
 
 #### key
 
-A JSON string that represents a cryptographic key and its' properties. Can also
-be set using `CUBEJS_JWK_KEY`.
+A JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
+also be set using `CUBEJS_JWT_KEY`.
 
 #### algorithms
 
@@ -492,13 +541,12 @@ JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
-
 ### externalDbType
 
 Should be used in conjunction with
 [`externalDriverFactory`](#external-driver-factory) option. Either `String` or
-`Function` could be passed. Providing a `Function` allows you to dynamically select
-a database type depending on the user's context. It is usually used in
+`Function` could be passed. Providing a `Function` allows you to dynamically
+select a database type depending on the user's context. It is usually used in
 [Multitenancy Setup][ref-multitenancy].
 
 Called only once per [`appId`][ref-opts-ctx-to-appid].
@@ -636,6 +684,7 @@ the additional transpiler for check duplicates.
 [ref-cube-ctx-sec-ctx]: /cube#context-variables-security-context
 [ref-multitenancy]: /multitenancy-setup
 [ref-ext-driverfactory]: #external-driver-factory
+[ref-opts-req-ctx]: #request-context
 [ref-opts-checkauth]: #options-reference-check-auth
 [ref-opts-ctx-to-appid]: #options-reference-context-to-app-id
 [ref-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
@@ -649,3 +698,5 @@ the additional transpiler for check duplicates.
 [ref-sec-ctx]: /security/context
 [ref-rest-api]: /rest-api
 [ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-development-mode]: /overview#development-mode
+[ref-pre-aggregations-refresh-key]: /pre-aggregations#refresh-key

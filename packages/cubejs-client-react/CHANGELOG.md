@@ -3,6 +3,211 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** reorder reset ([#2810](https://github.com/cube-js/cube.js/issues/2810)) ([2d22683](https://github.com/cube-js/cube.js/commit/2d22683e7f02447f22a74db5fc2e0a122939f7e8))
+
+
+
+
+
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** display error message on all tabs ([#2741](https://github.com/cube-js/cube.js/issues/2741)) ([0b9b597](https://github.com/cube-js/cube.js/commit/0b9b597f8e936c9daf287c5ed2e03ecdf5af2a0b))
+
+
+### Features
+
+* **@cubejs-client/playground:** member grouping ([#2736](https://github.com/cube-js/cube.js/issues/2736)) ([7659438](https://github.com/cube-js/cube.js/commit/76594383e08e44354c5966f8e60107d65e05ddab))
+
+
+
+
+
+## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.27.6](https://github.com/cube-js/cube.js/compare/v0.27.5...v0.27.6) (2021-05-03)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** display server error message ([#2648](https://github.com/cube-js/cube.js/issues/2648)) ([c4d8936](https://github.com/cube-js/cube.js/commit/c4d89369db8796fb136af8370aee2111ac3d0316))
+
+
+
+
+
+## [0.27.5](https://github.com/cube-js/cube.js/compare/v0.27.4...v0.27.5) (2021-05-03)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.26.102](https://github.com/cube-js/cube.js/compare/v0.26.101...v0.26.102) (2021-04-22)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.26.94](https://github.com/cube-js/cube.js/compare/v0.26.93...v0.26.94) (2021-04-13)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.26.93](https://github.com/cube-js/cube.js/compare/v0.26.92...v0.26.93) (2021-04-12)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.26.82](https://github.com/cube-js/cube.js/compare/v0.26.81...v0.26.82) (2021-04-07)
+
+
+### Features
+
+* **@cubejs-client/playground:** run query button, disable query auto triggering ([#2476](https://github.com/cube-js/cube.js/issues/2476)) ([92a5d45](https://github.com/cube-js/cube.js/commit/92a5d45eca00e88e925e547a12c3f69b05bfafa6))
+
+
+
+
+
+## [0.26.73](https://github.com/cube-js/cube.js/compare/v0.26.72...v0.26.73) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.26.70](https://github.com/cube-js/cube.js/compare/v0.26.69...v0.26.70) (2021-03-26)
+
+
+### Features
+
+* Vue chart renderers ([#2428](https://github.com/cube-js/cube.js/issues/2428)) ([bc2cbab](https://github.com/cube-js/cube.js/commit/bc2cbab22fee860cfc846d1207f6a83899198dd8))
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.26.63](https://github.com/cube-js/cube.js/compare/v0.26.62...v0.26.63) (2021-03-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** stateChangeHeuristics type definition ([b983344](https://github.com/cube-js/cube.js/commit/b9833441c74ad8901d3115a8dbf409d5eb9fb620))
+
+
+
+
+
+## [0.26.61](https://github.com/cube-js/cube.js/compare/v0.26.60...v0.26.61) (2021-03-18)
+
+
+### Features
+
+* **@cubejs-client/vue:** vue query builder ([#1824](https://github.com/cube-js/cube.js/issues/1824)) ([06ee13f](https://github.com/cube-js/cube.js/commit/06ee13f72ef33372385567ed5e1795087b4f5f53))
+
+
+
+
+
+## [0.26.60](https://github.com/cube-js/cube.js/compare/v0.26.59...v0.26.60) (2021-03-16)
+
+
+### Features
+
+* **@cubejs-client/playground:** Playground components ([#2329](https://github.com/cube-js/cube.js/issues/2329)) ([489dc12](https://github.com/cube-js/cube.js/commit/489dc12d7e9bfa87bfb3c8ffabf76f238c86a2fe))
+
+
+
+
+
 ## [0.26.58](https://github.com/cube-js/cube.js/compare/v0.26.56...v0.26.58) (2021-03-14)
 
 

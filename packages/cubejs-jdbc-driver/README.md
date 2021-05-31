@@ -9,6 +9,39 @@
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
+# Java installation
+
+## macOS
+
+```sh
+brew install openjdk@8
+sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
+```
+
+If this doesn't work, please run commands from `$ brew info openjdk@8`.
+
+## Debian, Ubuntu, etc.
+
+```sh
+sudo apt install openjdk-8-jdk
+```
+
+## Fedora, Oracle Linux, Red Hat Enterprise Linux, etc.
+
+```sh
+su -c "yum install java-1.8.0-openjdk"
+```
+
+## Windows
+
+If you have Chocolatey packet manager:
+
+```
+choco install openjdk
+```
+
+Or download it from 
+
 ### License
 
 Cube.js JDBC Database Driver is [Apache 2.0 licensed](./LICENSE).

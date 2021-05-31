@@ -1,4 +1,5 @@
 import { toPairs, fromPairs } from 'ramda';
+import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 
 export default {
   props: {
@@ -22,24 +23,26 @@ export default {
       required: false,
       default: () => ({}),
     },
+    chartType: {
+      type: String,
+      required: false,
+    },
   },
   data() {
     return {
       mutexObj: {},
       error: undefined,
       resultSet: undefined,
-      loading: true,
+      loading: false,
       sqlQuery: undefined,
     };
   },
   async mounted() {
     const { query, queries } = this;
 
-    if (query) {
+    if (isQueryPresent(query)) {
       await this.load();
-    }
-
-    if (queries) {
+    } else if (isQueryPresent(queries)) {
       await this.loadQueries(queries);
     }
   },
@@ -55,18 +58,20 @@ export default {
     }
 
     if ((!loading && resultSet && !error) || onlyDefault) {
-      const slotProps = {
+      let slotProps = {
         resultSet,
         sqlQuery,
         query: this.builderProps.query || this.query,
       };
 
       if (onlyDefault) {
-        Object.assign(slotProps, {
+        slotProps = {
           loading,
           error,
+          refetch: this.load,
           ...this.builderProps,
-        });
+          ...slotProps,
+        };
       }
 
       slot = $scopedSlots.default ? $scopedSlots.default(slotProps) : slot;
@@ -74,36 +79,45 @@ export default {
       slot = $scopedSlots.error ? $scopedSlots.error({ error, sqlQuery }) : slot;
     }
 
-    return createElement(
-      'div',
-      {},
-      [
-        controls,
-        slot,
-      ],
-    );
+    return createElement('div', {}, [controls, slot]);
   },
   methods: {
     async load() {
       const { query } = this;
+
+      if (!isQueryPresent(query)) {
+        return;
+      }
+
       try {
         this.loading = true;
-        this.error = undefined;
+        this.error = null;
+        this.resultSet = null;
 
-        if (query && Object.keys(query).length > 0) {
-          if (this.loadSql === 'only') {
-            this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
-          } else if (this.loadSql) {
-            this.sqlQuery = await this.cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' });
-            this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
-          } else {
-            this.resultSet = await this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' });
-          }
+        if (this.loadSql === 'only') {
+          this.sqlQuery = await this.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql',
+          });
+        } else if (this.loadSql) {
+          this.sqlQuery = await this.cubejsApi.sql(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'sql',
+          });
+          this.resultSet = await this.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query',
+          });
+        } else {
+          this.resultSet = await this.cubejsApi.load(query, {
+            mutexObj: this.mutexObj,
+            mutexKey: 'query',
+          });
         }
 
         this.loading = false;
-      } catch (exc) {
-        this.error = exc;
+      } catch (error) {
+        this.error = error;
         this.resultSet = undefined;
         this.loading = false;
       }
@@ -114,27 +128,50 @@ export default {
         this.error = undefined;
         this.loading = true;
 
-        const resultPromises = Promise.all(toPairs(queries).map(
-          ([name, query]) =>
-          this.cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
-        ));
+        const resultPromises = Promise.all(
+          toPairs(queries).map(([name, query]) =>
+            this.cubejsApi
+              .load(query, {
+                mutexObj: this.mutexObj,
+                mutexKey: name,
+              })
+              .then((r) => [name, r])
+          )
+        );
 
         this.resultSet = fromPairs(await resultPromises);
         this.loading = false;
-      } catch (exc) {
-        this.error = exc;
+      } catch (error) {
+        this.error = error;
         this.loading = false;
       }
     },
   },
   watch: {
+    loading(loading) {
+      if (loading === false) {
+        this.$emit('queryStatus', {
+          isLoading: false,
+          error: this.error,
+          resultSet: this.resultSet,
+        });
+      } else {
+        this.$emit('queryStatus', { isLoading: true });
+      }
+    },
+    cubejsApi() {
+      this.load();
+    },
+    chartType() {
+      this.load();
+    },
     query: {
-      handler(val) {
-        if (val) {
+      deep: true,
+      handler(query, prevQuery) {
+        if (!areQueriesEqual(query, prevQuery)) {
           this.load();
         }
       },
-      deep: true,
     },
     queries: {
       handler(val) {

@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
+import { displayCLIWarning } from './cli';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -68,7 +69,11 @@ function asBoolOrTime(input: string, envName: string): number|boolean {
   );
 }
 
-const variables = {
+let legacyRedisPasswordAlerted: boolean = false;
+let legacyRedisUrlAlerted: boolean = false;
+let legacyRedisTlsAlerted: boolean = false;
+
+const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
     .asBoolStrict(),
@@ -107,8 +112,39 @@ const variables = {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
   },
+  // Common db options
+  dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
+    .required(required)
+    .asString(),
+  // Export Bucket options
+  dbExportBucketType: ({ supported }: { supported: ('s3' | 'gcp' | 'azure')[] }) => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
+    .asEnum(supported),
+  dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
+    .asString(),
+  // Export bucket options for AWS S3
+  dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
+    .asString(),
+  dbExportBucketAwsSecret: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET')
+    .asString(),
+  dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
+    .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
+    .asString(),
+  // Cube Store
+  cubeStoreHost: () => get('CUBEJS_CUBESTORE_HOST')
+    .asString(),
+  cubeStorePort: () => get('CUBEJS_CUBESTORE_PORT')
+    .asPortNumber(),
+  cubeStoreUser: () => get('CUBEJS_CUBESTORE_USER')
+    .asString(),
+  cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
+    .asString(),
+  // Databricks
+  databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
+    .required()
+    .asString(),
+  databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
     .asString(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
@@ -120,8 +156,69 @@ const variables = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
-  redisUrl: () => get('REDIS_URL')
-    .asString(),
+  redisPassword: () => {
+    const redisPassword = get('CUBEJS_REDIS_PASSWORD')
+      .asString();
+    if (redisPassword) {
+      return redisPassword;
+    }
+
+    const legacyRedisPassword = get('REDIS_PASSWORD')
+      .asString();
+    if (legacyRedisPassword) {
+      if (!legacyRedisPasswordAlerted) {
+        displayCLIWarning('REDIS_PASSWORD is deprecated and will be removed, please use CUBEJS_REDIS_PASSWORD.');
+
+        legacyRedisPasswordAlerted = true;
+      }
+
+      return legacyRedisPassword;
+    }
+
+    return undefined;
+  },
+  redisUrl: () => {
+    const redisUrl = get('CUBEJS_REDIS_URL')
+      .asString();
+    if (redisUrl) {
+      return redisUrl;
+    }
+
+    const legacyRedisUrl = get('REDIS_URL')
+      .asString();
+    if (legacyRedisUrl) {
+      if (!legacyRedisUrlAlerted) {
+        displayCLIWarning('REDIS_URL is deprecated and will be removed, please use CUBEJS_REDIS_URL.');
+
+        legacyRedisUrlAlerted = true;
+      }
+
+      return legacyRedisUrl;
+    }
+
+    return undefined;
+  },
+  redisTls: () => {
+    const redisTls = get('CUBEJS_REDIS_TLS')
+      .asBoolStrict();
+    if (redisTls) {
+      return redisTls;
+    }
+
+    const legacyRedisTls = get('REDIS_TLS')
+      .asBoolStrict();
+    if (legacyRedisTls) {
+      if (!legacyRedisTlsAlerted) {
+        displayCLIWarning('REDIS_TLS is deprecated and will be removed, please use CUBEJS_REDIS_TLS.');
+
+        legacyRedisTlsAlerted = true;
+      }
+
+      return legacyRedisTls;
+    }
+
+    return false;
+  },
   dbSsl: () => get('CUBEJS_DB_SSL')
     .default('false')
     .asBoolStrict(),
@@ -132,15 +229,12 @@ const variables = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
-  redisPassword: () => get('REDIS_PASSWORD')
-    .asString(),
-  redisTls: () => get('REDIS_TLS')
-    .default('false')
-    .asBoolStrict(),
   jwkKey: () => get('CUBEJS_JWK_KEY')
     .asUrlString(),
   jwkUrl: () => get('CUBEJS_JWK_URL')
-    .asUrlString(),
+    .asString(),
+  jwtKey: () => get('CUBEJS_JWT_KEY')
+    .asString(),
   jwtAlgorithms: () => get('CUBEJS_JWT_ALGS')
     .asArray(','),
   jwtAudience: () => get('CUBEJS_JWT_AUDIENCE')
@@ -156,13 +250,23 @@ const variables = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  telemetry: () => get('CUBEJS_TELEMETRY')
+    .default('true')
+    .asBool(),
+  // Experiments & Preview flags
+  livePreview: () => get('CUBEJS_LIVE_PREVIEW')
+    .default('false')
+    .asBoolStrict(),
+  externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
+    .default('false')
+    .asBoolStrict(),
 };
 
 type Vars = typeof variables;
 
-export function getEnv<T extends keyof Vars>(key: T): ReturnType<Vars[T]> {
+export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
-    return <any>variables[key]();
+    return <any>variables[key](opts);
   }
 
   throw new Error(

@@ -29,6 +29,10 @@ impl Index {
         })
     }
 
+    pub fn table_id(&self) -> u64 {
+        return self.table_id;
+    }
+
     pub fn get_name(&self) -> &String {
         &self.name
     }

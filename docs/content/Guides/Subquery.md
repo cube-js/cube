@@ -18,7 +18,7 @@ You can use subquery dimensions to **reference measures from other cubes inside 
 
 Consider the following data schema, where we have `Deals` and `Sales Managers`. `Deals` belong to `Sales Managers` and have the `amount` dimension. What we want is to calculate the amount of deals for `Sales Managers`.
 
-![subquery-1.png](https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Guides/subquery-1.png)
+![subquery-1.png](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Guides/subquery-1.png)
 
 
 To calculate the deals amount for sales managers in pure SQL, we can use the correlated subquery, which will look like this:

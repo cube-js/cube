@@ -3,6 +3,601 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.23](https://github.com/cube-js/cube.js/compare/v0.27.22...v0.27.23) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.21](https://github.com/cube-js/cube.js/compare/v0.27.20...v0.27.21) (2021-05-26)
+
+
+### Bug Fixes
+
+* Pre-aggregation warmup stucks if refresh range fetch takes too long ([fe9afd5](https://github.com/cube-js/cube.js/commit/fe9afd5007d2fc2a80fe08e792b3cdb1b29eedee))
+
+
+
+
+
+## [0.27.20](https://github.com/cube-js/cube.js/compare/v0.27.19...v0.27.20) (2021-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+
+### Features
+
+* Pre-aggregations Meta API, part 1 ([#2801](https://github.com/cube-js/cube.js/issues/2801)) ([2245a77](https://github.com/cube-js/cube.js/commit/2245a7774666a3a8bd36703b2b4001b20789b943))
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+
+### Features
+
+* Dont introspect schema, if driver can detect types ([3467b44](https://github.com/cube-js/cube.js/commit/3467b4472e800d8345260a5765542486ed93647b))
+
+
+
+
+
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+
+### Features
+
+* Enable external pre-aggregations by default for new users ([22de035](https://github.com/cube-js/cube.js/commit/22de0358ec35017c45e6a716faaacf176c49c652))
+* Start Cube Store on startup in devMode for official images ([5e216a8](https://github.com/cube-js/cube.js/commit/5e216a8df0e5df2168d007bac32102cf78ba26e3))
+
+
+
+
+
+## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
+
+
+### Bug Fixes
+
+* Add missing validators for configuration values ([6ac6350](https://github.com/cube-js/cube.js/commit/6ac6350d2e7a892122a3cbbe1cfae822ba483f3b))
+
+
+
+
+
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** telemetry ([#2727](https://github.com/cube-js/cube.js/issues/2727)) ([366435a](https://github.com/cube-js/cube.js/commit/366435aeae5ed2d30d520cd0ced2fb6d6b6bbe29))
+
+
+
+
+
+## [0.27.12](https://github.com/cube-js/cube.js/compare/v0.27.11...v0.27.12) (2021-05-13)
+
+
+### Bug Fixes
+
+* Out of memory on intensive pre-aggregation warmup: use intervals instead of promises cycles ([51149cb](https://github.com/cube-js/cube.js/commit/51149cbd56281cdd89072cfc7a5e449422793bc4))
+
+
+
+
+
+## [0.27.11](https://github.com/cube-js/cube.js/compare/v0.27.10...v0.27.11) (2021-05-12)
+
+
+### Features
+
+* Strict validatation for configuration ([eda24b8](https://github.com/cube-js/cube.js/commit/eda24b8f97fa1d406b75cf2496f77295af5e9e1a))
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+
+### Features
+
+* Move External Cache And Queue serving to Cube Store ([#2702](https://github.com/cube-js/cube.js/issues/2702)) ([37e4268](https://github.com/cube-js/cube.js/commit/37e4268869a23c07f922a039873d349b733bf577))
+
+
+
+
+
+## [0.27.9](https://github.com/cube-js/cube.js/compare/v0.27.8...v0.27.9) (2021-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.8](https://github.com/cube-js/cube.js/compare/v0.27.7...v0.27.8) (2021-05-06)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.7](https://github.com/cube-js/cube.js/compare/v0.27.6...v0.27.7) (2021-05-04)
+
+
+### Bug Fixes
+
+* ECONNREFUSED 127.0.0.1:3030 on health checks in production mode without Cube Store ([7ccfbe1](https://github.com/cube-js/cube.js/commit/7ccfbe1524f11b3b88c90aa2e49969596cb0aa48))
+
+
+
+
+
+## [0.27.6](https://github.com/cube-js/cube.js/compare/v0.27.5...v0.27.6) (2021-05-03)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.27.5](https://github.com/cube-js/cube.js/compare/v0.27.4...v0.27.5) (2021-05-03)
+
+
+### Features
+
+* Use Cube Store as default EXTERNAL_DB, prefix variables ([30d52c4](https://github.com/cube-js/cube.js/commit/30d52c4f8f1ae1d6619ec4976d9db1eeb1e44140))
+
+
+
+
+
+## [0.27.4](https://github.com/cube-js/cube.js/compare/v0.27.3...v0.27.4) (2021-04-29)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Ping connection only when it's OPEN ([d80e157](https://github.com/cube-js/cube.js/commit/d80e157e5865318c14be534a7f8a1bc39b0ad851))
+
+
+
+
+
+## [0.27.3](https://github.com/cube-js/cube.js/compare/v0.27.2...v0.27.3) (2021-04-29)
+
+
+### Bug Fixes
+
+* **@cubejs-server/core:** env file path ([#2622](https://github.com/cube-js/cube.js/issues/2622)) ([b9abb19](https://github.com/cube-js/cube.js/commit/b9abb195b5c73b3a0077801302721bf8ae2bdaa0))
+
+
+
+
+
+## [0.27.2](https://github.com/cube-js/cube.js/compare/v0.27.1...v0.27.2) (2021-04-28)
+
+
+### Bug Fixes
+
+* Disable Scheduling when querying is not ready (before connection Wizard) ([b518ccd](https://github.com/cube-js/cube.js/commit/b518ccdd66a2f51af541bc54de2df816e138bac5))
+* Error: ENOENT: no such file or directory, scandir '/cube/conf/schema' ([dc96084](https://github.com/cube-js/cube.js/commit/dc9608419f53dd823a7f59fcb18141b0f18f002b))
+* Move Prettier & Jest to dev dep (reduce size) ([da59584](https://github.com/cube-js/cube.js/commit/da5958426b701b8a81506e8d74070b2977e3df56))
+* **@cubejs-server/core:** config file check ([1c16af1](https://github.com/cube-js/cube.js/commit/1c16af18ea024239a66f096113157d72eb1065b0))
+
+
+
+
+
+## [0.27.1](https://github.com/cube-js/cube.js/compare/v0.27.0...v0.27.1) (2021-04-27)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.104](https://github.com/cube-js/cube.js/compare/v0.26.103...v0.26.104) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+
+### Bug Fixes
+
+* concurrency lock driver instance & release on error ([dd60f5d](https://github.com/cube-js/cube.js/commit/dd60f5d1be59012ed33958d5889276afcc0639af))
+* Typo JWK_KEY -> JWT_KEY ([#2516](https://github.com/cube-js/cube.js/issues/2516)) ([7bdb576](https://github.com/cube-js/cube.js/commit/7bdb576e2130c61eec87e88575fdb96c55d6b4a6)), closes [#ch449](https://github.com/cube-js/cube.js/issues/ch449)
+
+
+
+
+
+## [0.26.102](https://github.com/cube-js/cube.js/compare/v0.26.101...v0.26.102) (2021-04-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.101](https://github.com/cube-js/cube.js/compare/v0.26.100...v0.26.101) (2021-04-20)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.100](https://github.com/cube-js/cube.js/compare/v0.26.99...v0.26.100) (2021-04-20)
+
+
+### Bug Fixes
+
+* Make sure pre-aggregation warmup has a priority over Refresh Scheduler to avoid endless loop refreshes ([9df3506](https://github.com/cube-js/cube.js/commit/9df3506001fe8f0708f5fe85816d1b00f9b2573a))
+
+
+
+
+
+## [0.26.99](https://github.com/cube-js/cube.js/compare/v0.26.98...v0.26.99) (2021-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.97](https://github.com/cube-js/cube.js/compare/v0.26.96...v0.26.97) (2021-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+
+### Bug Fixes
+
+* **playground:** Test connection in Connection Wizard ([715fa1c](https://github.com/cube-js/cube.js/commit/715fa1c0ab6667017e12851cbd97e97cf6807d60))
+
+
+
+
+
+## [0.26.92](https://github.com/cube-js/cube.js/compare/v0.26.91...v0.26.92) (2021-04-12)
+
+
+### Bug Fixes
+
+* Do not refresh cube keys during pre-aggregations warmup ([f331d53](https://github.com/cube-js/cube.js/commit/f331d53dbfd3feef0a5fa71ffc89c72cef3ecbb0))
+
+
+
+
+
+## [0.26.91](https://github.com/cube-js/cube.js/compare/v0.26.90...v0.26.91) (2021-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.89](https://github.com/cube-js/cube.js/compare/v0.26.88...v0.26.89) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.88](https://github.com/cube-js/cube.js/compare/v0.26.87...v0.26.88) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.86](https://github.com/cube-js/cube.js/compare/v0.26.85...v0.26.86) (2021-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.85](https://github.com/cube-js/cube.js/compare/v0.26.84...v0.26.85) (2021-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.84](https://github.com/cube-js/cube.js/compare/v0.26.83...v0.26.84) (2021-04-09)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** make live preview optional for PlaygroundQueryBuilder ([#2513](https://github.com/cube-js/cube.js/issues/2513)) ([db7a7f5](https://github.com/cube-js/cube.js/commit/db7a7f5fe9783a0c4834d9ace9ffbe710bd266b0))
+
+
+
+
+
+## [0.26.82](https://github.com/cube-js/cube.js/compare/v0.26.81...v0.26.82) (2021-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+
+### Features
+
+* Dev mode and live preview  ([#2440](https://github.com/cube-js/cube.js/issues/2440)) ([1a7cde8](https://github.com/cube-js/cube.js/commit/1a7cde816ee231ea00d1a952f5000dcc5a8c0ca4))
+* Introduce databricks-jdbc-driver ([bb0b31f](https://github.com/cube-js/cube.js/commit/bb0b31fb333f2aa379f11f6733c4efc17ec12dde))
+
+
+
+
+
+## [0.26.80](https://github.com/cube-js/cube.js/compare/v0.26.79...v0.26.80) (2021-04-07)
+
+
+### Bug Fixes
+
+* TypeError: Cannot read property 'preAggregation' of undefined on empty pre-aggregations ([91ba03e](https://github.com/cube-js/cube.js/commit/91ba03e91545f31b498aa0fa47090ccd35085ae6)), closes [#2505](https://github.com/cube-js/cube.js/issues/2505)
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+
+### Features
+
+* Make apiSecret optional, when JWK_URL is specified ([1a94590](https://github.com/cube-js/cube.js/commit/1a94590292baa6984a049b1b1634b9a04ea9d99a))
+
+
+
+
+
+## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
+
+
+### Bug Fixes
+
+* Reduce Redis traffic for Refresh Scheduler by introducing single pre-aggregations load cache for a whole refresh cycle ([bdb69d5](https://github.com/cube-js/cube.js/commit/bdb69d55ee15e7d9ecca69a8e237d40ee666d051))
+
+
+
+
+
+## [0.26.76](https://github.com/cube-js/cube.js/compare/v0.26.75...v0.26.76) (2021-04-03)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.75](https://github.com/cube-js/cube.js/compare/v0.26.74...v0.26.75) (2021-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.73](https://github.com/cube-js/cube.js/compare/v0.26.72...v0.26.73) (2021-04-01)
+
+
+### Bug Fixes
+
+* Pre-aggregation warmup should wait for partitions to build ([#2474](https://github.com/cube-js/cube.js/issues/2474)) ([3f05d94](https://github.com/cube-js/cube.js/commit/3f05d94eacdd3d5cdb7d1a5edbf647e3c767fb60))
+
+
+
+
+
+## [0.26.72](https://github.com/cube-js/cube.js/compare/v0.26.71...v0.26.72) (2021-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.71](https://github.com/cube-js/cube.js/compare/v0.26.70...v0.26.71) (2021-03-26)
+
+
+### Features
+
+* Allow saving state of a scheduled refresh for warmup operations ([#2445](https://github.com/cube-js/cube.js/issues/2445)) ([0c637b8](https://github.com/cube-js/cube.js/commit/0c637b882b655652214f8ee543aa1a0fc74089bc))
+
+
+
+
+
+## [0.26.70](https://github.com/cube-js/cube.js/compare/v0.26.69...v0.26.70) (2021-03-26)
+
+
+### Features
+
+* Vue chart renderers ([#2428](https://github.com/cube-js/cube.js/issues/2428)) ([bc2cbab](https://github.com/cube-js/cube.js/commit/bc2cbab22fee860cfc846d1207f6a83899198dd8))
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+
+### Features
+
+* Introduce @cubejs-backend/maven ([#2432](https://github.com/cube-js/cube.js/issues/2432)) ([6dc6034](https://github.com/cube-js/cube.js/commit/6dc6034c3cdcc8e2c2b0568c218228a18b64f44b))
+
+
+
+
+
+## [0.26.68](https://github.com/cube-js/cube.js/compare/v0.26.67...v0.26.68) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.67](https://github.com/cube-js/cube.js/compare/v0.26.66...v0.26.67) (2021-03-24)
+
+
+### Bug Fixes
+
+* Make requireCubeStoreDriver private (to make it internal in d.ts) ([c0e6fb5](https://github.com/cube-js/cube.js/commit/c0e6fb569c5fea65146da9dfcf52e75800a22392))
+
+
+
+
+
+## [0.26.66](https://github.com/cube-js/cube.js/compare/v0.26.65...v0.26.66) (2021-03-24)
+
+
+### Bug Fixes
+
+* this.logger is not a function. fix [#2431](https://github.com/cube-js/cube.js/issues/2431) ([d715dc0](https://github.com/cube-js/cube.js/commit/d715dc0929673dbd0e7d9694e6f6d09b61f8c090))
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+
+### Bug Fixes
+
+* Warning/skip Cube Store on unsupported platforms ([c187e11](https://github.com/cube-js/cube.js/commit/c187e119b8747e1f6bb3fe2bd84f66ae3822ac7d))
+
+
+
+
+
+## [0.26.64](https://github.com/cube-js/cube.js/compare/v0.26.63...v0.26.64) (2021-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.63](https://github.com/cube-js/cube.js/compare/v0.26.62...v0.26.63) (2021-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.26.60](https://github.com/cube-js/cube.js/compare/v0.26.59...v0.26.60) (2021-03-16)
+
+
+### Features
+
+* introduce GET /cubejs-system/v1/context ([d97858d](https://github.com/cube-js/cube.js/commit/d97858d528f6efa65400bf54b81b3a8a4039ecb0))
+
+
+
+
+
 ## [0.26.58](https://github.com/cube-js/cube.js/compare/v0.26.56...v0.26.58) (2021-03-14)
 
 

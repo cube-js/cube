@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.26.59",
+  "version": "0.27.24",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -10,15 +10,22 @@
     "node": ">=10.8.0"
   },
   "scripts": {
-    "cypress:open": "cypress open",
+    "cypress:open": "TEST_PLAYGROUND_PORT=3080 yarn cypress:birdbox",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint --debug src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts",
-    "birdbox": "jest dist/test",
-    "birdbox:postgresql": "jest -i dist/test/birdbox-postgresql.test.js",
-    "birdbox:postgresql-cubestore": "jest -i dist/test/birdbox-postgresql-cubestore.test.js",
+    "lint": "eslint src/* test/ test/bin --ext .ts",
+    "lint:fix": "eslint --fix src/* test/ test/bin --ext .ts",
+    "dataset:minimal": "node dist/test/bin/download-dataset.js",
+    "birdbox": "jest --runInBand --verbose dist/test",
+    "birdbox:snapshot": "jest --runInBand --updateSnapshot --verbose dist/test",
+    "birdbox:start": "node dist/test/bin/start-birdbox.js",
+    "birdbox:postgresql": "jest --verbose -i dist/test/birdbox-postgresql.test.js",
+    "birdbox:postgresql:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql.test.js",
+    "birdbox:postgresql-cubestore": "jest --verbose -i dist/test/birdbox-postgresql-cubestore.test.js",
+    "birdbox:postgresql-cubestore:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql-cubestore.test.js",
+    "birdbox:cli:postgresql": "jest --forceExit --verbose -i dist/test/cli-postgresql.test.js",
+    "birdbox:cli:postgresql:snapshot": "jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
     "cypress:install": "cypress install",
     "cypress:birdbox": "node dist/test/bin/cypress-birdbox.js"
   },
@@ -27,22 +34,39 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
+    "@cubejs-backend/shared": "^0.27.22",
+    "@cubejs-client/ws-transport": "^0.27.24",
+    "fs-extra": "^8.1.0",
+    "http-proxy": "^1.18.1",
+    "node-fetch": "^2.6.1",
     "testcontainers": "^7.5.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.26.54",
-    "@cubejs-client/core": "^0.26.55",
+    "@4tw/cypress-drag-drop": "^1.6.0",
+    "@cubejs-backend/linter": "^0.27.0",
+    "@cubejs-client/core": "^0.27.24",
+    "@jest/globals": "^26.6.2",
+    "@types/http-proxy": "^1.17.5",
+    "@types/jest": "^26.0.22",
     "@types/node": "^10.17.55",
-    "cypress": "^6.6.0",
-    "cypress-intellij-reporter": "^0.0.6",
+    "cypress": "6.9.1",
+    "cypress-image-snapshot": "^4.0.1",
+    "cypress-localstorage-commands": "^1.4.3",
+    "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.1",
     "jest": "^26.6.3",
+    "jwt-decode": "^3.1.2",
     "typescript": "~4.1.5"
   },
   "jest": {
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/dist/test/*.(test|spec).(ts|js)"
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   },
   "publishConfig": {
     "access": "public"

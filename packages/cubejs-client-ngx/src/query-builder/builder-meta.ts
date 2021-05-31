@@ -12,20 +12,16 @@ export class BuilderMeta {
   timeDimensions: TCubeDimension[];
   filters: Array<TCubeMeasure | TCubeDimension>;
 
-  constructor(private meta: Meta) {
+  constructor(public readonly meta: Meta) {
     this.mapMeta();
   }
 
   private mapMeta() {
-    const allDimensions = this.meta.membersForQuery(
-      null,
-      'dimensions'
-    ) as TCubeDimension[];
+    const allDimensions = <TCubeDimension[]>(
+      this.meta.membersForQuery(null, 'dimensions')
+    );
 
-    this.measures = this.meta.membersForQuery(
-      null,
-      'measures'
-    ) as TCubeMeasure[];
+    this.measures = <TCubeMeasure[]>this.meta.membersForQuery(null, 'measures');
     this.segments = this.meta.membersForQuery(null, 'segments');
     this.dimensions = allDimensions.filter(({ type }) => type !== 'time');
     this.timeDimensions = allDimensions.filter(({ type }) => type === 'time');

@@ -3,6 +3,303 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.17](https://github.com/cube-js/cube.js/compare/v0.27.16...v0.27.17) (2021-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.16](https://github.com/cube-js/cube.js/compare/v0.27.15...v0.27.16) (2021-05-19)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.15](https://github.com/cube-js/cube.js/compare/v0.27.14...v0.27.15) (2021-05-18)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.14](https://github.com/cube-js/cube.js/compare/v0.27.13...v0.27.14) (2021-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.13](https://github.com/cube-js/cube.js/compare/v0.27.12...v0.27.13) (2021-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.11](https://github.com/cube-js/cube.js/compare/v0.27.10...v0.27.11) (2021-05-12)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.10](https://github.com/cube-js/cube.js/compare/v0.27.9...v0.27.10) (2021-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.9](https://github.com/cube-js/cube.js/compare/v0.27.8...v0.27.9) (2021-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.7](https://github.com/cube-js/cube.js/compare/v0.27.6...v0.27.7) (2021-05-04)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.5](https://github.com/cube-js/cube.js/compare/v0.27.4...v0.27.5) (2021-05-03)
+
+
+### Features
+
+* Use Cube Store as default EXTERNAL_DB, prefix variables ([30d52c4](https://github.com/cube-js/cube.js/commit/30d52c4f8f1ae1d6619ec4976d9db1eeb1e44140))
+
+
+
+
+
+## [0.27.4](https://github.com/cube-js/cube.js/compare/v0.27.3...v0.27.4) (2021-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.2](https://github.com/cube-js/cube.js/compare/v0.27.1...v0.27.2) (2021-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.27.1](https://github.com/cube-js/cube.js/compare/v0.27.0...v0.27.1) (2021-04-27)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+# [0.27.0](https://github.com/cube-js/cube.js/compare/v0.26.104...v0.27.0) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.104](https://github.com/cube-js/cube.js/compare/v0.26.103...v0.26.104) (2021-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.103](https://github.com/cube-js/cube.js/compare/v0.26.102...v0.26.103) (2021-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.101](https://github.com/cube-js/cube.js/compare/v0.26.100...v0.26.101) (2021-04-20)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.99](https://github.com/cube-js/cube.js/compare/v0.26.98...v0.26.99) (2021-04-16)
+
+
+### Features
+
+* **dreamio-driver:** Improve polling, similar to BigQuery driver ([5a4783a](https://github.com/cube-js/cube.js/commit/5a4783a62b62e54d960fc2498aecb47ad1142b3c))
+* **dreamio-driver:** Up code quality ([9e1aafe](https://github.com/cube-js/cube.js/commit/9e1aafe3b214673f1934fae2e66c8b901e44575d))
+
+
+
+
+
+## [0.26.98](https://github.com/cube-js/cube.js/compare/v0.26.97...v0.26.98) (2021-04-15)
+
+
+### Bug Fixes
+
+* **dreamio-driver:** Allow casting boolean/number/measure ([#2560](https://github.com/cube-js/cube.js/issues/2560)) ([4ff93fe](https://github.com/cube-js/cube.js/commit/4ff93fe44a79926044ec5e2cbe291276ca0e3235))
+* **dreamio-driver:** Remove unexpected console.log ([#2561](https://github.com/cube-js/cube.js/issues/2561)) ([a3beee7](https://github.com/cube-js/cube.js/commit/a3beee76f4797a3a073762a2013362dfd88b136b))
+
+
+
+
+
+## [0.26.95](https://github.com/cube-js/cube.js/compare/v0.26.94...v0.26.95) (2021-04-13)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.90](https://github.com/cube-js/cube.js/compare/v0.26.89...v0.26.90) (2021-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.88](https://github.com/cube-js/cube.js/compare/v0.26.87...v0.26.88) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.87](https://github.com/cube-js/cube.js/compare/v0.26.86...v0.26.87) (2021-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.81](https://github.com/cube-js/cube.js/compare/v0.26.80...v0.26.81) (2021-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.79](https://github.com/cube-js/cube.js/compare/v0.26.78...v0.26.79) (2021-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.77](https://github.com/cube-js/cube.js/compare/v0.26.76...v0.26.77) (2021-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.76](https://github.com/cube-js/cube.js/compare/v0.26.75...v0.26.76) (2021-04-03)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.74](https://github.com/cube-js/cube.js/compare/v0.26.73...v0.26.74) (2021-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.70](https://github.com/cube-js/cube.js/compare/v0.26.69...v0.26.70) (2021-03-26)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dremio-driver:** readOnly external pre-aggregations is not working ([#2443](https://github.com/cube-js/cube.js/issues/2443)) Thanks to [@rongfengliang](https://github.com/rongfengliang) ! ([eee9d95](https://github.com/cube-js/cube.js/commit/eee9d95e56b8ac14c628d539a55cf94308128644))
+
+
+
+
+
+## [0.26.69](https://github.com/cube-js/cube.js/compare/v0.26.68...v0.26.69) (2021-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.67](https://github.com/cube-js/cube.js/compare/v0.26.66...v0.26.67) (2021-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.65](https://github.com/cube-js/cube.js/compare/v0.26.64...v0.26.65) (2021-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/dremio-driver
+
+
+
+
+
+## [0.26.63](https://github.com/cube-js/cube.js/compare/v0.26.62...v0.26.63) (2021-03-22)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dremio-driver:** Fix ILIKE operator ([#2397](https://github.com/cube-js/cube.js/issues/2397)) Thanks [@rongfengliang](https://github.com/rongfengliang)! ([d9e3c8d](https://github.com/cube-js/cube.js/commit/d9e3c8d2fd1e106d7c91a0801f13aa051f42db2e))
+
+
+
+
+
 ## [0.26.56](https://github.com/cube-js/cube.js/compare/v0.26.55...v0.26.56) (2021-03-13)
 
 **Note:** Version bump only for package @cubejs-backend/dremio-driver

@@ -12,14 +12,16 @@ jest.mock('moment-range', () => {
 
 describe('default heuristics', () => {
   it('removes the time dimension when the measure is removed', () => {
-    const newQuery = {
-      timeDimensions: [
-        {
-          dimension: 'Orders.ts',
-          granularity: 'month',
-          dateRange: 'this year',
-        },
-      ],
+    const newState = {
+      query: {
+        timeDimensions: [
+          {
+            dimension: 'Orders.ts',
+            granularity: 'month',
+            dateRange: 'this year',
+          },
+        ],
+      },
     };
     const oldQuery = {
       measures: ['Orders.count'],
@@ -32,7 +34,7 @@ describe('default heuristics', () => {
       ],
     };
     expect(
-      defaultHeuristics(newQuery, oldQuery, {
+      defaultHeuristics(newState, oldQuery, {
         meta: {
           defaultTimeDimensionNameFor() {
             return 'Orders.ts';
@@ -47,6 +49,70 @@ describe('default heuristics', () => {
       },
       sessionGranularity: null,
       shouldApplyHeuristicOrder: true,
+    });
+  });
+
+  it('respects the granularity', () => {
+    const meta = {
+      defaultTimeDimensionNameFor() {
+        return 'Orders.createdAt';
+      },
+    };
+
+    const newState = {
+      query: {
+        measures: ['Orders.count'],
+        timeDimensions: [
+          {
+            dimension: 'Orders.createdAt',
+            granularity: 'month',
+          },
+        ],
+      },
+    };
+
+    const oldQuery = {};
+
+    expect(defaultHeuristics(newState, oldQuery, { meta })).toMatchObject({
+      query: {
+        timeDimensions: [
+          {
+            granularity: 'month',
+          },
+        ],
+      },
+    });
+  });
+
+  it('handles dateRange correctly', () => {
+    const meta = {
+      defaultTimeDimensionNameFor() {
+        return 'Orders.createdAt';
+      },
+    };
+
+    const newState = {
+      query: {
+        measures: ['Orders.count'],
+        timeDimensions: [
+          {
+            dimension: 'Orders.createdAt',
+            granularity: 'month',
+            dateRange: 'This quarter',
+          },
+        ],
+      },
+    };
+
+    expect(defaultHeuristics(newState, {}, { meta })).toMatchObject({
+      query: {
+        timeDimensions: [
+          {
+            granularity: 'month',
+            dateRange: 'This quarter',
+          },
+        ],
+      },
     });
   });
 });

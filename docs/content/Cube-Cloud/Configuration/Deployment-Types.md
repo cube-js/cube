@@ -1,7 +1,7 @@
 ---
 title: Deployment Types
 permalink: /cloud/configuration/deployment-types
-category: Configuring Cube Cloud
+category: Configuration
 menuOrder: 2
 ---
 

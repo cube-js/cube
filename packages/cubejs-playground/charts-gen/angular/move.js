@@ -14,8 +14,6 @@ indexHtml = indexHtml.replace(
   'src="/chart-renderers/angular/'
 );
 
-console.log(indexHtml)
-
 fs.writeFileSync(path.join(dirPath, 'index.html'), indexHtml);
 
 moveRecursively(dirPath, path.resolve('../public/chart-renderers/angular'), [

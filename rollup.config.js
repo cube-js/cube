@@ -1,23 +1,13 @@
 import babel from '@rollup/plugin-babel';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
-import replace from '@rollup/plugin-replace';
 import alias from '@rollup/plugin-alias';
+import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 
 const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) => {
-  baseConfig = {
-    plugins: [
-      replace({
-        'process.env.CUBEJS_API_URL': `"${process.env.CUBEJS_API_URL || 'https://statsbot.co/cubejs-api/v1'}"`,
-      }),
-    ],
-    ...baseConfig,
-  };
-
   const baseUmdConfig = {
     ...(umdConfig || baseConfig),
     plugins: [
-      ...baseConfig.plugins,
       commonjs({
         extensions: ['.js'],
       }),
@@ -87,7 +77,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     {
       ...baseConfig,
       plugins: [
-        ...baseConfig.plugins,
+        peerDepsExternal(),
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
@@ -129,7 +119,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     {
       ...baseConfig,
       plugins: [
-        ...baseConfig.plugins,
+        peerDepsExternal(),
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
@@ -195,6 +185,15 @@ export default bundle(
   .concat(
     bundle('cubejs-client-vue', 'cubejsVue', {
       input: 'packages/cubejs-client-vue/src/index.js',
+      external: ['vue'],
+      globals: {
+        vue: 'Vue',
+      },
+    })
+  )
+  .concat(
+    bundle('cubejs-client-vue3', 'cubejsVue3', {
+      input: 'packages/cubejs-client-vue3/src/index.js',
       external: ['vue'],
       globals: {
         vue: 'Vue',

@@ -73,7 +73,19 @@ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/c
 
 ### Cube.js Server
 
+#### Prerequisites
+
+If you are going to develop any JDBC driver, you need to [install Java with JDK][link-java-guide].
+
+[link-java-guide]:
+https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
+
+#### Development
+
 Cube.js is written in plain JavaScript, but some parts have already been migrated to TypeScript.
+
+> Attention: Cube.js uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
+> but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
 
 1. After cloning Cube.js repository run `$ yarn install` in root directory.
 2. Use `yarn tsc:watch` to start TypeScript compiler in watch mode.

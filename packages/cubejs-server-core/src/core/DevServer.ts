@@ -1,32 +1,41 @@
-/* eslint-disable global-require */
-import type { ChildProcess } from 'child_process';
+/* eslint-disable global-require,no-restricted-syntax */
+import dotenv from '@cubejs-backend/dotenv';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
-import crypto from 'crypto';
 import { getRequestIdFromRequest } from '@cubejs-backend/api-gateway';
-import type { Application as ExpressApplication } from 'express';
+import { LivePreviewWatcher } from '@cubejs-backend/cloud';
+import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
+import type { Application as ExpressApplication } from 'express';
+import type { ChildProcess } from 'child_process';
+
+import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
-import AppContainer from '../dev/AppContainer';
-import DependencyTree from '../dev/DependencyTree';
-import PackageFetcher from '../dev/PackageFetcher';
-import DevPackageFetcher from '../dev/DevPackageFetcher';
+import { ExternalDbTypeFn } from './types';
 
 const repo = {
   owner: 'cube-js',
   name: 'cubejs-playground-templates'
 };
 
-export class DevServer {
-  protected applyTemplatePackagesPromise: Promise<any>|null = null;
+type DevServerOptions = {
+  dockerVersion?: string,
+  externalDbTypeFn: ExternalDbTypeFn
+};
 
-  protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> }|null = null;
+export class DevServer {
+  protected applyTemplatePackagesPromise: Promise<any> | null = null;
+
+  protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> } | null = null;
+
+  protected livePreviewWatcher = new LivePreviewWatcher();
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
+    protected readonly options?: DevServerOptions
   ) {
   }
 
@@ -64,8 +73,18 @@ export class DevServer {
         basePath: options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
+        dockerVersion: this.options?.dockerVersion || null,
+        extDbType: this.options?.externalDbTypeFn({
+          authInfo: null,
+          securityContext: null,
+          requestId: getRequestIdFromRequest(req),
+        }) || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
-        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists()
+        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
+        livePreview: options.livePreview,
+        isDocker: isDocker(),
+        telemetry: options.telemetry,
+        dbType: options.dbType
       });
     }));
 
@@ -262,7 +281,8 @@ export class DevServer {
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
 
-        fetcher.cleanup();
+        // todo: uncomment
+        // fetcher.cleanup();
       };
 
       if (this.applyTemplatePackagesPromise) {
@@ -291,6 +311,30 @@ export class DevServer {
       res.json(await fetcher.manifestJSON());
     }));
 
+    app.get('/playground/live-preview/start/:token', catchErrors(async (req, res) => {
+      this.livePreviewWatcher.setAuth(req.params.token);
+      this.livePreviewWatcher.startWatch();
+
+      res.setHeader('Content-Type', 'text/html');
+      res.write('<html><head><script>window.close();</script></body></html>');
+      res.end();
+    }));
+
+    app.get('/playground/live-preview/stop', catchErrors(async (req, res) => {
+      this.livePreviewWatcher.stopWatch();
+      res.json({ active: false });
+    }));
+
+    app.get('/playground/live-preview/status', catchErrors(async (req, res) => {
+      const statusObj = await this.livePreviewWatcher.getStatus();
+      res.json(statusObj);
+    }));
+
+    app.post('/playground/live-preview/token', catchErrors(async (req, res) => {
+      const token = await this.livePreviewWatcher.createTokenWithPayload(req.body);
+      res.json({ token });
+    }));
+
     app.use(serveStatic(path.join(__dirname, '../../../playground'), {
       lastModified: false,
       etag: false,
@@ -301,53 +345,73 @@ export class DevServer {
       }
     }));
 
-    app.get('/playground/test-connection', catchErrors(async (req, res) => {
-      const orchestratorApi = this.cubejsServer.getOrchestratorApi({
-        dataSource: req.query.dataSource || 'default',
-        securityContext: null,
-        authInfo: null,
-        requestId: getRequestIdFromRequest(req),
-      });
+    app.post('/playground/test-connection', catchErrors(async (req, res) => {
+      const { variables = {} } = req.body || {};
+
+      let driver: BaseDriver|null = null;
 
       try {
-        orchestratorApi.addDataSeenSource('default');
-        await orchestratorApi.testConnection();
+        if (!variables.CUBEJS_DB_TYPE) {
+          throw new Error('CUBEJS_DB_TYPE is required');
+        }
+
+        // Backup env variables for restoring
+        const originalProcessEnv = process.env;
+        process.env = {
+          ...process.env,
+        };
+
+        for (const [envName, value] of Object.entries(variables)) {
+          process.env[envName] = <string>value;
+        }
+
+        driver = CubejsServerCore.createDriver(variables.CUBEJS_DB_TYPE);
+
+        // Restore original process.env
+        process.env = originalProcessEnv;
+
+        await driver.testConnection();
+
         this.cubejsServer.event('test_database_connection_success');
+
+        return res.json('ok');
       } catch (error) {
         this.cubejsServer.event('test_database_connection_error');
+
         return res.status(400).json({
           error: error.toString()
         });
+      } finally {
+        if (driver && (<any>driver).release) {
+          await (<any>driver).release();
+        }
       }
-
-      return res.json('ok');
-    }));
-
-    app.get('/restart', catchErrors(async (_, res) => {
-      process.kill(process.pid, 'SIGUSR1');
-
-      return res.json('Restarting...');
     }));
 
     app.post('/playground/env', catchErrors(async (req, res) => {
       let { variables = {} } = req.body || {};
 
       if (!variables.CUBEJS_API_SECRET) {
-        variables.CUBEJS_API_SECRET = crypto.randomBytes(64).toString('hex');
+        variables.CUBEJS_API_SECRET = options.apiSecret;
       }
+
+      // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
+      variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
-      if (fs.existsSync('./.env')) {
-        fs.removeSync('./.env');
+      const repositoryPath = path.join(process.cwd(), options.schemaPath);
+
+      if (!fs.existsSync(repositoryPath)) {
+        fs.mkdirSync(repositoryPath);
       }
 
-      if (!fs.existsSync('./schema')) {
-        fs.mkdirSync('./schema');
-      }
+      fs.writeFileSync(path.join(process.cwd(), '.env'), variables.join('\n'));
 
-      fs.writeFileSync('.env', variables.join('\n'));
+      dotenv.config({ override: true });
 
-      res.status(200).json('ok');
+      await this.cubejsServer.resetInstanceState();
+
+      res.status(200).json(req.body.variables || {});
     }));
 
     app.post('/playground/token', catchErrors(async (req, res) => {

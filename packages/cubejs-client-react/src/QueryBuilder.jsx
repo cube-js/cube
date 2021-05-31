@@ -1,8 +1,18 @@
 import React from 'react';
-import { prop, uniqBy, equals, pick, clone } from 'ramda';
-import { ResultSet, moveItemInArray, defaultOrder, flattenFilters, getQueryMembers } from '@cubejs-client/core';
+import { prop, uniqBy, equals, pick, clone, indexBy, uniq } from 'ramda';
+import {
+  ResultSet,
+  moveItemInArray,
+  defaultOrder,
+  flattenFilters,
+  getQueryMembers,
+  movePivotItem,
+  defaultHeuristics,
+} from '@cubejs-client/core';
+
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
+import { generateAnsiHTML } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
@@ -46,10 +56,15 @@ export default class QueryBuilder extends React.Component {
     }
 
     if (Array.isArray(query)) {
-      return query.reduce((memo, currentQuery) => memo.concat(QueryBuilder.resolveMember(type, {
-        meta,
-        query: currentQuery
-      })), []);
+      return query.reduce(
+        (memo, currentQuery) => memo.concat(
+          QueryBuilder.resolveMember(type, {
+            meta,
+            query: currentQuery,
+          })
+        ),
+        []
+      );
     }
 
     if (type === 'timeDimensions') {
@@ -78,11 +93,13 @@ export default class QueryBuilder extends React.Component {
       validatedQuery: props.query, // deprecated, validatedQuery should not be set until after dry-run for safety
       missingMembers: [],
       isFetchingMeta: false,
+      dryRunResponse: null,
       ...props.vizState, // deprecated
-      ...props.initialVizState
+      ...props.initialVizState,
     };
 
     this.mutexObj = {};
+    this.reorderTriggered = false;
   }
 
   async componentDidMount() {
@@ -101,7 +118,7 @@ export default class QueryBuilder extends React.Component {
             schemaVersion,
             refresh: async () => {
               await this.fetchMeta();
-            }
+            },
           });
         }
       } catch (error) {
@@ -122,16 +139,19 @@ export default class QueryBuilder extends React.Component {
       metaError = error;
     }
 
-    this.setState({
-      meta,
-      metaError,
-      isFetchingMeta: false
-    }, () => {
-      // Run update query to force viz state update
-      // This will catch any new missing members, and also validate the query against the new meta
-      this.updateQuery({});
-    });
-  }
+    this.setState(
+      {
+        meta,
+        metaError: metaError ? new Error(generateAnsiHTML(metaError.message || metaError.toString())) : null,
+        isFetchingMeta: false,
+      },
+      () => {
+        // Run update query to force viz state update
+        // This will catch any new missing members, and also validate the query against the new meta
+        this.updateQuery({});
+      }
+    );
+  };
 
   cubejsApi() {
     const { cubejsApi } = this.props;
@@ -212,7 +232,8 @@ export default class QueryBuilder extends React.Component {
       pivotConfig,
       validatedQuery,
       missingMembers,
-      isFetchingMeta
+      isFetchingMeta,
+      dryRunResponse,
     } = this.state;
 
     const flatFilters = uniqBy(
@@ -238,9 +259,48 @@ export default class QueryBuilder extends React.Component {
       ...meta.resolveMember(m, 'segments'),
     }));
 
-    const availableMeasures = meta ? meta.membersForQuery(query, 'measures') : [];
-    const availableDimensions = meta ? meta.membersForQuery(query, 'dimensions') : [];
-    const availableSegments = meta ? meta.membersForQuery(query, 'segments') : [];
+    let availableMeasures = [];
+    let availableDimensions = [];
+    let availableSegments = [];
+    let availableFilterMembers = [];
+
+    const availableMembers = meta?.membersGroupedByCube() || {
+      measures: [],
+      dimensions: [],
+      segments: [],
+      timeDimensions: [],
+    };
+
+    if (meta) {
+      availableMeasures = meta.membersForQuery(query, 'measures');
+      availableDimensions = meta.membersForQuery(query, 'dimensions');
+      availableSegments = meta.membersForQuery(query, 'segments');
+
+      const indexedMeasures = indexBy(
+        prop('cubeName'),
+        availableMembers.measures
+      );
+      const indexedDimensions = indexBy(
+        prop('cubeName'),
+        availableMembers.dimensions
+      );
+      const cubeNames = uniq([
+        ...Object.keys(indexedMeasures),
+        ...Object.keys(indexedDimensions),
+      ]).sort();
+
+      availableFilterMembers = cubeNames.map((name) => {
+        const cube = (indexedMeasures[name] || indexedDimensions[name]);
+
+        return {
+          ...cube,
+          members: [
+            ...indexedMeasures[name]?.members,
+            ...indexedDimensions[name]?.members,
+          ].sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1))
+        };
+      });
+    }
 
     let orderMembers = uniqBy(prop('id'), [
       ...(Array.isArray(query.order) ? query.order : Object.entries(query.order || {})).map(([id, order]) => ({
@@ -249,18 +309,26 @@ export default class QueryBuilder extends React.Component {
         title: meta ? meta.resolveMember(id, ['measures', 'dimensions']).title : '',
       })),
       // uniqBy prefers first, so these will only be added if not already in the query
-      ...[...measures, ...dimensions].map(({ name, title }) => ({ id: name, title, order: 'none' })),
+      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: 'none' })),
     ]);
 
     // Preserve order until the members change or manually re-ordered
     // This is needed so that when an order member becomes active, it doesn't jump to the top of the list
     const orderMemberOrderKey = JSON.stringify(orderMembers.map(({ id }) => id).sort());
-    if (this.orderMemberOrderKey && this.orderMemberOrder && orderMemberOrderKey === this.orderMemberOrderKey) {
+
+    if (
+      this.orderMemberOrderKey
+      && this.orderMemberOrder
+      && orderMemberOrderKey === this.orderMemberOrderKey
+      && !this.reorderTriggered
+    ) {
       orderMembers = this.orderMemberOrder.map((id) => orderMembers.find((member) => member.id === id));
     } else {
       this.orderMemberOrderKey = orderMemberOrderKey;
       this.orderMemberOrder = orderMembers.map(({ id }) => id);
     }
+
+    this.reorderTriggered = false;
 
     return {
       meta,
@@ -280,6 +348,8 @@ export default class QueryBuilder extends React.Component {
       availableDimensions,
       availableTimeDimensions: availableDimensions.filter((m) => m.type === 'time'),
       availableSegments,
+      availableMembers,
+      availableFilterMembers,
       updateQuery: (queryUpdate) => this.updateQuery(queryUpdate),
       updateMeasures: updateMethods('measures'),
       updateDimensions: updateMethods('dimensions'),
@@ -308,6 +378,8 @@ export default class QueryBuilder extends React.Component {
             return;
           }
 
+          this.reorderTriggered = true;
+
           this.updateQuery({
             order: moveItemInArray(orderMembers, sourceIndex, destinationIndex).reduce(
               (acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc),
@@ -319,25 +391,8 @@ export default class QueryBuilder extends React.Component {
       pivotConfig,
       updatePivotConfig: {
         moveItem: ({ sourceIndex, destinationIndex, sourceAxis, destinationAxis }) => {
-          const nextPivotConfig = {
-            ...pivotConfig,
-            x: [...pivotConfig.x],
-            y: [...pivotConfig.y],
-          };
-          const id = pivotConfig[sourceAxis][sourceIndex];
-          const lastIndex = nextPivotConfig[destinationAxis].length - 1;
-
-          if (id === 'measures') {
-            destinationIndex = lastIndex + 1;
-          } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
-            destinationIndex = lastIndex - 1;
-          }
-
-          nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
-          nextPivotConfig[destinationAxis].splice(destinationIndex, 0, id);
-
           this.updateVizState({
-            pivotConfig: nextPivotConfig,
+            pivotConfig: movePivotItem(pivotConfig, sourceIndex, destinationIndex, sourceAxis, destinationAxis),
           });
         },
         update: (config) => {
@@ -348,13 +403,14 @@ export default class QueryBuilder extends React.Component {
               ...pivotConfig,
               ...config,
             },
-            ...(limit ? { query: { ...query, limit } } : null)
+            ...(limit ? { query: { ...query, limit } } : null),
           });
         },
       },
       missingMembers,
       refresh: this.fetchMeta,
       isFetchingMeta,
+      dryRunResponse,
       ...queryRendererProps,
     };
   }
@@ -387,7 +443,8 @@ export default class QueryBuilder extends React.Component {
         // Don't run callbacks more than once unless the viz state has changed since last time
         if (!vizStateSent || !equals(vizStateSent, newVizState)) {
           onVizStateChanged(newVizState);
-          vizStateSent = clone(newVizState); // use clone to make sure we don't save object references
+          // use clone to make sure we don't save object references
+          vizStateSent = clone(newVizState);
         }
       }
     };
@@ -412,7 +469,7 @@ export default class QueryBuilder extends React.Component {
     );
 
     finalState.missingMembers = this.getMissingMembers(finalState.query, meta);
-    finalState.chartType = state.chartType || chartType;
+    finalState.chartType = finalState.chartType || state.chartType || chartType;
 
     // deprecated
     runSetters({
@@ -440,6 +497,7 @@ export default class QueryBuilder extends React.Component {
 
         finalState.pivotConfig = ResultSet.getNormalizedPivotConfig(response.pivotQuery, finalState.pivotConfig);
         finalState.validatedQuery = this.validatedQuery(finalState);
+        finalState.dryRunResponse = response;
 
         // deprecated
         if (QueryRenderer.isQueryPresent(stateQuery)) {
@@ -449,9 +507,8 @@ export default class QueryBuilder extends React.Component {
           });
         }
       } catch (error) {
-        console.error(error);
         this.setState({
-          queryError: error
+          queryError: new Error(generateAnsiHTML(error.message || error.toString())),
         });
       }
     }
@@ -470,148 +527,11 @@ export default class QueryBuilder extends React.Component {
 
   defaultHeuristics(newState) {
     const { query, sessionGranularity, meta } = this.state;
-    const defaultGranularity = sessionGranularity || 'day';
 
-    if (Array.isArray(query)) {
-      return newState;
-    }
-
-    if (newState.query) {
-      const oldQuery = query;
-      let newQuery = newState.query;
-
-      if (
-        (oldQuery.timeDimensions || []).length === 1
-        && (newQuery.timeDimensions || []).length === 1
-        && newQuery.timeDimensions[0].granularity
-        && oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
-      ) {
-        newState = {
-          ...newState,
-          sessionGranularity: newQuery.timeDimensions[0].granularity,
-        };
-      }
-
-      if (
-        ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0)
-        || ((oldQuery.measures || []).length === 1
-          && (newQuery.measures || []).length === 1
-          && oldQuery.measures[0] !== newQuery.measures[0])
-      ) {
-        const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
-        newQuery = {
-          ...newQuery,
-          timeDimensions: defaultTimeDimension
-            ? [
-              {
-                dimension: defaultTimeDimension,
-                granularity: defaultGranularity,
-              },
-            ]
-            : [],
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          chartType: defaultTimeDimension ? 'line' : 'number',
-        };
-      }
-
-      if ((oldQuery.dimensions || []).length === 0 && (newQuery.dimensions || []).length > 0) {
-        newQuery = {
-          ...newQuery,
-          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({ ...td, granularity: undefined })),
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          chartType: 'table',
-        };
-      }
-
-      if ((oldQuery.dimensions || []).length > 0 && (newQuery.dimensions || []).length === 0) {
-        newQuery = {
-          ...newQuery,
-          timeDimensions: (newQuery.timeDimensions || []).map((td) => ({
-            ...td,
-            granularity: td.granularity || defaultGranularity,
-          })),
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          chartType: (newQuery.timeDimensions || []).length ? 'line' : 'number',
-        };
-      }
-
-      if (
-        ((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0)
-        && (newQuery.dimensions || []).length === 0
-        && (newQuery.measures || []).length === 0
-      ) {
-        newQuery = {
-          ...newQuery,
-          timeDimensions: [],
-          filters: [],
-        };
-
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: newQuery,
-          sessionGranularity: null,
-        };
-      }
-      return newState;
-    }
-
-    if (newState.chartType) {
-      const newChartType = newState.chartType;
-      if (
-        (newChartType === 'line' || newChartType === 'area')
-        && (query.timeDimensions || []).length === 1
-        && !query.timeDimensions[0].granularity
-      ) {
-        const [td] = query.timeDimensions;
-        return {
-          ...newState,
-          pivotConfig: null,
-          query: {
-            ...query,
-            timeDimensions: [{ ...td, granularity: defaultGranularity }],
-          },
-        };
-      }
-
-      if (
-        (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number')
-        && (query.timeDimensions || []).length === 1
-        && query.timeDimensions[0].granularity
-      ) {
-        const [td] = query.timeDimensions;
-        return {
-          ...newState,
-          pivotConfig: null,
-          shouldApplyHeuristicOrder: true,
-          query: {
-            ...query,
-            timeDimensions: [{ ...td, granularity: undefined }],
-          },
-        };
-      }
-    }
-
-    return newState;
+    return defaultHeuristics(newState, query, {
+      meta,
+      sessionGranularity: sessionGranularity || 'day',
+    });
   }
 
   applyStateChangeHeuristics(newState) {

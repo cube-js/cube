@@ -4,6 +4,34 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
 import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import { generateAuthToken } from './utils';
+
+const preAggregationsResultFactory = () => ([
+  {
+    preAggregationName: 'usages',
+    preAggregation: {
+      type: 'rollup',
+      scheduledRefresh: true,
+    },
+    cube: 'Usage',
+    references: {
+      dimensions: [
+        'Usage.deploymentId',
+        'Usage.tenantId'
+      ],
+      measures: [
+        'Usage.count'
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Usage.createdAt',
+          granularity: 'day'
+        }
+      ],
+      rollups: []
+    }
+  }
+]);
 
 export const compilerApi = jest.fn().mockImplementation(() => ({
   async getSql() {
@@ -39,6 +67,10 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
       },
     ];
   },
+
+  async preAggregations() {
+    return preAggregationsResultFactory();
+  }
 }));
 
 export class DataSourceStorageMock {
@@ -112,6 +144,7 @@ async function requestBothGetAndPost(app, { url, query, body }, assert) {
   }
 }
 
+const API_SECRET = 'secret';
 function createApiGateway(
   adapterApi: any = new AdapterApiMock(),
   dataSourceStorage: any = new DataSourceStorageMock(),
@@ -119,7 +152,7 @@ function createApiGateway(
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway('secret', compilerApi, () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, () => adapterApi, logger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -215,7 +248,7 @@ describe('API Gateway', () => {
       {
         checkAuth: (req: Request, authorization) => {
           if (authorization) {
-            req.authInfo = jwt.verify(authorization, 'secret');
+            req.authInfo = jwt.verify(authorization, API_SECRET);
           }
         },
         queryTransformer
@@ -255,7 +288,7 @@ describe('API Gateway', () => {
       {
         checkAuth: (req: Request, authorization) => {
           if (authorization) {
-            jwt.verify(authorization, 'secret');
+            jwt.verify(authorization, API_SECRET);
             req.authInfo = authorization;
           }
         },
@@ -477,6 +510,87 @@ describe('API Gateway', () => {
           timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }],
         },
         data: [{ 'Foo.bar': 42 }],
+      });
+    });
+  });
+
+  describe('/cubejs-system/v1', () => {
+    const scheduledRefreshContextsFactory = () => ([
+      { securityContext: { foo: 'bar' } },
+      { securityContext: { bar: 'foo' } }
+    ]);
+
+    const scheduledRefreshTimeZonesFactory = () => (['UTC', 'America/Los_Angeles']);
+
+    const appPrepareFactory = () => {
+      const playgroundAuthSecret = 'test12345';
+      const { app } = createApiGateway(
+        new AdapterApiMock(),
+        new DataSourceStorageMock(),
+        {
+          basePath: 'awesomepathtotest',
+          playgroundAuthSecret,
+          scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
+          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
+        }
+      );
+      const token = generateAuthToken({ uid: 5, }, {}, playgroundAuthSecret);
+      const tokenUser = generateAuthToken({ uid: 5, }, {}, API_SECRET);
+
+      return { app, token, tokenUser };
+    };
+    
+    const notAllowedTestFactory = (route: String) => async () => {
+      const { app } = appPrepareFactory();
+      return request(app)
+        .get(`/cubejs-system/v1/${route}`)
+        .set('Content-type', 'application/json')
+        .expect(403);
+    };
+
+    const notAllowedWithUserTokenTestFactory = (route: String) => async () => {
+      const { app, tokenUser } = appPrepareFactory();
+
+      return request(app)
+        .get(`/cubejs-system/v1/${route}`)
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`)
+        .expect(403);
+    };
+
+    const notExistsTestFactory = (route: String) => async () => {
+      const { app } = createApiGateway();
+
+      return request(app)
+        .get(`/cubejs-system/v1/${route}`)
+        .set('Content-type', 'application/json')
+        .expect(404);
+    };
+
+    const successTestFactory = (route: String, result: any) => async () => {
+      const { app, token } = appPrepareFactory();
+      const res = await request(app)
+        .get(`/cubejs-system/v1/${route}`)
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toMatchObject(result);
+    };
+
+    const testConfigs = [
+      { route: 'context', successResult: { basePath: 'awesomepathtotest' } },
+      { route: 'pre-aggregations', successResult: { preAggregations: preAggregationsResultFactory() } },
+      { route: 'pre-aggregations/security-contexts', successResult: { securityContexts: scheduledRefreshContextsFactory().map(obj => obj.securityContext) } },
+      { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } }
+    ];
+
+    testConfigs.forEach(({ route, successResult }) => {
+      describe(`/cubejs-system/v1/${route}`, () => {
+        test('not allowed', notAllowedTestFactory(route));
+        test('not allowed with user token', notAllowedWithUserTokenTestFactory(route));
+        test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(route));
+        test('success', successTestFactory(route, successResult));
       });
     });
   });

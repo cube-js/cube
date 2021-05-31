@@ -22,18 +22,24 @@ declare module '@cubejs-client/core' {
      */
     headers?: Record<string, string>;
     credentials?: 'omit' | 'same-origin' | 'include';
-    method?: 'GET' | 'PUT' | 'POST' | 'PATCH'
+    method?: 'GET' | 'PUT' | 'POST' | 'PATCH';
   };
 
-  export interface ITransport {
-    request(method: string, params: Record<string, unknown>): () => Promise<void>;
+  export interface ITransportResponse<R> {
+    subscribe: <CBResult>(cb: (result: R, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
+    // Optional, supported in WebSocketTransport
+    unsubscribe?: () => Promise<void>;
+  }
+
+  export interface ITransport<R> {
+    request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
   }
 
   /**
    * Default transport implementation.
    * @order 3
    */
-  export class HttpTransport implements ITransport {
+  export class HttpTransport implements ITransport<ResultSet> {
     /**
      * @hidden
      */
@@ -54,8 +60,10 @@ declare module '@cubejs-client/core' {
      * @hidden
      */
     protected credentials: TransportOptions['credentials'];
+
     constructor(options: TransportOptions);
-    request(method: string, params: any): () => Promise<any>;
+
+    public request(method: string, params: any): ITransportResponse<ResultSet>;
   }
 
   export type CubeJSApiOptions = {
@@ -66,7 +74,7 @@ declare module '@cubejs-client/core' {
     /**
      * Transport implementation to use. [HttpTransport](#http-transport) will be used by default.
      */
-    transport?: ITransport;
+    transport?: ITransport<any>;
     headers?: Record<string, string>;
     pollInterval?: number;
     credentials?: 'omit' | 'same-origin' | 'include';
@@ -118,17 +126,35 @@ declare module '@cubejs-client/core' {
 
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
 
+  export type TransformedQuery = {
+    allFiltersWithinSelectedDimensions: boolean;
+    granularityHierarchies: Record<string, string[]>;
+    hasMultipliedMeasures: boolean;
+    hasNoTimeDimensionsWithoutGranularity: boolean;
+    isAdditive: boolean;
+    leafMeasureAdditive: boolean;
+    leafMeasures: string[];
+    measures: string[];
+    sortedDimensions: string[];
+    sortedTimeDimensions: [[string, string]];
+  };
+
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
     query: Query;
     data: T[];
+    external: boolean | null;
+    dbType: string;
+    usedPreAggregations?: Record<string, any>;
+    transformedQuery?: TransformedQuery;
   };
 
   export type LoadResponse<T> = {
     queryType: QueryType;
     results: LoadResponseResult<T>[];
     pivotQuery: PivotQuery;
+    [key: string]: any;
   };
 
   /**
@@ -250,6 +276,10 @@ declare module '@cubejs-client/core' {
     yValuesArray: Array<[string[], number]>;
   };
 
+  export type SerializedResult<T = any> = {
+    loadResponse: LoadResponse<T>;
+  };
+
   /**
    * Provides a convenient interface for data manipulation.
    */
@@ -277,7 +307,7 @@ declare module '@cubejs-client/core' {
     /**
      * Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
      */
-    serialize(): Object;
+    serialize(): SerializedResult;
 
     /**
      * Can be used when you need access to the methods that can't be used with some query types (eg `compareDateRangeQuery` or `blendingQuery`)
@@ -287,7 +317,7 @@ declare module '@cubejs-client/core' {
      * });
      * ```
      */
-    decompose(): Object;
+    decompose(): ResultSet[];
 
     /**
      * @hidden
@@ -661,6 +691,8 @@ declare module '@cubejs-client/core' {
      * @returns An array of columns
      */
     tableColumns(pivotConfig?: PivotConfig): TableColumn[];
+    totalRow(pivotConfig?: PivotConfig): ChartPivotRow;
+    categories(pivotConfig?: PivotConfig): ChartPivotRow[];
 
     tableRow(): ChartPivotRow;
     query(): Query;
@@ -712,12 +744,12 @@ declare module '@cubejs-client/core' {
   type TimeDimensionComparisonFields = {
     compareDateRange: Array<DateRange>;
     dateRange?: never;
-  }
+  };
   export type TimeDimensionComparison = TimeDimensionBase & TimeDimensionComparisonFields;
 
   type TimeDimensionRangedFields = {
     dateRange?: DateRange;
-  }
+  };
   export type TimeDimensionRanged = TimeDimensionBase & TimeDimensionRangedFields;
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
@@ -736,11 +768,6 @@ declare module '@cubejs-client/core' {
     ungrouped?: boolean;
   };
 
-  export type ProgressResponse = {
-    stage: string;
-    timeElapsed: number;
-  };
-
   export class ProgressResult {
     stage(): string;
     timeElapsed(): string;
@@ -756,10 +783,8 @@ declare module '@cubejs-client/core' {
     dataSource: boolean;
     external: boolean;
     sql: SqlQueryTuple;
-  };
-
-  export type SqlApiResponse = {
-    sql: SqlData;
+    preAggregations: any[];
+    rollupMatchResults: any[];
   };
 
   export class SqlQuery {
@@ -772,9 +797,9 @@ declare module '@cubejs-client/core' {
   type TOrderMember = {
     id: string;
     title: string;
-    order: QueryOrder | 'none'
-  }
-  
+    order: QueryOrder | 'none';
+  };
+
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
   type TCubeMember = {
@@ -816,11 +841,43 @@ declare module '@cubejs-client/core' {
     queryOrder: Array<{ [k: string]: QueryOrder }>;
   };
 
+  export type Cube = {
+    name: string;
+    title: string;
+    measures: TCubeMeasure[];
+    dimensions: TCubeDimension[];
+    segments: TCubeSegment[];
+  };
+
+  export type MetaResponse = {
+    cubes: Cube[];
+  };
+
+  type FilterOperator = {
+    name: string;
+    title: string;
+  };
+
   /**
    * Contains information about available cubes and it's members.
    * @order 4
    */
   export class Meta {
+    /**
+     * Raw meta response
+     */
+    meta: MetaResponse;
+
+    /**
+     * An array of all available cubes with their members
+     */
+    cubes: Cube[];
+
+    /**
+     * A map of all cubes where the key is a cube name
+     */
+    cubesMap: Record<string, Pick<Cube, 'dimensions' | 'measures' | 'segments'>>;
+
     /**
      * Get all members of a specific type for a given query.
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -849,7 +906,7 @@ declare module '@cubejs-client/core' {
       memberType: T | T[]
     ): { title: string; error: string } | TCubeMemberByType<T>;
     defaultTimeDimensionNameFor(memberName: string): string;
-    filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): any;
+    filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): FilterOperator[];
   }
 
   /**
@@ -963,12 +1020,30 @@ declare module '@cubejs-client/core' {
    */
   export type TSourceAxis = 'x' | 'y';
 
+  export type ChartType = 'line' | 'bar' | 'table' | 'area' | 'number' | 'pie';
+
   export type TDefaultHeuristicsOptions = {
     meta: Meta;
     sessionGranularity?: TimeDimensionGranularity;
   };
 
-  export function defaultHeuristics(newQuery: Query, oldQuery: Query, options: TDefaultHeuristicsOptions): any;
+  export type TDefaultHeuristicsResponse = {
+    shouldApplyHeuristicOrder: boolean;
+    pivotConfig: PivotConfig | null;
+    query: Query;
+    chartType?: ChartType;
+  };
+
+  export type TDefaultHeuristicsState = {
+    query: Query;
+    chartType?: ChartType;
+  };
+
+  export function defaultHeuristics(
+    newState: TDefaultHeuristicsState,
+    oldQuery: Query,
+    options: TDefaultHeuristicsOptions
+  ): TDefaultHeuristicsResponse;
   /**
    * @hidden
    */
@@ -998,9 +1073,30 @@ declare module '@cubejs-client/core' {
    * @hidden
    */
   export function flattenFilters(filters: Filter[]): TFlatFilter[];
-  
+
+  type TGranularityMap = {
+    name: TimeDimensionGranularity | undefined;
+    title: string;
+  };
+
+  /**
+   * @hidden
+   */
+  export function getOrderMembersFromOrder(
+    orderMembers: any,
+    order: TQueryOrderObject | TQueryOrderArray
+  ): TOrderMember[];
+
+  export const GRANULARITIES: TGranularityMap[];
   /**
    * @hidden
    */
   export function getQueryMembers(query: Query): string[];
+
+  export function areQueriesEqual(query1: Query | null, query2: Query | null): boolean;
+
+  export type ProgressResponse = {
+    stage: string;
+    timeElapsed: number;
+  };
 }
