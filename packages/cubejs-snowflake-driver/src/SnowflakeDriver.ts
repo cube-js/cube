@@ -73,6 +73,8 @@ const hydrators: HydrationConfiguration[] = [
 ];
 
 const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
+  // It's a limitation for now, because anyway we dont work with JSON objects in Cube Store.
+  object: 'HLL_SNOWFLAKE',
   number: 'decimal',
   timestamp_ntz: 'timestamp'
 };
@@ -242,7 +244,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       // the upper size limit (in bytes) of each file to be generated in parallel per thread
       MAX_FILE_SIZE: (options.maxFileSize * 1024 * 1024).toFixed(),
       CREDENTIALS: `(AWS_KEY_ID = '${keyId}' AWS_SECRET_KEY = '${secretKey}')`,
-      FILE_FORMAT: '(TYPE = CSV, COMPRESSION = GZIP)',
+      FILE_FORMAT: `(TYPE = CSV, COMPRESSION = GZIP, FIELD_OPTIONALLY_ENCLOSED_BY = '"')`,
     };
     const optionsPart = Object.entries(optionsToExport)
       .map(([key, value]) => `${key} = ${value}`)
@@ -303,7 +305,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const stmt = await new Promise<Statement>((resolve, reject) => connection.execute({
       sqlText: query,
       binds: <string[]|undefined>values,
-      fetchAsString: ['Number'],
+      fetchAsString: [
+        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube.js
+        'Number',
+        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
+        'JSON'
+      ],
       streamResult: true,
       complete: (err, statement) => {
         if (err) {

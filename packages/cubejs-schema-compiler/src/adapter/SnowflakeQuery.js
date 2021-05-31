@@ -36,4 +36,16 @@ export class SnowflakeQuery extends BaseQuery {
   nowTimestampSql() {
     return 'CURRENT_TIMESTAMP';
   }
+
+  hllInit(sql) {
+    return `HLL_EXPORT(HLL_ACCUMULATE(${sql}))`;
+  }
+
+  hllMerge(sql) {
+    return `HLL_ESTIMATE(HLL_COMBINE(HLL_IMPORT(${sql})))`;
+  }
+
+  countDistinctApprox(sql) {
+    return `APPROX_COUNT_DISTINCT(${sql})`;
+  }
 }
