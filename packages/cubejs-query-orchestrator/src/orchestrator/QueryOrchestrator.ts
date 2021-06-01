@@ -188,13 +188,18 @@ export class QueryOrchestrator {
           requestId
         ))
     );
-    const partitionsByTableName = preAggregations.map(p => p.partitions).flat().reduce((obj, partition) => {
-      obj[partition.sql.tableName] = partition;
-      return obj;
-    }, {});
+
+    const flatFromReduceFn = (arr, p) => ([...arr, ...p]);
+    const partitionsByTableName = preAggregations
+      .map(p => p.partitions)
+      .reduce(flatFromReduceFn, [])
+      .reduce((obj, partition) => {
+        obj[partition.sql.tableName] = partition;
+        return obj;
+      }, {});
 
     return versionEntries
-      .flat()
+      .reduce(flatFromReduceFn, [])
       .filter((versionEntry) => {
         const partition = partitionsByTableName[versionEntry.table_name];
         return partition && versionEntry.structure_version === PreAggregations.structureVersion(partition.sql);
