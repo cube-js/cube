@@ -239,7 +239,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const optionsToExport = {
       HEADER: 'true',
       INCLUDE_QUERY_ID: 'true',
-      MAX_FILE_SIZE: options.maxFileSize,
+      // the upper size limit (in bytes) of each file to be generated in parallel per thread
+      MAX_FILE_SIZE: (options.maxFileSize * 1024 * 1024).toFixed(),
       CREDENTIALS: `(AWS_KEY_ID = '${keyId}' AWS_SECRET_KEY = '${secretKey}')`,
       FILE_FORMAT: '(TYPE = CSV, COMPRESSION = GZIP)',
     };
