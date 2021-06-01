@@ -17,6 +17,9 @@ export interface ScheduledRefreshOptions {
 }
 
 type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concurrency' | 'workerIndices'> & {
+  contextSymbols: {
+    securityContext: object,
+  };
   timezones: string[],
   refreshRange?: [string, string]
 };
@@ -95,7 +98,7 @@ export class RefreshScheduler {
       };
       const partitionQuery = compilerApi.createQueryByDataSource(compilers, baseQuery);
       const { partitionDimension } = partitionQuery.preAggregations.partitionDimension(preAggregation);
-      
+
       return partitionDimension.timeSeries().map(range => ({
         ...baseQuery,
         timeDimensions: [{
@@ -133,18 +136,21 @@ export class RefreshScheduler {
   }
 
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
+    const context: RequestContext = {
+      authInfo: null,
+      securityContext: {},
+      ...ctx,
+      requestId: `scheduler-${ctx && ctx.requestId || uuid()}`,
+    };
+
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],
       ...options,
       concurrency: options.concurrency || 1,
       workerIndices: options.workerIndices || R.range(0, options.concurrency || 1),
-    };
-
-    const context: RequestContext = {
-      authInfo: null,
-      securityContext: null,
-      ...ctx,
-      requestId: `scheduler-${ctx && ctx.requestId || uuid()}`,
+      contextSymbols: {
+        securityContext: context.securityContext,
+      },
     };
 
     this.serverCore.logger('Refresh Scheduler Run', {
@@ -251,7 +257,10 @@ export class RefreshScheduler {
           concurrency: undefined,
           workerIndices: undefined,
           timezone,
-          refreshRange
+          refreshRange,
+          contextSymbols: {
+            securityContext: context.securityContext || {},
+          },
         }
       );
 
@@ -267,7 +276,7 @@ export class RefreshScheduler {
             ))
         )
       );
-      
+
       return {
         timezone,
         preAggregation,

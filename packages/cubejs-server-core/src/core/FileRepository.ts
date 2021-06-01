@@ -8,6 +8,7 @@ export interface FileContent {
 }
 
 export interface SchemaFileRepository {
+  localPath: () => string;
   dataSchemaFiles: (includeDependencies?: boolean) => Promise<FileContent[]>;
 }
 
