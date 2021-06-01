@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mssql-driver:** Add column type mappings for MSSQL external pre-aggregations ([#2846](https://github.com/cube-js/cube.js/issues/2846)) ([7c1ef6d](https://github.com/cube-js/cube.js/commit/7c1ef6d69e9cc0ff8f19c6dd2b8a6f2328ec6456))
+* **cubestore:** allow decimal and float type in index keys ([32d2f69](https://github.com/cube-js/cube.js/commit/32d2f691d7fba73bd36a8cfd75ed1ecebb046ef3))
+* **cubestore:** Uncompress files with .gz ([5f8062a](https://github.com/cube-js/cube.js/commit/5f8062a272ed3d01d61c0de7847bd31363079d92))
+* **mysql/aurora-mysql:** Unexpected index creation in loop ([#2828](https://github.com/cube-js/cube.js/issues/2828)) ([456aae7](https://github.com/cube-js/cube.js/commit/456aae7f1a21b18250511f2f8b5783e6e66dfb53))
+
+
+### Features
+
+* Introduce Redshift driver (based on postgres-driver) ([f999699](https://github.com/cube-js/cube.js/commit/f99969905ee4df1a797afd389177a72dd5a097c8))
+* **cubestore:** Support import of Snowflake HLL ([61324e0](https://github.com/cube-js/cube.js/commit/61324e0784314bb7c6db67a45d5da35bdc5fee26))
+* **redshift-driver:** Support UNLOAD (direct export to S3) ([d741027](https://github.com/cube-js/cube.js/commit/d7410278d3a27e692c41b222ab0eb66f7992fe21))
+* Pre-aggregations Meta API, part 2 ([#2804](https://github.com/cube-js/cube.js/issues/2804)) ([84b6e70](https://github.com/cube-js/cube.js/commit/84b6e70ed81e80cff0ba8d0dd9ad507132bb1b24))
+* time filter operators ([#2851](https://github.com/cube-js/cube.js/issues/2851)) ([5054249](https://github.com/cube-js/cube.js/commit/505424964d34ae16205485e5347409bb4c5a661d))
+
+
+
+
+
 ## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
 
 

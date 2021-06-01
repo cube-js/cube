@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Bug Fixes
+
+* **mysql/aurora-mysql:** Unexpected index creation in loop ([#2828](https://github.com/cube-js/cube.js/issues/2828)) ([456aae7](https://github.com/cube-js/cube.js/commit/456aae7f1a21b18250511f2f8b5783e6e66dfb53))
+
+
+
+
+
 ## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
 
 **Note:** Version bump only for package @cubejs-backend/mysql-aurora-serverless-driver

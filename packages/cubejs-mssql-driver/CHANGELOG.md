@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mssql-driver:** Add column type mappings for MSSQL external pre-aggregations ([#2846](https://github.com/cube-js/cube.js/issues/2846)) ([7c1ef6d](https://github.com/cube-js/cube.js/commit/7c1ef6d69e9cc0ff8f19c6dd2b8a6f2328ec6456))
+
+
+
+
+
 ## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver

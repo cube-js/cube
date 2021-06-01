@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Features
+
+* time filter operators ([#2851](https://github.com/cube-js/cube.js/issues/2851)) ([5054249](https://github.com/cube-js/cube.js/commit/505424964d34ae16205485e5347409bb4c5a661d))
+
+
+
+
+
 ## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
 
 

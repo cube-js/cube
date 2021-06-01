@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "0.27.22",
+  "version": "0.27.25",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",

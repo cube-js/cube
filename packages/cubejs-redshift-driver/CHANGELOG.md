@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Features
+
+* Introduce Redshift driver (based on postgres-driver) ([f999699](https://github.com/cube-js/cube.js/commit/f99969905ee4df1a797afd389177a72dd5a097c8))
+* **redshift-driver:** Support UNLOAD (direct export to S3) ([d741027](https://github.com/cube-js/cube.js/commit/d7410278d3a27e692c41b222ab0eb66f7992fe21))
+
+
+
+
+
 ## [0.27.19](https://github.com/cube-js/cube.js/compare/v0.27.18...v0.27.19) (2021-05-24)
 
 
