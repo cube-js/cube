@@ -345,13 +345,13 @@ export class ApiGateway {
       app.get('/cubejs-system/v1/pre-aggregations/security-contexts', systemMiddlewares, (async (req, res) => {
         const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
         this.resToResultFn(res)({
-          securityContexts: contexts.map(context => context.securityContext)
+          securityContexts: contexts.filter(c => c).map(context => context.securityContext)
         });
       }));
 
       app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, (async (req, res) => {
         this.resToResultFn(res)({
-          timezones: this.scheduledRefreshTimeZones
+          timezones: this.scheduledRefreshTimeZones || []
         });
       }));
 
