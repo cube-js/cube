@@ -156,3 +156,37 @@ pub trait TableStore {
     //     row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
     // ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError>;
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::table::{TableValue, TimestampValue};
+    use crate::util::decimal::Decimal;
+    use serde::{Deserialize, Serialize};
+
+    #[test]
+    fn serialization() {
+        for v in &[
+            TableValue::Null,
+            TableValue::String("foo".into()),
+            TableValue::Int(123),
+            TableValue::Decimal(Decimal::new(123)),
+            TableValue::Float(12_f64.into()),
+            TableValue::Bytes(vec![1, 2, 3]),
+            TableValue::Timestamp(TimestampValue::new(123)),
+            TableValue::Boolean(false),
+        ] {
+            let b = bincode::serialize(v).expect(&format!("could not serialize {:?}", v));
+            let v2: TableValue =
+                bincode::deserialize(&b).expect(&format!("could not deserialize {:?}", v));
+            assert_eq!(v, &v2);
+
+            let mut s = flexbuffers::FlexbufferSerializer::new();
+            v.serialize(&mut s)
+                .expect(&format!("could not serialize {:?}", v));
+            let b = s.take_buffer();
+            let v2 = TableValue::deserialize(flexbuffers::Reader::get_root(&b).unwrap())
+                .expect(&format!("could not deserialize {:?}", v));
+            assert_eq!(v, &v2);
+        }
+    }
+}

@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 /// This it not a general-purpose decimal implementation. We use it inside [TableValue] to cement
 /// data format of decimals in CubeStore.
@@ -30,5 +30,30 @@ impl Decimal {
         let integral = v / n;
         let fractional = (v % n).abs();
         format!("{}.{}", integral, fractional)
+    }
+}
+
+impl Serialize for Decimal {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        // Flexbuffers do not support i128.
+        let v = self.raw_value as u128;
+        ((v >> 64) as u64, v as u64).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Decimal {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        type SerTuple = (u64, u64);
+        let (high, low) = SerTuple::deserialize(deserializer)?;
+        let v: u128 = (high as u128) << 64 | low as u128;
+        Ok(Decimal {
+            raw_value: v as i128,
+        })
     }
 }
