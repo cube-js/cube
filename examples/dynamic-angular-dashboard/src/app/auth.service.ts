@@ -1,31 +1,33 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, from, pipe } from 'rxjs';
+import { BehaviorSubject, from } from 'rxjs';
+import { CubejsConfig } from '@cubejs-client/ngx';
 
-const wait = (delay = 200) =>
-  new Promise((resolve) => setTimeout(resolve, delay));
+import { cubejsConfig } from './app.module';
 
 @Injectable()
 export class AuthService {
-  public token$ = new BehaviorSubject<string | null>(null);
-  public token = null;
+  public config$ = new BehaviorSubject<CubejsConfig | null>(null);
 
-  constructor() {}
-
-  get isAuthorized() {
-    return Boolean(this.token);
+  constructor() {
+    this.login().then(() => console.log('config ready'));
   }
 
-  login(userName: string, password: string) {
-    const authPromise = new Promise((resolve) =>
+  // Used as an example to show async CubejsClient initialization
+  public login(): any {
+    return new Promise<void>((resolve) =>
       setTimeout(() => {
-        this.token$.next(`${userName}:${Math.random().toString()}`);
-        resolve(`${userName}:${Math.random().toString()}`);
-      }, 1000)
+        this.config$.next({
+          token: cubejsConfig.token,
+          options: {
+            apiUrl: cubejsConfig.options.apiUrl,
+          },
+        });
+        resolve();
+      }, 0)
     );
-    return from(authPromise);
   }
 
-  logout() {
-    this.token$.next(null);
+  public logout(): void {
+    this.config$.next(null);
   }
 }

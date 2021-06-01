@@ -1,5 +1,5 @@
-import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { APP_INITIALIZER, FactoryProvider, InjectionToken, NgModule, Provider } from '@angular/core';
+import { HttpClientModule } from '@angular/common/http';
+import { NgModule } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatGridListModule } from '@angular/material/grid-list';
@@ -18,7 +18,11 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { CubejsClientModule, QueryBuilderService } from '@cubejs-client/ngx';
+import {
+  CubejsClient,
+  CubejsConfig,
+  QueryBuilderService,
+} from '@cubejs-client/ngx';
 import { ChartsModule } from 'ng2-charts';
 import { HttpLink } from 'apollo-angular/http';
 import { APOLLO_OPTIONS } from 'apollo-angular';
@@ -32,84 +36,27 @@ import { OrderComponent } from './explore/order/order.component';
 import { PivotComponent } from './explore/pivot/pivot.component';
 import { SettingsDialogComponent } from './settings-dialog/settings-dialog.component';
 import {
-  FilterGroupComponent,
   FilterComponent,
+  FilterGroupComponent,
 } from './explore/filter-group/filter-group.component';
 import { AppRoutingModule } from './app-routing.module';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { AddToDashboardDialogComponent } from './explore/add-to-dashboard-dialog/add-to-dashboard-dialog.component';
 import { QueryRendererComponent } from './explore/query-renderer/query-renderer.component';
 import apolloClient from '../graphql/client';
-
 import { AuthService } from './auth.service';
-import { CubejsService } from './cubejs.service';
-import { TestingComponent } from './testing/testing.component';
 
-// const cubejsOptions = of({
-//   token: 'environment.CUBEJS_API_TOKEN',
-//   options: {
-//     apiUrl: 'http://localhost:4000/cubejs-api/v1',
-//   },
-// }).pipe(delay(4000));
-
-export function cubejsClientFactory(http: HttpClient) {
-  return () =>
-    new Promise((resolve) => {
-      setTimeout(() => resolve({ token: '100500' }), 2000);
-    });
-}
-
-export type CubejsConfig = {
-  token: string;
-  options?: Object;
-};
-
-export const cubejsOptions: CubejsConfig = {
-  token: 'environment.CUBEJS_API_TOKEN111',
+export const cubejsConfig: CubejsConfig = {
+  token:
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MDY1OTA0NjEsImV4cCI6MTkyMjE2NjQ2MX0.DdY7GaiHsQWyTH_xkslHb17Cbc3yLFfMFwoEpx89JiA',
   options: {
-    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    apiUrl:
+      'https://aquamarine-galliform.aws-us-east-2.cubecloudapp.dev/cubejs-api/v1',
   },
 };
 
-export const CUBEJS_CONFIG = new InjectionToken<CubejsConfig>('config');
-export const CUBEJS_SERVICE = new InjectionToken<CubejsService>(
-  'cubejs.service'
-);
-
-const cubejsConfigFactory = (authService: AuthService) => {
-  console.log(
-    'function cubejsConfigFactory(authService: AuthService) {',
-    authService.token
-  );
-  return new CubejsService(
-    authService.token$
-    // {
-    //   apiUrl: 'http://localhost:4000/cubejs-api/v1',
-    // },
-    // authService.token$
-  );
-  // return authService.isAuthorized
-  //   ? new CubejsService(
-  //       {
-  //         apiUrl: 'http://localhost:4000/cubejs-api/v1',
-  //       },
-  //       authService.token
-  //     )
-  //   : null;
-  // return authService.isAuthorized
-  //   ? {
-  //       token: authService.token,
-  //       options: {
-  //         apiUrl: 'http://localhost:4000/cubejs-api/v1',
-  //       },
-  //     }
-  //   : null;
-};
-
-export const cubejsServiceProvider: FactoryProvider = {
-  provide: CubejsService,
-  useFactory: cubejsConfigFactory,
-  deps: [AuthService],
+const cubejsClientFactory = (authService: AuthService) => {
+  return new CubejsClient(authService.config$);
 };
 
 @NgModule({
@@ -126,13 +73,11 @@ export const cubejsServiceProvider: FactoryProvider = {
     AddToDashboardDialogComponent,
     FilterGroupComponent,
     FilterComponent,
-    TestingComponent,
   ],
   entryComponents: [SettingsDialogComponent, AddToDashboardDialogComponent],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
-    CubejsClientModule.forRoot(cubejsOptions),
     MatButtonModule,
     MatSelectModule,
     MatGridListModule,
@@ -163,16 +108,10 @@ export const cubejsServiceProvider: FactoryProvider = {
       deps: [HttpLink],
     },
     {
-      provide: CUBEJS_SERVICE,
-      useFactory: cubejsConfigFactory,
+      provide: CubejsClient,
+      useFactory: cubejsClientFactory,
       deps: [AuthService],
     },
-    // {
-    //   provide: APP_INITIALIZER,
-    //   useFactory: cubejsClientFactory,
-    //   deps: [HttpClient],
-    //   multi: true,
-    // },
   ],
   bootstrap: [AppComponent],
 })

@@ -834,7 +834,17 @@ declare module '@cubejs-client/core' {
     ? TCubeSegment
     : never;
 
+  /**
+   * @deprecated use DryRunResponse
+   */
   type TDryRunResponse = {
+    queryType: QueryType;
+    normalizedQueries: Query[];
+    pivotQuery: PivotQuery;
+    queryOrder: Array<{ [k: string]: QueryOrder }>;
+  };
+
+  export type DryRunResponse = {
     queryType: QueryType;
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
@@ -981,11 +991,11 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 
-    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<TDryRunResponse>;
+    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<TDryRunResponse>): void;
+    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
   }
 
   /**
