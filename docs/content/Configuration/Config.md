@@ -580,7 +580,8 @@ module.exports = {
 
 ### cacheAndQueueDriver
 
-The cache and queue driver to use for the Cube.js deployment. Defaults to `redis`.
+The cache and queue driver to use for the Cube.js deployment. Defaults to
+`memory` in development, `redis` in production.
 
 ### orchestratorOptions
 
