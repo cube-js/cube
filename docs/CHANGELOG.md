@@ -3,6 +3,81 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.26.53](https://github.com/cube-js/cube.js/compare/v0.26.52...v0.26.53) (2021-03-11)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
+## [0.26.49](https://github.com/cube-js/cube.js/compare/v0.26.48...v0.26.49) (2021-03-05)
+
+
+### Features
+
+* **elasticsearch-driver:** Support for elastic.co & improve docs ([#2240](https://github.com/cube-js/cube.js/issues/2240)) ([d8557f6](https://github.com/cube-js/cube.js/commit/d8557f6487ea98c19c055cc94b94b284dd273835))
+
+
+
+
+
+## [0.26.46](https://github.com/cube-js/cube.js/compare/v0.26.45...v0.26.46) (2021-03-04)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
+## [0.26.45](https://github.com/cube-js/cube.js/compare/v0.26.44...v0.26.45) (2021-03-04)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
+## [0.26.44](https://github.com/cube-js/cube.js/compare/v0.26.43...v0.26.44) (2021-03-02)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
+## [0.26.40](https://github.com/cube-js/cube.js/compare/v0.26.39...v0.26.40) (2021-03-01)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
+## [0.26.38](https://github.com/cube-js/cube.js/compare/v0.26.37...v0.26.38) (2021-02-26)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
+## [0.26.36](https://github.com/cube-js/cube.js/compare/v0.26.35...v0.26.36) (2021-02-25)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
+## [0.26.34](https://github.com/cube-js/cube.js/compare/v0.26.33...v0.26.34) (2021-02-25)
+
+**Note:** Version bump only for package @cubejs-docs/site
+
+
+
+
+
 ## [0.26.31](https://github.com/cube-js/cube.js/compare/v0.26.30...v0.26.31) (2021-02-23)
 
 **Note:** Version bump only for package @cubejs-docs/site

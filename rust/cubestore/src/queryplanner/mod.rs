@@ -1,12 +1,19 @@
 pub mod hll;
+mod optimizations;
 mod partition_filter;
+mod planning;
+pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
+mod topk;
+pub use topk::MIN_TOPK_STREAM_ROWS;
 pub mod udfs;
 
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStore, MetaStoreTable};
+use crate::queryplanner::planning::choose_index_ext;
 use crate::queryplanner::query_executor::batch_to_dataframe;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -19,6 +26,7 @@ use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
 use arrow::{datatypes::DataType, record_batch::RecordBatch};
 use async_trait::async_trait;
 use core::fmt;
+use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
@@ -49,6 +57,7 @@ crate::di_service!(MockQueryPlanner, [QueryPlanner]);
 
 pub struct QueryPlannerImpl {
     meta_store: Arc<dyn MetaStore>,
+    config: Arc<dyn ConfigObj>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -72,11 +81,16 @@ impl QueryPlanner for QueryPlannerImpl {
         let mut logical_plan = query_planner.statement_to_plan(&statement)?;
 
         logical_plan = ctx.optimize(&logical_plan)?;
-
         trace!("Logical Plan: {:#?}", &logical_plan);
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
-            QueryPlan::Select(SerializedPlan::try_new(logical_plan, self.meta_store.clone()).await?)
+            let (logical_plan, index_snapshots) = choose_index_ext(
+                &logical_plan,
+                &self.meta_store.as_ref(),
+                self.config.enable_topk(),
+            )
+            .await?;
+            QueryPlan::Select(SerializedPlan::try_new(logical_plan, index_snapshots).await?)
         } else {
             QueryPlan::Meta(logical_plan)
         };
@@ -99,14 +113,18 @@ impl QueryPlanner for QueryPlannerImpl {
             "Meta query data processing time: {:?}",
             execution_time.elapsed()?
         );
-        let data_frame = batch_to_dataframe(&results)?;
+        let data_frame =
+            tokio::task::spawn_blocking(move || batch_to_dataframe(&results)).await??;
         Ok(data_frame)
     }
 }
 
 impl QueryPlannerImpl {
-    pub fn new(meta_store: Arc<dyn MetaStore>) -> Arc<QueryPlannerImpl> {
-        Arc::new(QueryPlannerImpl { meta_store })
+    pub fn new(
+        meta_store: Arc<dyn MetaStore>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Arc<QueryPlannerImpl> {
+        Arc::new(QueryPlannerImpl { meta_store, config })
     }
 }
 
@@ -131,11 +149,17 @@ impl MetaStoreSchemaProvider {
 }
 
 impl ContextProvider for MetaStoreSchemaProvider {
-    fn get_table_provider(&self, name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
+    fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
+        let name = match name {
+            TableReference::Partial { schema, table } => format!("{}.{}", schema, table),
+            TableReference::Bare { .. } | TableReference::Full { .. } => return None,
+        };
+        let name = name.as_str();
+
         let res = self
             .tables
             .get(name)
-            .map(|table| -> Arc<dyn TableProvider + Send + Sync> {
+            .map(|table| -> Arc<dyn TableProvider> {
                 let schema = Arc::new(Schema::new(
                     table
                         .table
@@ -264,6 +288,7 @@ impl TableProvider for InfoSchemaTableProvider {
         _projection: &Option<Vec<usize>>,
         _batch_size: usize,
         _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let exec = InfoSchemaTableExec {
             meta_store: self.meta_store.clone(),
@@ -349,6 +374,7 @@ impl TableProvider for CubeTableLogical {
         _projection: &Option<Vec<usize>>,
         _batch_size: usize,
         _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         panic!("scan has been called on CubeTableLogical: serialized plan wasn't preprocessed for select");
     }

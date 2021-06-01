@@ -1,9 +1,11 @@
 import path from 'path';
 import fs from 'fs';
+import vm from 'vm';
 import color from '@oclif/color';
 import dotenv from '@cubejs-backend/dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import {
+  displayCLIWarning,
   getEnv,
   isDockerImage,
   packageExists,
@@ -166,13 +168,15 @@ export class ServerContainer {
       return;
     }
 
+    const deepsToIgnore = [
+      '@cubejs-backend/databricks-jdbc-driver',
+    ];
+
     if (manifest.dependencies) {
       // eslint-disable-next-line no-restricted-syntax
       for (const [pkgName] of Object.entries(manifest.dependencies)) {
-        if (isDevPackage(pkgName)) {
-          throw new Error(
-            `"${pkgName}" package must be installed in devDependencies`
-          );
+        if (isDevPackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
+          displayCLIWarning(`"${pkgName}" package must be installed in devDependencies`);
         }
       }
     }
@@ -237,9 +241,9 @@ export class ServerContainer {
     return server;
   }
 
-  public async lookupConfiguration(): Promise<CreateOptions> {
+  public async lookupConfiguration(override: boolean = false): Promise<CreateOptions> {
     dotenv.config({
-      override: true,
+      override,
       multiline: 'line-breaks'
     });
 
@@ -249,21 +253,54 @@ export class ServerContainer {
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
-      this.getTypeScriptCompiler().compileConfiguration();
+      return this.loadConfigurationFromMemory(
+        this.getTypeScriptCompiler().compileConfiguration()
+      );
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.js'))) {
-      return this.loadConfiguration();
+      return this.loadConfigurationFromFile();
     }
 
-    console.log(
-      `${color.yellow('warning')} There is no cube.js file. Continue with environment variables`
+    displayCLIWarning(
+      'There is no cube.js file. Continue with environment variables'
     );
 
     return {};
   }
 
-  protected async loadConfiguration(): Promise<CreateOptions> {
+  protected async loadConfigurationFromMemory(content: string): Promise<CreateOptions> {
+    if (this.configuration.debug) {
+      console.log('Loaded configuration from memory', content);
+    }
+
+    const exports: Record<string, any> = {};
+
+    const script = new vm.Script(content, {
+      displayErrors: true,
+    });
+    script.runInNewContext(
+      {
+        require,
+        console,
+        // Workaround for ES5 exports
+        exports
+      },
+      {
+        filename: 'cube.js',
+      }
+    );
+
+    if (exports.default) {
+      return exports.default;
+    }
+
+    throw new Error(
+      'Configure file must export configuration as default.'
+    );
+  }
+
+  protected async loadConfigurationFromFile(): Promise<CreateOptions> {
     const file = await import(
       path.join(process.cwd(), 'cube.js')
     );
@@ -285,8 +322,8 @@ export class ServerContainer {
    * @param embedded Cube.js will start without https/ws/graceful shutdown + without timers
    */
   public async start(embedded: boolean = false) {
-    const makeInstance = async () => {
-      const userConfig = await this.lookupConfiguration();
+    const makeInstance = async (override: boolean) => {
+      const userConfig = await this.lookupConfiguration(override);
 
       const configuration = {
         // By default graceful shutdown is disabled, but this value is needed for reboot
@@ -303,21 +340,54 @@ export class ServerContainer {
       };
     };
 
-    let instance = await makeInstance();
+    let instance = await makeInstance(false);
 
     if (!embedded) {
-      if (instance.gracefulEnabled) {
-        // eslint-disable-next-line no-restricted-syntax
-        for (const bindSignal of ['SIGTERM', 'SIGINT']) {
-          // eslint-disable-next-line no-loop-func
-          process.on(bindSignal, async (signal) => {
+      let shutdownHandler: Promise<0|1>|null = null;
+      let killSignalCount = 0;
+
+      const signalToShutdown = [
+        // Signal Terminate - graceful shutdown in Unix systems
+        'SIGTERM',
+        // Ctrl+C
+        'SIGINT'
+      ];
+
+      // eslint-disable-next-line no-restricted-syntax
+      for (const bindSignal of signalToShutdown) {
+        // eslint-disable-next-line no-loop-func
+        process.on(bindSignal, async (signal) => {
+          killSignalCount++;
+
+          if (killSignalCount === 3) {
+            console.log('Received killing signal 3 times, exiting immediately');
+
+            // 130 is the default exit code when killed by a signal.
+            process.exit(130);
+          }
+
+          if (instance.gracefulEnabled) {
+            if (shutdownHandler) {
+              return;
+            }
+
             console.log(`Received ${signal} signal, shutting down in ${instance.configuration.gracefulShutdown}s`);
 
-            process.exit(
-              await instance.server.shutdown(signal, true)
-            );
-          });
-        }
+            try {
+              shutdownHandler = instance.server.shutdown(signal, true);
+
+              process.exit(
+                await shutdownHandler,
+              );
+            } catch (e) {
+              console.log(e);
+
+              process.exit(1);
+            }
+          } else {
+            process.exit(0);
+          }
+        });
       }
 
       let restartHandler: Promise<0|1>|null = null;
@@ -339,7 +409,7 @@ export class ServerContainer {
           restartHandler = null;
         }
 
-        instance = await makeInstance();
+        instance = await makeInstance(true);
       });
     }
   }

@@ -117,9 +117,10 @@ export class BaseFilter extends BaseDimension {
 
   firstParameter() {
     const params = this.filterParams();
-    if (!params[0]) {
+    if (!params.length) {
       throw new Error('Expected one parameter but nothing found');
     }
+
     return this.allocateCastParam(params[0]);
   }
 

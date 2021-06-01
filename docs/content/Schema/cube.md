@@ -319,10 +319,13 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 ### dataSource
 
 Each cube in schema can have it's own `dataSource` name to support scenarios where data should be fetched from multiple databases.
-Value of `dataSource` parameter will be passed to [dbType](@cubejs-backend-server-core#options-reference-db-type) and
-[driverFactory](@cubejs-backend-server-core#options-reference-driver-factory) functions as part of context param.
-By default each cube has a `default` value for it's `dataSource`.
+Value of `dataSource` parameter will be passed to [`dbType`][ref-config-dbtype] and
+[`driverFactory`][ref-config-driverfactory] functions as part of the context paramameter.
+By default, each cube has a `default` value for it's `dataSource`.
 To override it you can use:
+
+[ref-config-dbtype]: /config#options-reference-db-type
+[ref-config-driverfactory]: /config#options-reference-driver-factory
 
 ```javascript
 cube(`OrderFacts`, {

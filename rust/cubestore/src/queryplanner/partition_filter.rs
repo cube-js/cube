@@ -28,8 +28,20 @@ impl PartitionFilter {
 
     /// Returns whether any rows between `min_row` and `max_row` could potentially match the filter.
     /// When this returns false, the corresponding rows can safely be ignored.
-    pub fn can_match(&self, min_row: &[TableValue], max_row: &[TableValue]) -> bool {
-        self.min_max.is_empty() || self.min_max.iter().any(|mm| mm.can_match(min_row, max_row))
+    pub fn can_match(
+        &self,
+        min_row: Option<&[TableValue]>,
+        max_row: Option<&[TableValue]>,
+    ) -> bool {
+        if self.min_max.is_empty() {
+            return true;
+        }
+        match (min_row, max_row) {
+            (Some(mn), Some(mx)) => self.min_max.iter().any(|mm| mm.can_match(mn, mx)),
+            (Some(mn), None) => self.min_max.iter().any(|mm| mm.can_match_min(mn)),
+            (None, Some(mx)) => self.min_max.iter().any(|mm| mm.can_match_max(mx)),
+            (None, None) => true,
+        }
     }
 }
 
@@ -40,6 +52,46 @@ struct MinMaxCondition {
 }
 
 impl MinMaxCondition {
+    /// Assuming max is unbounded.
+    pub fn can_match_min(&self, min_row: &[TableValue]) -> bool {
+        let n = self.max.len();
+        assert_eq!(n, min_row.len());
+        for i in 0..n {
+            if !self.max[i].is_some() {
+                return true;
+            }
+            let ord = cmp_same_types(self.max[i].as_ref().unwrap(), &min_row[i]);
+            if ord < Ordering::Equal {
+                return false;
+            }
+            if ord > Ordering::Equal {
+                return true;
+            }
+            // continue if equal.
+        }
+        return true;
+    }
+
+    /// Assuming min is unbounded.
+    pub fn can_match_max(&self, max_row: &[TableValue]) -> bool {
+        let n = self.min.len();
+        assert_eq!(n, max_row.len());
+        for i in 0..n {
+            if !self.min[i].is_some() {
+                return true;
+            }
+            let ord = cmp_same_types(&max_row[i], self.min[i].as_ref().unwrap());
+            if ord < Ordering::Equal {
+                return false;
+            }
+            if ord > Ordering::Equal {
+                return true;
+            }
+            // continue if equal.
+        }
+        return true;
+    }
+
     pub fn can_match(&self, min_row: &[TableValue], max_row: &[TableValue]) -> bool {
         let n = self.min.len();
         assert_eq!(n, min_row.len());
@@ -149,6 +201,27 @@ impl Builder<'_> {
                         .map(|e| self.extract_filter(e, r.clone())),
                 );
             }
+            Expr::Column(name, alias) => {
+                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(true)));
+                if let Some(cc) =
+                    self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, &true_expr)
+                {
+                    self.apply_stat(&cc, &mut r);
+                    return r;
+                }
+                r
+            }
+            // TODO: generic Not support with other expressions as children.
+            Expr::Not(box Expr::Column(name, alias)) => {
+                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(false)));
+                if let Some(cc) =
+                    self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, &true_expr)
+                {
+                    self.apply_stat(&cc, &mut r);
+                    return r;
+                }
+                r
+            }
             _ => r,
             // TODO: most important unsupported expressions are:
             //       - IsNull/IsNotNull
@@ -163,22 +236,58 @@ impl Builder<'_> {
         rs: Iter,
     ) -> Vec<MinMaxCondition> {
         let mut res = None;
-        for mut r in rs {
+        for r in rs {
             if r.is_empty() {
                 return Vec::new();
             }
-            if res.is_none() {
-                res = Some(r);
-                continue;
+            let res = match &mut res {
+                Some(res) => res,
+                res @ None => {
+                    *res = Some(r);
+                    continue;
+                }
+            };
+            res.extend(r);
+            if PartitionFilter::SIZE_LIMIT < res.len() {
+                Self::fold_or_inplace(res);
             }
-            if PartitionFilter::SIZE_LIMIT < res.as_mut().unwrap().len() + r.len() {
-                assert!(r.len() <= PartitionFilter::SIZE_LIMIT);
-                r.truncate(PartitionFilter::SIZE_LIMIT - r.len());
-            }
-            res.as_mut().unwrap().extend(r);
         }
 
         res.unwrap_or_default()
+    }
+
+    /// Reduces the number of stored [MinMaxCondition]s, loosing some information.
+    fn fold_or_inplace(cs: &mut Vec<MinMaxCondition>) {
+        assert!(!cs.is_empty());
+        let (r, tail) = cs.split_first_mut().unwrap();
+
+        for c in tail {
+            for i in 0..r.min.len() {
+                if r.min[i].is_none() {
+                    continue;
+                }
+                if c.min[i].is_none()
+                    || cmp_same_types(c.min[i].as_ref().unwrap(), &r.min[i].as_ref().unwrap())
+                        < Ordering::Equal
+                {
+                    r.min[i] = c.min[i].clone();
+                }
+            }
+
+            for i in 0..r.max.len() {
+                if r.max[i].is_none() {
+                    continue;
+                }
+                if c.max[i].is_none()
+                    || cmp_same_types(&r.max[i].as_ref().unwrap(), c.max[i].as_ref().unwrap())
+                        < Ordering::Equal
+                {
+                    r.max[i] = c.max[i].clone();
+                }
+            }
+        }
+
+        cs.truncate(1);
     }
 
     fn extract_column_compare(
@@ -286,9 +395,32 @@ impl Builder<'_> {
         }
         match t {
             t if Self::is_signed_int(t) => Self::extract_signed_int(v),
+            DataType::Boolean => Self::extract_bool(v),
             DataType::Utf8 => Self::extract_string(v),
             _ => None,
             // TODO: more data types
+        }
+    }
+
+    fn extract_bool(v: &ScalarValue) -> Option<TableValue> {
+        match v {
+            ScalarValue::Boolean(v) => v.as_ref().map(|v| TableValue::Boolean(*v)),
+            ScalarValue::Utf8(s) | ScalarValue::LargeUtf8(s) => {
+                if s.is_none() {
+                    return None;
+                }
+                let s = s.as_ref().unwrap().as_str();
+                let b;
+                if s.eq_ignore_ascii_case("true") {
+                    b = true;
+                } else if s.eq_ignore_ascii_case("false") {
+                    b = false;
+                } else {
+                    b = s.parse::<i64>().ok()? != 0;
+                }
+                Some(TableValue::Boolean(b))
+            }
+            _ => return None,
         }
     }
 
@@ -377,6 +509,7 @@ mod tests {
     use super::*;
     use crate::sql::parser::{CubeStoreParser, Statement as CubeStatement};
     use arrow::datatypes::Field;
+    use datafusion::catalog::TableReference;
     use datafusion::datasource::TableProvider;
     use datafusion::logical_plan::ToDFSchema;
     use datafusion::physical_plan::udaf::AggregateUDF;
@@ -507,6 +640,35 @@ mod tests {
     }
 
     #[test]
+    fn test_bools() {
+        let s = schema(&[("a", DataType::Boolean)]);
+        let extract = |sql| PartitionFilter::extract(&s, &[parse(sql, &s)]);
+
+        let true_cond = vec![MinMaxCondition {
+            min: vec![Some(TableValue::Boolean(true))],
+            max: vec![Some(TableValue::Boolean(true))],
+        }];
+        let false_cond = vec![MinMaxCondition {
+            min: vec![Some(TableValue::Boolean(false))],
+            max: vec![Some(TableValue::Boolean(false))],
+        }];
+
+        assert_eq!(extract("a = true").min_max, true_cond);
+        assert_eq!(extract("a = false").min_max, false_cond);
+
+        assert_eq!(extract("a = 'true'").min_max, true_cond);
+        assert_eq!(extract("a = 'TRUE'").min_max, true_cond);
+        assert_eq!(extract("a = 'false'").min_max, false_cond);
+        assert_eq!(extract("a = 'FALSE'").min_max, false_cond);
+
+        assert_eq!(extract("a = '1'").min_max, true_cond);
+        assert_eq!(extract("a = '0'").min_max, false_cond);
+
+        assert_eq!(extract("a").min_max, true_cond);
+        assert_eq!(extract("NOT a").min_max, false_cond);
+    }
+
+    #[test]
     fn test_arithmetic_corner_cases() {
         let s = schema(&[("a", DataType::Int64)]);
         let extract = |sql: &str| PartitionFilter::extract(&s, &[parse(sql, &s)]);
@@ -542,8 +704,8 @@ mod tests {
             }]
         );
 
-        assert!(!f.can_match(&[TableValue::Int(1)], &[TableValue::Int(1)]));
-        assert!(f.can_match(&[TableValue::Null], &[TableValue::Int(1)]));
+        assert!(!f.can_match(Some(&[TableValue::Int(1)]), Some(&[TableValue::Int(1)])));
+        assert!(f.can_match(Some(&[TableValue::Null]), Some(&[TableValue::Int(1)])));
 
         let f = extract("a != NULL");
         assert_eq!(
@@ -722,7 +884,52 @@ mod tests {
             &[Expr::Literal(ScalarValue::Boolean(Some(true)))],
         );
         assert_eq!(f.min_max, vec![]);
-        assert!(f.can_match(&[], &[]));
+        assert!(f.can_match(Some(&[]), Some(&[])));
+    }
+
+    #[test]
+    fn test_missing_min_or_max() {
+        let mm = MinMaxCondition {
+            min: vec![Some(TableValue::Int(10))],
+            max: vec![Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(9)]));
+        assert!(mm.can_match_min(&[TableValue::Int(10)]));
+        assert!(mm.can_match_min(&[TableValue::Int(11)]));
+        assert!(!mm.can_match_min(&[TableValue::Int(12)]));
+
+        assert!(!mm.can_match_max(&[TableValue::Int(9)]));
+        assert!(mm.can_match_max(&[TableValue::Int(10)]));
+        assert!(mm.can_match_max(&[TableValue::Int(11)]));
+        assert!(mm.can_match_max(&[TableValue::Int(12)]));
+
+        let mm = MinMaxCondition {
+            min: vec![Some(TableValue::Int(0)), Some(TableValue::Int(10))],
+            max: vec![Some(TableValue::Int(0)), Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(9)]));
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(10)]));
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(11)]));
+        assert!(!mm.can_match_min(&[TableValue::Int(0), TableValue::Int(12)]));
+
+        assert!(!mm.can_match_max(&[TableValue::Int(0), TableValue::Int(9)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(10)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(11)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(12)]));
+
+        let mm = MinMaxCondition {
+            min: vec![Some(TableValue::Int(0)), Some(TableValue::Int(10))],
+            max: vec![Some(TableValue::Int(1)), Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(-1), TableValue::Int(12)]));
+        assert!(mm.can_match_max(&[TableValue::Int(3), TableValue::Int(9)]));
+
+        let mm = MinMaxCondition {
+            min: vec![None, Some(TableValue::Int(10))],
+            max: vec![None, Some(TableValue::Int(11))],
+        };
+        assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(12)]));
+        assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(9)]));
     }
 
     #[test]
@@ -790,7 +997,13 @@ mod tests {
 
         let f = extract("(a <= 1 or b <= 2) and (a <= 2 or b <= 3) and (a <= 4 or b <= 5) and (a <= 6 or b <= 7) and (a <= 8 or b <= 9) and (a <= 10 or b <= 11)");
         // Must bail out to avoid too much compute.
-        assert_eq!(f.min_max.len(), 50)
+        assert_eq!(
+            f.min_max,
+            vec![MinMaxCondition {
+                min: vec![None, None],
+                max: vec![None, None],
+            }]
+        );
     }
 
     #[test]
@@ -815,6 +1028,56 @@ mod tests {
                 max: vec![Some(TableValue::Int(1))],
             }]
         );
+    }
+
+    #[test]
+    fn test_limits_no_panic() {
+        let s = schema(&[
+            ("a", DataType::Int64),
+            ("b", DataType::Int64),
+            ("c", DataType::Int64),
+            ("d", DataType::Int64),
+            ("e", DataType::Int64),
+        ]);
+        let extract = |sql| PartitionFilter::extract(&s, &[parse(sql, &s)]);
+
+        let filter = extract(
+            "a IN (1,2,3,4,5,6,7,8,9) \
+                 AND b = 1 \
+                 AND c = 1 \
+                 AND d IN (1,2,3,4,5,6,7) \
+                 AND e IN (1, 2)",
+        );
+        assert_ne!(filter.min_max.len(), 0);
+        assert!(filter.can_match(
+            Some(&vec![TableValue::Int(1); 5]),
+            Some(&vec![TableValue::Int(1); 5])
+        ));
+        let max_row = &[9, 1, 1, 7, 2];
+        assert!(filter.can_match(Some(&vals(max_row)), Some(&vals(max_row))));
+
+        // Check we keep information about min and max values for each field.
+        for i in 0..s.fields().len() {
+            let mut row_before = vec![1; 5];
+            row_before[i] -= 1;
+            assert!(
+                !filter.can_match(Some(&vals(&row_before)), Some(&vals(&row_before))),
+                "must not match {:?}",
+                row_before
+            );
+
+            let mut row_after = max_row.to_vec();
+            row_after[i] += 1;
+            assert!(
+                !filter.can_match(Some(&vals(&row_after)), Some(&vals(&row_after))),
+                "must not match {:?}",
+                row_after
+            );
+        }
+
+        fn vals(is: &[i64]) -> Vec<TableValue> {
+            is.iter().map(|i| TableValue::Int(*i)).collect()
+        }
     }
 
     fn schema(s: &[(&str, DataType)]) -> Schema {
@@ -849,7 +1112,7 @@ mod tests {
 
     pub struct NoContextProvider {}
     impl ContextProvider for NoContextProvider {
-        fn get_table_provider(&self, _name: &str) -> Option<Arc<dyn TableProvider + Send + Sync>> {
+        fn get_table_provider(&self, _name: TableReference) -> Option<Arc<dyn TableProvider>> {
             None
         }
 

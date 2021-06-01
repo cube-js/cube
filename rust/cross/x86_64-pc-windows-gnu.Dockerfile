@@ -5,9 +5,16 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install --assume-yes -y curl pkg-config wget llvm libclang-dev gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 binutils make git automake autoconf ca-certificates gcc g++ mingw-w64-x86-64-dev
 
-RUN wget https://www.openssl.org/source/openssl-1.1.1i.tar.gz -O - | tar -xz
-WORKDIR /openssl-1.1.1i
-RUN ./Configure --prefix=/openssl --openssldir=/openssl/lib --cross-compile-prefix=x86_64-w64-mingw32- mingw64 && make && make install_sw && make install_ssldirs
+# https://www.openssl.org/source/old/1.1.1/
+ARG OPENSSL_VERSION=1.1.1h
+
+RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz
+WORKDIR /openssl-${OPENSSL_VERSION}
+RUN ./Configure --prefix=/openssl --openssldir=/openssl/lib --cross-compile-prefix=x86_64-w64-mingw32- mingw64 && \
+    make && \
+    make install_sw && \
+    make install_ssldirs && \
+    cd .. && rm -rf /openssl-${OPENSSL_VERSION}
 
 ENV OPENSSL_DIR=/openssl \
     OPENSSL_STATIC=yes \

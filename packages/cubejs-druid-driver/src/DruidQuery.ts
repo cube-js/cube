@@ -12,11 +12,11 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 };
 
 export class DruidQuery extends BaseQuery {
-  timeGroupedColumn(granularity: string, dimension: string) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  convertTz(field: string) {
+  public convertTz(field: string) {
     // TODO respect day light saving
     const [hour, minute] = moment().tz(this.timezone).format('Z').split(':');
     const minutes = parseInt(hour, 10) * 60 + parseInt(minute, 10);
@@ -28,23 +28,23 @@ export class DruidQuery extends BaseQuery {
     return field;
   }
 
-  subtractInterval(date: string, interval: string) {
+  public subtractInterval(date: string, interval: string) {
     return `(${date} + INTERVAL ${interval})`;
   }
 
-  addInterval(date: string, interval: string) {
+  public addInterval(date: string, interval: string) {
     return `(${date} + INTERVAL ${interval})`;
   }
 
-  timeStampCast(value: string) {
+  public timeStampCast(value: string) {
     return `TIME_PARSE(${value})`;
   }
 
-  timeStampParam() {
+  public timeStampParam() {
     return this.timeStampCast('?');
   }
 
-  nowTimestampSql(): string {
+  public nowTimestampSql(): string {
     return `CURRENT_TIMESTAMP`;
   }
 }

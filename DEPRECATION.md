@@ -35,7 +35,7 @@ features:
 
 | Status     | Feature                                                                                                            | Deprecated | Remove    |
 | ---------- | ------------------------------------------------------------------------------------------------------------------ | ---------- | --------- |
-| Deprecated | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0   |
+| Removed    | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0   |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                            | v0.23.8    | June 2021 |
 | Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | v0.26.0   |
 | Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                               | v0.24.0    | June 2021 |
@@ -47,6 +47,7 @@ features:
 | Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    |           |
 | Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |           |
 | Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |           |
+| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)              | v0.27.0    |           |
 
 ### Node.js 8
 
@@ -226,6 +227,7 @@ the `u` property. It has also been renamed to
 claims are now populated from the root payload instead of the `u` property.
 
 Old shape of `authInfo`:
+
 ```json
 {
   "sub": "1234567890",
@@ -236,6 +238,7 @@ Old shape of `authInfo`:
 ```
 
 New shape of `authInfo`:
+
 ```json
 {
   "sub": "1234567890",
@@ -243,15 +246,14 @@ New shape of `authInfo`:
 }
 ```
 
-
-[ref-security-context]: https://cube.dev/docs/security#security-context
+[ref-security-context]: https://cube.dev/docs/security/context
 
 Deprecated:
 
 ```js
 const server = new CubejsServer({
   checkAuth: async (req, auth) => {
-    // Notice how we're using the `u` property in `jwt.verify()` and assigning the result to `req.authInfo``
+    // Notice how we're using the `u` property in `jwt.verify()` and assigning the result to `req.authInfo`
     req.authInfo = jwt.verify({ u: auth }, pem);
   },
   contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
@@ -265,13 +267,36 @@ You should use:
 ```js
 const server = new CubejsServer({
   checkAuth: async (req, auth) => {
-    // We're now using directly assiging the result of `jet.verify()` to the `securityContext` property
+    // We're now using directly assigning the result of `jet.verify()` to the `securityContext` property
     req.securityContext = jwt.verify(auth, pem);
   },
-  // And here we're now using the `securityContext` parameter`
+  // And here we're now using the `securityContext` parameter
   contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
   // And the same here
   preAggregationsSchema: ({ securityContext }) =>
     `pre_aggregations_${securityContext.userId}`,
 });
+```
+
+### Prefix Redis environment variables with `CUBEJS_`
+
+Redis-related environment variables are now prefixed with `CUBEJS_` for
+consistency with other environment variables.
+
+**Deprecated in Release: v0.27.0**
+
+Deprecated:
+
+```
+REDIS_URL=XXXX
+REDIS_PASSWORD=XXX
+REDIS_TLS=true
+```
+
+You should use:
+
+```
+CUBEJS_REDIS_URL=XXXX
+CUBEJS_REDIS_PASSWORD=XXX
+CUBEJS_REDIS_TLS=true
 ```

@@ -1,9 +1,12 @@
 {
   "name": "@cubejs-backend/cubestore",
-  "version": "0.26.33",
+  "version": "0.27.25",
   "description": "Cube.js pre-aggregation storage layer.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
+  "engines": {
+    "node": ">=10.8.0"
+  },
   "bin": {
     "cubestore-dev": "bin/cubestore-dev"
   },
@@ -11,38 +14,40 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "linter js-wrapper/* --ext .ts,.js",
-    "lint:fix": "linter --fix js-wrapper/* --ext .ts,js",
-    "postinstall": "if [[ -z \"${CUBESTORE_SKIP_POST_INSTALL}\" ]]; then node ./dist/post-install.js; else echo \"Skipping Cube Store Post Installing\"; fi"
+    "lint": "eslint js-wrapper/* --ext .ts,.js",
+    "lint:fix": "eslint --fix js-wrapper/* --ext .ts,js",
+    "unit": "jest",
+    "unit:debug": "jest --runInBand",
+    "postinstall": "node bin/post-install"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/bytes": "^3.1.0",
+    "@cubejs-backend/linter": "^0.27.0",
+    "@types/jest": "^26.0.22",
     "@types/node": "^10.17.54",
-    "@types/node-fetch": "^2.5.8",
-    "@types/tar": "^4.0.4",
-    "@types/throttle-debounce": "^2.1.0",
-    "typescript": "^4.1.5"
+    "jest": "^26.6.3",
+    "typescript": "~4.1.5"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@cubejs-backend/linter": "^0.26.13",
-    "@cubejs-backend/shared": "^0.26.25",
-    "@oclif/color": "^0.1.2",
+    "@cubejs-backend/shared": "^0.27.22",
     "@octokit/core": "^3.2.5",
-    "bytes": "^3.1.0",
-    "cli-ux": "^5.5.1",
-    "node-fetch": "^2.6.1",
-    "tar": "^6.1.0",
-    "throttle-debounce": "^3.0.1"
+    "source-map-support": "^0.5.19"
   },
   "eslintConfig": {
     "extends": "../packages/cubejs-linter"
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/dist/*.(test|spec).(js)"
+    ],
+    "testEnvironment": "node"
   }
 }

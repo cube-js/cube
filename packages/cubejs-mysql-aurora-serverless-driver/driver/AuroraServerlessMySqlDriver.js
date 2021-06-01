@@ -20,7 +20,8 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
     this.dataApi = dataApi({
       secretArn: this.config.secretArn,
       resourceArn: this.config.resourceArn,
-      database: this.config.database
+      database: this.config.database,
+      options: this.config.options,
     });
   }
 
@@ -141,10 +142,11 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
           VALUES ${valueParamPlaceholders}`,
           params
         );
-        for (let i = 0; i < indexesSql.length; i++) {
-          const [query, p] = indexesSql[i].sql;
-          await this.query(query, p);
-        }
+      }
+
+      for (let i = 0; i < indexesSql.length; i++) {
+        const [query, p] = indexesSql[i].sql;
+        await this.query(query, p);
       }
     } catch (e) {
       await this.dropTable(table);

@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+:root {
+  --color-fg: #000;
+  --color-link-underline: rgba(0, 0, 0, 0.5);
+
+  --color-grocery: 20, 158, 176;
+  --color-park: 23, 128, 56;
+  --color-residential: 132, 49, 206;
+  --color-retail: 24, 103, 210;
+  --color-transit: 208, 25, 132;
+  --color-workplace: 212, 110, 13;
+
+  --font-size: 14pt;
+  --font-size-delta: 4pt;
+
+  --font-size-h1: calc(var(--font-size) + var(--font-size-delta) * 4);
+  --font-size-h2: calc(var(--font-size) + var(--font-size-delta) * 2);
+  --font-size-metric: calc(var(--font-size) + var(--font-size-delta) * 6);
+  --font-size-small: calc(var(--font-size) - var(--font-size-delta));
+}
+
+body {
+  background-color: #f0f2f5;
+  color: var(--color-fg);
+  font-family: 'Roboto', sans-serif;
+  font-weight: 400;
+  font-size: var(--font-size);
+  line-height: 1.1em;
+  margin: 0 auto;
+}
+
+a {
+  color: inherit;
+  border-bottom: solid 1px var(--color-link-underline);
+  text-decoration: inherit;
+}

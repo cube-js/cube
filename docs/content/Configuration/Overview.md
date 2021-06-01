@@ -24,6 +24,7 @@ Cube.js can be run in an insecure, development mode by setting the
 mode does the following:
 
 - Disables authentication checks
+- Enables Cube Store in single instance mode
 - Enables background refresh for in-memory cache and [scheduled
   pre-aggregations][link-scheduled-refresh]
 - Allows another log level to be set (`trace`)

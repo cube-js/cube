@@ -1,0 +1,49 @@
+version: "3"
+
+services:
+  cube:
+    container_name: birdbox-cube
+    image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
+    environment:
+      CUBEJS_DB_TYPE: postgres
+      CUBEJS_DB_HOST: db
+      CUBEJS_DB_NAME: test
+      CUBEJS_DB_USER: test
+      CUBEJS_DB_PASS: test
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_WEB_SOCKETS: "true"
+      CUBEJS_API_SECRET: mysupersecret
+    depends_on:
+      - db
+      - cubestore
+    links:
+      - db
+      - cubestore
+    volumes:
+      - ./postgresql/cubestore/cube.js:/cube/conf/cube.js
+      - ./postgresql/schema:/cube/conf/schema
+    ports:
+      - 4000
+    restart: always
+
+  db:
+    container_name: birdbox-db
+    image: postgres:13
+    environment:
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_USER=test
+      - POSTGRES_DB=test
+    restart: always
+    ports:
+      - 5432
+    volumes:
+      - ./datasets:/data:ro
+      - ./postgresql/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cubestore:
+    image: cubejs/cubestore:edge

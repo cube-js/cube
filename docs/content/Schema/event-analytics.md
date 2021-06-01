@@ -7,6 +7,12 @@ menuOrder: 12
 ---
 [comment]: # (DOCUMENT IS PROOFREADED, MAKE CHANGES WITH CONFIDENCE)
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/).
+| We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/event-analytics-transforming-raw-event-data-into-sessions).
+<!-- prettier-ignore-end -->
+
 This tutorial walks through how to transform raw event data into sessions. Many “out-of-box” web analytics solutions come already prepackaged with sessions, but they work as a “black box.” It doesn’t give the user either insight into or control how these sessions defined and work.
 
 With Cube.js SQL-based sessions schema, you’ll have full control over how these metrics are defined. It will give you great flexibility when designing sessions and events to your unique business use case.
@@ -25,7 +31,15 @@ We’ll explore the subject using the data from [Segment.com](https://segment.co
 
 A session is defined as a group of interactions one user takes within a given time frame on your app. Usually that time frame defaults to 30 minutes, meaning that whatever a user does on your app (e.g. browses pages, downloads resources, purchases products) before they leave equals one session.
 
-<img src="https://raw.githubusercontent.com/statsbotco/cube.js/master/docs/content/Schema/session-schema.png" width="100%" />
+<div
+  style="text-align: center"
+>
+  <img
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/session-schema.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 ## Unify events and page views into single cube
 

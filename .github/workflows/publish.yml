@@ -18,16 +18,6 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - uses: actions/cache@v2
-        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
       - name: Restore lerna
         uses: actions/cache@v2
         with:
@@ -35,18 +25,15 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('**/yarn.lock') }}
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-14.x-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Yarn install
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: install --frozen-lockfile
-      - name: Set environment variables
-        uses: allenevans/set-env@v2.0.0
-        with:
-          CUBESTORE_SKIP_POST_INSTALL: true
-      - name: Lerna bootstrap
-        run: yarn lerna bootstrap
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
@@ -59,8 +46,8 @@ jobs:
         run: ./node_modules/.bin/lerna publish from-package --yes
 
   docker-default:
-    needs: npm
-    name: Release docker image
+    needs: [npm, cubestore]
+    name: Debian docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -123,8 +110,8 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-alpine:
-    needs: npm
-    name: Release alpine docker image
+    needs: [npm, cubestore]
+    name: Alpine docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -188,15 +175,98 @@ jobs:
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
+  docker-cubestore:
+    name: Cube Store Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Repo metadata
+        id: repo
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const repo = await github.repos.get(context.repo)
+            return repo.data
+      - name: Prepare
+        id: prep
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          DOCKER_IMAGE=cubejs/cubestore
+          VERSION=noop
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION=nightly
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          TAGS="${DOCKER_IMAGE}:${VERSION}"
+          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            MINOR=${VERSION%.*}
+            MAJOR=${MINOR%.*}
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
+          fi
+          echo ::set-output name=version::${VERSION}
+          echo ::set-output name=tags::${TAGS}
+          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@v2
+        with:
+          context: ./rust/
+          file: ./rust/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+          labels: |
+            org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
+            org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
+            org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
+            org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
+            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+      - name: Update repo description
+        uses: peter-evans/dockerhub-description@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: cubejs/cubestore
+          readme-filepath: ./rust/README.md
+
   cubestore:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      RUSTFLAGS: '-Ctarget-feature=+crt-static'
+      OPENSSL_STATIC: 1
     strategy:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
         include:
           - os: ubuntu-latest
@@ -204,18 +274,27 @@ jobs:
             executable_name: cubestored
             cross: true
             strip: true
-            compress: false
+            compress: true
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             cross: true
             strip: true
+            # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
           - os: ubuntu-latest
             target: x86_64-pc-windows-gnu
             executable_name: cubestored.exe
             cross: true
             strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
+            compress: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            executable_name: cubestored.exe
+            cross: false
+            strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -235,31 +314,42 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: ./rust
+          working-directory: rust
+          key: cross-${{ runner.OS }}-${{ matrix.target }}
+          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
-      - name: Install dependencies Windows
+      - name: Install OpenSSL for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
-        if: matrix.os == 'windows-latest'
-        env:
-          VCPKG_ROOT: 'C:\vcpkg'
-      - name: Set Env Variables for Musl
+      - name: Instal LLVM for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: choco install -y llvm --version 9.0.1
+      - name: Set Env Variables for Windows
         uses: allenevans/set-env@v2.0.0
-        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        if: ${{ startsWith(matrix.os, 'windows') }}
         with:
-          OPENSSL_STATIC: true
-          OPENSSL_DIR: "/musl"
-      # https://github.com/actions-rs/cargo/issues/6
-      #- uses: actions-rs/cargo@v1
-      - uses: marcopolo/cargo@master
-        with:
-          working-directory: rust
-          command: build
-          args: --release --target=${{ matrix.target }}
-          # We need to force it everywhere before using it in cross building
-          #args: --release --locked --target=${{ matrix.target }}
-          use-cross: ${{ matrix.cross }}
+          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
+          # This paths are required to work with static linking
+          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
+          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
+      - name: Build with Cross
+        if: ${{ matrix.cross }}
+        run: |
+          wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
+          chmod +x cross && sudo mv cross /usr/local/bin/cross
+          cd rust
+          cross build --release --target=${{ matrix.target }}
+      - name: Build with Cargo
+        if: ${{ !matrix.cross }}
+        run: |
+          cd rust && cargo build --release --target=${{ matrix.target }}
+      - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew update
+          brew install upx
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
@@ -267,13 +357,18 @@ jobs:
           file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
-      - name: Create archive for release
+      - name: Create folder for archive
         run: |
           mkdir cubestore-archive
           mkdir cubestore-archive/bin
+      - name: Copy/paste OpenSSL to Archive (hotfix for Windows)
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
+      - name: Create archive for release
+        run: |
           mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          tar cvf cubestored-${{ matrix.target }}.tar.gz *
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
       - name: Upload Binary to Release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -281,3 +376,4 @@ jobs:
           file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
+          overwrite: true

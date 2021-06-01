@@ -1,16 +1,10 @@
 const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
 const { addLessLoader } = require('customize-cra');
-const VARIABLES = require('./src/variables');
-const path = require('path');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const rewireYarnWorkspaces = require('react-app-rewire-yarn-workspaces');
 
-const LESS_VARIABLES = {};
-
-// Create LESS variable map.
-Object.keys(VARIABLES)
-  .forEach((key) => {
-    LESS_VARIABLES[`@${key}`] = VARIABLES[key];
-  });
+const { LESS_VARIABLES } = require('./src/variables');
 
 module.exports = function override(config, env) {
   config.optimization = {
@@ -46,14 +40,19 @@ module.exports = function override(config, env) {
   };
   config.stats = 'verbose';
   config.plugins = config.plugins.concat([
-    new webpack.ProgressPlugin()
+    new webpack.ProgressPlugin(),
+    // to fix No module factory available for dependency type: CssDependency
+    new MiniCssExtractPlugin(),
   ]);
   if (env === 'production') {
     config.devtool = false;
   }
   config = addLessLoader({
-    javascriptEnabled: true,
-    modifyVars: LESS_VARIABLES,
+    lessOptions: {
+      modifyVars: LESS_VARIABLES,
+      javascriptEnabled: true,
+    },
   })(config);
-  return config;
+
+  return rewireYarnWorkspaces(config, env);
 };

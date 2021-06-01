@@ -107,7 +107,12 @@ describe('MSSqlPreAggregations', () => {
           dimensionReferences: [source],
           timeDimensionReference: createdAt,
           granularity: 'day',
-          partitionGranularity: 'month'
+          partitionGranularity: 'month',
+          refreshKey: {
+            every: '1 hour',
+            incremental: true,
+            updateWindow: '7 day'
+          }
         },
         multiStage: {
           useOriginalSqlPreAggregations: true,
@@ -242,6 +247,72 @@ describe('MSSqlPreAggregations', () => {
         ]);
       });
   }));
+
+  it('hourly refresh with 7 day updateWindow', () => compiler.compile()
+    .then(() => {
+      const query = new MssqlQuery({
+        joinGraph,
+        cubeEvaluator,
+        compiler
+      }, {
+        measures: [
+          'visitors.checkinsTotal'
+        ],
+        dimensions: [
+          'visitors.source'
+        ],
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-25']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+
+      expect(preAggregationsDescription[0].invalidateKeyQueries[0][0].replace(/(\r\n|\n|\r)/gm, '')
+        .replace(/\s+/g, ' '))
+        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIME)) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END');
+      expect(preAggregationsDescription[0].invalidateKeyQueries[0][1][0])
+        .toEqual('2017-02-01T07:59:59Z');
+
+      return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription)
+        .concat([
+          query.buildSqlAndParams()
+        ])
+        .map(q => replaceTableName(q, preAggregationsDescription, 103)))
+        .then(res => {
+          expect(res)
+            .toEqual([
+              {
+                visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+                visitors__checkins_total: 3,
+                visitors__source: 'some',
+              },
+              {
+                visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+                visitors__checkins_total: 2,
+                visitors__source: 'some',
+              },
+              {
+                visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+                visitors__checkins_total: 1,
+                visitors__source: 'google',
+              },
+              {
+                visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+                visitors__checkins_total: 0,
+                visitors__source: null
+              }
+
+            ]);
+        });
+    }));
 
   it('leaf measure pre-aggregation', () => compiler.compile().then(() => {
     const query = new MssqlQuery(

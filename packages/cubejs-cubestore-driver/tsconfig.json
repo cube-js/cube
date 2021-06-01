@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src",
+    "test",
+    "codegen"
+  ],
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+  }
+}

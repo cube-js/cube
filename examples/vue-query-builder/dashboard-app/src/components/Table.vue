@@ -1,40 +1,45 @@
 <template>
   <v-data-table
+    v-if="resultSet"
     :headers="headers"
-    :items="desserts"
-    :items-per-page="5"
+    :items="items"
+    :items-per-page="50"
+    :hide-default-footer="true"
     class="elevation-1"
   ></v-data-table>
 </template>
 
 <script>
-  export default {
-    name: 'Table',
-    props: ['data'],
-    mounted() {
+import { ResultSet } from '@cubejs-client/core';
+
+export default {
+  name: 'Table',
+  props: {
+    resultSet: {
+      type: ResultSet,
+      required: true,
     },
-    data: () => ({
-    }),
-    computed: {
-      headers() {
-        let data = this.data.tablePivot();
-        let headers = Object.keys(data[0]).map(key => {
-          return {
-            text: key,
-            align: 'start',
-            sortable: true,
-            value: key,
-          }
-        })
-        return headers
-      },
-      desserts() {
-        let data = this.data.tablePivot();
-        let desserts = data.map(key => {
-          return key
-        })
-        return desserts
-      }
-    }
-  }
+  },
+  mounted() {},
+  data: () => ({}),
+  computed: {
+    headers() {
+      const data = this.resultSet.tablePivot();
+      return Object.keys(data[0]).map((key) => {
+        return {
+          text: key,
+          align: 'start',
+          sortable: true,
+          value: key,
+        };
+      });
+    },
+    items() {
+      const data = this.resultSet.tablePivot();
+      return data.map((key) => {
+        return key;
+      });
+    },
+  },
+};
 </script>

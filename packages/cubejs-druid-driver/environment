@@ -26,7 +26,8 @@ DRUID_MAXDIRECTMEMORYSIZE=6172m
 
 druid_emitter_logging_logLevel=debug
 
-druid_extensions_loadList=["druid-histogram", "druid-datasketches", "druid-lookups-cached-global", "postgresql-metadata-storage"]
+# Load extensions
+druid_extensions_loadList=["druid-basic-security", "druid-histogram", "druid-datasketches", "druid-lookups-cached-global", "postgresql-metadata-storage"]
 
 druid_zk_service_host=zookeeper
 
@@ -50,3 +51,20 @@ druid_processing_numThreads=2
 druid_processing_numMergeBuffers=2
 
 DRUID_LOG4J=<?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+
+# Auth
+druid_auth_authenticatorChain=["MyBasicMetadataAuthenticator"]
+druid_auth_authenticator_MyBasicMetadataAuthenticator.type=basic
+druid_auth_authenticator_MyBasicMetadataAuthenticator.initialAdminPassword=password1
+druid_auth_authenticator_MyBasicMetadataAuthenticator.initialInternalClientPassword=password2
+druid_auth_authenticator_MyBasicMetadataAuthenticator.credentialsValidator.type=metadata
+druid_auth_authenticator_MyBasicMetadataAuthenticator.skipOnFailure=false
+druid_auth_authenticator_MyBasicMetadataAuthenticator.authorizerName=MyBasicMetadataAuthorizer
+
+druid_escalator_type=basic
+druid_escalator_internalClientUsername=druid_system
+druid_escalator_internalClientPassword=password2
+druid_escalator_authorizerName=MyBasicMetadataAuthorizer
+
+druid_auth_authorizers=["MyBasicMetadataAuthorizer"]
+druid_auth_authorizer.MyBasicMetadataAuthorizer.type=basic

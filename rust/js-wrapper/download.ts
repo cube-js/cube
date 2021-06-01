@@ -1,125 +1,22 @@
 /* eslint-disable no-restricted-syntax */
-import tar from 'tar';
-import fs, { mkdirSync, WriteStream } from 'fs';
-import fetch, { Headers, Request, Response } from 'node-fetch';
-import { throttle } from 'throttle-debounce';
-import { internalExceptions } from '@cubejs-backend/shared';
-import bytes from 'bytes';
-import cli from 'cli-ux';
+import { downloadAndExtractFile } from '@cubejs-backend/shared';
 import process from 'process';
 import { Octokit } from '@octokit/core';
 import * as path from 'path';
 
-import { detectLibc } from './utils';
+import { getTarget } from './utils';
 
-type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
-
-export async function streamWithProgress(
-  response: Response,
-  writer: fs.WriteStream,
-  progressCallback: ByteProgressCallback
-): Promise<void> {
-  const total = parseInt(response.headers.get('Content-Length') || '0', 10);
-  const startedAt = Date.now();
-
-  let done = 0;
-
-  const throttled = throttle(
-    10,
-    () => {
-      const elapsed = (Date.now() - startedAt) / 1000;
-      const rate = done / elapsed;
-      const speed = `${bytes(rate)}/s`;
-      const estimated = total / rate;
-      const progress = parseInt(<any>((done / total) * 100), 10);
-      const eta = estimated - elapsed;
-
-      progressCallback({
-        progress,
-        eta,
-        speed
-      });
-    },
-  );
-
-  response.body.pipe(writer);
-  response.body.on('data', (chunk) => {
-    done += chunk.length;
-    throttled();
-  });
-
-  return new Promise(
-    (resolve) => {
-      response.body.on('end', () => {
-        resolve();
-      });
-    }
-  );
+export function getCubeStorePath() {
+  return path.join(path.resolve(__dirname, '..'), 'downloaded', 'latest');
 }
 
-export async function downloadAndExtractFile(url: string, fileName: string, workingDirectory: string) {
-  const request = new Request(url, {
-    headers: new Headers({
-      'Content-Type': 'application/octet-stream'
-    })
-  });
+export function getBinaryPath() {
+  const binaryName = process.platform === 'win32' ? 'cubestored.exe' : 'cubestored';
 
-  const response = await fetch(request);
-  if (!response.ok) {
-    throw new Error(`unexpected response ${response.statusText}`);
-  }
-
-  const bar = cli.progress({
-    format: 'Downloading from GitHub [{bar}] {percentage}% | Speed: {speed}',
-  });
-  bar.start(100, 0);
-
-  try {
-    mkdirSync(path.join(workingDirectory, 'downloaded'));
-    mkdirSync(path.join(workingDirectory, 'downloaded', 'latest'));
-  } catch (e) {
-    internalExceptions(e);
-  }
-
-  const writer = tar.x({
-    cwd: path.join(workingDirectory, 'downloaded', 'latest'),
-  });
-
-  await streamWithProgress(response, <WriteStream>writer, ({ progress, speed, eta }) => {
-    bar.update(progress, {
-      speed,
-      eta
-    });
-  });
-
-  bar.stop();
+  return path.join(getCubeStorePath(), 'bin', binaryName);
 }
 
-export function getTarget(): string {
-  if (process.arch !== 'x64') {
-    throw new Error(
-      `You are using ${process.arch} architecture which is not supported by Cube Store`,
-    );
-  }
-
-  switch (process.platform) {
-    case 'win32':
-      return 'x86_64-pc-windows-gnu';
-    case 'linux':
-      return `x86_64-unknown-linux-${detectLibc()}`;
-    case 'darwin':
-      return 'x86_64-apple-darwin';
-    default:
-      throw new Error(
-        `You are using ${process.env} which is not supported by Cube Store`,
-      );
-  }
-}
-
-async function fetchRelease() {
-  // eslint-disable-next-line global-require
-  const { version } = require('../package.json');
-
+async function fetchRelease(version: string) {
   const client = new Octokit();
 
   const { data } = await client.request('GET /repos/{owner}/{repo}/releases/tags/{tag}', {
@@ -131,23 +28,64 @@ async function fetchRelease() {
   return data;
 }
 
+function parseInfoFromAssetName(assetName: string): { target: string, type: string, format: string } | null {
+  if (assetName.startsWith('cubestored-')) {
+    const fileName = assetName.slice('cubestored-'.length);
+    const targetAndType = fileName.slice(0, fileName.indexOf('.'));
+    const format = fileName.slice(fileName.indexOf('.') + 1);
+
+    if (targetAndType.endsWith('-shared')) {
+      return {
+        target: targetAndType.substr(0, targetAndType.length - '-shared'.length),
+        format,
+        type: 'shared'
+      };
+    }
+
+    return {
+      target: targetAndType,
+      format,
+      type: 'static'
+    };
+  }
+
+  return null;
+}
+
 export async function downloadBinaryFromRelease() {
-  const release = await fetchRelease();
+  // eslint-disable-next-line global-require
+  const { version } = require('../package.json');
+
+  const release = await fetchRelease(version);
   if (release) {
     if (release.assets.length === 0) {
-      throw new Error('No assets in release');
+      throw new Error(
+        `There are no artifacts for Cube Store v${version}. Most probably it is still building. Please try again later.`
+      );
     }
 
-    const target = getTarget();
+    const currentTarget = getTarget();
 
     for (const asset of release.assets) {
-      const fileName = asset.name.substr(0, asset.name.length - 7);
-      if (fileName.startsWith('cubestored-')) {
-        const assetTarget = fileName.substr('cubestored-'.length);
-        if (assetTarget === target) {
-          await downloadAndExtractFile(asset.browser_download_url, asset.name, path.resolve(__dirname, '..'));
-        }
+      const assetInfo = parseInfoFromAssetName(asset.name);
+      if (assetInfo && assetInfo.target === currentTarget
+        && assetInfo.type === 'static' && assetInfo.format === 'tar.gz'
+      ) {
+        const cubestorePath = getCubeStorePath();
+
+        return downloadAndExtractFile(asset.browser_download_url, {
+          cwd: cubestorePath,
+          showProgress: true,
+        });
       }
     }
+
+    throw new Error(
+      `Cube Store v${version} Artifact for ${process.platform} is not found. Most probably it is still building. Please try again later.`
+    );
   }
+
+  throw new Error(
+    `Unable to find Cube Store release v${version}. Most probably it was removed.`
+  );
 }

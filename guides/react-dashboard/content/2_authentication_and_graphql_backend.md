@@ -99,7 +99,7 @@ underlying analytics data. Cube.js comes with a flexible [security
 model](https://cube.dev/docs/security), designed to manage access to the data on
 different levels. The usual flow is to use JSON Web Tokens (JWT) for
 the authentication/authorization. The JWT tokens can carry a payload, such as a user
-ID, which can then be passed to the data schema as a [security context](https://cube.dev/docs/security#security-context) to restrict access to some part
+ID, which can then be passed to the data schema as a [security context](https://cube.dev/docs/security/context) to restrict access to some part
 of the data.
 
 In our tutorial, we're not going to restrict users to access

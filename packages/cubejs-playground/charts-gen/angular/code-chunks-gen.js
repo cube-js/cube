@@ -1,7 +1,4 @@
 const { TargetSource } = require('@cubejs-templates/core');
-// const t = require('@babel/types');
-// const traverse = require('@babel/traverse').default;
-// const generator = require('@babel/generator').default;
 
 const commonFiles = {
   'src/app/app.module.ts': `import { BrowserModule } from '@angular/platform-browser';

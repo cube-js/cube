@@ -1,0 +1,73 @@
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4002:4000
+      - 3002:3000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      # TODO: Fill in the values below
+      - CUBEJS_DB_BQ_PROJECT_ID=
+      - CUBEJS_DB_BQ_CREDENTIALS=
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+
+      - CUBEJS_EXT_DB_TYPE=postgres
+      - CUBEJS_EXT_DB_HOST=postgres
+      - CUBEJS_EXT_DB_PORT=5432
+      - CUBEJS_EXT_DB_NAME=postgres
+      - CUBEJS_EXT_DB_USER=postgres
+      - CUBEJS_EXT_DB_PASS=postgres
+
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      
+      - CUBEJS_API_SECRET=SECRET
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - refresh_worker
+      - postgres
+      - redis
+
+  refresh_worker:
+    image: cubejs/cube:latest
+    environment:
+      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+      - CUBEJS_DB_TYPE=bigquery
+      # TODO: Fill in the values below
+      - CUBEJS_DB_BQ_PROJECT_ID=
+      - CUBEJS_DB_BQ_CREDENTIALS=
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+
+      - CUBEJS_EXT_DB_TYPE=postgres
+      - CUBEJS_EXT_DB_HOST=postgres
+      - CUBEJS_EXT_DB_PORT=5432
+      - CUBEJS_EXT_DB_NAME=postgres
+      - CUBEJS_EXT_DB_USER=postgres
+      - CUBEJS_EXT_DB_PASS=postgres
+
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      
+      - CUBEJS_API_SECRET=SECRET
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /data/postgres
+    volumes:
+        - .postgres:/data/postgres
+
+  redis:
+    image: bitnami/redis:latest
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    logging:
+      driver: none 

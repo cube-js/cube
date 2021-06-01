@@ -19,10 +19,9 @@ import { gracefulHttp, GracefulHttpServer } from './server/gracefull-http';
 import { gracefulMiddleware } from './graceful-middleware';
 import { ServerStatusHandler } from './server-status';
 
-const { version } = require('../package.json');
+const { version } = require('../../package.json');
 
 dotenv.config({
-  override: true,
   multiline: 'line-breaks',
 });
 
@@ -130,8 +129,8 @@ export class CubejsServer {
   }
 
   // @internal
-  public handleScheduledRefreshInterval() {
-    return this.core.handleScheduledRefreshInterval();
+  public handleScheduledRefreshInterval(options: any) {
+    return this.core.handleScheduledRefreshInterval(options);
   }
 
   // @internal

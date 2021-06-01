@@ -1,6 +1,7 @@
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions } from '@cubejs-backend/api-gateway';
+import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import type { SchemaFileRepository } from './FileRepository';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -37,12 +38,6 @@ export interface RequestContext {
   requestId: string;
 }
 
-export type UserBackgroundContext = {
-  // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo?: any;
-  securityContext: any;
-};
-
 export interface DriverContext extends RequestContext {
   dataSource: string;
 }
@@ -51,18 +46,10 @@ export interface DialectContext extends DriverContext {
   dbType: string;
 }
 
-export interface FileContent {
-  fileName: string;
-  content: string;
-}
-
-export interface SchemaFileRepository {
-  dataSchemaFiles: () => Promise<FileContent[]>;
-}
-
 export interface DriverFactory {}
 
 export type DatabaseType =
+  | 'cubestore'
   | 'athena'
   | 'bigquery'
   | 'clickhouse'
@@ -89,7 +76,13 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 
-export type DbTypeFn = (context: RequestContext) => DatabaseType;
+export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
+
+export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
+
+export type DbTypeFn = (context: DriverContext) => DatabaseType;
+
+export type LoggerFn = (msg: string, params: any) => void;
 
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
@@ -98,11 +91,11 @@ export interface CreateOptions {
   basePath?: string;
   devServer?: boolean;
   apiSecret?: string;
-  logger?: (msg: string, params: any) => void;
+  logger?: LoggerFn;
   driverFactory?: (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
   dialectFactory?: (context: DialectContext) => BaseQuery;
-  externalDriverFactory?: (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
-  externalDialectFactory?: (context: RequestContext) => BaseQuery;
+  externalDriverFactory?: ExternalDriverFactoryFn;
+  externalDialectFactory?: ExternalDialectFactoryFn;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
@@ -128,4 +121,8 @@ export interface CreateOptions {
   contextToDataSourceId?: any;
   dashboardAppPath?: string;
   dashboardAppPort?: number;
+  sqlCache?: boolean;
+  livePreview?: boolean;
+  // Internal flag, that we use to detect serverless env
+  serverless?: boolean;
 }

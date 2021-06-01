@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import jwt from 'jsonwebtoken';
-import type { CommanderStatic } from 'commander';
 import { isDockerImage, requireFromPackage } from '@cubejs-backend/shared';
+import type { CommanderStatic } from 'commander';
 
 import { displayError, displayWarning, event } from '../utils';
 
@@ -33,7 +33,7 @@ export const token = async (options: TokenOptions) => {
     event: 'Generate Token'
   });
 
-  const cubejsServer = await requireFromPackage<any>('@cubejs-backend/server', {
+  const cubejsServer = requireFromPackage<any>('@cubejs-backend/server', {
     relative: isDockerImage()
   });
   const { expiry = defaultExpiry, secret = cubejsServer.apiSecret() } = options;

@@ -78,7 +78,7 @@ export const TEST_USER_IDS = [1, 2, 3, 4, 5];
 **usersSql.js:**
 
 ```javascript
-export default (usersTable) => `select * form ${usersTable}`;
+export default (usersTable) => `select * from ${usersTable}`;
 ```
 
 Later, you can `import` into the cube, wherever needed:

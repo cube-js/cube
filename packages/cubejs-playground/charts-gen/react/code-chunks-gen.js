@@ -1,17 +1,17 @@
-const { TargetSource } = require('@cubejs-templates/core');
+const { TargetSource, SourceSnippet } = require('@cubejs-templates/core');
 const t = require('@babel/types');
 const traverse = require('@babel/traverse').default;
 const generator = require('@babel/generator').default;
 
 function generateCodeChunks(chartRendererCode) {
-  const ts = new TargetSource('', chartRendererCode);
+  const ts = new TargetSource('ChartRenderer.js', chartRendererCode);
 
   const imports = ts.imports.map(({ node }) => generator(node, {}).code);
 
   const chartComponents = getChartComponents(ts).map(({ key, code }) => {
     return `
       if (chartType === '${key}') {
-        return \`${TargetSource.formatCode(code)}\`;
+        return \`${SourceSnippet.formatCode(code)}\`;
       }
     `;
   });
@@ -41,7 +41,7 @@ function generateCodeChunks(chartRendererCode) {
     }
     
     export function getCommon() {
-      return \`${TargetSource.formatCode(ts.code())}\`;
+      return \`${SourceSnippet.formatCode(ts.code())}\`;
     }
     
     export function getImports() {

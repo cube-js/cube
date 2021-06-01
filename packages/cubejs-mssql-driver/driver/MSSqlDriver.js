@@ -1,6 +1,12 @@
 const sql = require('mssql');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
+const GenericTypeToMSSql = {
+  string: 'nvarchar(max)',
+  text: 'nvarchar(max)',
+  timestamp: 'datetime2',
+};
+
 class MSSqlDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -30,7 +36,6 @@ class MSSqlDriver extends BaseDriver {
     };
     this.connectionPool = new sql.ConnectionPool(this.config);
     this.initialConnectPromise = this.connectionPool.connect();
-    this.config = config;
   }
 
   static driverEnvVariables() {
@@ -74,6 +79,18 @@ class MSSqlDriver extends BaseDriver {
     });
   }
 
+  informationSchemaQuery() {
+    // fix The multi-part identifier "columns.data_type" could not be bound
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+        columns.table_name as ${this.quoteIdentifier('table_name')},
+        columns.table_schema as ${this.quoteIdentifier('table_schema')},
+        columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns columns
+      WHERE columns.table_schema NOT IN ('information_schema', 'sys')
+    `;
+  }
+
   async downloadQueryResults(query, values) {
     const result = await this.query(query, values);
     const types = Object.keys(result.columns).map((key) => ({
@@ -85,6 +102,10 @@ class MSSqlDriver extends BaseDriver {
       rows: result,
       types,
     };
+  }
+
+  fromGenericType(columnType) {
+    return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
   }
 
   readOnly() {

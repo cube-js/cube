@@ -1,4 +1,4 @@
-import * as moment from 'moment-timezone';
+import moment from 'moment-timezone';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';

@@ -1,0 +1,35 @@
+version: "3"
+
+services:
+  mysql:
+    image: mysql:${TEST_MYSQL_VERSION:-5.6.50}
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: Test1test
+    ports:
+      - 3306
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      interval: 15s
+      retries: 5
+      start_period: 20s
+
+  router:
+    image: koxudaxi/local-data-api:${TEST_LOCAL_DATA_API_VERSION:-0.6.4}
+    container_name: router
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: Test1test
+      SECRET_ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy
+      RESOURCE_ARN: arn:aws:rds:us-east-1:123456789012:cluster:dummy
+    ports:
+      - 80
+    depends_on:
+      - mysql
+    links:
+      - mysql
+    restart: always

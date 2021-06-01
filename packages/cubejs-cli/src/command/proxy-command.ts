@@ -1,13 +1,13 @@
 import { CommanderStatic } from 'commander';
 import chalk from 'chalk';
 import semver from 'semver';
-import type { Command, flags } from '@oclif/command';
 import {
   isDockerImage,
   packageExists,
   requireFromPackage,
   requirePackageManifest,
 } from '@cubejs-backend/shared';
+import type { Command, flags } from '@oclif/command';
 import { displayError, loadCliManifest, } from '../utils';
 
 export async function proxyCommand(program: CommanderStatic, command: string) {
@@ -24,7 +24,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
     if (packageManifest.cubejsCliVersion) {
       const cliManifest = loadCliManifest();
       if (semver.satisfies(cliManifest.version, packageManifest.cubejsCliVersion)) {
-        const OriginalCommandPackage = await requireFromPackage<any>(
+        const OriginalCommandPackage = requireFromPackage<any>(
           `@cubejs-backend/server/dist/command/${command}.js`,
           {
             relative,

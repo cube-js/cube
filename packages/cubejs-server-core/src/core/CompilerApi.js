@@ -14,6 +14,7 @@ export class CompilerApi {
     this.schemaVersion = this.options.schemaVersion;
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
+    this.sqlCache = options.sqlCache;
   }
 
   async getCompilers(options) {
@@ -22,10 +23,12 @@ export class CompilerApi {
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
     ).toString();
+
     if (this.options.devServer) {
       const files = await this.repository.dataSchemaFiles();
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
+
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
@@ -39,6 +42,7 @@ export class CompilerApi {
       });
       this.compilerVersion = compilerVersion;
     }
+
     return this.compilers;
   }
 
@@ -53,12 +57,13 @@ export class CompilerApi {
     return this.dialectClass && this.dialectClass({ dataSource: dataSource || 'default', dbType });
   }
 
-  async getSql(query, options) {
-    options = options || {};
+  async getSql(query, options = {}) {
     const { includeDebugInfo } = options;
+
     const dbType = this.getDbType();
     const compilers = await this.getCompilers({ requestId: query.requestId });
     let sqlGenerator = this.createQueryByDataSource(compilers, query);
+
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
@@ -78,7 +83,7 @@ export class CompilerApi {
       }
     }
 
-    return compilers.compiler.withQuery(sqlGenerator, () => ({
+    const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
@@ -92,6 +97,20 @@ export class CompilerApi {
         sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
       canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
     }));
+
+    if (this.sqlCache) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId, ...keyOptions } = query;
+      const key = { query: keyOptions, options };
+      return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
+    } else {
+      return getSqlFn();
+    }
+  }
+
+  async preAggregations(filter) {
+    const { cubeEvaluator } = await this.getCompilers();
+    return cubeEvaluator.preAggregations(filter);
   }
 
   async scheduledPreAggregations() {

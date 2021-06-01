@@ -1,20 +1,23 @@
 use crate::config::processing_loop::ProcessingLoop;
 use crate::sql::{SqlQueryContext, SqlService};
 use crate::table::TableValue;
+use crate::util::time_span::warn_long;
 use crate::{metastore, CubeError};
 use async_trait::async_trait;
 use hex::ToHex;
 use log::{error, info, warn};
 use msql_srv::*;
+use std::convert::TryFrom;
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 use std::time::SystemTime;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 struct Backend {
     sql_service: Arc<dyn SqlService>,
-    auth: Arc<dyn MySqlAuth>,
+    auth: Arc<dyn SqlAuthService>,
     user: Option<String>,
 }
 
@@ -65,6 +68,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
             return Ok(());
         }
+        let _s = warn_long("sending query results", Duration::from_millis(100));
         let data_frame = res.unwrap();
         let columns = data_frame
             .get_columns()
@@ -88,12 +92,18 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
         let mut rw = results.start(&columns)?;
         for row in data_frame.get_rows().iter() {
-            for value in row.values().iter() {
+            for (i, value) in row.values().iter().enumerate() {
                 match value {
                     TableValue::String(s) => rw.write_col(s)?,
                     TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
                     TableValue::Int(i) => rw.write_col(i)?,
-                    TableValue::Decimal(v) => rw.write_col(v.to_string())?,
+                    TableValue::Decimal(v) => {
+                        let scale = u8::try_from(
+                            data_frame.get_columns()[i].get_column_type().target_scale(),
+                        )
+                        .unwrap();
+                        rw.write_col(v.to_string(scale))?
+                    }
                     TableValue::Boolean(v) => rw.write_col(v.to_string())?,
                     TableValue::Float(v) => rw.write_col(v.to_string())?,
                     TableValue::Bytes(b) => {
@@ -120,12 +130,15 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     where
         W: 'async_trait,
     {
-        if !user.is_empty() {
-            self.user = Some(String::from_utf8_lossy(user.as_slice()).to_string())
-        }
+        self.user = if !user.is_empty() {
+            Some(String::from_utf8_lossy(user.as_slice()).to_string())
+        } else {
+            None
+        };
         self.auth
-            .authenticate(user)
+            .authenticate(self.user.clone())
             .await
+            .map(|p| p.map(|p| p.as_bytes().to_vec()))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
     }
 }
@@ -133,7 +146,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 pub struct MySqlServer {
     address: String,
     sql_service: Arc<dyn SqlService>,
-    auth: Arc<dyn MySqlAuth>,
+    auth: Arc<dyn SqlAuthService>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
 }
@@ -197,7 +210,7 @@ impl MySqlServer {
     pub fn new(
         address: String,
         sql_service: Arc<dyn SqlService>,
-        auth: Arc<dyn MySqlAuth>,
+        auth: Arc<dyn SqlAuthService>,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
         Arc::new(Self {
@@ -211,17 +224,17 @@ impl MySqlServer {
 }
 
 #[async_trait]
-pub trait MySqlAuth: Send + Sync {
-    async fn authenticate(&self, user: Vec<u8>) -> Result<Option<Vec<u8>>, CubeError>;
+pub trait SqlAuthService: Send + Sync {
+    async fn authenticate(&self, user: Option<String>) -> Result<Option<String>, CubeError>;
 }
 
-pub struct MySqlAuthDefaultImpl;
+pub struct SqlAuthDefaultImpl;
 
-crate::di_service!(MySqlAuthDefaultImpl, [MySqlAuth]);
+crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 
 #[async_trait]
-impl MySqlAuth for MySqlAuthDefaultImpl {
-    async fn authenticate(&self, _user: Vec<u8>) -> Result<Option<Vec<u8>>, CubeError> {
+impl SqlAuthService for SqlAuthDefaultImpl {
+    async fn authenticate(&self, _user: Option<String>) -> Result<Option<String>, CubeError> {
         Ok(None)
     }
 }

@@ -6,8 +6,6 @@ import ProgressResult from './ProgressResult';
 import HttpTransport from './HttpTransport';
 import RequestError from './RequestError';
 
-const API_URL = process.env.CUBEJS_API_URL;
-
 let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
@@ -23,8 +21,13 @@ class CubejsApi {
       apiToken = undefined;
     }
     options = options || {};
+
+    if (!options.transport && !options.apiUrl) {
+      throw new Error('The `apiUrl` option is required');
+    }
+
     this.apiToken = apiToken;
-    this.apiUrl = options.apiUrl || API_URL;
+    this.apiUrl = options.apiUrl;
     this.method = options.method;
     this.headers = options.headers || {};
     this.credentials = options.credentials;
@@ -104,7 +107,15 @@ class CubejsApi {
         await checkMutex();
         return continueWait(true);
       }
-      const body = await response.json();
+
+      let body = {};
+
+      try {
+        body = await response.clone().json();
+      } catch (_) {
+        body.error = await response.text();
+      }
+
       if (body.error === 'Continue wait') {
         await checkMutex();
         if (options.progressCallback) {
@@ -112,12 +123,13 @@ class CubejsApi {
         }
         return continueWait();
       }
+
       if (response.status !== 200) {
         await checkMutex();
         if (!options.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
         }
-        
+
         const error = new RequestError(body.error, body); // TODO error class
         if (callback) {
           callback(error);
@@ -198,7 +210,7 @@ class CubejsApi {
       callback
     );
   }
-  
+
   dryRun(query, options, callback) {
     return this.loadMethod(
       () => this.request('dry-run', { query }),
@@ -223,13 +235,16 @@ class CubejsApi {
 
 export default (apiToken, options) => new CubejsApi(apiToken, options);
 
-export { HttpTransport, ResultSet };
+export { CubejsApi, HttpTransport, ResultSet };
 export {
+  areQueriesEqual,
   defaultHeuristics,
   movePivotItem,
   isQueryPresent,
   moveItemInArray,
   defaultOrder,
   flattenFilters,
-  getQueryMembers
+  getQueryMembers,
+  getOrderMembersFromOrder,
+  GRANULARITIES
 } from './utils';

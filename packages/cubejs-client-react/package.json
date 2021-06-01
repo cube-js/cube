@@ -1,6 +1,7 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.26.19",
+  "version": "0.27.25",
+  "engines": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -10,8 +11,10 @@
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "^0.26.19",
+    "@cubejs-client/core": "^0.27.25",
+    "anser": "^2.0.1",
     "core-js": "^3.6.5",
+    "html-entities": "^2.3.2",
     "ramda": "^0.27.0"
   },
   "peerDependencies": {
@@ -21,7 +24,8 @@
   "module": "dist/cubejs-client-react.esm.js",
   "types": "index.d.ts",
   "scripts": {
-    "lint": "eslint src/*.js src/*.jsx"
+    "lint": "eslint src/*.js src/*.jsx",
+    "lint:fix": "eslint --fix src/*.js src/*.jsx"
   },
   "files": [
     "src",
@@ -31,7 +35,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/react": "^16.9.41",
-    "eslint": "^6.5.1",
+    "eslint": "^7.21.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.18.2",

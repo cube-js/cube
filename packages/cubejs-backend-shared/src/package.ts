@@ -37,15 +37,15 @@ type RequireOptions = RequireBaseOptions & { silent?: true };
 export function requireFromPackage<T = unknown|null>(
   pkg: string,
   opts: RequireBaseOptions & { silent: true }
-): Promise<T|null>;
+): T|null;
 export function requireFromPackage<T = unknown>(
   pkg: string,
   opts?: RequireBaseOptions
-): Promise<T>;
-export async function requireFromPackage<T = unknown|null>(pkg: string, options?: RequireOptions): Promise<T|null> {
+): T;
+export function requireFromPackage<T = unknown|null>(pkg: string, options?: RequireOptions): T|null {
   const { basePath = process.cwd(), relative = false, silent = undefined } = options || {};
 
-  const exists = await packageExists(pkg, relative, basePath);
+  const exists = packageExists(pkg, relative, basePath);
   if (!exists) {
     if (silent) {
       return null;

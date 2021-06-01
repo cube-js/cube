@@ -250,7 +250,7 @@ export class BaseQuery {
   get dataSource() {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
-      throw new UserError(`Joins across data sources aren't supported in community edition. Found data sources: ${dataSources.join(', ')}`);
+      throw new UserError(`To join across data sources use rollupJoin with external pre-aggregations. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
   }
@@ -755,6 +755,10 @@ export class BaseQuery {
     return `SELECT ${this.dateTimeCast('date_from')}, ${this.dateTimeCast('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
+  /**
+   * @param {string} timeDimension
+   * @return {string}
+   */
   timeStampParam(timeDimension) {
     return timeDimension.dateFieldType() === 'string' ? '?' : this.timeStampCast('?');
   }
@@ -836,19 +840,25 @@ export class BaseQuery {
   }
 
   joinQuery(join, subQueryDimensions) {
+    const subQueryDimensionsByCube = R.groupBy(d => this.cubeEvaluator.cubeNameFromPath(d), subQueryDimensions);
     const joins = join.joins.map(
       j => {
         const [cubeSql, cubeAlias, conditions] = this.rewriteInlineCubeSql(j.originalTo, true);
-        return {
+        return [{
           sql: cubeSql,
           alias: cubeAlias,
           on: `${this.evaluateSql(j.originalFrom, j.join.sql)}${conditions ? ` AND (${conditions})` : ''}`
-        };
+          // TODO handle the case when sub query referenced by a foreign cube on other side of a join
+        }].concat((subQueryDimensionsByCube[j.originalTo] || []).map(d => this.subQueryJoin(d)));
       }
-    ).concat(subQueryDimensions.map(d => this.subQueryJoin(d)));
+    ).reduce((a, b) => a.concat(b), []);
 
     const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(join.root);
-    return this.joinSql([{ sql: cubeSql, alias: cubeAlias }, ...joins]);
+    return this.joinSql([
+      { sql: cubeSql, alias: cubeAlias },
+      ...(subQueryDimensionsByCube[join.root] || []).map(d => this.subQueryJoin(d)),
+      ...joins
+    ]);
   }
 
   joinSql(toJoin) {
@@ -1118,7 +1128,14 @@ export class BaseQuery {
       .concat(this.segments)
       .concat(this.filters)
       .concat(this.measureFilters)
-      .concat(excludeTimeDimensions ? [] : this.timeDimensions);
+      .concat(excludeTimeDimensions ? [] : this.timeDimensions)
+      .concat(this.join ? this.join.joins.map(j => ({
+        getMembers: () => [{
+          path: () => null,
+          cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
+          definition: () => j.join,
+        }]
+      })) : []);
     return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
@@ -1646,6 +1663,10 @@ export class BaseQuery {
     return this.inIntegrationTimeZone(date).clone().utc().format();
   }
 
+  /**
+   * @param {string} field
+   * @return {string}
+   */
   convertTz(field) {
     throw new Error('Not implemented');
   }
@@ -1965,16 +1986,29 @@ export class BaseQuery {
     return 'second'; // TODO return 'millisecond';
   }
 
-  parseSecondDuration(interval) {
+  /**
+   * @protected
+   * @param {string} interval
+   * @return {(number|*)[]}
+   */
+  parseInterval(interval) {
     const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }
+
     const duration = parseInt(intervalMatch[1], 10);
     if (duration < 1) {
       throw new UserError(`Duration should be positive: ${interval}`);
     }
-    const secondsInInterval = SecondsDurations[intervalMatch[2]];
+
+    return [duration, intervalMatch[2]];
+  }
+
+  parseSecondDuration(interval) {
+    const [duration, type] = this.parseInterval(interval);
+
+    const secondsInInterval = SecondsDurations[type];
     return secondsInInterval * duration;
   }
 

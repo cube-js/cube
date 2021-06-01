@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
@@ -16,7 +17,7 @@ import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
+import { getPivotQuery, getQueryGranularity, normalizeQuery, normalizeQueryPreAggregations, QUERY_TYPE } from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -39,6 +40,10 @@ type MetaConfig = {
     name: string,
     title: string
   }
+};
+
+type CheckAuthInternalOptions = {
+  isPlaygroundCheckAuth: boolean;
 };
 
 const toConfigMap = (metaConfig: MetaConfig[]) => R.fromPairs(
@@ -131,6 +136,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
 
       return [transformResult];
     }),
+    // @ts-ignore
     R.unnest,
     R.fromPairs
   // @ts-ignore
@@ -154,10 +160,18 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
   return row;
 }));
 
+export type UserBackgroundContext = {
+  // @deprecated Renamed to securityContext, please use securityContext.
+  authInfo?: any;
+  securityContext: any;
+};
+
 export interface ApiGatewayOptions {
   standalone: boolean;
   dataSourceStorage: any;
   refreshScheduler: any;
+  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
+  scheduledRefreshTimeZones?: String[];
   basePath: string;
   extendContext?: ExtendContextFn;
   checkAuth?: CheckAuthFn;
@@ -168,10 +182,15 @@ export interface ApiGatewayOptions {
   queryTransformer?: QueryTransformerFn;
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
+  playgroundAuthSecret?: string;
 }
 
 export class ApiGateway {
   protected readonly refreshScheduler: any;
+
+  protected readonly scheduledRefreshContexts: ApiGatewayOptions['scheduledRefreshContexts'];
+
+  protected readonly scheduledRefreshTimeZones: ApiGatewayOptions['scheduledRefreshTimeZones'];
 
   protected readonly basePath: string;
 
@@ -189,11 +208,17 @@ export class ApiGateway {
 
   public readonly checkAuthFn: CheckAuthFn;
 
+  public readonly checkAuthSystemFn: CheckAuthFn;
+
   protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
+
+  protected readonly releaseListeners: (() => any)[] = [];
+
+  protected readonly playgroundAuthSecret?: string;
 
   public constructor(
     protected readonly apiSecret: string,
@@ -204,15 +229,19 @@ export class ApiGateway {
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
+    this.scheduledRefreshContexts = options.scheduledRefreshContexts;
+    this.scheduledRefreshTimeZones = options.scheduledRefreshTimeZones;
     this.standalone = options.standalone;
     this.basePath = options.basePath;
+    this.playgroundAuthSecret = options.playgroundAuthSecret;
 
     this.queryTransformer = options.queryTransformer || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
-    
+
     this.checkAuthFn = this.createCheckAuthFn(options);
+    this.checkAuthSystemFn = this.createCheckAuthSystemFn();
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
@@ -297,6 +326,44 @@ export class ApiGateway {
       });
     }));
 
+    if (this.playgroundAuthSecret) {
+      const systemMiddlewares: RequestHandler[] = [
+        this.checkAuthSystemMiddleware,
+        this.requestContextMiddleware,
+        this.requestLoggerMiddleware
+      ];
+
+      app.get('/cubejs-system/v1/context', systemMiddlewares, this.createSystemContextHandler(this.basePath));
+
+      app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
+        await this.getPreAggregations({
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
+
+      app.get('/cubejs-system/v1/pre-aggregations/security-contexts', systemMiddlewares, (async (req, res) => {
+        const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
+        this.resToResultFn(res)({
+          securityContexts: contexts.map(context => context.securityContext)
+        });
+      }));
+
+      app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, (async (req, res) => {
+        this.resToResultFn(res)({
+          timezones: this.scheduledRefreshTimeZones
+        });
+      }));
+
+      app.post('/cubejs-system/v1/pre-aggregations/partitions', jsonParser, systemMiddlewares, (async (req, res) => {
+        await this.getPreAggregationPartitions({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
+    }
+
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
@@ -336,6 +403,69 @@ export class ApiGateway {
       const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
       const cubes = metaConfig.map(c => c.config);
       res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+    try {
+      const preAggregations = await this.getCompilerApi(context).preAggregations();
+
+      res({ preAggregations });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationPartitions(
+    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      query = normalizeQueryPreAggregations(this.parseQueryParam(query));
+      const orchestratorApi = this.getAdapterApi(context);
+      const compilerApi = this.getCompilerApi(context);
+
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartitions(
+          context,
+          compilerApi,
+          query
+        );
+
+      const preAggregationVersionEntries = preAggregationPartitions &&
+        await orchestratorApi.getPreAggregationVersionEntries(
+          context,
+          preAggregationPartitions,
+          compilerApi.preAggregationsSchema
+        );
+
+      const mergePartitionsAndVersionEntries = () => {
+        const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntry) => {
+          if (!obj[versionEntry.table_name]) obj[versionEntry.table_name] = [];
+          obj[versionEntry.table_name].push(versionEntry);
+          return obj;
+        }, {});
+
+        return ({ preAggregation, partitions, ...props }) => ({
+          ...props,
+          preAggregation,
+          partitions: partitions.map(partition => {
+            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql.tableName];
+            return partition;
+          }),
+        });
+      };
+
+      res({
+        preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
+      });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
@@ -389,7 +519,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -474,7 +604,7 @@ export class ApiGateway {
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: process.env.NODE_ENV !== 'production' }
+          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
         ))
       );
 
@@ -539,7 +669,8 @@ export class ApiGateway {
           values: sqlQuery.sql[1],
           continueWait: true,
           renewQuery: normalizedQuery.renewQuery,
-          requestId: context.requestId
+          requestId: context.requestId,
+          context
         };
 
         const response = await this.getAdapterApi(context).executeQuery(toExecute);
@@ -561,12 +692,16 @@ export class ApiGateway {
             normalizedQuery,
             queryType
           ),
-          lastRefreshTime: response.lastRefreshTime && response.lastRefreshTime.toISOString(),
-          ...(process.env.NODE_ENV === 'production' ? undefined : {
+          lastRefreshTime: response.lastRefreshTime?.toISOString(),
+          ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
             refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations
-          }),
+            usedPreAggregations: response.usedPreAggregations,
+            transformedQuery: sqlQuery.canUseTransformedQuery,
+          } : null),
           annotation,
+          dataSource: response.dataSource,
+          dbType: response.dbType,
+          external: response.external,
           slowQuery: Boolean(response.slowQuery)
         };
       }));
@@ -681,6 +816,7 @@ export class ApiGateway {
       securityContext,
       // Deprecated, but let's allow it for now.
       authInfo: securityContext,
+      signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
       ...extensions
     };
@@ -822,7 +958,7 @@ export class ApiGateway {
     };
   }
 
-  protected createDefaultCheckAuth(options?: JWTOptions): CheckAuthFn {
+  protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
     type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
@@ -835,21 +971,39 @@ export class ApiGateway {
     let checkAuthFn: VerifyTokenFn = verifyToken;
 
     if (options?.jwkUrl) {
-      const jwks = createJWKsFetcher(options);
+      const jwks = createJWKsFetcher(options, {
+        onBackgroundException: (e) => {
+          this.logger('JWKs Background Fetching Error', {
+            error: e.message,
+          });
+        },
+      });
+
+      this.releaseListeners.push(jwks.release);
 
       // Precache JWKs response to speedup first auth
       if (options.jwkUrl && typeof options.jwkUrl === 'string') {
-        jwks.fetchOnly(options.jwkUrl);
+        jwks.fetchOnly(options.jwkUrl).catch((e) => this.logger('JWKs Prefetching Error', {
+          error: e.message,
+        }));
       }
 
       checkAuthFn = async (auth) => {
         const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
         if (!decoded) {
-          throw new UserError('Unable to decode JWT key');
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden',
+            'Unable to decode JWT key'
+          );
         }
 
         if (!decoded.header || !decoded.header.kid) {
-          throw new UserError('JWT without kid inside headers');
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden',
+            'JWT without kid inside headers'
+          );
         }
 
         const jwk = await jwks.getJWKbyKid(
@@ -857,8 +1011,10 @@ export class ApiGateway {
           decoded.header.kid
         );
         if (!jwk) {
-          throw new UserError(
-            `Unable to verify, JWK with kid: "${decoded.header.kid}" not found`,
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden',
+            `Unable to verify, JWK with kid: "${decoded.header.kid}" not found`
           );
         }
 
@@ -872,9 +1028,10 @@ export class ApiGateway {
       if (auth) {
         try {
           req.securityContext = await checkAuthFn(auth, secret);
+          req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e) {
           if (this.enforceSecurityChecks) {
-            throw new UserError('Invalid token');
+            throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
           } else {
             this.log({
               type: e.message,
@@ -884,33 +1041,43 @@ export class ApiGateway {
           }
         }
       } else if (this.enforceSecurityChecks) {
-        throw new UserError('Authorization header isn\'t set');
+        // @todo Move it to 401 or 400
+        throw new CubejsHandlerError(403, 'Forbidden', 'Authorization header isn\'t set');
       }
     };
   }
-  
-  protected createCheckAuthFn(options: ApiGatewayOptions) {
-    const playgroundAuthSecret = getEnv('playgroundAuthSecret');
+
+  protected createCheckAuthFn(options: ApiGatewayOptions): CheckAuthFn {
     const mainCheckAuthFn = options.checkAuth
       ? this.wrapCheckAuth(options.checkAuth)
       : this.createDefaultCheckAuth(options.jwt);
-    
-    if (playgroundAuthSecret) {
-      const playgroundCheckAuthFn = this.createDefaultCheckAuth({
-        key: playgroundAuthSecret,
-        algorithms: ['HS256']
-      });
-        
+
+    if (this.playgroundAuthSecret) {
+      const systemCheckAuthFn = this.createCheckAuthSystemFn();
       return async (ctx, authorization) => {
         try {
           await mainCheckAuthFn(ctx, authorization);
         } catch (error) {
-          await playgroundCheckAuthFn(ctx, authorization);
+          await systemCheckAuthFn(ctx, authorization);
         }
       };
     }
-      
+
     return (ctx, authorization) => mainCheckAuthFn(ctx, authorization);
+  }
+
+  protected createCheckAuthSystemFn(): CheckAuthFn {
+    const systemCheckAuthFn = this.createDefaultCheckAuth(
+      {
+        key: this.playgroundAuthSecret,
+        algorithms: ['HS256']
+      },
+      { isPlaygroundCheckAuth: true }
+    );
+
+    return async (ctx, authorization) => {
+      await systemCheckAuthFn(ctx, authorization);
+    };
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
@@ -926,17 +1093,17 @@ export class ApiGateway {
     return undefined;
   }
 
-  protected checkAuth: RequestHandler = async (req, res, next) => {
+  protected async checkAuthWrapper(checkAuthFn: CheckAuthFn, req: Request, res: Response, next) {
     const token = this.extractAuthorizationHeaderWithSchema(req);
 
     try {
-      await this.checkAuthFn(req, token);
+      await checkAuthFn(req, token);
       if (next) {
         next();
       }
     } catch (e) {
-      if (e instanceof UserError) {
-        res.status(403).json({ error: e.message });
+      if (e instanceof CubejsHandlerError) {
+        res.status(e.status).json({ error: e.message });
       } else {
         this.log({
           type: 'Auth Error',
@@ -946,6 +1113,14 @@ export class ApiGateway {
         res.status(500).json({ error: e.toString() });
       }
     }
+  }
+
+  protected checkAuth: RequestHandler = async (req, res, next) => {
+    await this.checkAuthWrapper(this.checkAuthFn, req, res, next);
+  };
+
+  protected checkAuthSystemMiddleware: RequestHandler = async (req, res, next) => {
+    await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
   };
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
@@ -1019,6 +1194,16 @@ export class ApiGateway {
     });
   }
 
+  protected createSystemContextHandler = (basePath: string): RequestHandler => {
+    const body: Readonly<Record<string, any>> = {
+      basePath,
+    };
+
+    return (req, res) => {
+      res.status(200).json(body);
+    };
+  };
+
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
@@ -1081,4 +1266,10 @@ export class ApiGateway {
 
     return this.healthResponse(res, health);
   };
+
+  public release() {
+    for (const releaseListener of this.releaseListeners) {
+      releaseListener();
+    }
+  }
 }

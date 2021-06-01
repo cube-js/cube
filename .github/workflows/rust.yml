@@ -35,6 +35,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./rust
+          key: ubuntu-latest
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -88,13 +89,17 @@ jobs:
 
   cross:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      RUSTFLAGS: '-Ctarget-feature=+crt-static'
+      OPENSSL_STATIC: 1
     strategy:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
         include:
           - os: ubuntu-latest
@@ -102,18 +107,27 @@ jobs:
             executable_name: cubestored
             cross: true
             strip: true
-            compress: false
+            compress: true
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             cross: true
             strip: true
+            # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
           - os: ubuntu-latest
             target: x86_64-pc-windows-gnu
             executable_name: cubestored.exe
             cross: true
             strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
+            compress: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            executable_name: cubestored.exe
+            cross: false
+            strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -133,31 +147,42 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: ./rust
+          working-directory: rust
+          key: cross-${{ runner.OS }}-${{ matrix.target }}
+          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
-      - name: Install dependencies Windows
+      - name: Install OpenSSL for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
-        if: matrix.os == 'windows-latest'
-        env:
-          VCPKG_ROOT: 'C:\vcpkg'
-      - name: Set Env Variables for Musl
+      - name: Instal LLVM for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: choco install -y llvm --version 9.0.1
+      - name: Set Env Variables for Windows
         uses: allenevans/set-env@v2.0.0
-        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        if: ${{ startsWith(matrix.os, 'windows') }}
         with:
-          OPENSSL_STATIC: true
-          OPENSSL_DIR: "/musl"
-      # https://github.com/actions-rs/cargo/issues/6
-      #- uses: actions-rs/cargo@v1
-      - uses: marcopolo/cargo@master
-        with:
-          working-directory: rust
-          command: build
-          args: --release --target=${{ matrix.target }}
-          # We need to force it everywhere before using it in cross building
-          #args: --release --locked --target=${{ matrix.target }}
-          use-cross: ${{ matrix.cross }}
+          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
+          # This paths are required to work with static linking
+          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
+          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
+      - name: Build with Cross
+        if: ${{ matrix.cross }}
+        run: |
+          wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
+          chmod +x cross && sudo mv cross /usr/local/bin/cross
+          cd rust
+          cross build --release --target=${{ matrix.target }}
+      - name: Build with Cargo
+        if: ${{ !matrix.cross }}
+        run: |
+          cd rust && cargo build --release --target=${{ matrix.target }}
+      - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew update
+          brew install upx
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
@@ -165,3 +190,20 @@ jobs:
           file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
+      - name: Create folder for archive
+        run: |
+          mkdir cubestore-archive
+          mkdir cubestore-archive/bin
+      - name: Copy/paste OpenSSL to Archive (hotfix for Windows)
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
+      - name: Create archive for release
+        run: |
+          mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          cd cubestore-archive
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
+      - uses: actions/upload-artifact@v2
+        with:
+          path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
+          name: cubestored-${{ matrix.target }}.tar.gz
+          retention-days: 1

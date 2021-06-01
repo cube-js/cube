@@ -1,11 +1,12 @@
 import express, { Application as ExpressApplication, RequestHandler } from 'express';
 import request from 'supertest';
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { pausePromise } from '@cubejs-backend/shared';
 
-import { ApiGateway, ApiGatewayOptions, Request } from '../src';
-import { AdapterApiMock, DataSourceStorageMock } from './index.test';
+import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request } from '../src';
+import { AdapterApiMock, DataSourceStorageMock } from './mocks';
 import { RequestContext } from '../src/interfaces';
+import { generateAuthToken } from './utils';
 
 function createApiGateway(handler: RequestHandler, logger: () => any, options: Partial<ApiGatewayOptions>) {
   const adapterApi: any = new AdapterApiMock();
@@ -47,14 +48,6 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function generateAuthToken(payload: object = {}, options?: SignOptions, secret: string = 'secret') {
-  return jwt.sign(payload, secret, {
-    expiresIn: '10000d',
-    ...options,
-  });
-}
-
 describe('test authorization', () => {
   test('default authorization', async () => {
     const loggerMock = jest.fn(() => {
@@ -91,7 +84,7 @@ describe('test authorization', () => {
     // authInfo was deprecated, but should exists as computability
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
-  
+
   test('playground auth token', async () => {
     const loggerMock = jest.fn(() => {
       //
@@ -110,12 +103,13 @@ describe('test authorization', () => {
       res.status(200).end();
     });
 
-    const playgroundSecret = 'playgroundSecret';
-    process.env.CUBEJS_PLAYGROUND_AUTH_SECRET = playgroundSecret;
-    const { app } = createApiGateway(handlerMock, loggerMock, {});
+    const playgroundAuthSecret = 'playgroundSecret';
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      playgroundAuthSecret
+    });
 
     const token = generateAuthToken({ uid: 5, }, {});
-    const playgroundToken = generateAuthToken({ uid: 5, }, {}, playgroundSecret);
+    const playgroundToken = generateAuthToken({ uid: 5, }, {}, playgroundAuthSecret);
     const badToken = generateAuthToken({ uid: 5, }, {}, 'bad');
 
     await request(app)
@@ -127,7 +121,7 @@ describe('test authorization', () => {
       .get('/test-auth-fake')
       .set('Authorization', `Authorization: ${playgroundToken}`)
       .expect(200);
-      
+
     await request(app)
       .get('/test-auth-fake')
       .set('Authorization', `Authorization: ${badToken}`)
@@ -140,8 +134,6 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
     // authInfo was deprecated, but should exists as computability
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
-    
-    delete process.env.CUBEJS_PLAYGROUND_AUTH_SECRET;
   });
 
   test('default authorization with JWT token and securityContext in u', async () => {
@@ -225,6 +217,33 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
     // authInfo was deprecated, but should exists as computability
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
+  });
+
+  test('custom checkAuth with async flow and throw exception', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const handlerMock = jest.fn((req, res) => {
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      checkAuth: async () => {
+        throw new CubejsHandlerError(555, 'unknown', 'unknown message');
+      }
+    });
+
+    const token = generateAuthToken({ uid: 5, });
+
+    const res = await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(555);
+
+    expect(res.body).toMatchObject({
+      error: 'unknown message'
+    });
   });
 
   test('custom checkAuth with deprecated authInfo', async () => {

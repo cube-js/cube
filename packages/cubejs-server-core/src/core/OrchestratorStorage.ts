@@ -15,6 +15,10 @@ export class OrchestratorStorage {
     return this.storage.set(orchestratorId, orchestratorApi);
   }
 
+  public clear() {
+    this.storage.clear();
+  }
+
   public async testConnections() {
     const result = [];
 

@@ -2,23 +2,28 @@
 title: Auth0 Guide
 permalink: /security/jwt/auth0
 category: Authentication & Authorization
-menuOrder: 1
+subCategory: Guides
+menuOrder: 3
 ---
 
 ## Introduction
 
 In this guide, you'll learn how to integrate Auth0 authentication with a Cube.js
 deployment. If you already have a pre-existing application on Auth0 that you'd
-like to re-use, please skip ahead to
-[Configure Cube.js to use Auth0](#configure-cube-js-to-use-auth-0).
+like to re-use, please skip ahead to [Configure Cube.js][ref-config-auth0].
 
-## Create and configure an application on Auth0
+We'll be creating an Auth0 [application][link-auth0-docs-app] and
+[API][link-auth0-docs-api], configuring a [rule on Auth0][link-auth0-docs-rules]
+to add custom claims to vended JWTs, and finally configuring Cube.js to use
+Auth0.
+
+## Create an application
 
 First, go to the [Auth0 dashboard][link-auth0-app], and click on the
-'Applications' menu option on the left and then click the '+ Create Application'
+Applications menu option on the left and then click the Create Application
 button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -26,12 +31,12 @@ button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
-In the 'Create Application' popup, set the name of your application and select
-'Single Page Web Applications'.
+In the popup, set the name of your application and select Single Page Web
+Applications.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -39,7 +44,7 @@ In the 'Create Application' popup, set the name of your application and select
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Next, go to the application's settings and add the appropriate callback URLs for
 your application (`http://localhost:4000` for the Developer Playground).
@@ -48,31 +53,21 @@ your application (`http://localhost:4000` for the Developer Playground).
 
 You can also configure custom claims for your JWT token. Auth0 has two SDKs
 available; [Auth0.js][link-auth0-js] and the [Auth0 SPA
-SDK][link-auth0-spa-sdk]. In either case, you’ll want to open the Auth0
-dashboard, click on 'Rules' and add a rule to add any custom claims to the JWT.
+SDK][link-auth0-spa-sdk]. We recommend using the SPA SDK wherever possible, [as
+per Auth0's own developer advice][gh-auth0-spa-sdk-issue34]. If you're using
+`@auth0/auth0-angular` or `@auth0/auth0-react`, then the SPA SDK is
+automatically included.
 
-#### Auth0.js
-
-Take note of the value of `namespace` here, you will need it later to configure
-Cube.js.
-
-```javascript
-function (user, context, callback) {
-  const namespace = "http://localhost:4000/";
-  context.idToken[namespace] =
-    {
-      'company_id': 'company1',
-      'user_id': user.user_id,
-      'roles': ['user'],
-    };
-  callback(null, user, context);
-}
-```
+Open the Auth0 dashboard, click on 'Rules' and add a rule to add any custom
+claims to the JWT.
 
 #### Auth0 SPA SDK
 
-Take note of the value of `namespace` here, you will need it later to configure
-Cube.js.
+<!-- prettier-ignore-start -->
+[[info |]]
+| Take note of the value of `namespace` here, you will need it later to
+| [configure Cube.js][ref-config-auth0].
+<!-- prettier-ignore-end -->
 
 ```javascript
 function (user, context, callback) {
@@ -87,14 +82,14 @@ function (user, context, callback) {
 }
 ```
 
-## Create an API on Auth0
+## Create an API
 
 If you're using the Auth0 SPA SDK, you'll also need to [create an
 API][link-auth0-api]. First, go to the [Auth0 dashboard][link-auth0-app] and
-click on the 'APIs' menu option from the left sidebar, then click the '+ Create
-API' button.
+click on the APIs menu option from the left sidebar, then click the Create API
+button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -102,18 +97,12 @@ API' button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 In the 'New API' popup, set a name for this API and an identifier (e.g.
-`cubejs`)
+`cubejs-app`), then click the Create button.
 
-<!-- prettier-ignore-start -->
-[[info |]]
-| After creating the API, take note of the Client ID and Secret as you'll need
-| them later.
-<!-- prettier-ignore-end -->
-
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -121,10 +110,17 @@ In the 'New API' popup, set a name for this API and an identifier (e.g.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| Take note of the Identifier here, as it is used to
+| [set the JWT Audience option in Cube.js][ref-config-auth0].
+<!-- prettier-ignore-end -->
 
 In your application code, configure your API identifier as the audience when
-initializing Auth0:
+initializing Auth0. If you're using the `@auth0/auth-react` package for your
+application front-end, this might look something like this:
 
 ```typescript jsx
 <Auth0Provider
@@ -136,7 +132,10 @@ initializing Auth0:
 >
 ```
 
-## Configure Cube.js to use Auth0
+Refer to Auth0's documentation for instructions on configuring
+[Angular][link-auth0-angular] or [Vue][link-auth0-vue] applications.
+
+## Configure Cube.js
 
 Now we're ready to configure Cube.js to use Auth0. Go to your Cube.js project
 and open the `.env` file and add the following, replacing the values wrapped in
@@ -157,7 +156,7 @@ CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
 Go to the [OpenID Playground from Auth0][link-openid-playground] to and click
 Configuration.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -165,18 +164,19 @@ Configuration.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Enter the following values:
 
 - **Auth0 domain**: `<AUTH0-SUBDOMAIN>.auth0.com`
-- **OIDC Client ID**: Retrieve from Auth0 API settings page
-- **OIDC Client Secret**: Retrieve from Auth0 API settings page
+- **OIDC Client ID**: Retrieve from Auth0 Application settings page
+- **OIDC Client Secret**: Retrieve from Auth0 Application settings page
+- **Audience**: Retrieve from Auth0 API settings
 
 Click 'Use Auth0 Discovery Document' to auto-fill the remaining values, then
 click Save.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -184,7 +184,7 @@ click Save.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -193,11 +193,9 @@ click Save.
 <!-- prettier-ignore-end -->
 
 Now click Start; if the login is successful, you should see the code, as well as
-a button called 'Exchange'. Click on it to exchange the token for a JWT, then
-click Next. You should now have a valid JWT. Copy it for use in the next
-section.
+a button called 'Exchange'. Click on it to exchange the code for your tokens:
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -205,14 +203,18 @@ section.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
+
+Copy the `access_token` from the response, and use the [JWT.IO
+Debugger][link-jwt-io-debug] to decode the token and verify any custom claims
+were successfully added.
 
 ### Set JWT in Developer Playground
 
 Now open the Developer Playground (at `http://localhost:4000`) and on the Build
 page, click Add Security Context.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -220,12 +222,12 @@ page, click Add Security Context.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Click the Token tab, paste the JWT from OpenID Playground and click the Save
 button.
 
-<p
+<div
   style="text-align: center"
 >
   <img
@@ -233,7 +235,7 @@ button.
   style="border: none"
   width="80%"
   />
-</p>
+</div>
 
 Close the popup and use the Developer Playground to make a request. Any schemas
 using the [Security Context][ref-sec-ctx] should now work as expected.
@@ -242,14 +244,26 @@ using the [Security Context][ref-sec-ctx] should now work as expected.
 
 To help you get up and running, we have [an example project which is configured
 to use Auth0][gh-cubejs-auth0-example]. You can use it as a starting point for
-your own Cube.js application.
+your own Cube.js application. You can also use our [Multi-Tenant Analytics with
+Auth0 and Cube.js guide][link-multitenant-auth0-guide] for a more detailed
+walkthrough.
 
+[link-auth0-angular]: https://auth0.com/docs/quickstart/spa/angular/01-login
+[link-auth0-vue]: https://auth0.com/docs/quickstart/spa/vuejs/01-login
+[link-auth0-docs-app]: https://auth0.com/docs/applications
+[link-auth0-docs-api]: https://auth0.com/docs/get-started/set-up-apis
+[link-auth0-docs-rules]: https://auth0.com/docs/rules
+[gh-auth0-spa-sdk-issue34]:
+  https://github.com/auth0/auth0-spa-js/issues/34#issuecomment-505420895
 [link-auth0-app]: https://manage.auth0.com/
 [link-auth0-js]: https://auth0.com/docs/libraries/auth0js
 [link-auth0-spa-sdk]: https://auth0.com/docs/libraries/auth0-spa-js
 [link-auth0-api]:
   https://auth0.com/docs/tokens/access-tokens#json-web-token-access-tokens
+[link-jwt-io-debug]: https://jwt.io/#debugger-io
 [link-openid-playground]: https://openidconnect.net/
-[ref-sec-ctx]: /security#security-context
+[ref-config-auth0]: #configure-cube-js
+[ref-sec-ctx]: /security/context
 [gh-cubejs-auth0-example]:
   https://github.com/cube-js/cube.js/tree/master/examples/auth0
+[link-multitenant-auth0-guide]: https://multi-tenant-analytics.cube.dev/
