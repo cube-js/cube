@@ -70,7 +70,7 @@ interface CubejsConfiguration {
   },
   externalDbType: string | ((context: RequestContext) => string);
   externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
-  cacheAndQueueDriver: string;
+  cacheAndQueueDriver: 'memory' | 'redis';
   orchestratorOptions: OrchestratorOptions | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
 }
