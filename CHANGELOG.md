@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.27](https://github.com/cube-js/cube.js/compare/v0.27.26...v0.27.27) (2021-06-01)
+
+
+### Bug Fixes
+
+* **cubestore:** panic on compaction of decimals [#2868](https://github.com/cube-js/cube.js/issues/2868) ([a4eef83](https://github.com/cube-js/cube.js/commit/a4eef83602734b1e6c59e0666822f9c80eed3a90))
+* Filter empty contexts for pre-aggregation Meta API ([#2873](https://github.com/cube-js/cube.js/issues/2873)) ([cec4dff](https://github.com/cube-js/cube.js/commit/cec4dff54b1e56f6670edf1041b0ff22ee2c25d1))
+
+
+
+
+
 ## [0.27.26](https://github.com/cube-js/cube.js/compare/v0.27.25...v0.27.26) (2021-06-01)
 
 
