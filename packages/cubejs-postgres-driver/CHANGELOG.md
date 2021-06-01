@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.26](https://github.com/cube-js/cube.js/compare/v0.27.25...v0.27.26) (2021-06-01)
+
+
+### Bug Fixes
+
+* **redshift-driver:** publishConfig - public ([d72baf4](https://github.com/cube-js/cube.js/commit/d72baf4ef39d89be986f51941629def0975c989f))
+
+
+
+
+
 ## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
 
 
