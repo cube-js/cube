@@ -26,6 +26,7 @@ pub struct ParquetTableStore {
 }
 
 pub struct RowParquetWriter {
+    schema: Arc<parquet::schema::types::Type>,
     columns: Vec<Column>,
     parquet_writer: SerializedFileWriter<File>,
     buffer: MutRows,
@@ -612,9 +613,10 @@ impl RowParquetWriter {
         );
 
         let props = Self::writer_props();
-        let parquet_writer = SerializedFileWriter::new(file.try_clone()?, schema, props)?;
+        let parquet_writer = SerializedFileWriter::new(file.try_clone()?, schema.clone(), props)?;
 
         Ok(RowParquetWriter {
+            schema: schema,
             columns: table.get_columns().clone(),
             parquet_writer,
             row_group_size,
@@ -635,6 +637,7 @@ impl RowParquetWriter {
     fn write_buffer(&'a mut self) -> Result<(), CubeError> {
         let batch_size = self.row_group_size;
         let row_group_count = div_ceil(self.buffer.num_rows(), self.row_group_size);
+        log::trace!("Columns: {:?}, schema: {:#?}", self.columns, self.schema);
         for row_batch_index in 0..row_group_count {
             let mut row_group_writer = self.parquet_writer.next_row_group()?;
 
