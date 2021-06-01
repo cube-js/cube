@@ -213,3 +213,23 @@ export const normalizeQuery = (query) => {
     }).concat(regularToTimeDimension)
   };
 };
+
+const queryPreAggregationsSchema = Joi.object().keys({
+  timezone: Joi.string(),
+  preAggregations: Joi.array().items(Joi.object().keys({
+    id: Joi.string().required(),
+    refreshRange: Joi.array().items(Joi.string()).length(2)
+  }))
+});
+
+export const normalizeQueryPreAggregations = (query) => {
+  const { error } = Joi.validate(query, queryPreAggregationsSchema);
+  if (error) {
+    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+  }
+
+  return {
+    timezone: query.timezone || 'UTC',
+    preAggregations: query.preAggregations
+  };
+};

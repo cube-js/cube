@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { pausePromise } from '@cubejs-backend/shared';
 
 import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request } from '../src';
-import { AdapterApiMock, DataSourceStorageMock } from './index.test';
+import { AdapterApiMock, DataSourceStorageMock } from './mocks';
 import { RequestContext } from '../src/interfaces';
 import { generateAuthToken } from './utils';
 
