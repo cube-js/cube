@@ -22,6 +22,7 @@
     "@cubejs-backend/oracle-driver": "^0.27.25",
     "@cubejs-backend/postgres-driver": "^0.27.26",
     "@cubejs-backend/prestodb-driver": "^0.27.25",
+    "@cubejs-backend/redshift-driver": "^0.27.26",
     "@cubejs-backend/server": "^0.27.27",
     "@cubejs-backend/snowflake-driver": "^0.27.25",
     "@cubejs-backend/sqlite-driver": "^0.27.25",
