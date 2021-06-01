@@ -29,14 +29,22 @@ $ npm install --save winston-loggly-bulk
 
 <!-- prettier-ignore-start -->
 [[info | Running Cube.js in Docker]]
-| When installing custom Node.js packages for Cube.js running in Docker container, make sure you correctly mount the folder with `node_modules` subfolder.
+| When installing custom Node.js packages for Cube.js running in Docker
+| container, make sure you mount the project _including_ the
+| `node_modules` subfolder:
+|
 | ```bash
 | $ docker run -d \
 |   -v ~/my-cubejs-project:/cube/conf
 |   cubejs/cube
 | ```
-| If you need to use third-party Node.js packages with native extensions, you'd need to build your own Docker image.
+|
+| If you need to use third-party Node.js packages with native extensions,
+| you'll need to [build your own Docker image][ref-deployment-docker-extend].
 <!-- prettier-ignore-end -->
+
+[ref-deployment-docker-extend]:
+  /deployment/platforms/docker#extend-the-docker-image
 
 Now we can require and use `winston-loggly-bulk` library inside `cube.js`:
 
@@ -60,19 +68,23 @@ module.exports = {
   },
 };
 ```
+
 ## Using CubejsServer and CubejsServerCore
 
-You can directly use `@cubejs-backend/server-core` or `@cubejs-backend/server` Node.js packages to run Cube.js.
+You can directly use `@cubejs-backend/server-core` or `@cubejs-backend/server`
+Node.js packages to run Cube.js.
 
 <!-- prettier-ignore-start -->
 [[warning | ]]
-| We do not recommend embedding Cube.js into existing Express application to share the runtime. Cube.js should be scaled very differently vs. other parts of Express, and embedding Cube.js is not the right approach in the long term, especially for larger deployments.
+| We do not recommend embedding Cube.js into existing Express application to
+| share the runtime. Cube.js should be scaled very differently vs. other parts
+| of Express, and embedding Cube.js **is not** the right approach in the long
+| term, especially for larger deployments.
 <!-- prettier-ignore-end -->
 
+You can create an `index.js` file with the following content.
 
-You can create `index.js` file with the following content.
-
-```js
+```javascript
 const CubejsServer = require('@cubejs-backend/server');
 
 const server = new CubejsServer();
@@ -82,8 +94,8 @@ server.listen().then(({ version, port }) => {
 });
 ```
 
-And then start Cube.js as a regular Node.js application.
+Then start Cube.js as a regular Node.js application:
 
 ```bash
-$ node index.js
+node index.js
 ```
