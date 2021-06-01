@@ -1362,7 +1362,9 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts_gcs() {
-        if env::var("SERVICE_ACCOUNT_JSON").is_err() {
+        if env::var("SERVICE_ACCOUNT_JSON").is_err()
+            && env::var("CUBESTORE_GCP_SERVICE_ACCOUNT_JSON").is_err()
+        {
             return;
         }
         Config::test("high_frequency_inserts_gcs")

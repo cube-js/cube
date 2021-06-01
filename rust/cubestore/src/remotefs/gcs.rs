@@ -8,7 +8,7 @@ use futures::StreamExt;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use std::time::SystemTime;
 use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
@@ -16,6 +16,34 @@ use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
+
+static INIT_CREDENTIALS: Once = Once::new();
+fn ensure_credentials_init() {
+    // The cloud storage library uses env vars to get access tokens.
+    // We decided CubeStore needs its own alias for it, so rewrite and hope no one read it before.
+    // TODO: switch to something that allows to configure without env vars.
+    // TODO: remove `SERVICE_ACCOUNT` completely.
+    INIT_CREDENTIALS.call_once(|| {
+        for var in &["SERVICE_ACCOUNT", "GOOGLE_APPLICATION_CREDENTIALS", "SERVICE_ACCOUNT_JSON", "GOOGLE_APPLICATION_CREDENTIALS_JSON"] {
+            let cube_var = format!("CUBESTORE_GCP_{}", var);
+            match std::env::var(&cube_var) {
+                Ok(value) => {
+                    if let Ok(sa) = std::env::var(var) {
+                        if sa != value {
+                            log::warn!("'{}' and '{}' differ. Using the latter", var, cube_var)
+                        }
+                    }
+                    std::env::set_var(var, value);
+                }
+                Err(_) => {
+                    if std::env::var(var).is_ok() {
+                        log::warn!("CubeStore will stop reading '{}' in future versions, please set '{}' instead", var, cube_var)
+                    }
+                }
+            }
+        }
+    })
+}
 
 #[derive(Debug)]
 pub struct GCSRemoteFs {
@@ -31,6 +59,7 @@ impl GCSRemoteFs {
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
+        ensure_credentials_init();
         Ok(Arc::new(Self {
             dir,
             bucket: bucket_name.to_string(),
