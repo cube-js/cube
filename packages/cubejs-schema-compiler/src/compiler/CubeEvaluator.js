@@ -60,7 +60,7 @@ export class CubeEvaluator extends CubeSymbols {
               (!preAggregationIds || preAggregationIds.includes(idFactory({ cube, preAggregationName })))
           )
           .map(preAggregationName => {
-            const { indexes, refreshRangeStart, refreshRangeEnd } = preAggregations[preAggregationName];
+            const { indexes, refreshRangeStart, refreshRangeEnd, refreshKey } = preAggregations[preAggregationName];
             return {
               id: idFactory({ cube, preAggregationName }),
               preAggregationName,
@@ -70,6 +70,12 @@ export class CubeEvaluator extends CubeSymbols {
               refreshRangeReferences: {
                 refreshRangeStart: refreshRangeStart && refreshRangeStart.sql && { sql: refreshRangeStart.sql() },
                 refreshRangeEnd: refreshRangeEnd && refreshRangeEnd.sql && { sql: refreshRangeEnd.sql() }
+              },
+              refreshKeyReferences: {
+                refreshKey: refreshKey && {
+                  ...refreshKey,
+                  sql: refreshKey && refreshKey.sql && refreshKey.sql()
+                }
               },
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
                 obj[indexName] = {
