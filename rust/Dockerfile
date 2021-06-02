@@ -23,10 +23,10 @@ COPY cubestore-sql-tests cubestore-sql-tests
 COPY cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
-RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release -p cubestore
+RUN cargo build --release -p cubestore
 
 COPY cubestore cubestore
-RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release -p cubestore
+RUN cargo build --release -p cubestore
 
 FROM debian:buster-slim
 
