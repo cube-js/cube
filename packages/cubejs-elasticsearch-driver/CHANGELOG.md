@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.28](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.28) (2021-06-02)
+
+
+### Bug Fixes
+
+* **elasticsearch-driver:** Lock @elastic/elasticsearch to 7.12 for Node.js 10 support ([cedf108](https://github.com/cube-js/cube.js/commit/cedf1089ea6262a4e3e3fed18c3714fb8258fa93))
+
+
+
+
+
 ## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
 
 **Note:** Version bump only for package @cubejs-backend/elasticsearch-driver
