@@ -47,6 +47,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
+        t("coalesce", coalesce),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -890,6 +891,89 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
             TableValue::Int(3)
         ])]
     );
+}
+
+async fn coalesce(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.Data (n int, v int, s text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.Data (n, v, s) VALUES \
+            (1, 2, 'foo'),\
+            (null, 3, 'bar'),\
+            (null, null, 'baz'),\
+            (null, null, null)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT coalesce(1, 2, 3)")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(1)]]);
+    // TODO: the type should be 'int' here. Hopefully not a problem in practice.
+    let r = service
+        .exec_query("SELECT coalesce(NULL, 2, 3)")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::String("2".to_string())]]);
+    let r = service
+        .exec_query("SELECT coalesce(NULL, NULL, NULL)")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Null]]);
+    let r = service
+        .exec_query("SELECT coalesce(n, v) FROM s.Data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Null],
+            vec![TableValue::Null],
+            vec![TableValue::Int(1)],
+            vec![TableValue::Int(3)]
+        ]
+    );
+    // Coerces all args to text.
+    let r = service
+        .exec_query("SELECT coalesce(n, v, s) FROM s.Data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Null],
+            vec![TableValue::String("1".to_string())],
+            vec![TableValue::String("3".to_string())],
+            vec![TableValue::String("baz".to_string())]
+        ]
+    );
+
+    let r = service
+        .exec_query("SELECT coalesce(n+1,v+1,0) FROM s.Data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(0)],
+            vec![TableValue::Int(0)],
+            vec![TableValue::Int(2)],
+            vec![TableValue::Int(4)],
+        ]
+    );
+
+    service
+        .exec_query("SELECT n, coalesce() FROM s.Data ORDER BY 1")
+        .await
+        .unwrap_err();
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
