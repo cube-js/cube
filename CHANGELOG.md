@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.29](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.29) (2021-06-02)
+
+
+### Bug Fixes
+
+* Pass securityContext to contextSymbols in refresh scheduler ([886c276](https://github.com/cube-js/cube.js/commit/886c2764d72837899f0bbde8c6e4cd80c1cafc97))
+* Resolve refresh key sql for pre-aggregations meta api ([#2881](https://github.com/cube-js/cube.js/issues/2881)) ([55383b6](https://github.com/cube-js/cube.js/commit/55383b6d1d9755ded6e8815fc04ba3070e675199))
+* **cubestore:** clean up metastore if create table fails, fix [#2880](https://github.com/cube-js/cube.js/issues/2880) ([f2d5b1a](https://github.com/cube-js/cube.js/commit/f2d5b1af2d2bd8d3444eb70464f8e5bcd3511dab))
+* **cubestore:** fix encoding of sparse HLL imported from Snowflake ([5ca48f4](https://github.com/cube-js/cube.js/commit/5ca48f4384e59ac56bbdfe85644f1730d5cbe011))
+* **elasticsearch-driver:** Lock @elastic/elasticsearch to 7.12 for Node.js 10 support ([cedf108](https://github.com/cube-js/cube.js/commit/cedf1089ea6262a4e3e3fed18c3714fb8258fa93))
+
+
+### Features
+
+* **cubestore:** cubestore-specific env vars for GCS configuration ([6760c0e](https://github.com/cube-js/cube.js/commit/6760c0e0c8706332890f50c3eb85d8e0def5d8f5))
+* **docker:** Install redshift-driver ([dc81be5](https://github.com/cube-js/cube.js/commit/dc81be526c11a32e3b45327dae98a477597438d9))
+* **snowflake-driver:** Support HLL ([7b57840](https://github.com/cube-js/cube.js/commit/7b578401a5271a2cbe43266f0190b786b2191aaf))
+
+
+
+
+
 ## [0.27.28](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.28) (2021-06-02)
 
 
