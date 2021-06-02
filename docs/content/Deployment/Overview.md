@@ -16,8 +16,7 @@ If you are moving Cube.js to production, check this guide:
 [link-deployment-guides]: /deployment/guide
 
 As shown in the diagram below, a typical production Cube.js cluster consists of
-one or multiple API instances, a refresh worker, Redis and a Cube Store cluster.
-Refresh Worker and Cube Store cluster.
+one or multiple API instances, a Refresh Worker, Redis and a Cube Store cluster.
 
 <div
   style="text-align: center"
