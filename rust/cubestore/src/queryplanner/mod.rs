@@ -7,6 +7,7 @@ pub mod query_executor;
 pub mod serialized_plan;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
+mod coalesce;
 pub mod udfs;
 
 use crate::config::injection::DIService;
@@ -190,6 +191,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
         let kind = match name {
             "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
+            "coalesce" | "COALESCE" => CubeScalarUDFKind::Coalesce,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
