@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 
-use crate::cluster::{Cluster, JobEvent};
+use crate::cluster::{Cluster, JobEvent, JobResultListener};
 
 use crate::config::injection::DIService;
 use crate::import::limits::ConcurrencyLimits;
@@ -170,60 +170,10 @@ impl SqlServiceImpl {
                 });
             }
         }
-        if external {
-            let listener = self.cluster.job_result_listener();
-            let table = self
+
+        if !external {
+            return self
                 .db
-                .create_table(
-                    schema_name,
-                    table_name,
-                    columns_to_set,
-                    locations,
-                    Some(ImportFormat::CSV),
-                    indexes_to_create,
-                    false,
-                )
-                .await?;
-            let wait_for = table
-                .get_row()
-                .locations()
-                .unwrap()
-                .iter()
-                .map(|&l| {
-                    (
-                        RowKey::Table(TableId::Tables, table.get_id()),
-                        JobType::TableImportCSV(l.clone()),
-                    )
-                })
-                .collect();
-            let imports = listener.wait_for_job_results(wait_for).await?;
-            for r in imports {
-                if let JobEvent::Error(_, _, e) = r {
-                    return Err(CubeError::user(format!("Create table failed: {}", e)));
-                }
-            }
-
-            let mut futures = Vec::new();
-            let indexes = self.db.get_table_indexes(table.get_id()).await?;
-            let partitions = self
-                .db
-                .get_active_partitions_and_chunks_by_index_id_for_select(
-                    indexes.iter().map(|i| i.get_id()).collect(),
-                )
-                .await?;
-            for (partition, chunks) in partitions.into_iter().flatten() {
-                futures.push(self.cluster.warmup_partition(partition, chunks));
-            }
-            join_all(futures)
-                .await
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()?;
-
-            self.db.table_ready(table.get_id(), true).await?;
-
-            Ok(table)
-        } else {
-            self.db
                 .create_table(
                     schema_name,
                     table_name,
@@ -233,8 +183,78 @@ impl SqlServiceImpl {
                     indexes_to_create,
                     true,
                 )
-                .await
+                .await;
         }
+
+        let listener = self.cluster.job_result_listener();
+        let table = self
+            .db
+            .create_table(
+                schema_name,
+                table_name,
+                columns_to_set,
+                locations,
+                Some(ImportFormat::CSV),
+                indexes_to_create,
+                false,
+            )
+            .await?;
+
+        if let Err(e) = self.finalize_external_table(&table, listener).await {
+            if let Err(inner) = self.db.drop_table(table.get_id()).await {
+                log::error!(
+                    "Drop table ({}) after error failed: {}",
+                    table.get_id(),
+                    inner
+                );
+            }
+            return Err(e);
+        }
+        Ok(table)
+    }
+
+    async fn finalize_external_table(
+        &self,
+        table: &IdRow<Table>,
+        listener: JobResultListener,
+    ) -> Result<(), CubeError> {
+        let wait_for = table
+            .get_row()
+            .locations()
+            .unwrap()
+            .iter()
+            .map(|&l| {
+                (
+                    RowKey::Table(TableId::Tables, table.get_id()),
+                    JobType::TableImportCSV(l.clone()),
+                )
+            })
+            .collect();
+        let imports = listener.wait_for_job_results(wait_for).await?;
+        for r in imports {
+            if let JobEvent::Error(_, _, e) = r {
+                return Err(CubeError::user(format!("Create table failed: {}", e)));
+            }
+        }
+
+        let mut futures = Vec::new();
+        let indexes = self.db.get_table_indexes(table.get_id()).await?;
+        let partitions = self
+            .db
+            .get_active_partitions_and_chunks_by_index_id_for_select(
+                indexes.iter().map(|i| i.get_id()).collect(),
+            )
+            .await?;
+        for (partition, chunks) in partitions.into_iter().flatten() {
+            futures.push(self.cluster.warmup_partition(partition, chunks));
+        }
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.db.table_ready(table.get_id(), true).await?;
+        Ok(())
     }
 
     async fn create_index(

@@ -57,6 +57,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("group_by_without_aggregates", group_by_without_aggregates),
         t("create_table_with_location", create_table_with_location),
         t("create_table_with_url", create_table_with_url),
+        t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
         t("bytes", bytes),
         t("hyperloglog", hyperloglog),
@@ -1105,6 +1106,32 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) {
     assert_eq!(
         result.get_rows(),
         &vec![Row::new(vec![TableValue::Int(813)])]
+    );
+}
+
+async fn create_table_fail_and_retry(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data(n int, v int) INDEX reverse (v,n) LOCATION 'non-existing-file'",
+        )
+        .await
+        .unwrap_err();
+    service
+        .exec_query("CREATE TABLE s.Data(n int, v int) INDEX reverse (v,n)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(n, v) VALUES (1, -1), (2, -2)")
+        .await
+        .unwrap();
+    let rows = service
+        .exec_query("SELECT n FROM s.Data ORDER BY n")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&rows),
+        vec![vec![TableValue::Int(1)], vec![TableValue::Int(2)]]
     );
 }
 
