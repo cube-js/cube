@@ -1,20 +1,20 @@
 import { getEnv } from '@cubejs-backend/shared';
-import QueryQueueTest from '../unit/QueryQueue.test';
+import { QueryCacheTest } from '../unit/QueryCache.abstract';
 import { RedisPool } from '../../src/orchestrator/RedisPool';
 
-function doRedisTest(useIORedis) {
-  process.env.CUBEJS_REDIS_USE_IOREDIS = useIORedis;
+function doRedisTest(useIORedis: boolean) {
+  process.env.CUBEJS_REDIS_USE_IOREDIS = <any>useIORedis;
 
   const title = `RedisPool, Driver: ${useIORedis ? 'plain redis' : 'ioredis'}`;
 
-  QueryQueueTest(
+  QueryCacheTest(
     title,
     {
       cacheAndQueueDriver: 'redis',
       redisPool: new RedisPool()
     }
   );
-  QueryQueueTest(
+  QueryCacheTest(
     `${title} without pool`,
     {
       cacheAndQueueDriver: 'redis',
