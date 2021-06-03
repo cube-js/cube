@@ -958,8 +958,7 @@ export class PreAggregations {
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
 
-    const getLoadCacheByDataSource = (dataSource) => {
-      dataSource = dataSource || 'default';
+    const getLoadCacheByDataSource = (dataSource = 'default') => {
       if (!loadCacheByDataSource[dataSource]) {
         loadCacheByDataSource[dataSource] =
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
@@ -967,6 +966,7 @@ export class PreAggregations {
             dataSource
           });
       }
+
       return loadCacheByDataSource[dataSource];
     };
 
