@@ -52,6 +52,19 @@ export class DevServer {
       console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
     }
     console.log(`🦅 Dev environment available at ${apiUrl}`);
+
+    if (
+      (
+        this.options?.externalDbTypeFn({
+          authInfo: null,
+          securityContext: null,
+          requestId: '',
+        }) || ''
+      ).toLowerCase() !== 'cubestore'
+    ) {
+      console.log('⚠️  Your pre-aggregations will be on an external database. It is recommended to use Cube Store for optimal performance"');
+    }
+
     this.cubejsServer.event('Dev Server Start');
     const serveStatic = require('serve-static');
 
@@ -78,7 +91,7 @@ export class DevServer {
           authInfo: null,
           securityContext: null,
           requestId: getRequestIdFromRequest(req),
-        }) || null,
+        }).toLowerCase() || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
         livePreview: options.livePreview,

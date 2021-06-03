@@ -166,6 +166,7 @@ export type TPlaygroundQueryBuilderProps = {
 export type QueryStatus = {
   timeElapsed: number;
   isAggregated: boolean;
+  external: boolean | null;
   transformedQuery?: TransformedQuery;
 };
 
@@ -459,11 +460,7 @@ export default function PlaygroundQueryBuilder({
                   />
 
                   {queryStatus ? (
-                    <PreAggregationStatus
-                      timeElapsed={queryStatus.timeElapsed}
-                      isAggregated={queryStatus.isAggregated}
-                      transformedQuery={queryStatus.transformedQuery}
-                    />
+                    <PreAggregationStatus {...queryStatus} />
                   ) : null}
                 </SectionRow>
               </Col>
@@ -564,12 +561,13 @@ export default function PlaygroundQueryBuilder({
                               setQueryError(null);
 
                               if (isAggregated != null && timeElapsed != null) {
+                                const [result] = response.loadResponse.results;
+
                                 setQueryStatus({
                                   isAggregated,
                                   timeElapsed,
-                                  transformedQuery:
-                                    response.loadResponse.results[0]
-                                      .transformedQuery,
+                                  transformedQuery: result.transformedQuery,
+                                  external: result.external
                                 });
                               }
                             }
