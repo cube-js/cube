@@ -1,7 +1,6 @@
 import styled from 'styled-components';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
 import { useState } from 'react';
-import { TransformedQuery } from '@cubejs-client/core';
 import Icon from '@ant-design/icons';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
@@ -58,7 +57,7 @@ export function PreAggregationStatus({
         )}
 
         {external && extDbType !== 'cubestore' ? (
-          <Alert message="Large dataset warning placeholder" type="warning" />
+          <Alert message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets" type="warning" />
         ) : null}
       </Space>
 
