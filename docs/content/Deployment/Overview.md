@@ -67,7 +67,8 @@ services:
     volumes:
       - .:/cube/conf
     depends_on:
-      - cubestore_router
+      - cubestore_worker_1
+      - cubestore_worker_2
       - cube_refresh_worker
       - redis
 
@@ -98,9 +99,6 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_router:9999
     volumes:
       - .cubestore:/cube/data
-    depends_on:
-      - cubestore_worker_1
-      - cubestore_worker_2
 
   cubestore_worker_1:
     image: cubejs/cubestore:latest
@@ -112,6 +110,8 @@ services:
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
       - .cubestore:/cube/data
+    depends_on:
+      - cubestore_router
 
   cubestore_worker_2:
     image: cubejs/cubestore:latest
@@ -123,6 +123,8 @@ services:
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
       - .cubestore:/cube/data
+    depends_on:
+      - cubestore_router
 
   redis:
     image: bitnami/redis:latest
