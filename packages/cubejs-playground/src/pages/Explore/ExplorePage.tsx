@@ -20,7 +20,7 @@ type TLivePreviewContext = {
   token: string;
 };
 
-export default function ExplorePage() {
+export function ExplorePage() {
   const dashboardSource = useMemo(() => new DashboardSource(), []);
 
   const { push, location } = useHistory();
