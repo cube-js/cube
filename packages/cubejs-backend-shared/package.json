@@ -27,6 +27,7 @@
     "@types/cli-progress": "^3.9.1",
     "@types/decompress": "^4.2.3",
     "@types/jest": "^26.0.16",
+    "@types/node": "^10.17.60",
     "@types/node-fetch": "^2.5.8",
     "@types/throttle-debounce": "^2.1.0",
     "jest": "^26.6.3",
@@ -39,6 +40,7 @@
     "decompress": "^4.2.1",
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",
+    "http-proxy-agent": "^4.0.1",
     "node-fetch": "^2.6.1",
     "throttle-debounce": "^3.0.1"
   },
