@@ -57,13 +57,12 @@ export default class QueryBuilder extends React.Component {
 
     if (Array.isArray(query)) {
       return query.reduce(
-        (memo, currentQuery) =>
-          memo.concat(
-            QueryBuilder.resolveMember(type, {
-              meta,
-              query: currentQuery,
-            })
-          ),
+        (memo, currentQuery) => memo.concat(
+          QueryBuilder.resolveMember(type, {
+            meta,
+            query: currentQuery,
+          })
+        ),
         []
       );
     }
@@ -286,9 +285,10 @@ export default class QueryBuilder extends React.Component {
 
         return {
           ...cube,
-          members: [...indexedMeasures[name]?.members, ...indexedDimensions[name]?.members].sort((a, b) =>
-            a.shortTitle > b.shortTitle ? 1 : -1
-          ),
+          members: [
+            ...indexedMeasures[name]?.members,
+            ...indexedDimensions[name]?.members
+          ].sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1)),
         };
       });
     }
