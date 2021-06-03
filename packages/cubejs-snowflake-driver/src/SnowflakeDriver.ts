@@ -396,12 +396,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   public informationSchemaQuery() {
     return `
-        SELECT columns.column_name as "column_name",
-               columns.table_name as "table_name",
-               columns.table_schema as "table_schema",
-               columns.data_type as "data_type"
-        FROM information_schema.columns
-        WHERE columns.table_schema NOT IN ('INFORMATION_SCHEMA')
+        SELECT COLUMNS.COLUMN_NAME as "column_name",
+               COLUMNS.TABLE_NAME as "table_name",
+               COLUMNS.TABLE_SCHEMA as "table_schema",
+               COLUMNS.DATA_TYPE as "data_type"
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE COLUMNS.TABLE_SCHEMA NOT IN ('INFORMATION_SCHEMA')
      `;
   }
 
@@ -421,12 +421,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const [schema, name] = table.split('.');
 
     const columns = await this.query<{ COLUMN_NAME: string, DATA_TYPE: string }[]>(
-      `SELECT columns.column_name,
-             columns.table_name,
-             columns.table_schema,
-             columns.data_type
-      FROM information_schema.columns
-      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      `SELECT COLUMNS.COLUMN_NAME,
+             COLUMNS.DATA_TYPE
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = ${this.param(0)} AND TABLE_SCHEMA = ${this.param(1)}
+      ORDER BY ORDINAL_POSITION`,
       [name.toUpperCase(), schema.toUpperCase()]
     );
 
