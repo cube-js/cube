@@ -1,6 +1,18 @@
-import { RedisClient, Commands } from 'redis';
+import { RedisClient, Commands, Callback } from 'redis';
+
+interface Multi extends Commands<Multi> {
+  exec(cb?: Callback<any[]>): boolean;
+  EXEC(cb?: Callback<any[]>): boolean;
+
+  // eslint-disable-next-line camelcase
+  exec_atomic(cb?: Callback<any[]>): boolean;
+  EXEC_ATOMIC(cb?: Callback<any[]>): boolean;
+
+  execAsync: <T = any>() => Promise<T>,
+}
 
 interface AsyncRedisClient extends RedisClient {
+  evalAsync: Commands<Promise<any>>['eval'],
   brpopAsync: Commands<Promise<any>>['brpop'],
   delAsync: Commands<Promise<any>>['del'],
   getAsync: Commands<Promise<any>>['get'],
@@ -17,7 +29,7 @@ interface AsyncRedisClient extends RedisClient {
   decrAsync: Commands<Promise<any>>['decr'],
   lpushAsync: Commands<Promise<any>>['lpush'],
   // @todo Improve types
-  multi: () => any,
+  multi: () => Multi,
   end: (flush?: boolean) => void,
 }
 
