@@ -81,12 +81,6 @@ function memberMenu(onClick, availableMembers: AvailableCube[]) {
   }, [availableMembers]);
 
   useEffect(() => {
-    document.getElementById('member-dropdown-menu')?.scroll({
-      top: 0,
-    });
-  }, [index, search]);
-
-  useEffect(() => {
     let currentSearch = search;
 
     (async () => {
@@ -108,7 +102,7 @@ function memberMenu(onClick, availableMembers: AvailableCube[]) {
     : availableMembers;
 
   return (
-    <Menu id="member-dropdown-menu">
+    <Menu>
       {hasMembers ? (
         <>
           <SearchMenuItem disabled>
