@@ -2,10 +2,10 @@
   "extends": "./tsconfig.base.json",
   "references": [
     {
-      "path": "packages/cubejs-templates"
+      "path": "packages/cubejs-backend-shared"
     },
     {
-      "path": "packages/cubejs-backend-shared"
+      "path": "packages/cubejs-templates"
     },
     {
       "path": "packages/cubejs-testing"
