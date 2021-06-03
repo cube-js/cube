@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { CSSProperties } from "react";
 import { Button } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 
@@ -8,6 +9,7 @@ import { copyToClipboard } from '../utils';
 type CodeSnippetProps = {
   code: string;
   language?: string;
+  style?: CSSProperties;
 };
 
 const StyledCodeSnippet = styled.div`
@@ -51,9 +53,9 @@ const ButtonWrapper = styled.div`
   }
 `;
 
-export function CodeSnippet({ code, language }: CodeSnippetProps) {
+export function CodeSnippet({ code, language, style }: CodeSnippetProps) {
   return (
-    <StyledCodeSnippet>
+    <StyledCodeSnippet style={style}>
       <PrismCode code={code} language={language} style={{ flexGrow: 1 }} />
 
       <ButtonWrapper>
