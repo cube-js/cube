@@ -1,21 +1,32 @@
 /* eslint-disable no-throw-literal */
 import pt from 'promise-timeout';
-import { QueryOrchestrator, ContinueWaitError } from '@cubejs-backend/query-orchestrator';
+import { QueryOrchestrator, ContinueWaitError, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 
 import { DbTypeFn, RequestContext } from './types';
 
+interface OrchestratorApiOptions {
+  externalDriverFactory: DriverFactoryByDataSource;
+  contextToDbType: DbTypeFn;
+  continueWaitTimeout?: number;
+  redisPrefix?: string;
+}
+
 export class OrchestratorApi {
-  private seenDataSources: { [dataSource: string]: boolean } = {};
+  private seenDataSources: Record<string, boolean> = {};
 
   protected readonly orchestrator: QueryOrchestrator;
 
-  protected readonly externalDriverFactory: any;
+  protected readonly externalDriverFactory: DriverFactoryByDataSource;
 
   protected readonly continueWaitTimeout: number;
 
   protected readonly contextToDbType: DbTypeFn;
 
-  public constructor(protected driverFactory, protected logger, protected options: any = {}) {
+  public constructor(
+    protected driverFactory: DriverFactoryByDataSource,
+    protected logger,
+    protected options: OrchestratorApiOptions
+  ) {
     const { externalDriverFactory, contextToDbType } = options;
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
 
@@ -126,7 +137,7 @@ export class OrchestratorApi {
     return this.orchestrator.testConnections();
   }
 
-  public async testDriverConnection(driverFn, dataSource: string = 'default') {
+  public async testDriverConnection(driverFn: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       await driver.testConnection();

@@ -647,6 +647,8 @@ export class CubejsServerCore {
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
     let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
 
+    const externalDbType = this.contextToExternalDbType(context);
+
     const orchestratorApi = this.createOrchestratorApi({
       getDriver: async (dataSource = 'default') => {
         if (driverPromise[dataSource]) {
@@ -707,7 +709,12 @@ export class CubejsServerCore {
         })();
       }),
       redisPrefix: orchestratorId,
-      orchestratorOptions: this.orchestratorOptions(context)
+      orchestratorOptions: {
+        skipExternalCacheAndQueue: externalDbType === 'cubestore',
+        ...this.options.orchestratorOptions,
+        // OrchestratorOptionsFn should have an ability to override static configuration form cube.js file
+        ...this.orchestratorOptions(context),
+      }
     });
 
     this.orchestratorStorage.set(orchestratorId, orchestratorApi);
@@ -739,7 +746,7 @@ export class CubejsServerCore {
       {
         redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
         externalDriverFactory: options.getExternalDriverFactory,
-        ...(options.orchestratorOptions || this.options.orchestratorOptions),
+        ...options.orchestratorOptions,
         contextToDbType: this.contextToDbType.bind(this)
       }
     );
