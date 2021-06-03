@@ -153,7 +153,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#c23d6d9b9bfb3cc759ff36e59b96d035da2707b0"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#ec6f60552a8b8a396ce909c243ad9bd34eb3579d"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#c23d6d9b9bfb3cc759ff36e59b96d035da2707b0"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#ec6f60552a8b8a396ce909c243ad9bd34eb3579d"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -1124,7 +1124,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#c23d6d9b9bfb3cc759ff36e59b96d035da2707b0"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#ec6f60552a8b8a396ce909c243ad9bd34eb3579d"
 dependencies = [
  "ahash 0.7.2",
  "arrow",
@@ -2469,9 +2469,9 @@ checksum = "1255076139a83bb467426e7f8d0134968a8118844faa755985e077cf31850333"
 
 [[package]]
 name = "multipart"
-version = "0.17.1"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d050aeedc89243f5347c3e237e3e13dc76fbe4ae3742a57b94dc14f69acf76d4"
+checksum = "00dec633863867f29cb39df64a397cdf4a6354708ddd7759f70c7fb51c5f9182"
 dependencies = [
  "buf_redux",
  "httparse",
@@ -2479,7 +2479,7 @@ dependencies = [
  "mime",
  "mime_guess",
  "quick-error",
- "rand 0.7.3",
+ "rand 0.8.3",
  "safemem",
  "tempfile",
  "twoway",
@@ -2912,7 +2912,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#c23d6d9b9bfb3cc759ff36e59b96d035da2707b0"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#ec6f60552a8b8a396ce909c243ad9bd34eb3579d"
 dependencies = [
  "arrow",
  "base64 0.12.3",
@@ -4470,9 +4470,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1a5f475f1b9d077ea1017ecbc60890fda8e54942d680ca0b1d2b47cfa2d861b"
+checksum = "1e96bb520beab540ab664bd5a9cfeaa1fcd846fa68c830b42e2c8963071251d2"
 dependencies = [
  "futures-util",
  "log",
@@ -4684,9 +4684,9 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tungstenite"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ada8297e8d70872fa9a551d93250a9f407beb9f37ef86494eb20012a2ff7c24"
+checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
 dependencies = [
  "base64 0.13.0",
  "byteorder",
@@ -4697,6 +4697,7 @@ dependencies = [
  "log",
  "rand 0.8.3",
  "sha-1",
+ "thiserror",
  "url",
  "utf-8",
 ]
@@ -4854,8 +4855,8 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.3.0"
-source = "git+https://github.com/seanmonstar/warp#68ac3a595a1969347df6ef66ca327d315b12ab7d"
+version = "0.3.1"
+source = "git+https://github.com/seanmonstar/warp#46734106f6a2d523c0dd6b5c6a8415350acb5b72"
 dependencies = [
  "bytes 1.0.1",
  "futures 0.3.13",

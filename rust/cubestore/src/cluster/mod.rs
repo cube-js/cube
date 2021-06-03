@@ -69,6 +69,14 @@ use tracing_futures::WithSubscriber;
 pub trait Cluster: DIService + Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
 
+    /// Send full select to a worker, which will act as the main node for the query.
+    async fn route_select(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>;
+
+    /// Runs select on a single worker node to get partial results from that worker.
     async fn run_select(
         &self,
         node_name: &str,
@@ -213,6 +221,20 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
+    async fn route_select(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
+        let response = self
+            .send_or_process_locally(&node_name, NetworkMessage::RouterSelect(plan))
+            .await?;
+        match response {
+            NetworkMessage::SelectResult(r) => r,
+            _ => panic!("unexpected response for route select"),
+        }
+    }
+
     #[instrument(level = "trace", skip(self, plan_node))]
     async fn run_select(
         &self,
@@ -319,8 +341,19 @@ impl Cluster for ClusterImpl {
     #[instrument(level = "trace", skip(self, m))]
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
         match m {
+            NetworkMessage::RouterSelect(plan) => {
+                let res = self
+                    .query_executor
+                    .execute_router_plan(plan, self.this.upgrade().unwrap())
+                    .await
+                    .and_then(|(schema, records)| {
+                        let records = SerializedRecordBatchStream::write(&schema, records)?;
+                        Ok((schema, records))
+                    });
+                NetworkMessage::SelectResult(res)
+            }
             NetworkMessage::Select(plan) => {
-                let res = self.run_local_select_serialized(plan).await;
+                let res = self.run_local_select_worker(plan).await;
                 NetworkMessage::SelectResult(res)
             }
             NetworkMessage::WarmupDownload(remote_path) => {
@@ -846,7 +879,7 @@ impl ClusterImpl {
     }
 
     #[instrument(level = "trace", skip(self, plan_node))]
-    async fn run_local_select_serialized(
+    async fn run_local_select_worker(
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
@@ -875,46 +908,36 @@ impl ClusterImpl {
             warn!("Warmup download for select ({:?})", warmup);
         }
 
-        #[cfg(target_os = "windows")]
+        let mut res = None;
+        #[cfg(not(target_os = "windows"))]
         {
+            if let Some(pool) = self.select_process_pool.read().await.clone() {
+                res = Some(
+                    pool.process(WorkerMessage::Select(
+                        plan_node.clone(),
+                        remote_to_local_names.clone(),
+                    ))
+                    .instrument(tracing::span!(
+                        tracing::Level::TRACE,
+                        "execute_worker_plan_on_pool"
+                    ))
+                    .await,
+                )
+            }
+        }
+
+        if res.is_none() {
             // TODO optimize for no double conversion
             let (schema, records) = self
                 .query_executor
                 .execute_worker_plan(plan_node.clone(), remote_to_local_names)
                 .await?;
             let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
-            info!("Running select completed ({:?})", start.elapsed()?);
-            Ok((schema, records?))
+            res = Some(Ok((schema, records?)))
         }
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            let pool_option = self.select_process_pool.read().await.clone();
-
-            let res = if let Some(pool) = pool_option {
-                let serialized_plan_node = plan_node.clone();
-                pool.process(WorkerMessage::Select(
-                    serialized_plan_node,
-                    remote_to_local_names,
-                ))
-                .instrument(tracing::span!(
-                    tracing::Level::TRACE,
-                    "execute_worker_plan_on_pool"
-                ))
-                .await
-            } else {
-                // TODO optimize for no double conversion
-                let (schema, records) = self
-                    .query_executor
-                    .execute_worker_plan(plan_node.clone(), remote_to_local_names)
-                    .await?;
-                let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
-                Ok((schema, records?))
-            };
-
-            info!("Running select completed ({:?})", start.elapsed()?);
-            res
-        }
+        info!("Running select completed ({:?})", start.elapsed()?);
+        res.unwrap()
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {
@@ -1041,7 +1064,7 @@ impl ClusterImpl {
     async fn start_stream_on_worker(self: Arc<Self>, m: NetworkMessage) -> Box<dyn MessageStream> {
         match m {
             NetworkMessage::SelectStart(p) => {
-                let (schema, results) = match self.run_local_select_serialized(p).await {
+                let (schema, results) = match self.run_local_select_worker(p).await {
                     Err(e) => return Box::new(QueryStream::new_error(e)),
                     Ok(x) => x,
                 };

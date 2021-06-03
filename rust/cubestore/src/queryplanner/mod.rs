@@ -14,9 +14,10 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStore, MetaStoreTable};
-use crate::queryplanner::planning::choose_index_ext;
-use crate::queryplanner::query_executor::batch_to_dataframe;
+use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
+use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec};
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 use crate::store::DataFrame;
@@ -30,7 +31,7 @@ use core::fmt;
 use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
+use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, PlanVisitor, ToDFSchema};
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
@@ -38,6 +39,7 @@ use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRe
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{datasource::TableProvider, prelude::ExecutionContext};
+use itertools::Itertools;
 use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
@@ -65,7 +67,7 @@ crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
 
 pub enum QueryPlan {
     Meta(LogicalPlan),
-    Select(SerializedPlan),
+    Select(SerializedPlan, /*partitions*/ Vec<Vec<u64>>),
 }
 
 #[async_trait]
@@ -91,7 +93,11 @@ impl QueryPlanner for QueryPlannerImpl {
                 self.config.enable_topk(),
             )
             .await?;
-            QueryPlan::Select(SerializedPlan::try_new(logical_plan, index_snapshots).await?)
+            let partitions = extract_partitions(&logical_plan)?;
+            QueryPlan::Select(
+                SerializedPlan::try_new(logical_plan, index_snapshots).await?,
+                partitions,
+            )
         } else {
             QueryPlan::Meta(logical_plan)
         };
@@ -395,5 +401,47 @@ impl TableProvider for CubeTableLogical {
         _filter: &Expr,
     ) -> Result<TableProviderFilterPushDown, DataFusionError> {
         return Ok(TableProviderFilterPushDown::Inexact);
+    }
+}
+
+fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
+    struct Visitor {
+        snapshots: Vec<Vec<u64>>,
+    }
+    impl PlanVisitor for Visitor {
+        type Error = ();
+
+        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, ()> {
+            match plan {
+                LogicalPlan::Extension { node } => {
+                    let snapshots;
+                    if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
+                        snapshots = &cs.snapshots;
+                    } else if let Some(cs) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+                        snapshots = &cs.snapshots;
+                    } else {
+                        return Ok(true);
+                    }
+
+                    self.snapshots = ClusterSendExec::execution_partitions(&snapshots)
+                        .into_iter()
+                        .map(|ps| ps.iter().map(|p| p.get_id()).collect_vec())
+                        .collect_vec();
+                    Ok(false)
+                }
+                _ => Ok(true),
+            }
+        }
+    }
+
+    let mut v = Visitor {
+        snapshots: Vec::new(),
+    };
+    match p.accept(&mut v) {
+        Ok(false) => Ok(v.snapshots),
+        Ok(true) => Err(CubeError::internal(
+            "no cluster send node found in plan".to_string(),
+        )),
+        Err(_) => panic!("unexpected return value"),
     }
 }

@@ -9,6 +9,10 @@ use tokio::net::TcpStream;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetworkMessage {
+    /// Route subqueries to other nodes and collect results.
+    RouterSelect(SerializedPlan),
+
+    /// Partial select on the worker.
     Select(SerializedPlan),
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 

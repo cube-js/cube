@@ -27,7 +27,7 @@ use crate::config::injection::DIService;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
-use crate::queryplanner::query_executor::QueryExecutor;
+use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::CubeStoreParser;
@@ -48,6 +48,8 @@ use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
+use rand::distributions::Uniform;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -531,14 +533,35 @@ impl SqlService for SqlServiceImpl {
                     QueryPlan::Meta(logical_plan) => {
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
-                    QueryPlan::Select(serialized) => {
+                    QueryPlan::Select(serialized, partitions) => {
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
                         timeout(
                             self.query_timeout,
                             self.cache
                                 .get(query, serialized, async move |plan| {
-                                    executor.execute_router_plan(plan, cluster).await
+                                    let records;
+                                    if partitions.len() == 0 {
+                                        records =
+                                            executor.execute_router_plan(plan, cluster).await?.1;
+                                    } else {
+                                        // Pick one of the workers to run as main for the request.
+                                        let i =
+                                            thread_rng().sample(Uniform::new(0, partitions.len()));
+                                        let node = cluster.node_name_by_partitions(&partitions[i]);
+                                        let rs = cluster.route_select(&node, plan).await?.1;
+                                        records = rs
+                                            .into_iter()
+                                            .map(|r| r.read())
+                                            .collect::<Result<Vec<_>, _>>()?;
+                                    }
+                                    Ok(tokio::task::spawn_blocking(
+                                        move || -> Result<DataFrame, CubeError> {
+                                            let df = batch_to_dataframe(&records)?;
+                                            Ok(df)
+                                        },
+                                    )
+                                    .await??)
                                 })
                                 .with_current_subscriber(),
                         )
@@ -564,7 +587,7 @@ impl SqlService for SqlServiceImpl {
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))
                     .await?;
                 match logical_plan {
-                    QueryPlan::Select(router_plan) => {
+                    QueryPlan::Select(router_plan, _) => {
                         // For tests, pretend we have all partitions on the same worker.
                         let worker_plan = router_plan.with_partition_id_to_execute(
                             router_plan
