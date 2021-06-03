@@ -3,6 +3,79 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.29](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.29) (2021-06-02)
+
+
+### Bug Fixes
+
+* **cubestore:** clean up metastore if create table fails, fix [#2880](https://github.com/cube-js/cube.js/issues/2880) ([f2d5b1a](https://github.com/cube-js/cube.js/commit/f2d5b1af2d2bd8d3444eb70464f8e5bcd3511dab))
+* **cubestore:** fix encoding of sparse HLL imported from Snowflake ([5ca48f4](https://github.com/cube-js/cube.js/commit/5ca48f4384e59ac56bbdfe85644f1730d5cbe011))
+
+
+### Features
+
+* **cubestore:** cubestore-specific env vars for GCS configuration ([6760c0e](https://github.com/cube-js/cube.js/commit/6760c0e0c8706332890f50c3eb85d8e0def5d8f5))
+
+
+
+
+
+## [0.27.28](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.28) (2021-06-02)
+
+
+### Bug Fixes
+
+* **cubestore:** clean up metastore if create table fails, fix [#2880](https://github.com/cube-js/cube.js/issues/2880) ([f2d5b1a](https://github.com/cube-js/cube.js/commit/f2d5b1af2d2bd8d3444eb70464f8e5bcd3511dab))
+* **cubestore:** fix encoding of sparse HLL imported from Snowflake ([5ca48f4](https://github.com/cube-js/cube.js/commit/5ca48f4384e59ac56bbdfe85644f1730d5cbe011))
+
+
+### Features
+
+* **cubestore:** cubestore-specific env vars for GCS configuration ([6760c0e](https://github.com/cube-js/cube.js/commit/6760c0e0c8706332890f50c3eb85d8e0def5d8f5))
+
+
+
+
+
+## [0.27.27](https://github.com/cube-js/cube.js/compare/v0.27.26...v0.27.27) (2021-06-01)
+
+
+### Bug Fixes
+
+* **cubestore:** panic on compaction of decimals [#2868](https://github.com/cube-js/cube.js/issues/2868) ([a4eef83](https://github.com/cube-js/cube.js/commit/a4eef83602734b1e6c59e0666822f9c80eed3a90))
+
+
+
+
+
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Bug Fixes
+
+* **cubestore:** allow decimal and float type in index keys ([32d2f69](https://github.com/cube-js/cube.js/commit/32d2f691d7fba73bd36a8cfd75ed1ecebb046ef3))
+* **cubestore:** Uncompress files with .gz ([5f8062a](https://github.com/cube-js/cube.js/commit/5f8062a272ed3d01d61c0de7847bd31363079d92))
+
+
+### Features
+
+* **cubestore:** Support import of Snowflake HLL ([61324e0](https://github.com/cube-js/cube.js/commit/61324e0784314bb7c6db67a45d5da35bdc5fee26))
+
+
+
+
+
+## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
+
+
+### Bug Fixes
+
+* **cubestore:** Invalid cross-device link (os error 18) during streaming CREATE TABLE ([942f6d0](https://github.com/cube-js/cube.js/commit/942f6d0b1ee7635bf15c17b8d69467385fba4747))
+
+
+
+
+
 ## [0.27.23](https://github.com/cube-js/cube.js/compare/v0.27.22...v0.27.23) (2021-05-27)
 
 

@@ -695,4 +695,50 @@ describe('QueryOrchestrator', () => {
     console.log(mockDriver.tables);
     expect(mockDriver.tables.length).toBe(2);
   });
+
+  test('pre-aggregation version entries', async () => {
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM stb_pre_aggregations.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT 2', []]]
+      }],
+      renewQuery: true,
+      requestId: 'save structure versions'
+    });
+
+    const versionEntries = await queryOrchestrator.getPreAggregationVersionEntries(
+      [
+        {
+          preAggregation: {},
+          partitions: [
+            {
+              sql: {
+                preAggregationsSchema: 'stb_pre_aggregations',
+                tableName: 'stb_pre_aggregations.orders',
+                loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
+                invalidateKeyQueries: [['SELECT 2', []]]
+              }
+            }
+          ]
+        }
+      ],
+      'stb_pre_aggregations'
+    );
+
+    expect(versionEntries.length).toBe(1);
+    expect(versionEntries[0]).toMatchObject({
+      table_name: 'stb_pre_aggregations.orders',
+      content_version: 'mjooke4',
+      structure_version: 'ezlvkhjl',
+      naming_version: 2
+    });
+  });
 });

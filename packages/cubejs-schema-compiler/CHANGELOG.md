@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.29](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.29) (2021-06-02)
+
+
+### Bug Fixes
+
+* Resolve refresh key sql for pre-aggregations meta api ([#2881](https://github.com/cube-js/cube.js/issues/2881)) ([55383b6](https://github.com/cube-js/cube.js/commit/55383b6d1d9755ded6e8815fc04ba3070e675199))
+
+
+### Features
+
+* **snowflake-driver:** Support HLL ([7b57840](https://github.com/cube-js/cube.js/commit/7b578401a5271a2cbe43266f0190b786b2191aaf))
+
+
+
+
+
+## [0.27.28](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.28) (2021-06-02)
+
+
+### Bug Fixes
+
+* Resolve refresh key sql for pre-aggregations meta api ([#2881](https://github.com/cube-js/cube.js/issues/2881)) ([55383b6](https://github.com/cube-js/cube.js/commit/55383b6d1d9755ded6e8815fc04ba3070e675199))
+
+
+### Features
+
+* **snowflake-driver:** Support HLL ([7b57840](https://github.com/cube-js/cube.js/commit/7b578401a5271a2cbe43266f0190b786b2191aaf))
+
+
+
+
+
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Features
+
+* Pre-aggregations Meta API, part 2 ([#2804](https://github.com/cube-js/cube.js/issues/2804)) ([84b6e70](https://github.com/cube-js/cube.js/commit/84b6e70ed81e80cff0ba8d0dd9ad507132bb1b24))
+
+
+
+
+
 ## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

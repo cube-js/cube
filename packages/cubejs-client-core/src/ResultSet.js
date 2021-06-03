@@ -7,7 +7,7 @@ import { extendMoment } from 'moment-range';
 
 const moment = extendMoment(Moment);
 
-const TIME_SERIES = {
+export const TIME_SERIES = {
   day: (range) => Array.from(range.by('day'))
     .map(d => d.format('YYYY-MM-DDT00:00:00.000')),
   month: (range) => Array.from(range.snapTo('month').by('month'))

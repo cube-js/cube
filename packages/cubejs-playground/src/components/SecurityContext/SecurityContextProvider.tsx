@@ -17,7 +17,7 @@ export const SecurityContextContext = createContext<TSecurityContextContextProps
   {} as TSecurityContextContextProps
 );
 
-type TSecurityContextProviderProps = {
+type SecurityContextProviderProps = {
   children: ReactNode;
   tokenKey?: string | null;
 } & Pick<TSecurityContextContextProps, 'getToken'>
@@ -26,7 +26,7 @@ export function SecurityContextProvider({
   children,
   getToken,
   tokenKey = null,
-}: TSecurityContextProviderProps) {
+}: SecurityContextProviderProps) {
   const [token, setToken] = useState<string | null>(null);
   const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);

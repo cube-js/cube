@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.27](https://github.com/cube-js/cube.js/compare/v0.27.26...v0.27.27) (2021-06-01)
+
+
+### Bug Fixes
+
+* Filter empty contexts for pre-aggregation Meta API ([#2873](https://github.com/cube-js/cube.js/issues/2873)) ([cec4dff](https://github.com/cube-js/cube.js/commit/cec4dff54b1e56f6670edf1041b0ff22ee2c25d1))
+
+
+
+
+
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Features
+
+* Pre-aggregations Meta API, part 2 ([#2804](https://github.com/cube-js/cube.js/issues/2804)) ([84b6e70](https://github.com/cube-js/cube.js/commit/84b6e70ed81e80cff0ba8d0dd9ad507132bb1b24))
+
+
+
+
+
 ## [0.27.22](https://github.com/cube-js/cube.js/compare/v0.27.21...v0.27.22) (2021-05-27)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

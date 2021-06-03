@@ -2,7 +2,7 @@
 title: Deployment Guide
 permalink: /deployment/guide
 category: Deployment
-menuOrder: 1
+menuOrder: 2
 redirect_from:
   - /deployment/
 ---

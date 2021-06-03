@@ -1,9 +1,16 @@
 import { PlusOutlined } from '@ant-design/icons';
+import { AvailableCube } from '@cubejs-client/react';
 
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import { SectionRow } from '../components';
 import MissingMemberTooltip from './MissingMemberTooltip';
+
+type MemberGroupProps = {
+  disalbed?: boolean;
+  availableMembers: AvailableCube[];
+  [key: string]: any;
+};
 
 const MemberGroup = ({
   disabled = false,
@@ -12,7 +19,7 @@ const MemberGroup = ({
   missingMembers,
   addMemberName,
   updateMethods,
-}) => (
+}: MemberGroupProps) => (
   <SectionRow>
     {members.map((m) => {
       const isMissing = missingMembers.includes(m.title);
@@ -36,9 +43,7 @@ const MemberGroup = ({
       );
 
       return isMissing ? (
-        <MissingMemberTooltip>
-          {buttonGroup}
-        </MissingMemberTooltip>
+        <MissingMemberTooltip>{buttonGroup}</MissingMemberTooltip>
       ) : (
         buttonGroup
       );

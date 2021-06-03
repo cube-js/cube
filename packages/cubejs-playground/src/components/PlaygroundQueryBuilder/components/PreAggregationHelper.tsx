@@ -67,10 +67,10 @@ export function PreAggregationHelper({
             Add the following pre-aggregation to the <b>{cubeName}</b> cube.
           </Paragraph>
 
-          <CodeSnippet code={preAggCode} />
+          <CodeSnippet style={{ marginBottom: 16 }} code={preAggCode} />
         </>
       ) : (
-        <>
+        <Paragraph>
           <Link
             href="!https://cube.dev/docs/pre-aggregations#rollup-rollup-selection-rules"
             target="_blank"
@@ -86,8 +86,16 @@ export function PreAggregationHelper({
             originalSql
           </Link>{' '}
           pre-aggregation instead.
-        </>
+        </Paragraph>
       )}
+
+      <Link
+        style={{ paddingTop: 16 }}
+        href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
+        target="_blank"
+      >
+        Further reading about pre-aggregations for reference.
+      </Link>
     </>
   );
 }

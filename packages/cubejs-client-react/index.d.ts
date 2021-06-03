@@ -307,14 +307,14 @@ declare module '@cubejs-client/react' {
     dryRunResponse?: TDryRunResponse;
   };
 
-  type AvailableMembers = {
+  export type AvailableMembers = {
     measures: AvailableCube<TCubeMeasure>[];
     dimensions: AvailableCube<TCubeDimension>[];
     segments: AvailableCube<TCubeSegment>[];
     timeDimensions: AvailableCube<TCubeDimension>[];
   }
 
-  type AvailableCube<T> = {
+  export type AvailableCube<T = any> = {
     cubeName: string,
     cubeTitle: string,
     members: T[]

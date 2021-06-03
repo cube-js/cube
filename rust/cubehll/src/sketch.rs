@@ -30,10 +30,10 @@ pub struct HllSketch {
 impl HllSketch {
     /// Create a sketch for an empty set of elements.
     /// The number of buckets is a power of two, not more than 65536.
-    pub fn new(num_buckets: u32) -> HllSketch {
-        return HllSketch {
-            instance: HllInstance::new(num_buckets),
-        };
+    pub fn new(num_buckets: u32) -> Result<HllSketch> {
+        return Ok(HllSketch {
+            instance: HllInstance::new(num_buckets)?,
+        });
     }
 
     /// Maximum number of buckets used for this representation.
@@ -50,6 +50,14 @@ impl HllSketch {
             instance: HllInstance::read(data)?,
         });
     }
+
+    /// Read from the snowflake JSON format, i.e. result of HLL_EXPORT serialized to string.
+    pub fn read_snowflake(s: &str) -> Result<HllSketch> {
+        return Ok(HllSketch {
+            instance: HllInstance::read_snowflake(s)?,
+        });
+    }
+
     pub fn write(&self) -> Vec<u8> {
         return self.instance.write();
     }

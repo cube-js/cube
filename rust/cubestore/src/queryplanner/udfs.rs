@@ -1,3 +1,4 @@
+use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::Hll;
 use crate::CubeError;
 use arrow::array::{Array, BinaryArray, UInt64Builder};
@@ -6,7 +7,7 @@ use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::{Accumulator, ColumnarValue};
+use datafusion::physical_plan::{type_coercion, Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::smallvec;
@@ -16,6 +17,7 @@ use std::sync::Arc;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeScalarUDFKind {
     HllCardinality, // cardinality(), accepting the HyperLogLog sketches.
+    Coalesce,
 }
 
 pub trait CubeScalarUDF {
@@ -27,6 +29,7 @@ pub trait CubeScalarUDF {
 pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Box<dyn CubeScalarUDF> {
     match k {
         CubeScalarUDFKind::HllCardinality => Box::new(HllCardinality {}),
+        CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
     }
 }
 
@@ -34,6 +37,9 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Box<dyn CubeScalarUDF> {
 pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     if n == "CARDINALITY" {
         return Some(CubeScalarUDFKind::HllCardinality);
+    }
+    if n == "COALESCE" {
+        return Some(CubeScalarUDFKind::Coalesce);
     }
     return None;
 }
@@ -66,6 +72,39 @@ pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
 
 // The rest of the file are implementations of the various functions that we have.
 // TODO: add custom type and use it instead of `Binary` for HLL columns.
+
+struct Coalesce {}
+impl Coalesce {
+    fn signature() -> Signature {
+        Signature::Variadic(SUPPORTED_COALESCE_TYPES.to_vec())
+    }
+}
+impl CubeScalarUDF for Coalesce {
+    fn kind(&self) -> CubeScalarUDFKind {
+        CubeScalarUDFKind::Coalesce
+    }
+
+    fn name(&self) -> &str {
+        "COALESCE"
+    }
+
+    fn descriptor(&self) -> ScalarUDF {
+        return ScalarUDF {
+            name: self.name().to_string(),
+            signature: Self::signature(),
+            return_type: Arc::new(|inputs| {
+                if inputs.is_empty() {
+                    return Err(DataFusionError::Plan(
+                        "COALESCE requires at least 1 argument".to_string(),
+                    ));
+                }
+                let ts = type_coercion::data_types(inputs, &Self::signature())?;
+                Ok(Arc::new(ts[0].clone()))
+            }),
+            fun: Arc::new(coalesce),
+        };
+    }
+}
 
 struct HllCardinality {}
 impl CubeScalarUDF for HllCardinality {

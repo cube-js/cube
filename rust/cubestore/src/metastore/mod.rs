@@ -284,7 +284,7 @@ impl DataFrameValue<String> for Option<Row> {
                             TableValue::Timestamp(t) => format!("{:?}", t),
                             TableValue::Bytes(b) => format!("{:?}", b),
                             TableValue::Boolean(b) => format!("{:?}", b),
-                            TableValue::Decimal(v) => format!("{}", v),
+                            TableValue::Decimal(v) => format!("{}", v.raw_value()),
                             TableValue::Float(v) => format!("{}", v),
                         })
                         .join(", ")
@@ -297,10 +297,20 @@ impl DataFrameValue<String> for Option<Row> {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum HllFlavour {
     Airlift,    // Compatible with Presto, Athena, etc.
+    Snowflake,  // Same storage as Airlift, imports from Snowflake JSON.
     ZetaSketch, // Compatible with BigQuery.
 }
 
-pub fn is_valid_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
+impl HllFlavour {
+    pub fn imports_from_binary(&self) -> bool {
+        match self {
+            HllFlavour::Airlift | HllFlavour::ZetaSketch => true,
+            HllFlavour::Snowflake => false,
+        }
+    }
+}
+
+pub fn is_valid_binary_hll_input(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
     // TODO: do no memory allocations for better performance, this is run on hot path.
     match f {
         HllFlavour::Airlift => {
@@ -308,6 +318,9 @@ pub fn is_valid_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
         }
         HllFlavour::ZetaSketch => {
             HyperLogLogPlusPlus::read(data)?;
+        }
+        HllFlavour::Snowflake => {
+            panic!("string formats should be handled separately")
         }
     }
     return Ok(());
@@ -438,6 +451,7 @@ impl fmt::Display for Column {
             ColumnType::Bytes => "BYTES".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Airlift) => "HYPERLOGLOG".to_string(),
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "HYPERLOGLOGPP".to_string(),
+            ColumnType::HyperLogLog(HllFlavour::Snowflake) => "HLL_SNOWFLAKE".to_string(),
             ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))
@@ -2270,7 +2284,7 @@ impl MetaStore for RocksMetaStore {
 
             let schema_id =
                 rocks_schema.get_single_row_by_index(&schema_name, &SchemaRocksIndex::Name)?;
-            let index_cols = columns.clone();
+            let table_columns = columns.clone();
             let table = Table::new(
                 table_name,
                 schema_id.get_id(),
@@ -2285,36 +2299,29 @@ impl MetaStore for RocksMetaStore {
                     batch_pipe,
                     &rocks_index,
                     &rocks_partition,
-                    &index_cols,
+                    &table_columns,
                     &table_id,
                     index_def,
                 )?;
             }
-
-            let (mut sorted, mut unsorted) =
-                index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
-                    match c.get_column_type() {
-                        ColumnType::Decimal { .. } | ColumnType::Bytes | ColumnType::Float => false,
-                        _ => true,
-                    }
-                });
-
-            let sorted_key_size = sorted.len() as u64;
-            sorted.append(&mut unsorted);
-
-            let index = Index::try_new(
-                "default".to_string(),
-                table_id.get_id(),
-                sorted
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, c)| c.replace_index(i))
-                    .collect::<Vec<_>>(),
-                sorted_key_size,
+            let def_index_columns = table_columns
+                .iter()
+                .filter_map(|c| match c.get_column_type() {
+                    ColumnType::Bytes => None,
+                    _ => Some(c.get_name().clone()),
+                })
+                .collect_vec();
+            RocksMetaStore::add_index(
+                batch_pipe,
+                &rocks_index,
+                &rocks_partition,
+                &table_columns,
+                &table_id,
+                IndexDef {
+                    name: "default".to_string(),
+                    columns: def_index_columns,
+                },
             )?;
-            let index_id = rocks_index.insert(index, batch_pipe)?;
-            let partition = Partition::new(index_id.id, None, None);
-            let _ = rocks_partition.insert(partition, batch_pipe)?;
 
             Ok(table_id)
         })
@@ -3386,6 +3393,7 @@ mod tests {
                 },
                 2,
             ));
+            columns.push(Column::new("col4".to_string(), ColumnType::Bytes, 3));
 
             let table1 = meta_store
                 .create_table(

@@ -216,7 +216,12 @@ impl From<flexbuffers::SerializationError> for CubeError {
 
 impl From<s3::S3Error> for CubeError {
     fn from(v: s3::S3Error) -> Self {
-        CubeError::internal(v.to_string())
+        let mut m = v.to_string();
+        if let Some(data) = v.data {
+            m += ": ";
+            m += &data
+        }
+        CubeError::internal(m)
     }
 }
 

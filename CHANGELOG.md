@@ -3,6 +3,108 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.29](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.29) (2021-06-02)
+
+
+### Bug Fixes
+
+* Pass securityContext to contextSymbols in refresh scheduler ([886c276](https://github.com/cube-js/cube.js/commit/886c2764d72837899f0bbde8c6e4cd80c1cafc97))
+* Resolve refresh key sql for pre-aggregations meta api ([#2881](https://github.com/cube-js/cube.js/issues/2881)) ([55383b6](https://github.com/cube-js/cube.js/commit/55383b6d1d9755ded6e8815fc04ba3070e675199))
+* **cubestore:** clean up metastore if create table fails, fix [#2880](https://github.com/cube-js/cube.js/issues/2880) ([f2d5b1a](https://github.com/cube-js/cube.js/commit/f2d5b1af2d2bd8d3444eb70464f8e5bcd3511dab))
+* **cubestore:** fix encoding of sparse HLL imported from Snowflake ([5ca48f4](https://github.com/cube-js/cube.js/commit/5ca48f4384e59ac56bbdfe85644f1730d5cbe011))
+* **elasticsearch-driver:** Lock @elastic/elasticsearch to 7.12 for Node.js 10 support ([cedf108](https://github.com/cube-js/cube.js/commit/cedf1089ea6262a4e3e3fed18c3714fb8258fa93))
+
+
+### Features
+
+* **cubestore:** cubestore-specific env vars for GCS configuration ([6760c0e](https://github.com/cube-js/cube.js/commit/6760c0e0c8706332890f50c3eb85d8e0def5d8f5))
+* **docker:** Install redshift-driver ([dc81be5](https://github.com/cube-js/cube.js/commit/dc81be526c11a32e3b45327dae98a477597438d9))
+* **snowflake-driver:** Support HLL ([7b57840](https://github.com/cube-js/cube.js/commit/7b578401a5271a2cbe43266f0190b786b2191aaf))
+
+
+
+
+
+## [0.27.28](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.28) (2021-06-02)
+
+
+### Bug Fixes
+
+* Pass securityContext to contextSymbols in refresh scheduler ([886c276](https://github.com/cube-js/cube.js/commit/886c2764d72837899f0bbde8c6e4cd80c1cafc97))
+* Resolve refresh key sql for pre-aggregations meta api ([#2881](https://github.com/cube-js/cube.js/issues/2881)) ([55383b6](https://github.com/cube-js/cube.js/commit/55383b6d1d9755ded6e8815fc04ba3070e675199))
+* **cubestore:** clean up metastore if create table fails, fix [#2880](https://github.com/cube-js/cube.js/issues/2880) ([f2d5b1a](https://github.com/cube-js/cube.js/commit/f2d5b1af2d2bd8d3444eb70464f8e5bcd3511dab))
+* **cubestore:** fix encoding of sparse HLL imported from Snowflake ([5ca48f4](https://github.com/cube-js/cube.js/commit/5ca48f4384e59ac56bbdfe85644f1730d5cbe011))
+* **elasticsearch-driver:** Lock @elastic/elasticsearch to 7.12 for Node.js 10 support ([cedf108](https://github.com/cube-js/cube.js/commit/cedf1089ea6262a4e3e3fed18c3714fb8258fa93))
+
+
+### Features
+
+* **cubestore:** cubestore-specific env vars for GCS configuration ([6760c0e](https://github.com/cube-js/cube.js/commit/6760c0e0c8706332890f50c3eb85d8e0def5d8f5))
+* **docker:** Install redshift-driver ([dc81be5](https://github.com/cube-js/cube.js/commit/dc81be526c11a32e3b45327dae98a477597438d9))
+* **snowflake-driver:** Support HLL ([7b57840](https://github.com/cube-js/cube.js/commit/7b578401a5271a2cbe43266f0190b786b2191aaf))
+
+
+
+
+
+## [0.27.27](https://github.com/cube-js/cube.js/compare/v0.27.26...v0.27.27) (2021-06-01)
+
+
+### Bug Fixes
+
+* **cubestore:** panic on compaction of decimals [#2868](https://github.com/cube-js/cube.js/issues/2868) ([a4eef83](https://github.com/cube-js/cube.js/commit/a4eef83602734b1e6c59e0666822f9c80eed3a90))
+* Filter empty contexts for pre-aggregation Meta API ([#2873](https://github.com/cube-js/cube.js/issues/2873)) ([cec4dff](https://github.com/cube-js/cube.js/commit/cec4dff54b1e56f6670edf1041b0ff22ee2c25d1))
+
+
+
+
+
+## [0.27.26](https://github.com/cube-js/cube.js/compare/v0.27.25...v0.27.26) (2021-06-01)
+
+
+### Bug Fixes
+
+* **redshift-driver:** publishConfig - public ([d72baf4](https://github.com/cube-js/cube.js/commit/d72baf4ef39d89be986f51941629def0975c989f))
+
+
+
+
+
+## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mssql-driver:** Add column type mappings for MSSQL external pre-aggregations ([#2846](https://github.com/cube-js/cube.js/issues/2846)) ([7c1ef6d](https://github.com/cube-js/cube.js/commit/7c1ef6d69e9cc0ff8f19c6dd2b8a6f2328ec6456))
+* **cubestore:** allow decimal and float type in index keys ([32d2f69](https://github.com/cube-js/cube.js/commit/32d2f691d7fba73bd36a8cfd75ed1ecebb046ef3))
+* **cubestore:** Uncompress files with .gz ([5f8062a](https://github.com/cube-js/cube.js/commit/5f8062a272ed3d01d61c0de7847bd31363079d92))
+* **mysql/aurora-mysql:** Unexpected index creation in loop ([#2828](https://github.com/cube-js/cube.js/issues/2828)) ([456aae7](https://github.com/cube-js/cube.js/commit/456aae7f1a21b18250511f2f8b5783e6e66dfb53))
+
+
+### Features
+
+* Introduce Redshift driver (based on postgres-driver) ([f999699](https://github.com/cube-js/cube.js/commit/f99969905ee4df1a797afd389177a72dd5a097c8))
+* **cubestore:** Support import of Snowflake HLL ([61324e0](https://github.com/cube-js/cube.js/commit/61324e0784314bb7c6db67a45d5da35bdc5fee26))
+* **redshift-driver:** Support UNLOAD (direct export to S3) ([d741027](https://github.com/cube-js/cube.js/commit/d7410278d3a27e692c41b222ab0eb66f7992fe21))
+* Pre-aggregations Meta API, part 2 ([#2804](https://github.com/cube-js/cube.js/issues/2804)) ([84b6e70](https://github.com/cube-js/cube.js/commit/84b6e70ed81e80cff0ba8d0dd9ad507132bb1b24))
+* time filter operators ([#2851](https://github.com/cube-js/cube.js/issues/2851)) ([5054249](https://github.com/cube-js/cube.js/commit/505424964d34ae16205485e5347409bb4c5a661d))
+
+
+
+
+
+## [0.27.24](https://github.com/cube-js/cube.js/compare/v0.27.23...v0.27.24) (2021-05-29)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** decompose type ([#2849](https://github.com/cube-js/cube.js/issues/2849)) ([60f2596](https://github.com/cube-js/cube.js/commit/60f25964f8f7aecd8a36cc0f1b811445ae12edc6))
+* **cubestore:** Invalid cross-device link (os error 18) during streaming CREATE TABLE ([942f6d0](https://github.com/cube-js/cube.js/commit/942f6d0b1ee7635bf15c17b8d69467385fba4747))
+
+
+
+
+
 ## [0.27.23](https://github.com/cube-js/cube.js/compare/v0.27.22...v0.27.23) (2021-05-27)
 
 

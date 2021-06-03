@@ -123,6 +123,8 @@ export class PreAggregations {
     }
 
     return {
+      preAggregationId: `${cube}.${preAggregationName}`,
+      timezone: this.query.options && this.query.options.timezone,
       tableName,
       external,
       preAggregationsSchema: this.query.preAggregationSchema(),

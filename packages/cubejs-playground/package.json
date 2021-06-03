@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.27.22",
+  "version": "0.27.26",
   "engines": {},
   "repository": {
     "type": "git",
@@ -32,13 +32,13 @@
   "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.27.22",
-    "@cubejs-client/react": "^0.27.22",
+    "@cubejs-client/core": "^0.27.26",
+    "@cubejs-client/react": "^0.27.26",
     "codesandbox-import-utils": "^2.1.1",
     "customize-cra": "^1.0.0",
     "fast-deep-equal": "^3.1.3",
     "fetch-retry": "^4.0.1",
-    "fuse.js": "^6.4.6",
+    "flexsearch": "^0.6.32",
     "history": "^4.9.0",
     "js-cookie": "^2.2.1",
     "jwt-decode": "^3.1.2",

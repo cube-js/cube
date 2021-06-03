@@ -40,11 +40,14 @@ function getTypeParser(dataType: TypeId, format: TypeFormat|undefined) {
   return (val: any) => parser(val);
 }
 
-export class PostgresDriver extends BaseDriver implements DriverInterface {
+export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriverConfiguration>
+  extends BaseDriver implements DriverInterface {
   protected readonly pool: Pool;
 
+  protected readonly config: Partial<C>;
+
   public constructor(
-    protected readonly config: Partial<PostgresDriverConfiguration> = {}
+    config: Partial<C> = {}
   ) {
     super();
 
@@ -62,6 +65,19 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
     this.pool.on('error', (err) => {
       console.log(`Unexpected error on idle client: ${err.stack || err}`); // TODO
     });
+
+    this.config = {
+      ...this.getInitialConfiguration(),
+      ...config,
+    };
+  }
+
+  /**
+   * The easist way how to add additional configuration from env variables, because
+   * you cannot call method in RedshiftDriver.constructor before super.
+   */
+  protected getInitialConfiguration(): Partial<C> {
+    return {};
   }
 
   public async testConnection(): Promise<void> {
@@ -76,11 +92,14 @@ export class PostgresDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  protected async prepareConnection(conn: PoolClient) {
+  protected async prepareConnection(
+    conn: PoolClient,
+    options: { executionTimeout: number } = {
+      executionTimeout: this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000
+    }
+  ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
-
-    const statementTimeout: number = this.config.executionTimeout ? this.config.executionTimeout * 1000 : 600000;
-    await conn.query(`set statement_timeout to ${statementTimeout}`);
+    await conn.query(`set statement_timeout to ${options.executionTimeout}`);
   }
 
   public async stream(
