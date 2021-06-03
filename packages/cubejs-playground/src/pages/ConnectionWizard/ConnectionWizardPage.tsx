@@ -72,7 +72,7 @@ export type Database = {
   instructions?: string;
 };
 
-export default function ConnectionWizardPage({ history }) {
+export function ConnectionWizardPage({ history }) {
   const [hostname, setHostname] = useState<string>('');
   const [isLoading, setLoading] = useState(false);
   const [isTestConnectionLoading, setTestConnectionLoading] = useState(false);

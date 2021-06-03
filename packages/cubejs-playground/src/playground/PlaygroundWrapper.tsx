@@ -13,7 +13,7 @@ const StyledWrapper = styled.div`
   min-height: 100vh;
 `;
 
-type TPlaygroundWrapperProps = {
+type PlaygroundWrapperProps = {
   tokenKey?: string;
   children: ReactNode;
 } & Pick<TSecurityContextContextProps, 'getToken'>;
@@ -22,7 +22,7 @@ export default function PlaygroundWrapper({
   tokenKey,
   getToken,
   children,
-}: TPlaygroundWrapperProps) {
+}: PlaygroundWrapperProps) {
   return (
     <StyledWrapper>
       <BrowserRouter>
