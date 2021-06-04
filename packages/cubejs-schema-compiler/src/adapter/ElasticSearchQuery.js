@@ -16,7 +16,7 @@ const GRANULARITY_TO_INTERVAL = {
 
 class ElasticSearchQueryFilter extends BaseFilter {
   likeIgnoreCase(column, not, param) {
-    return `${not ? ' NOT' : ''} MATCH(${column}, ${this.allocateParam(param)}, 'fuzziness=AUTO:1,5')`;
+    return `${not ? " NOT" : ""}  ${column} RLIKE '.*${param}.*'`;
   }
 }
 
