@@ -410,6 +410,7 @@ export class DevServer {
 
       // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
+      variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
       const repositoryPath = path.join(process.cwd(), options.schemaPath);

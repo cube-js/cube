@@ -260,6 +260,9 @@ const variables: Record<string, (...args: any) => any> = {
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('false')
     .asBoolStrict(),
+  scheduledRefreshDefault: () => get('CUBEJS_SCHEDULED_REFRESH_DEFAULT')
+    .default('false')
+    .asBoolStrict(),
 };
 
 type Vars = typeof variables;
