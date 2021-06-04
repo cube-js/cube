@@ -4,6 +4,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
+use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -59,7 +60,14 @@ impl NetworkMessage {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         self.serialize(&mut ser).unwrap();
         let message_buffer = ser.take_buffer();
-        socket.write_u64(message_buffer.len() as u64).await?;
+        let len = message_buffer.len() as u64;
+        if MAX_NETWORK_MSG_LEN < len {
+            return Err(std::io::Error::new(
+                ErrorKind::Other,
+                format!("network message too large, {} bytes", len),
+            ));
+        }
+        socket.write_u64(len).await?;
         socket.write_all(message_buffer.as_slice()).await?;
         Ok(())
     }
@@ -82,9 +90,26 @@ impl NetworkMessage {
         };
         let len = len?;
 
+        if MAX_NETWORK_MSG_LEN < len {
+            // Common misconfig of CubeJS can cause it to send HTTP message to the metastore port.
+            // The constant is the numeric value of the 'GET /ws ' string.
+            if len == 5135603447297962784 {
+                return Err(CubeError::internal(format!(
+                    "HTTP message on metastore port"
+                )));
+            }
+            return Err(CubeError::internal(format!(
+                "invalid metastore message: declared length is too large, {} bytes",
+                len
+            )));
+        }
+
         let mut buffer = Vec::with_capacity(len as usize);
         socket.take(len).read_to_end(&mut buffer).await?;
         let r = flexbuffers::Reader::get_root(&buffer)?;
         Ok(Some(Self::deserialize(r)?))
     }
 }
+
+// Anything larger is considered to be an invalid message.
+const MAX_NETWORK_MSG_LEN: u64 = 20 * 1024 * 1024 * 1024; // 20GiB
