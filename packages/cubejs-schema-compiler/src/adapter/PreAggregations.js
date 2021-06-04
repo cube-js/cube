@@ -1,5 +1,4 @@
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 
@@ -115,18 +114,11 @@ export class PreAggregations {
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
 
-    // eslint-disable-next-line prefer-destructuring
-    let external = preAggregation.external;
-
-    if (external === undefined) {
-      external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
-    }
-
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
       tableName,
-      external,
+      external: preAggregation.external,
       preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),

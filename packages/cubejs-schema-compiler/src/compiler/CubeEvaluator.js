@@ -1,4 +1,6 @@
+/* eslint-disable no-restricted-syntax */
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -15,6 +17,8 @@ export class CubeEvaluator extends CubeSymbols {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
 
+    Object.values(validCubes).map(this.prepareCube);
+
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(validCubes.map((v) => {
@@ -24,6 +28,21 @@ export class CubeEvaluator extends CubeSymbols {
         primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
       ];
     }));
+  }
+
+  prepareCube(cube) {
+    if (cube.preAggregations) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const preAggregation of Object.values(cube.preAggregations)) {
+        if (preAggregation.scheduledRefresh === undefined) {
+          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+        }
+
+        if (preAggregation.external === undefined) {
+          preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
+        }
+      }
+    }
   }
 
   cubesByFileName(fileName) {
