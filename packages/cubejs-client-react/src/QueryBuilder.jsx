@@ -297,7 +297,7 @@ export default class QueryBuilder extends React.Component {
 
     let orderMembers = uniqBy(prop('id'), [
       // uniqBy prefers first, so these will only be added if not already in the query
-      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: activeOrder[name] || 'none' })),
+      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: activeOrder?.[name] || 'none' })),
     ]);
 
     if (this.orderMembersOrderKeys.length !== orderMembers.length) {
