@@ -20,16 +20,17 @@ extern crate lazy_static;
 use crate::metastore::TableId;
 use crate::remotefs::queue::RemoteFsOpResult;
 use arrow::error::ArrowError;
-use core::fmt;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
 use serde_derive::{Deserialize, Serialize};
-use smallvec::alloc::fmt::{Debug, Formatter};
 use sqlparser::parser::ParserError;
 use std::backtrace::Backtrace;
+use std::fmt;
+use std::fmt::Display;
+use std::fmt::{Debug, Formatter};
 use std::num::ParseIntError;
 use std::sync::PoisonError;
 use tokio::sync::broadcast;
@@ -56,6 +57,7 @@ pub mod util;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
     pub message: String,
+    pub backtrace: String,
     pub cause: CubeErrorCauseType,
 }
 
@@ -68,9 +70,25 @@ pub enum CubeErrorCauseType {
 }
 
 impl CubeError {
+    fn display_with_backtrace(&'a self) -> impl Display + 'a {
+        struct WithBt<'a>(&'a CubeError);
+        impl Display for WithBt<'_> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                f.write_fmt(format_args!("{}", self.0))?;
+                if !self.0.backtrace.is_empty() {
+                    f.write_str("\n")?;
+                    f.write_str(&self.0.backtrace)?;
+                }
+                Ok(())
+            }
+        }
+        WithBt(self)
+    }
+
     pub fn user(message: String) -> CubeError {
         CubeError {
             message,
+            backtrace: String::new(),
             cause: CubeErrorCauseType::User,
         }
     }
@@ -78,20 +96,23 @@ impl CubeError {
     pub fn internal(message: String) -> CubeError {
         CubeError {
             message,
+            backtrace: String::new(),
             cause: CubeErrorCauseType::Internal,
         }
     }
 
     pub fn from_error<E: fmt::Display>(error: E) -> CubeError {
         CubeError {
-            message: format!("{}\n{}", error, Backtrace::capture()),
+            message: format!("{}", error),
+            backtrace: Backtrace::capture().to_string(),
             cause: CubeErrorCauseType::Internal,
         }
     }
 
     fn from_debug_error<E: Debug>(error: E) -> CubeError {
         CubeError {
-            message: format!("{:?}\n{}", error, Backtrace::capture()),
+            message: format!("{:?}", error),
+            backtrace: Backtrace::capture().to_string(),
             cause: CubeErrorCauseType::Internal,
         }
     }
@@ -117,7 +138,7 @@ impl From<rocksdb::Error> for CubeError {
 
 impl From<std::io::Error> for CubeError {
     fn from(v: std::io::Error) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::from_error(v)
     }
 }
 
@@ -144,13 +165,13 @@ where
     T: Debug,
 {
     fn from(v: SendError<T>) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::from_debug_error(v)
     }
 }
 
 impl From<broadcast::error::SendError<RemoteFsOpResult>> for CubeError {
     fn from(v: broadcast::error::SendError<RemoteFsOpResult>) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::from_debug_error(v)
     }
 }
 
@@ -186,19 +207,19 @@ impl From<arrow::error::ArrowError> for CubeError {
 
 impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
     fn from(v: tokio::sync::broadcast::error::RecvError) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::from_debug_error(v)
     }
 }
 
 impl From<tokio::sync::broadcast::error::SendError<metastore::MetaStoreEvent>> for CubeError {
     fn from(v: tokio::sync::broadcast::error::SendError<metastore::MetaStoreEvent>) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::from_debug_error(v)
     }
 }
 
 impl From<tokio::sync::broadcast::error::SendError<cluster::JobEvent>> for CubeError {
     fn from(v: tokio::sync::broadcast::error::SendError<cluster::JobEvent>) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::from_debug_error(v)
     }
 }
 
