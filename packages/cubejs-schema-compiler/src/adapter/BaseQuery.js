@@ -407,8 +407,10 @@ export class BaseQuery {
         return true;
       }
       const preAggregationsDescription = this.preAggregations.preAggregationsDescription();
-      return preAggregationsDescription.length && R.all((p) => p.external, preAggregationsDescription);
+
+      return preAggregationsDescription.length > 0 && R.all((p) => p.external, preAggregationsDescription);
     }
+
     return false;
   }
 
