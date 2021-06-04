@@ -1,10 +1,13 @@
 import {
   createContext,
-  ReactNode, useContext,
+  ReactNode,
+  useContext,
+  useEffect,
   useState,
 } from 'react';
 
 export type ContextProps = {
+  isDocker?: boolean;
   extDbType?: string;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
@@ -33,6 +36,20 @@ export function AppContextProvider({ children }: AppContextProps) {
       {children}
     </AppContext.Provider>
   );
+}
+
+type AppContextConsumerProps = {
+  onReady: (context: ContextProps) => void;
+};
+
+export function AppContextConsumer({ onReady }: AppContextConsumerProps) {
+  const context = useAppContext();
+
+  useEffect(() => {
+    onReady(context);
+  }, [context]);
+
+  return null;
 }
 
 export function useAppContext() {

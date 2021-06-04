@@ -1,16 +1,13 @@
 import { Component } from 'react';
-import {
-  Layout,
-  Button,
-  Modal,
-  Empty,
-} from 'antd';
+import { Layout, Button, Modal, Empty, Typography } from 'antd';
+import { RouterProps } from 'react-router';
 
 import PrismCode from '../../PrismCode';
 import { playgroundAction } from '../../events';
 import { Menu, Tabs, Tree } from '../../components';
 import { Alert, CubeLoader } from '../../atoms';
 import fetch from '../../playground-fetch';
+import { AppContextConsumer } from '../../components/AppContext';
 
 const { Content, Sider } = Layout;
 
@@ -23,18 +20,21 @@ const schemaToTreeData = (schemas) =>
     title: schemaName,
     key: schemaName,
     treeData: Object.keys(schemas[schemaName]).map((tableName) => {
-      const key = `${schemaName}.${tableName}`
-      schemasMap[key] = [schemaName, tableName]
+      const key = `${schemaName}.${tableName}`;
+      schemasMap[key] = [schemaName, tableName];
       return {
         title: tableName,
         key,
-      }
+      };
     }),
   }));
 
-export default class SchemaPage extends Component<any, any> {
+type SchemaPageProps = RouterProps;
+
+export default class SchemaPage extends Component<SchemaPageProps, any> {
   constructor(props) {
     super(props);
+
     this.state = {
       expandedKeys: [],
       autoExpandParent: true,
@@ -42,6 +42,7 @@ export default class SchemaPage extends Component<any, any> {
       selectedKeys: [],
       activeTab: 'schema',
       files: [],
+      isDocker: null,
     };
   }
 
@@ -100,7 +101,9 @@ export default class SchemaPage extends Component<any, any> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        tables: checkedKeys.filter((k) => !!schemasMap[k]).map(e => schemasMap[e]),
+        tables: checkedKeys
+          .filter((k) => !!schemasMap[k])
+          .map((e) => schemasMap[e]),
         tablesSchema,
       }),
     });
@@ -162,6 +165,7 @@ export default class SchemaPage extends Component<any, any> {
       checkedKeys,
       selectedKeys,
       activeTab,
+      isDocker,
     } = this.state;
     const renderTreeNodes = (data) =>
       data.map((item) => {
@@ -227,25 +231,42 @@ export default class SchemaPage extends Component<any, any> {
             }
           >
             <TabPane tab="Tables" key="schema">
-              {schemaLoading ? (
-                <CubeLoader />
-              ) : (
-                renderTreeOrError()
-              )}
+              {schemaLoading ? <CubeLoader /> : renderTreeOrError()}
             </TabPane>
+
             <TabPane tab="Files" key="files">
               {this.renderFilesMenu()}
             </TabPane>
           </Tabs>
         </Sider>
-        <Content style={{ minHeight: 280, padding: 24 }}>
+
+        <Content
+          style={{
+            minHeight: 280,
+            padding: 24,
+          }}
+        >
           {selectedFile && (
             <Alert
               message={
-                <span>
-                  This file can be edited at&nbsp;
-                  <b>{this.selectedFile().absPath}</b>
-                </span>
+                isDocker ? (
+                  <span>
+                    Schema files are located and can be edited in the mount
+                    volume directory.{' '}
+                    <Typography.Link
+                      href="https://cube.dev/docs/getting-started-cubejs-schema"
+                      target="_blank"
+                    >
+                      Learn more about working with Cube.js data schema in the
+                      docs
+                    </Typography.Link>
+                  </span>
+                ) : (
+                  <span>
+                    This file can be edited at&nbsp;
+                    <b>{this.selectedFile().absPath}</b>
+                  </span>
+                )
               }
               type="info"
               style={{ paddingTop: 10, paddingBottom: 11 }}
@@ -262,6 +283,10 @@ export default class SchemaPage extends Component<any, any> {
               description="Select tables to generate Cube.js schema"
             />
           )}
+
+          <AppContextConsumer
+            onReady={({ isDocker }) => this.setState({ isDocker })}
+          />
         </Content>
       </Layout>
     );

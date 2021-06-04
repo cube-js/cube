@@ -121,7 +121,10 @@ function ContextSetter({ context }: Pick<TAppState, 'context'>) {
 
   useEffect(() => {
     if (context !== null) {
-      setContext({ extDbType: context.extDbType });
+      setContext({
+        isDocker: Boolean(context.isDocker),
+        extDbType: context.extDbType
+      });
     }
   }, [context]);
 
