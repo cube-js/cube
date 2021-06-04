@@ -27,6 +27,7 @@ const DbTypeToGenericType = {
   time: 'string',
   datetime: 'timestamp',
   date: 'date',
+  enum: 'varchar',
   'double precision': 'double',
   // PostgreSQL aliases, but maybe another databases support it
   int8: 'bigint',
