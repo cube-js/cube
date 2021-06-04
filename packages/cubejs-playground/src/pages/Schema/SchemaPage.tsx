@@ -29,9 +29,7 @@ const schemaToTreeData = (schemas) =>
     }),
   }));
 
-type SchemaPageProps = {
-  isDocker: boolean;
-} & RouterProps;
+type SchemaPageProps = RouterProps;
 
 export default class SchemaPage extends Component<SchemaPageProps, any> {
   constructor(props) {
