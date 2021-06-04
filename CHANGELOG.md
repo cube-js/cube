@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/query-orchestrator:** enum to generic type ([#2906](https://github.com/cube-js/cube.js/issues/2906)) ([1a4f745](https://github.com/cube-js/cube.js/commit/1a4f74575116ec14570f1245895fc8756a6a6ff4))
+* **@cubejs-client/playground:** pre-agg status ([#2904](https://github.com/cube-js/cube.js/issues/2904)) ([b18685f](https://github.com/cube-js/cube.js/commit/b18685f55a5f2bde8060cc7345dfd38f762307e3))
+* **@cubejs-client/react:** order reset ([#2901](https://github.com/cube-js/cube.js/issues/2901)) ([536819f](https://github.com/cube-js/cube.js/commit/536819f5551e2846131d3f0459a46eba1306492a))
+* **snowflake-driver:** Unexpected random order for columns in pre-aggregations ([a99977a](https://github.com/cube-js/cube.js/commit/a99977a11a2ae3029d3c2436b7d1500f7186a687))
+* pass timezone to pre-aggregation description ([#2884](https://github.com/cube-js/cube.js/issues/2884)) ([9cca41e](https://github.com/cube-js/cube.js/commit/9cca41ee18ee6bb0dbd0d6abe6f778d467a9a240))
+
+
+### Features
+
+* Make scheduledRefresh true by default (preview period) ([f3e648c](https://github.com/cube-js/cube.js/commit/f3e648c7a3d05bfe4719a8f820794f11611fb8c7))
+* skipExternalCacheAndQueue for Cube Store ([dc6138e](https://github.com/cube-js/cube.js/commit/dc6138e27deb9c319bab2faadd4413fe318c18e2))
+* **cubestore:** combine query results on worker ([d76c9fd](https://github.com/cube-js/cube.js/commit/d76c9fdfc54feede8f2e4e6a6f62aaacd4f8f8f9))
+* Introduce lock for dropOrphanedTables (concurrency bug) ([29509fa](https://github.com/cube-js/cube.js/commit/29509fa6714f636ba28960119138fbc20d604b4f))
+* large dataset warning ([#2848](https://github.com/cube-js/cube.js/issues/2848)) ([92edbe9](https://github.com/cube-js/cube.js/commit/92edbe96cdc27a7830ae1496ca8c0c226177ca72))
+* **cross:** Upgrade, use llvm/clang 9 ([f046839](https://github.com/cube-js/cube.js/commit/f0468398ee1890e0a7bff8b42da975029341ada2))
+* **cubestore:** support the 'coalesce' function, fix [#2887](https://github.com/cube-js/cube.js/issues/2887) ([017fd4b](https://github.com/cube-js/cube.js/commit/017fd4b0be6d3c236a85782e59933932f0a0a7cf))
+* **cubestore:** Use NPM's proxy settings in post-installer ([0b4daec](https://github.com/cube-js/cube.js/commit/0b4daec01eb41ff67daf97918df664a3dbab300a))
+
+
+
+
+
 ## [0.27.29](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.29) (2021-06-02)
 
 

@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/query-orchestrator:** enum to generic type ([#2906](https://github.com/cube-js/cube.js/issues/2906)) ([1a4f745](https://github.com/cube-js/cube.js/commit/1a4f74575116ec14570f1245895fc8756a6a6ff4))
+* **@cubejs-client/playground:** pre-agg status ([#2904](https://github.com/cube-js/cube.js/issues/2904)) ([b18685f](https://github.com/cube-js/cube.js/commit/b18685f55a5f2bde8060cc7345dfd38f762307e3))
+
+
+### Features
+
+* Introduce lock for dropOrphanedTables (concurrency bug) ([29509fa](https://github.com/cube-js/cube.js/commit/29509fa6714f636ba28960119138fbc20d604b4f))
+* skipExternalCacheAndQueue for Cube Store ([dc6138e](https://github.com/cube-js/cube.js/commit/dc6138e27deb9c319bab2faadd4413fe318c18e2))
+
+
+
+
+
 ## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
 
 

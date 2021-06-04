@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Unexpected random order for columns in pre-aggregations ([a99977a](https://github.com/cube-js/cube.js/commit/a99977a11a2ae3029d3c2436b7d1500f7186a687))
+
+
+
+
+
 ## [0.27.29](https://github.com/cube-js/cube.js/compare/v0.27.27...v0.27.29) (2021-06-02)
 
 
