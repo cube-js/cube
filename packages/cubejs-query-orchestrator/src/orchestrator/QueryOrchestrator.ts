@@ -99,8 +99,7 @@ export class QueryOrchestrator {
     return {
       ...result,
       dataSource: queryBody.dataSource,
-      // 0 - no pre-agg was used
-      external: queryBody.external === 0 ? null : queryBody.external,
+      external: queryBody.external,
       usedPreAggregations
     };
   }

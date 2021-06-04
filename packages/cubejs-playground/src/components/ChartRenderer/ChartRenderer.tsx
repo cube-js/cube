@@ -139,13 +139,13 @@ export default function ChartRenderer({
 
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
-          const { external, dbType } = loadResponse.results[0] || {};
+          const { external, dbType, usedPreAggregations = {} } = loadResponse.results[0] || {};
 
           setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
           Boolean(loadResponse.slowQuery) && setSlowQuery(false);
           setResultSet(true);
 
-          isAggregated = external !== null;
+          isAggregated = Object.keys(usedPreAggregations).length > 0;
 
           event(
             isAggregated

@@ -567,7 +567,7 @@ export default function PlaygroundQueryBuilder({
                                   isAggregated,
                                   timeElapsed,
                                   transformedQuery: result.transformedQuery,
-                                  external: result.external
+                                  external: result.external,
                                 });
                               }
                             }

@@ -11,7 +11,7 @@ import { QueryStream } from './QueryStream';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
-  double: 'decimal'
+  double: 'decimal',
 };
 
 const DataTypeMapping: Record<string, any> = {};
