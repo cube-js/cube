@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
+import { Storage } from '@google-cloud/storage';
 import { getEnv } from '@cubejs-backend/shared';
 
 import { HydrationMap, HydrationStream } from './HydrationStream';
@@ -88,6 +89,15 @@ interface SnowflakeDriverExportAWS {
   region: string,
 }
 
+interface SnowflakeDriverExportGCS {
+  bucketType: 'gcs',
+  integrationName: string,
+  bucketName: string,
+  credentials: object,
+}
+
+export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS;
+
 interface SnowflakeDriverOptions {
   account: string,
   username: string,
@@ -100,7 +110,7 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
-  exportBucket?: SnowflakeDriverExportAWS,
+  exportBucket?: SnowflakeDriverExportBucket,
 }
 
 /**
@@ -133,38 +143,52 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     };
   }
 
+  protected createExportBucket(bucketType: string): SnowflakeDriverExportBucket {
+    if (bucketType === 's3') {
+      return {
+        bucketType,
+        bucketName: getEnv('dbExportBucket'),
+        keyId: getEnv('dbExportBucketAwsKey'),
+        secretKey: getEnv('dbExportBucketAwsSecret'),
+        region: getEnv('dbExportBucketAwsRegion'),
+      };
+    }
+
+    if (bucketType === 'gcs') {
+      return {
+        bucketType,
+        bucketName: getEnv('dbExportBucket'),
+        integrationName: getEnv('dbExportIntegration'),
+        credentials: getEnv('dbExportGCSCredentials'),
+      };
+    }
+
+    throw new Error(
+      `Unsupported EXPORT_BUCKET_TYPE, supported: ${['s3', 'gcs'].join(',')}`
+    );
+  }
+
   /**
    * @todo Move to BaseDriver in the future?
    */
-  protected getExportBucket(): SnowflakeDriverExportAWS|undefined {
-    const exportBucket: Partial<SnowflakeDriverExportAWS> = {
-      bucketType: getEnv('dbExportBucketType', {
-        supported: ['s3']
-      }),
-      bucketName: getEnv('dbExportBucket'),
-      keyId: getEnv('dbExportBucketAwsKey'),
-      secretKey: getEnv('dbExportBucketAwsSecret'),
-      region: getEnv('dbExportBucketAwsRegion'),
-    };
-
-    if (exportBucket.bucketType) {
-      const supportedBucketTypes = ['s3'];
-
-      if (!supportedBucketTypes.includes(exportBucket.bucketType)) {
-        throw new Error(
-          `Unsupported EXPORT_BUCKET_TYPE, supported: ${supportedBucketTypes.join(',')}`
-        );
-      }
+  protected getExportBucket(): SnowflakeDriverExportBucket|undefined {
+    const bucketType = getEnv('dbExportBucketType', {
+      supported: ['s3', 'gcs']
+    });
+    if (bucketType) {
+      const exportBucket = this.createExportBucket(
+        bucketType,
+      );
 
       const emptyKeys = Object.keys(exportBucket)
-        .filter((key: string) => exportBucket[<keyof SnowflakeDriverExportAWS>key] === undefined);
+        .filter((key: string) => exportBucket[<keyof SnowflakeDriverExportBucket>key] === undefined);
       if (emptyKeys.length) {
         throw new Error(
           `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyKeys.join(',')}`
         );
       }
 
-      return <SnowflakeDriverExportAWS>exportBucket;
+      return exportBucket;
     }
 
     return undefined;
@@ -234,18 +258,63 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
-    const { bucketType, bucketName, keyId, secretKey, region } = this.config.exportBucket;
+    const { bucketType, bucketName } = this.config.exportBucket;
 
     const exportPathName = crypto.randomBytes(10).toString('hex');
 
-    const optionsToExport = {
+    // @link https://docs.snowflake.com/en/sql-reference/sql/copy-into-location.html
+    const optionsToExport: Record<string, string> = {
       HEADER: 'true',
       INCLUDE_QUERY_ID: 'true',
       // the upper size limit (in bytes) of each file to be generated in parallel per thread
       MAX_FILE_SIZE: (options.maxFileSize * 1024 * 1024).toFixed(),
-      CREDENTIALS: `(AWS_KEY_ID = '${keyId}' AWS_SECRET_KEY = '${secretKey}')`,
-      FILE_FORMAT: `(TYPE = CSV, COMPRESSION = GZIP, FIELD_OPTIONALLY_ENCLOSED_BY = '"')`,
+      FILE_FORMAT: '(TYPE = CSV, COMPRESSION = GZIP, FIELD_OPTIONALLY_ENCLOSED_BY = \'"\')',
     };
+
+    let unloadExtractor: () => Promise<DownloadTableCSVData> = async () => {
+      throw new Error('Unsupported');
+    };
+
+    // eslint-disable-next-line default-case
+    switch (bucketType) {
+      case 's3':
+        {
+          const { keyId, secretKey, region } = <SnowflakeDriverExportAWS> this.config.exportBucket;
+
+          optionsToExport.CREDENTIALS = `(AWS_KEY_ID = '${keyId}' AWS_SECRET_KEY = '${secretKey}')`;
+          unloadExtractor = () => this.extractFilesFromS3(
+            new S3({
+              credentials: {
+                accessKeyId: keyId,
+                secretAccessKey: secretKey,
+              },
+              region,
+            }),
+            bucketName,
+            exportPathName,
+          );
+        }
+        break;
+      case 'gcs':
+        {
+          const { integrationName, credentials } = <SnowflakeDriverExportGCS> this.config.exportBucket;
+
+          optionsToExport.STORAGE_INTEGRATION = `${integrationName}`;
+          unloadExtractor = () => this.extractFilesFromGCS(
+            new Storage({
+              credentials
+            }),
+            bucketName,
+            exportPathName,
+          );
+        }
+        break;
+      default:
+        throw new Error(
+          `Unsupported EXPORT_BUCKET_TYPE, supported: ${['s3', 'gcs'].join(',')}`
+        );
+    }
+
     const optionsPart = Object.entries(optionsToExport)
       .map(([key, value]) => `${key} = ${value}`)
       .join(' ');
@@ -266,14 +335,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       };
     }
 
-    const client = new S3({
-      credentials: {
-        accessKeyId: keyId,
-        secretAccessKey: secretKey,
-      },
-      region,
-    });
-    const list = await client.listObjectsV2({
+    return unloadExtractor();
+  }
+
+  protected async extractFilesFromS3(
+    storage: S3,
+    bucketName: string,
+    exportPathName: string
+  ): Promise<DownloadTableCSVData> {
+    const list = await storage.listObjectsV2({
       Bucket: bucketName,
       Prefix: exportPathName,
     });
@@ -284,7 +354,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
             Bucket: bucketName,
             Key: file.Key,
           });
-          return getSignedUrl(client, command, { expiresIn: 3600 });
+          return getSignedUrl(storage, command, { expiresIn: 3600 });
         })
       );
 
@@ -294,6 +364,30 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
 
     throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
+  }
+
+  protected async extractFilesFromGCS(
+    storage: Storage,
+    bucketName: string,
+    exportPathName: string
+  ): Promise<DownloadTableCSVData> {
+    const bucket = storage.bucket(bucketName);
+
+    const [files] = await bucket.getFiles({ prefix: `${exportPathName}/` });
+    if (files.length) {
+      const csvFile = await Promise.all(files.map(async (file) => {
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+        });
+
+        return url;
+      }));
+
+      return { csvFile };
+    }
+
+    throw new Error('Unable to UNLOAD table, there are no files in GCS storage');
   }
 
   public async stream(

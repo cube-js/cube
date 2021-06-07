@@ -128,6 +128,19 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
     .asString(),
+  // Export bucket options for Integration based
+  dbExportIntegration: () => get('CUBEJS_DB_EXPORT_INTEGRATION')
+    .asString(),
+  // Export bucket options for GCS
+  dbExportGCSCredentials: () => {
+    const credentials = get('CUBEJS_DB_EXPORT_GCS_CREDENTIALS')
+      .asString();
+    if (credentials) {
+      return JSON.parse(Buffer.from(credentials, 'base64').toString('utf8'));
+    }
+
+    return undefined;
+  },
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),

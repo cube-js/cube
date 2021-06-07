@@ -29,6 +29,7 @@
     "@aws-sdk/s3-request-presigner": "^3.16.0",
     "@cubejs-backend/query-orchestrator": "^0.27.30",
     "@cubejs-backend/shared": "^0.27.30",
+    "@google-cloud/storage": "^5.8.5",
     "date-fns-timezone": "^0.1.4",
     "snowflake-sdk": "^1.6.1"
   },
