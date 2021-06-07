@@ -484,7 +484,7 @@ describe('API Gateway', () => {
         method: 'post',
         successBody: {
           query: {
-            timezone: 'UTC',
+            timezones: ['UTC'],
             preAggregations: [
               {
                 id: 'cube.preAggregationName',
