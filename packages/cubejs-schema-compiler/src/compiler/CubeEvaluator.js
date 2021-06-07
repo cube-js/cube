@@ -17,8 +17,6 @@ export class CubeEvaluator extends CubeSymbols {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
 
-    Object.values(validCubes).map(this.prepareCube);
-
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(validCubes.map((v) => {
@@ -28,41 +26,6 @@ export class CubeEvaluator extends CubeSymbols {
         primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
       ];
     }));
-  }
-
-  prepareCube(cube) {
-    if (cube.preAggregations) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const preAggregation of Object.values(cube.preAggregations)) {
-        if (preAggregation.scheduledRefresh === undefined) {
-          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
-        }
-
-        if (preAggregation.external === undefined) {
-          preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
-        }
-
-        if (preAggregation.timeDimensions) {
-          preAggregation.timeDimensionReference = preAggregation.timeDimensions;
-          delete preAggregation.timeDimensions;
-        }
-
-        if (preAggregation.dimensions) {
-          preAggregation.dimensionReferences = preAggregation.dimensions;
-          delete preAggregation.dimensions;
-        }
-
-        if (preAggregation.measures) {
-          preAggregation.measureReferences = preAggregation.measures;
-          delete preAggregation.measures;
-        }
-
-        if (preAggregation.segments) {
-          preAggregation.segmentReferences = preAggregation.segments;
-          delete preAggregation.segments;
-        }
-      }
-    }
   }
 
   cubesByFileName(fileName) {

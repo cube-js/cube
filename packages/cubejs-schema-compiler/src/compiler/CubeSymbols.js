@@ -2,6 +2,7 @@ import R from 'ramda';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
+import { getEnv } from '@cubejs-backend/shared';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
@@ -121,6 +122,34 @@ export class CubeSymbols {
       // Rollup is a default type for pre-aggregations
       if (!preAggregation.type) {
         preAggregation.type = 'rollup';
+      }
+
+      if (preAggregation.scheduledRefresh === undefined) {
+        preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+      }
+
+      if (preAggregation.external === undefined) {
+        preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
+      }
+
+      if (preAggregation.timeDimensions) {
+        preAggregation.timeDimensionReference = preAggregation.timeDimensions;
+        delete preAggregation.timeDimensions;
+      }
+
+      if (preAggregation.dimensions) {
+        preAggregation.dimensionReferences = preAggregation.dimensions;
+        delete preAggregation.dimensions;
+      }
+
+      if (preAggregation.measures) {
+        preAggregation.measureReferences = preAggregation.measures;
+        delete preAggregation.measures;
+      }
+
+      if (preAggregation.segments) {
+        preAggregation.segmentReferences = preAggregation.segments;
+        delete preAggregation.segments;
       }
     }
   }
