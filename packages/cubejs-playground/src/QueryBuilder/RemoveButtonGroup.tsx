@@ -1,11 +1,24 @@
+import { ReactNode } from 'react';
 import styled from 'styled-components';
 import { CloseOutlined } from '@ant-design/icons';
 
 import { Button } from '../atoms';
 
-const UnstyledRemoveButtonGroup = ({ onRemoveClick, children, ...props }) => (
+type UnstyledRemoveButtonGroupProps = {
+  onRemoveClick: () => void;
+  children: ReactNode;
+  disabled?: boolean;
+  [k: string]: any;
+};
+
+const UnstyledRemoveButtonGroup = ({
+  onRemoveClick,
+  children,
+  ...props
+}: UnstyledRemoveButtonGroupProps) => (
   <Button.Group {...props}>
     {children}
+
     <Button
       ghost
       className="remove-btn"

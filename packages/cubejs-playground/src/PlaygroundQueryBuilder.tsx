@@ -30,6 +30,8 @@ import {
   useDeepCompareMemoize,
   useSecurityContext,
   useLivePreviewContext,
+  useLocalStorage,
+  useIdentifier,
 } from './hooks';
 import { Button, Card, FatalError } from './atoms';
 import { UIFramework } from './types';
@@ -41,7 +43,7 @@ const Section = styled.div`
   flex-flow: column;
   margin-right: 24px;
   margin-bottom: 16px;
-
+  
   > *:first-child {
     margin-bottom: 8px;
   }
@@ -146,7 +148,7 @@ function QueryChangeEmitter({
   return null;
 }
 
-type THandleRunButtonClickProps = {
+type HandleRunButtonClickProps = {
   query: Query;
   pivotConfig?: PivotConfig;
   chartType: ChartType;
@@ -158,6 +160,7 @@ export type TPlaygroundQueryBuilderProps = {
   defaultQuery?: Query;
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
+  queryVersion?: number | string;
   initialVizState?: VizState;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
@@ -176,6 +179,7 @@ export default function PlaygroundQueryBuilder({
   defaultQuery,
   dashboardSource,
   schemaVersion = 0,
+  queryVersion = 0,
   initialVizState,
   onSchemaChange,
   onVizStateChanged,
@@ -205,7 +209,7 @@ export default function PlaygroundQueryBuilder({
     query,
     pivotConfig,
     chartType,
-  }: THandleRunButtonClickProps) {
+  }: HandleRunButtonClickProps) {
     if (ref.current) {
       if (areQueriesEqual(query, queryRef.current)) {
         dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
@@ -235,6 +239,7 @@ export default function PlaygroundQueryBuilder({
       initialVizState={initialVizState}
       wrapWithQueryRenderer={false}
       schemaVersion={schemaVersion}
+      queryVersion={queryVersion}
       onSchemaChange={onSchemaChange}
       onVizStateChanged={onVizStateChanged}
       render={({

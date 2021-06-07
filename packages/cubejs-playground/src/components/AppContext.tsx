@@ -9,17 +9,18 @@ import {
 export type ContextProps = {
   isDocker?: boolean;
   extDbType?: string;
+  identifier?: string | null;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
 
 export type AppContextProps = {
   children: ReactNode;
-};
+} & Omit<ContextProps, 'setContext'>;
 
 export const AppContext = createContext<ContextProps>({} as ContextProps);
 
-export function AppContextProvider({ children }: AppContextProps) {
-  const [context, setContext] = useState<Partial<ContextProps> | null>(null);
+export function AppContextProvider({ children, ...contextProps }: AppContextProps) {
+  const [context, setContext] = useState<Partial<ContextProps> | null>(contextProps || null);
 
   return (
     <AppContext.Provider

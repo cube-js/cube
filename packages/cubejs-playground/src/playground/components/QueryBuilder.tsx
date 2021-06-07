@@ -8,7 +8,7 @@ import PlaygroundQueryBuilder, {
 import { TSecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
 
-type TQueryBuilderProps = {
+type QueryBuilderProps = {
   apiUrl: string;
   token: string;
   tokenKey?: string;
@@ -17,12 +17,13 @@ type TQueryBuilderProps = {
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
+  | 'queryVersion'
   | 'onVizStateChanged'
   | 'onSchemaChange'
 > &
   Pick<TSecurityContextContextProps, 'getToken'>;
 
-export function QueryBuilder({ apiUrl, token, ...props }: TQueryBuilderProps) {
+export function QueryBuilder({ apiUrl, token, ...props }: QueryBuilderProps) {
   return (
     <PlaygroundWrapper tokenKey={props.tokenKey} getToken={props.getToken}>
       <QueryBuilderContainer apiUrl={apiUrl} token={token} {...props} />
@@ -30,8 +31,8 @@ export function QueryBuilder({ apiUrl, token, ...props }: TQueryBuilderProps) {
   );
 }
 
-type TQueryBuilderContainerProps = Omit<
-  TQueryBuilderProps,
+type QueryBuilderContainerProps = Omit<
+  QueryBuilderProps,
   'tokenKey' | 'getToken'
 >;
 
@@ -39,7 +40,7 @@ function QueryBuilderContainer({
   apiUrl,
   token,
   ...props
-}: TQueryBuilderContainerProps) {
+}: QueryBuilderContainerProps) {
   const { token: securityContextToken } = useSecurityContext();
   const currentToken = securityContextToken || token;
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
@@ -70,6 +71,7 @@ function QueryBuilderContainer({
           ...props.initialVizState,
         }}
         schemaVersion={props.schemaVersion}
+        queryVersion={props.queryVersion}
         onVizStateChanged={props.onVizStateChanged}
         onSchemaChange={props.onSchemaChange}
       />

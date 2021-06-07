@@ -7,6 +7,7 @@ import DashboardSource from '../../DashboardSource';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
 import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
 import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
+import { QueryTabs } from '../../components/QueryTabs/QueryTabs';
 
 type TPlaygroundContext = {
   apiUrl: string;
@@ -28,14 +29,10 @@ export function ExplorePage() {
 
   const [schemaVersion, updateSchemaVersion] = useState<number>(0);
   const [apiUrl, setApiUrl] = useState<string | null>(null);
-  const [
-    playgroundContext,
-    setPlaygroundContext,
-  ] = useState<TPlaygroundContext | null>(null);
-  const [
-    livePreviewContext,
-    setLivePreviewContext,
-  ] = useState<TLivePreviewContext | null>(null);
+  const [playgroundContext, setPlaygroundContext] =
+    useState<TPlaygroundContext | null>(null);
+  const [livePreviewContext, setLivePreviewContext] =
+    useState<TLivePreviewContext | null>(null);
 
   const currentToken =
     livePreviewContext?.token || token || playgroundContext?.cubejsToken;
@@ -106,16 +103,33 @@ export function ExplorePage() {
       onChange={handleChangeLivePreview}
     >
       <CubeProvider cubejsApi={cubejsApi}>
-        <PlaygroundQueryBuilder
-          defaultQuery={query}
-          apiUrl={apiUrl}
-          cubejsToken={currentToken as string}
-          dashboardSource={dashboardSource}
-          schemaVersion={schemaVersion}
-          onVizStateChanged={({ query }) =>
-            push(`/build?query=${JSON.stringify(query)}`)
-          }
-        />
+        <QueryTabs>
+          {({ query }, saveTab) => {
+            // return (
+            //   <div style={{ color: 'orange' }}>
+            //     {Math.random()}
+            //     <pre>{JSON.stringify(query, null, 2)}</pre>
+            //   </div>
+            // );
+
+            console.log('.', JSON.stringify(query));
+
+            return (
+              <PlaygroundQueryBuilder
+                apiUrl={apiUrl}
+                cubejsToken={currentToken as string}
+                defaultQuery={query}
+                dashboardSource={dashboardSource}
+                schemaVersion={schemaVersion}
+                queryVersion={JSON.stringify(query)}
+                onVizStateChanged={({ query }) => {
+                  push(`/build?query=${JSON.stringify(query)}`);
+                  saveTab({ query: query || {} });
+                }}
+              />
+            );
+          }}
+        </QueryTabs>
       </CubeProvider>
     </LivePreviewContextProvider>
   );
