@@ -12,8 +12,8 @@ pub mod udfs;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
-use crate::metastore::table::TablePath;
-use crate::metastore::{MetaStore, MetaStoreTable};
+use crate::metastore::table::{Table, TablePath};
+use crate::metastore::{IdRow, MetaStore, MetaStoreTable};
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec};
 use crate::queryplanner::serialized_plan::SerializedPlan;
@@ -21,7 +21,7 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 use crate::store::DataFrame;
-use crate::CubeError;
+use crate::{metastore, CubeError};
 use arrow::array::StringArray;
 use arrow::datatypes::Field;
 use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
@@ -45,7 +45,8 @@ use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::Formatter;
 use std::any::Any;
-use std::collections::HashMap;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -142,14 +143,45 @@ impl QueryPlannerImpl {
 }
 
 struct MetaStoreSchemaProvider {
-    tables: HashMap<String, TablePath>,
+    /// Keeps the data used by [by_name] alive.
+    _data: Arc<Vec<TablePath>>,
+    by_name: HashSet<TableKey>,
     meta_store: Arc<dyn MetaStore>,
 }
 
+/// Points into [MetaStoreSchemaProvider::data], never null.
+struct TableKey(*const TablePath);
+unsafe impl Send for TableKey {}
+unsafe impl Sync for TableKey {}
+
+impl TableKey {
+    fn qual_name(&self) -> (&str, &str) {
+        let s = unsafe { &*self.0 };
+        (
+            s.schema.get_row().get_name().as_str(),
+            s.table.get_row().get_table_name().as_str(),
+        )
+    }
+}
+
+impl PartialEq for TableKey {
+    fn eq(&self, o: &Self) -> bool {
+        self.qual_name() == o.qual_name()
+    }
+}
+impl Eq for TableKey {}
+impl Hash for TableKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.qual_name().hash(state)
+    }
+}
+
 impl MetaStoreSchemaProvider {
-    pub fn new(tables: Vec<TablePath>, meta_store: Arc<dyn MetaStore>) -> Self {
+    pub fn new(tables: Arc<Vec<TablePath>>, meta_store: Arc<dyn MetaStore>) -> Self {
+        let by_name = tables.iter().map(|t| TableKey(t)).collect();
         Self {
-            tables: tables.into_iter().map(|t| (t.table_name(), t)).collect(),
+            _data: tables,
+            by_name,
             meta_store,
         }
     }
@@ -157,16 +189,24 @@ impl MetaStoreSchemaProvider {
 
 impl ContextProvider for MetaStoreSchemaProvider {
     fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
-        let name = match name {
-            TableReference::Partial { schema, table } => format!("{}.{}", schema, table),
+        let (schema, table) = match name {
+            TableReference::Partial { schema, table } => (schema, table),
             TableReference::Bare { .. } | TableReference::Full { .. } => return None,
         };
-        let name = name.as_str();
+        // Mock table path for hash set access.
+        let name = TablePath {
+            table: IdRow::new(
+                u64::MAX,
+                Table::new(table.to_string(), u64::MAX, Vec::new(), None, None, false),
+            ),
+            schema: Arc::new(IdRow::new(0, metastore::Schema::new(schema.to_string()))),
+        };
 
         let res = self
-            .tables
-            .get(name)
+            .by_name
+            .get(&TableKey(&name))
             .map(|table| -> Arc<dyn TableProvider> {
+                let table = unsafe { &*table.0 };
                 let schema = Arc::new(Schema::new(
                     table
                         .table
@@ -181,12 +221,12 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     schema,
                 })
             });
-        res.or_else(|| match name {
-            "information_schema.tables" => Some(Arc::new(InfoSchemaTableProvider::new(
+        res.or_else(|| match (schema, table) {
+            ("information_schema", "tables") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 InfoSchemaTable::Tables,
             ))),
-            "information_schema.schemata" => Some(Arc::new(InfoSchemaTableProvider::new(
+            ("information_schema", "schemata") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 InfoSchemaTable::Schemata,
             ))),
