@@ -692,7 +692,7 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Table>, CubeError>;
     async fn get_table_by_id(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
     async fn get_tables(&self) -> Result<Vec<IdRow<Table>>, CubeError>;
-    async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError>;
+    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError>;
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
 
     fn partition_table(&self) -> PartitionMetaStoreTable;
@@ -960,6 +960,7 @@ pub struct RocksMetaStore {
     last_check_seq: Arc<RwLock<u64>>,
     upload_loop: Arc<WorkerLoop>,
     config: Arc<dyn ConfigObj>,
+    cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
 }
 
 trait BaseRocksSecondaryIndex<T>: Debug {
@@ -1550,6 +1551,7 @@ impl RocksMetaStore {
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             upload_loop: Arc::new(WorkerLoop::new("Meta Store Upload")),
             config,
+            cached_tables: Arc::new(Mutex::new(None)),
         };
         meta_store
     }
@@ -1683,6 +1685,7 @@ impl RocksMetaStore {
                 Ok((res, write_result))
             })
             .await??;
+        self.invalidate_caches();
 
         mem::drop(db);
         mem::drop(db_span);
@@ -1694,7 +1697,6 @@ impl RocksMetaStore {
                 listener.send(event.clone())?;
             }
         }
-
         Ok(spawn_res)
     }
 
@@ -2116,6 +2118,10 @@ impl RocksMetaStore {
         }
         return Ok(activated_row_count);
     }
+
+    fn invalidate_caches(&self) {
+        *self.cached_tables.lock().unwrap() = None;
+    }
 }
 
 #[async_trait]
@@ -2357,19 +2363,29 @@ impl MetaStore for RocksMetaStore {
             .await
     }
 
-    async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError> {
-        self.read_operation(|db_ref| {
+    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError> {
+        let cache = self.cached_tables.clone();
+        self.read_operation(move |db_ref| {
+            let cached = cache.lock().unwrap().clone();
+            if let Some(t) = cached {
+                return Ok(t);
+            }
             let tables = TableRocksTable::new(db_ref.clone())
                 .all_rows()?
                 .into_iter()
                 .filter(|t| t.get_row().is_ready())
                 .collect::<Vec<_>>();
             let schemas = SchemaRocksTable::new(db_ref);
-            Ok(schemas.build_path_rows(
+            let tables = Arc::new(schemas.build_path_rows(
                 tables,
                 |t| t.get_row().get_schema_id(),
                 |table, schema| TablePath { table, schema },
-            )?)
+            )?);
+
+            let to_cache = tables.clone();
+            *cache.lock().unwrap() = Some(to_cache);
+
+            Ok(tables)
         })
         .await
     }
