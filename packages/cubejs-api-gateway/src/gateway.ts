@@ -430,7 +430,10 @@ export class ApiGateway {
   ) {
     const requestStarted = new Date();
     try {
-      query = normalizeQueryPreAggregations(this.parseQueryParam(query));
+      query = normalizeQueryPreAggregations(
+        this.parseQueryParam(query),
+        { timezones: this.scheduledRefreshTimeZones }
+      );
       const orchestratorApi = this.getAdapterApi(context);
       const compilerApi = this.getCompilerApi(context);
 

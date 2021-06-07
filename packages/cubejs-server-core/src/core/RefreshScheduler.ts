@@ -25,7 +25,7 @@ type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concur
 };
 
 type PreAggregationsQueryingOptions = {
-  timezone: string,
+  timezones: string[],
   preAggregations: {
     id: string,
     refreshRange?: [string, string]
@@ -245,24 +245,29 @@ export class RefreshScheduler {
     });
 
     return Promise.all(preAggregations.map(async preAggregation => {
-      const { timezone } = queryingOptions;
+      const { timezones } = queryingOptions;
       const { refreshRange } = preAggregationsQueringOptions[preAggregation.id] || {};
-      const queriesForPreAggregation = preAggregation && await this.refreshQueriesForPreAggregation(
-        context,
-        compilerApi,
-        preAggregation,
-        // TODO: timezones, concurrency, workerIndices???
-        {
-          timezones: undefined,
-          concurrency: undefined,
-          workerIndices: undefined,
-          timezone,
-          refreshRange,
-          contextSymbols: {
-            securityContext: context.securityContext || {},
-          },
-        }
-      );
+
+      const queriesForPreAggregation = preAggregation && (await Promise.all(
+        timezones.map(
+          timezone => this.refreshQueriesForPreAggregation(
+            context,
+            compilerApi,
+            preAggregation,
+            // TODO: timezones, concurrency, workerIndices???
+            {
+              timezones: undefined,
+              concurrency: undefined,
+              workerIndices: undefined,
+              timezone,
+              refreshRange,
+              contextSymbols: {
+                securityContext: context.securityContext || {},
+              },
+            }
+          )
+        )
+      )).reduce((target, source) => [...target, ...source], []);
 
       const partitions: any = queriesForPreAggregation && await Promise.all(
         queriesForPreAggregation.map(
@@ -278,7 +283,7 @@ export class RefreshScheduler {
       );
 
       return {
-        timezone,
+        timezones,
         preAggregation,
         partitions
       };
