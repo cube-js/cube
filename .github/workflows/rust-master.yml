@@ -10,7 +10,7 @@ on:
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -30,7 +30,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./rust
-          key: ubuntu-latest
+          key: ubuntu-20.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -58,7 +58,7 @@ jobs:
 
   cubestore-docker-image-dev:
     name: Release Cube Store :dev image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
 
     steps:
@@ -155,20 +155,20 @@ jobs:
           - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
             executable_name: cubestored
             cross: true
             strip: true
             compress: true
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             cross: true
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             target: x86_64-pc-windows-gnu
             executable_name: cubestored.exe
             cross: true
@@ -201,7 +201,7 @@ jobs:
         shell: bash
       #- name: Install dependencies Windows
       #  run: vcpkg integrate install; vcpkg install openssl:x64-windows
-      #  if: matrix.os == 'windows-latest'
+      #  if: matrix.os == 'windows-2019'
       #  env:
       #    VCPKG_ROOT: 'C:\vcpkg'
       - name: Set Env Variables for Darwin
