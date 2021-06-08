@@ -38,7 +38,7 @@
     "moment-timezone": "^0.5.27",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.0",
-    "uuid": "^3.3.3"
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.27.0",
