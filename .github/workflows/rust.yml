@@ -167,6 +167,7 @@ jobs:
           # This paths are required to work with static linking
           OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
           OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
+          LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
       - name: Build with Cross
         if: ${{ matrix.cross }}
         run: |
