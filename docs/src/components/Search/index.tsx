@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Helmet from 'react-helmet';
 import cx from 'classnames';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import '../../../static/styles/docsearch.scss';
 import '../../../static/styles/docsearch-custom.css';
 

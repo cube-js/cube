@@ -16,7 +16,7 @@ import ScrollLink, {
   SCROLL_OFFSET,
 } from '../components/templates/ScrollSpyLink';
 
-import styles from '../../static/styles/index.module.scss';
+import * as styles from '../../static/styles/index.module.scss';
 import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
 
 const mdContentCallback = () => {
