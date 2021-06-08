@@ -15,7 +15,7 @@ on:
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -35,7 +35,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./rust
-          key: ubuntu-latest
+          key: ubuntu-20.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -59,7 +59,7 @@ jobs:
 
   docker-image-latest:
     name: Build only :latest image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: github.ref != 'refs/heads/master'
     steps:
@@ -102,27 +102,27 @@ jobs:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
             executable_name: cubestored
             cross: true
             strip: true
             compress: true
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             cross: true
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             target: x86_64-pc-windows-gnu
             executable_name: cubestored.exe
             cross: true
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
-          - os: windows-latest
+          - os: windows-2019
             target: x86_64-pc-windows-msvc
             executable_name: cubestored.exe
             cross: false
