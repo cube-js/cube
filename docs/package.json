@@ -25,8 +25,8 @@
     "cubedev-tracking": "^1.0.4",
     "dotenv": "^7.0.0",
     "gatsby": "^3",
-    "gatsby-image": "^3.5.0",
-    "gatsby-link": "^2.0.16",
+    "gatsby-image": "^3",
+    "gatsby-link": "^3",
     "gatsby-plugin-antd": "^2.0.2",
     "gatsby-plugin-catch-links": "^3",
     "gatsby-plugin-google-analytics": "^3",
@@ -36,7 +36,7 @@
     "gatsby-plugin-root-import": "^2.0.5",
     "gatsby-plugin-s3": "^0.2.5",
     "gatsby-plugin-sass": "^4",
-    "gatsby-plugin-sharp": "^2.6.31",
+    "gatsby-plugin-sharp": "^3",
     "gatsby-plugin-sitemap": "^4",
     "gatsby-redirect-from": "^0.2.4",
     "gatsby-remark-copy-linked-files": "^3",
@@ -53,8 +53,7 @@
     "react-helmet": "^5.2.0",
     "react-html-parser": "^2.0.2",
     "react-scroll": "^1.7.11",
-    "remark-custom-blocks": "^2.5.0",
-    "sharp": "^0.26.0"
+    "remark-custom-blocks": "^2.5.0"
   },
   "devDependencies": {
     "@percy/agent": "^0.28.5",
