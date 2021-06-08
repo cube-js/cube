@@ -8,8 +8,8 @@ import '@ant-design/compatible/assets/index.css';
 import DashboardSource from '../../DashboardSource';
 import { frameworks } from '../../ChartContainer';
 import CreateOwnModal from './CreateOwnModal';
-import { frameworkChartLibraries } from '../../PlaygroundQueryBuilder';
 import { Button, Card, CubeLoader } from '../../atoms';
+import { frameworkChartLibraries } from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 
 const MarginFrame = ({ children }) => (
   <div style={{ margin: 25 }}>{children}</div>
@@ -29,7 +29,7 @@ const Image = styled.div<any>`
 
 type TRecipeCardProps = {
   createYourOwn?: boolean;
-}
+};
 
 const RecipeCard = styled(Card)<TRecipeCardProps>`
   && {
@@ -288,7 +288,8 @@ class TemplateGalleryPage extends Component<any, any> {
             onCancel={() => this.setState({ createOwnModalVisible: false })}
             onChange={(key, value: string) => {
               if (key === 'framework' && framework !== value) {
-                const packages = this.dashboardSource?.templatePackages(value) || [];
+                const packages =
+                  this.dashboardSource?.templatePackages(value) || [];
 
                 this.setState({
                   templatePackageName: packages[0]?.name,
@@ -300,7 +301,9 @@ class TemplateGalleryPage extends Component<any, any> {
             }}
             chartLibraries={frameworkChartLibraries[framework]}
             currentLibraryItem={currentLibraryItem}
-            frameworks={frameworks.filter((currentFramework) => currentFramework.id !== 'vanilla')}
+            frameworks={frameworks.filter(
+              (currentFramework) => currentFramework.id !== 'vanilla'
+            )}
             framework={framework}
             frameworkItem={frameworkItem}
             templatePackages={

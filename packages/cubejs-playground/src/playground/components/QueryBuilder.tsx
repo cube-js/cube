@@ -2,11 +2,12 @@ import { useLayoutEffect } from 'react';
 import { CubeProvider } from '@cubejs-client/react';
 
 import PlaygroundWrapper from '../PlaygroundWrapper';
-import PlaygroundQueryBuilder, {
-  TPlaygroundQueryBuilderProps,
-} from '../../PlaygroundQueryBuilder';
 import { TSecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
+import {
+  PlaygroundQueryBuilder,
+  TPlaygroundQueryBuilderProps,
+} from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 
 type QueryBuilderProps = {
   apiUrl: string;
@@ -66,6 +67,8 @@ function QueryBuilderContainer({
       <PlaygroundQueryBuilder
         apiUrl={apiUrl}
         cubejsToken={currentToken}
+        // todo: !!!
+        queryId="???f"
         initialVizState={{
           query: props.defaultQuery,
           ...props.initialVizState,

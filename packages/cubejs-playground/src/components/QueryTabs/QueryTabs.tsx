@@ -1,62 +1,59 @@
+import { Tabs } from 'antd';
 import { ReactNode, useState } from 'react';
 import { ChartType, Query } from '@cubejs-client/core';
-import { PlusOutlined } from '@ant-design/icons';
+import styled from 'styled-components';
 
 import { useLocalStorage } from '../../hooks';
-import styled from 'styled-components';
-import RemoveButtonGroup from '../../QueryBuilder/RemoveButtonGroup';
-import { Button } from '../../atoms';
+import { useHistory } from 'react-router';
 
-const Wrapper = styled.div`
-  display: flex;
-  align-items: center;
-  
-  & > div {
-    margin-right: 16px;
+const { TabPane } = Tabs;
+
+const StyledTabs = styled(Tabs)`
+  & .ant-tabs-nav {
+    background: #fff;
+    padding: 12px 16px 0;
+    margin: 0;
+  }
+
+  & .ant-tabs-extra-content {
+    margin-left: 32px;
   }
 `;
 
 type QueryTab = {
-  id: number;
+  id: string;
   query: Query;
   chartType?: ChartType;
 };
 
 type QueryTabsProps = {
+  query: Query;
   children: (
     tab: QueryTab,
     saveTab: (tab: Omit<QueryTab, 'id'>) => void
   ) => ReactNode;
-  onTabChange?: (tab: QueryTab) => void;
+  sidebar?: ReactNode | null;
 };
 
-export function QueryTabs({ children, onTabChange }: QueryTabsProps) {
-  const [activeId, setActiveId] = useState<number>(1);
-
+export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
   const [tabs, saveTabs] = useLocalStorage<QueryTab[]>('queryTabs', [
     {
-      id: 1,
-      query: {},
-    },
-    {
-      id: 2,
-      query: {
-        measures: ['Sales.count'],
-        dimensions: ['Sales.status'],
-      },
+      id: '1',
+      query
     },
   ]);
+  const [activeId, setActiveId] = useState<string>(tabs[0].id);
 
-  function getNextId(): number {
+  function getNextId(): string {
     const ids = tabs.map(({ id }) => id);
 
     for (let index = 1; index <= tabs.length + 1; index++) {
-      if (!ids.includes(index)) {
-        return index;
+      if (!ids.includes(index.toString())) {
+        return index.toString();
       }
     }
 
-    return tabs.length + 1;
+    return (tabs.length + 1).toString();
   }
 
   function handleTabSave(tab: Omit<QueryTab, 'id'>) {
@@ -72,51 +69,51 @@ export function QueryTabs({ children, onTabChange }: QueryTabsProps) {
     );
   }
 
-  const activeTab = tabs.find(({ id }) => id === activeId) as QueryTab;
-
   return (
-    <>
-      <Wrapper>
-        {tabs.map((item) => {
-          return (
-            <RemoveButtonGroup
-              key={item.id.toString()}
-              onRemoveClick={() => {
-                saveTabs(tabs.filter(({ id }) => id !== item.id));
-              }}
-            >
-              <Button
-                onClick={() => {
-                  setActiveId(item.id);
-                  // onTabChange(activeTab);
-                }}
-              >
-                Query {item.id}
-              </Button>
-            </RemoveButtonGroup>
-          );
-        })}
+    <StyledTabs
+      activeKey={activeId}
+      type="editable-card"
+      tabBarExtraContent={{
+        right: sidebar,
+      }}
+      hideAdd={false}
+      onChange={setActiveId}
+      onEdit={(event) => {
+        if (typeof event === 'string') {
+          let closedIndex = Number.MAX_VALUE;
+          const nextTabs = tabs.filter(({ id }, index) => {
+            if (id === event) {
+              closedIndex = index;
+            }
+            return id !== event;
+          });
 
-        <Button
-          onClick={() => {
-            const nextId = getNextId();
+          saveTabs(nextTabs);
+          setActiveId(nextTabs[Math.min(closedIndex, nextTabs.length - 1)].id);
+        } else {
+          const nextId = getNextId();
 
-            saveTabs([
-              ...tabs,
-              {
-                id: nextId,
-                query: {},
-              },
-            ]);
+          saveTabs([
+            ...tabs,
+            {
+              id: nextId,
+              query: {},
+            },
+          ]);
 
-            setActiveId(nextId);
-          }}
+          setActiveId(nextId);
+        }
+      }}
+    >
+      {tabs.map((tab) => (
+        <TabPane
+          key={tab.id}
+          tab={`Query ${tab.id}`}
+          closable={tabs.length > 1}
         >
-          <PlusOutlined />
-        </Button>
-      </Wrapper>
-
-      <div key={activeId.toString()}>{children(activeTab, handleTabSave)}</div>
-    </>
+          {children(tab, handleTabSave)}
+        </TabPane>
+      ))}
+    </StyledTabs>
   );
 }

@@ -6,10 +6,13 @@ import {
   useState,
 } from 'react';
 
+import { PlaygroundContext } from '../App';
+
 export type ContextProps = {
   isDocker?: boolean;
   extDbType?: string;
   identifier?: string | null;
+  playgroundContext?: PlaygroundContext;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
 
@@ -19,8 +22,13 @@ export type AppContextProps = {
 
 export const AppContext = createContext<ContextProps>({} as ContextProps);
 
-export function AppContextProvider({ children, ...contextProps }: AppContextProps) {
-  const [context, setContext] = useState<Partial<ContextProps> | null>(contextProps || null);
+export function AppContextProvider({
+  children,
+  ...contextProps
+}: AppContextProps) {
+  const [context, setContext] = useState<Partial<ContextProps> | null>(
+    contextProps || null
+  );
 
   return (
     <AppContext.Provider

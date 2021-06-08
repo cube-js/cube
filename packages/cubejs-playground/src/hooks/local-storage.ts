@@ -71,7 +71,7 @@ export function useLocalStorage<T = any>(
   defaultValue?: T
 ): [T, (next: T) => T, (itemKey: string) => void] {
   const identifier = useIdentifier();
-  const key = `${itemKey}:${identifier}`;
+  const key = [itemKey, identifier ? ':' : '', identifier].join('');
 
   const [value, setValue] = useState<T>(() => {
     return storage.getItem(key, defaultValue);

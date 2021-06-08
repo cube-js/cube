@@ -5,8 +5,8 @@ import Icon from '@ant-design/icons';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { PreAggregationHelper } from './PreAggregationHelper';
-import { QueryStatus } from '../../../PlaygroundQueryBuilder';
 import { useAppContext } from '../../AppContext';
+import { QueryStatus } from "./PlaygroundQueryBuilder";
 
 const Badge = styled.div`
   display: flex;
