@@ -8,24 +8,36 @@ export interface TableColumn {
 }
 export type TableStructure = TableColumn[];
 
-export interface DownloadTableMemoryData {
+// It's more easy to use this interface with optional method release as a base interface instead of type assertion
+export interface DownloadTableBase {
+  /**
+   * Optional function to release stream/cursor/connection
+   */
+  release?: () => Promise<void>;
+}
+
+export interface DownloadTableMemoryData extends DownloadTableBase {
   rows: Record<string, unknown>[];
+  /**
+   * Some drivers know types of response
+   */
+  types?: TableStructure;
 }
 
-export interface DownloadTableCSVData {
+export interface DownloadTableCSVData extends DownloadTableBase {
   csvFile: string[];
+  /**
+   * Some drivers know types of response
+   */
+  types?: TableStructure;
 }
 
-export interface StreamTableData {
+export interface StreamTableData extends DownloadTableBase {
   rowStream: NodeJS.ReadableStream;
   /**
    * Some drivers know types of response
    */
   types?: TableStructure;
-  /**
-   * Optional function to release stream/cursor/connection
-   */
-  release?: () => Promise<void>;
 }
 export type StreamTableDataWithTypes = StreamTableData & {
   /**

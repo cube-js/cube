@@ -3,16 +3,24 @@ import R from 'ramda';
 
 import { getEnv } from '@cubejs-backend/shared';
 
-import { cancelCombinator } from '../driver/utils';
+import { cancelCombinator, SaveCancelFn } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { QueryCache } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
-import { BaseDriver, StreamOptions, UnloadOptions } from '../driver';
+import {
+  BaseDriver,
+  DownloadTableCSVData,
+  DownloadTableData,
+  DownloadTableMemoryData,
+  StreamOptions, StreamTableData,
+  UnloadOptions,
+} from '../driver';
 import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
+import { LargeStreamWarning } from './StreamObjectsCounter';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
@@ -580,7 +588,7 @@ class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry, invalidationKeys) {
+  public refresh(preAggregation: any, newVersionEntry, invalidationKeys) {
     return (client) => {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
@@ -591,7 +599,13 @@ class PreAggregationLoader {
           this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
       }
       return cancelCombinator(
-        saveCancelFn => refreshStrategy.bind(this)(client, newVersionEntry, saveCancelFn, invalidationKeys)
+        saveCancelFn => refreshStrategy.bind(this)(
+          client,
+          newVersionEntry,
+          saveCancelFn,
+          preAggregation,
+          invalidationKeys
+        )
       );
     };
   }
@@ -617,7 +631,8 @@ class PreAggregationLoader {
   protected async refreshImplStoreInSourceStrategy(
     client: DriverInterface,
     newVersionEntry,
-    saveCancelFn,
+    saveCancelFn: SaveCancelFn,
+    preAggregation,
     invalidationKeys
   ) {
     const [loadSql, params] =
@@ -647,8 +662,9 @@ class PreAggregationLoader {
    */
   protected async refreshImplTempTableExternalStrategy(
     client: DriverInterface,
-    newVersionEntry,
-    saveCancelFn,
+    newVersionEntry: VersionEntry,
+    saveCancelFn: SaveCancelFn,
+    preAggregation,
     invalidationKeys
   ) {
     const [loadSql, params] =
@@ -668,7 +684,12 @@ class PreAggregationLoader {
       this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry)
     ));
 
-    const tableData = await this.downloadTempExternalPreAggregation(client, newVersionEntry, saveCancelFn);
+    const tableData = await this.downloadTempExternalPreAggregation(
+      client,
+      newVersionEntry,
+      preAggregation,
+      saveCancelFn
+    );
 
     try {
       await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
@@ -685,7 +706,13 @@ class PreAggregationLoader {
   /**
    * Strategy to copy pre-aggregation from source db (for read-only permissions) to external data
    */
-  protected async refreshImplStreamExternalStrategy(client, newVersionEntry, saveCancelFn, invalidationKeys) {
+  protected async refreshImplStreamExternalStrategy(
+    client: DriverInterface,
+    newVersionEntry: VersionEntry,
+    saveCancelFn,
+    preAggregation,
+    invalidationKeys
+  ) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
@@ -739,7 +766,12 @@ class PreAggregationLoader {
   /**
    * Create table (for db with write permissions) and extract data via memory/stream/unload
    */
-  protected async downloadTempExternalPreAggregation(client: DriverInterface, newVersionEntry, saveCancelFn) {
+  protected async downloadTempExternalPreAggregation(
+    client: DriverInterface,
+    newVersionEntry,
+    preAggregation,
+    saveCancelFn: SaveCancelFn
+  ) {
     // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
     if (!client.downloadTable) {
       throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
@@ -754,17 +786,23 @@ class PreAggregationLoader {
     const externalDriver = await this.externalDriverFactory();
     const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
-    let loadFn;
+    let tableData: DownloadTableData;
 
     if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      loadFn = client.unload(table, this.getUnloadOptions());
+      tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
     } else if (capabilities.streamImport && client.stream) {
-      loadFn = client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions());
-    } else {
-      loadFn = client.downloadTable(table, capabilities);
-    }
+      tableData = await saveCancelFn(
+        client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
+      );
 
-    const tableData = await saveCancelFn(loadFn);
+      if (client.unload) {
+        const stream = new LargeStreamWarning(preAggregation.preAggregationId);
+        tableData.rowStream.pipe(stream);
+        tableData.rowStream = stream;
+      }
+    } else {
+      tableData = await saveCancelFn(client.downloadTable(table, capabilities));
+    }
 
     if (!tableData.types) {
       tableData.types = await saveCancelFn(client.tableColumnTypes(table));
@@ -773,28 +811,24 @@ class PreAggregationLoader {
     return tableData;
   }
 
-  protected async uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn) {
-    const externalDriver = await this.externalDriverFactory();
-    if (!externalDriver.uploadTable) {
-      throw new Error('Can\'t load external pre-aggregation: destination driver doesn\'t support uploadTable()');
-    }
-
+  protected async uploadExternalPreAggregation(
+    tableData: DownloadTableData,
+    newVersionEntry: VersionEntry,
+    saveCancelFn: SaveCancelFn,
+  ) {
+    const externalDriver: DriverInterface = await this.externalDriverFactory();
     const table = this.targetTableName(newVersionEntry);
 
     this.logger('Uploading external pre-aggregation', {
       preAggregation: this.preAggregation,
       requestId: this.requestId
     });
-    if (externalDriver.uploadTableWithIndexes) {
-      await saveCancelFn(
-        externalDriver.uploadTableWithIndexes(
-          table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry)
-        )
-      );
-    } else {
-      await saveCancelFn(externalDriver.uploadTable(table, tableData.types, tableData));
-      await this.createIndexes(externalDriver, newVersionEntry, saveCancelFn);
-    }
+
+    await saveCancelFn(
+      externalDriver.uploadTableWithIndexes(
+        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry)
+      )
+    );
 
     await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true);
@@ -837,7 +871,7 @@ class PreAggregationLoader {
   protected async dropOrphanedTables(
     client: DriverInterface,
     justCreatedTable: string,
-    saveCancelFn,
+    saveCancelFn: SaveCancelFn,
     external: boolean
   ) {
     await this.preAggregations.addTableUsed(justCreatedTable);
@@ -1014,7 +1048,7 @@ export class PreAggregations {
           ),
           { requestId, externalRefresh: this.externalRefresh }
         );
-        return loader.refresh(newVersionEntry, invalidationKeys)(client);
+        return loader.refresh(preAggregation, newVersionEntry, invalidationKeys)(client);
       }, {
         concurrency: 1,
         logger: this.logger,
