@@ -4,6 +4,7 @@ pub mod lock;
 pub mod logger;
 mod malloc_trim_loop;
 pub mod maybe_owned;
+pub mod metrics;
 pub mod ordfloat;
 pub mod time_span;
 
