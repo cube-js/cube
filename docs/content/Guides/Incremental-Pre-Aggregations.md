@@ -28,7 +28,7 @@ export const immutablePartitionRollupRefreshKey = (filterFn) =>
 ```
 
 Here we use Standard BigQuery SQL dialect.
-To use this `refreshKey` with for example `Events` table you can define `autoRollup` like this:
+To use this `refreshKey` with for example `Events` table you can define `rollup` like this:
 
 ```javascript
 import { immutablePartitionRollupRefreshKey } from './RefreshKeyHelper';
@@ -37,9 +37,12 @@ cube(`Events`, {
   // ...
 
   preAggregations: {
-    auto: {
-      type: `autoRollup`,
+    main: {
+      type: `rollup`,
       partitionGranularity: `month`,
+      
+      // ...
+      
       refreshKey: {
         sql: immutablePartitionRollupRefreshKey(
           FILTER_PARAMS.FirebaseEvents.time.filter
