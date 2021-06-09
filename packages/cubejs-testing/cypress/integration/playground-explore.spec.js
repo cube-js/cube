@@ -13,6 +13,11 @@ context('Playground: Explore Page', () => {
 
   beforeEach(() => {
     blockAllAnalytics();
+    cy.restoreLocalStorage();
+  });
+
+  afterEach(() => {
+    cy.saveLocalStorage();
   });
 
   // @todo Fix...

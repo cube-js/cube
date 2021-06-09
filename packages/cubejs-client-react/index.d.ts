@@ -211,6 +211,10 @@ declare module '@cubejs-client/react' {
     /**
      * @hidden
      */
+    queryVersion?: number | string;
+    /**
+     * @hidden
+     */
     onSchemaChange?: (props: SchemaChangeProps) => void
   };
 

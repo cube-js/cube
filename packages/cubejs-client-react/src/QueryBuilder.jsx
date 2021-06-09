@@ -107,7 +107,7 @@ export default class QueryBuilder extends React.Component {
   }
 
   async componentDidUpdate(prevProps) {
-    const { schemaVersion, onSchemaChange } = this.props;
+    const { schemaVersion, queryVersion, defaultQuery, onSchemaChange } = this.props;
     const { meta } = this.state;
 
     if (prevProps.schemaVersion !== schemaVersion) {
@@ -125,6 +125,12 @@ export default class QueryBuilder extends React.Component {
         // eslint-disable-next-line
         this.setState({ metaError: error });
       }
+    }
+
+    if (defaultQuery != null && prevProps.queryVersion !== queryVersion) {
+      this.updateVizState({
+        query: defaultQuery
+      });
     }
   }
 

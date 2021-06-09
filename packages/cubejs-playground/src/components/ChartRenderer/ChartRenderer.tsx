@@ -9,8 +9,8 @@ import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
-import { QueryStatus } from '../../PlaygroundQueryBuilder';
 import { useAppContext } from '../AppContext';
+import { QueryStatus } from "../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder";
 
 const { Text } = Typography;
 
@@ -73,7 +73,8 @@ export type TQueryLoadResult = {
   error?: Error | null;
 } & Partial<QueryStatus>;
 
-type TChartRendererProps = {
+type ChartRendererProps = {
+  queryId: string;
   query: Query;
   queryError: Error | null;
   isQueryLoading: boolean;
@@ -90,6 +91,7 @@ type TChartRendererProps = {
 };
 
 export default function ChartRenderer({
+  queryId,
   areQueriesEqual,
   queryError,
   iframeRef,
@@ -100,7 +102,7 @@ export default function ChartRenderer({
   onChartRendererReadyChange,
   onQueryStatusChange,
   onRunButtonClick,
-}: TChartRendererProps) {
+}: ChartRendererProps) {
   const runButtonRef = useRef<HTMLButtonElement>(null);
   const [slowQuery, setSlowQuery] = useState(false);
   const [resultSetExists, setResultSet] = useState(false);
@@ -278,6 +280,7 @@ export default function ChartRenderer({
 
       <ChartContainer invisible={invisible}>
         <iframe
+          id={`iframe-${queryId}`}
           data-testid="chart-renderer"
           ref={iframeRef}
           title="Chart renderer"

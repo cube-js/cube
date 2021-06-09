@@ -2,13 +2,14 @@ import { useLayoutEffect } from 'react';
 import { CubeProvider } from '@cubejs-client/react';
 
 import PlaygroundWrapper from '../PlaygroundWrapper';
-import PlaygroundQueryBuilder, {
-  TPlaygroundQueryBuilderProps,
-} from '../../PlaygroundQueryBuilder';
 import { TSecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
+import {
+  PlaygroundQueryBuilder,
+  TPlaygroundQueryBuilderProps,
+} from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 
-type TQueryBuilderProps = {
+type QueryBuilderProps = {
   apiUrl: string;
   token: string;
   tokenKey?: string;
@@ -17,12 +18,13 @@ type TQueryBuilderProps = {
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
+  | 'queryVersion'
   | 'onVizStateChanged'
   | 'onSchemaChange'
 > &
   Pick<TSecurityContextContextProps, 'getToken'>;
 
-export function QueryBuilder({ apiUrl, token, ...props }: TQueryBuilderProps) {
+export function QueryBuilder({ apiUrl, token, ...props }: QueryBuilderProps) {
   return (
     <PlaygroundWrapper tokenKey={props.tokenKey} getToken={props.getToken}>
       <QueryBuilderContainer apiUrl={apiUrl} token={token} {...props} />
@@ -30,8 +32,8 @@ export function QueryBuilder({ apiUrl, token, ...props }: TQueryBuilderProps) {
   );
 }
 
-type TQueryBuilderContainerProps = Omit<
-  TQueryBuilderProps,
+type QueryBuilderContainerProps = Omit<
+  QueryBuilderProps,
   'tokenKey' | 'getToken'
 >;
 
@@ -39,7 +41,7 @@ function QueryBuilderContainer({
   apiUrl,
   token,
   ...props
-}: TQueryBuilderContainerProps) {
+}: QueryBuilderContainerProps) {
   const { token: securityContextToken } = useSecurityContext();
   const currentToken = securityContextToken || token;
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
@@ -65,11 +67,14 @@ function QueryBuilderContainer({
       <PlaygroundQueryBuilder
         apiUrl={apiUrl}
         cubejsToken={currentToken}
+        // todo: !!!
+        queryId="???f"
         initialVizState={{
           query: props.defaultQuery,
           ...props.initialVizState,
         }}
         schemaVersion={props.schemaVersion}
+        queryVersion={props.queryVersion}
         onVizStateChanged={props.onVizStateChanged}
         onSchemaChange={props.onSchemaChange}
       />

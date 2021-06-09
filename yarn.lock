@@ -5415,7 +5415,7 @@
   resolved "https://registry.yarnpkg.com/@types/qs/-/qs-6.9.6.tgz#df9c3c8b31a247ec315e6996566be3171df4b3b1"
   integrity sha512-0/HnwIfW4ki2D8L8c9GVcG5I72s9jP5GSLVF0VIXDW00kmIpA6O33G7a8n59Tmh7Nz0WUC3rSb7PTY/sdW2JzA==
 
-"@types/ramda@^0.27.32", "@types/ramda@^0.27.34", "@types/ramda@^0.27.40":
+"@types/ramda@0.27.40", "@types/ramda@^0.27.32", "@types/ramda@^0.27.34", "@types/ramda@^0.27.40":
   version "0.27.40"
   resolved "https://registry.yarnpkg.com/@types/ramda/-/ramda-0.27.40.tgz#99f307356fe553095ee4d3c2af2b0eb3af7a8413"
   integrity sha512-V99ZfTH2tqVYdLDAlgh2uT+N074HPgqnAsMjALKSBqogYd0HbuuGMqNukJ6fk9Ml/Htaus76fsc4Yh3p7q1VdQ==
@@ -10038,7 +10038,7 @@ cypress-image-snapshot@^4.0.1:
     pkg-dir "^3.0.0"
     term-img "^4.0.0"
 
-cypress-localstorage-commands@^1.4.3:
+cypress-localstorage-commands@^1.4.5:
   version "1.4.5"
   resolved "https://registry.yarnpkg.com/cypress-localstorage-commands/-/cypress-localstorage-commands-1.4.5.tgz#7e97f82c144314655ab7ecb4ce0e273c70d1e569"
   integrity sha512-mr86nv74GvOE4zOFwoMrksFCykNSbRh57Pg7xUGpm2ax+wfHhqwBA56Sn5dhHV73gzz7C6B1kfNpMrjMH/hgyg==
@@ -17362,6 +17362,11 @@ mississippi@^3.0.0:
     pumpify "^1.3.3"
     stream-each "^1.1.0"
     through2 "^2.0.0"
+
+mitt@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/mitt/-/mitt-2.1.0.tgz#f740577c23176c6205b121b2973514eade1b2230"
+  integrity sha512-ILj2TpLiysu2wkBbWjAmww7TkZb65aiQO+DkVdUTBpBXq+MHYiETENkKFMtsJZX1Lf4pe4QOrTSjIfUwN5lRdg==
 
 mixin-deep@^1.2.0:
   version "1.3.2"

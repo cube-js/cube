@@ -43,6 +43,7 @@
     "js-cookie": "^2.2.1",
     "jwt-decode": "^3.1.2",
     "less": "^3.10.3",
+    "mitt": "^2.1.0",
     "moment": "^2.24.0",
     "prettier": "^2.0.5",
     "prismjs": "^1.23.0",
