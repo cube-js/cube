@@ -1,6 +1,7 @@
 import inflection from 'inflection';
 import { ScaffoldingSchema } from './ScaffoldingSchema';
 import { UserError } from '../compiler/UserError';
+import { ValueWithComments } from './ValueWithComments';
 
 class MemberReference {
   constructor(member) {
@@ -70,6 +71,10 @@ export class ScaffoldingTemplate {
     return {
       cube: tableSchema.cube,
       sql: `SELECT * FROM ${this.escapeName(tableSchema.schema)}.${this.escapeName(tableSchema.table)}`, // TODO escape
+      preAggregations: new ValueWithComments({}, [
+        'Pre-Aggregations definitions go here',
+        'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started'
+      ]),
       joins: tableSchema.joins.map(j => ({
         [j.cubeToJoin]: {
           sql: `\${CUBE}.${this.escapeName(j.thisTableColumn)} = \${${j.cubeToJoin}}.${this.escapeName(j.columnToJoin)}`,
@@ -118,7 +123,7 @@ export class ScaffoldingTemplate {
     return `cube(\`${cube}\`, ${this.render(descriptor, 0)});\n`;
   }
 
-  render(descriptor, level) {
+  render(descriptor, level, appendComment = '') {
     // eslint-disable-next-line prefer-template
     const lineSeparator = ',\n' + (level < 2 ? '\n' : '');
     if (Array.isArray(descriptor)) {
@@ -128,13 +133,22 @@ export class ScaffoldingTemplate {
       return `\`${descriptor.replace(/`/g, '\\`')}\``;
     } else if (descriptor instanceof MemberReference) {
       return descriptor.member;
+    } else if (descriptor instanceof ValueWithComments) {
+      return this.render(
+        descriptor.value,
+        level,
+        descriptor.comments.map((comment) => `  // ${comment}`).join('\n')
+      );
     } else if (typeof descriptor === 'object') {
-      let entries = Object.keys(descriptor)
+      const content = Object.keys(descriptor)
         .filter(k => descriptor[k] != null)
-        .map(key => `${key}: ${this.render(descriptor[key], level + 1)}`).join(lineSeparator);
-      // eslint-disable-next-line prefer-template
-      entries = entries.split('\n').map(l => '  ' + l).join('\n');
-      return `{\n${entries}\n}`;
+        .map(key => `${key}: ${this.render(descriptor[key], level + 1)}`)
+        .join(lineSeparator)
+        .split('\n')
+        .map(l => `  ${l}`)
+        .join('\n');
+
+      return `{\n${appendComment}${content}\n}`;
     } else {
       return descriptor.toString();
     }

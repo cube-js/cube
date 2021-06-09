@@ -309,6 +309,11 @@ describe('ScaffoldingSchema', () => {
         content: `cube(\`Orders\`, {
   sql: \`SELECT * FROM public.orders\`,
   
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+  },
+  
   joins: {
     Customers: {
       sql: \`\${CUBE}."customerId" = \${Customers}.id\`,
@@ -342,6 +347,11 @@ describe('ScaffoldingSchema', () => {
         fileName: 'Customers.js',
         content: `cube(\`Customers\`, {
   sql: \`SELECT * FROM public.customers\`,
+  
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+  },
   
   joins: {
     Accounts: {
@@ -381,6 +391,11 @@ describe('ScaffoldingSchema', () => {
         fileName: 'Accounts.js',
         content: `cube(\`Accounts\`, {
   sql: \`SELECT * FROM public.accounts\`,
+  
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+  },
   
   joins: {
     
@@ -447,6 +462,11 @@ describe('ScaffoldingSchema', () => {
         content: `cube(\`SomeOrders\`, {
   sql: \`SELECT * FROM public.\\\`someOrders\\\`\`,
   
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+  },
+  
   joins: {
     
   },
@@ -501,6 +521,11 @@ describe('ScaffoldingSchema', () => {
         fileName: 'Orders.js',
         content: `cube(\`Orders\`, {
   sql: \`SELECT * FROM public.orders\`,
+  
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+  },
   
   joins: {
     
@@ -562,6 +587,12 @@ describe('ScaffoldingSchema', () => {
         content: `cube(\`Orders\`, {
   sql: \`SELECT * FROM public.orders\`,
   
+  preAggregations: {
+    main: {
+      type: \`originalSql\`
+    }
+  },
+  
   joins: {
     
   },
@@ -587,13 +618,7 @@ describe('ScaffoldingSchema', () => {
     }
   },
   
-  dataSource: \`testDataSource\`,
-  
-  preAggregations: {
-    main: {
-      type: \`originalSql\`
-    }
-  }
+  dataSource: \`testDataSource\`
 });
 `
       }

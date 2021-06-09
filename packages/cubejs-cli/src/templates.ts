@@ -208,6 +208,11 @@ const ordersJs = `cube(\`Orders\`, {
   select 5 as id, 600 as amount, 'shipped' status
   \`,
 
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  },
+
   measures: {
     count: {
       type: \`count\`
