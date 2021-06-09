@@ -24,25 +24,69 @@ fn ensure_credentials_init() {
     // TODO: switch to something that allows to configure without env vars.
     // TODO: remove `SERVICE_ACCOUNT` completely.
     INIT_CREDENTIALS.call_once(|| {
-        for var in &["SERVICE_ACCOUNT", "GOOGLE_APPLICATION_CREDENTIALS", "SERVICE_ACCOUNT_JSON", "GOOGLE_APPLICATION_CREDENTIALS_JSON"] {
-            let cube_var = format!("CUBESTORE_GCP_{}", var);
-            match std::env::var(&cube_var) {
-                Ok(value) => {
-                    if let Ok(sa) = std::env::var(var) {
-                        if sa != value {
-                            log::warn!("'{}' and '{}' differ. Using the latter", var, cube_var)
+        let mut creds_json = None;
+        if let Ok(c) = std::env::var("CUBESTORE_GCP_CREDENTIALS") {
+            match decode_credentials(&c) {
+                Ok(s) => creds_json = Some((s, "CUBESTORE_GCP_CREDENTIALS".to_string())),
+                Err(e) => log::error!("Could not decode 'CUBESTORE_GCP_CREDENTIALS': {}", e),
+            }
+        }
+        let mut creds_path = match std::env::var("CUBESTORE_GCP_KEY_FILE") {
+            Ok(s) => Some((s, "CUBESTORE_GCP_KEY_FILE".to_string())),
+            Err(_) => None,
+        };
+
+        // TODO: this handles deprecated variable names, remove them.
+        for (var, is_path) in &[
+            ("SERVICE_ACCOUNT", true),
+            ("GOOGLE_APPLICATION_CREDENTIALS", true),
+            ("SERVICE_ACCOUNT_JSON", false),
+            ("GOOGLE_APPLICATION_CREDENTIALS_JSON", false),
+        ] {
+            for var in &[&format!("CUBESTORE_GCP_{}", var), *var] {
+                if let Ok(var_value) = std::env::var(&var) {
+                    let (upgrade_var, read_value) = if *is_path {
+                        ("CUBESTORE_GCP_KEY_FILE", &mut creds_path)
+                    } else {
+                        ("CUBESTORE_GCP_CREDENTIALS", &mut creds_json)
+                    };
+
+                    match read_value {
+                        None => {
+                            *read_value = Some((var_value, var.to_string()));
+                            log::warn!(
+                                "Environment variable '{}' is deprecated and will be ignored in future versions, use '{}' instead",
+                                var,
+                                upgrade_var
+                            );
                         }
-                    }
-                    std::env::set_var(var, value);
-                }
-                Err(_) => {
-                    if std::env::var(var).is_ok() {
-                        log::warn!("CubeStore will stop reading '{}' in future versions, please set '{}' instead", var, cube_var)
+                        Some((prev_val, prev_var)) => {
+                            if prev_val != &var_value {
+                                log::warn!(
+                                    "Values of '{}' and '{}' differ, preferring the latter",
+                                    var,
+                                    prev_var
+                                );
+                            }
+                        }
                     }
                 }
             }
         }
+
+        match creds_json {
+            Some((v, _)) => std::env::set_var("SERVICE_ACCOUNT_JSON", v),
+            None => std::env::remove_var("SERVICE_ACCOUNT_JSON"),
+        }
+        match creds_path {
+            Some((v, _)) => std::env::set_var("SERVICE_ACCOUNT", v),
+            None => std::env::remove_var("SERVICE_ACCOUNT"),
+        }
     })
+}
+
+fn decode_credentials(creds_base64: &str) -> Result<String, CubeError> {
+    Ok(String::from_utf8(base64::decode(creds_base64)?)?)
 }
 
 #[derive(Debug)]
