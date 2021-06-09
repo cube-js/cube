@@ -10038,7 +10038,7 @@ cypress-image-snapshot@^4.0.1:
     pkg-dir "^3.0.0"
     term-img "^4.0.0"
 
-cypress-localstorage-commands@^1.4.3:
+cypress-localstorage-commands@^1.4.5:
   version "1.4.5"
   resolved "https://registry.yarnpkg.com/cypress-localstorage-commands/-/cypress-localstorage-commands-1.4.5.tgz#7e97f82c144314655ab7ecb4ce0e273c70d1e569"
   integrity sha512-mr86nv74GvOE4zOFwoMrksFCykNSbRh57Pg7xUGpm2ax+wfHhqwBA56Sn5dhHV73gzz7C6B1kfNpMrjMH/hgyg==

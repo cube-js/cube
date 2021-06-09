@@ -36,13 +36,25 @@ type QueryTabsProps = {
 };
 
 export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
-  const [tabs, saveTabs] = useLocalStorage<QueryTab[]>('queryTabs', [
-    {
-      id: '1',
-      query
-    },
-  ]);
-  const [activeId, setActiveId] = useState<string>(tabs[0].id);
+  let [tabs, saveTabs] = useLocalStorage<QueryTab[]>('queryTabs', (value: unknown) => {
+    if (value == null) {
+      return [
+        {
+          id: '1',
+          query
+        },
+      ]
+    }
+
+    return value as QueryTab[];
+  });
+
+  const [activeId, setActiveId] = useState<string>(tabs?.[0].id);
+
+  if (!tabs || !tabs.length) {
+    return <div>no tabs</div>
+  }
+
 
   function getNextId(): string {
     const ids = tabs.map(({ id }) => id);
@@ -71,6 +83,7 @@ export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
 
   return (
     <StyledTabs
+      data-testid="query-tabs"
       activeKey={activeId}
       type="editable-card"
       tabBarExtraContent={{
@@ -108,6 +121,7 @@ export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
       {tabs.map((tab) => (
         <TabPane
           key={tab.id}
+          data-testid={`query-tab-${tab.id}`}
           tab={`Query ${tab.id}`}
           closable={tabs.length > 1}
         >

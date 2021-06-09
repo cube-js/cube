@@ -242,7 +242,7 @@ export default function ChartRenderer({
         <Positioner>
           <Centered>
             <Button
-              data-testid={`run-query-btn-${queryId}`}
+              data-testid="run-query-btn"
               ref={runButtonRef}
               size="large"
               type="primary"
