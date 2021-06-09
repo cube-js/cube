@@ -58,10 +58,20 @@ jobs:
           args: --manifest-path rust/Cargo.toml -j 1
 
   docker-image-latest:
-    name: Build only :latest image
+    name: Build only :latest image (${{ matrix.platform }})
     runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     if: github.ref != 'refs/heads/master'
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            dockerfile: Dockerfile
+          - platform: linux/arm64
+            dockerfile: arm64.Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -78,11 +88,10 @@ jobs:
             ${{ runner.os }}-buildx-
       - name: Build only
         uses: docker/build-push-action@v2
-        timeout-minutes: 60
         with:
           context: ./rust/
-          file: ./rust/Dockerfile
-          platforms: linux/amd64
+          file: ./rust/${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
           push: false
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache

@@ -59,8 +59,17 @@ jobs:
   cubestore-docker-image-dev:
     name: Release Cube Store :dev image
     runs-on: ubuntu-20.04
-    timeout-minutes: 60
-
+    timeout-minutes: 120
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            dockerfile: Dockerfile
+          - platform: linux/arm64
+            dockerfile: arm64.Dockerfile
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -121,8 +130,8 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./rust/
-          file: ./rust/Dockerfile
-          platforms: linux/amd64
+          file: ./rust/${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           cache-from: type=local,src=/tmp/.buildx-cache
