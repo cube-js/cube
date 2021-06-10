@@ -22,7 +22,7 @@ import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
   ExtendContextFn,
-  QueryTransformerFn,
+  QueryRewriteFn,
   RequestContext,
   RequestLoggerMiddlewareFn,
   Request,
@@ -179,7 +179,7 @@ export interface ApiGatewayOptions {
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   jwt?: JWTOptions;
   requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
-  queryTransformer?: QueryTransformerFn;
+  queryRewrite?: QueryRewriteFn;
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
   playgroundAuthSecret?: string;
@@ -194,7 +194,7 @@ export class ApiGateway {
 
   protected readonly basePath: string;
 
-  protected readonly queryTransformer: QueryTransformerFn;
+  protected readonly queryRewrite: QueryRewriteFn;
 
   protected readonly subscriptionStore: any;
 
@@ -235,7 +235,7 @@ export class ApiGateway {
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
 
-    this.queryTransformer = options.queryTransformer || (async (query) => query);
+    this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
@@ -493,7 +493,7 @@ export class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
-      queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
+      queries.map((currentQuery) => this.queryRewrite(normalizeQuery(currentQuery), context))
     );
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
