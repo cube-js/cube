@@ -595,7 +595,6 @@ export class CubejsServerCore {
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
-        contextToExtDbType: this.contextToExternalDbType
       }
     );
   }
@@ -750,7 +749,7 @@ export class CubejsServerCore {
         externalDriverFactory: options.getExternalDriverFactory,
         ...options.orchestratorOptions,
         contextToDbType: this.contextToDbType.bind(this),
-        externalDbTypeFn: this.contextToExternalDbType.bind(this),
+        contextToExternalDbType: this.contextToExternalDbType.bind(this),
       }
     );
   }

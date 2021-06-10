@@ -7,7 +7,7 @@ import { DbTypeFn, ExternalDbTypeFn, RequestContext } from './types';
 interface OrchestratorApiOptions {
   externalDriverFactory: DriverFactoryByDataSource;
   contextToDbType: DbTypeFn;
-  externalDbTypeFn: ExternalDbTypeFn;
+  contextToExternalDbType: ExternalDbTypeFn;
   continueWaitTimeout?: number;
   redisPrefix?: string;
 }
@@ -23,14 +23,14 @@ export class OrchestratorApi {
 
   protected readonly contextToDbType: DbTypeFn;
 
-  protected readonly contextToExtDbType: ExternalDbTypeFn;
+  protected readonly contextToExternalDbType: ExternalDbTypeFn;
 
   public constructor(
     protected driverFactory: DriverFactoryByDataSource,
     protected logger,
     protected readonly options: OrchestratorApiOptions
   ) {
-    const { externalDriverFactory, contextToDbType, externalDbTypeFn } = options;
+    const { externalDriverFactory, contextToDbType, contextToExternalDbType } = options;
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
 
     this.orchestrator = new QueryOrchestrator(
@@ -43,7 +43,7 @@ export class OrchestratorApi {
     this.driverFactory = driverFactory;
     this.externalDriverFactory = externalDriverFactory;
     this.contextToDbType = contextToDbType;
-    this.contextToExtDbType = externalDbTypeFn;
+    this.contextToExternalDbType = contextToExternalDbType;
     this.logger = logger;
   }
 
@@ -81,7 +81,7 @@ export class OrchestratorApi {
       );
 
       const extractExternalDbType = (response) => (
-        this.contextToExtDbType({
+        this.contextToExternalDbType({
           ...query.context,
           dataSource: response.dataSource,
         })
