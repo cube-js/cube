@@ -266,7 +266,7 @@ module.exports = {
 
 <!-- prettier-ignore-start -->
 [[warning | Note]]
-| In previous versions of Cube.js it was called `queryTransformer`.
+| In previous versions of Cube.js, this was called `queryTransformer`.
 <!-- prettier-ignore-end -->
 
 This is a security hook to check your query just before it gets processed. You
