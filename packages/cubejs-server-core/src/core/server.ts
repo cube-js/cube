@@ -463,7 +463,7 @@ export class CubejsServerCore {
     }
 
     // Create schema directory to protect error on new project with dev mode (docker flow)
-    if (options.devServer && !this.configFileExists()) {
+    if (options.devServer) {
       const repositoryPath = path.join(process.cwd(), options.schemaPath);
 
       if (!fs.existsSync(repositoryPath)) {
