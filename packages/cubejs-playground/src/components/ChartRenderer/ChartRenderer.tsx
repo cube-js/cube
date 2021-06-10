@@ -10,7 +10,7 @@ import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
 import { useAppContext } from '../AppContext';
-import { QueryStatus } from "../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder";
+import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 
 const { Text } = Typography;
 
@@ -109,8 +109,6 @@ export default function ChartRenderer({
   const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
 
-  const { extDbType } = useAppContext();
-
   // for you, ovr :)
   useHotkeys('cmd+enter', () => {
     runButtonRef.current?.click();
@@ -141,7 +139,12 @@ export default function ChartRenderer({
 
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
-          const { external, dbType, usedPreAggregations = {} } = loadResponse.results[0] || {};
+          const {
+            external,
+            dbType,
+            extDbType,
+            usedPreAggregations = {},
+          } = loadResponse.results[0] || {};
 
           setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
           Boolean(loadResponse.slowQuery) && setSlowQuery(false);
@@ -167,7 +170,7 @@ export default function ChartRenderer({
             error,
             isLoading: false,
             timeElapsed,
-            isAggregated
+            isAggregated,
           });
         }
       },
@@ -190,9 +193,7 @@ export default function ChartRenderer({
   }, [framework, onChartRendererReadyChange]);
 
   const loading: boolean =
-    queryHasMissingMembers ||
-    isQueryLoading ||
-    isPreAggregationBuildInProgress;
+    queryHasMissingMembers || isQueryLoading || isPreAggregationBuildInProgress;
 
   const invisible: boolean =
     !isChartRendererReady ||

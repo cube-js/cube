@@ -10,7 +10,6 @@ import { PlaygroundContext } from '../App';
 
 export type ContextProps = {
   isDocker?: boolean;
-  extDbType?: string;
   identifier?: string | null;
   playgroundContext?: PlaygroundContext;
   setContext: (context: Partial<ContextProps> | null) => void;

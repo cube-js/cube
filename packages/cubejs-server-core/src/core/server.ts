@@ -324,7 +324,7 @@ export class CubejsServerCore {
     const definedExtDBVariables = skipOnEnv.filter((field) => process.env[field] !== undefined);
 
     const externalDbType = opts.externalDbType ||
-      <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE ||
+      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE ||
       (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
@@ -594,7 +594,8 @@ export class CubejsServerCore {
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
-        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones
+        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
+        contextToExtDbType: this.contextToExternalDbType
       }
     );
   }
@@ -710,6 +711,7 @@ export class CubejsServerCore {
       }),
       redisPrefix: orchestratorId,
       orchestratorOptions: {
+        // todo: dynamic externalDbType?
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         ...this.options.orchestratorOptions,
         // OrchestratorOptionsFn should have an ability to override static configuration form cube.js file
@@ -747,7 +749,8 @@ export class CubejsServerCore {
         redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
         externalDriverFactory: options.getExternalDriverFactory,
         ...options.orchestratorOptions,
-        contextToDbType: this.contextToDbType.bind(this)
+        contextToDbType: this.contextToDbType.bind(this),
+        externalDbTypeFn: this.contextToExternalDbType.bind(this),
       }
     );
   }

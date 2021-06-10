@@ -173,6 +173,7 @@ export interface ApiGatewayOptions {
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshTimeZones?: String[];
   basePath: string;
+  contextToExtDbType?: (context: RequestContext) => string;
   extendContext?: ExtendContextFn;
   checkAuth?: CheckAuthFn;
   // @deprecated Please use checkAuth
@@ -218,6 +219,8 @@ export class ApiGateway {
 
   protected readonly releaseListeners: (() => any)[] = [];
 
+  protected readonly contextToExtDbType?: any;
+
   protected readonly playgroundAuthSecret?: string;
 
   public constructor(
@@ -234,6 +237,7 @@ export class ApiGateway {
     this.standalone = options.standalone;
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
+    this.contextToExtDbType = options.contextToExtDbType;
 
     this.queryTransformer = options.queryTransformer || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
@@ -706,6 +710,7 @@ export class ApiGateway {
           annotation,
           dataSource: response.dataSource,
           dbType: response.dbType,
+          extDbType: response.extDbType,
           external: response.external,
           slowQuery: Boolean(response.slowQuery)
         };
