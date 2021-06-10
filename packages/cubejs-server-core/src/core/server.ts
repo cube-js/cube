@@ -710,7 +710,6 @@ export class CubejsServerCore {
       }),
       redisPrefix: orchestratorId,
       orchestratorOptions: {
-        // todo: dynamic externalDbType?
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         ...this.options.orchestratorOptions,
         // OrchestratorOptionsFn should have an ability to override static configuration form cube.js file
