@@ -163,6 +163,7 @@ export type QueryStatus = {
   timeElapsed: number;
   isAggregated: boolean;
   external: boolean | null;
+  extDbType: string;
   transformedQuery?: TransformedQuery;
 };
 
@@ -534,6 +535,7 @@ export function PlaygroundQueryBuilder({
                                   timeElapsed,
                                   transformedQuery: result.transformedQuery,
                                   external: result.external,
+                                  extDbType: result.extDbType,
                                 });
                               }
                             }

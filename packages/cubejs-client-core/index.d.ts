@@ -146,6 +146,7 @@ declare module '@cubejs-client/core' {
     data: T[];
     external: boolean | null;
     dbType: string;
+    extDbType: string;
     usedPreAggregations?: Record<string, any>;
     transformedQuery?: TransformedQuery;
   };

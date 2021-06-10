@@ -324,7 +324,7 @@ export class CubejsServerCore {
     const definedExtDBVariables = skipOnEnv.filter((field) => process.env[field] !== undefined);
 
     const externalDbType = opts.externalDbType ||
-      <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE ||
+      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE ||
       (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
@@ -594,7 +594,7 @@ export class CubejsServerCore {
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
-        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones
+        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
       }
     );
   }
@@ -747,7 +747,8 @@ export class CubejsServerCore {
         redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
         externalDriverFactory: options.getExternalDriverFactory,
         ...options.orchestratorOptions,
-        contextToDbType: this.contextToDbType.bind(this)
+        contextToDbType: this.contextToDbType.bind(this),
+        contextToExternalDbType: this.contextToExternalDbType.bind(this),
       }
     );
   }
