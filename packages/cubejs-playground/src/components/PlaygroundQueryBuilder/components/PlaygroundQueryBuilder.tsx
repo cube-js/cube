@@ -41,6 +41,11 @@ const Section = styled.div`
   }
 `;
 
+const Wrapper = styled.div`
+  background-color: var(--layout-body-background);
+  padding-bottom: 16px;
+`;
+
 export const frameworkChartLibraries: Record<
   UIFramework,
   Array<{ value: string; title: string }>
@@ -146,14 +151,13 @@ type HandleRunButtonClickProps = {
   chartType: ChartType;
 };
 
-export type TPlaygroundQueryBuilderProps = {
+export type PlaygroundQueryBuilderProps = {
   apiUrl: string;
   cubejsToken: string;
   queryId: string;
   defaultQuery?: Query;
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
-  queryVersion?: number | string;
   initialVizState?: VizState;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
@@ -174,26 +178,25 @@ export function PlaygroundQueryBuilder({
   queryId,
   dashboardSource,
   schemaVersion = 0,
-  queryVersion = 0,
   initialVizState,
   onSchemaChange,
   onVizStateChanged,
-}: TPlaygroundQueryBuilderProps) {
+}: PlaygroundQueryBuilderProps) {
   const ref = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
 
   const [queryStatusMap, setQueryStatusMap] = useState<
     Record<string, QueryStatus | null>
   >({});
-  const [framework, setFramework] = useState('react');
-  const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
+  const [framework, setFramework] = useState<UIFramework>('react');
+  const [chartingLibrary, setChartingLibrary] = useState<string>('bizcharts');
   const [chartRendererState, setChartRendererReady] = useState<
     Record<string, boolean>
   >({});
   const [isQueryLoadingMap, setQueryLoadingMap] = useState<
     Record<string, boolean>
   >({});
-  const [queryError, setQueryError] = useState<Error | null>(null);
+  const [queryErrorMap, setQueryErrorMap] = useState<Record<string, Error | null>>({});
 
   function isChartRendererReady(): boolean {
     return Boolean(chartRendererState[queryId]);
@@ -219,6 +222,17 @@ export function PlaygroundQueryBuilder({
 
   function isQueryLoading(): boolean {
     return isQueryLoadingMap[queryId] || false;
+  }
+
+  function setQueryError(error: Error | null) {
+    setQueryErrorMap({
+      ...queryErrorMap,
+      [queryId]: error,
+    });
+  }
+
+  function queryError(): Error | null {
+    return queryErrorMap[queryId] || null;
   }
 
   useEffect(() => {
@@ -264,7 +278,6 @@ export function PlaygroundQueryBuilder({
       initialVizState={initialVizState}
       wrapWithQueryRenderer={false}
       schemaVersion={schemaVersion}
-      queryVersion={queryVersion}
       onSchemaChange={onSchemaChange}
       onVizStateChanged={onVizStateChanged}
       render={({
@@ -305,7 +318,7 @@ export function PlaygroundQueryBuilder({
         }
 
         return (
-          <div data-testid={`query-builder-${queryId}`}>
+          <Wrapper data-testid={`query-builder-${queryId}`}>
             <Row
               justify="space-around"
               align="top"
@@ -443,9 +456,7 @@ export function PlaygroundQueryBuilder({
               justify="space-around"
               align="top"
               gutter={32}
-              style={{
-                margin: '0 0 16px 0',
-              }}
+              style={{ margin: 0 }}
             >
               <Col span={24}>
                 {!isQueryPresent && metaError ? (
@@ -509,7 +520,7 @@ export function PlaygroundQueryBuilder({
                           isChartRendererReady={
                             isChartRendererReady() && !isFetchingMeta
                           }
-                          queryError={queryError}
+                          queryError={queryError()}
                           framework={framework}
                           chartType={chartType || 'line'}
                           query={query}
@@ -584,12 +595,12 @@ export function PlaygroundQueryBuilder({
                 setQueryLoading(false);
                 setQueryStatus(null);
 
-                if (queryError) {
+                if (queryError()) {
                   setQueryError(null);
                 }
               }}
             />
-          </div>
+          </Wrapper>
         );
       }}
     />

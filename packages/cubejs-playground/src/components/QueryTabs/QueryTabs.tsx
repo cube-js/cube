@@ -1,10 +1,9 @@
 import { Tabs } from 'antd';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { ChartType, Query } from '@cubejs-client/core';
 import styled from 'styled-components';
 
 import { useLocalStorage } from '../../hooks';
-import { useHistory } from 'react-router';
 
 const { TabPane } = Tabs;
 
@@ -26,6 +25,11 @@ type QueryTab = {
   chartType?: ChartType;
 };
 
+type QueryTabs = {
+  activeId: string;
+  tabs: QueryTab[];
+};
+
 type QueryTabsProps = {
   query: Query;
   children: (
@@ -36,25 +40,31 @@ type QueryTabsProps = {
 };
 
 export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
-  let [tabs, saveTabs] = useLocalStorage<QueryTab[]>('queryTabs', (value: unknown) => {
-    if (value == null) {
-      return [
-        {
-          id: '1',
-          query
-        },
-      ]
-    }
-
-    return value as QueryTab[];
+  const [queryTabs, saveTabs] = useLocalStorage<QueryTabs>('queryTabs', {
+    activeId: '1',
+    tabs: [
+      {
+        id: '1',
+        query,
+      },
+    ],
   });
 
-  const [activeId, setActiveId] = useState<string>(tabs?.[0].id);
+  // tmp transition to new format
+  useEffect(() => {
+    if (!queryTabs.activeId && (queryTabs as any).length > 0) {
+      saveTabs({
+        activeId: queryTabs[0].id,
+        tabs: queryTabs as any
+      })
+    }
+  }, [queryTabs]);
 
-  if (!tabs || !tabs.length) {
-    return <div>no tabs</div>
+  if (!queryTabs.activeId) {
+    return null;
   }
 
+  const { activeId, tabs } = queryTabs;
 
   function getNextId(): string {
     const ids = tabs.map(({ id }) => id);
@@ -69,16 +79,21 @@ export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
   }
 
   function handleTabSave(tab: Omit<QueryTab, 'id'>) {
-    saveTabs(
-      tabs.map((currentTab) => {
+    saveTabs({
+      ...queryTabs,
+      tabs: tabs.map((currentTab) => {
         return activeId === currentTab.id
           ? {
               ...currentTab,
               ...tab,
             }
           : currentTab;
-      })
-    );
+      }),
+    });
+  }
+
+  function setActiveId(activeId: string) {
+    saveTabs({ activeId, tabs });
   }
 
   return (
@@ -101,20 +116,23 @@ export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
             return id !== event;
           });
 
-          saveTabs(nextTabs);
-          setActiveId(nextTabs[Math.min(closedIndex, nextTabs.length - 1)].id);
+          saveTabs({
+            activeId: nextTabs[Math.min(closedIndex, nextTabs.length - 1)].id,
+            tabs: nextTabs,
+          });
         } else {
           const nextId = getNextId();
 
-          saveTabs([
-            ...tabs,
-            {
-              id: nextId,
-              query: {},
-            },
-          ]);
-
-          setActiveId(nextId);
+          saveTabs({
+            activeId: nextId,
+            tabs: [
+              ...tabs,
+              {
+                id: nextId,
+                query: {},
+              },
+            ],
+          });
         }
       }}
     >

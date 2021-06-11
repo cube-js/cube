@@ -1,44 +1,42 @@
-import { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import {
+  createContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import jwtDecode from 'jwt-decode';
 
 import { SecurityContext } from './SecurityContext';
+import { useLocalStorage } from '../../hooks';
 
-export type TSecurityContextContextProps = {
+export type SecurityContextContextProps = {
   payload: string;
   token: string | null;
-  isValid: boolean;
   isModalOpen: boolean;
   setIsModalOpen: any;
   saveToken: (token: string | null) => void;
   getToken: (payload: string) => Promise<string>;
 };
 
-export const SecurityContextContext = createContext<TSecurityContextContextProps>(
-  {} as TSecurityContextContextProps
-);
+export const SecurityContextContext =
+  createContext<SecurityContextContextProps>(
+    {} as SecurityContextContextProps
+  );
 
 type SecurityContextProviderProps = {
   children: ReactNode;
-  tokenKey?: string | null;
-} & Pick<TSecurityContextContextProps, 'getToken'>
+} & Pick<SecurityContextContextProps, 'getToken'>;
 
 export function SecurityContextProvider({
   children,
   getToken,
-  tokenKey = null,
 }: SecurityContextProviderProps) {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken, removeToken] = useLocalStorage<string | null>(
+    'cubejsToken',
+    null
+  );
   const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const tokenName = tokenKey ? `cubejsToken:${tokenKey}` : 'cubejsToken';
-
-  useEffect(() => {
-    const token = localStorage.getItem(tokenName);
-    if (token) {
-      setToken(token);
-    }
-  }, [tokenName]);
 
   useEffect(() => {
     if (token) {
@@ -49,31 +47,26 @@ export function SecurityContextProvider({
         setPayload('');
         console.error('Invalid JWT token');
       }
+    } else {
+      setPayload('');
     }
   }, [token]);
-
-  const saveToken = useCallback(
-    (token) => {
-      if (token) {
-        localStorage.setItem(tokenName, token);
-      } else {
-        localStorage.removeItem(tokenName);
-        setPayload('');
-      }
-      setToken(token || null);
-    },
-    [tokenName]
-  );
 
   return (
     <SecurityContextContext.Provider
       value={{
-        payload,
         token,
-        isValid: false,
+        payload,
         isModalOpen,
         setIsModalOpen,
-        saveToken,
+        saveToken: (token) => {
+          if (!token) {
+            removeToken();
+          } else {
+            setToken(token);
+            console.log('will set', token)
+          }
+        },
         getToken,
       }}
     >

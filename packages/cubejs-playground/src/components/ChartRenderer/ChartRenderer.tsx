@@ -9,7 +9,6 @@ import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
-import { useAppContext } from '../AppContext';
 import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 
 const { Text } = Typography;
@@ -67,7 +66,7 @@ const Wrapper = styled.div`
   text-align: center;
 `;
 
-export type TQueryLoadResult = {
+export type QueryLoadResult = {
   isLoading: boolean;
   resultSet?: ResultSet;
   error?: Error | null;
@@ -85,7 +84,7 @@ type ChartRendererProps = {
   pivotConfig?: PivotConfig;
   iframeRef: RefObject<HTMLIFrameElement>;
   framework: UIFramework;
-  onQueryStatusChange: (result: TQueryLoadResult) => void;
+  onQueryStatusChange: (result: QueryLoadResult) => void;
   onChartRendererReadyChange: (isReady: boolean) => void;
   onRunButtonClick: () => void;
 };
@@ -133,7 +132,7 @@ export default function ChartRenderer({
         queryStartTime = Date.now();
         onQueryStatusChange({ isLoading: true });
       },
-      onQueryLoad: ({ resultSet, error }: TQueryLoadResult) => {
+      onQueryLoad: ({ resultSet, error }: QueryLoadResult) => {
         let isAggregated;
         const timeElapsed = Date.now() - queryStartTime;
 
@@ -190,7 +189,7 @@ export default function ChartRenderer({
         onChartRendererReadyChange(true);
       },
     };
-  }, [framework, onChartRendererReadyChange]);
+  }, [framework]);
 
   const loading: boolean =
     queryHasMissingMembers || isQueryLoading || isPreAggregationBuildInProgress;
