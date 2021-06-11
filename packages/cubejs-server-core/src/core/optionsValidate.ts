@@ -68,6 +68,7 @@ const schemaOptions = Joi.object().keys({
   checkAuthMiddleware: Joi.func(),
   jwt: jwtOptions,
   queryTransformer: Joi.func(),
+  queryRewrite: Joi.func(),
   preAggregationsSchema: Joi.alternatives().try(
     Joi.string(),
     Joi.func()

@@ -121,7 +121,7 @@ describe('API Gateway', () => {
   });
 
   test('query transform with checkAuth', async () => {
-    const queryTransformer = jest.fn(async (query: Query, context) => {
+    const queryRewrite = jest.fn(async (query: Query, context) => {
       expect(context.securityContext).toEqual({
         exp: 2475857705,
         iat: 1611857705,
@@ -146,7 +146,7 @@ describe('API Gateway', () => {
             req.authInfo = jwt.verify(authorization, API_SECRET);
           }
         },
-        queryTransformer
+        queryRewrite
       }
     );
 
@@ -161,11 +161,11 @@ describe('API Gateway', () => {
     console.log(res.body);
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
 
-    expect(queryTransformer.mock.calls.length).toEqual(1);
+    expect(queryRewrite.mock.calls.length).toEqual(1);
   });
 
   test('query transform with checkAuth (return securityContext as string)', async () => {
-    const queryTransformer = jest.fn(async (query: Query, context) => {
+    const queryRewrite = jest.fn(async (query: Query, context) => {
       expect(context.securityContext).toEqual(
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g'
       );
@@ -187,7 +187,7 @@ describe('API Gateway', () => {
             req.authInfo = authorization;
           }
         },
-        queryTransformer
+        queryRewrite
       }
     );
 
@@ -202,7 +202,7 @@ describe('API Gateway', () => {
     console.log(res.body);
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
 
-    expect(queryTransformer.mock.calls.length).toEqual(1);
+    expect(queryRewrite.mock.calls.length).toEqual(1);
   });
 
   test('null filter values', async () => {
@@ -435,7 +435,7 @@ describe('API Gateway', () => {
 
       return { app, token, tokenUser };
     };
-    
+
     const notAllowedTestFactory = ({ route, method = 'get' }) => async () => {
       const { app } = appPrepareFactory();
       return request(app)[method](`/cubejs-system/v1/${route}`)

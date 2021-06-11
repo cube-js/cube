@@ -1,4 +1,11 @@
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
+import {
+  CheckAuthFn,
+  CheckAuthMiddlewareFn,
+  ExtendContextFn,
+  JWTOptions,
+  UserBackgroundContext,
+  QueryRewriteFn,
+} from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
@@ -104,7 +111,9 @@ export interface CreateOptions {
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   jwt?: JWTOptions;
-  queryTransformer?: QueryTransformerFn;
+  // @deprecated Please use queryRewrite
+  queryTransformer?: QueryRewriteFn;
+  queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string;
   extendContext?: ExtendContextFn;
