@@ -40,7 +40,7 @@ type QueryTabsProps = {
 };
 
 export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
-  let [queryTabs, saveTabs] = useLocalStorage<QueryTabs>('queryTabs', {
+  const [queryTabs, saveTabs] = useLocalStorage<QueryTabs>('queryTabs', {
     activeId: '1',
     tabs: [
       {
