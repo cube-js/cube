@@ -139,6 +139,13 @@ declare module '@cubejs-client/core' {
     sortedTimeDimensions: [[string, string]];
   };
 
+  export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
+
+  type UsedPreAggregation = {
+    targetTableName: string;
+    type: PreAggregationType;
+  }
+
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
@@ -147,7 +154,7 @@ declare module '@cubejs-client/core' {
     external: boolean | null;
     dbType: string;
     extDbType: string;
-    usedPreAggregations?: Record<string, any>;
+    usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
   };
 

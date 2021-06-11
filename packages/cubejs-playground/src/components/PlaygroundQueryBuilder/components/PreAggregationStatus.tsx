@@ -21,7 +21,8 @@ export function PreAggregationStatus({
   isAggregated,
   transformedQuery,
   external,
-  extDbType
+  extDbType,
+  preAggregationType,
 }: PreAggregationStatusProps) {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   // hide it for the time being
@@ -56,7 +57,23 @@ export function PreAggregationStatus({
         )}
 
         {external && extDbType !== 'cubestore' ? (
-          <Alert message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets" type="warning" />
+          <Alert
+            message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets"
+            type="warning"
+          />
+        ) : null}
+
+        {!external && preAggregationType !== 'originalSql' ? (
+          <Alert
+            message={
+              <>
+                For optimized performance, consider using <b>external</b>{' '}
+                {preAggregationType} pre-aggregation, rather than the source
+                database (internal)
+              </>
+            }
+            type="warning"
+          />
         ) : null}
       </Space>
 

@@ -1014,13 +1014,23 @@ export class PreAggregations {
         p,
         preAggregationsTablesToTempTables,
         getLoadCacheByDataSource(p.dataSource),
-        { waitForRenew: queryBody.renewQuery, requestId: queryBody.requestId, externalRefresh: this.externalRefresh }
+        {
+          waitForRenew: queryBody.renewQuery,
+          requestId: queryBody.requestId,
+          externalRefresh: this.externalRefresh
+        }
       );
+
       const preAggregationPromise = () => loader.loadPreAggregation().then(async targetTableName => {
-        const usedPreAggregation = typeof targetTableName === 'string' ? { targetTableName } : targetTableName;
+        const usedPreAggregation = {
+          ...(typeof targetTableName === 'string' ? { targetTableName } : targetTableName),
+          type: p.type,
+        };
         await this.addTableUsed(usedPreAggregation.targetTableName);
+
         return [p.tableName, usedPreAggregation];
       });
+
       return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
   }
