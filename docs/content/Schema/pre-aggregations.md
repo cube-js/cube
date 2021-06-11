@@ -395,12 +395,12 @@ up a custom refresh check strategy by using `refreshKey`:
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   preAggregations: {
     main: {
-      type: `autoRollup`,
-      maxPreAggregations: 20,
+      type: `rollup`,
+      measureReferences: [Orders.count],
       refreshKey: {
         sql: `SELECT MAX(created_at) FROM orders`,
       },
