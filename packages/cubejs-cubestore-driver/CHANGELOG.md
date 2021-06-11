@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.31](https://github.com/cube-js/cube.js/compare/v0.27.30...v0.27.31) (2021-06-11)
+
+
+### Features
+
+* Suggest export/unload for large pre-aggregations (detect via streaming) ([b20cdbc](https://github.com/cube-js/cube.js/commit/b20cdbc0b9fa98785d3ea46443492037017da12f))
+
+
+
+
+
 ## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

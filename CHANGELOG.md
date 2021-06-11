@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.31](https://github.com/cube-js/cube.js/compare/v0.27.30...v0.27.31) (2021-06-11)
+
+
+### Bug Fixes
+
+* Allow multi timezone filter for pre-aggregations Meta API ([#2912](https://github.com/cube-js/cube.js/issues/2912)) ([5a873db](https://github.com/cube-js/cube.js/commit/5a873db17b9e12e7409b956de506ad525b723240))
+* **bigquery-driver:** Encode buffer as base64 for CSV (streaming) ([a311a9a](https://github.com/cube-js/cube.js/commit/a311a9ab21ad8cfd902545e2052020a9cd28fddc))
+* **cubejs-api-gateway:** Proper end date when current month has less days than previous month ([#2824](https://github.com/cube-js/cube.js/issues/2824)) ([0f83356](https://github.com/cube-js/cube.js/commit/0f83356fac4f276be8c2e22b27fa9d86f9b113e9))
+* Create schema directory in DEV_MODE, when server is ready for processing ([c7b886c](https://github.com/cube-js/cube.js/commit/c7b886c0bf54d3e6a7981286a6a0e2eebddb68dc))
+* **cubestore:** finalize GCP configuration variable names ([116ddc5](https://github.com/cube-js/cube.js/commit/116ddc5f019715308b1a640e5e88b278b07ced3d))
+* **cubestore:** optimize access to table metainformation ([e727c8b](https://github.com/cube-js/cube.js/commit/e727c8b9b223c96199e2bbfdef2cd29a4457be86))
+* **cubestore:** remove backtraces from error messages ([89a2e28](https://github.com/cube-js/cube.js/commit/89a2e28c3c6aea29fdf7b628174b3e03071515f6))
+* extDbType warning ([#2939](https://github.com/cube-js/cube.js/issues/2939)) ([0f014bf](https://github.com/cube-js/cube.js/commit/0f014bf701e07dd1d542529d4792c0e9fbdceb48))
+* Fetch all partitions, pre-aggregations Meta API ([#2944](https://github.com/cube-js/cube.js/issues/2944)) ([b5585fb](https://github.com/cube-js/cube.js/commit/b5585fbbb677b1b9e76d10719e64531286175da3))
+* Make missing externalDriverFactory error message more specific ([b5480f6](https://github.com/cube-js/cube.js/commit/b5480f6b86e4d727bc027b22914508f17fd1f88c))
+
+
+### Features
+
+* **@cubejs-client/playground:** query tabs, preserve query history ([#2915](https://github.com/cube-js/cube.js/issues/2915)) ([d794d9e](https://github.com/cube-js/cube.js/commit/d794d9ec1281a2bc66a9194496df0eeb97936217))
+* **cubestore:** Bump rocksdb for bindgen -> libloading (compatiblity aaarch64) ([a09d399](https://github.com/cube-js/cube.js/commit/a09d3998e296f0ebc2183abda28b30ab945aa4d7))
+* **snowflake-driver:** Support UNLOAD to GCS ([91691e9](https://github.com/cube-js/cube.js/commit/91691e9513742496793d0d06a356976fc43b24fd))
+* Rename queryTransformer to queryRewrite (with compatibility) ([#2934](https://github.com/cube-js/cube.js/issues/2934)) ([458cd9d](https://github.com/cube-js/cube.js/commit/458cd9d388bffc5e66893844c1e93b3b06e05525))
+* Suggest export/unload for large pre-aggregations (detect via streaming) ([b20cdbc](https://github.com/cube-js/cube.js/commit/b20cdbc0b9fa98785d3ea46443492037017da12f))
+* Write preAggregations block in schema generation ([2c1e150](https://github.com/cube-js/cube.js/commit/2c1e150ce70787381a34b22da32bf5b1e9e26bc6))
+
+
+
+
+
 ## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
 
 

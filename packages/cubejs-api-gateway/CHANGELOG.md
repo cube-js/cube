@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.31](https://github.com/cube-js/cube.js/compare/v0.27.30...v0.27.31) (2021-06-11)
+
+
+### Bug Fixes
+
+* Allow multi timezone filter for pre-aggregations Meta API ([#2912](https://github.com/cube-js/cube.js/issues/2912)) ([5a873db](https://github.com/cube-js/cube.js/commit/5a873db17b9e12e7409b956de506ad525b723240))
+* **cubejs-api-gateway:** Proper end date when current month has less days than previous month ([#2824](https://github.com/cube-js/cube.js/issues/2824)) ([0f83356](https://github.com/cube-js/cube.js/commit/0f83356fac4f276be8c2e22b27fa9d86f9b113e9))
+* extDbType warning ([#2939](https://github.com/cube-js/cube.js/issues/2939)) ([0f014bf](https://github.com/cube-js/cube.js/commit/0f014bf701e07dd1d542529d4792c0e9fbdceb48))
+
+
+### Features
+
+* Rename queryTransformer to queryRewrite (with compatibility) ([#2934](https://github.com/cube-js/cube.js/issues/2934)) ([458cd9d](https://github.com/cube-js/cube.js/commit/458cd9d388bffc5e66893844c1e93b3b06e05525))
+
+
+
+
+
 ## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.27.30",
+  "version": "0.27.31",
   "engines": {},
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
   "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.27.26",
-    "@cubejs-client/react": "^0.27.30",
+    "@cubejs-client/core": "^0.27.31",
+    "@cubejs-client/react": "^0.27.31",
     "codesandbox-import-utils": "^2.1.1",
     "customize-cra": "^1.0.0",
     "fast-deep-equal": "^3.1.3",

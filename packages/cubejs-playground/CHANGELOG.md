@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.31](https://github.com/cube-js/cube.js/compare/v0.27.30...v0.27.31) (2021-06-11)
+
+
+### Bug Fixes
+
+* extDbType warning ([#2939](https://github.com/cube-js/cube.js/issues/2939)) ([0f014bf](https://github.com/cube-js/cube.js/commit/0f014bf701e07dd1d542529d4792c0e9fbdceb48))
+
+
+### Features
+
+* **@cubejs-client/playground:** query tabs, preserve query history ([#2915](https://github.com/cube-js/cube.js/issues/2915)) ([d794d9e](https://github.com/cube-js/cube.js/commit/d794d9ec1281a2bc66a9194496df0eeb97936217))
+
+
+
+
+
 ## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
 
 

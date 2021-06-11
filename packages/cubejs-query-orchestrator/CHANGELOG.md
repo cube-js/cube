@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.31](https://github.com/cube-js/cube.js/compare/v0.27.30...v0.27.31) (2021-06-11)
+
+
+### Bug Fixes
+
+* Fetch all partitions, pre-aggregations Meta API ([#2944](https://github.com/cube-js/cube.js/issues/2944)) ([b5585fb](https://github.com/cube-js/cube.js/commit/b5585fbbb677b1b9e76d10719e64531286175da3))
+* Make missing externalDriverFactory error message more specific ([b5480f6](https://github.com/cube-js/cube.js/commit/b5480f6b86e4d727bc027b22914508f17fd1f88c))
+
+
+### Features
+
+* Suggest export/unload for large pre-aggregations (detect via streaming) ([b20cdbc](https://github.com/cube-js/cube.js/commit/b20cdbc0b9fa98785d3ea46443492037017da12f))
+
+
+
+
+
 ## [0.27.30](https://github.com/cube-js/cube.js/compare/v0.27.29...v0.27.30) (2021-06-04)
 
 
