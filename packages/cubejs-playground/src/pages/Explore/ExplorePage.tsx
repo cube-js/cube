@@ -1,7 +1,7 @@
-import { CubeProvider } from '@cubejs-client/react';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useHistory } from 'react-router';
 
-import { useCubejsApi, useSecurityContext } from '../../hooks';
+import { useSecurityContext } from '../../hooks';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
 import { useAppContext } from '../../components/AppContext';
@@ -19,13 +19,15 @@ export function buildApiUrl(
 }
 
 export function ExplorePage() {
+  const { push } = useHistory();
+
   const { playgroundContext } = useAppContext();
   const { token } = useSecurityContext();
   const [livePreviewContext, setLivePreviewContext] =
     useState<LivePreviewContext | null>(null);
 
   const [schemaVersion, updateSchemaVersion] = useState<number>(0);
-  const [apiUrl, setApiUrl] = useState<string | null>(null);
+  const [apiUrl, setApiUrl] = useState<string>('');
 
   useEffect(() => {
     if (playgroundContext && livePreviewContext === null) {
@@ -67,22 +69,6 @@ export function ExplorePage() {
   const currentToken =
     livePreviewContext?.token || token || playgroundContext?.cubejsToken;
 
-  useLayoutEffect(() => {
-    if (apiUrl && currentToken) {
-      window['__cubejsPlayground'] = {
-        ...window['__cubejsPlayground'],
-        apiUrl,
-        token: currentToken,
-      };
-    }
-  }, [currentToken, apiUrl]);
-
-  const cubejsApi = useCubejsApi(apiUrl, currentToken);
-
-  if (!cubejsApi || !apiUrl || !currentToken) {
-    return null;
-  }
-
   return (
     <LivePreviewContextProvider
       disabled={
@@ -90,13 +76,14 @@ export function ExplorePage() {
       }
       onChange={handleChangeLivePreview}
     >
-      <CubeProvider cubejsApi={cubejsApi}>
-        <QueryBuilderContainer
-          apiUrl={apiUrl}
-          token={currentToken}
-          schemaVersion={schemaVersion}
-        />
-      </CubeProvider>
+      <QueryBuilderContainer
+        apiUrl={apiUrl}
+        token={currentToken}
+        schemaVersion={schemaVersion}
+        onVizStateChanged={({ query }) =>
+          push(`/build?query=${JSON.stringify(query)}`)
+        }
+      />
     </LivePreviewContextProvider>
   );
 }

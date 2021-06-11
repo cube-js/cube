@@ -5,8 +5,9 @@ import styled from 'styled-components';
 import GlobalStyles from '../components/GlobalStyles';
 import {
   SecurityContextProvider,
-  TSecurityContextContextProps,
+  SecurityContextContextProps,
 } from '../components/SecurityContext/SecurityContextProvider';
+import { AppContextProvider } from '../components/AppContext';
 
 const StyledWrapper = styled.div`
   background-color: var(--layout-body-background);
@@ -14,21 +15,23 @@ const StyledWrapper = styled.div`
 `;
 
 type PlaygroundWrapperProps = {
-  tokenKey?: string;
+  identifier?: string;
   children: ReactNode;
-} & Pick<TSecurityContextContextProps, 'getToken'>;
+} & Pick<SecurityContextContextProps, 'getToken'>;
 
 export default function PlaygroundWrapper({
-  tokenKey,
+  identifier,
   getToken,
   children,
 }: PlaygroundWrapperProps) {
   return (
     <StyledWrapper>
       <BrowserRouter>
-        <SecurityContextProvider tokenKey={tokenKey} getToken={getToken}>
-          {children}
-        </SecurityContextProvider>
+        <AppContextProvider identifier={identifier}>
+          <SecurityContextProvider getToken={getToken}>
+            {children}
+          </SecurityContextProvider>
+        </AppContextProvider>
 
         <GlobalStyles />
       </BrowserRouter>

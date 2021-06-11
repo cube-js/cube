@@ -69,7 +69,7 @@ const storage = new (class Storage {
 export function useLocalStorage<T = any>(
   itemKey: string,
   defaultValue?: T | ((value: unknown) => T)
-): [T, (next: T) => T, (itemKey: string) => void] {
+): [T, (next: T) => T, () => void] {
   const identifier = useIdentifier();
   const key = [itemKey, identifier ? ':' : '', identifier].join('');
 
@@ -78,7 +78,7 @@ export function useLocalStorage<T = any>(
   useEffect(() => {
     storage.subscribe(key, (value) => {
       // @ts-ignore
-      setValue(typeof defaultValue === 'function' ? defaultValue(value) : defaultValue)
+      setValue(typeof defaultValue === 'function' ? defaultValue(value) : value || defaultValue)
     });
 
     return () => {

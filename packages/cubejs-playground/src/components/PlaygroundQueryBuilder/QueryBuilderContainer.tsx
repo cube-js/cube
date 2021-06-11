@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo } from 'react';
 import { Card, Space } from 'antd';
 import styled from 'styled-components';
 import { CloudOutlined, LockOutlined } from '@ant-design/icons';
@@ -6,10 +6,14 @@ import { useHistory } from 'react-router';
 
 import { Button } from '../../atoms';
 import LivePreviewBar from '../LivePreviewContext/LivePreviewBar';
-import { useLivePreviewContext, useSecurityContext } from '../../hooks';
+import { useCubejsApi, useLivePreviewContext, useSecurityContext } from '../../hooks';
 import DashboardSource from '../../DashboardSource';
-import { PlaygroundQueryBuilder } from './components/PlaygroundQueryBuilder';
+import {
+  PlaygroundQueryBuilder,
+  PlaygroundQueryBuilderProps,
+} from './components/PlaygroundQueryBuilder';
 import { QueryTabs } from '../QueryTabs/QueryTabs';
+import { CubeProvider } from '@cubejs-client/react';
 
 const StyledCard: typeof Card = styled(Card)`
   border-radius: 0;
@@ -22,85 +26,117 @@ const StyledCard: typeof Card = styled(Card)`
 `;
 
 type QueryBuilderContainerProps = {
-  apiUrl: string;
-  token: string;
-  schemaVersion: number;
-};
+  apiUrl?: string;
+  token?: string;
+} & Pick<
+  PlaygroundQueryBuilderProps,
+  | 'defaultQuery'
+  | 'initialVizState'
+  | 'schemaVersion'
+  | 'onVizStateChanged'
+  | 'onSchemaChange'
+>;
 
 export function QueryBuilderContainer({
   apiUrl,
   token,
-  schemaVersion,
+  ...props
 }: QueryBuilderContainerProps) {
   const dashboardSource = useMemo(() => new DashboardSource(), []);
 
-  const { push, location } = useHistory();
+  const { location } = useHistory();
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || '{}');
 
   const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
   const livePreviewContext = useLivePreviewContext();
 
+  useLayoutEffect(() => {
+    if (apiUrl && token) {
+      window['__cubejsPlayground'] = {
+        ...window['__cubejsPlayground'],
+        apiUrl,
+        token,
+      };
+    }
+  }, [apiUrl, token]);
+
+  const cubejsApi = useCubejsApi(apiUrl, token);
+
+  if (!cubejsApi || !apiUrl || !token) {
+    return null;
+  }
+
   return (
-    <StyledCard bordered={false}>
-      <QueryTabs
-        query={query}
-        sidebar={
-          <Space direction="horizontal">
-            <Button.Group>
-              <Button
-                data-testid="security-context-btn"
-                icon={<LockOutlined />}
-                size="small"
-                type={securityContextToken ? 'primary' : 'default'}
-                onClick={() => setIsModalOpen(true)}
-              >
-                {securityContextToken ? 'Edit' : 'Add'} Security Context
-              </Button>
-
-              {livePreviewContext && !livePreviewContext.livePreviewDisabled && (
+    <CubeProvider cubejsApi={cubejsApi}>
+      <StyledCard bordered={false}>
+        <QueryTabs
+          query={query}
+          sidebar={
+            <Space direction="horizontal">
+              <Button.Group>
                 <Button
-                  data-testid="live-preview-btn"
-                  icon={<CloudOutlined />}
+                  data-testid="security-context-btn"
+                  icon={<LockOutlined />}
                   size="small"
-                  type={
-                    livePreviewContext.statusLivePreview.active
-                      ? 'primary'
-                      : 'default'
-                  }
-                  onClick={() =>
-                    livePreviewContext.statusLivePreview.active
-                      ? livePreviewContext.stopLivePreview()
-                      : livePreviewContext.startLivePreview()
-                  }
+                  type={securityContextToken ? 'primary' : 'default'}
+                  onClick={() => setIsModalOpen(true)}
                 >
-                  {livePreviewContext.statusLivePreview.active
-                    ? 'Stop'
-                    : 'Start'}{' '}
-                  Live Preview
+                  {securityContextToken ? 'Edit' : 'Add'} Security Context
                 </Button>
-              )}
-            </Button.Group>
 
-            {livePreviewContext?.statusLivePreview.active && <LivePreviewBar />}
-          </Space>
-        }
-      >
-        {({ id, query }, saveTab) => (
-          <PlaygroundQueryBuilder
-            queryId={id}
-            apiUrl={apiUrl}
-            cubejsToken={token}
-            defaultQuery={query}
-            dashboardSource={dashboardSource}
-            schemaVersion={schemaVersion}
-            onVizStateChanged={({ query }) => {
-              push(`/build?query=${JSON.stringify(query)}`);
-              saveTab({ query: query || {} });
-            }}
-          />
-        )}
-      </QueryTabs>
-    </StyledCard>
+                {livePreviewContext && !livePreviewContext.livePreviewDisabled && (
+                  <Button
+                    data-testid="live-preview-btn"
+                    icon={<CloudOutlined />}
+                    size="small"
+                    type={
+                      livePreviewContext.statusLivePreview.active
+                        ? 'primary'
+                        : 'default'
+                    }
+                    onClick={() =>
+                      livePreviewContext.statusLivePreview.active
+                        ? livePreviewContext.stopLivePreview()
+                        : livePreviewContext.startLivePreview()
+                    }
+                  >
+                    {livePreviewContext.statusLivePreview.active
+                      ? 'Stop'
+                      : 'Start'}{' '}
+                    Live Preview
+                  </Button>
+                )}
+              </Button.Group>
+
+              {livePreviewContext?.statusLivePreview.active && (
+                <LivePreviewBar />
+              )}
+            </Space>
+          }
+        >
+          {({ id, query, chartType }, saveTab) => (
+            <PlaygroundQueryBuilder
+              queryId={id}
+              apiUrl={apiUrl}
+              cubejsToken={token}
+              initialVizState={{
+                query,
+                chartType
+              }}
+              dashboardSource={dashboardSource}
+              schemaVersion={props.schemaVersion}
+              onVizStateChanged={(vizState) => {
+                saveTab({
+                  query: vizState.query || {},
+                  chartType: vizState.chartType
+                });
+                props.onVizStateChanged?.(vizState);
+              }}
+            />
+          )}
+        </QueryTabs>
+      </StyledCard>
+    </CubeProvider>
   );
 }
