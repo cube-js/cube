@@ -989,7 +989,7 @@ export class PreAggregations {
 
       const preAggregationPromise = () => loader.loadPreAggregation().then(async targetTableName => {
         const usedPreAggregation = {
-          ...(typeof targetTableName === 'string' ? { targetTableName } : targetTableName ),
+          ...(typeof targetTableName === 'string' ? { targetTableName } : targetTableName),
           type: p.type,
         };
         await this.addTableUsed(usedPreAggregation.targetTableName);
