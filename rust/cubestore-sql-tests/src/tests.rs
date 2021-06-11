@@ -31,6 +31,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
         t("float_decimal_scale", float_decimal_scale),
+        t("float_merge", float_merge),
         t("join", join),
         t("three_tables_join", three_tables_join),
         t(
@@ -321,6 +322,44 @@ async fn float_decimal_scale(service: Box<dyn SqlClient>) {
     assert_eq!(
         result.get_rows(),
         &vec![Row::new(vec![TableValue::Float(7456503871042.786.into())])]
+    );
+}
+
+async fn float_merge(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.f1 (n float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.f1 (n) VALUES (1.0), (2.0)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.f2 (n float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.f2 (n) VALUES (1.0), (3.0)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT n \
+             FROM (SELECT * from s.f1 UNION ALL SELECT * FROM s.f2) \
+             GROUP BY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Float(1.0.into())],
+            vec![TableValue::Float(2.0.into())],
+            vec![TableValue::Float(3.0.into())],
+        ]
     );
 }
 
