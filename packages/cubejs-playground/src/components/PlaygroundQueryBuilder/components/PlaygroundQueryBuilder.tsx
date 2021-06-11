@@ -534,7 +534,7 @@ export function PlaygroundQueryBuilder({
 
                                 const preAggregationType = Object.values(
                                   result.usedPreAggregations || {}
-                                )[0].type;
+                                )[0]?.type;
 
                                 setQueryStatus({
                                   isAggregated,
