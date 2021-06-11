@@ -9,6 +9,7 @@ import {
   areQueriesEqual,
   ChartType,
   PivotConfig,
+  PreAggregationType,
   Query,
   TransformedQuery,
 } from '@cubejs-client/core';
@@ -163,6 +164,7 @@ export type QueryStatus = {
   timeElapsed: number;
   isAggregated: boolean;
   external: boolean | null;
+  preAggregationType?: PreAggregationType;
   transformedQuery?: TransformedQuery;
 };
 
@@ -529,11 +531,16 @@ export function PlaygroundQueryBuilder({
                               if (isAggregated != null && timeElapsed != null) {
                                 const [result] = response.loadResponse.results;
 
+                                const preAggregationType = Object.values(
+                                  result.usedPreAggregations || {}
+                                )[0].type;
+
                                 setQueryStatus({
                                   isAggregated,
                                   timeElapsed,
                                   transformedQuery: result.transformedQuery,
                                   external: result.external,
+                                  preAggregationType,
                                 });
                               }
                             }

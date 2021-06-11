@@ -6,7 +6,7 @@ import Icon from '@ant-design/icons';
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { PreAggregationHelper } from './PreAggregationHelper';
 import { useAppContext } from '../../AppContext';
-import { QueryStatus } from "./PlaygroundQueryBuilder";
+import { QueryStatus } from './PlaygroundQueryBuilder';
 
 const Badge = styled.div`
   display: flex;
@@ -22,6 +22,7 @@ export function PreAggregationStatus({
   isAggregated,
   transformedQuery,
   external,
+  preAggregationType,
 }: PreAggregationStatusProps) {
   const { extDbType } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -57,7 +58,23 @@ export function PreAggregationStatus({
         )}
 
         {external && extDbType !== 'cubestore' ? (
-          <Alert message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets" type="warning" />
+          <Alert
+            message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets"
+            type="warning"
+          />
+        ) : null}
+
+        {!external && preAggregationType !== 'originalSql' ? (
+          <Alert
+            message={
+              <>
+                For optimized performance, consider using <b>external</b>{' '}
+                {preAggregationType} pre-aggregation, rather than the source
+                database (internal)
+              </>
+            }
+            type="warning"
+          />
         ) : null}
       </Space>
 
