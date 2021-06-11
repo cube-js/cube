@@ -62,7 +62,7 @@ export class DevServer {
         }) || ''
       ).toLowerCase() !== 'cubestore'
     ) {
-      console.log('⚠️  Your pre-aggregations will be on an external database. It is recommended to use Cube Store for optimal performance"');
+      console.log('⚠️  Your pre-aggregations will be on an external database. It is recommended to use Cube Store for optimal performance');
     }
 
     this.cubejsServer.event('Dev Server Start');

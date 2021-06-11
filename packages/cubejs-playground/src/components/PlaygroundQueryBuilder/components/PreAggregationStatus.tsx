@@ -5,7 +5,6 @@ import Icon from '@ant-design/icons';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { PreAggregationHelper } from './PreAggregationHelper';
-import { useAppContext } from '../../AppContext';
 import { QueryStatus } from './PlaygroundQueryBuilder';
 
 const Badge = styled.div`
@@ -22,9 +21,9 @@ export function PreAggregationStatus({
   isAggregated,
   transformedQuery,
   external,
+  extDbType,
   preAggregationType,
 }: PreAggregationStatusProps) {
-  const { extDbType } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   // hide it for the time being
   // const renderTime = () => (

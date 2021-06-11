@@ -2,11 +2,12 @@
 import pt from 'promise-timeout';
 import { QueryOrchestrator, ContinueWaitError, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeFn, RequestContext } from './types';
+import { DbTypeFn, ExternalDbTypeFn, RequestContext } from './types';
 
 interface OrchestratorApiOptions {
   externalDriverFactory: DriverFactoryByDataSource;
   contextToDbType: DbTypeFn;
+  contextToExternalDbType: ExternalDbTypeFn;
   continueWaitTimeout?: number;
   redisPrefix?: string;
 }
@@ -22,12 +23,14 @@ export class OrchestratorApi {
 
   protected readonly contextToDbType: DbTypeFn;
 
+  protected readonly contextToExternalDbType: ExternalDbTypeFn;
+
   public constructor(
     protected driverFactory: DriverFactoryByDataSource,
     protected logger,
-    protected options: OrchestratorApiOptions
+    protected readonly options: OrchestratorApiOptions
   ) {
-    const { externalDriverFactory, contextToDbType } = options;
+    const { externalDriverFactory, contextToDbType, contextToExternalDbType } = options;
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
 
     this.orchestrator = new QueryOrchestrator(
@@ -40,6 +43,7 @@ export class OrchestratorApi {
     this.driverFactory = driverFactory;
     this.externalDriverFactory = externalDriverFactory;
     this.contextToDbType = contextToDbType;
+    this.contextToExternalDbType = contextToExternalDbType;
     this.logger = logger;
   }
 
@@ -76,14 +80,23 @@ export class OrchestratorApi {
         })
       );
 
+      const extractExternalDbType = (response) => (
+        this.contextToExternalDbType({
+          ...query.context,
+          dataSource: response.dataSource,
+        })
+      );
+
       if (Array.isArray(data)) {
         return data.map((item) => ({
           ...item,
-          dbType: extractDbType(item)
+          dbType: extractDbType(item),
+          extDbType: extractExternalDbType(item)
         }));
       }
 
       data.dbType = extractDbType(data);
+      data.extDbType = extractExternalDbType(data);
 
       return data;
     } catch (err) {

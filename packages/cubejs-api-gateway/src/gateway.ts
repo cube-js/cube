@@ -706,6 +706,7 @@ export class ApiGateway {
           annotation,
           dataSource: response.dataSource,
           dbType: response.dbType,
+          extDbType: response.extDbType,
           external: response.external,
           slowQuery: Boolean(response.slowQuery)
         };
