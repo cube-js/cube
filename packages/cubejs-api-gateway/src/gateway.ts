@@ -715,7 +715,13 @@ export class ApiGateway {
       this.log({
         type: 'Load Request Success',
         query,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
+        usedPreAggregations: results.every(
+          (r: any) => r.usedPreAggregations && Object.keys(r.usedPreAggregations).length
+        ),
+        dataIsEmpty: results.every(
+          (r: any) => !r.data || !r.data.length
+        )
       }, context);
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
