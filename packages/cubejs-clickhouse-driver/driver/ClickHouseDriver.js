@@ -1,9 +1,18 @@
+/* eslint-disable no-restricted-syntax */
 const ClickHouse = require('@apla/clickhouse');
 const { getEnv } = require('@cubejs-backend/shared');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const genericPool = require('generic-pool');
 const { uuid } = require('uuidv4');
 const sqlstring = require('sqlstring');
+
+const ClickhouseTypeToGeneric = {
+  string: 'text',
+  datetime: 'timestamp',
+  date: 'date',
+  int64: 'bigint',
+  uint64: 'bigint',
+};
 
 class ClickHouseDriver extends BaseDriver {
   constructor(config) {
@@ -87,6 +96,10 @@ class ClickHouseDriver extends BaseDriver {
   }
 
   query(query, values) {
+    return this.queryResponse(query, values).then(res => this.normaliseResponse(res));
+  }
+
+  queryResponse(query, values) {
     const formattedQuery = sqlstring.format(query, values);
 
     return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
@@ -102,7 +115,7 @@ class ClickHouseDriver extends BaseDriver {
         //
         ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
       }
-    }).then(res => this.normaliseResponse(res)));
+    }));
   }
 
   normaliseResponse(res) {
@@ -149,6 +162,42 @@ class ClickHouseDriver extends BaseDriver {
         FROM system.columns
        WHERE database = '${this.config.queryOptions.database}'
     `;
+  }
+
+  async downloadQueryResults(query, values, options) {
+    const response = await this.queryResponse(query, values);
+
+    return {
+      rows: this.normaliseResponse(response),
+      types: response.meta.map((field) => ({
+        name: field.name,
+        type: this.toGenericType(field.type),
+      })),
+    };
+  }
+
+  toGenericType(columnType) {
+    if (columnType.toLowerCase() in ClickhouseTypeToGeneric) {
+      return ClickhouseTypeToGeneric[columnType.toLowerCase()];
+    }
+
+    /**
+     * Example of types:
+     *
+     * Int64
+     * Nullable(Int64) / Nullable(String)
+     * Nullable(DateTime('UTC'))
+     */
+    if (columnType.includes('(')) {
+      const types = columnType.toLowerCase().match(/([a-z']+)/g);
+      for (const type of types) {
+        if (type in ClickhouseTypeToGeneric) {
+          return ClickhouseTypeToGeneric[type];
+        }
+      }
+    }
+
+    return super.toGenericType(columnType);
   }
 
   async createSchemaIfNotExists(schemaName) {
