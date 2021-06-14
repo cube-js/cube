@@ -364,6 +364,14 @@ export class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+
+      app.post('/cubejs-system/v1/pre-aggregations/preview', jsonParser, systemMiddlewares, (async (req, res) => {
+        await this.getPreAggregationPreview({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -470,6 +478,28 @@ export class ApiGateway {
 
       res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
+      });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationPreview(
+    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      const orchestratorApi = this.getAdapterApi(context);
+      const preAggregations = await this.getCompilerApi(context).preAggregations();
+      const preAggregation = preAggregations.find(p => p.id === query.preAggregationId);
+      res({
+        preview: preAggregation && await orchestratorApi.getPreAggregationPreview(
+          context,
+          preAggregation.preAggregation,
+          query.versionEntry
+        )
       });
     } catch (e) {
       this.handleError({

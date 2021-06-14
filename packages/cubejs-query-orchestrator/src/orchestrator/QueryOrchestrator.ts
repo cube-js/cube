@@ -193,4 +193,15 @@ export class QueryOrchestrator {
         return partition && versionEntry.structure_version === PreAggregations.structureVersion(partition.sql);
       });
   }
+
+  public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {
+    const data = await this.fetchQuery({
+      continueWait: true,
+      external: preAggregation.external,
+      query: `SELECT * FROM ${PreAggregations.targetTableName(versionEntry)} LIMIT 1000`,
+      requestId
+    });
+
+    return data;
+  }
 }
