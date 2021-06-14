@@ -164,7 +164,59 @@ class ClickHouseDriver extends BaseDriver {
     `;
   }
 
+  async stream(query, values, { highWaterMark }) {
+    // eslint-disable-next-line no-underscore-dangle
+    const conn = await this.pool._factory.create();
+
+    try {
+      const formattedQuery = sqlstring.format(query, values);
+
+      return await new Promise((resolve, reject) => {
+        const options = {
+          queryOptions: {
+            query_id: uuid(),
+            //
+            //
+            // If ClickHouse user's permissions are restricted with "readonly = 1",
+            // change settings queries are not allowed. Thus, "join_use_nulls" setting
+            // can not be changed
+            //
+            //
+            ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+          }
+        };
+
+        const rowStream = conn.query(formattedQuery, options, (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({
+              rowStream,
+              types: result.meta.map((field) => ({
+                name: field.name,
+                type: this.toGenericType(field.type),
+              })),
+              release: async () => {
+                // eslint-disable-next-line no-underscore-dangle
+                await this.pool._factory.destroy(conn);
+              }
+            });
+          }
+        });
+      });
+    } catch (e) {
+      // eslint-disable-next-line no-underscore-dangle
+      await this.pool._factory.destroy(conn);
+
+      throw e;
+    }
+  }
+
   async downloadQueryResults(query, values, options) {
+    if ((options || {}).streamImport) {
+      return this.stream(query, values, options);
+    }
+
     const response = await this.queryResponse(query, values);
 
     return {
