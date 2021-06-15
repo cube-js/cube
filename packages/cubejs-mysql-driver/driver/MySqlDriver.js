@@ -2,12 +2,34 @@ const mysql = require('mysql');
 const genericPool = require('generic-pool');
 const { promisify } = require('util');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
-const crypto = require('crypto');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
   text: 'varchar(255) CHARACTER SET utf8mb4',
   decimal: 'decimal(38,10)',
+};
+
+/**
+ * MySQL Native types -> SQL type
+ * @link https://github.com/mysqljs/mysql/blob/master/lib/protocol/constants/types.js#L9
+ */
+const MySqlNativeToMySqlType = {
+  [mysql.Types.DECIMAL]: 'decimal',
+  [mysql.Types.TINY]: 'tinyint',
+  [mysql.Types.SHORT]: 'smallint',
+  [mysql.Types.LONG]: 'int',
+  [mysql.Types.INT24]: 'mediumint',
+  [mysql.Types.LONGLONG]: 'bigint',
+  [mysql.Types.NEWDATE]: 'datetime',
+  [mysql.Types.TIMESTAMP2]: 'timestamp',
+  [mysql.Types.DATETIME2]: 'datetime',
+  [mysql.Types.TIME2]: 'time',
+  [mysql.Types.TINY_BLOB]: 'tinytext',
+  [mysql.Types.MEDIUM_BLOB]: 'mediumtext',
+  [mysql.Types.LONG_BLOB]: 'longtext',
+  [mysql.Types.BLOB]: 'text',
+  [mysql.Types.VAR_STRING]: 'varchar',
+  [mysql.Types.STRING]: 'binary',
 };
 
 const MySqlToGenericType = {
@@ -166,14 +188,23 @@ class MySqlDriver extends BaseDriver {
     try {
       await this.setTimeZone(conn);
 
-      return {
-        // eslint-disable-next-line no-underscore-dangle
-        rowStream: conn.query(query).stream({ highWaterMark }),
-        release: async () => {
-          // eslint-disable-next-line no-underscore-dangle
-          await this.pool._factory.destroy(conn);
-        }
-      };
+      return await new Promise((resolve, reject) => {
+        const response = conn.query(query, values, (err, result, fields) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({
+              // eslint-disable-next-line no-underscore-dangle
+              rowStream: response.stream({ highWaterMark }),
+              types: this.mapFieldsToGenericTypes(fields),
+              release: async () => {
+                // eslint-disable-next-line no-underscore-dangle
+                await this.pool._factory.destroy(conn);
+              }
+            });
+          }
+        });
+      });
     } catch (e) {
       // eslint-disable-next-line no-underscore-dangle
       await this.pool._factory.destroy(conn);
@@ -182,40 +213,42 @@ class MySqlDriver extends BaseDriver {
     }
   }
 
-  async downloadQueryResults(query, values, options) {
-    if (!this.config.database) {
-      throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
-    }
-    const tableName = crypto.randomBytes(10).toString('hex');
-    const columns = await this.withConnection(async db => {
-      await this.setTimeZone(db);
-      await db.execute(`CREATE TEMPORARY TABLE \`${this.config.database}\`.t_${tableName} AS ${query} LIMIT 0`, values);
-      const result = await db.execute(`DESCRIBE \`${this.config.database}\`.t_${tableName}`);
-      await db.execute(`DROP TEMPORARY TABLE \`${this.config.database}\`.t_${tableName}`);
-      return result;
-    });
+  mapFieldsToGenericTypes(fields) {
+    return fields.map((field) => {
+      let type = mysql.Types[field.type];
 
-    const types = columns.map(c => ({ name: c.Field, type: this.toGenericType(c.Type) }));
+      if (field.type in MySqlNativeToMySqlType) {
+        type = MySqlNativeToMySqlType[field.type];
+      }
 
-    if ((options || {}).streamImport) {
-      // TODO use pool once figure out how to close stream gracefully and recover from errors
-      // eslint-disable-next-line no-underscore-dangle
-      const conn = await this.pool._factory.create();
-      await this.setTimeZone(conn);
       return {
-        rowStream: conn.query(query, values).stream(),
-        types,
-        release: async () => {
-          // eslint-disable-next-line no-underscore-dangle
-          await this.pool._factory.destroy(conn);
-        }
+        name: field.name,
+        type: this.toGenericType(type)
       };
+    });
+  }
+
+  async downloadQueryResults(query, values, options) {
+    if ((options || {}).streamImport) {
+      return this.stream(query, values, options);
     }
 
-    return {
-      rows: await this.query(query, values),
-      types,
-    };
+    return this.withConnection(async (conn) => {
+      await this.setTimeZone(conn);
+
+      return new Promise((resolve, reject) => {
+        conn.query(query, values, (err, rows, fields) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({
+              rows,
+              types: this.mapFieldsToGenericTypes(fields),
+            });
+          }
+        });
+      });
+    });
   }
 
   toColumnValue(value, genericType) {
