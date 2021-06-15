@@ -246,7 +246,6 @@ slow to return results.
 rack up costs.
 
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
-[ref-config-env]: /reference/environment-variables#cube-store
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
 [ref-preaggs]: /pre-aggregations
 [ref-preagg-sched-refresh]: /pre-aggregations#scheduled-refresh
