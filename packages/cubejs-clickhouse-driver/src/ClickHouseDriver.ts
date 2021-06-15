@@ -1,22 +1,59 @@
 /* eslint-disable no-restricted-syntax */
-const ClickHouse = require('@apla/clickhouse');
-const { getEnv } = require('@cubejs-backend/shared');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
-const genericPool = require('generic-pool');
-const { uuid } = require('uuidv4');
-const sqlstring = require('sqlstring');
+import {
+  BaseDriver,
+  DownloadQueryResultsOptions, DownloadQueryResultsResult,
+  DriverInterface,
+  StreamOptions, StreamTableData, StreamTableDataWithTypes,
+} from '@cubejs-backend/query-orchestrator';
+import { getEnv } from '@cubejs-backend/shared';
+import genericPool, { Pool } from 'generic-pool';
+import { v4 as uuidv4 } from 'uuid';
+import sqlstring from 'sqlstring';
+import { HydrationStream } from './HydrationStream';
 
-const ClickhouseTypeToGeneric = {
+const ClickHouse = require('@apla/clickhouse');
+
+const ClickhouseTypeToGeneric: Record<string, string> = {
+  enum: 'text',
   string: 'text',
   datetime: 'timestamp',
+  datetime64: 'timestamp',
   date: 'date',
+  // integers
+  int8: 'int',
+  int16: 'int',
+  int32: 'bigint',
   int64: 'bigint',
+  // unsigned int
+  uint8: 'int',
+  uint16: 'int',
+  uint32: 'int',
   uint64: 'bigint',
+  // floats
+  float32: 'float',
+  float64: 'double',
 };
 
-class ClickHouseDriver extends BaseDriver {
-  constructor(config) {
+interface ClickHouseDriverOptions {
+  host?: string,
+  port?: string,
+  auth?: string,
+  protocol?: string,
+  database?: string,
+  readOnly?: boolean,
+  queryOptions?: object,
+}
+
+export class ClickHouseDriver extends BaseDriver implements DriverInterface {
+  protected readonly pool: Pool<any>;
+
+  protected readonly readOnlyMode: boolean;
+
+  protected readonly config: any;
+
+  public constructor(config: ClickHouseDriverOptions = {}) {
     super();
+
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT,
@@ -40,7 +77,7 @@ class ClickHouseDriver extends BaseDriver {
           //
           //
           ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
-          session_id: uuid(),
+          session_id: uuidv4(),
           ...this.config.queryOptions,
         }
       }),
@@ -55,14 +92,15 @@ class ClickHouseDriver extends BaseDriver {
     });
   }
 
-  withConnection(fn) {
+  protected withConnection(fn: (con: any, queryId: string) => Promise<any>) {
     const self = this;
     const connectionPromise = this.pool.acquire();
-    const queryId = uuid();
+    const queryId = uuidv4();
 
     let cancelled = false;
-    const cancelObj = {};
-    const promise = connectionPromise.then(connection => {
+    const cancelObj: any = {};
+
+    const promise: any = connectionPromise.then((connection: any) => {
       cancelObj.cancel = async () => {
         cancelled = true;
         await self.withConnection(async conn => {
@@ -84,22 +122,23 @@ class ClickHouseDriver extends BaseDriver {
         }));
     });
     promise.cancel = () => cancelObj.cancel();
+
     return promise;
   }
 
-  testConnection() {
-    return this.query('SELECT 1');
+  public async testConnection() {
+    await this.query('SELECT 1', []);
   }
 
-  readOnly() {
+  public readOnly() {
     return !!this.config.readOnly || this.readOnlyMode;
   }
 
-  query(query, values) {
-    return this.queryResponse(query, values).then(res => this.normaliseResponse(res));
+  public async query(query: string, values: unknown[]) {
+    return this.queryResponse(query, values).then((res: any) => this.normaliseResponse(res));
   }
 
-  queryResponse(query, values) {
+  protected queryResponse(query: string, values: unknown[]) {
     const formattedQuery = sqlstring.format(query, values);
 
     return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
@@ -118,7 +157,7 @@ class ClickHouseDriver extends BaseDriver {
     }));
   }
 
-  normaliseResponse(res) {
+  protected normaliseResponse(res: any) {
     //
     //
     //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
@@ -128,11 +167,11 @@ class ClickHouseDriver extends BaseDriver {
     //
     //
     if (res.data) {
-      res.data.forEach(row => {
+      res.data.forEach((row: any) => {
         Object.keys(row).forEach(field => {
           const value = row[field];
           if (value !== null) {
-            const meta = res.meta.find(m => m.name === field);
+            const meta = res.meta.find((m: any) => m.name === field);
             if (meta.type.includes('DateTime')) {
               row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
             } else if (meta.type.includes('Date')) {
@@ -148,12 +187,12 @@ class ClickHouseDriver extends BaseDriver {
     return res.data;
   }
 
-  async release() {
+  public async release() {
     await this.pool.drain();
     await this.pool.clear();
   }
 
-  informationSchemaQuery() {
+  public informationSchemaQuery() {
     return `
       SELECT name as column_name,
              table as table_name,
@@ -164,9 +203,13 @@ class ClickHouseDriver extends BaseDriver {
     `;
   }
 
-  async stream(query, values, { highWaterMark }) {
+  public async stream(
+    query: string,
+    values: unknown[],
+    { highWaterMark }: StreamOptions
+  ): Promise<StreamTableDataWithTypes> {
     // eslint-disable-next-line no-underscore-dangle
-    const conn = await this.pool._factory.create();
+    const conn = await (<any> this.pool)._factory.create();
 
     try {
       const formattedQuery = sqlstring.format(query, values);
@@ -174,7 +217,7 @@ class ClickHouseDriver extends BaseDriver {
       return await new Promise((resolve, reject) => {
         const options = {
           queryOptions: {
-            query_id: uuid(),
+            query_id: uuidv4(),
             //
             //
             // If ClickHouse user's permissions are restricted with "readonly = 1",
@@ -186,19 +229,22 @@ class ClickHouseDriver extends BaseDriver {
           }
         };
 
-        const rowStream = conn.query(formattedQuery, options, (err, result) => {
+        const originalStream = conn.query(formattedQuery, options, (err: Error|null, result: any) => {
           if (err) {
             reject(err);
           } else {
+            const rowStream = new HydrationStream(result.meta);
+            originalStream.pipe(rowStream);
+
             resolve({
               rowStream,
-              types: result.meta.map((field) => ({
+              types: result.meta.map((field: any) => ({
                 name: field.name,
                 type: this.toGenericType(field.type),
               })),
               release: async () => {
                 // eslint-disable-next-line no-underscore-dangle
-                await this.pool._factory.destroy(conn);
+                await (<any> this.pool)._factory.destroy(conn);
               }
             });
           }
@@ -206,13 +252,17 @@ class ClickHouseDriver extends BaseDriver {
       });
     } catch (e) {
       // eslint-disable-next-line no-underscore-dangle
-      await this.pool._factory.destroy(conn);
+      await (<any> this.pool)._factory.destroy(conn);
 
       throw e;
     }
   }
 
-  async downloadQueryResults(query, values, options) {
+  public async downloadQueryResults(
+    query: string,
+    values: unknown[],
+    options: DownloadQueryResultsOptions
+  ): Promise<DownloadQueryResultsResult> {
     if ((options || {}).streamImport) {
       return this.stream(query, values, options);
     }
@@ -221,14 +271,14 @@ class ClickHouseDriver extends BaseDriver {
 
     return {
       rows: this.normaliseResponse(response),
-      types: response.meta.map((field) => ({
+      types: response.meta.map((field: any) => ({
         name: field.name,
         type: this.toGenericType(field.type),
       })),
     };
   }
 
-  toGenericType(columnType) {
+  public toGenericType(columnType: string) {
     if (columnType.toLowerCase() in ClickhouseTypeToGeneric) {
       return ClickhouseTypeToGeneric[columnType.toLowerCase()];
     }
@@ -242,9 +292,11 @@ class ClickHouseDriver extends BaseDriver {
      */
     if (columnType.includes('(')) {
       const types = columnType.toLowerCase().match(/([a-z']+)/g);
-      for (const type of types) {
-        if (type in ClickhouseTypeToGeneric) {
-          return ClickhouseTypeToGeneric[type];
+      if (types) {
+        for (const type of types) {
+          if (type in ClickhouseTypeToGeneric) {
+            return ClickhouseTypeToGeneric[type];
+          }
         }
       }
     }
@@ -252,13 +304,11 @@ class ClickHouseDriver extends BaseDriver {
     return super.toGenericType(columnType);
   }
 
-  async createSchemaIfNotExists(schemaName) {
-    await this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`);
+  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+    return this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
   }
 
-  getTablesQuery(schemaName) {
+  public getTablesQuery(schemaName: string) {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
   }
 }
-
-module.exports = ClickHouseDriver;
