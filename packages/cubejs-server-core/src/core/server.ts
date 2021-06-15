@@ -427,11 +427,11 @@ export class CubejsServerCore {
         devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
       ),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
-      logger,
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
       sqlCache: true,
       livePreview: getEnv('livePreview'),
       ...opts,
+      logger,
       jwt: {
         key: getEnv('jwtKey'),
         algorithms: getEnv('jwtAlgorithms'),
