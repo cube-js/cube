@@ -71,6 +71,7 @@ export type UnloadOptions = {
 };
 
 export type QueryOptions = {};
+export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData);
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
@@ -85,7 +86,7 @@ export interface DriverInterface {
   // Remove table from database
   dropTable: (tableName: string, options?: QueryOptions) => Promise<unknown>;
   // Download data from Query (for readOnly)
-  downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData)>;
+  downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
   downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
   // Some drivers can implement streaming from SQL

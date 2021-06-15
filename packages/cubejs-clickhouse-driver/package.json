@@ -11,12 +11,20 @@
   "engines": {
     "node": ">=10.8.0"
   },
-  "main": "driver/ClickHouseDriver.js",
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
   "scripts": {
-    "integration": "mocha",
-    "integration:clickhouse": "mocha",
-    "lint": "eslint **/*.js",
-    "lint:fix": "eslint --fix **/*.js"
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/* test/* --ext .ts",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts",
+    "integration": "mocha dist/test",
+    "integration:clickhouse": "mocha dist/test"
   },
   "dependencies": {
     "@apla/clickhouse": "^1.5.5",
@@ -24,14 +32,15 @@
     "@cubejs-backend/shared": "^0.27.33",
     "generic-pool": "^3.6.0",
     "sqlstring": "^2.3.1",
-    "uuidv4": "^6.0.2"
+    "uuid": "^8.3.2"
   },
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.27.0",
     "mocha": "^8.0.1",
     "should": "^13.2.3",
-    "testcontainers": "^2.4.0"
+    "testcontainers": "^7.11.1",
+    "typescript": "~4.1.5"
   },
   "publishConfig": {
     "access": "public"
