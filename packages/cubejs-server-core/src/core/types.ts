@@ -1,4 +1,11 @@
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
+import {
+  CheckAuthFn,
+  CheckAuthMiddlewareFn,
+  ExtendContextFn,
+  JWTOptions,
+  UserBackgroundContext,
+  QueryRewriteFn,
+} from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
@@ -74,13 +81,15 @@ export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOpt
 
 export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
-export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
-
-export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
-
-export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
-
+// internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
+export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
+export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
+
+// external
+export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
+export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
+export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFn = (msg: string, params: any) => void;
 
@@ -92,8 +101,8 @@ export interface CreateOptions {
   devServer?: boolean;
   apiSecret?: string;
   logger?: LoggerFn;
-  driverFactory?: (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
-  dialectFactory?: (context: DialectContext) => BaseQuery;
+  driverFactory?: DriverFactoryFn;
+  dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
   contextToAppId?: ContextToAppIdFn;
@@ -102,7 +111,9 @@ export interface CreateOptions {
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   jwt?: JWTOptions;
-  queryTransformer?: QueryTransformerFn;
+  // @deprecated Please use queryRewrite
+  queryTransformer?: QueryRewriteFn;
+  queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string;
   extendContext?: ExtendContextFn;

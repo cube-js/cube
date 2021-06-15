@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect, RefObject } from 'react';
-import { Col, Row, Divider } from 'antd';
-import { LockOutlined, CloudOutlined } from '@ant-design/icons';
+import { RefObject, useEffect, useRef, useState } from 'react';
+import { Col, Row } from 'antd';
 import {
   QueryBuilder,
   SchemaChangeProps,
@@ -8,33 +7,29 @@ import {
 } from '@cubejs-client/react';
 import {
   areQueriesEqual,
-  PivotConfig,
-  Query,
   ChartType,
+  PivotConfig,
+  PreAggregationType,
+  Query,
   TransformedQuery,
 } from '@cubejs-client/core';
 import styled from 'styled-components';
 
-import { playgroundAction } from './events';
-import MemberGroup from './QueryBuilder/MemberGroup';
-import FilterGroup from './QueryBuilder/FilterGroup';
-import TimeGroup from './QueryBuilder/TimeGroup';
-import SelectChartType from './QueryBuilder/SelectChartType';
-import Settings from './components/Settings/Settings';
-import LivePreviewBar from './components/LivePreviewContext/LivePreviewBar';
-import ChartRenderer from './components/ChartRenderer/ChartRenderer';
-import { SectionHeader, SectionRow } from './components';
-import ChartContainer from './ChartContainer';
-import { dispatchPlaygroundEvent } from './utils';
-import {
-  useDeepCompareMemoize,
-  useSecurityContext,
-  useLivePreviewContext,
-} from './hooks';
-import { Button, Card, FatalError } from './atoms';
-import { UIFramework } from './types';
-import DashboardSource from './DashboardSource';
-import { PreAggregationStatus } from './components/PlaygroundQueryBuilder/components';
+import { playgroundAction } from '../../../events';
+import MemberGroup from '../../../QueryBuilder/MemberGroup';
+import FilterGroup from '../../../QueryBuilder/FilterGroup';
+import TimeGroup from '../../../QueryBuilder/TimeGroup';
+import SelectChartType from '../../../QueryBuilder/SelectChartType';
+import Settings from '../../../components/Settings/Settings';
+import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
+import { SectionHeader, SectionRow } from '../../../components';
+import ChartContainer from '../../../ChartContainer';
+import { dispatchPlaygroundEvent } from '../../../utils';
+import { useDeepCompareMemoize } from '../../../hooks';
+import { Card, FatalError } from '../../../atoms';
+import { UIFramework } from '../../../types';
+import DashboardSource from '../../../DashboardSource';
+import { PreAggregationStatus } from './PreAggregationStatus';
 
 const Section = styled.div`
   display: flex;
@@ -45,6 +40,11 @@ const Section = styled.div`
   > *:first-child {
     margin-bottom: 8px;
   }
+`;
+
+const Wrapper = styled.div`
+  background-color: var(--layout-body-background);
+  padding-bottom: 16px;
 `;
 
 export const frameworkChartLibraries: Record<
@@ -146,15 +146,16 @@ function QueryChangeEmitter({
   return null;
 }
 
-type THandleRunButtonClickProps = {
+type HandleRunButtonClickProps = {
   query: Query;
   pivotConfig?: PivotConfig;
   chartType: ChartType;
 };
 
-export type TPlaygroundQueryBuilderProps = {
+export type PlaygroundQueryBuilderProps = {
   apiUrl: string;
   cubejsToken: string;
+  queryId: string;
   defaultQuery?: Query;
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
@@ -166,45 +167,90 @@ export type TPlaygroundQueryBuilderProps = {
 export type QueryStatus = {
   timeElapsed: number;
   isAggregated: boolean;
+  external: boolean | null;
+  extDbType: string;
+  preAggregationType?: PreAggregationType;
   transformedQuery?: TransformedQuery;
 };
 
-export default function PlaygroundQueryBuilder({
+export function PlaygroundQueryBuilder({
   apiUrl,
   cubejsToken,
   defaultQuery,
+  queryId,
   dashboardSource,
   schemaVersion = 0,
   initialVizState,
   onSchemaChange,
   onVizStateChanged,
-}: TPlaygroundQueryBuilderProps) {
+}: PlaygroundQueryBuilderProps) {
   const ref = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
 
-  const [queryStatus, setQueryStatus] = useState<QueryStatus | null>(null);
-  const [framework, setFramework] = useState('react');
-  const [chartingLibrary, setChartingLibrary] = useState('bizcharts');
-  const [isChartRendererReady, setChartRendererReady] = useState(false);
-  const [isQueryLoading, setQueryLoading] = useState(false);
-  const [queryError, setQueryError] = useState<Error | null>(null);
-  const { token, setIsModalOpen } = useSecurityContext();
-  const livePreviewContext = useLivePreviewContext();
+  const [queryStatusMap, setQueryStatusMap] = useState<
+    Record<string, QueryStatus | null>
+  >({});
+  const [framework, setFramework] = useState<UIFramework>('react');
+  const [chartingLibrary, setChartingLibrary] = useState<string>('bizcharts');
+  const [chartRendererState, setChartRendererReady] = useState<
+    Record<string, boolean>
+  >({});
+  const [isQueryLoadingMap, setQueryLoadingMap] = useState<
+    Record<string, boolean>
+  >({});
+  const [queryErrorMap, setQueryErrorMap] = useState<Record<string, Error | null>>({});
+
+  function isChartRendererReady(): boolean {
+    return Boolean(chartRendererState[queryId]);
+  }
+
+  function setQueryStatus(queryStatus: QueryStatus | null) {
+    setQueryStatusMap({
+      ...queryStatusMap,
+      [queryId]: queryStatus,
+    });
+  }
+
+  function queryStatus() {
+    return queryStatusMap[queryId] || null;
+  }
+
+  function setQueryLoading(isLoading: boolean) {
+    setQueryLoadingMap({
+      ...isQueryLoadingMap,
+      [queryId]: isLoading,
+    });
+  }
+
+  function isQueryLoading(): boolean {
+    return isQueryLoadingMap[queryId] || false;
+  }
+
+  function setQueryError(error: Error | null) {
+    setQueryErrorMap({
+      ...queryErrorMap,
+      [queryId]: error,
+    });
+  }
+
+  function queryError(): Error | null {
+    return queryErrorMap[queryId] || null;
+  }
 
   useEffect(() => {
-    if (isChartRendererReady && ref.current) {
+    if (isChartRendererReady() && ref.current) {
       dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
         token: cubejsToken,
         apiUrl,
       });
     }
-  }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
+  }, [ref, cubejsToken, apiUrl, isChartRendererReady()]);
 
   function handleRunButtonClick({
     query,
     pivotConfig,
     chartType,
-  }: THandleRunButtonClickProps) {
+  }: HandleRunButtonClickProps) {
     if (ref.current) {
       if (areQueriesEqual(query, queryRef.current)) {
         dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
@@ -274,64 +320,7 @@ export default function PlaygroundQueryBuilder({
         }
 
         return (
-          <>
-            <Row>
-              <Col span={24}>
-                <Card
-                  bordered={false}
-                  style={{
-                    borderRadius: 0,
-                    borderBottom: 1,
-                  }}
-                >
-                  <Button.Group>
-                    <Button
-                      data-testid="security-context-btn"
-                      icon={<LockOutlined />}
-                      size="small"
-                      type={token ? 'primary' : 'default'}
-                      onClick={() => setIsModalOpen(true)}
-                    >
-                      {token ? 'Edit' : 'Add'} Security Context
-                    </Button>
-                    {livePreviewContext &&
-                      !livePreviewContext.livePreviewDisabled && (
-                        <Button
-                          data-testid="live-preview-btn"
-                          icon={<CloudOutlined />}
-                          size="small"
-                          type={
-                            livePreviewContext.statusLivePreview.active
-                              ? 'primary'
-                              : 'default'
-                          }
-                          onClick={() =>
-                            livePreviewContext.statusLivePreview.active
-                              ? livePreviewContext.stopLivePreview()
-                              : livePreviewContext.startLivePreview()
-                          }
-                        >
-                          {livePreviewContext.statusLivePreview.active
-                            ? 'Stop'
-                            : 'Start'}{' '}
-                          Live Preview
-                        </Button>
-                      )}
-                  </Button.Group>
-                </Card>
-              </Col>
-            </Row>
-
-            {livePreviewContext?.statusLivePreview.active && (
-              <Row>
-                <Col span={24}>
-                  <LivePreviewBar />
-                </Col>
-              </Row>
-            )}
-
-            <Divider style={{ margin: 0 }} />
-
+          <Wrapper data-testid={`query-builder-${queryId}`}>
             <Row
               justify="space-around"
               align="top"
@@ -458,12 +447,8 @@ export default function PlaygroundQueryBuilder({
                     onUpdate={updatePivotConfig.update}
                   />
 
-                  {queryStatus ? (
-                    <PreAggregationStatus
-                      timeElapsed={queryStatus.timeElapsed}
-                      isAggregated={queryStatus.isAggregated}
-                      transformedQuery={queryStatus.transformedQuery}
-                    />
+                  {queryStatus() ? (
+                    <PreAggregationStatus {...(queryStatus() as QueryStatus)} />
                   ) : null}
                 </SectionRow>
               </Col>
@@ -472,19 +457,10 @@ export default function PlaygroundQueryBuilder({
             <Row
               justify="space-around"
               align="top"
-              gutter={24}
-              style={{
-                marginRight: 0,
-                marginLeft: 0,
-              }}
+              gutter={32}
+              style={{ margin: 0 }}
             >
-              <Col
-                span={24}
-                style={{
-                  paddingLeft: 16,
-                  paddingRight: 16,
-                }}
-              >
+              <Col span={24}>
                 {!isQueryPresent && metaError ? (
                   <Card>
                     <FatalError error={metaError} />
@@ -502,7 +478,7 @@ export default function PlaygroundQueryBuilder({
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
                     iframeRef={ref}
-                    isChartRendererReady={isChartRendererReady}
+                    isChartRendererReady={isChartRendererReady()}
                     query={query}
                     error={error}
                     chartType={chartType}
@@ -537,15 +513,16 @@ export default function PlaygroundQueryBuilder({
 
                       return (
                         <ChartRenderer
+                          queryId={queryId}
                           areQueriesEqual={areQueriesEqual(
                             query,
                             queryRef.current
                           )}
-                          isQueryLoading={isQueryLoading}
+                          isQueryLoading={isQueryLoading()}
                           isChartRendererReady={
-                            isChartRendererReady && !isFetchingMeta
+                            isChartRendererReady() && !isFetchingMeta
                           }
-                          queryError={queryError}
+                          queryError={queryError()}
                           framework={framework}
                           chartType={chartType || 'line'}
                           query={query}
@@ -564,12 +541,19 @@ export default function PlaygroundQueryBuilder({
                               setQueryError(null);
 
                               if (isAggregated != null && timeElapsed != null) {
+                                const [result] = response.loadResponse.results;
+
+                                const preAggregationType = Object.values(
+                                  result.usedPreAggregations || {}
+                                )[0]?.type;
+
                                 setQueryStatus({
                                   isAggregated,
                                   timeElapsed,
-                                  transformedQuery:
-                                    response.loadResponse.results[0]
-                                      .transformedQuery,
+                                  transformedQuery: result.transformedQuery,
+                                  external: result.external,
+                                  extDbType: result.extDbType,
+                                  preAggregationType,
                                 });
                               }
                             }
@@ -581,10 +565,15 @@ export default function PlaygroundQueryBuilder({
 
                             setQueryLoading(isLoading);
                           }}
-                          onChartRendererReadyChange={setChartRendererReady}
+                          onChartRendererReadyChange={(isReady) =>
+                            setChartRendererReady({
+                              ...chartRendererState,
+                              [queryId]: isReady,
+                            })
+                          }
                           onRunButtonClick={() => {
                             if (
-                              isChartRendererReady &&
+                              isChartRendererReady() &&
                               ref.current &&
                               missingMembers.length === 0
                             ) {
@@ -613,12 +602,12 @@ export default function PlaygroundQueryBuilder({
                 setQueryLoading(false);
                 setQueryStatus(null);
 
-                if (queryError) {
+                if (queryError()) {
                   setQueryError(null);
                 }
               }}
             />
-          </>
+          </Wrapper>
         );
       }}
     />

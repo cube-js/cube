@@ -1,4 +1,6 @@
+/* eslint-disable no-restricted-syntax */
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -15,6 +17,8 @@ export class CubeEvaluator extends CubeSymbols {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
 
+    Object.values(validCubes).map(this.prepareCube);
+
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(validCubes.map((v) => {
@@ -24,6 +28,21 @@ export class CubeEvaluator extends CubeSymbols {
         primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
       ];
     }));
+  }
+
+  prepareCube(cube) {
+    if (cube.preAggregations) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const preAggregation of Object.values(cube.preAggregations)) {
+        if (preAggregation.scheduledRefresh === undefined) {
+          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+        }
+
+        if (preAggregation.external === undefined) {
+          preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
+        }
+      }
+    }
   }
 
   cubesByFileName(fileName) {
@@ -46,22 +65,55 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
-  preAggregations(onlyScheduled = false) {
-    return Object.keys(this.evaluatedCubes).map(cube => {
-      const preAggregations = this.preAggregationsForCube(cube);
-      return Object.keys(preAggregations)
-        .filter(name => !onlyScheduled || preAggregations[name].scheduledRefresh)
-        .map(preAggregationName => ({
-          preAggregationName,
-          preAggregation: preAggregations[preAggregationName],
-          cube,
-          references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName])
-        }));
-    }).reduce((a, b) => a.concat(b), []);
+  preAggregations(filter) {
+    const { scheduled, cubes, preAggregationIds } = filter || {};
+    const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
+
+    return Object.keys(this.evaluatedCubes)
+      .filter(cube => !cubes || cubes.includes(cube))
+      .map(cube => {
+        const preAggregations = this.preAggregationsForCube(cube);
+        return Object.keys(preAggregations)
+          .filter(
+            preAggregationName => (!scheduled || preAggregations[preAggregationName].scheduledRefresh) &&
+              (!preAggregationIds || preAggregationIds.includes(idFactory({ cube, preAggregationName })))
+          )
+          .map(preAggregationName => {
+            const { indexes, refreshRangeStart, refreshRangeEnd, refreshKey } = preAggregations[preAggregationName];
+            return {
+              id: idFactory({ cube, preAggregationName }),
+              preAggregationName,
+              preAggregation: preAggregations[preAggregationName],
+              cube,
+              references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
+              refreshRangeReferences: {
+                refreshRangeStart: refreshRangeStart && refreshRangeStart.sql && { sql: refreshRangeStart.sql() },
+                refreshRangeEnd: refreshRangeEnd && refreshRangeEnd.sql && { sql: refreshRangeEnd.sql() }
+              },
+              refreshKeyReferences: {
+                refreshKey: refreshKey && {
+                  ...refreshKey,
+                  sql: refreshKey && refreshKey.sql && refreshKey.sql()
+                }
+              },
+              indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
+                obj[indexName] = {
+                  columns: this.evaluateReferences(
+                    cube,
+                    indexes[indexName].columns,
+                    { originalSorting: true }
+                  )
+                };
+                return obj;
+              }, {})
+            };
+          });
+      })
+      .reduce((a, b) => a.concat(b), []);
   }
 
   scheduledPreAggregations() {
-    return this.preAggregations(true);
+    return this.preAggregations({ scheduled: true });
   }
 
   cubeNames() {

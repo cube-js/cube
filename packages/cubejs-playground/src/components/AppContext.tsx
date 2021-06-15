@@ -1,22 +1,33 @@
 import {
   createContext,
-  ReactNode, useContext,
+  ReactNode,
+  useContext,
+  useEffect,
   useState,
 } from 'react';
 
+import { PlaygroundContext } from '../App';
+
 export type ContextProps = {
-  extDbType?: string;
+  isDocker?: boolean;
+  identifier?: string | null;
+  playgroundContext?: PlaygroundContext;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
 
 export type AppContextProps = {
   children: ReactNode;
-};
+} & Omit<ContextProps, 'setContext'>;
 
 export const AppContext = createContext<ContextProps>({} as ContextProps);
 
-export function AppContextProvider({ children }: AppContextProps) {
-  const [context, setContext] = useState<Partial<ContextProps> | null>(null);
+export function AppContextProvider({
+  children,
+  ...contextProps
+}: AppContextProps) {
+  const [context, setContext] = useState<Partial<ContextProps> | null>(
+    contextProps || null
+  );
 
   return (
     <AppContext.Provider
@@ -33,6 +44,20 @@ export function AppContextProvider({ children }: AppContextProps) {
       {children}
     </AppContext.Provider>
   );
+}
+
+type AppContextConsumerProps = {
+  onReady: (context: ContextProps) => void;
+};
+
+export function AppContextConsumer({ onReady }: AppContextConsumerProps) {
+  const context = useAppContext();
+
+  useEffect(() => {
+    onReady(context);
+  }, [context]);
+
+  return null;
 }
 
 export function useAppContext() {

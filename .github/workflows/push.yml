@@ -37,7 +37,7 @@ on:
 
 jobs:
   unit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
 
     strategy:
@@ -85,7 +85,7 @@ jobs:
           verbose: true # optional (default = false)
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
 
     steps:
@@ -117,7 +117,7 @@ jobs:
         run: yarn lerna run --concurrency 1 lint
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
 
     steps:
@@ -152,7 +152,7 @@ jobs:
 
   integration-redis:
     needs: [unit, lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
 
     services:
@@ -227,7 +227,7 @@ jobs:
 
   integration:
     needs: [unit, lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
 
     strategy:
@@ -268,7 +268,7 @@ jobs:
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
     needs: [lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
     steps:
@@ -282,7 +282,7 @@ jobs:
   docker-image-latest:
     needs: docker-image-latest-set-tag
     name: Build & Test :latest for ${{ matrix.name }} without pushing
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: (!contains(needs['docker-image-latest-set-tag'].outputs.tag, 'v'))
     services:
@@ -357,7 +357,7 @@ jobs:
   docker-dev:
     needs: [build, unit, lint]
     name: Build & Test :dev for ${{ matrix.name }} without pushing
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     services:
       registry:

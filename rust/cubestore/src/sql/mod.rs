@@ -8,8 +8,8 @@ use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
 
 use crate::metastore::{
-    is_valid_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef, MetaStoreTable,
-    RowKey, Schema, TableId,
+    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::CubeError;
@@ -21,13 +21,13 @@ use std::sync::Arc;
 
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 
-use crate::cluster::{Cluster, JobEvent};
+use crate::cluster::{Cluster, JobEvent, JobResultListener};
 
 use crate::config::injection::DIService;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
-use crate::queryplanner::query_executor::QueryExecutor;
+use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::CubeStoreParser;
@@ -40,6 +40,7 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
+use cubehll::HllSketch;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -47,6 +48,8 @@ use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
 use parser::Statement as CubeStoreStatement;
+use rand::distributions::Uniform;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -169,60 +172,10 @@ impl SqlServiceImpl {
                 });
             }
         }
-        if external {
-            let listener = self.cluster.job_result_listener();
-            let table = self
+
+        if !external {
+            return self
                 .db
-                .create_table(
-                    schema_name,
-                    table_name,
-                    columns_to_set,
-                    locations,
-                    Some(ImportFormat::CSV),
-                    indexes_to_create,
-                    false,
-                )
-                .await?;
-            let wait_for = table
-                .get_row()
-                .locations()
-                .unwrap()
-                .iter()
-                .map(|&l| {
-                    (
-                        RowKey::Table(TableId::Tables, table.get_id()),
-                        JobType::TableImportCSV(l.clone()),
-                    )
-                })
-                .collect();
-            let imports = listener.wait_for_job_results(wait_for).await?;
-            for r in imports {
-                if let JobEvent::Error(_, _, e) = r {
-                    return Err(CubeError::user(format!("Create table failed: {}", e)));
-                }
-            }
-
-            let mut futures = Vec::new();
-            let indexes = self.db.get_table_indexes(table.get_id()).await?;
-            let partitions = self
-                .db
-                .get_active_partitions_and_chunks_by_index_id_for_select(
-                    indexes.iter().map(|i| i.get_id()).collect(),
-                )
-                .await?;
-            for (partition, chunks) in partitions.into_iter().flatten() {
-                futures.push(self.cluster.warmup_partition(partition, chunks));
-            }
-            join_all(futures)
-                .await
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()?;
-
-            self.db.table_ready(table.get_id(), true).await?;
-
-            Ok(table)
-        } else {
-            self.db
                 .create_table(
                     schema_name,
                     table_name,
@@ -232,8 +185,78 @@ impl SqlServiceImpl {
                     indexes_to_create,
                     true,
                 )
-                .await
+                .await;
         }
+
+        let listener = self.cluster.job_result_listener();
+        let table = self
+            .db
+            .create_table(
+                schema_name,
+                table_name,
+                columns_to_set,
+                locations,
+                Some(ImportFormat::CSV),
+                indexes_to_create,
+                false,
+            )
+            .await?;
+
+        if let Err(e) = self.finalize_external_table(&table, listener).await {
+            if let Err(inner) = self.db.drop_table(table.get_id()).await {
+                log::error!(
+                    "Drop table ({}) after error failed: {}",
+                    table.get_id(),
+                    inner
+                );
+            }
+            return Err(e);
+        }
+        Ok(table)
+    }
+
+    async fn finalize_external_table(
+        &self,
+        table: &IdRow<Table>,
+        listener: JobResultListener,
+    ) -> Result<(), CubeError> {
+        let wait_for = table
+            .get_row()
+            .locations()
+            .unwrap()
+            .iter()
+            .map(|&l| {
+                (
+                    RowKey::Table(TableId::Tables, table.get_id()),
+                    JobType::TableImportCSV(l.clone()),
+                )
+            })
+            .collect();
+        let imports = listener.wait_for_job_results(wait_for).await?;
+        for r in imports {
+            if let JobEvent::Error(_, _, e) = r {
+                return Err(CubeError::user(format!("Create table failed: {}", e)));
+            }
+        }
+
+        let mut futures = Vec::new();
+        let indexes = self.db.get_table_indexes(table.get_id()).await?;
+        let partitions = self
+            .db
+            .get_active_partitions_and_chunks_by_index_id_for_select(
+                indexes.iter().map(|i| i.get_id()).collect(),
+            )
+            .await?;
+        for (partition, chunks) in partitions.into_iter().flatten() {
+            futures.push(self.cluster.warmup_partition(partition, chunks));
+        }
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.db.table_ready(table.get_id(), true).await?;
+        Ok(())
     }
 
     async fn create_index(
@@ -510,14 +533,35 @@ impl SqlService for SqlServiceImpl {
                     QueryPlan::Meta(logical_plan) => {
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
-                    QueryPlan::Select(serialized) => {
+                    QueryPlan::Select(serialized, partitions) => {
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
                         timeout(
                             self.query_timeout,
                             self.cache
                                 .get(query, serialized, async move |plan| {
-                                    executor.execute_router_plan(plan, cluster).await
+                                    let records;
+                                    if partitions.len() == 0 {
+                                        records =
+                                            executor.execute_router_plan(plan, cluster).await?.1;
+                                    } else {
+                                        // Pick one of the workers to run as main for the request.
+                                        let i =
+                                            thread_rng().sample(Uniform::new(0, partitions.len()));
+                                        let node = cluster.node_name_by_partitions(&partitions[i]);
+                                        let rs = cluster.route_select(&node, plan).await?.1;
+                                        records = rs
+                                            .into_iter()
+                                            .map(|r| r.read())
+                                            .collect::<Result<Vec<_>, _>>()?;
+                                    }
+                                    Ok(tokio::task::spawn_blocking(
+                                        move || -> Result<DataFrame, CubeError> {
+                                            let df = batch_to_dataframe(&records)?;
+                                            Ok(df)
+                                        },
+                                    )
+                                    .await??)
                                 })
                                 .with_current_subscriber(),
                         )
@@ -543,7 +587,7 @@ impl SqlService for SqlServiceImpl {
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))
                     .await?;
                 match logical_plan {
-                    QueryPlan::Select(router_plan) => {
+                    QueryPlan::Select(router_plan, _) => {
                         // For tests, pretend we have all partitions on the same worker.
                         let worker_plan = router_plan.with_partition_id_to_execute(
                             router_plan
@@ -656,6 +700,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
+                        "hll_snowflake" => ColumnType::HyperLogLog(HllFlavour::Snowflake),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
@@ -713,10 +758,27 @@ fn parse_hyper_log_log<'a>(
     v: &'a Value,
     f: HllFlavour,
 ) -> Result<&'a [u8], CubeError> {
-    let bytes = parse_binary_string(buffer, v)?;
-    is_valid_hll(bytes, f)?;
-
-    return Ok(bytes);
+    match f {
+        HllFlavour::Snowflake => {
+            let str = if let Value::SingleQuotedString(str) = v {
+                str
+            } else {
+                return Err(CubeError::user(format!(
+                    "Single quoted string is expected but {:?} found",
+                    v
+                )));
+            };
+            let hll = HllSketch::read_snowflake(str)?;
+            *buffer = hll.write();
+            Ok(buffer)
+        }
+        f => {
+            assert!(f.imports_from_binary());
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_binary_hll_input(bytes, f)?;
+            Ok(bytes)
+        }
+    }
 }
 
 fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a [u8], CubeError> {
@@ -1343,7 +1405,9 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts_gcs() {
-        if env::var("SERVICE_ACCOUNT_JSON").is_err() {
+        if env::var("SERVICE_ACCOUNT_JSON").is_err()
+            && env::var("CUBESTORE_GCP_SERVICE_ACCOUNT_JSON").is_err()
+        {
             return;
         }
         Config::test("high_frequency_inserts_gcs")

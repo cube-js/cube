@@ -1,55 +1,57 @@
 <template>
-  <v-row>
-    <v-col cols="12" md="2" v-if="showFilters">
-      <v-select
-        label="Select Dimension or Measure"
-        outlined
-        hide-details
-        v-model="select"
-        :items="[...measures, ...dimensions]"
-      />
-    </v-col>
+  <div class="filter-container">
+    <v-row>
+      <template>
+        <v-col cols="2" class="mb-2" v-for="(filter, index) in filters" :key="index">
+          <div class="mx-auto filter-card">
+            <v-list-item>
+              <v-list-item-content>
+                <v-list-item-title>
+                  {{ filter['member']['title'] }}
+                  <v-icon @click="removeFilter(index, filter)">mdi-filter-remove-outline</v-icon>
+                </v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+          </div>
+        </v-col>
+      </template>
+    </v-row>
 
-    <v-col cols="12" md="2" v-if="select">
-      <v-select
-        label="Select action"
-        v-model="operator"
-        item-text="text"
-        item-value="value"
-        outlined
-        hide-details
-        :items="actionItems"
-      />
-    </v-col>
+    <v-row v-if="showFilters">
+      <v-col cols="12" md="2">
+        <v-select
+          label="Select Dimension or Measure"
+          outlined
+          hide-details
+          v-model="select"
+          :items="[...measures, ...dimensions]"
+        />
+      </v-col>
 
-    <v-col cols="12" md="2" v-if="operator">
-      <v-text-field label="Value" outlined hide-details v-model="value"></v-text-field>
-    </v-col>
+      <v-col cols="12" md="2" v-if="select">
+        <v-select
+          label="Select action"
+          v-model="operator"
+          item-text="text"
+          item-value="value"
+          outlined
+          hide-details
+          :items="actionItems"
+        />
+      </v-col>
 
-    <v-col cols="12" class="pa-0">
-      <div>
-        <template>
-          <v-col cols="2" class="mb-2" v-for="(filter, index) in filters" :key="index">
-            <div class="mx-auto filter-card">
-              <v-list-item>
-                <v-list-item-content>
-                  <v-list-item-title>
-                    {{ filter['member']['title'] }}
-                    <v-icon @click="removeFilter(index, filter)">mdi-filter-remove-outline</v-icon>
-                  </v-list-item-title>
-                </v-list-item-content>
-              </v-list-item>
-            </div>
-          </v-col>
-        </template>
-      </div>
-    </v-col>
+      <v-col cols="12" md="2" v-if="operator">
+        <v-text-field label="Value" outlined hide-details v-model="value"></v-text-field>
+      </v-col>
+    </v-row>
 
-    <v-col cols="12" class="d-flex flex-start pb-0 mt-2">
-      <v-btn v-if="select" color="primary" @click="save"> Save filter </v-btn>
-      <v-btn v-else color="primary" outlined @click="save"> Add filter </v-btn>
-    </v-col>
-  </v-row>
+    <v-row>
+      <v-col cols="12" class="d-flex flex-start pb-0 mt-2">
+        <v-btn v-if="select" color="primary" @click="save(false)"> Save filter </v-btn>
+        <v-btn v-else color="primary" outlined @click="save(true)"> Add filter </v-btn>
+      </v-col>
+    </v-row>
+  </div>
 </template>
 
 <script>
@@ -98,22 +100,30 @@ export default {
     showFilters: false,
   }),
   methods: {
-    save() {
-      if (!this.showFilters) {
-        this.showFilters = true;
-        return true;
+    save(showFilters) {
+      this.showFilters = Boolean(showFilters);
+
+      if (![this.select, this.operator, this.value].every((value) => value !== '' && value != null)) {
+        return;
       }
+
       this.dialog = false;
-      let newFilters = [
-        ...this.filters,
+      const newFilters = [
+        ...this.filters.map((filter) => ({
+          member: filter.member.name,
+          operator: filter.operator,
+          values: filter.values,
+        })),
         {
           member: this.select,
           operator: this.operator,
           values: [this.value],
         },
       ];
+
       this.setFilters(newFilters);
       this.clearFilter();
+      this.showFilters = false;
     },
     removeFilter(index) {
       this.filters.splice(index, 1);
@@ -128,3 +138,13 @@ export default {
   },
 };
 </script>
+<style scoped>
+.filter-card {
+  background: #f5f5f5;
+  border-radius: 3px;
+}
+
+.filter-container {
+  margin-top: 20px;
+}
+</style>

@@ -200,12 +200,18 @@ impl HttpServer {
                             message_id,
                             command,
                         },
-                        Err(e) => HttpMessage {
-                            message_id,
-                            command: HttpCommand::Error {
-                                error: e.to_string(),
-                            },
-                        },
+                        Err(e) => {
+                            log::error!(
+                                "Error processing HTTP command: {}\n",
+                                e.display_with_backtrace()
+                            );
+                            HttpMessage {
+                                message_id,
+                                command: HttpCommand::Error {
+                                    error: e.to_string(),
+                                },
+                            }
+                        }
                     };
                     if let Err(e) = sender.send(message).await {
                         error!("Send result channel error: {:?}", e);

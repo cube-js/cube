@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AvailableCube } from '@cubejs-client/react';
 import { Input, Menu as AntdMenu } from 'antd';
 import styled from 'styled-components';
-import Fuse from 'fuse.js';
+import FlexSearch from 'flexsearch';
 
 import ButtonDropdown from './ButtonDropdown';
 
@@ -31,134 +32,77 @@ const SearchMenuItem = styled(Menu.Item)`
     left: 0;
     bottom: -20px;
     height: 20px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 1),
+      rgba(255, 255, 255, 0)
+    );
   }
 `;
 
-function flattenMembers(members) {
-  const map = new Map();
+function getKeyTitle(members) {
+  const items: [string, string][] = [];
 
-  members.map((cube) =>
-    cube.members.forEach((member) => {
-      map.set(`${cube.cubeName}:${member.name}`, {
-        ...cube,
-        ...member,
-      });
+  members.forEach((cube) =>
+    cube.members.forEach(({ name, title }) => {
+      items.push([name, title]);
     })
   );
 
-  return Array.from(map.values());
+  return items;
 }
 
-function flattenedMembersByCube(members: any[]) {
-  return Object.values(
-    members
-      .sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1))
-      .reduce((memo, member) => {
-        const { cubeName, cubeTitle, ...memberProps } = member;
+function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
+  const cubeNames = keys.map((key) => key.split('.')[0]);
 
-        memo[member.cubeName] = {
-          cubeName,
-          cubeTitle,
-          members: [...(memo[member.cubeName]?.members || []), memberProps],
-        };
-
-        return memo;
-      }, {})
-  );
+  return members
+    .filter(({ cubeName }) => cubeNames.includes(cubeName))
+    .map((cube) => {
+      return {
+        ...cube,
+        members: cube.members.filter(({ name }) => keys.includes(name)),
+      };
+    });
 }
 
 // Can't be a Pure Component due to Dropdown lookups overlay component type to set appropriate styles
-function memberMenu(onClick, availableMembers) {
+function memberMenu(onClick, availableMembers: AvailableCube[]) {
+  const flexSearch = useRef(FlexSearch.create<string>({ encode: 'advanced' }));
   const [search, setSearch] = useState<string>('');
-  const [filteredMembers, setFilteredMembers] = useState<null | any[]>(null);
-  const [cubeMembers, setCubeMembers] = useState<null | any[]>(null);
-  const [flattenedMembers, setFlattendMembers] = useState<null | any[]>(null);
+  const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
+  const index = flexSearch.current;
   const hasMembers = availableMembers.some((cube) => cube.members.length > 0);
-  const [cubeName, memberName] = search.split('.');
-
-  const members =
-    filteredMembers != null
-      ? flattenedMembersByCube(filteredMembers)
-      : availableMembers;
 
   useEffect(() => {
-    setFlattendMembers(flattenMembers(availableMembers));
+    getKeyTitle(availableMembers).forEach(([name, title]) =>
+      index.add(name as any, title)
+    );
   }, [availableMembers]);
 
-  const fuse = useMemo(() => {
-    if (flattenedMembers) {
-      return new Fuse(flattenedMembers, {
-        keys: ['cubeTitle', 'shortTitle'],
-        threshold: 0.2,
-      });
-    }
-
-    return null;
-  }, [flattenedMembers]);
-
-  const cubeFuse = useMemo(() => {
-    if (flattenedMembers != null) {
-      return new Fuse(flattenedMembers, {
-        keys: ['cubeTitle'],
-        threshold: 0.2,
-      });
-    }
-
-    return null;
-  }, [flattenedMembers, memberName]);
-
-  const memberFuse = useMemo(() => {
-    if (cubeMembers != null && memberName !== undefined) {
-      return new Fuse(cubeMembers, {
-        keys: ['shortTitle'],
-        threshold: 0.2,
-      });
-    }
-
-    return null;
-  }, [cubeMembers, memberName]);
-
   useEffect(() => {
-    let currentFuse: Fuse<any> | null;
-    let searchValue = '';
+    let currentSearch = search;
 
-    if (memberName === undefined) {
-      currentFuse = fuse;
-      searchValue = search;
-    } else if (memberName === '') {
-      currentFuse = cubeFuse;
-      searchValue = cubeName;
-    } else {
-      currentFuse = memberFuse;
-      searchValue = memberName;
-    }
-
-    if (currentFuse && searchValue) {
-      const members = currentFuse
-        .search(searchValue)
-        .map(({ item }) => item)
-        .filter(Boolean);
-
-      setFilteredMembers(members);
-
-      if (memberName === '') {
-        setCubeMembers(members);
+    (async () => {
+      const results = await index.search(search);
+      if (currentSearch !== search) {
+        return;
       }
-    } else {
-      setFilteredMembers(null);
-    }
-  }, [search, cubeName, memberName, fuse, cubeFuse]);
 
-  useEffect(() => {
-    document.getElementById('member-dropdown-menu')?.scroll({
-      top: 0,
-    });
-  }, [search]);
+      setFilteredKeys(results);
+    })();
+
+    return () => {
+      currentSearch = '';
+    };
+  }, [index, search]);
+
+  const members = search
+    ? filterMembersByKeys(availableMembers, filteredKeys)
+    : availableMembers;
 
   return (
-    <Menu id="member-dropdown-menu">
+    <Menu>
       {hasMembers ? (
         <>
           <SearchMenuItem disabled>
@@ -187,7 +131,7 @@ function memberMenu(onClick, availableMembers) {
                     data-testid={m.name}
                     onClick={() => {
                       setSearch('');
-                      setFilteredMembers(null);
+                      setFilteredKeys([]);
                       onClick(m);
                     }}
                   >
@@ -205,7 +149,16 @@ function memberMenu(onClick, availableMembers) {
   );
 }
 
-const MemberDropdown = ({ onClick, availableMembers, ...buttonProps }: any) => (
+type MemberDropdownProps = {
+  availableMembers: AvailableCube[];
+  [key: string]: any;
+};
+
+const MemberDropdown = ({
+  availableMembers,
+  onClick,
+  ...buttonProps
+}: MemberDropdownProps) => (
   <ButtonDropdown
     overlay={memberMenu(onClick, availableMembers)}
     {...buttonProps}

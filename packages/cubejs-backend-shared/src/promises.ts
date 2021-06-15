@@ -1,9 +1,15 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
 import crypto from 'crypto';
 
+import { Optional } from './type-helpers';
+
+type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
+
 export interface CancelablePromise<T> extends Promise<T> {
-  cancel: (waitExecution?: boolean) => Promise<any>;
+  cancel: CancelablePromiseCancel;
 }
+
+export type MaybeCancelablePromise<T> = Optional<CancelablePromise<T>, 'cancel'>;
 
 export function pausePromise(ms: number): CancelablePromise<void> {
   let cancel: Function = () => {
@@ -27,7 +33,7 @@ export function pausePromise(ms: number): CancelablePromise<void> {
 class CancelToken {
   protected readonly deferred: (() => Promise<void>|void)[] = [];
 
-  protected readonly withQueue: (CancelablePromise<void>)[] = [];
+  protected readonly withQueue: CancelablePromiseCancel[] = [];
 
   protected canceled = false;
 
@@ -44,7 +50,7 @@ class CancelToken {
 
     if (this.withQueue.length) {
       await Promise.all(
-        this.withQueue.map((queued) => queued.cancel())
+        this.withQueue.map((cb) => cb())
       );
     }
   }
@@ -53,8 +59,10 @@ class CancelToken {
     this.deferred.push(fn);
   }
 
-  public async with(fn: CancelablePromise<void>) {
-    this.withQueue.push(fn);
+  public async with<T = any>(fn: MaybeCancelablePromise<T>): Promise<T> {
+    if (fn.cancel) {
+      this.withQueue.push(fn.cancel);
+    }
 
     return fn;
   }

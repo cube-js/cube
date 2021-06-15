@@ -1,7 +1,7 @@
 /* globals describe, test, expect, afterAll */
 import { QueryQueue } from '../../src/orchestrator/QueryQueue';
 
-const QueryQueueTest = (name, options) => {
+export const QueryQueueTest = (name: string, options?: any) => {
   describe(`QueryQueue${name}`, () => {
     let delayCount = 0;
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
@@ -142,8 +142,8 @@ const QueryQueueTest = (name, options) => {
     });
 
     test('queue driver lock obtain race condition', async () => {
-      const redisClient = await queue.queueDriver.createConnection();
-      const redisClient2 = await queue.queueDriver.createConnection();
+      const redisClient: any = await queue.queueDriver.createConnection();
+      const redisClient2: any = await queue.queueDriver.createConnection();
       const priority = 10;
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
@@ -241,7 +241,3 @@ const QueryQueueTest = (name, options) => {
     });
   });
 };
-
-QueryQueueTest('Local');
-
-module.exports = QueryQueueTest;

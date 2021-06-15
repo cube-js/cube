@@ -99,8 +99,7 @@ export class QueryOrchestrator {
     return {
       ...result,
       dataSource: queryBody.dataSource,
-      // 0 - no pre-agg was used
-      external: queryBody.external === 0 ? null : queryBody.external,
+      external: queryBody.external,
       usedPreAggregations
     };
   }
@@ -161,5 +160,37 @@ export class QueryOrchestrator {
 
   public async cleanup() {
     return this.queryCache.cleanup();
+  }
+
+  public async getPreAggregationVersionEntries(
+    preAggregations: { preAggregation: any, partitions: any[]}[],
+    preAggregationsSchema: string,
+    requestId: string,
+  ) {
+    const versionEntries = await Promise.all(
+      preAggregations.map(p => this.preAggregations.getPreAggregationVersionEntries(
+        {
+          ...p.preAggregation,
+          preAggregationsSchema
+        },
+        requestId
+      ))
+    );
+
+    const flatFn = (arrResult: any[], arrItem: any[]) => ([...arrResult, ...arrItem]);
+    const partitionsByTableName = preAggregations
+      .map(p => p.partitions)
+      .reduce(flatFn, [])
+      .reduce((obj, partition) => {
+        obj[partition.sql.tableName] = partition;
+        return obj;
+      }, {});
+
+    return versionEntries
+      .reduce(flatFn, [])
+      .filter((versionEntry) => {
+        const partition = partitionsByTableName[versionEntry.table_name];
+        return partition && versionEntry.structure_version === PreAggregations.structureVersion(partition.sql);
+      });
   }
 }

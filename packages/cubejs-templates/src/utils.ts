@@ -2,8 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import spawn from 'cross-spawn';
 import fetch from 'node-fetch';
-import HttpsProxyAgent from 'http-proxy-agent';
-import { exec } from 'child_process';
+import { getHttpAgentForProxySettings } from '@cubejs-backend/shared';
 
 export type File = {
   fileName: string;
@@ -59,32 +58,11 @@ export async function executeCommand(command, args, options = {}) {
   });
 }
 
-function getCommandOutput(command) {
-  return new Promise<string>((resolve, reject) => {
-    exec(command, (error, stdout) => {
-      if (error) {
-        reject(error.message);
-        return;
-      }
-      resolve(stdout);
-    });
-  });
-}
-
 export async function proxyFetch(url) {
-  const [proxy] = (
-    await Promise.all([getCommandOutput('npm config get https-proxy'), getCommandOutput('npm config get proxy')])
-  )
-    .map((s) => s.trim())
-    .filter((s) => !['null', 'undefined', ''].includes(s));
-
   return fetch(
     url,
-    proxy
-      ? {
-        // @ts-ignore
-        agent: new HttpsProxyAgent(proxy),
-      }
-      : {}
+    {
+      agent: await getHttpAgentForProxySettings(),
+    }
   );
 }

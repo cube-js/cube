@@ -7,7 +7,7 @@ import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
   DownloadTableCSVData,
-  DownloadTableMemoryData,
+  DownloadTableMemoryData, DriverInterface, IndexesSQL,
   StreamTableData,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
@@ -28,7 +28,7 @@ type Column = {
   name: string;
 };
 
-export class CubeStoreDriver extends BaseDriver {
+export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   protected readonly config: any;
 
   protected readonly connection: WebSocketConnection;
@@ -88,7 +88,7 @@ export class CubeStoreDriver extends BaseDriver {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: any) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL) {
     const indexes =
       indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
 
@@ -153,7 +153,7 @@ export class CubeStoreDriver extends BaseDriver {
     });
   }
 
-  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes) {
+  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string) {
     const writer = csvWriter({ headers: columns.map(c => c.name) });
     const gzipStream = createGzip();
     const tempFile = tempy.file();

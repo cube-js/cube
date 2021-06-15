@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import * as path from 'path';
 
 import { internalExceptions } from './errors';
+import { getHttpAgentForProxySettings } from './proxy';
 
 type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
 
@@ -70,7 +71,8 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   const request = new Request(url, {
     headers: new Headers({
       'Content-Type': 'application/octet-stream'
-    })
+    }),
+    agent: await getHttpAgentForProxySettings(),
   });
 
   const response = await fetch(request);

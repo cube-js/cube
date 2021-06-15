@@ -4,7 +4,7 @@ import {
   pluck, mergeAll, flatten,
 } from 'ramda';
 
-const TIME_SERIES = {
+export const TIME_SERIES = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
   month: (range) => range.snapTo('month').by('M').map(d => d.format('YYYY-MM-01T00:00:00.000')),
   year: (range) => range.snapTo('year').by('y').map(d => d.format('YYYY-01-01T00:00:00.000')),
@@ -35,14 +35,14 @@ const groupByToPairs = (keyFn) => {
   };
 };
 
-const dayRange = (from, to) => ({
+export const dayRange = (from, to) => ({
   by: (value) => {
     const results = [];
 
     let start = dayjs(from);
     const end = dayjs(to);
 
-    while (start.isBefore(end)) {
+    while (start.isBefore(end) || start.isSame(end)) {
       results.push(start);
       start = start.add(1, value);
     }

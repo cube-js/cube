@@ -1,6 +1,13 @@
+import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
+
 import { CacheDriverInterface } from './cache-driver.interface';
 
-const store = {};
+interface ItemBucket {
+  value: any,
+  exp: number,
+}
+
+const store: Record<string, ItemBucket> = {};
 
 export class LocalCacheDriver implements CacheDriverInterface {
   protected readonly store: Record<string, any>;
@@ -13,6 +20,7 @@ export class LocalCacheDriver implements CacheDriverInterface {
     if (this.store[key] && this.store[key].exp < new Date().getTime()) {
       delete this.store[key];
     }
+
     return this.store[key] && this.store[key].value;
   }
 
@@ -39,4 +47,34 @@ export class LocalCacheDriver implements CacheDriverInterface {
   public async testConnection(): Promise<void> {
     // Nothing to do
   }
+
+  public withLock = (
+    key: string,
+    cb: () => MaybeCancelablePromise<any>,
+    expiration: number = 60,
+    freeAfter: boolean = true,
+  ) => createCancelablePromise(async (tkn) => {
+    if (key in this.store) {
+      if (this.store[key].exp < new Date().getTime()) {
+        delete this.store[key];
+      }
+
+      return false;
+    }
+
+    try {
+      this.store[key] = {
+        value: Math.random(),
+        exp: new Date().getTime() + expiration * 1000
+      };
+
+      await tkn.with(cb());
+
+      return true;
+    } finally {
+      if (freeAfter) {
+        delete this.store[key];
+      }
+    }
+  });
 }

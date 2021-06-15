@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.27.24",
+  "version": "0.27.32",
   "engines": {},
   "repository": {
     "type": "git",
@@ -19,7 +19,7 @@
     "dayjs": "^1.10.4",
     "ramda": "^0.27.0",
     "url-search-params-polyfill": "^7.0.0",
-    "uuid": "^3.4.0"
+    "uuid": "^8.3.2"
   },
   "scripts": {
     "test": "npm run unit",

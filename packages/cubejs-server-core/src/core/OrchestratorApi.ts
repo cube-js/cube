@@ -1,22 +1,36 @@
 /* eslint-disable no-throw-literal */
 import pt from 'promise-timeout';
-import { QueryOrchestrator, ContinueWaitError } from '@cubejs-backend/query-orchestrator';
+import { QueryOrchestrator, ContinueWaitError, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeFn } from './types';
+import { DbTypeFn, ExternalDbTypeFn, RequestContext } from './types';
+
+interface OrchestratorApiOptions {
+  externalDriverFactory: DriverFactoryByDataSource;
+  contextToDbType: DbTypeFn;
+  contextToExternalDbType: ExternalDbTypeFn;
+  continueWaitTimeout?: number;
+  redisPrefix?: string;
+}
 
 export class OrchestratorApi {
-  private seenDataSources: { [dataSource: string]: boolean } = {};
+  private seenDataSources: Record<string, boolean> = {};
 
   protected readonly orchestrator: QueryOrchestrator;
 
-  protected readonly externalDriverFactory: any;
+  protected readonly externalDriverFactory: DriverFactoryByDataSource;
 
   protected readonly continueWaitTimeout: number;
 
   protected readonly contextToDbType: DbTypeFn;
 
-  public constructor(protected driverFactory, protected logger, protected options: any = {}) {
-    const { externalDriverFactory, contextToDbType } = options;
+  protected readonly contextToExternalDbType: ExternalDbTypeFn;
+
+  public constructor(
+    protected driverFactory: DriverFactoryByDataSource,
+    protected logger,
+    protected readonly options: OrchestratorApiOptions
+  ) {
+    const { externalDriverFactory, contextToDbType, contextToExternalDbType } = options;
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
 
     this.orchestrator = new QueryOrchestrator(
@@ -29,6 +43,7 @@ export class OrchestratorApi {
     this.driverFactory = driverFactory;
     this.externalDriverFactory = externalDriverFactory;
     this.contextToDbType = contextToDbType;
+    this.contextToExternalDbType = contextToExternalDbType;
     this.logger = logger;
   }
 
@@ -65,14 +80,23 @@ export class OrchestratorApi {
         })
       );
 
+      const extractExternalDbType = (response) => (
+        this.contextToExternalDbType({
+          ...query.context,
+          dataSource: response.dataSource,
+        })
+      );
+
       if (Array.isArray(data)) {
         return data.map((item) => ({
           ...item,
-          dbType: extractDbType(item)
+          dbType: extractDbType(item),
+          extDbType: extractExternalDbType(item)
         }));
       }
 
       data.dbType = extractDbType(data);
+      data.extDbType = extractExternalDbType(data);
 
       return data;
     } catch (err) {
@@ -126,7 +150,7 @@ export class OrchestratorApi {
     return this.orchestrator.testConnections();
   }
 
-  public async testDriverConnection(driverFn, dataSource: string = 'default') {
+  public async testDriverConnection(driverFn: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       await driver.testConnection();
@@ -152,5 +176,13 @@ export class OrchestratorApi {
 
   public addDataSeenSource(dataSource) {
     this.seenDataSources[dataSource] = true;
+  }
+
+  public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema) {
+    return this.orchestrator.getPreAggregationVersionEntries(
+      preAggregations,
+      preAggregationsSchema,
+      context.requestId
+    );
   }
 }

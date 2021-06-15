@@ -93,7 +93,7 @@ export interface JWTOptions {
   claimsNamespace?: string,
 }
 
-export type QueryTransformerFn = (query: Query, context: RequestContext) => Promise<Query>;
+export type QueryRewriteFn = (query: Query, context: RequestContext) => Promise<Query>;
 
 // @deprecated
 export type CheckAuthMiddlewareFn = (req: Request, res: ExpressResponse, next: ExpressNextFunction) => void;

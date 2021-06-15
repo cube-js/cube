@@ -324,7 +324,7 @@ export class CubejsServerCore {
     const definedExtDBVariables = skipOnEnv.filter((field) => process.env[field] !== undefined);
 
     const externalDbType = opts.externalDbType ||
-      <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE ||
+      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE ||
       (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
@@ -463,7 +463,7 @@ export class CubejsServerCore {
     }
 
     // Create schema directory to protect error on new project with dev mode (docker flow)
-    if (options.devServer && !this.configFileExists()) {
+    if (options.devServer) {
       const repositoryPath = path.join(process.cwd(), options.schemaPath);
 
       if (!fs.existsSync(repositoryPath)) {
@@ -588,13 +588,13 @@ export class CubejsServerCore {
         basePath: this.options.basePath,
         checkAuthMiddleware: this.options.checkAuthMiddleware,
         checkAuth: this.options.checkAuth,
-        queryTransformer: this.options.queryTransformer,
+        queryRewrite: this.options.queryRewrite || this.options.queryTransformer,
         extendContext: this.options.extendContext,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
-        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones
+        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
       }
     );
   }
@@ -646,6 +646,8 @@ export class CubejsServerCore {
 
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
     let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
+
+    const externalDbType = this.contextToExternalDbType(context);
 
     const orchestratorApi = this.createOrchestratorApi({
       getDriver: async (dataSource = 'default') => {
@@ -707,7 +709,12 @@ export class CubejsServerCore {
         })();
       }),
       redisPrefix: orchestratorId,
-      orchestratorOptions: this.orchestratorOptions(context)
+      orchestratorOptions: {
+        skipExternalCacheAndQueue: externalDbType === 'cubestore',
+        ...this.options.orchestratorOptions,
+        // OrchestratorOptionsFn should have an ability to override static configuration form cube.js file
+        ...this.orchestratorOptions(context),
+      }
     });
 
     this.orchestratorStorage.set(orchestratorId, orchestratorApi);
@@ -739,8 +746,9 @@ export class CubejsServerCore {
       {
         redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
         externalDriverFactory: options.getExternalDriverFactory,
-        ...(options.orchestratorOptions || this.options.orchestratorOptions),
-        contextToDbType: this.contextToDbType.bind(this)
+        ...options.orchestratorOptions,
+        contextToDbType: this.contextToDbType.bind(this),
+        contextToExternalDbType: this.contextToExternalDbType.bind(this),
       }
     );
   }

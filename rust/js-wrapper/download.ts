@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-syntax */
-import { downloadAndExtractFile } from '@cubejs-backend/shared';
+import { downloadAndExtractFile, getHttpAgentForProxySettings } from '@cubejs-backend/shared';
 import process from 'process';
 import { Octokit } from '@octokit/core';
 import * as path from 'path';
@@ -17,7 +17,11 @@ export function getBinaryPath() {
 }
 
 async function fetchRelease(version: string) {
-  const client = new Octokit();
+  const client = new Octokit({
+    request: {
+      agent: await getHttpAgentForProxySettings(),
+    }
+  });
 
   const { data } = await client.request('GET /repos/{owner}/{repo}/releases/tags/{tag}', {
     owner: 'cube-js',

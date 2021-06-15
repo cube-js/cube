@@ -13,7 +13,7 @@ on:
 
 jobs:
   cli:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -67,7 +67,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -126,7 +126,7 @@ jobs:
         browser: [chrome]
         include:
           - browser: chrome
-            os: ubuntu-latest
+            os: ubuntu-20.04
             container: cypress/browsers:node12.18.3-chrome89-ff86
     steps:
       - name: Checkout

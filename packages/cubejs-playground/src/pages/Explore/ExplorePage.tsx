@@ -1,102 +1,73 @@
-import { CubeProvider } from '@cubejs-client/react';
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useHistory } from 'react-router';
-import { fetch } from 'whatwg-fetch';
 
-import DashboardSource from '../../DashboardSource';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
-import PlaygroundQueryBuilder from '../../PlaygroundQueryBuilder';
+import { useSecurityContext } from '../../hooks';
+import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
+import { useAppContext } from '../../components/AppContext';
 
-type TPlaygroundContext = {
-  apiUrl: string;
-  cubejsToken: string;
-  basePath: string;
-  livePreview?: boolean;
-};
-
-type TLivePreviewContext = {
+type LivePreviewContext = {
   apiUrl: string;
   token: string;
 };
 
-export default function ExplorePage() {
-  const dashboardSource = useMemo(() => new DashboardSource(), []);
+export function buildApiUrl(
+  apiUrl: string,
+  basePath: string = '/cubejs-api'
+): string {
+  return `${apiUrl}${basePath}/v1`;
+}
 
-  const { push, location } = useHistory();
+export function ExplorePage() {
+  const { push } = useHistory();
+
+  const { playgroundContext } = useAppContext();
   const { token } = useSecurityContext();
+  const [livePreviewContext, setLivePreviewContext] =
+    useState<LivePreviewContext | null>(null);
 
   const [schemaVersion, updateSchemaVersion] = useState<number>(0);
-  const [apiUrl, setApiUrl] = useState<string | null>(null);
-  const [
-    playgroundContext,
-    setPlaygroundContext,
-  ] = useState<TPlaygroundContext | null>(null);
-  const [
-    livePreviewContext,
-    setLivePreviewContext,
-  ] = useState<TLivePreviewContext | null>(null);
+  const [apiUrl, setApiUrl] = useState<string>('');
 
-  const currentToken =
-    livePreviewContext?.token || token || playgroundContext?.cubejsToken;
+  useEffect(() => {
+    if (playgroundContext && livePreviewContext === null) {
+      setDefaultApiUrl();
+    }
+  }, [playgroundContext, livePreviewContext]);
 
-  const cubejsApi = useCubejsApi(apiUrl, currentToken);
+  function setDefaultApiUrl() {
+    setApiUrl(
+      buildApiUrl(
+        playgroundContext?.apiUrl ||
+          window.location.href.split('#')[0].replace(/\/$/, ''),
+        playgroundContext?.basePath
+      )
+    );
+  }
 
-  const changeApiUrl = (apiUrl, basePath = '/cubejs-api') => {
-    setApiUrl(`${apiUrl}${basePath}/v1`);
-  };
-
-  const fetchPlaygroundContext = async () => {
-    const res = await fetch('/playground/context');
-    const result = await res.json();
-    setPlaygroundContext(result);
-  };
-
-  const handleChangeLivePreview = ({ token, apiUrl }) => {
+  function handleChangeLivePreview({
+    token,
+    apiUrl,
+  }: {
+    token: string | null;
+    apiUrl: string | null;
+  }) {
     if (token && apiUrl) {
       setLivePreviewContext({
         token,
         apiUrl,
       });
-      changeApiUrl(apiUrl, playgroundContext?.basePath);
+      setApiUrl(buildApiUrl(apiUrl, playgroundContext?.basePath));
     } else {
-      setApiUrl(null);
       setLivePreviewContext(null);
+      setDefaultApiUrl();
     }
 
     updateSchemaVersion((value) => value + 1);
-  };
-
-  useEffect(() => {
-    fetchPlaygroundContext();
-  }, []);
-
-  useLayoutEffect(() => {
-    if (apiUrl && currentToken) {
-      window['__cubejsPlayground'] = {
-        ...window['__cubejsPlayground'],
-        apiUrl,
-        token: currentToken,
-      };
-    }
-  }, [currentToken, apiUrl]);
-
-  useLayoutEffect(() => {
-    if (playgroundContext && livePreviewContext === null) {
-      changeApiUrl(
-        playgroundContext.apiUrl ||
-          window.location.href.split('#')[0].replace(/\/$/, ''),
-        playgroundContext.basePath
-      );
-    }
-  }, [playgroundContext, livePreviewContext]);
-
-  if (!cubejsApi || !apiUrl) {
-    return null;
   }
 
-  const params = new URLSearchParams(location.search);
-  const query = JSON.parse(params.get('query') || '{}');
+  const currentToken =
+    livePreviewContext?.token || token || playgroundContext?.cubejsToken;
 
   return (
     <LivePreviewContextProvider
@@ -105,18 +76,14 @@ export default function ExplorePage() {
       }
       onChange={handleChangeLivePreview}
     >
-      <CubeProvider cubejsApi={cubejsApi}>
-        <PlaygroundQueryBuilder
-          defaultQuery={query}
-          apiUrl={apiUrl}
-          cubejsToken={currentToken as string}
-          dashboardSource={dashboardSource}
-          schemaVersion={schemaVersion}
-          onVizStateChanged={({ query }) =>
-            push(`/build?query=${JSON.stringify(query)}`)
-          }
-        />
-      </CubeProvider>
+      <QueryBuilderContainer
+        apiUrl={apiUrl}
+        token={currentToken}
+        schemaVersion={schemaVersion}
+        onVizStateChanged={({ query }) =>
+          push(`/build?query=${JSON.stringify(query)}`)
+        }
+      />
     </LivePreviewContextProvider>
   );
 }

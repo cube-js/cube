@@ -1,11 +1,11 @@
 import styled from 'styled-components';
-import { Button, Modal, Space, Typography } from 'antd';
+import { Alert, Button, Modal, Space, Typography } from 'antd';
 import { useState } from 'react';
-import { TransformedQuery } from '@cubejs-client/core';
 import Icon from '@ant-design/icons';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { PreAggregationHelper } from './PreAggregationHelper';
+import { QueryStatus } from './PlaygroundQueryBuilder';
 
 const Badge = styled.div`
   display: flex;
@@ -15,15 +15,14 @@ const Badge = styled.div`
   background: var(--warning-bg-color);
 `;
 
-type PreAggregationStatusProps = {
-  timeElapsed: number;
-  isAggregated: boolean;
-  transformedQuery?: TransformedQuery;
-};
+type PreAggregationStatusProps = QueryStatus;
 
 export function PreAggregationStatus({
   isAggregated,
   transformedQuery,
+  external,
+  extDbType,
+  preAggregationType,
 }: PreAggregationStatusProps) {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   // hide it for the time being
@@ -56,6 +55,26 @@ export function PreAggregationStatus({
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
         )}
+
+        {external && extDbType !== 'cubestore' ? (
+          <Alert
+            message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets"
+            type="warning"
+          />
+        ) : null}
+
+        {!external && preAggregationType !== 'originalSql' ? (
+          <Alert
+            message={
+              <>
+                For optimized performance, consider using <b>external</b>{' '}
+                {preAggregationType} pre-aggregation, rather than the source
+                database (internal)
+              </>
+            }
+            type="warning"
+          />
+        ) : null}
       </Space>
 
       <Modal

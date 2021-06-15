@@ -2,6 +2,8 @@ require('dotenv').config({
   path: `.env.${process.env.NODE_ENV}`,
 });
 
+const PACKAGE_VERSION = require('../lerna.json').version;
+
 const config = {
   siteMetadata: {
     title: 'Cube.js Docs',
@@ -78,6 +80,15 @@ const config = {
               maxWidth: 1150,
               wrapperStyle: 'margin-bottom: 24px'
             }
+          },
+          {
+            resolve: 'gatsby-remark-find-replace',
+            options: {
+              replacements: {
+                CURRENT_VERSION: PACKAGE_VERSION,
+              },
+              prefix: '%',
+            },
           },
           {
             resolve: 'gatsby-remark-custom-blocks',

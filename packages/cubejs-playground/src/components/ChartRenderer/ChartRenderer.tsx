@@ -9,8 +9,7 @@ import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
 import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
-import { QueryStatus } from '../../PlaygroundQueryBuilder';
-import { useAppContext } from '../AppContext';
+import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 
 const { Text } = Typography;
 
@@ -67,13 +66,14 @@ const Wrapper = styled.div`
   text-align: center;
 `;
 
-export type TQueryLoadResult = {
+export type QueryLoadResult = {
   isLoading: boolean;
   resultSet?: ResultSet;
   error?: Error | null;
 } & Partial<QueryStatus>;
 
-type TChartRendererProps = {
+type ChartRendererProps = {
+  queryId: string;
   query: Query;
   queryError: Error | null;
   isQueryLoading: boolean;
@@ -84,12 +84,13 @@ type TChartRendererProps = {
   pivotConfig?: PivotConfig;
   iframeRef: RefObject<HTMLIFrameElement>;
   framework: UIFramework;
-  onQueryStatusChange: (result: TQueryLoadResult) => void;
+  onQueryStatusChange: (result: QueryLoadResult) => void;
   onChartRendererReadyChange: (isReady: boolean) => void;
   onRunButtonClick: () => void;
 };
 
 export default function ChartRenderer({
+  queryId,
   areQueriesEqual,
   queryError,
   iframeRef,
@@ -100,14 +101,12 @@ export default function ChartRenderer({
   onChartRendererReadyChange,
   onQueryStatusChange,
   onRunButtonClick,
-}: TChartRendererProps) {
+}: ChartRendererProps) {
   const runButtonRef = useRef<HTMLButtonElement>(null);
   const [slowQuery, setSlowQuery] = useState(false);
   const [resultSetExists, setResultSet] = useState(false);
   const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
   const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
-
-  const { extDbType } = useAppContext();
 
   // for you, ovr :)
   useHotkeys('cmd+enter', () => {
@@ -133,19 +132,24 @@ export default function ChartRenderer({
         queryStartTime = Date.now();
         onQueryStatusChange({ isLoading: true });
       },
-      onQueryLoad: ({ resultSet, error }: TQueryLoadResult) => {
+      onQueryLoad: ({ resultSet, error }: QueryLoadResult) => {
         let isAggregated;
         const timeElapsed = Date.now() - queryStartTime;
 
         if (resultSet) {
           const { loadResponse } = resultSet.serialize();
-          const { external, dbType } = loadResponse.results[0] || {};
+          const {
+            external,
+            dbType,
+            extDbType,
+            usedPreAggregations = {},
+          } = loadResponse.results[0] || {};
 
           setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
           Boolean(loadResponse.slowQuery) && setSlowQuery(false);
           setResultSet(true);
 
-          isAggregated = external !== null;
+          isAggregated = Object.keys(usedPreAggregations).length > 0;
 
           event(
             isAggregated
@@ -165,7 +169,7 @@ export default function ChartRenderer({
             error,
             isLoading: false,
             timeElapsed,
-            isAggregated
+            isAggregated,
           });
         }
       },
@@ -185,12 +189,10 @@ export default function ChartRenderer({
         onChartRendererReadyChange(true);
       },
     };
-  }, [framework, onChartRendererReadyChange]);
+  }, [framework]);
 
   const loading: boolean =
-    queryHasMissingMembers ||
-    isQueryLoading ||
-    isPreAggregationBuildInProgress;
+    queryHasMissingMembers || isQueryLoading || isPreAggregationBuildInProgress;
 
   const invisible: boolean =
     !isChartRendererReady ||
@@ -278,6 +280,7 @@ export default function ChartRenderer({
 
       <ChartContainer invisible={invisible}>
         <iframe
+          id={`iframe-${queryId}`}
           data-testid="chart-renderer"
           ref={iframeRef}
           title="Chart renderer"

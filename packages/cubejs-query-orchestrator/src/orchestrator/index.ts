@@ -13,3 +13,4 @@ export * from './IORedisFactory';
 export * from './RedisPool';
 export * from './RedisQueueDriver';
 export * from './TimeoutError';
+export * from './DriverFactory';

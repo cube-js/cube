@@ -19,7 +19,7 @@ your specific case. The options are:
 - `driverFactory`
 - `repositoryFactory`
 - `preAggregationsSchema`
-- `queryTransformer`
+- `queryRewrite`
 
 All of the above options are functions, which you provide to Cube.js in the
 [`cube.js` configuration file][ref-config]. The functions accept one argument -
@@ -150,14 +150,14 @@ cube(`Products`, {
 });
 ```
 
-### Security Context vs queryTransformer
+### Security Context vs queryRewrite
 
 [`SECURITY_CONTEXT`][ref-cube-security-ctx] is great for use cases where you
 want to get explicit control over filtering of underlying data seen by users.
 However for use cases where you want to reuse pre-aggregation tables for
 different users or even tenants, using
-[`queryTransformer`][ref-config-query-transform] is a much better choice.
-[`queryTransformer`][ref-config-query-transform] is also very convenient way of
+[`queryRewrite`][ref-config-query-rewrite] is a much better choice.
+[`queryRewrite`][ref-config-query-rewrite] is also very convenient way of
 enforcing row level security by means of join logic defined in your cubes
 instead of embedding [`SECURITY_CONTEXT`][ref-cube-security-ctx] filtering
 boilerplate into each cube. Together with
@@ -168,7 +168,7 @@ set for each tenant.
 ## Same DB Instance with per Tenant Row Level Security
 
 Per tenant row-level security can be achieved by configuring
-[`queryTransformer`][ref-config-query-transform], which adds a tenant identifier
+[`queryRewrite`][ref-config-query-rewrite], which adds a tenant identifier
 filter to the original query. It uses the
 [`securityContext`][ref-config-security-ctx] to determine which tenant is
 requesting data. This way, every tenant starts to see their own data. However,
@@ -179,7 +179,7 @@ tenants.
 
 ```javascript
 module.exports = {
-  queryTransformer: (query, { securityContext }) => {
+  queryRewrite: (query, { securityContext }) => {
     const user = securityContext;
     if (user.id) {
       query.filters.push({
@@ -415,7 +415,7 @@ maximum number of Redis connections **per-tenant**.
 [ref-config-ctx-to-appid]: /config#options-reference-context-to-app-id
 [ref-config-ctx-to-orch-id]:
   /config#options-reference-context-to-orchestrator-id
-[ref-config-query-transform]: /config#options-reference-query-transformer
+[ref-config-query-rewrite]: /config#options-reference-query-rewrite
 [ref-config-refresh-ctx]: /config#options-reference-scheduled-refresh-contexts
 [ref-config-refresh-tz]: /config#options-reference-scheduled-refresh-time-zones
 [ref-config-security-ctx]: /config#request-context-security-context

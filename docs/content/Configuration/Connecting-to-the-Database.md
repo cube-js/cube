@@ -23,6 +23,7 @@ Cube.js currently provides connectors to the following databases:
 | Oracle                                 | `oracle`        |
 | Apache Druid                           | `druid`         |
 | SQLite                                 | `sqlite`        |
+| Elasticsearch                          | `elasticsearch` |
 
 <!-- prettier-ignore-start -->
 [[info | ]]
@@ -61,6 +62,7 @@ databases:
 | Druid                                                  | `CUBEJS_DB_URL`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`, `CUBEJS_DB_SSL`                                                                                                                                                                                                                                                                                 |
 | SQLite                                                 | `CUBEJS_DB_NAME`                                                                                                                                                                                                                                                                                                                                     |
 | Databricks                                             | `CUBEJS_DB_NAME`, `CUBEJS_DB_DATABRICKS_URL`                                                                                                                                                                                                                                                                                                         |
+| Elasticsearch                                          | `CUBEJS_DB_URL`, `CUBEJS_DB_ELASTIC_QUERY_FORMAT`,`CUBEJS_DB_ELASTIC_OPENDISTRO` ,`CUBEJS_DB_ELASTIC_APIKEY_ID`,`CUBEJS_DB_ELASTIC_APIKEY_KEY`                                                                                                                                                                                                       |
 
 ## Multiple Databases
 
@@ -270,6 +272,12 @@ CUBEJS_DB_NAME=default
 # You can find it inside specific cluster configuration
 CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token;PWD=XXXXX
 ```
+
+### Elasticsearch
+
+To connect to a Elasticsearch database, use `CUBEJS_DB_URL` with the username
+and password embedded in the URL, if required. If you're not using Elastic
+Cloud, you **must** specify `CUBEJS_DB_ELASTIC_QUERY_FORMAT`.
 
 [link-java-guide]:
   https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation

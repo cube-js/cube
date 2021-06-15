@@ -5,30 +5,33 @@ import styled from 'styled-components';
 import GlobalStyles from '../components/GlobalStyles';
 import {
   SecurityContextProvider,
-  TSecurityContextContextProps,
+  SecurityContextContextProps,
 } from '../components/SecurityContext/SecurityContextProvider';
+import { AppContextProvider } from '../components/AppContext';
 
 const StyledWrapper = styled.div`
   background-color: var(--layout-body-background);
   min-height: 100vh;
 `;
 
-type TPlaygroundWrapperProps = {
-  tokenKey?: string;
+type PlaygroundWrapperProps = {
+  identifier?: string;
   children: ReactNode;
-} & Pick<TSecurityContextContextProps, 'getToken'>;
+} & Pick<SecurityContextContextProps, 'getToken'>;
 
 export default function PlaygroundWrapper({
-  tokenKey,
+  identifier,
   getToken,
   children,
-}: TPlaygroundWrapperProps) {
+}: PlaygroundWrapperProps) {
   return (
     <StyledWrapper>
       <BrowserRouter>
-        <SecurityContextProvider tokenKey={tokenKey} getToken={getToken}>
-          {children}
-        </SecurityContextProvider>
+        <AppContextProvider identifier={identifier}>
+          <SecurityContextProvider getToken={getToken}>
+            {children}
+          </SecurityContextProvider>
+        </AppContextProvider>
 
         <GlobalStyles />
       </BrowserRouter>

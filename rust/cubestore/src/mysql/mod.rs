@@ -64,7 +64,11 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             )
             .await;
         if let Err(e) = res {
-            error!("Error during processing {}: {}", query, e.message);
+            error!(
+                "Error during processing {}: {}",
+                query,
+                e.display_with_backtrace()
+            );
             results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
             return Ok(());
         }

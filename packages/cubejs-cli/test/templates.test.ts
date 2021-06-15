@@ -22,7 +22,8 @@ CUBEJS_WEB_SOCKETS=true
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
-CUBEJS_EXTERNAL_DEFAULT=true`;
+CUBEJS_EXTERNAL_DEFAULT=true
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
 });
@@ -38,7 +39,8 @@ CUBEJS_WEB_SOCKETS=true
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
-CUBEJS_EXTERNAL_DEFAULT=true`;
+CUBEJS_EXTERNAL_DEFAULT=true
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
 });
@@ -55,7 +57,8 @@ CUBEJS_JDBC_DRIVER=athena
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
-CUBEJS_EXTERNAL_DEFAULT=true`;
+CUBEJS_EXTERNAL_DEFAULT=true
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
 });

@@ -56,7 +56,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
-    ) -> Result<DataFrame, CubeError>;
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
     async fn execute_worker_plan(
         &self,
@@ -89,7 +89,7 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
-    ) -> Result<DataFrame, CubeError> {
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
@@ -127,8 +127,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 &split_plan
             );
         }
-        let data_frame = tokio::task::spawn_blocking(|| batch_to_dataframe(&results?)).await??;
-        Ok(data_frame)
+        Ok((split_plan.schema().to_schema_ref(), results?))
     }
 
     #[instrument(level = "trace", skip(self, plan, remote_to_local_names))]
@@ -537,8 +536,20 @@ impl ClusterSendExec {
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
     ) -> Self {
-        let to_multiply = union_snapshots
-            .into_iter()
+        let partitions = ClusterSendExec::execution_partitions(&union_snapshots);
+        Self {
+            schema,
+            partitions,
+            cluster,
+            serialized_plan,
+            input_for_optimizations,
+            use_streaming,
+        }
+    }
+
+    pub fn execution_partitions(snapshots: &[Vec<IndexSnapshot>]) -> Vec<Vec<IdRow<Partition>>> {
+        let to_multiply = snapshots
+            .iter()
             .map(|union| {
                 union
                     .iter()
@@ -550,14 +561,7 @@ impl ClusterSendExec {
             .into_iter()
             .multi_cartesian_product()
             .collect::<Vec<Vec<_>>>();
-        Self {
-            schema,
-            partitions,
-            cluster,
-            serialized_plan,
-            input_for_optimizations,
-            use_streaming,
-        }
+        partitions
     }
 
     pub fn with_changed_schema(
