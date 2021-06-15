@@ -716,12 +716,8 @@ export class ApiGateway {
         type: 'Load Request Success',
         query,
         duration: this.duration(requestStarted),
-        usedPreAggregations: results.every(
-          (r: any) => r.usedPreAggregations && Object.keys(r.usedPreAggregations).length
-        ),
-        dataIsEmpty: results.every(
-          (r: any) => !r.data || !r.data.length
-        )
+        queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length).length,
+        queriesWithData: results.filter((r: any) => r.data && r.data.length).length
       }, context);
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
