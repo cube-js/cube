@@ -38,8 +38,7 @@ export function ExplorePage() {
   function setDefaultApiUrl() {
     setApiUrl(
       buildApiUrl(
-        playgroundContext?.apiUrl ||
-          window.location.href.split('#')[0].replace(/\/$/, ''),
+        window.location.href.split('#')[0].replace(/\/$/, ''),
         playgroundContext?.basePath
       )
     );

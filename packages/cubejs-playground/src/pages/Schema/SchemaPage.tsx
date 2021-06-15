@@ -275,7 +275,10 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
           {selectedFile ? (
             <PrismCode
               code={this.selectedFileContent()}
-              style={{ padding: 0, marginTop: 24 }}
+              style={{
+                padding: 0,
+                marginTop: 24,
+              }}
             />
           ) : (
             <Empty
@@ -285,7 +288,9 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
           )}
 
           <AppContextConsumer
-            onReady={({ isDocker }) => this.setState({ isDocker })}
+            onReady={({ playgroundContext }) =>
+              this.setState({ isDocker: playgroundContext?.isDocker })
+            }
           />
         </Content>
       </Layout>
