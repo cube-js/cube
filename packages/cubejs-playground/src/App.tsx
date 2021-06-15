@@ -4,7 +4,7 @@ import '@ant-design/compatible/assets/index.css';
 import { Layout, Alert } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { RouteComponentProps, withRouter } from 'react-router';
-import styled from "styled-components";
+import styled from 'styled-components';
 
 import Header from './components/Header';
 import GlobalStyles from './components/GlobalStyles';
@@ -16,7 +16,7 @@ import {
   setTelemetry,
   trackImpl,
 } from './events';
-import { useAppContext } from './components/AppContext';
+import { PlaygroundContext, useAppContext } from './components/AppContext';
 import './index.less';
 
 const selectedTab = (pathname) => {
@@ -29,25 +29,11 @@ const selectedTab = (pathname) => {
 
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
-  
+
   & > div {
     background: var(--layout-body-background);
   }
-`
-
-export type PlaygroundContext = {
-  anonymousId: string;
-  apiUrl: string;
-  cubejsToken: string;
-  basePath: string;
-  isDocker: boolean;
-  extDbType: string | null;
-  dbType: string;
-  telemetry: boolean;
-  shouldStartConnectionWizardFlow: boolean;
-  dockerVersion: string | null;
-  livePreview?: boolean;
-};
+`;
 
 type AppState = {
   fatalError: Error | null;

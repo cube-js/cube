@@ -6,10 +6,26 @@ import {
   useState,
 } from 'react';
 
-import { PlaygroundContext } from '../App';
+export type PlaygroundContext = {
+  anonymousId: string;
+  cubejsToken: string;
+  basePath: string;
+  isDocker: boolean;
+  extDbType: string | null;
+  dbType: string;
+  telemetry: boolean;
+  shouldStartConnectionWizardFlow: boolean;
+  dockerVersion: string | null;
+  livePreview?: boolean;
+};
+
+export type SystemContext = {
+  basePath: string;
+  isDocker: boolean;
+  dockerVersion: string | null;
+}
 
 export type ContextProps = {
-  isDocker?: boolean;
   identifier?: string | null;
   playgroundContext?: PlaygroundContext;
   setContext: (context: Partial<ContextProps> | null) => void;

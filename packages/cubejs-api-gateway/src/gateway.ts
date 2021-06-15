@@ -225,7 +225,7 @@ export class ApiGateway {
     protected readonly compilerApi: any,
     protected readonly adapterApi: any,
     protected readonly logger: any,
-    options: ApiGatewayOptions,
+    protected readonly options: ApiGatewayOptions,
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
