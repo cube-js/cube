@@ -66,7 +66,7 @@ const checkEnvForPlaceholders = () => {
 export type ServerCoreInitializedOptions = Required<
   CreateOptions,
   // This fields are required, because we add default values in constructor
-  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'logger' | 'dashboardAppPath' | 'dashboardAppPort' |
+  'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'dashboardAppPath' | 'dashboardAppPort' |
   'driverFactory' | 'dialectFactory' |
   'externalDriverFactory' | 'externalDialectFactory' |
   'scheduledRefreshContexts'
@@ -101,7 +101,7 @@ export class CubejsServerCore {
 
   protected readonly orchestratorOptions: OrchestratorOptionsFn;
 
-  public logger: (type: string, params: Record<string, any>) => void;
+  public logger: LoggerFn;
 
   protected preAgentLogger: any;
 
@@ -128,9 +128,15 @@ export class CubejsServerCore {
   public coreServerVersion: string|null = null;
 
   public constructor(opts: CreateOptions = {}) {
+    optionsValidate(opts);
+
+    this.logger = opts.logger || (
+      process.env.NODE_ENV !== 'production'
+        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
+        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
+    );
     this.options = this.handleConfiguration(opts);
 
-    this.logger = this.options.logger;
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
@@ -304,8 +310,6 @@ export class CubejsServerCore {
   });
 
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
-    optionsValidate(opts);
-
     const skipOnEnv = [
       // Default EXT_DB variables
       'CUBEJS_EXT_DB_URL',
@@ -329,12 +333,6 @@ export class CubejsServerCore {
       undefined;
 
     const devServer = process.env.NODE_ENV !== 'production' || getEnv('devMode');
-    const logger: LoggerFn = opts.logger || (
-      process.env.NODE_ENV !== 'production'
-        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
-    );
-
     let externalDriverFactory = externalDbType && (
       () => new (CubejsServerCore.lookupDriverClass(externalDbType))({
         url: process.env.CUBEJS_EXT_DB_URL,
@@ -367,7 +365,7 @@ export class CubejsServerCore {
             stderr: (data) => {
               console.log(data.toString().trim());
             },
-            onRestart: (code) => logger('Cube Store Restarting', {
+            onRestart: (code) => this.logger('Cube Store Restarting', {
               warning: `Instance exit with ${code}, restarting`,
             }),
           });
@@ -387,7 +385,7 @@ export class CubejsServerCore {
           externalDriverFactory = () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
           externalDialectFactory = () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
         } else {
-          logger('Cube Store is not supported on your system', {
+          this.logger('Cube Store is not supported on your system', {
             warning: (
               `You are using ${process.platform} platform with ${process.arch} architecture, ` +
               'which is not supported by Cube Store.'
@@ -427,7 +425,6 @@ export class CubejsServerCore {
         devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
       ),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
-      logger,
       scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
       sqlCache: true,
       livePreview: getEnv('livePreview'),
@@ -445,7 +442,7 @@ export class CubejsServerCore {
     };
 
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
-      options.logger('Multitenancy Without ScheduledRefreshContexts', {
+      this.logger('Multitenancy Without ScheduledRefreshContexts', {
         warning: (
           'You are using multitenancy without configuring scheduledRefreshContexts, which can lead to issues where the ' +
           'security context will be undefined while Cube.js will do background refreshing: ' +
