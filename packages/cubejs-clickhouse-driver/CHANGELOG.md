@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.34](https://github.com/cube-js/cube.js/compare/v0.27.33...v0.27.34) (2021-06-15)
+
+
+### Features
+
+* **clickhouse-driver:** Migrate to TS & HydrationStream ([c9672c0](https://github.com/cube-js/cube.js/commit/c9672c0a14d141a9c3fc6ae75e4321a2211383e7))
+* **clickhouse-driver:** Support streaming ([2df4b10](https://github.com/cube-js/cube.js/commit/2df4b10c4998db8bbc6cafe07d1a8a30d4b0c41f))
+* **clickhouse-driver:** Support type ingestion from database ([dfde312](https://github.com/cube-js/cube.js/commit/dfde31292dedf6c7ee2326bf06ee8d754f932b83))
+
+
+
+
+
 ## [0.27.33](https://github.com/cube-js/cube.js/compare/v0.27.32...v0.27.33) (2021-06-15)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver
