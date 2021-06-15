@@ -273,12 +273,10 @@ export class RefreshScheduler {
         queriesForPreAggregation.map(
           query => compilerApi
             .getSql(query)
-            .then(sql => (
-              {
-                ...query,
-                sql: sql.preAggregations[0]
-              }
-            ))
+            .then(sql => ({
+              ...query,
+              sql: sql.preAggregations.find(p => p.preAggregationId === preAggregation.id)
+            }))
         )
       );
 
