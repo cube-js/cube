@@ -170,7 +170,10 @@ export default {
             );
           },
           update: (pivotConfig) => {
-            this.pivotConfig = Object.assign({}, this.pivotConfig, pivotConfig)
+            this.pivotConfig = {
+              ...this.pivotConfig,
+              ...pivotConfig,
+            }
           },
         },
       };
