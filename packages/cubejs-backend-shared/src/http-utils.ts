@@ -8,7 +8,6 @@ import fs from 'fs';
 import * as os from 'os';
 import crypto from 'crypto';
 import * as path from 'path';
-import spawn from 'cross-spawn';
 
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
@@ -108,31 +107,4 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   }
 
   bar.stop();
-}
-
-export async function executeCommand(
-  command: string,
-  args: string | string[],
-  options = {}
-) {
-  const argsArray: string[] = typeof args === 'string' ? args.split(' ') : args;
-  const child = spawn(
-    command,
-    argsArray,
-    { stdio: 'inherit', ...options }
-  );
-
-  return new Promise<void>((resolve, reject) => {
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(
-          new Error(
-            `${command} ${argsArray.join(' ')} failed with exit code ${code}. Please check your console.`
-          )
-        );
-        return;
-      }
-      resolve();
-    });
-  });
 }
