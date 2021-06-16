@@ -65,8 +65,8 @@ In development mode, Cube.js enables background refresh by default and will
 refresh all pre-aggregations marked with the
 [`scheduledRefresh`](/pre-aggregations#scheduled-refresh) parameter.
 
-Please consult the [Production Checklist][ref-production-checklist-refresh] for
-best practices on running background refresh in production environments.
+Please consult the [Production Checklist][ref-prod-list-refresh] for best
+practices on running background refresh in production environments.
 
 ```js
 cube(`Orders`, {
@@ -193,10 +193,20 @@ CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
 
 <!-- prettier-ignore-start -->
 [[warning |]]
-| Please be aware of the limitations when using internal and external (outside of Cube Store) pre-aggregations.
+| Please be aware of the limitations when using internal and external (outside
+| of Cube Store) pre-aggregations.
 <!-- prettier-ignore-end -->
 
-![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-aggregations.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Internal vs External vs External with Cube Store diagram"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-aggregations.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 #### Some known limitations when using Postgres/MySQL as a storage layer listed below.
 
@@ -245,15 +255,75 @@ slow to return results.
 (such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
 rack up costs.
 
+## Optimizing Pre-Aggregation Build Times
+
+<!-- prettier-ignore-start -->
+[[info | ]]
+| For ideal performance, pre-aggregations should be built using a dedicated
+| Refresh Worker. [See here for more details][ref-prod-list-refresh].
+<!-- prettier-ignore-end -->
+
+By default, Cube.js will use the source database as a temporary staging area for
+writing pre-aggregations to determine column types. The data is loaded back into
+memory before writing them to Cube Store (or an external database).
+
+![](build-regular.png)
+
+If the dataset is large (more than 100k rows), then Cube.js can face issues when
+the Node runtime runs out of memory.
+
+### Batching
+
+Batching is a more performant strategy where Cube.js sends compressed CSVs for
+Cube Store to ingest.
+
+![](build-batching.png)
+
+The performance scales to the amount of memory available on the Cube.js
+instance. Support is currently available for:
+
+- [AWS Athena][ref-connect-db-athena] (coming soon)
+- [AWS Redshift][ref-connect-db-redshift]
+- [BigQuery][ref-connect-db-bigquery]
+- [MySQL][ref-connect-db-mysql]
+- [Postgres][ref-connect-db-postgres]
+
+### Export bucket
+
+When dealing with larger pre-aggregations (more than 100k rows), performance can
+be significantly improved by using an export bucket. This allows the source
+database to persist data directly into cloud storage, which is then loaded into
+Cube Store in parallel:
+
+![](build-export-bucket.png)
+
+Export buckets are currently supported for the following databases:
+
+- [AWS Athena][ref-connect-db-athena] (coming soon)
+- [AWS Redshift][ref-connect-db-redshift]
+- [BigQuery][ref-connect-db-bigquery]
+- [Snowflake][ref-connect-db-snowflake]
+
+When using cloud storage, it is important to correctly configure any data
+retention policies to clean up the data in the export bucket as Cube.js does not
+currently manage this. For most use-cases, 1 day is sufficient.
+
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
+[ref-config-connect-db]: /connecting-to-the-database
+[ref-config-env]: /reference/environment-variables#cube-store
+[ref-connect-db-athena]: /connecting-to-the-database#notes-aws-athena
+[ref-connect-db-redshift]: /connecting-to-the-database#notes-aws-redshift
+[ref-connect-db-bigquery]: /connecting-to-the-database#notes-google-big-query
+[ref-connect-db-mysql]: /connecting-to-the-database#notes-my-sql
+[ref-connect-db-postgres]: /connecting-to-the-database#notes-aws-rds-postgres
+[ref-connect-db-snowflake]: /connecting-to-the-database#notes-snowflake
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
 [ref-preaggs]: /pre-aggregations
 [ref-preagg-sched-refresh]: /pre-aggregations#scheduled-refresh
 [ref-preagg-time-part]: /pre-aggregations#rollup-time-partitioning
 [ref-preagg-segment-part]: /pre-aggregations#rollup-segment-partitioning
 [ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
+[ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
 [ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-driverfactory]: /config#options-reference-driver-factory
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
-[ref-production-checklist-refresh]:
-  /deployment/production-checklist#set-up-refresh-worker
