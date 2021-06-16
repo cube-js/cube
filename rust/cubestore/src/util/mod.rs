@@ -1,6 +1,7 @@
 pub mod decimal;
 pub mod error;
 pub mod lock;
+pub mod logger;
 mod malloc_trim_loop;
 pub mod maybe_owned;
 pub mod ordfloat;
