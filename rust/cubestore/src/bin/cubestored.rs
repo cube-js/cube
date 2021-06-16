@@ -1,13 +1,25 @@
+use cubestore::app_metrics;
 use cubestore::config::{Config, CubeServices};
 use cubestore::telemetry::track_event;
 use cubestore::util::logger::init_cube_logger;
-use cubestore::util::spawn_malloc_trim_loop;
+use cubestore::util::metrics::init_metrics;
+use cubestore::util::{metrics, spawn_malloc_trim_loop};
 use log::debug;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Builder;
 
 fn main() {
+    let metrics_mode = match std::env::var("CUBESTORE_METRICS") {
+        Ok(s) if s == "statsd" => metrics::Compatibility::StatsD,
+        Ok(s) if s == "dogstatsd" => metrics::Compatibility::DogStatsD,
+        Ok(s) => panic!(
+            "CUBESTORE_METRICS must be 'statsd' or 'dogstatsd', got '{}'",
+            s
+        ),
+        Err(_) => metrics::Compatibility::StatsD,
+    };
+    init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode);
     init_cube_logger(true);
 
     let config = Config::default();
@@ -19,6 +31,7 @@ fn main() {
     }
 
     debug!("New process started");
+    app_metrics::STARTUPS.increment();
 
     #[cfg(not(target_os = "windows"))]
     procspawn::init();

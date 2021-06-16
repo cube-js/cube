@@ -37,6 +37,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
 use tokio::time::error::Elapsed;
 
+pub mod app_metrics;
 pub mod cluster;
 pub mod codegen;
 pub mod config;
