@@ -24,6 +24,8 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
   protected getInitialConfiguration(): Partial<RedshiftDriverConfiguration> {
     return {
+      // @todo It's not possible to support UNLOAD in readOnly mode, because we need column types (CREATE TABLE?)
+      readOnly: false,
       exportBucket: this.getExportBucket(),
     };
   }
