@@ -110,10 +110,8 @@ export function dispatchPlaygroundEvent(
   document.dispatchEvent(myEvent);
 }
 
-
 type FetchPollCallbackArgs = {
-  error: Error | null;
-  response: Response | null;
+  response: Response;
   retries: number;
   cancel: () => void;
 };
@@ -133,31 +131,18 @@ export function fetchPoll(
 
   function request() {
     setTimeout(async () => {
-      let args: Pick<FetchPollCallbackArgs, 'error' | 'response'> = <any>{};
+      const response = await fetch(url, fetchOptions);
 
-      try {
-        const response = await fetch(url, fetchOptions);
-        args = {
-          error: null,
+      if (!canceled) {
+        callback({
           response,
-        };
-      } catch (error) {
-        args = {
-          error,
-          response: null,
-        };
-      } finally {
-        retries++;
-
-        if (!canceled) {
-          callback({
-            ...args,
-            cancel,
-            retries,
-          });
-          request();
-        }
+          cancel,
+          retries,
+        });
+        request();
       }
+
+      retries++;
     }, timeout);
   }
 
@@ -169,7 +154,11 @@ export function fetchPoll(
   };
 }
 
-export function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
+export function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeout: number
+): Promise<Response> {
   return Promise.race([
     fetch(url, options),
     new Promise<Response>((_, reject) =>
@@ -199,5 +188,5 @@ export async function copyToClipboard(value, message = 'Copied to clipboard') {
 }
 
 export function formatNumber(num: number): string {
-  return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+  return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
 }

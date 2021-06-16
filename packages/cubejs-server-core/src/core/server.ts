@@ -499,10 +499,18 @@ export class CubejsServerCore {
   }
 
   public configFileExists(): boolean {
+    let config = {};
+
+    try {
+      config = require(path.resolve('./cube.js'));
+    } catch (_) {
+      // allowed to fail
+    }
+
     return (
       Boolean(process.env.CUBEJS_DB_HOST) ||
       Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
-      fs.existsSync('./cube.js')
+      Object.keys(config).length > 0
     );
   }
 

@@ -11,6 +11,7 @@ import { Button, FatalError } from '../../atoms';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
 import { event, playgroundAction } from '../../events';
 import { useAppContext } from '../../components/AppContext';
+import { useSetter } from '../../hooks/setter';
 
 const { Title, Paragraph } = Typography;
 
@@ -86,8 +87,7 @@ export function ConnectionWizardPage({ history }) {
   const [isDriverInstallationInProgress, setDriverInstallationInProgress] =
     useState<boolean>(false);
   const [dependencyName, setDependencyName] = useState<string | null>(null);
-  const [installationError, setInstallationError] =
-    useState<Error | null>(null);
+  const [installationError, setInstallationError] = useState<string | null>(null);
 
   useEffect(() => {
     playgroundAction('connection_wizard_open');
@@ -98,7 +98,7 @@ export function ConnectionWizardPage({ history }) {
       selectDatabase(
         databases.find(
           (currentDb) =>
-            currentDb.title.toLowerCase() === playgroundContext?.dbType
+            currentDb.driver.toLowerCase() === playgroundContext?.dbType
         ) || null
       );
     }
@@ -111,19 +111,16 @@ export function ConnectionWizardPage({ history }) {
       fetchResult = fetchPoll(
         `/playground/driver?driver=${db.driver}`,
         1000,
-        async ({ response, error, cancel }) => {
-          if (response) {
-            const { status } = await response.json();
-            if (status !== 'installing') {
-              cancel();
-              setDriverInstallationInProgress(false);
-            }
-          }
+        async ({ response, cancel }) => {
+          const { status, error } = await response.json();
 
-          if (error) {
+          if (response.ok && status !== 'installing') {
             cancel();
-            console.error(error);
             setDriverInstallationInProgress(false);
+          } else {
+            cancel();
+            setDriverInstallationInProgress(false);
+            setInstallationError(error);
           }
         }
       );
@@ -140,10 +137,10 @@ export function ConnectionWizardPage({ history }) {
   useEffect(() => {
     setTestConnectionLoading(false);
     setTestConnectionResult(null);
-    setHostname('');
     setDependencyName(null);
     setInstallationError(null);
-  }, [db?.title]);
+    setHostname('');
+  }, [db?.driver]);
 
   function handleDatabaseSelect(db: Database) {
     return async () => {
@@ -151,24 +148,26 @@ export function ConnectionWizardPage({ history }) {
         return selectDatabase(db);
       }
 
-      try {
-        const data = await fetch(
+      {
+        const response = await fetch(
           `/playground/driver?driver=${db.driver || ''}`
         );
-        const { status } = await data.json();
+        const { status, error } = await response.json();
 
-        if (status === 'installed') {
-          return selectDatabase(db);
-        } else if (status === 'installing') {
-          setDriverInstallationInProgress(true);
-          selectDatabase(db);
+        if (response.ok) {
+          if (status === 'installed') {
+            return selectDatabase(db);
+          } else if (status === 'installing') {
+            setDriverInstallationInProgress(true);
+            selectDatabase(db);
+          }
+        } else {
+          setInstallationError(error);
         }
-      } catch (error) {
-        setInstallationError(error);
       }
 
-      try {
-        const data = await fetch('/playground/driver', {
+      {
+        const response = await fetch('/playground/driver', {
           method: 'post',
           headers: {
             'Content-Type': 'application/json',
@@ -177,17 +176,26 @@ export function ConnectionWizardPage({ history }) {
             driver: db.driver,
           }),
         });
-        const { dependency } = await data.json();
-        setDependencyName(dependency);
-        setDriverInstallationInProgress(true);
-      } catch (error) {
-        setInstallationError(error);
+
+        const { dependency, error } = await response.json();
+
+        if (response.ok) {
+          setDependencyName(dependency);
+          setDriverInstallationInProgress(true);
+          selectDatabase(db);
+        } else {
+          setInstallationError(error);
+        }
       }
     };
   }
 
   if (installationError) {
-    return <FatalError error={installationError} />;
+    return (
+      <Layout>
+        <FatalError error={installationError} />
+      </Layout>
+    );
   }
 
   if (isDriverInstallationInProgress && dependencyName) {

@@ -31,10 +31,6 @@ type DevServerOptions = {
 export class DevServer {
   protected applyTemplatePackagesPromise: Promise<any> | null = null;
 
-  protected driverPromise: Promise<void> | null = null;
-
-  protected driverError: Error | null = null;
-
   protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> } | null = null;
 
   protected livePreviewWatcher = new LivePreviewWatcher();
@@ -254,8 +250,10 @@ export class DevServer {
       });
     }));
 
+    let driverPromise: Promise<void> | null = null;
+    let driverError: Error | null = null;
+
     app.get('/playground/driver', catchErrors(async (req: Request, res: Response) => {
-      // todo: manage driver installation error
       const { driver } = req.query;
 
       if (!driver || !DriverDependencies[driver]) {
@@ -264,35 +262,48 @@ export class DevServer {
 
       if (packageExists(DriverDependencies[driver])) {
         return res.json({ status: 'installed' });
-      } else if (this.driverPromise[<string>driver]) {
+      } else if (driverPromise) {
         return res.json({ status: 'installing' });
+      } else if (driverError) {
+        return res.status(500).json({
+          status: 'error',
+          error: driverError.toString()
+        });
       }
 
-      res.json({ status: null });
+      return res.json({ status: null });
     }));
 
-    app.post('/playground/driver', catchErrors(async (req, res) => {
+    app.post('/playground/driver', catchErrors((req, res) => {
       const { driver } = req.body;
 
       if (!DriverDependencies[driver]) {
         return res.status(400).json(`'${driver}' driver dependency not found`);
       }
 
-      if (!this.driverPromise) {
-        this.driverPromise = executeCommand(
-          'npm',
-          ['install', DriverDependencies[driver], '-D'],
-          { cwd: path.resolve('.') }
-        );
+      async function installDriver() {
+        driverError = null;
 
-        this.driverPromise.catch((error) => {
-          this.driverError = error;
-        }).finally(() => {
-          this.driverPromise = null;
-        });
+        try {
+          await executeCommand(
+            'yarn',
+            ['add', DriverDependencies[driver], '-D'],
+            // 'npm',
+            // ['install', DriverDependencies[driver], '-D'],
+            { cwd: path.resolve('.') }
+          );
+        } catch (error) {
+          driverError = error;
+        } finally {
+          driverPromise = null;
+        }
       }
 
-      res.json({
+      if (!driverPromise) {
+        driverPromise = installDriver();
+      }
+
+      return res.json({
         dependency: DriverDependencies[driver]
       });
     }));
@@ -309,7 +320,7 @@ export class DevServer {
         const manifestJson = await fetcher.manifestJSON();
         const response = await fetcher.downloadPackages();
 
-        let templatePackages = [];
+        let templatePackages: string[];
         if (typeof toApply === 'string') {
           const template = manifestJson.templates.find(({ name }) => name === toApply);
           templatePackages = template.templatePackages;
