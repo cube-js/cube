@@ -21,7 +21,7 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 use crate::store::DataFrame;
-use crate::{metastore, CubeError};
+use crate::{app_metrics, metastore, CubeError};
 use arrow::array::StringArray;
 use arrow::datatypes::Field;
 use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
@@ -117,10 +117,9 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let execution_time = SystemTime::now();
         let results = collect(physical_plan).await?;
-        debug!(
-            "Meta query data processing time: {:?}",
-            execution_time.elapsed()?
-        );
+        let execution_time = execution_time.elapsed()?;
+        app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
+        debug!("Meta query data processing time: {:?}", execution_time,);
         let data_frame =
             tokio::task::spawn_blocking(move || batch_to_dataframe(&results)).await??;
         Ok(data_frame)

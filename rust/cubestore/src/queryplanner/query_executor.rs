@@ -7,7 +7,7 @@ use crate::queryplanner::planning::get_worker_plan;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
     Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
@@ -99,32 +99,21 @@ impl QueryExecutor for QueryExecutorImpl {
         let execution_time = SystemTime::now();
 
         let results = collect(split_plan.clone()).instrument(collect_span).await;
-        debug!(
-            "Query data processing time: {:?}",
-            execution_time.elapsed()?
-        );
-        if execution_time.elapsed()?.as_millis() > 200 {
-            warn!(
-                "Slow Query ({:?}):\n{:#?}",
-                execution_time.elapsed()?,
-                logical_plan
-            );
+        let execution_time = execution_time.elapsed()?;
+        debug!("Query data processing time: {:?}", execution_time,);
+        app_metrics::DATA_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
+        if execution_time.as_millis() > 200 {
+            warn!("Slow Query ({:?}):\n{:#?}", execution_time, logical_plan);
             debug!(
                 "Slow Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &split_plan
+                execution_time, &split_plan
             );
         }
         if results.is_err() {
-            error!(
-                "Error Query ({:?}):\n{:#?}",
-                execution_time.elapsed()?,
-                logical_plan
-            );
+            error!("Error Query ({:?}):\n{:#?}", execution_time, logical_plan);
             error!(
                 "Error Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &split_plan
+                execution_time, &split_plan
             );
         }
         Ok((split_plan.schema().to_schema_ref(), results?))
