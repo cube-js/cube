@@ -16,8 +16,7 @@
     "@babel/runtime": "^7.1.2",
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
-    "moment": "^2.22.2",
-    "moment-range": "^4.0.1",
+    "dayjs": "^1.10.4",
     "ramda": "^0.27.0",
     "url-search-params-polyfill": "^7.0.0",
     "uuid": "^8.3.2"
