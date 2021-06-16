@@ -267,7 +267,16 @@ By default, Cube.js will use the source database as a temporary staging area for
 writing pre-aggregations to determine column types. The data is loaded back into
 memory before writing them to Cube Store (or an external database).
 
-![](build-regular.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Internal vs External vs External with Cube Store diagram"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-regular.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 If the dataset is large (more than 100k rows), then Cube.js can face issues when
 the Node runtime runs out of memory.
@@ -277,7 +286,16 @@ the Node runtime runs out of memory.
 Batching is a more performant strategy where Cube.js sends compressed CSVs for
 Cube Store to ingest.
 
-![](build-batching.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Internal vs External vs External with Cube Store diagram"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-batching.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 The performance scales to the amount of memory available on the Cube.js
 instance. Support is currently available for:
@@ -295,7 +313,16 @@ be significantly improved by using an export bucket. This allows the source
 database to persist data directly into cloud storage, which is then loaded into
 Cube Store in parallel:
 
-![](build-export-bucket.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Internal vs External vs External with Cube Store diagram"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-export-bucket.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 Export buckets are currently supported for the following databases:
 
