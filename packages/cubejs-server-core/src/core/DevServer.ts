@@ -8,13 +8,15 @@ import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
+import { executeCommand, packageExists } from '@cubejs-backend/shared';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import { ExternalDbTypeFn } from './types';
+import DriverDependencies from './DriverDependencies';
 
 const repo = {
   owner: 'cube-js',
@@ -28,6 +30,10 @@ type DevServerOptions = {
 
 export class DevServer {
   protected applyTemplatePackagesPromise: Promise<any> | null = null;
+
+  protected driverPromise: Promise<void> | null = null;
+
+  protected driverError: Error | null = null;
 
   protected dashboardAppProcess: ChildProcess & { dashboardUrlPromise?: Promise<any> } | null = null;
 
@@ -87,6 +93,7 @@ export class DevServer {
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options?.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
+        dbType: options.dbType || null,
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
         livePreview: options.livePreview,
         isDocker: isDocker(),
@@ -247,6 +254,49 @@ export class DevServer {
       });
     }));
 
+    app.get('/playground/driver', catchErrors(async (req: Request, res: Response) => {
+      // todo: manage driver installation error
+      const { driver } = req.query;
+
+      if (!driver || !DriverDependencies[driver]) {
+        return res.status(400).json('Wrong driver');
+      }
+
+      if (packageExists(DriverDependencies[driver])) {
+        return res.json({ status: 'installed' });
+      } else if (this.driverPromise[<string>driver]) {
+        return res.json({ status: 'installing' });
+      }
+
+      res.json({ status: null });
+    }));
+
+    app.post('/playground/driver', catchErrors(async (req, res) => {
+      const { driver } = req.body;
+
+      if (!DriverDependencies[driver]) {
+        return res.status(400).json(`'${driver}' driver dependency not found`);
+      }
+
+      if (!this.driverPromise) {
+        this.driverPromise = executeCommand(
+          'npm',
+          ['install', DriverDependencies[driver], '-D'],
+          { cwd: path.resolve('.') }
+        );
+
+        this.driverPromise.catch((error) => {
+          this.driverError = error;
+        }).finally(() => {
+          this.driverPromise = null;
+        });
+      }
+
+      res.json({
+        dependency: DriverDependencies[driver]
+      });
+    }));
+
     app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Download Template Packages');
 
@@ -404,6 +454,7 @@ export class DevServer {
       // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+      variables.CUBEJS_DEV_MODE = 'true';
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
       const repositoryPath = path.join(process.cwd(), options.schemaPath);

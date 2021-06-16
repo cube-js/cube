@@ -29,7 +29,7 @@ const envVarsDbMap = [
     databases: [
       { title: 'PostgreSQL', driver: 'postgres', logo: logoPostgres },
       { title: 'MySQL', driver: 'mysql', logo: logoMysql },
-      { title: 'AWS Redshift', drive: 'redshift', logo: logoRedshift },
+      { title: 'AWS Redshift', driver: 'redshift', logo: logoRedshift },
       { title: 'ClickHouse', driver: 'clickhouse', logo: logoClickhouse },
       { title: 'Hive/SparkSQL', driver: 'hive', logo: logoHive },
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },

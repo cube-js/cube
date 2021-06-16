@@ -1,15 +1,16 @@
-import { Alert, Col, Row, Space, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { Alert, Col, Row, Space, Spin, Typography } from 'antd';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import envVarsDatabaseMap from '../../shared/env-vars-db-map';
-import { fetchWithTimeout } from '../../utils';
+import { fetchPoll, fetchWithTimeout } from '../../utils';
 import ConnectionTest from './components/ConnectionTest';
 import { DatabaseCard, SelectedDatabaseCard } from './components/DatabaseCard';
 import DatabaseForm from './components/DatabaseForm';
-import { Button } from '../../atoms';
+import { Button, FatalError } from '../../atoms';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
 import { event, playgroundAction } from '../../events';
+import { useAppContext } from '../../components/AppContext';
 
 const { Title, Paragraph } = Typography;
 
@@ -17,7 +18,16 @@ const DatabaseCardWrapper = styled.div`
   cursor: pointer;
 `;
 
-const databases = envVarsDatabaseMap.reduce<any>(
+const Layout = styled.div`
+  width: auto;
+  min-height: 100vh;
+  max-width: 960px;
+  padding: 48px 24px;
+  margin: 0 auto;
+  background-color: #fff;
+`;
+
+const databases: Database[] = envVarsDatabaseMap.reduce<any>(
   (memo, { databases: dbs, settings }) => [
     ...memo,
     ...(dbs as any).map((db) => ({ ...db, settings })),
@@ -46,14 +56,6 @@ async function testConnection(variables: Record<string, string>) {
   }
 }
 
-const Layout = styled.div`
-  width: auto;
-  max-width: 960px;
-  padding: 48px 24px;
-  margin: 0 auto;
-  background-color: #fff;
-`;
-
 async function saveConnection(variables: Record<string, string>) {
   await fetch('/playground/env', {
     method: 'post',
@@ -68,26 +70,142 @@ async function saveConnection(variables: Record<string, string>) {
 
 export type Database = {
   title: string;
+  driver: string;
   logo: string;
   instructions?: string;
 };
 
 export function ConnectionWizardPage({ history }) {
+  const { playgroundContext } = useAppContext();
+
   const [hostname, setHostname] = useState<string>('');
   const [isLoading, setLoading] = useState(false);
   const [isTestConnectionLoading, setTestConnectionLoading] = useState(false);
   const [testConnectionResult, setTestConnectionResult] = useState<any>(null);
   const [db, selectDatabase] = useState<Database | null>(null);
+  const [isDriverInstallationInProgress, setDriverInstallationInProgress] =
+    useState<boolean>(false);
+  const [dependencyName, setDependencyName] = useState<string | null>(null);
+  const [installationError, setInstallationError] =
+    useState<Error | null>(null);
 
   useEffect(() => {
     playgroundAction('connection_wizard_open');
   }, []);
 
+  useLayoutEffect(() => {
+    if (playgroundContext?.dbType) {
+      selectDatabase(
+        databases.find(
+          (currentDb) =>
+            currentDb.title.toLowerCase() === playgroundContext?.dbType
+        ) || null
+      );
+    }
+  }, [playgroundContext]);
+
+  useEffect(() => {
+    let fetchResult;
+
+    if (isDriverInstallationInProgress && db) {
+      fetchResult = fetchPoll(
+        `/playground/driver?driver=${db.driver}`,
+        1000,
+        async ({ response, error, cancel }) => {
+          if (response) {
+            const { status } = await response.json();
+            if (status !== 'installing') {
+              cancel();
+              setDriverInstallationInProgress(false);
+            }
+          }
+
+          if (error) {
+            cancel();
+            console.error(error);
+            setDriverInstallationInProgress(false);
+          }
+        }
+      );
+    }
+
+    return () => {
+      if (db) {
+        fetchResult?.cancel();
+        setDriverInstallationInProgress(false);
+      }
+    };
+  }, [db, isDriverInstallationInProgress]);
+
   useEffect(() => {
     setTestConnectionLoading(false);
     setTestConnectionResult(null);
     setHostname('');
+    setDependencyName(null);
+    setInstallationError(null);
   }, [db?.title]);
+
+  function handleDatabaseSelect(db: Database) {
+    return async () => {
+      if (playgroundContext?.isDocker) {
+        return selectDatabase(db);
+      }
+
+      try {
+        const data = await fetch(
+          `/playground/driver?driver=${db.driver || ''}`
+        );
+        const { status } = await data.json();
+
+        if (status === 'installed') {
+          return selectDatabase(db);
+        } else if (status === 'installing') {
+          setDriverInstallationInProgress(true);
+          selectDatabase(db);
+        }
+      } catch (error) {
+        setInstallationError(error);
+      }
+
+      try {
+        const data = await fetch('/playground/driver', {
+          method: 'post',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            driver: db.driver,
+          }),
+        });
+        const { dependency } = await data.json();
+        setDependencyName(dependency);
+        setDriverInstallationInProgress(true);
+      } catch (error) {
+        setInstallationError(error);
+      }
+    };
+  }
+
+  if (installationError) {
+    return <FatalError error={installationError} />;
+  }
+
+  if (isDriverInstallationInProgress && dependencyName) {
+    return (
+      <Layout>
+        <Title>
+          <Title>Set Up a Database connection</Title>
+        </Title>
+
+        <Space align="center" size="middle">
+          <Spin />
+          <Typography.Text>
+            Installing <b>{dependencyName}</b>
+          </Typography.Text>
+        </Space>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -114,15 +232,21 @@ export function ConnectionWizardPage({ history }) {
               ) : (
                 <Typography.Paragraph>
                   Enter database credentials to connect to your database. <br />
-                  Cube.js will store your credentials into the <b><code>.env</code></b> file
-                  for future use.
+                  Cube.js will store your credentials into the <code>
+                    .env
+                  </code>{' '}
+                  file for future use.
                 </Typography.Paragraph>
               )}
 
               <Typography.Paragraph>
-                For advanced configuration, use the <code>cube.js</code> configuration file inside
-                mount volume or environment variables.<br />
-                <Typography.Link href="https://cube.dev/docs/connecting-to-the-database" target="_blank">
+                For advanced configuration, use the <code>cube.js</code>{' '}
+                configuration file inside mount volume or environment variables.
+                <br />
+                <Typography.Link
+                  href="https://cube.dev/docs/connecting-to-the-database"
+                  target="_blank"
+                >
                   Learn more about connecting to databases in the documentation.
                 </Typography.Link>
               </Typography.Paragraph>
@@ -193,11 +317,11 @@ export function ConnectionWizardPage({ history }) {
 
               {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse'].includes(
                 db?.title || ''
-              ) && (
+              ) && playgroundContext?.isDocker ? (
                 <Col span={12}>
                   <LocalhostTipBox onHostnameCopy={setHostname} />
                 </Col>
-              )}
+              ) : null}
             </Row>
           </Space>
         </>
@@ -208,7 +332,7 @@ export function ConnectionWizardPage({ history }) {
           <Row gutter={[12, 12]}>
             {databases.map((db) => (
               <Col xl={8} lg={8} md={12} sm={24} xs={24} key={db.title}>
-                <DatabaseCardWrapper onClick={() => selectDatabase(db)}>
+                <DatabaseCardWrapper onClick={handleDatabaseSelect(db)}>
                   <DatabaseCard db={db} />
                 </DatabaseCardWrapper>
               </Col>

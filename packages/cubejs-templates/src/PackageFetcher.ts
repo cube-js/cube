@@ -3,7 +3,8 @@ import decompress from 'decompress';
 import decompressTargz from 'decompress-targz';
 import path from 'path';
 
-import { executeCommand, proxyFetch } from './utils';
+import { proxyFetch } from './utils';
+import { executeCommand } from '@cubejs-backend/shared';
 
 type Repository = {
   name: string;

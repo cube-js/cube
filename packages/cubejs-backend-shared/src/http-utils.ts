@@ -1,5 +1,5 @@
 import decompress from 'decompress';
-import fetch, { Headers, Request, Response } from 'node-fetch';
+import fetch, { Headers, Request, RequestInit, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
 import { SingleBar } from 'cli-progress';
@@ -8,11 +8,12 @@ import fs from 'fs';
 import * as os from 'os';
 import crypto from 'crypto';
 import * as path from 'path';
+import spawn from 'cross-spawn';
 
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
 
-type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
+type ByteProgressCallback = (info: { progress: number; eta: number; speed: string }) => void;
 
 export async function streamWithProgress(
   response: Response,
@@ -63,14 +64,14 @@ export async function streamWithProgress(
 }
 
 type DownloadAndExtractFile = {
-  showProgress: boolean,
-  cwd: string,
+  showProgress: boolean;
+  cwd: string;
 };
 
 export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndExtractFile) {
   const request = new Request(url, {
     headers: new Headers({
-      'Content-Type': 'application/octet-stream'
+      'Content-Type': 'application/octet-stream',
     }),
     agent: await getHttpAgentForProxySettings(),
   });
@@ -94,7 +95,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   const savedFilePath = await streamWithProgress(response, ({ progress, speed, eta }) => {
     bar.update(progress, {
       speed,
-      eta
+      eta,
     });
   });
 
@@ -107,4 +108,31 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   }
 
   bar.stop();
+}
+
+export async function executeCommand(
+  command: string,
+  args: string | string[],
+  options = {}
+) {
+  const argsArray: string[] = typeof args === 'string' ? args.split(' ') : args;
+  const child = spawn(
+    command,
+    argsArray,
+    { stdio: 'inherit', ...options }
+  );
+
+  return new Promise<void>((resolve, reject) => {
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(
+          new Error(
+            `${command} ${argsArray.join(' ')} failed with exit code ${code}. Please check your console.`
+          )
+        );
+        return;
+      }
+      resolve();
+    });
+  });
 }

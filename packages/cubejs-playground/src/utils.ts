@@ -1,4 +1,6 @@
 import { notification } from 'antd';
+import fetch, { RequestInit, Response } from 'node-fetch';
+
 import { PlaygroundEvent } from './types';
 
 const bootstrapDefinition = {
@@ -106,6 +108,65 @@ export function dispatchPlaygroundEvent(
   });
 
   document.dispatchEvent(myEvent);
+}
+
+
+type FetchPollCallbackArgs = {
+  error: Error | null;
+  response: Response | null;
+  retries: number;
+  cancel: () => void;
+};
+
+export function fetchPoll(
+  url: string,
+  timeout: number,
+  callback: (args: FetchPollCallbackArgs) => void,
+  fetchOptions?: RequestInit
+) {
+  let retries: number = 0;
+  let canceled: boolean = false;
+
+  function cancel() {
+    canceled = true;
+  }
+
+  function request() {
+    setTimeout(async () => {
+      let args: Pick<FetchPollCallbackArgs, 'error' | 'response'> = <any>{};
+
+      try {
+        const response = await fetch(url, fetchOptions);
+        args = {
+          error: null,
+          response,
+        };
+      } catch (error) {
+        args = {
+          error,
+          response: null,
+        };
+      } finally {
+        retries++;
+
+        if (!canceled) {
+          callback({
+            ...args,
+            cancel,
+            retries,
+          });
+          request();
+        }
+      }
+    }, timeout);
+  }
+
+  request();
+
+  return {
+    cancel,
+    retries,
+  };
 }
 
 export function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {

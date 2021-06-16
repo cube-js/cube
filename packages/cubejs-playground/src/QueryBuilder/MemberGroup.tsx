@@ -43,7 +43,7 @@ const MemberGroup = ({
       );
 
       return isMissing ? (
-        <MissingMemberTooltip>{buttonGroup}</MissingMemberTooltip>
+        <MissingMemberTooltip key={m.index || m.name}>{buttonGroup}</MissingMemberTooltip>
       ) : (
         buttonGroup
       );
