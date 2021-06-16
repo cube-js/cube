@@ -1,4 +1,4 @@
-import PlaygroundWrapper from '../PlaygroundWrapper';
+import { PlaygroundWrapper } from './PlaygroundWrapper';
 import { SecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
 import {
   PlaygroundQueryBuilderProps,

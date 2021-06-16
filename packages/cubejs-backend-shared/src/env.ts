@@ -282,7 +282,7 @@ type Vars = typeof variables;
 
 export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
-    return <any>variables[key](opts);
+    return variables[key](opts);
   }
 
   throw new Error(

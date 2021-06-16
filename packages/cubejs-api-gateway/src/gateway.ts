@@ -225,7 +225,7 @@ export class ApiGateway {
     protected readonly compilerApi: any,
     protected readonly adapterApi: any,
     protected readonly logger: any,
-    options: ApiGatewayOptions,
+    protected readonly options: ApiGatewayOptions,
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
@@ -715,7 +715,9 @@ export class ApiGateway {
       this.log({
         type: 'Load Request Success',
         query,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
+        queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length).length,
+        queriesWithData: results.filter((r: any) => r.data?.length).length
       }, context);
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {

@@ -82,22 +82,15 @@ export class DevServer {
       this.cubejsServer.event('Dev Server Env Open');
       res.json({
         cubejsToken,
-        apiUrl: process.env.CUBEJS_API_URL,
         basePath: options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options?.dockerVersion || null,
-        extDbType: this.options?.externalDbTypeFn({
-          authInfo: null,
-          securityContext: null,
-          requestId: getRequestIdFromRequest(req),
-        }).toLowerCase() || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
-        dbType: options.dbType
       });
     }));
 
