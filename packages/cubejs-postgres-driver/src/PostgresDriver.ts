@@ -40,14 +40,14 @@ function getTypeParser(dataType: TypeId, format: TypeFormat|undefined) {
   return (val: any) => parser(val);
 }
 
-export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriverConfiguration>
+export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
   protected readonly pool: Pool;
 
-  protected readonly config: Partial<C>;
+  protected readonly config: Partial<Config>;
 
   public constructor(
-    config: Partial<C> = {}
+    config: Partial<Config> = {}
   ) {
     super();
 
@@ -73,11 +73,13 @@ export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriv
   }
 
   /**
-   * The easist way how to add additional configuration from env variables, because
+   * The easiest way how to add additional configuration from env variables, because
    * you cannot call method in RedshiftDriver.constructor before super.
    */
-  protected getInitialConfiguration(): Partial<C> {
-    return {};
+  protected getInitialConfiguration(): Partial<PostgresDriverConfiguration> {
+    return {
+      readOnly: true,
+    };
   }
 
   public async testConnection(): Promise<void> {
@@ -99,7 +101,7 @@ export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriv
     }
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
-    await conn.query(`set statement_timeout to ${options.executionTimeout}`);
+    await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
   }
 
   public async stream(

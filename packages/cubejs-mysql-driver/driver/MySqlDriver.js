@@ -60,6 +60,7 @@ class MySqlDriver extends BaseDriver {
       timezone: 'Z',
       ssl: this.getSslOptions(),
       dateStrings: true,
+      readOnly: true,
       ...restConfig,
     };
 
@@ -99,6 +100,10 @@ class MySqlDriver extends BaseDriver {
       acquireTimeoutMillis: 20000,
       ...pool
     });
+  }
+
+  readOnly() {
+    return !!this.config.readOnly;
   }
 
   withConnection(fn) {
