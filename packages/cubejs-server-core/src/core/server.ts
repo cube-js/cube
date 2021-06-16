@@ -502,6 +502,7 @@ export class CubejsServerCore {
     let config = {};
 
     try {
+      // eslint-disable-next-line global-require,import/no-dynamic-require
       config = require(path.resolve('./cube.js'));
     } catch (_) {
       // allowed to fail
