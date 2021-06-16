@@ -767,4 +767,46 @@ describe('QueryBuilder.vue', () => {
     //   expect(wrapper.vm.filters[0].values).toContain('1');
     // });
   });
+
+  describe('builder slot updatePivotConfig.update', () => {
+     it.each([
+       { x: [ 'Orders.status' ] },
+       { y: [ 'measures' ] },
+       { x: [ 'Orders.status', 'measures' ], y: [] },
+       { aliasSeries: [ 'one' ] },
+       { fillMissingDates: true },
+       { fillMissingDates: false }
+     ])('sets pivotConfig', async (pivotConfig) => {
+      const cube = createCubejsApi();
+      jest
+        .spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            measures: ['Orders.count'],
+            dimensions: ['Orders.status'],
+          },
+        },
+        scopedSlots: {
+          builder: function({ updatePivotConfig }) {
+            return this.$createElement(
+              'input',
+              {
+                on: { change: () => updatePivotConfig.update(pivotConfig) }
+              }
+            )
+          }
+        }
+      });
+
+      await flushPromises();
+
+      wrapper.find('input').trigger('change')
+      expect(wrapper.vm.pivotConfig).toMatchObject(pivotConfig);
+    });
+  })
 });
