@@ -426,6 +426,128 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.filters[0].values).toContain('valid');
     });
 
+    it('sets filters with boolean logical operators', async () => {
+      const cube = createCubejsApi();
+      jest
+        .spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        and: [
+          {
+            dimension: 'Orders.status',
+            operator: 'equals',
+            values: ['this'],
+          },
+          {
+            dimension: 'Orders.status',
+            operator: 'equals',
+            values: ['that'],
+          }
+        ],
+        or: [
+          {
+            dimension: 'Orders.status',
+            operator: 'equals',
+            values: ['this'],
+          },
+          {
+            dimension: 'Orders.status',
+            operator: 'equals',
+            values: ['that'],
+          }
+        ]
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.filters[0].or.length).toBe(2);
+      expect(wrapper.vm.filters[0].and.length).toBe(2);
+      wrapper.vm.setMembers('filters', []);
+      expect(wrapper.vm.validatedQuery.filters).toBeUndefined();
+      wrapper.vm.setMembers('filters', [filter]);
+      expect(wrapper.vm.validatedQuery.filters.length).toBe(1);
+      expect(wrapper.vm.validatedQuery.filters[0].and[0].member).toBe('Orders.status');
+      expect(wrapper.vm.validatedQuery.filters[0].and[0].values).toContain('this');
+      expect(wrapper.vm.validatedQuery.filters[0].and[1].values).toContain('that');
+      expect(wrapper.vm.validatedQuery.filters[0].or[0].member).toBe('Orders.status');
+      expect(wrapper.vm.validatedQuery.filters[0].or[0].values).toContain('this');
+      expect(wrapper.vm.validatedQuery.filters[0].or[1].values).toContain('that');
+    })
+
+    it.each([
+      [
+        {
+          and: [
+            {
+              dimension: 'Orders.status',
+              values: ['this'],
+            },
+          ],
+        },
+        0
+      ],
+      [
+        {
+          or: [
+            {
+              dimension: 'Orders.status',
+              values: ['this'],
+            },
+          ]
+        },
+        0
+      ],
+      [
+        {
+          and: [
+            {
+              dimension: 'Orders.status',
+              values: ['this'],
+            },
+          ],
+          or: [
+            {
+              dimension: 'Orders.status',
+              operator: 'equals',
+              values: ['this'],
+            },
+          ]
+        },
+        1
+      ]
+    ])('does not assign boolean logical operators having no operator', async (filter, expected) => {
+      const cube = createCubejsApi();
+      jest
+        .spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [],
+          },
+        },
+      });
+
+      await flushPromises();
+
+      wrapper.vm.setMembers('filters', [filter]);
+      expect(wrapper.vm.validatedQuery.filters.length).toBe(expected);
+    })
+
     it('sets filters when using measure', async () => {
       const cube = createCubejsApi();
       jest

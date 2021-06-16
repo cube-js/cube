@@ -23,6 +23,36 @@ const toOrderMember = (member) => ({
 const reduceOrderMembers = (array) =>
   array.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []);
 
+const validateFilter = (f) => f.operator
+
+const operators = [ 'and', 'or' ]
+
+const validateFilters = (filters) => filters.reduce((acc, raw) => {
+  const validated = { ...raw }
+
+  operators.reduce((acc, operator) => {
+    const filters = raw[operator]
+    if (filters) {
+      acc[operator] = filters.filter(validateFilter)
+    }
+    return acc
+  }, validated)
+
+  if (validated.operator || operators.some((operator) => validated[operator] && validated[operator].length)) {
+    acc.push(validated)
+  }
+
+  return acc
+}, [])
+
+const getDimensionOrMeasure = (meta, m) => {
+  const memberName = m.member || m.dimension
+  return memberName && meta.resolveMember(memberName, [ 'dimensions', 'measures' ])
+}
+
+const resolveMembers = (meta, arr) =>
+  arr && arr.map((e, index) => ({ ...e, member: getDimensionOrMeasure(meta, e), index }))
+
 export default {
   components: {
     QueryRenderer,
@@ -274,9 +304,11 @@ export default {
           });
         } else if (element === 'filters') {
           toQuery = (member) => ({
-            member: member.member.name,
+            member: member.member && member.member.name,
             operator: member.operator,
             values: member.values,
+            and: member.and && member.and.map(toQuery),
+            or: member.or && member.or.map(toQuery),
           });
         }
 
@@ -288,7 +320,7 @@ export default {
       });
 
       if (validatedQuery.filters) {
-        validatedQuery.filters = validatedQuery.filters.filter((f) => f.operator);
+        validatedQuery.filters = validateFilters(validatedQuery.filters)
       }
 
       // only set limit and offset if there are elements otherwise an invalid request with just limit/offset
@@ -402,15 +434,16 @@ export default {
         },
         index,
       }));
-      this.filters = filters.map((m, index) => ({
-        ...m,
-        member: this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-        operators: this.meta.filterOperatorsForMember(m.member || m.dimension, [
-          'dimensions',
-          'measures',
-        ]),
-        index,
-      }));
+      const memberTypes = ['dimensions', 'measures']
+      this.filters = filters.map((m, index) => {
+        const memberName = m.member || m.dimension
+        return {
+          ...m,
+          member: memberName && this.meta.resolveMember(memberName, memberTypes),
+          operators: memberName && this.meta.filterOperatorsForMember(memberName, memberTypes),
+          index,
+        }
+      });
 
       this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
       this.availableDimensions = this.meta.membersForQuery({}, 'dimensions') || [];
@@ -444,14 +477,12 @@ export default {
           };
         }
       } else if (element === 'filters') {
-        const filterMember = {
-          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
-        };
-
         mem = {
           ...member,
-          member: filterMember,
-        };
+          and: resolveMembers(this.meta, member.and),
+          or: resolveMembers(this.meta, member.or),
+          member: getDimensionOrMeasure(this.meta, member),
+        }
       } else {
         mem = this[`available${name}`].find((m) => m.name === member);
       }
@@ -501,14 +532,12 @@ export default {
         }
       } else if (element === 'filters') {
         index = this[element].findIndex((x) => x.dimension === old);
-        const filterMember = {
-          ...this.meta.resolveMember(member.member || member.dimension, ['dimensions', 'measures']),
-        };
-
         mem = {
           ...member,
-          member: filterMember,
-        };
+          and: resolveMembers(this.meta, member.and),
+          or: resolveMembers(this.meta, member.or),
+          member: getDimensionOrMeasure(this.meta, member),
+        }
       } else {
         index = this[element].findIndex((x) => x.name === old);
         mem = this[`available${name}`].find((m) => m.name === member);
@@ -541,14 +570,12 @@ export default {
             };
           }
         } else if (element === 'filters') {
-          const member = {
-            ...this.meta.resolveMember(m.member || m.dimension, ['dimensions', 'measures']),
-          };
-
           mem = {
             ...m,
-            member,
-          };
+            and: resolveMembers(this.meta, m.and),
+            or: resolveMembers(this.meta, m.or),
+            member: getDimensionOrMeasure(this.meta, m),
+          }
         } else {
           mem = this[`available${name}`].find((x) => x.name === m);
         }
