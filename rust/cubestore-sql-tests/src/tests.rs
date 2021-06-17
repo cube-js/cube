@@ -1733,7 +1733,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, SUM(hits):hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
-           \n    ClusterSend, partitions: [[1], [2]]"
+           \n    ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
             pp_phys_plan_ext(p.worker.as_ref(), &verbose),
@@ -1944,11 +1944,11 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
+    // TODO: test MergeSort node is present if ClusterSend has multiple partitions.
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "FinalInplaceAggregate\
-           \n  MergeSort\
-           \n    ClusterSend, partitions: [[1], [1]]"
+           \n  ClusterSend, partitions: [[1, 1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
