@@ -1,4 +1,6 @@
 import { notification } from 'antd';
+import fetch, { RequestInit, Response } from 'node-fetch';
+
 import { PlaygroundEvent } from './types';
 
 const bootstrapDefinition = {
@@ -108,7 +110,55 @@ export function dispatchPlaygroundEvent(
   document.dispatchEvent(myEvent);
 }
 
-export function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
+type FetchPollCallbackArgs = {
+  response: Response;
+  retries: number;
+  cancel: () => void;
+};
+
+export function fetchPoll(
+  url: string,
+  timeout: number,
+  callback: (args: FetchPollCallbackArgs) => void,
+  fetchOptions?: RequestInit
+) {
+  let retries: number = 0;
+  let canceled: boolean = false;
+
+  function cancel() {
+    canceled = true;
+  }
+
+  function request() {
+    setTimeout(async () => {
+      const response = await fetch(url, fetchOptions);
+
+      if (!canceled) {
+        callback({
+          response,
+          cancel,
+          retries,
+        });
+        request();
+      }
+
+      retries++;
+    }, timeout);
+  }
+
+  request();
+
+  return {
+    cancel,
+    retries,
+  };
+}
+
+export function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeout: number
+): Promise<Response> {
   return Promise.race([
     fetch(url, options),
     new Promise<Response>((_, reject) =>
@@ -138,5 +188,5 @@ export async function copyToClipboard(value, message = 'Copied to clipboard') {
 }
 
 export function formatNumber(num: number): string {
-  return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+  return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
 }

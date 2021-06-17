@@ -8,13 +8,15 @@ import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
+import { executeCommand, packageExists } from '@cubejs-backend/shared';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import { ExternalDbTypeFn } from './types';
+import DriverDependencies from './DriverDependencies';
 
 const repo = {
   owner: 'cube-js',
@@ -22,8 +24,9 @@ const repo = {
 };
 
 type DevServerOptions = {
-  dockerVersion?: string,
-  externalDbTypeFn: ExternalDbTypeFn
+  externalDbTypeFn: ExternalDbTypeFn;
+  isReadyForQueryProcessing: boolean;
+  dockerVersion?: string;
 };
 
 export class DevServer {
@@ -35,7 +38,7 @@ export class DevServer {
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
-    protected readonly options?: DevServerOptions
+    protected readonly options: DevServerOptions
   ) {
   }
 
@@ -55,7 +58,7 @@ export class DevServer {
 
     if (
       (
-        this.options?.externalDbTypeFn({
+        this.options.externalDbTypeFn({
           authInfo: null,
           securityContext: null,
           requestId: '',
@@ -85,9 +88,10 @@ export class DevServer {
         basePath: options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
-        dockerVersion: this.options?.dockerVersion || null,
+        dockerVersion: this.options.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
-        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
+        dbType: options.dbType || null,
+        shouldStartConnectionWizardFlow: !this.options.isReadyForQueryProcessing,
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
@@ -247,6 +251,62 @@ export class DevServer {
       });
     }));
 
+    let driverPromise: Promise<void> | null = null;
+    let driverError: Error | null = null;
+
+    app.get('/playground/driver', catchErrors(async (req: Request, res: Response) => {
+      const { driver } = req.query;
+
+      if (!driver || !DriverDependencies[driver]) {
+        return res.status(400).json('Wrong driver');
+      }
+
+      if (packageExists(DriverDependencies[driver])) {
+        return res.json({ status: 'installed' });
+      } else if (driverPromise) {
+        return res.json({ status: 'installing' });
+      } else if (driverError) {
+        return res.status(500).json({
+          status: 'error',
+          error: driverError.toString()
+        });
+      }
+
+      return res.json({ status: null });
+    }));
+
+    app.post('/playground/driver', catchErrors((req, res) => {
+      const { driver } = req.body;
+
+      if (!DriverDependencies[driver]) {
+        return res.status(400).json(`'${driver}' driver dependency not found`);
+      }
+
+      async function installDriver() {
+        driverError = null;
+
+        try {
+          await executeCommand(
+            'npm',
+            ['install', DriverDependencies[driver], '--save-dev'],
+            { cwd: path.resolve('.') }
+          );
+        } catch (error) {
+          driverError = error;
+        } finally {
+          driverPromise = null;
+        }
+      }
+
+      if (!driverPromise) {
+        driverPromise = installDriver();
+      }
+
+      return res.json({
+        dependency: DriverDependencies[driver]
+      });
+    }));
+
     app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Download Template Packages');
 
@@ -259,7 +319,7 @@ export class DevServer {
         const manifestJson = await fetcher.manifestJSON();
         const response = await fetcher.downloadPackages();
 
-        let templatePackages = [];
+        let templatePackages: string[];
         if (typeof toApply === 'string') {
           const template = manifestJson.templates.find(({ name }) => name === toApply);
           templatePackages = template.templatePackages;
@@ -303,7 +363,6 @@ export class DevServer {
           this.applyTemplatePackagesPromise = null;
         }
       }, (err) => {
-        console.log('err', err);
         lastApplyTemplatePackagesError = err;
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
@@ -404,6 +463,7 @@ export class DevServer {
       // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+      variables.CUBEJS_DEV_MODE = 'true';
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
       const repositoryPath = path.join(process.cwd(), options.schemaPath);

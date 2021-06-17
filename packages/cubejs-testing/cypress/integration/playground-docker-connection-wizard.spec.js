@@ -15,6 +15,7 @@ context('Playground: Connection Wizard', () => {
       req.reply((res) => {
         res.body = {
           ...res.body,
+          isDocker: true,
           shouldStartConnectionWizardFlow,
         };
       });

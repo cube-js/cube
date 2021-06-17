@@ -10,7 +10,7 @@
     "node": ">=10.8.0"
   },
   "scripts": {
-    "cypress:open": "TEST_PLAYGROUND_PORT=3080 yarn cypress:birdbox",
+    "cypress:open": "kill-port 4000 && TEST_PLAYGROUND_PORT=3080 yarn cypress:birdbox",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",

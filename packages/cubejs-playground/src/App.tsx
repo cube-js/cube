@@ -29,10 +29,6 @@ const selectedTab = (pathname) => {
 
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
-
-  & > div {
-    background: var(--layout-body-background);
-  }
 `;
 
 type AppState = {

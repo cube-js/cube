@@ -32,6 +32,8 @@ function safetyParseSemver(version: string|null) {
 }
 
 export class ServerContainer {
+  protected isCubeConfigEmpty: boolean = true;
+
   public constructor(
     protected readonly configuration: { debug: boolean }
   ) {
@@ -217,13 +219,19 @@ export class ServerContainer {
     }
   }
 
-  public async runServerInstance(configuration: CreateOptions, embedded: boolean = false) {
+  public async runServerInstance(
+    configuration: CreateOptions,
+    embedded: boolean = false,
+    isCubeConfigEmpty: boolean
+  ) {
     if (embedded) {
       process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'false';
       configuration.scheduledRefreshTimer = false;
     }
 
-    const server = new CubejsServer(configuration);
+    const server = new CubejsServer(configuration, {
+      isCubeConfigEmpty
+    });
 
     if (!embedded) {
       try {
@@ -314,7 +322,7 @@ export class ServerContainer {
     }
 
     throw new Error(
-      'Configure file must export configuration as default.'
+      'Configuration file must export the configuration as default.'
     );
   }
 
@@ -331,7 +339,11 @@ export class ServerContainer {
         ...userConfig,
       };
 
-      const server = await this.runServerInstance(configuration, embedded);
+      const server = await this.runServerInstance(
+        configuration,
+        embedded,
+        Object.keys(userConfig).length === 0
+      );
 
       return {
         configuration,

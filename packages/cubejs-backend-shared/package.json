@@ -37,6 +37,7 @@
     "@oclif/color": "^0.1.2",
     "bytes": "^3.1.0",
     "cli-progress": "^3.9.0",
+    "cross-spawn": "^7.0.3",
     "decompress": "^4.2.1",
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",

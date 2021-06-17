@@ -11,8 +11,7 @@ export type PlaygroundContext = {
   cubejsToken: string;
   basePath: string;
   isDocker: boolean;
-  extDbType: string | null;
-  dbType: string;
+  dbType: string | null;
   telemetry: boolean;
   shouldStartConnectionWizardFlow: boolean;
   dockerVersion: string | null;

@@ -44,20 +44,6 @@ export async function fileContentsRecursive(dir: string, rootPath?: string, incl
   ).reduce((a, b) => a.concat(b), []);
 }
 
-export async function executeCommand(command, args, options = {}) {
-  const child = spawn(command, args, { stdio: 'inherit', ...options });
-
-  return new Promise<void>((resolve, reject) => {
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}. Please check your console.`));
-        return;
-      }
-      resolve();
-    });
-  });
-}
-
 export async function proxyFetch(url) {
   return fetch(
     url,

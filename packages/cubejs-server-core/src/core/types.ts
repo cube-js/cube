@@ -137,3 +137,7 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
 }
+
+export type SystemOptions = {
+  isCubeConfigEmpty: boolean;
+};
