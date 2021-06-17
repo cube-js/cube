@@ -54,7 +54,11 @@ const generate = async (options) => {
 
   const container: ServerContainerType = new serverPackage.ServerContainer({ debug: false });
   const configuration = await container.lookupConfiguration();
-  const server = await container.runServerInstance(configuration, true);
+  const server = await container.runServerInstance(
+    configuration,
+    true,
+    Object.keys(configuration).length === 0
+  );
 
   const driver = await server.getDriver({
     dataSource: options.dataSource,
