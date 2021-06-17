@@ -140,4 +140,4 @@ export interface CreateOptions {
 
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;
-}
+};
