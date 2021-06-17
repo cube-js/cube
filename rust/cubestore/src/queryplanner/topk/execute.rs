@@ -563,7 +563,7 @@ impl TopKState<'_> {
     fn update_group_estimates(&self, group: &mut Group) -> Result<(), DataFusionError> {
         for i in 0..group.estimates.len() {
             group.estimates[i].reset();
-            group.estimates[i].merge(&group.accumulators[i].state()?.to_vec())?;
+            group.estimates[i].merge(&group.accumulators[i].state()?)?;
             // Node estimate might contain a neutral value (e.g. '0' for sum), but we must avoid
             // giving invalid estimates for NULL values.
             let use_node_estimates =
@@ -575,8 +575,7 @@ impl TopKState<'_> {
                         continue;
                     }
                     if use_node_estimates {
-                        group.estimates[i]
-                            .merge(&self.node_estimates[node][i].state()?.to_vec())?;
+                        group.estimates[i].merge(&self.node_estimates[node][i].state()?)?;
                     }
                 }
             }
