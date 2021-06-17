@@ -449,7 +449,7 @@ below:
 >
   <img
   alt="Pre-Aggregation Selection Flowchart"
-  src="pre-agg-selection-flow.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-agg-selection-flow.png"
   style="border: none"
   width="100%"
   />
