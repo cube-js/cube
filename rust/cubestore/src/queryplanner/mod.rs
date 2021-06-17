@@ -462,7 +462,7 @@ fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
                         return Ok(true);
                     }
 
-                    self.snapshots = ClusterSendExec::execution_partitions(&snapshots)
+                    self.snapshots = ClusterSendExec::logical_partitions(&snapshots)
                         .into_iter()
                         .map(|ps| ps.iter().map(|p| p.get_id()).collect_vec())
                         .collect_vec();
