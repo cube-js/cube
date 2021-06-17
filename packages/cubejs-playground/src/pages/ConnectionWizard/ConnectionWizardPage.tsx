@@ -11,9 +11,13 @@ import { Button, FatalError } from '../../atoms';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
 import { event, playgroundAction } from '../../events';
 import { useAppContext } from '../../components/AppContext';
-import { useSetter } from '../../hooks/setter';
 
 const { Title, Paragraph } = Typography;
+
+const STATUS = {
+  INSTALLING: 'installing',
+  INSTALLED: 'installed',
+};
 
 const DatabaseCardWrapper = styled.div`
   cursor: pointer;
@@ -114,10 +118,12 @@ export function ConnectionWizardPage({ history }) {
         async ({ response, cancel }) => {
           const { status, error } = await response.json();
 
-          if (response.ok && status !== 'installing') {
+          if (response.ok && status === STATUS.INSTALLED) {
             cancel();
             setDriverInstallationInProgress(false);
-          } else {
+          }
+
+          if (!response.ok) {
             cancel();
             setDriverInstallationInProgress(false);
             setInstallationError(error);
@@ -129,7 +135,6 @@ export function ConnectionWizardPage({ history }) {
     return () => {
       if (db) {
         fetchResult?.cancel();
-        setDriverInstallationInProgress(false);
       }
     };
   }, [db, isDriverInstallationInProgress]);
@@ -137,7 +142,6 @@ export function ConnectionWizardPage({ history }) {
   useEffect(() => {
     setTestConnectionLoading(false);
     setTestConnectionResult(null);
-    setDependencyName(null);
     setInstallationError(null);
     setHostname('');
   }, [db?.driver]);
@@ -155,9 +159,9 @@ export function ConnectionWizardPage({ history }) {
         const { status, error } = await response.json();
 
         if (response.ok) {
-          if (status === 'installed') {
+          if (status === STATUS.INSTALLED) {
             return selectDatabase(db);
-          } else if (status === 'installing') {
+          } else if (status === STATUS.INSTALLING) {
             setDriverInstallationInProgress(true);
             selectDatabase(db);
           }
@@ -202,7 +206,7 @@ export function ConnectionWizardPage({ history }) {
     return (
       <Layout>
         <Title>
-          <Title>Set Up a Database connection</Title>
+          Set Up a Database connection
         </Title>
 
         <Space align="center" size="middle">

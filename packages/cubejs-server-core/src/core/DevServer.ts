@@ -90,7 +90,7 @@ export class DevServer {
         dockerVersion: this.options?.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         dbType: options.dbType || null,
-        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
+        shouldStartConnectionWizardFlow: !this.cubejsServer.canConnectToDb(),
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
@@ -286,10 +286,8 @@ export class DevServer {
 
         try {
           await executeCommand(
-            'yarn',
-            ['add', DriverDependencies[driver], '-D'],
-            // 'npm',
-            // ['install', DriverDependencies[driver], '-D'],
+            'npm',
+            ['install', DriverDependencies[driver], '-D'],
             { cwd: path.resolve('.') }
           );
         } catch (error) {
@@ -364,7 +362,6 @@ export class DevServer {
           this.applyTemplatePackagesPromise = null;
         }
       }, (err) => {
-        console.log('err', err);
         lastApplyTemplatePackagesError = err;
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;

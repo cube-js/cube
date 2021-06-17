@@ -36,12 +36,8 @@ CUBEJS_EXTERNAL_DEFAULT=true
 CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
 
 const defaultDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
-CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_WEB_SOCKETS=true
-${sharedDotEnvVars(env)}`;
+${sharedDotEnvVars(env)}
+CUBEJS_WEB_SOCKETS=true`;
 
 const athenaDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
 CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>

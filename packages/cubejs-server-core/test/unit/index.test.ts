@@ -210,7 +210,7 @@ describe('index.test', () => {
     process.env.CUBEJS_DEV_MODE = 'true';
 
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
+      jest.spyOn(CubejsServerCore.prototype, 'canConnectToDb').mockImplementation(() => true);
       // eslint-disable-next-line
       new CubejsServerCore({});
       jest.restoreAllMocks();
@@ -232,7 +232,7 @@ describe('index.test', () => {
     process.env.NODE_ENV = 'production';
 
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
+      jest.spyOn(CubejsServerCore.prototype, 'canConnectToDb').mockImplementation(() => true);
       // eslint-disable-next-line
       new CubejsServerCore({});
       jest.restoreAllMocks();
@@ -244,7 +244,7 @@ describe('index.test', () => {
     process.env.NODE_ENV = 'production';
 
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
+      jest.spyOn(CubejsServerCore.prototype, 'canConnectToDb').mockImplementation(() => true);
       // eslint-disable-next-line
       new CubejsServerCore({ jwt: { jwkUrl: 'https://test.com/j.json' } });
       jest.restoreAllMocks();
@@ -263,7 +263,7 @@ describe('index.test', () => {
 
   test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => false);
+      jest.spyOn(CubejsServerCore.prototype, 'canConnectToDb').mockImplementation(() => false);
       // eslint-disable-next-line
       new CubejsServerCore({});
       jest.restoreAllMocks();

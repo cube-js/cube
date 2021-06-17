@@ -19,6 +19,18 @@ import type { Application as ExpressApplication } from 'express';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import type { Constructor, Required } from '@cubejs-backend/shared';
 import type { CubeStoreDevDriver, CubeStoreHandler, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
+
+import { FileRepository, SchemaFileRepository } from './FileRepository';
+import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
+import { OrchestratorApi } from './OrchestratorApi';
+import { CompilerApi } from './CompilerApi';
+import { DevServer } from './DevServer';
+import agentCollect from './agentCollect';
+import { OrchestratorStorage } from './OrchestratorStorage';
+import { prodLogger, devLogger } from './logger';
+import DriverDependencies from './DriverDependencies';
+import optionsValidate from './optionsValidate';
+
 import type {
   ContextToAppIdFn,
   CreateOptions,
@@ -30,38 +42,10 @@ import type {
   RequestContext,
   DriverContext,
   LoggerFn,
+  SystemOptions
 } from './types';
 
-import { FileRepository, SchemaFileRepository } from './FileRepository';
-import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
-import { OrchestratorApi } from './OrchestratorApi';
-import { CompilerApi } from './CompilerApi';
-import { DevServer } from './DevServer';
-import agentCollect from './agentCollect';
-import { OrchestratorStorage } from './OrchestratorStorage';
-import { prodLogger, devLogger } from './logger';
-
-import DriverDependencies from './DriverDependencies';
-import optionsValidate from './optionsValidate';
-
 const { version } = require('../../../package.json');
-
-const checkEnvForPlaceholders = () => {
-  const placeholderSubstr = '<YOUR_DB_';
-  const credentials = [
-    'CUBEJS_DB_HOST',
-    'CUBEJS_DB_NAME',
-    'CUBEJS_DB_USER',
-    'CUBEJS_DB_PASS'
-  ];
-  if (
-    credentials.find((credential) => (
-      process.env[credential] && process.env[credential].indexOf(placeholderSubstr) === 0
-    ))
-  ) {
-    throw new Error('Your .env file contains placeholders in DB credentials. Please replace them with your DB credentials.');
-  }
-};
 
 export type ServerCoreInitializedOptions = Required<
   CreateOptions,
@@ -127,7 +111,7 @@ export class CubejsServerCore {
 
   public coreServerVersion: string|null = null;
 
-  public constructor(opts: CreateOptions = {}) {
+  public constructor(opts: CreateOptions = {}, protected systemOptions?: SystemOptions) {
     optionsValidate(opts);
 
     this.logger = opts.logger || (
@@ -214,7 +198,7 @@ export class CubejsServerCore {
 
     this.initAgent();
 
-    if (this.options.devServer && !this.configFileExists()) {
+    if (this.options.devServer && !this.canConnectToDb()) {
       this.event('first_server_start');
     }
 
@@ -468,7 +452,7 @@ export class CubejsServerCore {
       }
     }
 
-    if (!options.devServer || this.configFileExists()) {
+    if (!options.devServer || this.canConnectToDb()) {
       const fieldsForValidation: (keyof ServerCoreInitializedOptions)[] = [
         'driverFactory',
         'dbType'
@@ -498,20 +482,12 @@ export class CubejsServerCore {
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
-  public configFileExists(): boolean {
-    let config = {};
-
-    try {
-      // eslint-disable-next-line global-require,import/no-dynamic-require
-      config = require(path.resolve('./cube.js'));
-    } catch (_) {
-      // allowed to fail
-    }
-
+  public canConnectToDb(): boolean {
     return (
       Boolean(process.env.CUBEJS_DB_HOST) ||
       Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
-      Object.keys(config).length > 0
+      this.systemOptions?.isCubeJsConfigEmpty === undefined ||
+      !this.systemOptions?.isCubeJsConfigEmpty
     );
   }
 
@@ -555,13 +531,11 @@ export class CubejsServerCore {
     }
   }
 
-  public static create(options?: CreateOptions) {
-    return new CubejsServerCore(options);
+  public static create(options?: CreateOptions, systemOptions?: SystemOptions) {
+    return new CubejsServerCore(options, systemOptions);
   }
 
   public async initApp(app: ExpressApplication) {
-    checkEnvForPlaceholders();
-
     const apiGateway = this.apiGateway();
     apiGateway.initApp(app);
 
@@ -576,8 +550,6 @@ export class CubejsServerCore {
   }
 
   public initSubscriptionServer(sendMessage) {
-    checkEnvForPlaceholders();
-
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
   }
@@ -844,8 +816,6 @@ export class CubejsServerCore {
   }
 
   public static createDriver(dbType: DatabaseType): BaseDriver {
-    checkEnvForPlaceholders();
-
     return new (CubejsServerCore.lookupDriverClass(dbType))();
   }
 
