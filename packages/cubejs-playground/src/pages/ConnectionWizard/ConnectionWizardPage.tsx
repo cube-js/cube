@@ -98,11 +98,11 @@ export function ConnectionWizardPage({ history }) {
   }, []);
 
   useLayoutEffect(() => {
-    if (playgroundContext?.dbType) {
+    if (playgroundContext?.dbType && !playgroundContext?.isDocker) {
       selectDatabase(
         databases.find(
           (currentDb) =>
-            currentDb.driver.toLowerCase() === playgroundContext?.dbType
+            currentDb.driver.toLowerCase() === playgroundContext.dbType
         ) || null
       );
     }
