@@ -1,38 +1,22 @@
-import mysql, { Connection, ConnectionOptions } from 'mysql2';
+import { createConnection, Connection, ConnectionOptions, RowDataPacket } from 'mysql2/promise';
+import {} from 'mysql2/'
 import genericPool, { Pool } from 'generic-pool';
-import { promisify } from 'util';
-import { BaseDriver, DriverInterface } from '@cubejs-backend/query-orchestrator';
-import { ResolveAwait } from '@cubejs-backend/shared';
+import {
+  BaseDriver, DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  DriverInterface,
+} from '@cubejs-backend/query-orchestrator';
+import { type } from 'ramda';
+import { getNativeTypeName } from './MySQLType';
 
 export interface MongoBIDriverConfiguration extends ConnectionOptions {
   storeTimezone?: string;
 }
 
-async function createConnection(config: MongoBIDriverConfiguration) {
-  const conn = mysql.createConnection(config);
-  const connect = promisify(conn.connect.bind(conn));
-
-  if (conn.on) {
-    conn.on('error', () => {
-      conn.destroy();
-    });
-  }
-
-  await connect();
-
-  return {
-    ...conn,
-    execute: promisify(conn.query).bind(conn),
-    close: promisify(conn.end).bind(conn)
-  };
-}
-
-type MySQLConnection = ResolveAwait<ReturnType<typeof createConnection>>;
-
 export class MongoBIDriver extends BaseDriver implements DriverInterface {
   protected readonly config: MongoBIDriverConfiguration;
 
-  protected readonly pool: Pool<MySQLConnection>;
+  protected readonly pool: Pool<Connection>;
 
   public constructor(config: MongoBIDriverConfiguration = {}) {
     super();
@@ -53,18 +37,28 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       ...config
     };
     this.pool = genericPool.createPool({
-      create: async () => createConnection(this.config),
-      destroy: async (connection) => {
-        await connection.close();
+      create: async () => {
+        const conn = await createConnection(this.config);
+
+        if (conn.on) {
+          conn.on('error', () => {
+            conn.destroy();
+          });
+        }
+
+        return conn;
       },
+      destroy: async (connection) => connection.end(),
       validate: async (connection) => {
         try {
-          await connection.execute({
+          await connection.query({
             sql: 'SELECT 1',
           });
         } catch (e) {
+          this.databasePoolError(e);
           return false;
         }
+
         return true;
       }
     }, {
@@ -78,7 +72,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  withConnection<T>(fn: (conn: MySQLConnection) => Promise<T>): Promise<T> {
+  withConnection<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
     const self = this;
     const connectionPromise = this.pool.acquire();
 
@@ -88,11 +82,11 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       cancelObj.cancel = async () => {
         cancelled = true;
         await self.withConnection(async processConnection => {
-          const processRows: any = await processConnection.execute({
+          const processRows: any = await processConnection.query({
             sql: 'SHOW PROCESSLIST'
           });
           await Promise.all(processRows.filter((row: any) => row.Time >= 599)
-            .map((row: any) => processConnection.execute({
+            .map((row: any) => processConnection.query({
               sql: `KILL ${row.Id}`
             })));
         });
@@ -117,9 +111,9 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
 
   async testConnection() {
     // eslint-disable-next-line no-underscore-dangle
-    const conn = await (<any> this.pool)._factory.create();
+    const conn: Connection = await (<any> this.pool)._factory.create();
     try {
-      return await conn.execute('SELECT 1');
+      await conn.query('SELECT 1');
     } finally {
       // eslint-disable-next-line no-underscore-dangle
       await (<any> this.pool)._factory.destroy(conn);
@@ -127,18 +121,42 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
-    const self = this;
-
     return <any> this.withConnection(async (conn) => {
-      await conn.execute({
-        sql: `SET time_zone = '${self.config.storeTimezone || '+00:00'}'`,
-        values: [],
-      });
+      await this.prepareConnection(conn);
 
-      return conn.execute({
+      const [rows] = await conn.query({
         sql: query,
         values,
       });
+
+      return rows;
+    });
+  }
+
+  protected async prepareConnection(conn: Connection) {
+    await conn.query({
+      sql: `SET time_zone = '${this.config.storeTimezone || '+00:00'}'`,
+      values: [],
+    });
+  }
+
+  public async downloadQueryResults(
+    query: string,
+    values: unknown[],
+    options: DownloadQueryResultsOptions
+  ): Promise<DownloadQueryResultsResult> {
+    return this.withConnection(async (conn) => {
+      await this.prepareConnection(conn);
+
+      const [rows, fields] = await conn.query<RowDataPacket[]>(query, values);
+
+      return {
+        rows,
+        types: fields.map((field: any) => ({
+          name: field.name,
+          type: this.toGenericType(getNativeTypeName(field.columnType)),
+        })),
+      };
     });
   }
 
