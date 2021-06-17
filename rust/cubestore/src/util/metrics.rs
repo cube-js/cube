@@ -136,12 +136,11 @@ impl Sink {
             MetricType::Distribution if self.mode == Compatibility::StatsD => "ms",
             MetricType::Distribution => "d",
         };
-        if let Err(e) = self
+        // We deliberately choose to loose metric submissions on failures.
+        // TODO: handle EWOULDBLOCK with background sends or at least internal failure counters.
+        let _ = self
             .socket
-            .send(format!("{}:{}|{}", m.name, value, kind).as_bytes())
-        {
-            log::error!("failed to send metrics: {}", e)
-        }
+            .send(format!("{}:{}|{}", m.name, value, kind).as_bytes());
     }
 }
 
