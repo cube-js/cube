@@ -27,7 +27,7 @@
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.27.34",
     "generic-pool": "^3.6.0",
-    "mysql2": "^2.1.0"
+    "mysql2": "^2.2.5"
   },
   "license": "Apache-2.0",
   "publishConfig": {
