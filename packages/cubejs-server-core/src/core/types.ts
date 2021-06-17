@@ -139,5 +139,5 @@ export interface CreateOptions {
 }
 
 export type SystemOptions = {
-  isCubeJsConfigEmpty: boolean;
+  isCubeConfigEmpty: boolean;
 }

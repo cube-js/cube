@@ -111,7 +111,7 @@ export class CubejsServerCore {
 
   public coreServerVersion: string|null = null;
 
-  public constructor(opts: CreateOptions = {}, protected systemOptions?: SystemOptions) {
+  public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
 
     this.logger = opts.logger || (
@@ -153,6 +153,8 @@ export class CubejsServerCore {
         this.options.maxCompilerCacheKeepAlive
       );
     }
+
+    console.log('CONSTRUCTOR', Date.now());
 
     this.startScheduledRefreshTimer();
 
@@ -198,14 +200,15 @@ export class CubejsServerCore {
 
     this.initAgent();
 
-    if (this.options.devServer && !this.canConnectToDb()) {
+    if (this.options.devServer && !this.isReadyForQueryProcessing()) {
       this.event('first_server_start');
     }
 
     if (this.options.devServer) {
       this.devServer = new DevServer(this, {
         dockerVersion: getEnv('dockerImageVersion'),
-        externalDbTypeFn: this.contextToExternalDbType
+        externalDbTypeFn: this.contextToExternalDbType,
+        isReadyForQueryProcessing: this.isReadyForQueryProcessing()
       });
       const oldLogger = this.logger;
       this.logger = ((msg, params) => {
@@ -248,12 +251,15 @@ export class CubejsServerCore {
   }
 
   protected isReadyForQueryProcessing(): boolean {
-    const dbType = this.options.dbType || <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
-
-    return typeof dbType !== 'undefined';
+    return (
+      Boolean(process.env.CUBEJS_DB_HOST) ||
+      Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
+      this.systemOptions?.isCubeConfigEmpty === undefined ||
+      !this.systemOptions?.isCubeConfigEmpty
+    );
   }
 
-  public startScheduledRefreshTimer(): [boolean, string|null] {
+  public startScheduledRefreshTimer(): [boolean, string | null] {
     if (!this.isReadyForQueryProcessing()) {
       return [false, 'Instance is not ready for query processing, refresh scheduler is disabled'];
     }
@@ -452,7 +458,7 @@ export class CubejsServerCore {
       }
     }
 
-    if (!options.devServer || this.canConnectToDb()) {
+    if (!options.devServer || this.isReadyForQueryProcessing()) {
       const fieldsForValidation: (keyof ServerCoreInitializedOptions)[] = [
         'driverFactory',
         'dbType'
@@ -480,15 +486,6 @@ export class CubejsServerCore {
 
     this.contextToDbType = wrapToFnIfNeeded(this.options.dbType);
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
-  }
-
-  public canConnectToDb(): boolean {
-    return (
-      Boolean(process.env.CUBEJS_DB_HOST) ||
-      Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
-      this.systemOptions?.isCubeJsConfigEmpty === undefined ||
-      !this.systemOptions?.isCubeJsConfigEmpty
-    );
   }
 
   protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number | false {

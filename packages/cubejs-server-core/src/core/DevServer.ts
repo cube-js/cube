@@ -24,8 +24,9 @@ const repo = {
 };
 
 type DevServerOptions = {
-  dockerVersion?: string,
-  externalDbTypeFn: ExternalDbTypeFn
+  externalDbTypeFn: ExternalDbTypeFn;
+  isReadyForQueryProcessing: boolean;
+  dockerVersion?: string;
 };
 
 export class DevServer {
@@ -37,7 +38,7 @@ export class DevServer {
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
-    protected readonly options?: DevServerOptions
+    protected readonly options: DevServerOptions
   ) {
   }
 
@@ -57,7 +58,7 @@ export class DevServer {
 
     if (
       (
-        this.options?.externalDbTypeFn({
+        this.options.externalDbTypeFn({
           authInfo: null,
           securityContext: null,
           requestId: '',
@@ -87,10 +88,10 @@ export class DevServer {
         basePath: options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
-        dockerVersion: this.options?.dockerVersion || null,
+        dockerVersion: this.options.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         dbType: options.dbType || null,
-        shouldStartConnectionWizardFlow: !this.cubejsServer.canConnectToDb(),
+        shouldStartConnectionWizardFlow: !this.options.isReadyForQueryProcessing,
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
@@ -287,7 +288,7 @@ export class DevServer {
         try {
           await executeCommand(
             'npm',
-            ['install', DriverDependencies[driver], '-D'],
+            ['install', DriverDependencies[driver], '--save-dev'],
             { cwd: path.resolve('.') }
           );
         } catch (error) {

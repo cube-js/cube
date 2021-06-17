@@ -32,7 +32,7 @@ function safetyParseSemver(version: string|null) {
 }
 
 export class ServerContainer {
-  protected isCubeJsConfigEmpty: boolean = true;
+  protected isCubeConfigEmpty: boolean = true;
 
   public constructor(
     protected readonly configuration: { debug: boolean }
@@ -222,7 +222,7 @@ export class ServerContainer {
   public async runServerInstance(
     configuration: CreateOptions,
     embedded: boolean = false,
-    isCubeJsConfigEmpty: boolean
+    isCubeConfigEmpty: boolean
   ) {
     if (embedded) {
       process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'false';
@@ -230,7 +230,7 @@ export class ServerContainer {
     }
 
     const server = new CubejsServer(configuration, {
-      isCubeJsConfigEmpty
+      isCubeConfigEmpty
     });
 
     if (!embedded) {
