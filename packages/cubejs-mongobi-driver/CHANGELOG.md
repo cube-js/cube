@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+
+### Features
+
+* **mongobi-driver:** Ingest types from driver ([c630997](https://github.com/cube-js/cube.js/commit/c63099799cd1fc99921c630d3f413d5da0b34453))
+* **mongobi-driver:** Migrate to TypeScript ([8ca7811](https://github.com/cube-js/cube.js/commit/8ca7811be9ce1f6d240d4f4d62a2bb93899fbbbd))
+* **mongobi-driver:** Support streaming ([059368e](https://github.com/cube-js/cube.js/commit/059368e68de606a0aefe1368131e21c795578995))
+
+
+
+
+
 ## [0.27.34](https://github.com/cube-js/cube.js/compare/v0.27.33...v0.27.34) (2021-06-15)
 
 **Note:** Version bump only for package @cubejs-backend/mongobi-driver

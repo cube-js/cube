@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cubestore",
-  "version": "0.27.33",
+  "version": "0.27.35",
   "description": "Cube.js pre-aggregation storage layer.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -37,7 +37,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@cubejs-backend/shared": "^0.27.33",
+    "@cubejs-backend/shared": "^0.27.35",
     "@octokit/core": "^3.2.5",
     "source-map-support": "^0.5.19"
   },

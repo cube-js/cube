@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+
+### Features
+
+* **@cubejs-client/playground:** cli connection wizard ([#2969](https://github.com/cube-js/cube.js/issues/2969)) ([77652d7](https://github.com/cube-js/cube.js/commit/77652d7e0121140b0d52912a862c25aed911ed9d))
+
+
+
+
+
 ## [0.27.34](https://github.com/cube-js/cube.js/compare/v0.27.33...v0.27.34) (2021-06-15)
 
 **Note:** Version bump only for package @cubejs-backend/server

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+
+### Features
+
+* MySQL/PostgreSQL - make readOnly by default ([86eef1b](https://github.com/cube-js/cube.js/commit/86eef1b9ea1382e9c6cfe1aabb48888c2132f406))
+
+
+
+
+
 ## [0.27.34](https://github.com/cube-js/cube.js/compare/v0.27.33...v0.27.34) (2021-06-15)
 
 **Note:** Version bump only for package @cubejs-backend/redshift-driver

@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** support all pivotConfig props ([#2964](https://github.com/cube-js/cube.js/issues/2964)) ([8c13b2b](https://github.com/cube-js/cube.js/commit/8c13b2beb3fe75533a923128859731cab2da4bbc))
+* **cubestore:** do not spam logs when no statsd server is listening ([44b8cad](https://github.com/cube-js/cube.js/commit/44b8cad96cdbb84dd830d255392152d3f20a4e23))
+* **cubestore:** fix assertion failure (unsorted inputs to merge sort) ([534da14](https://github.com/cube-js/cube.js/commit/534da146a472e2d04cd1e97c0ab9825f02623551))
+* **cubestore:** send at most one request per worker ([17e504a](https://github.com/cube-js/cube.js/commit/17e504a62c21961724dc2a17bf8a9a480cf3cf23))
+
+
+### Features
+
+* **@cubejs-client/playground:** cli connection wizard ([#2969](https://github.com/cube-js/cube.js/issues/2969)) ([77652d7](https://github.com/cube-js/cube.js/commit/77652d7e0121140b0d52912a862c25aed911ed9d))
+* **@cubejs-client/vue:** support logical operator filters ([#2950](https://github.com/cube-js/cube.js/issues/2950)). Thanks to [@piktur](https://github.com/piktur)! ([1313dad](https://github.com/cube-js/cube.js/commit/1313dad6a1f4b9da7e6ca194415b1a756e715692))
+* **mongobi-driver:** Ingest types from driver ([c630997](https://github.com/cube-js/cube.js/commit/c63099799cd1fc99921c630d3f413d5da0b34453))
+* **mongobi-driver:** Migrate to TypeScript ([8ca7811](https://github.com/cube-js/cube.js/commit/8ca7811be9ce1f6d240d4f4d62a2bb93899fbbbd))
+* **mongobi-driver:** Support streaming ([059368e](https://github.com/cube-js/cube.js/commit/059368e68de606a0aefe1368131e21c795578995))
+* MySQL/PostgreSQL - make readOnly by default ([86eef1b](https://github.com/cube-js/cube.js/commit/86eef1b9ea1382e9c6cfe1aabb48888c2132f406))
+* **mysql-driver:** Ingest types from driver ([89a48a8](https://github.com/cube-js/cube.js/commit/89a48a8c2107b6a3a31d017b56df3233d005de83))
+
+
+
+
+
 ## [0.27.34](https://github.com/cube-js/cube.js/compare/v0.27.33...v0.27.34) (2021-06-15)
 
 

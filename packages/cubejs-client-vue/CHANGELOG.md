@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** support all pivotConfig props ([#2964](https://github.com/cube-js/cube.js/issues/2964)) ([8c13b2b](https://github.com/cube-js/cube.js/commit/8c13b2beb3fe75533a923128859731cab2da4bbc))
+
+
+### Features
+
+* **@cubejs-client/vue:** support logical operator filters ([#2950](https://github.com/cube-js/cube.js/issues/2950)). Thanks to [@piktur](https://github.com/piktur)! ([1313dad](https://github.com/cube-js/cube.js/commit/1313dad6a1f4b9da7e6ca194415b1a756e715692))
+
+
+
+
+
 ## [0.27.32](https://github.com/cube-js/cube.js/compare/v0.27.31...v0.27.32) (2021-06-12)
 
 **Note:** Version bump only for package @cubejs-client/vue
