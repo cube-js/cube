@@ -5,7 +5,8 @@ import styled from 'styled-components';
 import GlobalStyles from '../../components/GlobalStyles';
 import {
   SecurityContextProvider,
-  SecurityContextContextProps,
+  SecurityContextProps,
+  SecurityContextProviderProps,
 } from '../../components/SecurityContext/SecurityContextProvider';
 import {
   AppContextProvider,
@@ -18,16 +19,18 @@ const StyledWrapper = styled.div`
 `;
 
 type PlaygroundWrapperProps = {
+  children: ReactNode;
   identifier?: string;
   playgroundContext?: PlaygroundContext;
-  children: ReactNode;
-} & Pick<SecurityContextContextProps, 'getToken'>;
+} & Pick<SecurityContextProps, 'token' | 'onTokenPayloadChange'> &
+  Pick<SecurityContextProviderProps, 'tokenUpdater'>;
 
 export function PlaygroundWrapper({
   identifier,
   playgroundContext,
-  getToken,
   children,
+  tokenUpdater,
+  onTokenPayloadChange,
 }: PlaygroundWrapperProps) {
   return (
     <StyledWrapper>
@@ -36,7 +39,10 @@ export function PlaygroundWrapper({
           identifier={identifier}
           playgroundContext={playgroundContext}
         >
-          <SecurityContextProvider getToken={getToken}>
+          <SecurityContextProvider
+            tokenUpdater={tokenUpdater}
+            onTokenPayloadChange={onTokenPayloadChange}
+          >
             {children}
           </SecurityContextProvider>
         </AppContextProvider>

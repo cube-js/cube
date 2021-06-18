@@ -1,35 +1,35 @@
-import {
-  createContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from 'react';
+import { createContext, useState, useEffect, ReactNode } from 'react';
 import jwtDecode from 'jwt-decode';
 
 import { SecurityContext } from './SecurityContext';
 import { useLocalStorage } from '../../hooks';
 
-export type SecurityContextContextProps = {
+export type SecurityContextProps = {
   payload: string;
   token: string | null;
   isModalOpen: boolean;
   setIsModalOpen: any;
   saveToken: (token: string | null) => void;
-  getToken: (payload: string) => Promise<string>;
+  onTokenPayloadChange: (payload: string) => Promise<string>;
 };
 
-export const SecurityContextContext =
-  createContext<SecurityContextContextProps>(
-    {} as SecurityContextContextProps
-  );
+export const SecurityContextContext = createContext<SecurityContextProps>(
+  {} as SecurityContextProps
+);
 
-type SecurityContextProviderProps = {
+export type SecurityContextProviderProps = {
   children: ReactNode;
-} & Pick<SecurityContextContextProps, 'getToken'>;
+  tokenUpdater?: (token: string | null) => Promise<string | null>;
+} & Pick<SecurityContextProps, 'onTokenPayloadChange'>;
+
+let mutex = 0;
+let refreshingToken: string | null = null;
+let mounted = false;
 
 export function SecurityContextProvider({
   children,
-  getToken,
+  tokenUpdater,
+  onTokenPayloadChange,
 }: SecurityContextProviderProps) {
   const [token, setToken, removeToken] = useLocalStorage<string | null>(
     'cubejsToken',
@@ -37,6 +37,31 @@ export function SecurityContextProvider({
   );
   const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    mounted = true;
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    async function updateToken(token: string | null) {
+      if (token != null && tokenUpdater && refreshingToken !== token) {
+        refreshingToken = token;
+        const currentMutext = mutex;
+        const refreshedToken = await tokenUpdater(token);
+
+        if (mounted && currentMutext === mutex) {
+          setToken(refreshedToken);
+          mutex++;
+        }
+      }
+    }
+
+    updateToken(token);
+  });
 
   useEffect(() => {
     if (token) {
@@ -64,10 +89,9 @@ export function SecurityContextProvider({
             removeToken();
           } else {
             setToken(token);
-            console.log('will set', token)
           }
         },
-        getToken,
+        onTokenPayloadChange,
       }}
     >
       {children}
