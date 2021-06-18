@@ -84,10 +84,7 @@ export function SecurityContext() {
       setSubmitting(true);
 
       try {
-        const res = await onTokenPayloadChange(tmpPayload || '');
-        console.log('@new token', res)
-        saveToken(res);
-        // saveToken(await onTokenPayloadChange(tmpPayload || ''));
+        saveToken(await onTokenPayloadChange(tmpPayload || ''));
       } catch (error) {
         console.error(error);
       }
