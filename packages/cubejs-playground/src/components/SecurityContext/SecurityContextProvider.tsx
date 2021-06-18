@@ -2,7 +2,7 @@ import { createContext, useState, useEffect, ReactNode } from 'react';
 import jwtDecode from 'jwt-decode';
 
 import { SecurityContext } from './SecurityContext';
-import { useLocalStorage } from '../../hooks';
+import { useIsMounted, useLocalStorage } from '../../hooks';
 
 export type SecurityContextProps = {
   payload: string;
@@ -24,13 +24,13 @@ export type SecurityContextProviderProps = {
 
 let mutex = 0;
 let refreshingToken: string | null = null;
-let mounted = false;
 
 export function SecurityContextProvider({
   children,
   tokenUpdater,
   onTokenPayloadChange,
 }: SecurityContextProviderProps) {
+  const isMounted = useIsMounted();
   const [token, setToken, removeToken] = useLocalStorage<string | null>(
     'cubejsToken',
     null
@@ -39,21 +39,13 @@ export function SecurityContextProvider({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    mounted = true;
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
     async function updateToken(token: string | null) {
       if (token != null && tokenUpdater && refreshingToken !== token) {
         refreshingToken = token;
         const currentMutext = mutex;
         const refreshedToken = await tokenUpdater(token);
 
-        if (mounted && currentMutext === mutex) {
+        if (isMounted && currentMutext === mutex) {
           setToken(refreshedToken);
           mutex++;
         }
