@@ -3,6 +3,7 @@ import { Card, Space } from 'antd';
 import styled from 'styled-components';
 import { CloudOutlined, LockOutlined } from '@ant-design/icons';
 import { useHistory } from 'react-router';
+import { CubeProvider } from '@cubejs-client/react';
 
 import { Button } from '../../atoms';
 import LivePreviewBar from '../LivePreviewContext/LivePreviewBar';
@@ -13,7 +14,6 @@ import {
   PlaygroundQueryBuilderProps,
 } from './components/PlaygroundQueryBuilder';
 import { QueryTabs } from '../QueryTabs/QueryTabs';
-import { CubeProvider } from '@cubejs-client/react';
 
 const StyledCard: typeof Card = styled(Card)`
   border-radius: 0;
@@ -51,19 +51,21 @@ export function QueryBuilderContainer({
   const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
   const livePreviewContext = useLivePreviewContext();
 
+  const currentToken = securityContextToken || token;
+
   useLayoutEffect(() => {
-    if (apiUrl && token) {
+    if (apiUrl && currentToken) {
       window['__cubejsPlayground'] = {
         ...window['__cubejsPlayground'],
         apiUrl,
-        token,
+        token: currentToken,
       };
     }
-  }, [apiUrl, token]);
+  }, [apiUrl, currentToken]);
 
-  const cubejsApi = useCubejsApi(apiUrl, token);
+  const cubejsApi = useCubejsApi(apiUrl, currentToken);
 
-  if (!cubejsApi || !apiUrl || !token) {
+  if (!cubejsApi || !apiUrl || !currentToken) {
     return null;
   }
 
@@ -119,7 +121,7 @@ export function QueryBuilderContainer({
             <PlaygroundQueryBuilder
               queryId={id}
               apiUrl={apiUrl}
-              cubejsToken={token}
+              cubejsToken={currentToken}
               initialVizState={{
                 query,
                 chartType

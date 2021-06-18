@@ -1,8 +1,9 @@
 import { PlaygroundWrapper } from './PlaygroundWrapper';
-import { SecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
 import {
-  PlaygroundQueryBuilderProps,
-} from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
+  SecurityContextProps,
+  SecurityContextProviderProps,
+} from '../../components/SecurityContext/SecurityContextProvider';
+import { PlaygroundQueryBuilderProps } from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 
 type QueryBuilderProps = {
@@ -17,11 +18,21 @@ type QueryBuilderProps = {
   | 'onVizStateChanged'
   | 'onSchemaChange'
 > &
-  Pick<SecurityContextContextProps, 'getToken'>;
+  Pick<SecurityContextProps, 'onTokenPayloadChange'> &
+  Pick<SecurityContextProviderProps, 'tokenUpdater'>;
 
-export function QueryBuilder({ token, identifier, ...props }: QueryBuilderProps) {
+export function QueryBuilder({
+  token,
+  identifier,
+  ...props
+}: QueryBuilderProps) {
   return (
-    <PlaygroundWrapper identifier={identifier} getToken={props.getToken}>
+    <PlaygroundWrapper
+      identifier={identifier}
+      token={token}
+      tokenUpdater={props.tokenUpdater}
+      onTokenPayloadChange={props.onTokenPayloadChange}
+    >
       <QueryBuilderContainer token={token} {...props} />
     </PlaygroundWrapper>
   );

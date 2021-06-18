@@ -4,3 +4,4 @@ export * from './cubejs-api';
 export * from './live-preview-context'
 export * from './local-storage'
 export * from './identifier'
+export * from './is-mounted'
