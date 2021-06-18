@@ -58,5 +58,5 @@ export function getNativeTypeName(typeId: MySQLType) {
 
   throw new Error(
     `Unsupported mapping for data type: ${typeId}`
-  )
+  );
 }

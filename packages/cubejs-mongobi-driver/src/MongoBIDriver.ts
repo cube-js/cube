@@ -1,12 +1,13 @@
-import { createConnection, Connection, ConnectionOptions, RowDataPacket } from 'mysql2/promise';
-import {} from 'mysql2/'
+import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field } from 'mysql2';
 import genericPool, { Pool } from 'generic-pool';
 import {
   BaseDriver, DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
-  DriverInterface,
+  DriverInterface, StreamOptions,
 } from '@cubejs-backend/query-orchestrator';
-import { type } from 'ramda';
+import { Readable } from 'stream';
+import moment from 'moment';
+
 import { getNativeTypeName } from './MySQLType';
 
 export interface MongoBIDriverConfiguration extends ConnectionOptions {
@@ -34,11 +35,20 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
           return Buffer.from((password).concat('\0')).toString();
         }
       },
+      typeCast: (field: Field, next) => {
+        if (field.type === 'DATETIME') {
+          // Example value 1998-08-02 00:00:00
+          return moment.utc(field.string())
+            .format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+        }
+
+        return next();
+      },
       ...config
     };
     this.pool = genericPool.createPool({
       create: async () => {
-        const conn = await createConnection(this.config);
+        const conn: Connection = createConnection(this.config);
 
         if (conn.on) {
           conn.on('error', () => {
@@ -46,12 +56,14 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
           });
         }
 
+        await conn.promise().connect();
+
         return conn;
       },
-      destroy: async (connection) => connection.end(),
+      destroy: async (connection) => connection.promise().end(),
       validate: async (connection) => {
         try {
-          await connection.query({
+          await connection.promise().query({
             sql: 'SELECT 1',
           });
         } catch (e) {
@@ -72,7 +84,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  withConnection<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
+  protected withConnection<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
     const self = this;
     const connectionPromise = this.pool.acquire();
 
@@ -82,11 +94,11 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       cancelObj.cancel = async () => {
         cancelled = true;
         await self.withConnection(async processConnection => {
-          const processRows: any = await processConnection.query({
+          const processRows: any = await processConnection.promise().query({
             sql: 'SHOW PROCESSLIST'
           });
           await Promise.all(processRows.filter((row: any) => row.Time >= 599)
-            .map((row: any) => processConnection.query({
+            .map((row: any) => processConnection.promise().query({
               sql: `KILL ${row.Id}`
             })));
         });
@@ -109,23 +121,23 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
     return promise;
   }
 
-  async testConnection() {
+  public async testConnection() {
     // eslint-disable-next-line no-underscore-dangle
     const conn: Connection = await (<any> this.pool)._factory.create();
     try {
-      await conn.query('SELECT 1');
+      await conn.promise().query('SELECT 1', []);
     } finally {
       // eslint-disable-next-line no-underscore-dangle
       await (<any> this.pool)._factory.destroy(conn);
     }
   }
 
-  public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
+  public async query<R = unknown>(sql: string, values: unknown[]): Promise<R[]> {
     return <any> this.withConnection(async (conn) => {
       await this.prepareConnection(conn);
 
-      const [rows] = await conn.query({
-        sql: query,
+      const [rows] = await conn.promise().query({
+        sql,
         values,
       });
 
@@ -134,10 +146,49 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async prepareConnection(conn: Connection) {
-    await conn.query({
+    await conn.promise().query({
       sql: `SET time_zone = '${this.config.storeTimezone || '+00:00'}'`,
       values: [],
     });
+  }
+
+  public async stream(query: string, values: unknown[], options: StreamOptions): Promise<any> {
+    // eslint-disable-next-line no-underscore-dangle
+    const conn: Connection = await (<any> this.pool)._factory.create();
+
+    try {
+      await this.prepareConnection(conn);
+
+      const [rowStream, fields] = await (
+        new Promise<[Readable, any[]]>((resolve, reject) => {
+          const stream = conn.query(query, values).stream(options);
+
+          stream.on('fields', (f) => {
+            resolve([stream, f]);
+          });
+          stream.on('error', (e) => {
+            reject(e);
+          });
+        })
+      );
+
+      return {
+        rowStream,
+        types: fields.map((field: any) => ({
+          name: field.name,
+          type: this.toGenericType(getNativeTypeName(field.columnType)),
+        })),
+        release: async () => {
+          // eslint-disable-next-line no-underscore-dangle
+          await (<any> this.pool)._factory.destroy(conn);
+        }
+      };
+    } catch (e) {
+      // eslint-disable-next-line no-underscore-dangle
+      await (<any> this.pool)._factory.destroy(conn);
+
+      throw e;
+    }
   }
 
   public async downloadQueryResults(
@@ -145,10 +196,14 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     options: DownloadQueryResultsOptions
   ): Promise<DownloadQueryResultsResult> {
+    if ((options || {}).streamImport) {
+      return this.stream(query, values, options);
+    }
+
     return this.withConnection(async (conn) => {
       await this.prepareConnection(conn);
 
-      const [rows, fields] = await conn.query<RowDataPacket[]>(query, values);
+      const [rows, fields] = await conn.promise().query<RowDataPacket[]>(query, values);
 
       return {
         rows,
