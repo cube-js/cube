@@ -229,6 +229,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
   }
 
   public readOnly() {
+    // Mongo BI doesn't support table creation
     return true;
   }
 }
