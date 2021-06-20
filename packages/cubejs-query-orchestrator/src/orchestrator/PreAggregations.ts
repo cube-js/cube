@@ -1136,7 +1136,6 @@ export class PreAggregations {
               this.queryCache,
               this,
               {
-                // TODO: skip requestId?
                 requestId,
                 dataSource
               }
