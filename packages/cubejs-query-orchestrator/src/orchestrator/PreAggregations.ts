@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import R, { of } from 'ramda';
+import R from 'ramda';
 
 import { getEnv } from '@cubejs-backend/shared';
 
