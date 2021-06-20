@@ -1127,7 +1127,8 @@ export class PreAggregations {
       preAggregations.map(
         async p => {
           const { dataSource } = p;
-          const cacheKey = [dataSource, p.preAggregation.external ? 'EXT' : ''].join('/');
+          const { external } = p.preAggregation;
+          const cacheKey = [dataSource, external ? 'EXT' : ''].join('/');
 
           if (!loadCacheByDataSource[dataSource]) {
             loadCacheByDataSource[dataSource] = new PreAggregationLoadCache(
@@ -1143,7 +1144,7 @@ export class PreAggregations {
           }
           if (firstByCacheKey[cacheKey]) await firstByCacheKey[cacheKey];
           const promise = loadCacheByDataSource[dataSource].getVersionEntries({
-            ...p.preAggregation,
+            external,
             dataSource,
             preAggregationsSchema
           });
