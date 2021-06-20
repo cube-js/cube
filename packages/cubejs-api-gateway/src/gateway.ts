@@ -346,8 +346,8 @@ export class ApiGateway {
         const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
         this.resToResultFn(res)({
           securityContexts: contexts
-            .filter(c => c && c.securityContext)
-            .map(context => context.securityContext)
+            .map(ctx => ctx && (ctx.securityContext || ctx.authInfo))
+            .filter(ctx => ctx)
         });
       }));
 
