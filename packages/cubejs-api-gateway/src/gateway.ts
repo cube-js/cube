@@ -342,10 +342,18 @@ export class ApiGateway {
         });
       }));
 
-      app.get('/cubejs-system/v1/pre-aggregations/config', systemMiddlewares, (async (req, res) => {
+      app.get('/cubejs-system/v1/pre-aggregations/security-contexts', systemMiddlewares, (async (req, res) => {
+        const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
         this.resToResultFn(res)({
-          scheduledRefreshContexts: this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [],
-          scheduledRefreshTimeZones: this.scheduledRefreshTimeZones || []
+          securityContexts: contexts
+            .map(ctx => ctx && (ctx.securityContext || ctx.authInfo))
+            .filter(ctx => ctx)
+        });
+      }));
+
+      app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, (async (req, res) => {
+        this.resToResultFn(res)({
+          timezones: this.scheduledRefreshTimeZones || []
         });
       }));
 

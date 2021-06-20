@@ -477,13 +477,8 @@ describe('API Gateway', () => {
     const testConfigs = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },
       { route: 'pre-aggregations', successResult: { preAggregations: preAggregationsResultFactory() } },
-      {
-        route: 'pre-aggregations/config',
-        successResult: {
-          scheduledRefreshContexts: scheduledRefreshContextsFactory(),
-          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
-        }
-      },
+      { route: 'pre-aggregations/security-contexts', successResult: { securityContexts: scheduledRefreshContextsFactory().map(obj => obj.securityContext) } },
+      { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } },
       {
         route: 'pre-aggregations/partitions',
         method: 'post',
