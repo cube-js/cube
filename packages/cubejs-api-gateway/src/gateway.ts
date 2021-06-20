@@ -344,11 +344,7 @@ export class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations/security-contexts', systemMiddlewares, (async (req, res) => {
         const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
-        this.resToResultFn(res)({
-          securityContexts: contexts
-            .filter(c => c && c.securityContext)
-            .map(context => context.securityContext)
-        });
+        this.resToResultFn(res)(contexts);
       }));
 
       app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, (async (req, res) => {
