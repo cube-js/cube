@@ -168,7 +168,7 @@ export class QueryOrchestrator {
     requestId: string,
   ) {
     const versionEntries = await this.preAggregations.getVersionEntries(
-      preAggregations,
+      preAggregations.map(p => p.preAggregation),
       preAggregationsSchema,
       requestId
     );

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import R from 'ramda';
+import R, { of } from 'ramda';
 
 import { getEnv } from '@cubejs-backend/shared';
 
@@ -203,6 +203,7 @@ class PreAggregationLoadCache {
   }
 
   private async fetchTablesNoCache(preAggregation) {
+    console.log('fetchTablesNoCache', preAggregation);
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory();
@@ -216,6 +217,7 @@ class PreAggregationLoadCache {
   protected async getTablesQuery(preAggregation) {
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.tables[redisKey]) {
+      console.log(redisKey);
       this.tables[redisKey] = this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external ?
         await this.fetchTablesNoCache(preAggregation) :
         await this.tablesFromCache(preAggregation);
@@ -1121,12 +1123,43 @@ export class PreAggregations {
 
   public async getVersionEntries(preAggregations, preAggregationsSchema, requestId): Promise<VersionEntry[][]> {
     const loadCacheByDataSource = {};
+    // const data: VersionEntry[][] = [];
 
+    // // eslint-disable-next-line no-restricted-syntax
+    // for (const p of preAggregations) {
+    //   const { dataSource } = p;
+    //   if (!loadCacheByDataSource[dataSource]) {
+    //     loadCacheByDataSource[dataSource] = new PreAggregationLoadCache(
+    //       this.redisPrefix,
+    //       () => this.driverFactory(dataSource),
+    //       this.queryCache,
+    //       this,
+    //       {
+    //         // TODO: skip requestId?
+    //         requestId,
+    //         dataSource
+    //       }
+    //     );
+    //   }
+
+    //   const res = await loadCacheByDataSource[dataSource].getVersionEntries({
+    //     ...p.preAggregation,
+    //     dataSource,
+    //     preAggregationsSchema
+    //   });
+
+    //   data.push(res.versionEntries);
+    // }
+
+    const firstByCacheKey = {};
     const data: VersionEntry[][] = await Promise.all(
       preAggregations.map(
-        async preAggregation => {
-          const { dataSource } = preAggregation;
+        async p => {
+          const { dataSource } = p;
+          const cacheKey = [dataSource, p.preAggregation.external ? 'EXT' : ''].join('/');
+
           if (!loadCacheByDataSource[dataSource]) {
+            console.log('new PreAggregationLoadCache');
             loadCacheByDataSource[dataSource] = new PreAggregationLoadCache(
               this.redisPrefix,
               () => this.driverFactory(dataSource),
@@ -1139,12 +1172,23 @@ export class PreAggregations {
               }
             );
           }
+          if (firstByCacheKey[cacheKey]) {
+            console.log('first await');
+            await firstByCacheKey[cacheKey];
+          }
 
-          const res = await loadCacheByDataSource[dataSource].getVersionEntries({
-            ...preAggregation,
+          const promise = loadCacheByDataSource[dataSource].getVersionEntries({
+            ...p.preAggregation,
+            dataSource,
             preAggregationsSchema
           });
 
+          if (!firstByCacheKey[cacheKey]) {
+            console.log('first set');
+            firstByCacheKey[cacheKey] = promise;
+          }
+          
+          const res = await promise;
           return res.versionEntries;
         }
       )
