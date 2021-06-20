@@ -167,14 +167,10 @@ export class QueryOrchestrator {
     preAggregationsSchema: string,
     requestId: string,
   ) {
-    const versionEntries = await Promise.all(
-      preAggregations.map(p => this.preAggregations.getPreAggregationVersionEntries(
-        {
-          ...p.preAggregation,
-          preAggregationsSchema
-        },
-        requestId
-      ))
+    const versionEntries = await this.preAggregations.getVersionEntries(
+      preAggregations,
+      preAggregationsSchema,
+      requestId
     );
 
     const flatFn = (arrResult: any[], arrItem: any[]) => ([...arrResult, ...arrItem]);

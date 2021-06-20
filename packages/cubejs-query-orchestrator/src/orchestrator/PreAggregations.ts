@@ -1119,22 +1119,37 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public async getPreAggregationVersionEntries(preAggregation, requestId): Promise<VersionEntry[]> {
-    const { dataSource } = preAggregation;
-    const loadCache = new PreAggregationLoadCache(
-      this.redisPrefix,
-      () => this.driverFactory(dataSource),
-      this.queryCache,
-      this,
-      {
-        // TODO: skip requestId?
-        requestId,
-        dataSource
-      }
+  public async getVersionEntries(preAggregations, preAggregationsSchema, requestId): Promise<VersionEntry[][]> {
+    const loadCacheByDataSource = {};
+
+    const data: VersionEntry[][] = await Promise.all(
+      preAggregations.map(
+        async preAggregation => {
+          const { dataSource } = preAggregation;
+          if (!loadCacheByDataSource[dataSource]) {
+            loadCacheByDataSource[dataSource] = new PreAggregationLoadCache(
+              this.redisPrefix,
+              () => this.driverFactory(dataSource),
+              this.queryCache,
+              this,
+              {
+                // TODO: skip requestId?
+                requestId,
+                dataSource
+              }
+            );
+          }
+
+          const res = await loadCacheByDataSource[dataSource].getVersionEntries({
+            ...preAggregation,
+            preAggregationsSchema
+          });
+
+          return res.versionEntries;
+        }
+      )
     );
 
-    const data = await loadCache.getVersionEntries(preAggregation);
-
-    return data.versionEntries;
+    return data;
   }
 }
