@@ -358,7 +358,6 @@ export class ApiGateway {
       }));
 
       app.post('/cubejs-system/v1/pre-aggregations/partitions', jsonParser, systemMiddlewares, (async (req, res) => {
-        console.log('cubejs-system/v1/pre-aggregations/partitions');
         await this.getPreAggregationPartitions({
           query: req.body.query,
           context: req.context,
