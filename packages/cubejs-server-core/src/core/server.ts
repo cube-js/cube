@@ -617,8 +617,6 @@ export class CubejsServerCore {
     this.reloadEnvVariables();
 
     this.startScheduledRefreshTimer();
-
-    console.log('x2>>', process.env.CUBEJS_DB_HOST);
   }
 
   public getOrchestratorApi(context: RequestContext): OrchestratorApi {

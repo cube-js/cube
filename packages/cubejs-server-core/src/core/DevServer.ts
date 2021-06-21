@@ -478,8 +478,6 @@ export class DevServer {
 
       await this.cubejsServer.resetInstanceState();
 
-      console.log('x1>>', process.env.CUBEJS_DB_HOST);
-
       res.status(200).json(req.body.variables || {});
     }));
 
