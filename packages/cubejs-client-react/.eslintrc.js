@@ -30,6 +30,8 @@ module.exports = {
     'no-param-reassign': 0,
     'no-mixed-operators': 0,
     'no-else-return': 0,
+    'react/static-property-placement': 0,
+    'react/destructuring-assignment': 0,
     'max-len': [
       'error',
       120,
@@ -39,15 +41,15 @@ module.exports = {
         ignoreComments: false,
         ignoreRegExpLiterals: true,
         ignoreStrings: true,
-        ignoreTemplateLiterals: true
-      }
+        ignoreTemplateLiterals: true,
+      },
     ],
     'no-trailing-spaces': ['error', { skipBlankLines: true }],
     'react/sort-comp': [
       1,
       {
-        order: ['static-methods', 'lifecycle', 'everything-else', 'render']
-      }
-    ]
-  }
+        order: ['static-variables', 'static-methods', 'lifecycle', 'everything-else', 'render'],
+      },
+    ],
+  },
 };
