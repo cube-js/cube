@@ -17,8 +17,6 @@ export class CubeEvaluator extends CubeSymbols {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
 
-    Object.values(validCubes).map(this.prepareCube);
-
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(validCubes.map((v) => {
@@ -28,21 +26,6 @@ export class CubeEvaluator extends CubeSymbols {
         primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
       ];
     }));
-  }
-
-  prepareCube(cube) {
-    if (cube.preAggregations) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const preAggregation of Object.values(cube.preAggregations)) {
-        if (preAggregation.scheduledRefresh === undefined) {
-          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
-        }
-
-        if (preAggregation.external === undefined) {
-          preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
-        }
-      }
-    }
   }
 
   cubesByFileName(fileName) {
@@ -175,19 +158,24 @@ export class CubeEvaluator extends CubeSymbols {
     if (!type) {
       throw new Error(`Type can't be undefined for '${path}'`);
     }
+
     if (!path) {
       throw new Error('Path can\'t be undefined');
     }
+
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
     if (!this.evaluatedCubes[cubeAndName[0]]) {
       throw new UserError(`Cube '${cubeAndName[0]}' not found for path '${path}'`);
     }
+
     if (!this.evaluatedCubes[cubeAndName[0]][type]) {
       throw new UserError(`${type} not defined for path '${path}'`);
     }
+
     if (!this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]]) {
       throw new UserError(`'${cubeAndName[1]}' not found for path '${path}'`);
     }
+
     return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 

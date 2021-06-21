@@ -198,15 +198,13 @@ const cubeSchema = Joi.object().keys({
       type: Joi.any().valid('autoRollup').required(),
       maxPreAggregations: Joi.number(),
     })),
+    // OriginalSQL partitioning with references
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
       timeDimensionReference: Joi.func().required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
     })),
-    Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
-      type: Joi.any().valid('originalSql').required(),
-    })),
-    // TODO duplicate
+    // RollupJoin with references
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
       measureReferences: Joi.func(),
@@ -214,7 +212,6 @@ const cubeSchema = Joi.object().keys({
       segmentReferences: Joi.func(),
       rollupReferences: Joi.func().required(),
     })),
-    // TODO duplicate
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
       measureReferences: Joi.func(),
@@ -226,6 +223,7 @@ const cubeSchema = Joi.object().keys({
       ).required(),
       rollupReferences: Joi.func().required(),
     })),
+    // Rollup with references
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),

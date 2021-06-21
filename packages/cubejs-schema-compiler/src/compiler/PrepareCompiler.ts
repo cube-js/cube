@@ -12,7 +12,6 @@ import { CubeSymbols } from './CubeSymbols';
 import { CubeDictionary } from './CubeDictionary';
 import { CubeEvaluator } from './CubeEvaluator';
 import { ContextEvaluator } from './ContextEvaluator';
-import { DashboardTemplateEvaluator } from './DashboardTemplateEvaluator';
 import { JoinGraph } from './JoinGraph';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
@@ -24,7 +23,6 @@ export const prepareCompiler = (repo, options) => {
   const cubeEvaluator = new CubeEvaluator(cubeValidator);
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
-  const dashboardTemplateEvaluator = new DashboardTemplateEvaluator(cubeEvaluator);
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
@@ -45,7 +43,6 @@ export const prepareCompiler = (repo, options) => {
     transpilers,
     cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
     contextCompilers: [contextEvaluator],
-    dashboardTemplateCompilers: [dashboardTemplateEvaluator],
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
     extensions: {
@@ -60,7 +57,6 @@ export const prepareCompiler = (repo, options) => {
     metaTransformer,
     cubeEvaluator,
     contextEvaluator,
-    dashboardTemplateEvaluator,
     joinGraph,
     compilerCache,
     headCommitId: options.headCommitId
