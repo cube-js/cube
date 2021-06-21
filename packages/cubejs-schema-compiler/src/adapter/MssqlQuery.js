@@ -62,7 +62,7 @@ export class MssqlQuery extends BaseQuery {
   }
 
   dateTimeCast(value) {
-    return `CAST(${value} AS DATETIME)`;
+    return `CAST(${value} AS DATETIME2)`;
   }
 
   timeGroupedColumn(granularity, dimension) {
