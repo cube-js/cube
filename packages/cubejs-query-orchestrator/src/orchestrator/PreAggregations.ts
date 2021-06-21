@@ -209,7 +209,7 @@ class PreAggregationLoadCache {
     return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
-  protected tablesRedisKey(preAggregation) {
+  public tablesRedisKey(preAggregation) {
     return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}_${preAggregation.dataSource}${preAggregation.external ? '_EXT' : ''}`;
   }
 
@@ -1128,7 +1128,6 @@ export class PreAggregations {
         async p => {
           const { dataSource } = p;
           const { external } = p.preAggregation;
-          const cacheKey = [dataSource, external ? 'EXT' : ''].join('/');
 
           if (!loadCacheByDataSource[dataSource]) {
             loadCacheByDataSource[dataSource] = new PreAggregationLoadCache(
@@ -1143,12 +1142,15 @@ export class PreAggregations {
             );
           }
 
-          if (firstByCacheKey[cacheKey]) await firstByCacheKey[cacheKey];
-          const promise = loadCacheByDataSource[dataSource].getVersionEntries({
+          const preAggregation = {
             external,
             dataSource,
             preAggregationsSchema
-          });
+          };
+
+          const cacheKey = loadCacheByDataSource[dataSource].tablesRedisKey(preAggregation);
+          if (firstByCacheKey[cacheKey]) await firstByCacheKey[cacheKey];
+          const promise = loadCacheByDataSource[dataSource].getVersionEntries(preAggregation);
           if (!firstByCacheKey[cacheKey]) firstByCacheKey[cacheKey] = promise;
 
           const res = await promise;
