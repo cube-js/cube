@@ -1120,27 +1120,28 @@ export class PreAggregations {
   }
 
   public async getVersionEntries(preAggregations, preAggregationsSchema, requestId): Promise<VersionEntry[][]> {
-    const loadCacheByDataSource = {};
-    const firstByCacheKey = {};
+    const loadCacheByDataSource = [...new Set(preAggregations.map(p => p.dataSource))]
+      .reduce((obj, dataSource: string) => {
+        obj[dataSource] = new PreAggregationLoadCache(
+          this.redisPrefix,
+          () => this.driverFactory(dataSource),
+          this.queryCache,
+          this,
+          {
+            requestId,
+            dataSource
+          }
+        );
 
+        return obj;
+      }, {});
+
+    const firstByCacheKey = {};
     const data: VersionEntry[][] = await Promise.all(
       preAggregations.map(
         async p => {
           const { dataSource } = p;
           const { external } = p.preAggregation;
-
-          if (!loadCacheByDataSource[dataSource]) {
-            loadCacheByDataSource[dataSource] = new PreAggregationLoadCache(
-              this.redisPrefix,
-              () => this.driverFactory(dataSource),
-              this.queryCache,
-              this,
-              {
-                requestId,
-                dataSource
-              }
-            );
-          }
 
           const preAggregation = {
             external,
@@ -1149,16 +1150,16 @@ export class PreAggregations {
           };
 
           const cacheKey = loadCacheByDataSource[dataSource].tablesRedisKey(preAggregation);
-          if (firstByCacheKey[cacheKey]) await firstByCacheKey[cacheKey];
-          const promise = loadCacheByDataSource[dataSource].getVersionEntries(preAggregation);
-          if (!firstByCacheKey[cacheKey]) firstByCacheKey[cacheKey] = promise;
+          if (!firstByCacheKey[cacheKey]) {
+            firstByCacheKey[cacheKey] = loadCacheByDataSource[dataSource].getVersionEntries(preAggregation);
+            const res = await firstByCacheKey[cacheKey];
+            return res.versionEntries;
+          }
 
-          const res = await promise;
-          return res.versionEntries;
+          return null;
         }
       )
     );
-
-    return data;
+    return data.filter(res => res);
   }
 }
