@@ -154,8 +154,6 @@ export class CubejsServerCore {
       );
     }
 
-    console.log('CONSTRUCTOR', Date.now());
-
     this.startScheduledRefreshTimer();
 
     this.event = async (name, props) => {
