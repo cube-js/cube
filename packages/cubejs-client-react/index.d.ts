@@ -33,7 +33,7 @@ declare module '@cubejs-client/react' {
   } from '@cubejs-client/core';
 
   type CubeProviderProps = {
-    cubejsApi: CubejsApi;
+    cubejsApi: CubejsApi | null;
     children: React.ReactNode;
   };
 
