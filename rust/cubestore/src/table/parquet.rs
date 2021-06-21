@@ -933,13 +933,15 @@ impl RowParquetWriter {
 #[cfg(test)]
 mod tests {
     use crate::metastore::{Column, ColumnType, Index};
-    use crate::table::parquet::{ColumnAccessor, ParquetTableStore, RowParquetReader};
+    use crate::table::parquet::{
+        ColumnAccessor, ParquetTableStore, RowParquetReader, RowParquetWriter,
+    };
     use crate::table::{Row, TableStore, TableValue};
     use std::{fs, io};
 
     extern crate test;
 
-    use crate::table::data::convert_row_to_heap_allocated;
+    use crate::table::data::{convert_row_to_heap_allocated, RowsView, TableValueR};
     use crate::util::decimal::Decimal;
     use csv::ReaderBuilder;
     use itertools::Itertools;
@@ -949,6 +951,7 @@ mod tests {
     use std::io::BufReader;
     use std::mem::swap;
     use std::time::SystemTime;
+    use tempfile::NamedTempFile;
     use test::Bencher;
 
     #[test]
@@ -1129,6 +1132,47 @@ mod tests {
         fs::remove_file(next_file).unwrap();
         fs::remove_file(split_1).unwrap();
         fs::remove_file(split_2).unwrap();
+    }
+
+    #[test]
+    fn failed_rle_run_bools() {
+        const NUM_ROWS: usize = 16384;
+
+        let check_bools = |bools: &[TableValueR]| {
+            let index = Index::try_new(
+                "test".to_string(),
+                0,
+                vec![Column::new("b".to_string(), ColumnType::Boolean, 0)],
+                1,
+            )
+            .unwrap();
+            let tmp_file = NamedTempFile::new().unwrap();
+            let mut w = RowParquetWriter::open(&index, tmp_file.path().to_str().unwrap(), NUM_ROWS)
+                .unwrap();
+            w.write_rows(RowsView::new(&bools, 1)).unwrap();
+            w.close().unwrap()
+        };
+
+        // Maximize the data to write with RLE encoding.
+        // First, in bit-packed encoding.
+        let mut bools = Vec::with_capacity(NUM_ROWS);
+        for _ in 0..NUM_ROWS / 2 {
+            bools.push(TableValueR::Boolean(true));
+            bools.push(TableValueR::Boolean(false));
+        }
+        check_bools(&bools);
+
+        // Second, in RLE encoding.
+        let mut bools = Vec::with_capacity(NUM_ROWS);
+        for _ in 0..NUM_ROWS / 16 {
+            for _ in 0..8 {
+                bools.push(TableValueR::Boolean(true));
+            }
+            for _ in 0..8 {
+                bools.push(TableValueR::Boolean(false));
+            }
+        }
+        check_bools(&bools);
     }
 
     #[bench]
