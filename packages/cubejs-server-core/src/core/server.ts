@@ -249,10 +249,6 @@ export class CubejsServerCore {
   }
 
   protected isReadyForQueryProcessing(): boolean {
-    console.log('isReady>>', {
-      host: process.env.CUBEJS_DB_HOST,
-      config: this.systemOptions?.isCubeConfigEmpty
-    })
     return (
       Boolean(process.env.CUBEJS_DB_HOST) ||
       Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
