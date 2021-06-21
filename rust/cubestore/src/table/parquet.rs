@@ -54,12 +54,7 @@ impl TableStore for ParquetTableStore {
     ) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
         let mut writers = Vec::new();
         for f in dest_files.iter() {
-            writers.push(RowParquetWriter::open(
-                &self.table,
-                f,
-                self.row_group_size,
-                sort_key_size,
-            )?);
+            writers.push(RowParquetWriter::open(&self.table, f, self.row_group_size)?);
         }
         if source_file.is_none() {
             let mut split_writer = SplitRowParquetWriter::new(writers, rows.len(), sort_key_size);
@@ -591,7 +586,6 @@ impl RowParquetWriter {
         table: &'a Index,
         file: &'a str,
         row_group_size: usize,
-        _sort_key_size: usize,
     ) -> Result<RowParquetWriter, CubeError> {
         let file = File::create(file)?;
 
