@@ -481,7 +481,8 @@ export class CubejsServerCore {
   protected reloadEnvVariables() {
     // `CUBEJS_DB_TYPE` has priority because the dbType can change in the Connection Wizard
     this.options.dbType = <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE || this.options.dbType;
-    this.options.externalDbType = this.options.externalDbType || <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    this.options.externalDbType = this.options.externalDbType
+      || <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
 
     this.driver = null;
     this.contextToDbType = wrapToFnIfNeeded(this.options.dbType);
