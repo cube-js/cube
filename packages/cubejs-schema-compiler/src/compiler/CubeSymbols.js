@@ -1,8 +1,8 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
-import { getEnv } from '@cubejs-backend/shared';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {

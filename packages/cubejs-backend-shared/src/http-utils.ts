@@ -1,5 +1,5 @@
 import decompress from 'decompress';
-import fetch, { Headers, Request, RequestInit, Response } from 'node-fetch';
+import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
 import { SingleBar } from 'cli-progress';
