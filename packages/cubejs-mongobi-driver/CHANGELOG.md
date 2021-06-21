@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.36](https://github.com/cube-js/cube.js/compare/v0.27.35...v0.27.36) (2021-06-21)
+
+
+### Bug Fixes
+
+* **elasticsearch-driver:** Make readOnly ([15ec569](https://github.com/cube-js/cube.js/commit/15ec5690fde529bf8294111150d44916139168fe))
+
+
+
+
+
 ## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
 
 
