@@ -1,23 +1,16 @@
-import {
-  RefObject,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { RefObject, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Typography } from 'antd';
 import { PlaySquareOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
+import type { ChartType, PivotConfig, Query } from '@cubejs-client/core';
 import { ResultSet } from '@cubejs-client/core';
 import { useHotkeys } from 'react-hotkeys-hook';
-import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
+import { CubeContext } from '@cubejs-client/react';
 
 import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { event } from '../../events';
 import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
-import { CubeContext } from '@cubejs-client/react';
 
 const { Text } = Typography;
 

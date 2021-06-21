@@ -1,13 +1,13 @@
 import React from 'react';
-import { prop, uniqBy, equals, pick, clone, indexBy, uniq } from 'ramda';
+import { clone, equals, indexBy, pick, prop, uniq, uniqBy } from 'ramda';
 import {
-  ResultSet,
-  moveItemInArray,
+  defaultHeuristics,
   defaultOrder,
   flattenFilters,
   getQueryMembers,
+  moveItemInArray,
   movePivotItem,
-  defaultHeuristics,
+  ResultSet
 } from '@cubejs-client/core';
 
 import QueryRenderer from './QueryRenderer.jsx';
