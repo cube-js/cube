@@ -48,7 +48,7 @@ export function QueryBuilderContainer({
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || '{}');
 
-  const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
+  const { token: securityContextToken, setIsModalOpen, refreshToken } = useSecurityContext();
   const livePreviewContext = useLivePreviewContext();
 
   const currentToken = securityContextToken || token;
@@ -64,10 +64,6 @@ export function QueryBuilderContainer({
   }, [apiUrl, currentToken]);
 
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
-
-  if (!cubejsApi || !apiUrl || !currentToken) {
-    return null;
-  }
 
   return (
     <CubeProvider cubejsApi={cubejsApi}>
@@ -120,8 +116,8 @@ export function QueryBuilderContainer({
           {({ id, query, chartType }, saveTab) => (
             <PlaygroundQueryBuilder
               queryId={id}
-              apiUrl={apiUrl}
-              cubejsToken={currentToken}
+              apiUrl={apiUrl!}
+              cubejsToken={currentToken!}
               initialVizState={{
                 query,
                 chartType

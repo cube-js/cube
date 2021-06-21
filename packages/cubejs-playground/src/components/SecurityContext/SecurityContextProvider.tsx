@@ -10,6 +10,7 @@ export type SecurityContextProps = {
   isModalOpen: boolean;
   setIsModalOpen: any;
   saveToken: (token: string | null) => void;
+  refreshToken: () => Promise<void>;
   onTokenPayloadChange: (payload: string) => Promise<string>;
 };
 
@@ -38,22 +39,18 @@ export function SecurityContextProvider({
   const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    async function updateToken(token: string | null) {
-      if (token != null && tokenUpdater && refreshingToken !== token) {
-        refreshingToken = token;
-        const currentMutext = mutex;
-        const refreshedToken = await tokenUpdater(token);
+  async function refreshToken() {
+    if (token != null && tokenUpdater && refreshingToken !== token) {
+      refreshingToken = token;
+      const currentMutex = mutex;
+      const refreshedToken = await tokenUpdater(token);
 
-        if (isMounted && currentMutext === mutex) {
-          setToken(refreshedToken);
-          mutex++;
-        }
+      if (isMounted && currentMutex === mutex) {
+        setToken(refreshedToken);
+        mutex++;
       }
     }
-
-    updateToken(token);
-  });
+  }
 
   useEffect(() => {
     if (token) {
@@ -76,13 +73,14 @@ export function SecurityContextProvider({
         payload,
         isModalOpen,
         setIsModalOpen,
-        saveToken: (token) => {
+        saveToken(token) {
           if (!token) {
             removeToken();
           } else {
             setToken(token);
           }
         },
+        refreshToken,
         onTokenPayloadChange,
       }}
     >

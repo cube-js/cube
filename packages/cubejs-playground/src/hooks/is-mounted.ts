@@ -10,5 +10,5 @@ export function useIsMounted() {
     };
   }, []);
 
-  return isMounted;
+  return isMounted();
 }

@@ -25,7 +25,11 @@ import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartContainer from '../../../ChartContainer';
 import { dispatchPlaygroundEvent } from '../../../utils';
-import { useDeepCompareMemoize } from '../../../hooks';
+import {
+  useDeepCompareMemoize,
+  useIsMounted,
+  useSecurityContext,
+} from '../../../hooks';
 import { Card, FatalError } from '../../../atoms';
 import { UIFramework } from '../../../types';
 import DashboardSource from '../../../DashboardSource';
@@ -184,9 +188,13 @@ export function PlaygroundQueryBuilder({
   onSchemaChange,
   onVizStateChanged,
 }: PlaygroundQueryBuilderProps) {
+  const isMounted = useIsMounted();
+  const { refreshToken } = useSecurityContext();
+
   const ref = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
 
+  const [tokenRefreshed, setTokenRefreshed] = useState<boolean>(false);
   const [queryStatusMap, setQueryStatusMap] = useState<
     Record<string, QueryStatus | null>
   >({});
@@ -198,7 +206,9 @@ export function PlaygroundQueryBuilder({
   const [isQueryLoadingMap, setQueryLoadingMap] = useState<
     Record<string, boolean>
   >({});
-  const [queryErrorMap, setQueryErrorMap] = useState<Record<string, Error | null>>({});
+  const [queryErrorMap, setQueryErrorMap] = useState<
+    Record<string, Error | null>
+  >({});
 
   function isChartRendererReady(): boolean {
     return Boolean(chartRendererState[queryId]);
@@ -238,6 +248,16 @@ export function PlaygroundQueryBuilder({
   }
 
   useEffect(() => {
+    (async () => {
+      await refreshToken();
+
+      if (isMounted) {
+        setTokenRefreshed(true);
+      }
+    })();
+  }, [isMounted]);
+
+  useEffect(() => {
     if (isChartRendererReady() && ref.current) {
       dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
         token: cubejsToken,
@@ -272,6 +292,10 @@ export function PlaygroundQueryBuilder({
 
     setQueryError(null);
     queryRef.current = query;
+  }
+
+  if (!tokenRefreshed) {
+    return null;
   }
 
   return (
@@ -571,12 +595,14 @@ export function PlaygroundQueryBuilder({
                               [queryId]: isReady,
                             })
                           }
-                          onRunButtonClick={() => {
+                          onRunButtonClick={async () => {
                             if (
                               isChartRendererReady() &&
                               ref.current &&
                               missingMembers.length === 0
                             ) {
+                              await refreshToken();
+
                               handleRunButtonClick({
                                 query,
                                 pivotConfig,
