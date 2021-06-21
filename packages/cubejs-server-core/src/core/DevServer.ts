@@ -25,7 +25,7 @@ const repo = {
 
 type DevServerOptions = {
   externalDbTypeFn: ExternalDbTypeFn;
-  isReadyForQueryProcessing: boolean;
+  isReadyForQueryProcessing: () => boolean;
   dockerVersion?: string;
 };
 
@@ -91,7 +91,7 @@ export class DevServer {
         dockerVersion: this.options.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
         dbType: options.dbType || null,
-        shouldStartConnectionWizardFlow: !this.options.isReadyForQueryProcessing,
+        shouldStartConnectionWizardFlow: !this.options.isReadyForQueryProcessing(),
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,

@@ -154,8 +154,6 @@ export class CubejsServerCore {
       );
     }
 
-    console.log('CONSTRUCTOR', Date.now());
-
     this.startScheduledRefreshTimer();
 
     this.event = async (name, props) => {
@@ -208,7 +206,7 @@ export class CubejsServerCore {
       this.devServer = new DevServer(this, {
         dockerVersion: getEnv('dockerImageVersion'),
         externalDbTypeFn: this.contextToExternalDbType,
-        isReadyForQueryProcessing: this.isReadyForQueryProcessing()
+        isReadyForQueryProcessing: this.isReadyForQueryProcessing.bind(this)
       });
       const oldLogger = this.logger;
       this.logger = ((msg, params) => {
@@ -484,6 +482,7 @@ export class CubejsServerCore {
     this.options.dbType = this.options.dbType || <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE;
     this.options.externalDbType = this.options.externalDbType || <DatabaseType|undefined>process.env.CUBEJS_EXT_DB_TYPE;
 
+    this.driver = null;
     this.contextToDbType = wrapToFnIfNeeded(this.options.dbType);
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
