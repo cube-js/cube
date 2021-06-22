@@ -1876,8 +1876,7 @@ export class BaseQuery {
     }
   }
 
-  calcIntervalForCronString(refreshKey) {
-    const every = refreshKey.every || '1 hour';
+  parseCronSyntax(every) {
     // One of the years that start from monday (first day of week)
     // Mon, 01 Jan 2018 00:00:00 GMT
     const startDate = 1514764800000;
@@ -1885,30 +1884,32 @@ export class BaseQuery {
       utc: true,
       currentDate: new Date(startDate)
     };
-    let utcOffset = 0;
 
-    if (refreshKey.timezone) {
-      utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
-    }
-
-    let start;
-    let end;
-    let dayOffset;
-    let dayOffsetPrev;
     try {
       const interval = cronParser.parseExpression(every, opt);
-      dayOffset = interval.next().getTime();
-      dayOffsetPrev = interval.prev().getTime();
+      let dayOffset = interval.next().getTime();
+      const dayOffsetPrev = interval.prev().getTime();
+
       if (dayOffsetPrev === startDate) {
         dayOffset = startDate;
       }
 
-      start = interval.next().getTime();
-      end = interval.next().getTime();
+      return {
+        start: interval.next(),
+        end: interval.next(),
+        dayOffset: (dayOffset - startDate) / 1000,
+      };
     } catch (err) {
       throw new UserError(`Invalid cron string '${every}' in refreshKey (${err})`);
     }
-    const delta = (end - start) / 1000;
+  }
+
+  calcIntervalForCronString(refreshKey) {
+    const every = refreshKey.every || '1 hour';
+
+    const { start, end, dayOffset } = this.parseCronSyntax(every);
+
+    const interval = (end.getTime() - start.getTime()) / 1000;
 
     if (
       !/^(\*|\d+)? ?(\*|\d+) (\*|\d+) \* \* (\*|\d+)$/g.test(every.replace(/ +/g, ' ').replace(/^ | $/g, ''))
@@ -1916,10 +1917,16 @@ export class BaseQuery {
       throw new UserError(`Your cron string ('${every}') is correct, but we support only equal time intervals.`);
     }
 
+    let utcOffset = 0;
+
+    if (refreshKey.timezone) {
+      utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
+    }
+
     return {
       utcOffset,
-      interval: delta,
-      dayOffset: (dayOffset - startDate) / 1000
+      interval,
+      dayOffset,
     };
   }
 
