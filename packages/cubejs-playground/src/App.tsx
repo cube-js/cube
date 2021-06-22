@@ -16,7 +16,11 @@ import {
   setTelemetry,
   trackImpl,
 } from './events';
-import { PlaygroundContext, useAppContext } from './components/AppContext';
+import {
+  AppContextConsumer,
+  PlaygroundContext,
+  useAppContext,
+} from './components/AppContext';
 import './index.less';
 
 const selectedTab = (pathname) => {
@@ -35,6 +39,7 @@ type AppState = {
   fatalError: Error | null;
   context: PlaygroundContext | null;
   showLoader: boolean;
+  isAppContextSet: boolean;
 };
 
 class App extends Component<RouteComponentProps, AppState> {
@@ -46,6 +51,7 @@ class App extends Component<RouteComponentProps, AppState> {
     fatalError: null,
     context: null,
     showLoader: false,
+    isAppContextSet: false,
   };
 
   async componentDidMount() {
@@ -89,15 +95,20 @@ class App extends Component<RouteComponentProps, AppState> {
   }
 
   render() {
-    const { context, fatalError, showLoader } = this.state;
     const { location, children } = this.props;
+    const { context, fatalError, isAppContextSet, showLoader } = this.state;
 
-    if (!showLoader) {
-      return null;
-    }
+    if (context != null && !isAppContextSet) {
+      return (
+        <>
+          {showLoader ? <CubeLoader /> : null}
 
-    if (context == null) {
-      return <CubeLoader />;
+          <ContextSetter context={context} />
+          <AppContextConsumer
+            onReady={() => this.setState({ isAppContextSet: true })}
+          />
+        </>
+      );
     }
 
     if (fatalError) {
@@ -121,8 +132,6 @@ class App extends Component<RouteComponentProps, AppState> {
             children
           )}
         </StyledLayoutContent>
-
-        <ContextSetter context={context} />
       </Layout>
     );
   }
@@ -137,7 +146,10 @@ function ContextSetter({ context }: ContextSetterProps) {
 
   useEffect(() => {
     if (context !== null) {
-      setContext({ playgroundContext: context });
+      setContext({
+        playgroundContext: context,
+        identifier: context.identifier,
+      });
     }
   }, [context]);
 

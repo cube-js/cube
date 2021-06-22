@@ -15,6 +15,7 @@ export type PlaygroundContext = {
   telemetry: boolean;
   shouldStartConnectionWizardFlow: boolean;
   dockerVersion: string | null;
+  identifier: string;
   livePreview?: boolean;
 };
 
