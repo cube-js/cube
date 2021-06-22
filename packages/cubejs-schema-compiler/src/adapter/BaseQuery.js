@@ -136,6 +136,10 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
+    /**
+     * @protected
+     * @type {ParamAllocator}
+     */
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
@@ -1722,23 +1726,30 @@ export class BaseQuery {
 
   refreshKeysByCubes(cubes, transformFn) {
     let refreshKeyAllSetManually = true;
-    const refreshKeyQueryByCube = cube => {
+
+    const refreshKeyQueryByCube = (cube) => {
       const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
       if (cubeFromPath.refreshKey) {
         if (cubeFromPath.refreshKey.sql) {
-          return this.evaluateSql(cube, cubeFromPath.refreshKey.sql);
+          return [this.evaluateSql(cube, cubeFromPath.refreshKey.sql), false];
         }
+
         if (cubeFromPath.refreshKey.every) {
-          return `SELECT ${this.everyRefreshKeySql(cubeFromPath.refreshKey)}`;
+          const [sql, external] = this.everyRefreshKeySql(cubeFromPath.refreshKey);
+          return [`SELECT ${sql}`, external];
         }
       }
+
       refreshKeyAllSetManually = false;
-      return `SELECT ${this.everyRefreshKeySql(this.defaultEveryRefreshKey())}`;
+
+      const [sql, external] = this.everyRefreshKeySql(this.defaultEveryRefreshKey());
+      return [`SELECT ${sql}`, external];
     };
-    const queries = cubes
-      .map(cube => [cube, refreshKeyQueryByCube(cube)])
+
+    const queries = cubes.map(cube => [cube, refreshKeyQueryByCube(cube)])
       .map(([cube, sql]) => (transformFn ? transformFn(sql, cube) : sql))
-      .map(paramAnnotatedSql => this.paramAllocator.buildSqlAndParams(paramAnnotatedSql));
+      .map(([sql, external]) => this.paramAllocator.buildSqlAndParams(sql).concat(external));
+
     return {
       queries,
       renewalThreshold: this.renewalThreshold(refreshKeyAllSetManually),
@@ -1807,6 +1818,7 @@ export class BaseQuery {
     if (preAggregation.external && this.externalQueryClass) {
       return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
     }
+
     if (index.columns) {
       const escapedColumns = this.evaluateIndexColumns(cube, index);
       return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
@@ -1934,11 +1946,15 @@ export class BaseQuery {
     };
   }
 
-  everyRefreshKeySql(refreshKey) {
+  everyRefreshKeySql(refreshKey, external = false) {
+    if (this.externalQueryClass) {
+      return this.externalQuery().everyRefreshKeySql(refreshKey, true);
+    }
+
     const every = refreshKey.every || '1 hour';
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      return this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
+      return [this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`), external];
     }
 
     const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);
@@ -1953,7 +1969,7 @@ export class BaseQuery {
      * SELECT ((3600 * (24 + 8) - 28800) / 86400); -- 1
      * SELECT ((3600 * (48 + 8) - 28800) / 86400); -- 2
      */
-    return this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()} - ${dayOffset}) / ${interval}`);
+    return [this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()} - ${dayOffset}) / ${interval}`), external];
   }
 
   granularityFor(momentDate) {
@@ -2091,7 +2107,7 @@ export class BaseQuery {
             };
           }
 
-          let refreshKey = this.everyRefreshKeySql(preAggregation.refreshKey);
+          let [refreshKey, refreshKeyExternal] = this.everyRefreshKeySql(preAggregation.refreshKey);
           let renewalThreshold = this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey);
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
@@ -2108,6 +2124,7 @@ export class BaseQuery {
                 refreshKey,
                 { window: preAggregation.refreshKey.updateWindow }
               );
+              refreshKeyExternal = false;
               renewalThreshold = this.incrementalRefreshKeyRenewalThreshold(
                 preAggregationQueryForSql,
                 renewalThreshold,
@@ -2117,17 +2134,19 @@ export class BaseQuery {
           }
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
             return {
-              queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`)],
+              queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`).concat(refreshKeyExternal)],
               refreshKeyRenewalThresholds: [renewalThreshold]
             };
           }
         }
+
         if (preAggregation.type === 'originalSql') {
           return this.evaluateSymbolSqlWithContext(
             () => this.refreshKeysByCubes([cube]),
             { preAggregationQuery: true }
           );
         }
+
         if (
           preAggregation.partitionGranularity &&
           !preAggregationQueryForSql.allCubeNames.find(c => {
@@ -2140,12 +2159,18 @@ export class BaseQuery {
             () => preAggregationQueryForSql.cacheKeyQueries(
               (originalRefreshKey, refreshKeyCube) => {
                 if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
-                  return `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`;
+                  return [
+                    `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`,
+                    false
+                  ];
                 } else if (!cubeFromPath.refreshKey) {
-                  return `SELECT ${this.everyRefreshKeySql({
+                  const [sql, external] = this.everyRefreshKeySql({
                     every: '1 hour'
-                  })}`;
+                  });
+
+                  return [`SELECT ${sql}`, external];
                 }
+
                 return originalRefreshKey;
               }
             ),

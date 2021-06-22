@@ -10,7 +10,8 @@ import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
 
-type QueryWithParams = [string, any[]] | string;
+type QueryTuple = [sql: string, params: unknown[], external?: boolean];
+type QueryWithParams = QueryTuple | string;
 type Query = {
   requestId?: string;
   dataSource: string;
@@ -356,11 +357,17 @@ export class QueryCache {
   }
 
   public async loadRefreshKeysFromQuery(query: Query) {
-    return Promise.all(this.loadRefreshKeys(this.cacheKeyQueriesFrom(query), this.getExpireSecs(query), {
-      requestId: query.requestId,
-      dataSource: query.dataSource,
-      refreshKeyRenewalThresholds: this.getRefreshKeyRenewalThresholds(query)
-    }));
+    return Promise.all(
+      this.loadRefreshKeys(
+        this.cacheKeyQueriesFrom(query),
+        this.getExpireSecs(query),
+        {
+          requestId: query.requestId,
+          dataSource: query.dataSource,
+          refreshKeyRenewalThresholds: this.getRefreshKeyRenewalThresholds(query)
+        }
+      )
+    );
   }
 
   public loadRefreshKeys(
@@ -373,23 +380,28 @@ export class QueryCache {
       dataSource: string
     }
   ) {
-    return cacheKeyQueries.map((q, i) => this.cacheQueryResult(
-      Array.isArray(q) ? q[0] : q,
-      Array.isArray(q) ? q[1] : [],
-      q,
-      expireSecs,
-      {
-        renewalThreshold:
-          this.options.refreshKeyRenewalThreshold ||
-          (options.refreshKeyRenewalThresholds || [])[i] ||
-          2 * 60,
-        renewalKey: q,
-        waitForRenew: !options.skipRefreshKeyWaitForRenew,
-        requestId: options.requestId,
-        dataSource: options.dataSource,
-        useInMemory: true
-      },
-    ));
+    return cacheKeyQueries.map((q, i) => {
+      const [query, values, external]: QueryTuple = Array.isArray(q) ? q : [q, [], false];
+
+      return this.cacheQueryResult(
+        query,
+        values,
+        [query, values],
+        expireSecs,
+        {
+          renewalThreshold:
+            this.options.refreshKeyRenewalThreshold ||
+            (options.refreshKeyRenewalThresholds || [])[i] ||
+            2 * 60,
+          renewalKey: q,
+          waitForRenew: !options.skipRefreshKeyWaitForRenew,
+          requestId: options.requestId,
+          dataSource: options.dataSource,
+          useInMemory: true,
+          external,
+        },
+      );
+    });
   }
 
   public withLock = <T = any>(

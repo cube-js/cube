@@ -2,6 +2,7 @@ import moment from 'moment-timezone';
 import { UserError } from '../../src/compiler/UserError';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareCompiler } from './PrepareCompiler';
+import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 
 describe('SQL Generation', () => {
   // this.timeout(90000);
@@ -128,31 +129,31 @@ describe('SQL Generation', () => {
     const utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60;
     expect(query.everyRefreshKeySql({
       every: '1 hour'
-    })).toEqual('FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)');
+    })).toEqual(['FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)', false]);
 
     // Standard syntax (minutes hours day month dow)
     expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 3600)`);
+      .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 3600)`, false]);
 
     expect(query.everyRefreshKeySql({ every: '0 10 * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 36000) / 86400)`);
+      .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 36000) / 86400)`, false]);
 
     // Additional syntax with seconds (seconds minutes hours day month dow)
     expect(query.everyRefreshKeySql({ every: '0 * * * * *', timezone, }))
-      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 60)`);
+      .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 60)`, false]);
 
     expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 3600)`);
+      .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 3600)`, false]);
 
     expect(query.everyRefreshKeySql({ every: '30 * * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 1800) / 3600)`);
+      .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 1800) / 3600)`, false]);
 
     expect(query.everyRefreshKeySql({ every: '30 5 * * 5', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 365400) / 604800)`);
+      .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 365400) / 604800)`, false]);
 
     for (let i = 1; i < 59; i++) {
       expect(query.everyRefreshKeySql({ every: `${i} * * * *`, timezone }))
-        .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - ${i * 60}) / ${1 * 60 * 60})`);
+        .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - ${i * 60}) / ${1 * 60 * 60})`, false]);
     }
 
     try {
@@ -165,5 +166,22 @@ describe('SQL Generation', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(UserError);
     }
+  });
+
+  it('Test for everyRefreshKeySql with external', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.count'
+      ],
+      timeDimensions: [],
+      filters: [],
+      timezone: 'America/Los_Angeles',
+      externalQueryClass: MssqlQuery
+    });
+
+    expect(query.everyRefreshKeySql({ every: '1 hour' }))
+      .toEqual([`FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600)`, true]);
   });
 });

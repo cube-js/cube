@@ -269,10 +269,12 @@ class PreAggregationLoadCache {
 
   protected async keyQueryResult(keyQuery, waitForRenew, priority, renewalThreshold) {
     if (!this.queryResults[this.queryCache.queryRedisKey(keyQuery)]) {
+      const [query, values, external] = Array.isArray(keyQuery) ? keyQuery : [keyQuery, [], false];
+
       this.queryResults[this.queryCache.queryRedisKey(keyQuery)] = await this.queryCache.cacheQueryResult(
-        Array.isArray(keyQuery) ? keyQuery[0] : keyQuery,
-        Array.isArray(keyQuery) ? keyQuery[1] : [],
-        keyQuery,
+        query,
+        values,
+        [query, values],
         60 * 60,
         {
           renewalThreshold:
@@ -284,7 +286,8 @@ class PreAggregationLoadCache {
           priority,
           requestId: this.requestId,
           dataSource: this.dataSource,
-          useInMemory: true
+          useInMemory: true,
+          external
         }
       );
     }
@@ -412,12 +415,12 @@ class PreAggregationLoader {
         });
         return this.targetTableName(versionEntryByStructureVersion);
       } else {
-        // no rollup has been built yet - build it syncronously as part of responding to this request
+        // no rollup has been built yet - build it synchronously as part of responding to this request
         return this.loadPreAggregationWithKeys();
       }
     } else {
       // either we have no data cached for this rollup or waitForRenew is true, either way,
-      // syncronously renew what data is needed so that the most current data will be returned for the current request
+      // synchronously renew what data is needed so that the most current data will be returned for the current request
       return {
         targetTableName: await this.loadPreAggregationWithKeys(),
         refreshKeyValues: await this.getInvalidationKeyValues()
