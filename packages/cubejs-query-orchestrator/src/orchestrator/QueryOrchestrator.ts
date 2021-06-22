@@ -168,7 +168,11 @@ export class QueryOrchestrator {
     requestId: string,
   ) {
     const versionEntries = await this.preAggregations.getVersionEntries(
-      preAggregations.map(p => p.preAggregation),
+      preAggregations.map(p => {
+        const partition = p.partitions[0];
+        p.preAggregation.dataSource = (partition && partition.dataSource) || 'default';
+        return p.preAggregation;
+      }),
       preAggregationsSchema,
       requestId
     );

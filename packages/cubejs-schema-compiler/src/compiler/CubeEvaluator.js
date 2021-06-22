@@ -65,10 +65,6 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
-  dataSourceForCube(path) {
-    return this.cubeFromPath(path).dataSource || 'default';
-  }
-
   preAggregations(filter) {
     const { scheduled, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
@@ -89,7 +85,6 @@ export class CubeEvaluator extends CubeSymbols {
               preAggregationName,
               preAggregation: preAggregations[preAggregationName],
               cube,
-              dataSource: this.dataSourceForCube(cube),
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
               refreshRangeReferences: {
                 refreshRangeStart: refreshRangeStart && refreshRangeStart.sql && { sql: refreshRangeStart.sql() },
