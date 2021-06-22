@@ -209,7 +209,7 @@ class PreAggregationLoadCache {
     return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
-  protected tablesRedisKey(preAggregation) {
+  public tablesRedisKey(preAggregation) {
     return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}_${preAggregation.dataSource}${preAggregation.external ? '_EXT' : ''}`;
   }
 
@@ -1119,22 +1119,39 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public async getPreAggregationVersionEntries(preAggregation, requestId): Promise<VersionEntry[]> {
-    const { dataSource } = preAggregation;
-    const loadCache = new PreAggregationLoadCache(
-      this.redisPrefix,
-      () => this.driverFactory(dataSource),
-      this.queryCache,
-      this,
-      {
-        // TODO: skip requestId?
-        requestId,
-        dataSource
-      }
+  public async getVersionEntries(preAggregations, requestId): Promise<VersionEntry[][]> {
+    const loadCacheByDataSource = [...new Set(preAggregations.map(p => p.dataSource))]
+      .reduce((obj, dataSource: string) => {
+        obj[dataSource] = new PreAggregationLoadCache(
+          this.redisPrefix,
+          () => this.driverFactory(dataSource),
+          this.queryCache,
+          this,
+          {
+            requestId,
+            dataSource
+          }
+        );
+
+        return obj;
+      }, {});
+
+    const firstByCacheKey = {};
+    const data: VersionEntry[][] = await Promise.all(
+      preAggregations.map(
+        async preAggregation => {
+          const { dataSource } = preAggregation;
+          const cacheKey = loadCacheByDataSource[dataSource].tablesRedisKey(preAggregation);
+          if (!firstByCacheKey[cacheKey]) {
+            firstByCacheKey[cacheKey] = loadCacheByDataSource[dataSource].getVersionEntries(preAggregation);
+            const res = await firstByCacheKey[cacheKey];
+            return res.versionEntries;
+          }
+
+          return null;
+        }
+      )
     );
-
-    const data = await loadCache.getVersionEntries(preAggregation);
-
-    return data.versionEntries;
+    return data.filter(res => res);
   }
 }
