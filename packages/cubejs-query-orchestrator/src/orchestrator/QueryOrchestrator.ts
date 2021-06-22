@@ -183,7 +183,7 @@ export class QueryOrchestrator {
       .map(p => p.partitions)
       .reduce(flatFn, [])
       .reduce((obj, partition) => {
-        obj[partition.sql.tableName] = partition;
+        if (partition && partition.sql) obj[partition.sql.tableName] = partition;
         return obj;
       }, {});
 

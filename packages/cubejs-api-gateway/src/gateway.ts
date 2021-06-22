@@ -462,7 +462,7 @@ export class ApiGateway {
           ...props,
           preAggregation,
           partitions: partitions.map(partition => {
-            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql.tableName];
+            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql?.tableName] || [];
             return partition;
           }),
         });
