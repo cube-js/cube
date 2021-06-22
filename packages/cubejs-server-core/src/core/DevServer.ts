@@ -11,6 +11,7 @@ import isDocker from 'is-docker';
 import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
 import { executeCommand, packageExists } from '@cubejs-backend/shared';
+import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
@@ -83,6 +84,7 @@ export class DevServer {
 
     app.get('/playground/context', catchErrors((req, res) => {
       this.cubejsServer.event('Dev Server Env Open');
+
       res.json({
         cubejsToken,
         basePath: options.basePath,
@@ -95,6 +97,7 @@ export class DevServer {
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
+        identifier: this.getIdentifier(options.apiSecret)
       });
     }));
 
@@ -347,8 +350,7 @@ export class DevServer {
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
 
-        // todo: uncomment
-        // fetcher.cleanup();
+        fetcher.cleanup();
       };
 
       if (this.applyTemplatePackagesPromise) {
@@ -489,5 +491,13 @@ export class DevServer {
 
       res.json({ token });
     }));
+  }
+
+  protected getIdentifier(apiSecret: string): string {
+    return crypto.createHash('md5')
+      .update(apiSecret)
+      .digest('hex')
+      .replace(/[^\d]/g, '')
+      .substr(0, 10);
   }
 }
