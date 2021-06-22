@@ -1119,7 +1119,7 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public async getVersionEntries(preAggregations, preAggregationsSchema, requestId): Promise<VersionEntry[][]> {
+  public async getVersionEntries(preAggregations, requestId): Promise<VersionEntry[][]> {
     const loadCacheByDataSource = [...new Set(preAggregations.map(p => p.dataSource))]
       .reduce((obj, dataSource: string) => {
         obj[dataSource] = new PreAggregationLoadCache(
@@ -1139,16 +1139,8 @@ export class PreAggregations {
     const firstByCacheKey = {};
     const data: VersionEntry[][] = await Promise.all(
       preAggregations.map(
-        async p => {
-          const { dataSource } = p;
-          const { external } = p.preAggregation;
-
-          const preAggregation = {
-            external,
-            dataSource,
-            preAggregationsSchema
-          };
-
+        async preAggregation => {
+          const { dataSource } = preAggregation;
           const cacheKey = loadCacheByDataSource[dataSource].tablesRedisKey(preAggregation);
           if (!firstByCacheKey[cacheKey]) {
             firstByCacheKey[cacheKey] = loadCacheByDataSource[dataSource].getVersionEntries(preAggregation);

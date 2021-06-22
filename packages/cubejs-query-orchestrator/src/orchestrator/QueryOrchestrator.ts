@@ -169,11 +169,12 @@ export class QueryOrchestrator {
   ) {
     const versionEntries = await this.preAggregations.getVersionEntries(
       preAggregations.map(p => {
+        const { preAggregation } = p.preAggregation;
         const partition = p.partitions[0];
-        p.preAggregation.dataSource = (partition && partition.dataSource) || 'default';
-        return p.preAggregation;
+        preAggregation.dataSource = (partition && partition.dataSource) || 'default';
+        preAggregation.preAggregationsSchema = preAggregationsSchema;
+        return preAggregation;
       }),
-      preAggregationsSchema,
       requestId
     );
 
