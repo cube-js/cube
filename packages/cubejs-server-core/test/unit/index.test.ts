@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
 import { withTimeout } from '@cubejs-backend/shared';
+import { DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
+
 import { CubejsServerCore } from '../../src';
 import { DatabaseType } from '../../src/core/types';
+import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 class CubejsServerCoreOpen extends CubejsServerCore {
   public detectScheduledRefreshTimer(scheduledRefreshTimer: number|boolean) {
@@ -83,7 +86,7 @@ describe('index.test', () => {
 
     const options = {
       dbType: <any>'mysql',
-      externalDbType: <any>'mysql',
+      externalDbType: 'cubestore',
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
@@ -92,10 +95,19 @@ describe('index.test', () => {
       devServer: false,
       apiSecret: 'randomstring',
       logger: () => {},
-      driverFactory: () => {},
+      driverFactory: () => <any>{
+        setLogger: () => {},
+        testConnection: async () => {},
+        release: () => {}
+      },
       dialectFactory: () => {},
-      externalDriverFactory: () => {},
+      externalDriverFactory: () => <any>{
+        setLogger: () => {},
+        testConnection: async () => {},
+        release: () => {}
+      },
       externalDialectFactory: () => {},
+      cacheAndQueueDriver: 'redis',
       contextToAppId: () => 'STANDALONE',
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
@@ -136,7 +148,7 @@ describe('index.test', () => {
         preAggregationsOptions: {
           queueOptions
         },
-        rollupOnlyMode: false
+        rollupOnlyMode: true
       },
       allowJsDuplicatePropsInSchema: true,
       jwt: {
@@ -158,8 +170,45 @@ describe('index.test', () => {
       livePreview: true
     };
 
-    const cubejsServerCore = new CubejsServerCore(<any>options);
+    class CubejsServerCoreMock extends CubejsServerCore {
+      public createOrchestratorApi(
+        getDriver: DriverFactoryByDataSource,
+        opts: OrchestratorApiOptions
+      ) {
+        return super.createOrchestratorApi(getDriver, opts);
+      }
+    }
+
+    const cubejsServerCore = new CubejsServerCoreMock(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+
+    const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
+
+    cubejsServerCore.getOrchestratorApi({
+      requestId: 'XXX',
+      authInfo: null,
+      securityContext: null,
+    });
+    expect(createOrchestratorApiSpy.mock.calls.length).toEqual(1);
+    expect(createOrchestratorApiSpy.mock.calls[0]).toEqual([
+      expect.any(Function),
+      {
+        cacheAndQueueDriver: 'redis',
+        contextToDbType: expect.any(Function),
+        contextToExternalDbType: expect.any(Function),
+        continueWaitTimeout: 10,
+        externalDriverFactory: expect.any(Function),
+        redisPrefix: 'some-prefix',
+        rollupOnlyMode: true,
+        // from orchestratorOptions
+        preAggregationsOptions: expect.any(Object),
+        queryCacheOptions: expect.any(Object),
+        // enabled for cubestore
+        skipExternalCacheAndQueue: true,
+      }
+    ]);
+    createOrchestratorApiSpy.mockRestore();
+
     await cubejsServerCore.releaseConnections();
   });
 

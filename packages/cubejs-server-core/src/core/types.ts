@@ -6,7 +6,7 @@ import {
   UserBackgroundContext,
   QueryRewriteFn,
 } from '@cubejs-backend/api-gateway';
-import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
 
@@ -76,6 +76,7 @@ export type DatabaseType =
   | 'sqlite';
 
 export type ContextToAppIdFn = (context: RequestContext) => string;
+export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
 
@@ -105,9 +106,9 @@ export interface CreateOptions {
   dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
-  cacheAndQueueDriver?: 'redis' | 'memory';
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
-  contextToOrchestratorId?: (context: RequestContext) => string;
+  contextToOrchestratorId?: ContextToOrchestratorIdFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
