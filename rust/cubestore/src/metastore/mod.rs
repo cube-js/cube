@@ -51,6 +51,7 @@ use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
+use rocksdb::backup::BackupEngineOptions;
 use rocksdb::checkpoint::Checkpoint;
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
@@ -789,6 +790,8 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         table_name: Vec<(String, String)>,
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError>;
+
+    async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
 }
 
 /// Information required to produce partition name on remote fs.
@@ -3098,6 +3101,15 @@ impl MetaStore for RocksMetaStore {
                 r.push((schema, table, indexes))
             }
             Ok(r)
+        })
+        .await
+    }
+
+    async fn debug_dump(&self, out_path: String) -> Result<(), CubeError> {
+        self.read_operation(|db| {
+            let mut e =
+                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), out_path)?;
+            Ok(e.create_new_backup_flush(db.db, true)?)
         })
         .await
     }

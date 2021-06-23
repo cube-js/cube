@@ -13,6 +13,7 @@ use std::fs::File;
 use std::future::Future;
 use std::io::Write;
 use std::panic::RefUnwindSafe;
+use std::path::Path;
 use std::pin::Pin;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
@@ -83,6 +84,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("decimal_index", decimal_index),
         t("float_index", float_index),
         t("now", now),
+        t("dump", dump),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2677,6 +2679,22 @@ async fn now(service: Box<dyn SqlClient>) {
         }
         _ => panic!("unexpected values: {:?}", r.get_rows()[0]),
     }
+}
+
+async fn dump(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("DUMP SELECT 1").await.unwrap();
+    let dump_dir = match &r.get_rows()[0].values()[0] {
+        TableValue::String(d) => d,
+        _ => panic!("invalid result"),
+    };
+
+    assert!(tokio::fs::metadata(dump_dir).await.unwrap().is_dir());
+    assert!(
+        tokio::fs::metadata(Path::new(dump_dir).join("metastore-backup"))
+            .await
+            .unwrap()
+            .is_dir()
+    );
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

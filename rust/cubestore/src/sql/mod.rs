@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -48,12 +48,16 @@ use crate::store::ChunkDataStore;
 use crate::table::data::{MutRows, Rows, TableValueR};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
+use crate::util::strings::path_to_string;
 use crate::CubeError;
 use crate::{
     app_metrics,
     metastore::{Column, ColumnType, MetaStore},
     store::DataFrame,
 };
+use tempfile::TempDir;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -320,6 +324,60 @@ impl SqlServiceImpl {
         ingestion.wait_completion().await?;
         Ok(data.len() as u64)
     }
+
+    async fn dump_select_inputs(
+        &self,
+        query: &str,
+        q: Box<Query>,
+    ) -> Result<Arc<DataFrame>, CubeError> {
+        // TODO: metastore snapshot must be consistent wrt the dumped data.
+        let logical_plan = self
+            .query_planner
+            .logical_plan(DFStatement::Statement(Statement::Query(q)))
+            .await?;
+
+        let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await);
+        dump_dir.push("dumps");
+        tokio::fs::create_dir_all(&dump_dir).await?;
+
+        let dump_dir = TempDir::new_in(&dump_dir)?.into_path();
+        let meta_dir = path_to_string(dump_dir.join("metastore-backup"))?;
+
+        log::debug!("Dumping metastore to {}", meta_dir);
+        self.db.debug_dump(meta_dir).await?;
+
+        match logical_plan {
+            QueryPlan::Select(p, _) => {
+                let data_dir = dump_dir.join("data");
+                tokio::fs::create_dir(&data_dir).await?;
+                log::debug!("Dumping data files to {:?}", data_dir);
+                // TODO: download in parallel.
+                for f in p.all_required_files() {
+                    let f = self.remote_fs.download_file(&f).await?;
+                    let name = Path::new(&f).file_name().ok_or_else(|| {
+                        CubeError::internal(format!("Could not get filename of '{}'", f))
+                    })?;
+                    tokio::fs::copy(&f, data_dir.join(&name)).await?;
+                }
+            }
+            QueryPlan::Meta(_) => {}
+        }
+
+        let query_file = dump_dir.join("query.sql");
+        File::create(query_file)
+            .await?
+            .write_all(query.as_bytes())
+            .await?;
+
+        log::debug!("Wrote debug dump to {:?}", dump_dir);
+
+        let dump_dir = path_to_string(dump_dir)?;
+        let columns = vec![Column::new("dump_path".to_string(), ColumnType::String, 0)];
+        Ok(Arc::new(DataFrame::new(
+            columns,
+            vec![Row::new(vec![TableValue::String(dump_dir)])],
+        )))
+    }
 }
 
 #[derive(Debug)]
@@ -571,6 +629,7 @@ impl SqlService for SqlServiceImpl {
                 };
                 Ok(res)
             }
+            CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
