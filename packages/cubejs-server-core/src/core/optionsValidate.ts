@@ -60,6 +60,7 @@ const schemaOptions = Joi.object().keys({
   externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
   //
+  cacheAndQueueDriver: Joi.string().valid('redis', 'memory'),
   contextToAppId: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),

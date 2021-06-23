@@ -105,6 +105,7 @@ export interface CreateOptions {
   dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
+  cacheAndQueueDriver?: 'redis' | 'memory';
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
