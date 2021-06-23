@@ -4,11 +4,13 @@ import { getEnv } from '@cubejs-backend/shared';
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
-import { DriverFactoryByDataSource } from './DriverFactory';
+import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 
-interface QueryOrchestratorOptions {
-  cacheAndQueueDriver?: 'redis' | 'memory';
-  externalDriverFactory?: any;
+export type CacheAndQueryDriverType = 'redis' | 'memory';
+
+export interface QueryOrchestratorOptions {
+  externalDriverFactory?: DriverFactory;
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
   redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: any;
   preAggregationsOptions?: any;
@@ -24,13 +26,11 @@ export class QueryOrchestrator {
 
   protected readonly redisPool: RedisPool|undefined;
 
-  protected readonly driverFactory: DriverFactoryByDataSource;
-
   protected readonly rollupOnlyMode: boolean;
 
   public constructor(
     protected readonly redisPrefix: string,
-    driverFactory: DriverFactoryByDataSource,
+    protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
     options: QueryOrchestratorOptions = {}
   ) {
@@ -49,11 +49,9 @@ export class QueryOrchestrator {
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
-    this.driverFactory = driverFactory;
-
     this.queryCache = new QueryCache(
       this.redisPrefix,
-      this.driverFactory,
+      driverFactory,
       this.logger,
       {
         externalDriverFactory,
