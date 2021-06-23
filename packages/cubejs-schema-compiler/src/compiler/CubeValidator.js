@@ -207,7 +207,7 @@ const cubeSchema = Joi.object().keys({
     // OriginalSQL partitioning without references
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
-      timeDimensions: Joi.func().required(),
+      timeDimension: Joi.func().required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
     })),
     Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
@@ -245,7 +245,7 @@ const cubeSchema = Joi.object().keys({
       measures: Joi.func(),
       dimensions: Joi.func(),
       segments: Joi.func(),
-      timeDimensions: Joi.func().required(),
+      timeDimension: Joi.func().required(),
       granularity: Joi.any().valid(
         'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
       ).required(),
@@ -280,7 +280,7 @@ const cubeSchema = Joi.object().keys({
       measures: Joi.func(),
       dimensions: Joi.func(),
       segments: Joi.func(),
-      timeDimensions: Joi.func().required(),
+      timeDimension: Joi.func().required(),
       granularity: Joi.any().valid(
         'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
       ).required()

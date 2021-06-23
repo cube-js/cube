@@ -65,13 +65,13 @@ const SCHEMA_VARIANTS = [
         month: {
           type: 'rollup',
           measures: [count],
-          timeDimensions: createdAt,
+          timeDimension: createdAt,
           granularity: 'month',
         },
         day: {
           type: 'rollup',
           measures: [count],
-          timeDimensions: createdAt,
+          timeDimension: createdAt,
           granularity: 'day',
         },
       }
