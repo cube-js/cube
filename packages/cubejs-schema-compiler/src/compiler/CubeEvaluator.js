@@ -34,9 +34,9 @@ export class CubeEvaluator extends CubeSymbols {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
       for (const preAggregation of Object.values(cube.preAggregations)) {
-        if (preAggregation.timeDimensions) {
-          preAggregation.timeDimensionReference = preAggregation.timeDimensions;
-          delete preAggregation.timeDimensions;
+        if (preAggregation.timeDimension) {
+          preAggregation.timeDimensionReference = preAggregation.timeDimension;
+          delete preAggregation.timeDimension;
         }
 
         if (preAggregation.dimensions) {

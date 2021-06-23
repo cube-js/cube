@@ -54,7 +54,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
   protected sqlAndReferencesFieldVisitor(cubeName): TraverseObject {
     // Unique fields that doesnt match any system fields in schema
-    const simpleFields = /^(sql|measureReferences|rollups|dimensionReferences|segmentReferences|timeDimensionReference|timeDimensions|rollupReferences|drillMembers|drillMemberReferences|contextMembers|columns)$/;
+    const simpleFields = /^(sql|measureReferences|rollups|dimensionReferences|segmentReferences|timeDimensionReference|timeDimension|rollupReferences|drillMembers|drillMemberReferences|contextMembers|columns)$/;
     // Not unique fields, example: measures exists in cube and pre-aggregation, which we should handle
     const complexFields = /^(dimensions|segments|measures)$/;
     const resolveSymbol = n => this.cubeSymbols.resolveSymbol(cubeName, n) || this.cubeSymbols.isCurrentCube(n);

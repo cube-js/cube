@@ -37,7 +37,7 @@ describe('Schema Testing', () => {
         preAggregations: {
             main: {
                 type: 'originalSql',
-                timeDimensions: createdAt,
+                timeDimension: createdAt,
                 partitionGranularity: \`month\`,
             },
             // Pre-aggregation without type, rollup is used by default
@@ -50,7 +50,7 @@ describe('Schema Testing', () => {
             countCreatedAtWithoutReferences: {
                 dimensions: [type],
                 measures: [count],
-                timeDimensions: [createdAt],
+                timeDimension: [createdAt],
                 segments: [sfUsers],
                 granularity: \`day\`,
                 partitionGranularity: \`month\`
