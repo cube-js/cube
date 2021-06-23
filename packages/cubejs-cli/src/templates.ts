@@ -100,7 +100,7 @@ provider:
     CUBEJS_DB_USER: <YOUR_DB_USER_HERE>
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
-    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_DB_TYPE: ${env.dbType}
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
@@ -161,7 +161,7 @@ provider:
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
     CUBEJS_DB_BQ_PROJECT_ID: "\${self:provider.project}"
-    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
     CUBEJS_SERVERLESS_PLATFORM: "\${self:provider.name}"
