@@ -82,6 +82,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("rolling_window_join", rolling_window_join),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
+        t("now", now),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2622,6 +2623,59 @@ async fn float_index(service: Box<dyn SqlClient>) {
                 ]
             })
             .collect_vec()
+    }
+}
+
+async fn now(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SELECT now()").await.unwrap();
+    assert_eq!(r.get_rows().len(), 1);
+    assert_eq!(r.get_rows()[0].values().len(), 1);
+    match &r.get_rows()[0].values()[0] {
+        TableValue::Timestamp(_) => {} // all ok.
+        v => panic!("not a timestamp: {:?}", v),
+    }
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(i int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT i, now() FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(r.len(), 3);
+    let mut seen = None;
+    for r in r.get_rows() {
+        match &r.values()[1] {
+            TableValue::Timestamp(v) => match &seen {
+                None => seen = Some(v),
+                Some(seen) => assert_eq!(seen, &v),
+            },
+            v => panic!("not a timestamp: {:?}", v),
+        }
+    }
+
+    let r = service
+        .exec_query("SELECT i, now() FROM s.Data WHERE now() = now()")
+        .await
+        .unwrap();
+    assert_eq!(r.len(), 3);
+
+    let r = service
+        .exec_query("SELECT now(), unix_timestamp()")
+        .await
+        .unwrap();
+    match r.get_rows()[0].values().as_slice() {
+        &[TableValue::Timestamp(v), TableValue::Int(t)] => {
+            assert_eq!(v.get_time_stamp() / 1_000_000_000, t)
+        }
+        _ => panic!("unexpected values: {:?}", r.get_rows()[0]),
     }
 }
 
