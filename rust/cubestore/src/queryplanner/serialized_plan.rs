@@ -565,16 +565,22 @@ impl SerializedPlan {
     }
 
     pub fn files_to_download(&self) -> Vec<String> {
+        self.list_files_to_download(|id| self.partition_ids_to_execute.contains(&id))
+    }
+
+    /// Note: avoid during normal execution, workers must filter the partitions they execute.
+    pub fn all_required_files(&self) -> Vec<String> {
+        self.list_files_to_download(|_| true)
+    }
+
+    fn list_files_to_download(&self, include_partition: impl Fn(u64) -> bool) -> Vec<String> {
         let indexes = self.index_snapshots();
 
         let mut files = Vec::new();
 
         for index in indexes.iter() {
             for partition in index.partitions() {
-                if !self
-                    .partition_ids_to_execute
-                    .contains(&partition.partition.get_id())
-                {
+                if !include_partition(partition.partition.get_id()) {
                     continue;
                 }
                 if let Some(file) = partition
