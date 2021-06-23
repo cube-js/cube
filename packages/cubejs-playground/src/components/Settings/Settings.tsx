@@ -38,7 +38,11 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button data-testid="pivot-btn" disabled={!isQueryPresent || disabled} style={{ border: 0 }}>
+        <Button
+          data-testid="pivot-btn"
+          disabled={!isQueryPresent || disabled}
+          style={{ border: 0 }}
+        >
           Pivot
         </Button>
       </Popover>
@@ -56,7 +60,11 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button data-testid="order-btn" disabled={!isQueryPresent || disabled} style={{ border: 0 }}>
+        <Button
+          data-testid="order-btn"
+          disabled={!isQueryPresent || disabled}
+          style={{ border: 0 }}
+        >
           Order
         </Button>
       </Popover>
@@ -70,7 +78,11 @@ export default function Settings({
         placement="bottomLeft"
         trigger="click"
       >
-        <Button data-testid="limit-btn" disabled={!isQueryPresent || disabled} style={{ border: 0 }}>
+        <Button
+          data-testid="limit-btn"
+          disabled={!isQueryPresent || disabled}
+          style={{ border: 0 }}
+        >
           Limit
         </Button>
       </Popover>

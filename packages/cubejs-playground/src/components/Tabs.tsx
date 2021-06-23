@@ -7,7 +7,7 @@ const StyledTabs: any = styled(AntdTabs)`
       padding: 0 16px;
       user-select: none;
     }
-    
+
     .ant-tabs-content-holder {
       padding: 0 16px;
     }
@@ -16,7 +16,6 @@ const StyledTabs: any = styled(AntdTabs)`
 
 StyledTabs.TabPane = styled(AntdTabs.TabPane)`
   && {
-        
   }
 `;
 

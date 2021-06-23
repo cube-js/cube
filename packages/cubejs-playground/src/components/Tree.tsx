@@ -4,7 +4,7 @@ import { Tree as AntdTree } from 'antd';
 const StyledTree: any = styled(AntdTree)`
   && {
     user-select: none;
-    
+
     .ant-tree-node-content-wrapper.ant-tree-node-selected {
       color: white;
     }
@@ -13,7 +13,6 @@ const StyledTree: any = styled(AntdTree)`
 
 StyledTree.TreeNode = styled(AntdTree.TreeNode)`
   && {
-    
   }
 `;
 

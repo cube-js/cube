@@ -129,21 +129,20 @@ export function fetchPoll(
     canceled = true;
   }
 
-  function request() {
-    setTimeout(async () => {
-      const response = await fetch(url, fetchOptions);
+  async function request() {
+    const response = await fetch(url, fetchOptions);
 
-      if (!canceled) {
-        callback({
-          response,
-          cancel,
-          retries,
-        });
-        request();
-      }
+    if (!canceled) {
+      callback({
+        response,
+        cancel,
+        retries,
+      });
 
-      retries++;
-    }, timeout);
+      setTimeout(request, timeout);
+    }
+
+    retries++;
   }
 
   request();

@@ -7,7 +7,11 @@ import { CubeProvider } from '@cubejs-client/react';
 
 import { Button } from '../../atoms';
 import LivePreviewBar from '../LivePreviewContext/LivePreviewBar';
-import { useCubejsApi, useLivePreviewContext, useSecurityContext } from '../../hooks';
+import {
+  useCubejsApi,
+  useLivePreviewContext,
+  useSecurityContext,
+} from '../../hooks';
 import DashboardSource from '../../DashboardSource';
 import {
   PlaygroundQueryBuilder,
@@ -48,7 +52,11 @@ export function QueryBuilderContainer({
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || '{}');
 
-  const { token: securityContextToken, setIsModalOpen, refreshToken } = useSecurityContext();
+  const {
+    token: securityContextToken,
+    setIsModalOpen,
+    refreshToken,
+  } = useSecurityContext();
   const livePreviewContext = useLivePreviewContext();
 
   const currentToken = securityContextToken || token;
@@ -120,14 +128,14 @@ export function QueryBuilderContainer({
               cubejsToken={currentToken!}
               initialVizState={{
                 query,
-                chartType
+                chartType,
               }}
               dashboardSource={dashboardSource}
               schemaVersion={props.schemaVersion}
               onVizStateChanged={(vizState) => {
                 saveTab({
                   query: vizState.query || {},
-                  chartType: vizState.chartType
+                  chartType: vizState.chartType,
                 });
                 props.onVizStateChanged?.(vizState);
               }}

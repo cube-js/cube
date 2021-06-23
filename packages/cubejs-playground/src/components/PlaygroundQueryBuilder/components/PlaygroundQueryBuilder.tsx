@@ -26,9 +26,9 @@ import { SectionHeader, SectionRow } from '../../../components';
 import ChartContainer from '../../../ChartContainer';
 import { dispatchPlaygroundEvent } from '../../../utils';
 import {
-  useDeepCompareMemoize,
+  useDeepEffect,
   useIsMounted,
-  useSecurityContext,
+  useSecurityContext
 } from '../../../hooks';
 import { Card, FatalError } from '../../../atoms';
 import { UIFramework } from '../../../types';
@@ -119,13 +119,13 @@ function PivotChangeEmitter({
   iframeRef,
   pivotConfig,
 }: TPivotChangeEmitterProps) {
-  useEffect(() => {
+  useDeepEffect(() => {
     if (iframeRef?.current) {
       dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
         pivotConfig,
       });
     }
-  }, useDeepCompareMemoize([iframeRef, pivotConfig]));
+  }, [iframeRef, pivotConfig]);
 
   return null;
 }

@@ -49,7 +49,7 @@ const StyledFormItem = styled(Form.Item)`
     &:not(:last-child) {
       margin-bottom: 16px;
     }
-    
+
     &:last-child {
       margin-bottom: 0;
     }

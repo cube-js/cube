@@ -18,9 +18,8 @@ export type TLivePreviewContextProps = {
   startLivePreview: () => Promise<Boolean>;
 };
 
-export const LivePreviewContextContext = createContext<TLivePreviewContextProps | null>(
-  null
-);
+export const LivePreviewContextContext =
+  createContext<TLivePreviewContextProps | null>(null);
 
 const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
   const activeRef = useRef<boolean>(false);

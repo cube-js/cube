@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { CSSProperties } from "react";
+import { CSSProperties } from 'react';
 import { Button } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 

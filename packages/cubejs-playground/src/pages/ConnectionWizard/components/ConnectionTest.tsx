@@ -18,7 +18,7 @@ export default function ConnectionTest({
   if (loading) {
     return (
       <Space align="center" size="middle">
-        <Spin data-testid="wizard-test-connection-spinner"/>
+        <Spin data-testid="wizard-test-connection-spinner" />
         <Typography.Text>Testing database connection</Typography.Text>
       </Space>
     );

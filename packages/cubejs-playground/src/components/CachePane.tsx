@@ -12,7 +12,7 @@ const CachePane = ({ query }) => (
     query={{ ...query, renewQuery: true }}
     render={({ sqlQuery, resultSet, error }) => {
       if (error) {
-        return <FatalError error={error} />
+        return <FatalError error={error} />;
       }
 
       const { loadResponse } = resultSet?.serialize() || {};

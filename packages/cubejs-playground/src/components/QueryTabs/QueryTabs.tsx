@@ -55,8 +55,8 @@ export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
     if (!queryTabs.activeId && (queryTabs as any).length > 0) {
       saveTabs({
         activeId: queryTabs[0].id,
-        tabs: queryTabs as any
-      })
+        tabs: queryTabs as any,
+      });
     }
   }, [queryTabs]);
 

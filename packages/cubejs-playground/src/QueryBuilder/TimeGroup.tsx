@@ -107,9 +107,7 @@ const TimeGroup = ({
         return (
           <Fragment key={index}>
             {isMissing ? (
-              <MissingMemberTooltip>
-                {buttonGroup}
-              </MissingMemberTooltip>
+              <MissingMemberTooltip>{buttonGroup}</MissingMemberTooltip>
             ) : (
               buttonGroup
             )}

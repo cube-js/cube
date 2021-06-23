@@ -54,7 +54,7 @@ export default function Base64Upload({ onInput, ...props }) {
     },
     onRemove() {
       setError('');
-    }
+    },
   };
 
   return (

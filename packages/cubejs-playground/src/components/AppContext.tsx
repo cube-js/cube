@@ -23,7 +23,7 @@ export type SystemContext = {
   basePath: string;
   isDocker: boolean;
   dockerVersion: string | null;
-}
+};
 
 export type ContextProps = {
   identifier?: string | null;

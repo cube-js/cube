@@ -1,1 +1,1 @@
-export * from './PreAggregationStatus'
+export * from './PreAggregationStatus';

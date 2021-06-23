@@ -144,7 +144,11 @@ export function SecurityContext() {
               </Space>
             </TabPane>
 
-            <TabPane data-testid="security-modal-token-tab" tab="Token" key="token">
+            <TabPane
+              data-testid="security-modal-token-tab"
+              tab="Token"
+              key="token"
+            >
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <Text type="secondary">
                   Edit or copy the generated token from below
