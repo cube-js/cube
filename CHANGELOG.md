@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.40](https://github.com/cube-js/cube.js/compare/v0.27.39...v0.27.40) (2021-06-23)
+
+
+### Bug Fixes
+
+* **cubestore:** refresh AWS credentials on timer, fix [#2946](https://github.com/cube-js/cube.js/issues/2946) ([23dee35](https://github.com/cube-js/cube.js/commit/23dee354573668f11553227ca50b5cf0b283d84a))
+
+
+### Features
+
+* **cubestore:** add now() and unix_timestamp() scalar function ([b40f3a8](https://github.com/cube-js/cube.js/commit/b40f3a896a1c65aece8c200733dd5cb8fe67d7be))
+* **mssql-driver:** Use DATETIME2 for timeStampCast ([ed13768](https://github.com/cube-js/cube.js/commit/ed13768d842392491a2545ac2f465d24e43986ba))
+
+
+
+
+
 ## [0.27.39](https://github.com/cube-js/cube.js/compare/v0.27.38...v0.27.39) (2021-06-22)
 
 
