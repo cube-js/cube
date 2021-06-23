@@ -8,12 +8,14 @@ pub mod serialized_plan;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
+mod now;
 pub mod udfs;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore, MetaStoreTable};
+use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec};
 use crate::queryplanner::serialized_plan::SerializedPlan;
@@ -36,6 +38,7 @@ use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
 use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRecordBatchStream};
+use datafusion::prelude::ExecutionConfig;
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{datasource::TableProvider, prelude::ExecutionContext};
@@ -137,7 +140,9 @@ impl QueryPlannerImpl {
 
 impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
-        Ok(Arc::new(ExecutionContext::new()))
+        Ok(Arc::new(ExecutionContext::with_config(
+            ExecutionConfig::new().add_optimizer_rule(Arc::new(MaterializeNow {})),
+        )))
     }
 }
 
@@ -237,6 +242,8 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let kind = match name {
             "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
             "coalesce" | "COALESCE" => CubeScalarUDFKind::Coalesce,
+            "now" | "NOW" => CubeScalarUDFKind::Now,
+            "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
