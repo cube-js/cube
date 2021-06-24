@@ -17,7 +17,14 @@ import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { getPivotQuery, getQueryGranularity, normalizeQuery, normalizeQueryPreAggregations, QUERY_TYPE } from './query';
+import {
+  getPivotQuery,
+  getQueryGranularity,
+  normalizeQuery,
+  normalizeQueryPreAggregations,
+  normalizeQueryPreAggregationPreview,
+  QUERY_TYPE
+} from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -491,13 +498,31 @@ export class ApiGateway {
   ) {
     const requestStarted = new Date();
     try {
+      query = normalizeQueryPreAggregationPreview(
+        this.parseQueryParam(query),
+        { timezone: (this.scheduledRefreshTimeZones || [])[0] }
+      );
+      const { preAggregationId, refreshRange, versionEntry, timezone } = query;
+
       const orchestratorApi = this.getAdapterApi(context);
-      const preAggregations = await this.getCompilerApi(context).preAggregations();
-      const preAggregation = preAggregations.find(p => p.id === query.preAggregationId);
-      res({
-        preview: preAggregation && await orchestratorApi.getPreAggregationPreview(
+      const compilerApi = this.getCompilerApi(context);
+
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartitions(
           context,
-          preAggregation.preAggregation,
+          compilerApi,
+          {
+            timezones: [timezone],
+            preAggregations: [{ id: preAggregationId, refreshRange }]
+          }
+        );
+      const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
+      const preAggregationPartition = partitions && partitions.find(p => p.sql?.tableName === versionEntry.table_name);
+
+      res({
+        preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
+          context,
+          preAggregationPartition,
           query.versionEntry
         )
       });

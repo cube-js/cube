@@ -186,7 +186,7 @@ export class OrchestratorApi {
     );
   }
 
-  public getPreAggregationPreview(context: RequestContext, preAggregation, partition) {
-    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, partition);
+  public getPreAggregationPreview(context: RequestContext, preAggregation, versionEntry) {
+    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, versionEntry);
   }
 }

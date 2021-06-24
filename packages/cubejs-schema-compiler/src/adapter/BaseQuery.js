@@ -1799,6 +1799,10 @@ export class BaseQuery {
     return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
+  preAggregationPreviewSql(tableName) {
+    return [`SELECT * FROM ${tableName} LIMIT 1000`];
+  }
+
   indexSql(cube, preAggregation, index, indexName, tableName) {
     if (preAggregation.external && this.externalQueryClass) {
       return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);

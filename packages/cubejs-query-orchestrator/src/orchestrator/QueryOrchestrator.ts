@@ -196,10 +196,16 @@ export class QueryOrchestrator {
   }
 
   public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {
+    const targetTableName = PreAggregations.targetTableName(versionEntry);
+    const query = preAggregation.sql && QueryCache.replacePreAggregationTableNames(
+      preAggregation.sql.previewSql,
+      [[preAggregation.sql.tableName, { targetTableName }]]
+    );
+
     const data = await this.fetchQuery({
       continueWait: true,
       external: preAggregation.external,
-      query: `SELECT * FROM ${PreAggregations.targetTableName(versionEntry)} LIMIT 1000`,
+      query: query && query[0],
       requestId
     });
 
