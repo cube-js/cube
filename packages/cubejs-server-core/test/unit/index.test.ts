@@ -12,6 +12,10 @@ class CubejsServerCoreOpen extends CubejsServerCore {
   public getRefreshScheduler() {
     return super.getRefreshScheduler();
   }
+
+  public isReadyForQueryProcessing() {
+    return super.isReadyForQueryProcessing();
+  }
 }
 
 describe('index.test', () => {
@@ -210,9 +214,9 @@ describe('index.test', () => {
     process.env.CUBEJS_DEV_MODE = 'true';
 
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
+      jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => true);
       // eslint-disable-next-line
-      new CubejsServerCore({});
+      new CubejsServerCoreOpen({});
       jest.restoreAllMocks();
     })
       .toThrowError(/dbType is required/);
@@ -232,9 +236,9 @@ describe('index.test', () => {
     process.env.NODE_ENV = 'production';
 
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
+      jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => true);
       // eslint-disable-next-line
-      new CubejsServerCore({});
+      new CubejsServerCoreOpen({});
       jest.restoreAllMocks();
     })
       .toThrowError(/dbType, apiSecret are required/);
@@ -244,9 +248,9 @@ describe('index.test', () => {
     process.env.NODE_ENV = 'production';
 
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => true);
+      jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => true);
       // eslint-disable-next-line
-      new CubejsServerCore({ jwt: { jwkUrl: 'https://test.com/j.json' } });
+      new CubejsServerCoreOpen({ jwt: { jwkUrl: 'https://test.com/j.json' } });
       jest.restoreAllMocks();
     })
       .toThrowError(/dbType is required/);
@@ -263,9 +267,9 @@ describe('index.test', () => {
 
   test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
     expect(() => {
-      jest.spyOn(CubejsServerCore.prototype, 'configFileExists').mockImplementation(() => false);
+      jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => false);
       // eslint-disable-next-line
-      new CubejsServerCore({});
+      new CubejsServerCoreOpen({});
       jest.restoreAllMocks();
     })
       .not.toThrow();

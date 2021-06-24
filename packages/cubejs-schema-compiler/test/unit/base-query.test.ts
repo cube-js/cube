@@ -115,45 +115,44 @@ describe('SQL Generation', () => {
   it('Test for everyRefreshKeySql', async () => {
     await compiler.compile();
 
+    const timezone = 'America/Los_Angeles';
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'cards.count'
       ],
       timeDimensions: [],
       filters: [],
-      timezone: 'America/Los_Angeles'
+      timezone,
     });
-
+    //
     const utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60;
     expect(query.everyRefreshKeySql({
       every: '1 hour'
     })).toEqual('FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)');
 
-    expect(query.everyRefreshKeySql({
-      every: '0 * * * * *',
-      timezone: 'America/Los_Angeles'
-    })).toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 60)`);
+    // Standard syntax (minutes hours day month dow)
+    expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
+      .toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
 
-    expect(query.everyRefreshKeySql({
-      every: '0 * * * *',
-      timezone: 'America/Los_Angeles'
-    })).toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
+    expect(query.everyRefreshKeySql({ every: '0 10 * * *', timezone }))
+      .toEqual(`FLOOR((${utcOffset} + 36000 + EXTRACT(EPOCH FROM NOW())) / 86400)`);
 
-    expect(query.everyRefreshKeySql({
-      every: '30 * * * *',
-      timezone: 'America/Los_Angeles'
-    })).toEqual(`FLOOR((${utcOffset} + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
+    // Additional syntax with seconds (seconds minutes hours day month dow)
+    expect(query.everyRefreshKeySql({ every: '0 * * * * *', timezone, }))
+      .toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 60)`);
 
-    expect(query.everyRefreshKeySql({
-      every: '30 5 * * 5',
-      timezone: 'America/Los_Angeles'
-    })).toEqual(`FLOOR((${utcOffset} + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)`);
+    expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
+      .toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
+
+    expect(query.everyRefreshKeySql({ every: '30 * * * *', timezone }))
+      .toEqual(`FLOOR((${utcOffset} + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
+
+    expect(query.everyRefreshKeySql({ every: '30 5 * * 5', timezone }))
+      .toEqual(`FLOOR((${utcOffset} + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)`);
 
     for (let i = 1; i < 59; i++) {
-      expect(query.everyRefreshKeySql({
-        every: `${i} * * * *`,
-        timezone: 'America/Los_Angeles'
-      })).toEqual(`FLOOR((${utcOffset} + ${i * 60} + EXTRACT(EPOCH FROM NOW())) / ${1 * 60 * 60})`);
+      expect(query.everyRefreshKeySql({ every: `${i} * * * *`, timezone }))
+        .toEqual(`FLOOR((${utcOffset} + ${i * 60} + EXTRACT(EPOCH FROM NOW())) / ${1 * 60 * 60})`);
     }
 
     try {

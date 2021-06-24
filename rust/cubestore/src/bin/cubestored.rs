@@ -1,35 +1,28 @@
+use cubestore::app_metrics;
 use cubestore::config::{Config, CubeServices};
-use cubestore::telemetry::{track_event, ReportingLogger};
-use cubestore::util::spawn_malloc_trim_loop;
+use cubestore::telemetry::track_event;
+use cubestore::util::logger::init_cube_logger;
+use cubestore::util::metrics::init_metrics;
+use cubestore::util::{metrics, spawn_malloc_trim_loop};
 use log::debug;
-use log::Level;
-use simple_logger::SimpleLogger;
 use std::collections::HashMap;
-use std::env;
 use std::time::Duration;
 use tokio::runtime::Builder;
 
 fn main() {
-    let log_level = match env::var("CUBESTORE_LOG_LEVEL")
-        .unwrap_or("info".to_string())
-        .to_lowercase()
-        .as_str()
-    {
-        "error" => Level::Error,
-        "warn" => Level::Warn,
-        "info" => Level::Info,
-        "debug" => Level::Debug,
-        "trace" => Level::Trace,
-        x => panic!("Unrecognized log level: {}", x),
+    let metrics_mode = match std::env::var("CUBESTORE_METRICS") {
+        Ok(s) if s == "statsd" => metrics::Compatibility::StatsD,
+        Ok(s) if s == "dogstatsd" => metrics::Compatibility::DogStatsD,
+        Ok(s) => panic!(
+            "CUBESTORE_METRICS must be 'statsd' or 'dogstatsd', got '{}'",
+            s
+        ),
+        Err(_) => metrics::Compatibility::StatsD,
     };
-
-    let logger = SimpleLogger::new()
-        .with_level(Level::Error.to_level_filter())
-        .with_module_level("cubestore", log_level.to_level_filter());
-    ReportingLogger::init(Box::new(logger), log_level.to_level_filter()).unwrap();
+    init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode);
+    init_cube_logger(true);
 
     let config = Config::default();
-
     Config::configure_worker_services();
 
     let trim_every = config.config_obj().malloc_trim_every_secs();
@@ -38,6 +31,7 @@ fn main() {
     }
 
     debug!("New process started");
+    app_metrics::STARTUPS.increment();
 
     #[cfg(not(target_os = "windows"))]
     procspawn::init();

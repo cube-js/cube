@@ -717,7 +717,11 @@ describe('QueryOrchestrator', () => {
     const versionEntries = await queryOrchestrator.getPreAggregationVersionEntries(
       [
         {
-          preAggregation: {},
+          preAggregation: {
+            preAggregation: {
+              external: false
+            }
+          },
           partitions: [
             {
               sql: {
@@ -730,7 +734,8 @@ describe('QueryOrchestrator', () => {
           ]
         }
       ],
-      'stb_pre_aggregations'
+      'stb_pre_aggregations',
+      'request-id'
     );
 
     expect(versionEntries.length).toBe(1);

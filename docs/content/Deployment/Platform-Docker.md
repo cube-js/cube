@@ -1,0 +1,355 @@
+---
+title: Deploy with Docker
+permalink: /deployment/platforms/docker
+category: Deployment
+subCategory: Platforms
+menuOrder: 1
+---
+
+This guide walks you through deploying Cube.js with Docker.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| This is an example of a production-ready deployment, but real-world
+| deployments can vary significantly depending on desired performance
+| and scale.
+<!-- prettier-ignore-end -->
+
+## Prerequisites
+
+- [Docker Desktop][link-docker-app]
+
+## Configuration
+
+Create a Docker Compose stack by creating a `docker-compose.yml`. A
+production-ready stack would at minimum consist of:
+
+- One or more Cube.js API instance
+- A Cube.js Refresh Worker
+- A Cube Store Router node
+- One or more Cube Store Worker nodes
+- A Redis instance
+
+An example stack using BigQuery as a data source is provided below:
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| Using macOS or Windows? Use `CUBEJS_DB_HOST=host.docker.internal` instead of
+| `localhost` if your database is on the same machine.
+<!-- prettier-ignore-end -->
+
+```yaml
+version: '2.2'
+
+services:
+  cube_api:
+    restart: always
+    image: cubejs/cube:v%CURRENT_VERSION
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      - CUBEJS_API_SECRET=secret
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_worker_1
+      - cubestore_worker_2
+      - cube_refresh_worker
+      - redis
+
+  cube_refresh_worker:
+    restart: always
+    image: cubejs/cube:v%CURRENT_VERSION
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      - CUBEJS_API_SECRET=secret
+      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+    volumes:
+      - .:/cube/conf
+
+  cubestore_router:
+    restart: always
+    image: cubejs/cubestore:v%CURRENT_VERSION
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+
+  cubestore_worker_1:
+    restart: always
+    image: cubejs/cubestore:v%CURRENT_VERSION
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
+      - CUBESTORE_WORKER_PORT=10001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+    depends_on:
+      - cubestore_router
+
+  cubestore_worker_2:
+    restart: always
+    image: cubejs/cubestore:v%CURRENT_VERSION
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
+      - CUBESTORE_WORKER_PORT=10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+    depends_on:
+      - cubestore_router
+
+  redis:
+    image: bitnami/redis:latest
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    logging:
+      driver: none
+```
+
+## Set up reverse proxy
+
+In production, the Cube.js API should be served over an HTTPS connection to
+ensure security of the data in-transit. We recommend using a reverse proxy; as
+an example, let's use [NGINX][link-nginx].
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| You can also use a reverse proxy to enable HTTP 2.0 and GZIP compression
+<!-- prettier-ignore-end -->
+
+First we'll create a new server configuration file called `cube.conf`:
+
+```
+server {
+  listen 443 ssl;
+  server_name cube.my-domain.com;
+
+  ssl_protocols               TLSv1 TLSv1.1 TLSv1.2;
+  ssl_ecdh_curve              secp384r1;
+  # Replace the ciphers with the appropriate values
+  ssl_ciphers                 "ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384 OLD_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 OLD_TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256";
+  ssl_prefer_server_ciphers   on;
+  ssl_certificate             /etc/ssl/private/cert.pem;
+  ssl_certificate_key         /etc/ssl/private/key.pem;
+  ssl_session_timeout         10m;
+  ssl_session_cache           shared:SSL:10m;
+  ssl_session_tickets         off;
+  ssl_stapling                on;
+  ssl_stapling_verify         on;
+
+  location / {
+    # Remember to replace `localhost` with `host.docker.internal` if you're on macOS/Windows
+    proxy_pass http://localhost:4000/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
+```
+
+Then we'll add a new service to our Docker Compose stack:
+
+```yaml
+services:
+  ...
+  webserver:
+    image: nginx
+    ports:
+      - 443:443
+    volumes:
+      - ./nginx:/etc/nginx
+      - ./ssl:/etc/ssl/private
+```
+
+## Security
+
+### Use JSON Web Tokens
+
+Cube.js can be configured to use industry-standard JSON Web Key Sets for
+securing its API and limiting access to data. To do this, we'll define the
+relevant options on our Cube.js API instance:
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| If you have cubes that use `SECURITY_CONTEXT` in their `sql` property, then
+| you must configure [`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so
+| the refresh workers can correctly create pre-aggregations.
+<!-- prettier-ignore-end -->
+
+```yaml
+services:
+  cube_api:
+    image: cubejs/cube:v%CURRENT_VERSION
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      - CUBEJS_API_SECRET=secret
+      - CUBEJS_JWK_URL=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>/.well-known/jwks.json
+      - CUBEJS_JWT_AUDIENCE=<APPLICATION_URL>
+      - CUBEJS_JWT_ISSUER=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>
+      - CUBEJS_JWT_ALGS=RS256
+      - CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_worker_1
+      - cubestore_worker_2
+      - cube_refresh_worker
+      - redis
+```
+
+### Securing Cube Store
+
+All Cube Store nodes (both router and workers) should only be accessible to
+Cube.js API instances and refresh workers. To do this with Docker Compose, we
+simply need to make sure that none of the Cube Store services have any exposed
+ports.
+
+## Monitoring
+
+All Cube.js logs can be found by through the Docker Compose CLI:
+
+```bash
+$ docker-compose ps
+
+           Name                           Command               State                    Ports
+---------------------------------------------------------------------------------------------------------------------------------
+cluster_cube_1                 docker-entrypoint.sh cubej ...   Up      0.0.0.0:4000->4000/tcp,:::4000->4000/tcp
+cluster_cubestore_router_1     ./cubestored                     Up      3030/tcp, 3306/tcp
+cluster_cubestore_worker_1_1   ./cubestored                     Up      3306/tcp, 9001/tcp
+cluster_cubestore_worker_2_1   ./cubestored                     Up      3306/tcp, 9001/tcp
+
+$ docker-compose logs
+
+cubestore_router_1    | 2021-06-02 15:03:20,915 INFO  [cubestore::metastore] Creating metastore from scratch in /cube/.cubestore/data/metastore
+cubestore_router_1    | 2021-06-02 15:03:20,950 INFO  [cubestore::cluster] Meta store port open on 0.0.0.0:9999
+cubestore_router_1    | 2021-06-02 15:03:20,951 INFO  [cubestore::mysql] MySQL port open on 0.0.0.0:3306
+cubestore_router_1    | 2021-06-02 15:03:20,952 INFO  [cubestore::http] Http Server is listening on 0.0.0.0:3030
+cube_1                | 🚀 Cube.js server (%CURRENT_VERSION) is listening on 4000
+cubestore_worker_2_1  | 2021-06-02 15:03:24,945 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
+cubestore_worker_1_1  | 2021-06-02 15:03:24,830 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
+```
+
+## Update to the latest version
+
+Find the latest stable release version (currently `v%CURRENT_VERSION`) [from
+Docker Hub][link-cubejs-docker]. Then update your `docker-compose.yml` to use
+the tag:
+
+```yaml
+version: '2.2'
+
+services:
+  cube_api:
+    image: cubejs/cube:v%CURRENT_VERSION
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      - CUBEJS_API_SECRET=secret
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_router
+      - cube_refresh_worker
+      - redis
+```
+
+## Extend the Docker image
+
+If you need to use npm packages with native extensions inside [the `cube.js`
+configuration file][ref-config-js], you'll need to build your own Docker image.
+You can do this by first creating a `Dockerfile` and a corresponding
+`.dockerignore`:
+
+```bash
+touch Dockerfile
+touch .dockerignore
+```
+
+Add this to the `Dockerfile`:
+
+```dockerfile
+FROM cubejs/cube:latest
+
+COPY . .
+RUN npm install
+```
+
+And this to the `.dockerignore`:
+
+```bash
+node_modules
+npm-debug.log
+schema
+cube.js
+.env
+```
+
+Then start the build process by running the following command:
+
+```bash
+docker build -t <YOUR-USERNAME>/cubejs-custom-build .
+```
+
+Finally, update your `docker-compose.yml` to use your newly-built image:
+
+```bash
+version: '2.2'
+
+services:
+  cube_api:
+    image: <YOUR-USERNAME>/cubejs-custom-build
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      - CUBEJS_API_SECRET=secret
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_router
+      - cube_refresh_worker
+      - redis
+```
+
+[link-cubejs-docker]: https://hub.docker.com/r/cubejs/cube
+[link-docker-app]: https://www.docker.com/products/docker-app
+[link-nginx]: https://www.nginx.com/
+[ref-config-js]: /config
+[ref-config-sched-ref-ctx]: /config#options-reference-scheduled-refresh-contexts

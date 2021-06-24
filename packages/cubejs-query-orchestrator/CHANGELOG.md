@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.39](https://github.com/cube-js/cube.js/compare/v0.27.38...v0.27.39) (2021-06-22)
+
+
+### Bug Fixes
+
+* Skip empty pre-aggregations sql, debug API ([#2989](https://github.com/cube-js/cube.js/issues/2989)) ([6629ca1](https://github.com/cube-js/cube.js/commit/6629ca15ae8f3e6d2efa83b019468f96a2473c18))
+
+
+
+
+
+## [0.27.38](https://github.com/cube-js/cube.js/compare/v0.27.37...v0.27.38) (2021-06-22)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Re-use pre-aggregations cache loader for debug API ([#2981](https://github.com/cube-js/cube.js/issues/2981)) ([2a5f26e](https://github.com/cube-js/cube.js/commit/2a5f26e83c88246644151cf504624ced1ff1d431))
+
+
+
+
+
+## [0.27.37](https://github.com/cube-js/cube.js/compare/v0.27.36...v0.27.37) (2021-06-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.27.34](https://github.com/cube-js/cube.js/compare/v0.27.33...v0.27.34) (2021-06-15)
+
+
+### Features
+
+* **clickhouse-driver:** Migrate to TS & HydrationStream ([c9672c0](https://github.com/cube-js/cube.js/commit/c9672c0a14d141a9c3fc6ae75e4321a2211383e7))
+
+
+
+
+
+## [0.27.33](https://github.com/cube-js/cube.js/compare/v0.27.32...v0.27.33) (2021-06-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
 ## [0.27.32](https://github.com/cube-js/cube.js/compare/v0.27.31...v0.27.32) (2021-06-12)
 
 

@@ -3,6 +3,55 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.39](https://github.com/cube-js/cube.js/compare/v0.27.38...v0.27.39) (2021-06-22)
+
+
+### Bug Fixes
+
+* Skip empty pre-aggregations sql, debug API ([#2989](https://github.com/cube-js/cube.js/issues/2989)) ([6629ca1](https://github.com/cube-js/cube.js/commit/6629ca15ae8f3e6d2efa83b019468f96a2473c18))
+
+
+
+
+
+## [0.27.37](https://github.com/cube-js/cube.js/compare/v0.27.36...v0.27.37) (2021-06-21)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.27.36](https://github.com/cube-js/cube.js/compare/v0.27.35...v0.27.36) (2021-06-21)
+
+
+### Bug Fixes
+
+* **api-gateway:** debug info, handle authInfo for Meta API ([#2979](https://github.com/cube-js/cube.js/issues/2979)) ([d9c4ef3](https://github.com/cube-js/cube.js/commit/d9c4ef34bdef47b9d3ff28e07087c3a44299887d))
+
+
+
+
+
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.27.33](https://github.com/cube-js/cube.js/compare/v0.27.32...v0.27.33) (2021-06-15)
+
+
+### Bug Fixes
+
+* **api-gateway:** Extend Load Request Success event ([#2952](https://github.com/cube-js/cube.js/issues/2952)) ([37a3563](https://github.com/cube-js/cube.js/commit/37a356350b18eca442d0be362b7b9ceae2caadd6))
+
+
+
+
+
 ## [0.27.31](https://github.com/cube-js/cube.js/compare/v0.27.30...v0.27.31) (2021-06-11)
 
 

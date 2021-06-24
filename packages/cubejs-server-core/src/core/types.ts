@@ -91,7 +91,7 @@ export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type LoggerFn = (msg: string, params: any) => void;
+export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
@@ -105,6 +105,7 @@ export interface CreateOptions {
   dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
+  cacheAndQueueDriver?: 'redis' | 'memory';
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
@@ -137,3 +138,7 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
 }
+
+export type SystemOptions = {
+  isCubeConfigEmpty: boolean;
+};

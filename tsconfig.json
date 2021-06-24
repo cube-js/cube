@@ -32,6 +32,12 @@
       "path": "packages/cubejs-postgres-driver"
     },
     {
+      "path": "packages/cubejs-mongobi-driver"
+    },
+    {
+      "path": "packages/cubejs-clickhouse-driver"
+    },
+    {
       "path": "packages/cubejs-redshift-driver"
     },
     {

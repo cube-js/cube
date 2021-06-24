@@ -3,6 +3,57 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.40](https://github.com/cube-js/cube.js/compare/v0.27.39...v0.27.40) (2021-06-23)
+
+
+### Bug Fixes
+
+* **cubestore:** refresh AWS credentials on timer, fix [#2946](https://github.com/cube-js/cube.js/issues/2946) ([23dee35](https://github.com/cube-js/cube.js/commit/23dee354573668f11553227ca50b5cf0b283d84a))
+
+
+### Features
+
+* **cubestore:** add now() and unix_timestamp() scalar function ([b40f3a8](https://github.com/cube-js/cube.js/commit/b40f3a896a1c65aece8c200733dd5cb8fe67d7be))
+
+
+
+
+
+## [0.27.37](https://github.com/cube-js/cube.js/compare/v0.27.36...v0.27.37) (2021-06-21)
+
+
+### Bug Fixes
+
+* **cubestore:** fix 'Failed to write RLE run' ([845094b](https://github.com/cube-js/cube.js/commit/845094b0bd96f7d10ba7bb9faa84b95404b9527b))
+
+
+
+
+
+## [0.27.35](https://github.com/cube-js/cube.js/compare/v0.27.34...v0.27.35) (2021-06-18)
+
+
+### Bug Fixes
+
+* **cubestore:** do not spam logs when no statsd server is listening ([44b8cad](https://github.com/cube-js/cube.js/commit/44b8cad96cdbb84dd830d255392152d3f20a4e23))
+* **cubestore:** fix assertion failure (unsorted inputs to merge sort) ([534da14](https://github.com/cube-js/cube.js/commit/534da146a472e2d04cd1e97c0ab9825f02623551))
+* **cubestore:** send at most one request per worker ([17e504a](https://github.com/cube-js/cube.js/commit/17e504a62c21961724dc2a17bf8a9a480cf3cf23))
+
+
+
+
+
+## [0.27.33](https://github.com/cube-js/cube.js/compare/v0.27.32...v0.27.33) (2021-06-15)
+
+
+### Bug Fixes
+
+* **cubestore:** fix crash (merge not supported on Float64) ([78e6d36](https://github.com/cube-js/cube.js/commit/78e6d36ad289ab2cc778e0fdc6c1dedd4de4c8e7))
+
+
+
+
+
 ## [0.27.31](https://github.com/cube-js/cube.js/compare/v0.27.30...v0.27.31) (2021-06-11)
 
 

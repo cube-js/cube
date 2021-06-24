@@ -1,9 +1,12 @@
 pub mod decimal;
 pub mod error;
 pub mod lock;
+pub mod logger;
 mod malloc_trim_loop;
 pub mod maybe_owned;
+pub mod metrics;
 pub mod ordfloat;
+pub mod strings;
 pub mod time_span;
 
 pub use malloc_trim_loop::spawn_malloc_trim_loop;

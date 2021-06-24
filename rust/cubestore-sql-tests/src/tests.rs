@@ -13,6 +13,7 @@ use std::fs::File;
 use std::future::Future;
 use std::io::Write;
 use std::panic::RefUnwindSafe;
+use std::path::Path;
 use std::pin::Pin;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
@@ -31,6 +32,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
         t("float_decimal_scale", float_decimal_scale),
+        t("float_merge", float_merge),
         t("join", join),
         t("three_tables_join", three_tables_join),
         t(
@@ -81,6 +83,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("rolling_window_join", rolling_window_join),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
+        t("now", now),
+        t("dump", dump),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -321,6 +325,44 @@ async fn float_decimal_scale(service: Box<dyn SqlClient>) {
     assert_eq!(
         result.get_rows(),
         &vec![Row::new(vec![TableValue::Float(7456503871042.786.into())])]
+    );
+}
+
+async fn float_merge(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.f1 (n float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.f1 (n) VALUES (1.0), (2.0)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.f2 (n float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.f2 (n) VALUES (1.0), (3.0)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT n \
+             FROM (SELECT * from s.f1 UNION ALL SELECT * FROM s.f2) \
+             GROUP BY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Float(1.0.into())],
+            vec![TableValue::Float(2.0.into())],
+            vec![TableValue::Float(3.0.into())],
+        ]
     );
 }
 
@@ -1694,7 +1736,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, SUM(hits):hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
-           \n    ClusterSend, partitions: [[1], [2]]"
+           \n    ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
             pp_phys_plan_ext(p.worker.as_ref(), &verbose),
@@ -1905,11 +1947,11 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
+    // TODO: test MergeSort node is present if ClusterSend has multiple partitions.
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "FinalInplaceAggregate\
-           \n  MergeSort\
-           \n    ClusterSend, partitions: [[1], [1]]"
+           \n  ClusterSend, partitions: [[1, 1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
@@ -2584,6 +2626,75 @@ async fn float_index(service: Box<dyn SqlClient>) {
             })
             .collect_vec()
     }
+}
+
+async fn now(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SELECT now()").await.unwrap();
+    assert_eq!(r.get_rows().len(), 1);
+    assert_eq!(r.get_rows()[0].values().len(), 1);
+    match &r.get_rows()[0].values()[0] {
+        TableValue::Timestamp(_) => {} // all ok.
+        v => panic!("not a timestamp: {:?}", v),
+    }
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(i int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT i, now() FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(r.len(), 3);
+    let mut seen = None;
+    for r in r.get_rows() {
+        match &r.values()[1] {
+            TableValue::Timestamp(v) => match &seen {
+                None => seen = Some(v),
+                Some(seen) => assert_eq!(seen, &v),
+            },
+            v => panic!("not a timestamp: {:?}", v),
+        }
+    }
+
+    let r = service
+        .exec_query("SELECT i, now() FROM s.Data WHERE now() = now()")
+        .await
+        .unwrap();
+    assert_eq!(r.len(), 3);
+
+    let r = service
+        .exec_query("SELECT now(), unix_timestamp()")
+        .await
+        .unwrap();
+    match r.get_rows()[0].values().as_slice() {
+        &[TableValue::Timestamp(v), TableValue::Int(t)] => {
+            assert_eq!(v.get_time_stamp() / 1_000_000_000, t)
+        }
+        _ => panic!("unexpected values: {:?}", r.get_rows()[0]),
+    }
+}
+
+async fn dump(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("DUMP SELECT 1").await.unwrap();
+    let dump_dir = match &r.get_rows()[0].values()[0] {
+        TableValue::String(d) => d,
+        _ => panic!("invalid result"),
+    };
+
+    assert!(tokio::fs::metadata(dump_dir).await.unwrap().is_dir());
+    assert!(
+        tokio::fs::metadata(Path::new(dump_dir).join("metastore-backup"))
+            .await
+            .unwrap()
+            .is_dir()
+    );
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

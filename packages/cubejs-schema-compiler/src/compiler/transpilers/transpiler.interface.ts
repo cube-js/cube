@@ -1,13 +1,6 @@
 import t from '@babel/types';
+import { NodePath } from '@babel/traverse';
 import { ErrorReporter } from '../ErrorReporter';
-
-// @todo Replace with Real type when https://github.com/babel/babel/pull/12488 PR will be merged
-export interface NodePath<T> {
-  node: T,
-  get(name: string): any,
-  replaceWith(node: t.VariableDeclaration | t.Expression): void;
-  replaceWithMultiple(node: t.VariableDeclaration[] | t.Expression): void;
-}
 
 export interface TraverseObject {
   ImportDeclaration?: (path: NodePath<t.ImportDeclaration>) => void,
@@ -15,6 +8,7 @@ export interface TraverseObject {
   ExportDefaultDeclaration?: (path: NodePath<t.ExportDefaultDeclaration>) => void,
   CallExpression?: (path: NodePath<t.CallExpression>) => void,
   Identifier?: (path: NodePath<t.Identifier>) => void,
+  ObjectProperty?: (path: NodePath<t.ObjectProperty>) => void,
 }
 
 export interface TranspilerInterface {

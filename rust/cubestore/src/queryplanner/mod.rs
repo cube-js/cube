@@ -8,12 +8,14 @@ pub mod serialized_plan;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
+mod now;
 pub mod udfs;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore, MetaStoreTable};
+use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec};
 use crate::queryplanner::serialized_plan::SerializedPlan;
@@ -21,7 +23,7 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 use crate::store::DataFrame;
-use crate::{metastore, CubeError};
+use crate::{app_metrics, metastore, CubeError};
 use arrow::array::StringArray;
 use arrow::datatypes::Field;
 use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
@@ -36,6 +38,7 @@ use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
 use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRecordBatchStream};
+use datafusion::prelude::ExecutionConfig;
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{datasource::TableProvider, prelude::ExecutionContext};
@@ -117,10 +120,9 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let execution_time = SystemTime::now();
         let results = collect(physical_plan).await?;
-        debug!(
-            "Meta query data processing time: {:?}",
-            execution_time.elapsed()?
-        );
+        let execution_time = execution_time.elapsed()?;
+        app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
+        debug!("Meta query data processing time: {:?}", execution_time,);
         let data_frame =
             tokio::task::spawn_blocking(move || batch_to_dataframe(&results)).await??;
         Ok(data_frame)
@@ -138,7 +140,9 @@ impl QueryPlannerImpl {
 
 impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
-        Ok(Arc::new(ExecutionContext::new()))
+        Ok(Arc::new(ExecutionContext::with_config(
+            ExecutionConfig::new().add_optimizer_rule(Arc::new(MaterializeNow {})),
+        )))
     }
 }
 
@@ -238,6 +242,8 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let kind = match name {
             "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
             "coalesce" | "COALESCE" => CubeScalarUDFKind::Coalesce,
+            "now" | "NOW" => CubeScalarUDFKind::Now,
+            "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
@@ -463,7 +469,7 @@ fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
                         return Ok(true);
                     }
 
-                    self.snapshots = ClusterSendExec::execution_partitions(&snapshots)
+                    self.snapshots = ClusterSendExec::logical_partitions(&snapshots)
                         .into_iter()
                         .map(|ps| ps.iter().map(|p| p.get_id()).collect_vec())
                         .collect_vec();

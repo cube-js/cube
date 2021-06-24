@@ -225,7 +225,7 @@ export class ApiGateway {
     protected readonly compilerApi: any,
     protected readonly adapterApi: any,
     protected readonly logger: any,
-    options: ApiGatewayOptions,
+    protected readonly options: ApiGatewayOptions,
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
@@ -346,8 +346,8 @@ export class ApiGateway {
         const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
         this.resToResultFn(res)({
           securityContexts: contexts
-            .filter(c => c && c.securityContext)
-            .map(context => context.securityContext)
+            .map(ctx => ctx && (ctx.securityContext || ctx.authInfo))
+            .filter(ctx => ctx)
         });
       }));
 
@@ -470,7 +470,7 @@ export class ApiGateway {
           ...props,
           preAggregation,
           partitions: partitions.map(partition => {
-            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql.tableName];
+            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql?.tableName] || [];
             return partition;
           }),
         });
@@ -745,7 +745,9 @@ export class ApiGateway {
       this.log({
         type: 'Load Request Success',
         query,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
+        queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length).length,
+        queriesWithData: results.filter((r: any) => r.data?.length).length
       }, context);
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {

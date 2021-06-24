@@ -70,6 +70,7 @@ interface CubejsConfiguration {
   },
   externalDbType: string | ((context: RequestContext) => string);
   externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
+  cacheAndQueueDriver: 'memory' | 'redis';
   orchestratorOptions: OrchestratorOptions | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
 }
@@ -581,6 +582,11 @@ module.exports = {
     }),
 };
 ```
+
+### cacheAndQueueDriver
+
+The cache and queue driver to use for the Cube.js deployment. Defaults to
+`memory` in development, `redis` in production.
 
 ### orchestratorOptions
 

@@ -14,7 +14,8 @@ export class ImportExportTranspiler implements TranspilerInterface {
               specifier.get('local').node,
               t.memberExpression(
                 t.callExpression(t.identifier('require'), [path.get('source').node]),
-                specifier.get('imported').node
+                // @todo fix without any
+                (<any>specifier.get('imported')).node
               )
             );
           } else if (specifier.node.type === 'ImportDefaultSpecifier') {
@@ -29,7 +30,7 @@ export class ImportExportTranspiler implements TranspilerInterface {
             });
           }
         });
-        path.replaceWith(t.variableDeclaration('const', declarations));
+        path.replaceWith(t.variableDeclaration('const', <t.VariableDeclarator[]>declarations));
       },
       ExportNamedDeclaration(path) {
         const specifiers = path.get('specifiers');
@@ -38,7 +39,8 @@ export class ImportExportTranspiler implements TranspilerInterface {
           if (specifier.node.type === 'ExportSpecifier') {
             return t.objectProperty(
               specifier.get('exported').node,
-              specifier.get('local').node
+              // @todo fix without any
+              (<any>specifier.get('local')).node
             );
           } else {
             reporter.syntaxError({
@@ -47,12 +49,14 @@ export class ImportExportTranspiler implements TranspilerInterface {
             });
           }
         });
-        const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(declarations)]);
+        const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(<t.ObjectProperty[]>declarations)]);
         if (path.get('declaration')) {
           path.replaceWithMultiple([
-            path.get('declaration').node,
+            // @todo fix without any
+            (<any>path.get('declaration')).node,
             t.callExpression(t.identifier('addExport'), [
               t.objectExpression(
+                // @ts-ignore
                 path.get('declaration').get('declarations').map(d => t.objectProperty(
                   d.get('id').node,
                   d.get('id').node
@@ -65,6 +69,7 @@ export class ImportExportTranspiler implements TranspilerInterface {
         }
       },
       ExportDefaultDeclaration(path) {
+        // @ts-ignore
         path.replaceWith(t.callExpression(t.identifier('setExport'), [path.get('declaration').node]));
       }
     };

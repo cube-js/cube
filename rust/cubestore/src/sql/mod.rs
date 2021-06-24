@@ -1,63 +1,66 @@
-pub mod cache;
-pub(crate) mod parser;
-
-use log::trace;
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
-use sqlparser::ast::*;
-use sqlparser::dialect::Dialect;
-
-use crate::metastore::{
-    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
-    MetaStoreTable, RowKey, Schema, TableId,
-};
-use crate::table::{Row, TableValue, TimestampValue};
-use crate::CubeError;
-use crate::{
-    metastore::{Column, ColumnType, MetaStore},
-    store::DataFrame,
-};
-use std::sync::Arc;
-
-use crate::queryplanner::{QueryPlan, QueryPlanner};
-
-use crate::cluster::{Cluster, JobEvent, JobResultListener};
-
-use crate::config::injection::DIService;
-use crate::import::limits::ConcurrencyLimits;
-use crate::import::Ingestion;
-use crate::metastore::job::JobType;
-use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
-use crate::remotefs::RemoteFs;
-use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::CubeStoreParser;
-use crate::store::ChunkDataStore;
-use crate::table::data::{MutRows, Rows, TableValueR};
-use crate::util::decimal::Decimal;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
 use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
-use cubehll::HllSketch;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
-use parser::Statement as CubeStoreStatement;
+use log::trace;
 use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::path::Path;
-use std::time::Duration;
+use sqlparser::ast::*;
+use sqlparser::dialect::Dialect;
 use tokio::time::timeout;
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
+
+use cubehll::HllSketch;
+use parser::Statement as CubeStoreStatement;
+
+use crate::cluster::{Cluster, JobEvent, JobResultListener};
+use crate::config::injection::DIService;
+use crate::import::limits::ConcurrencyLimits;
+use crate::import::Ingestion;
+use crate::metastore::job::JobType;
+use crate::metastore::{
+    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    MetaStoreTable, RowKey, Schema, TableId,
+};
+use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
+use crate::queryplanner::{QueryPlan, QueryPlanner};
+use crate::remotefs::RemoteFs;
+use crate::sql::cache::SqlResultCache;
+use crate::sql::parser::CubeStoreParser;
+use crate::store::ChunkDataStore;
+use crate::table::data::{MutRows, Rows, TableValueR};
+use crate::table::{Row, TableValue, TimestampValue};
+use crate::util::decimal::Decimal;
+use crate::util::strings::path_to_string;
+use crate::CubeError;
+use crate::{
+    app_metrics,
+    metastore::{Column, ColumnType, MetaStore},
+    store::DataFrame,
+};
+use tempfile::TempDir;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+
+pub mod cache;
+pub(crate) mod parser;
 
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
@@ -321,6 +324,60 @@ impl SqlServiceImpl {
         ingestion.wait_completion().await?;
         Ok(data.len() as u64)
     }
+
+    async fn dump_select_inputs(
+        &self,
+        query: &str,
+        q: Box<Query>,
+    ) -> Result<Arc<DataFrame>, CubeError> {
+        // TODO: metastore snapshot must be consistent wrt the dumped data.
+        let logical_plan = self
+            .query_planner
+            .logical_plan(DFStatement::Statement(Statement::Query(q)))
+            .await?;
+
+        let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await);
+        dump_dir.push("dumps");
+        tokio::fs::create_dir_all(&dump_dir).await?;
+
+        let dump_dir = TempDir::new_in(&dump_dir)?.into_path();
+        let meta_dir = path_to_string(dump_dir.join("metastore-backup"))?;
+
+        log::debug!("Dumping metastore to {}", meta_dir);
+        self.db.debug_dump(meta_dir).await?;
+
+        match logical_plan {
+            QueryPlan::Select(p, _) => {
+                let data_dir = dump_dir.join("data");
+                tokio::fs::create_dir(&data_dir).await?;
+                log::debug!("Dumping data files to {:?}", data_dir);
+                // TODO: download in parallel.
+                for f in p.all_required_files() {
+                    let f = self.remote_fs.download_file(&f).await?;
+                    let name = Path::new(&f).file_name().ok_or_else(|| {
+                        CubeError::internal(format!("Could not get filename of '{}'", f))
+                    })?;
+                    tokio::fs::copy(&f, data_dir.join(&name)).await?;
+                }
+            }
+            QueryPlan::Meta(_) => {}
+        }
+
+        let query_file = dump_dir.join("query.sql");
+        File::create(query_file)
+            .await?
+            .write_all(query.as_bytes())
+            .await?;
+
+        log::debug!("Wrote debug dump to {:?}", dump_dir);
+
+        let dump_dir = path_to_string(dump_dir)?;
+        let columns = vec![Column::new("dump_path".to_string(), ColumnType::String, 0)];
+        Ok(Arc::new(DataFrame::new(
+            columns,
+            vec![Row::new(vec![TableValue::String(dump_dir)])],
+        )))
+    }
 }
 
 #[derive(Debug)]
@@ -531,9 +588,11 @@ impl SqlService for SqlServiceImpl {
                 // TODO distribute and combine
                 let res = match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
+                        app_metrics::META_QUERIES.increment();
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
                     QueryPlan::Select(serialized, partitions) => {
+                        app_metrics::DATA_QUERIES.increment();
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
                         timeout(
@@ -570,6 +629,7 @@ impl SqlService for SqlServiceImpl {
                 };
                 Ok(res)
             }
+            CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
@@ -969,14 +1029,12 @@ fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::cluster::MockCluster;
-    use crate::config::{Config, FileStoreProvider};
-    use crate::metastore::RocksMetaStore;
-    use crate::queryplanner::query_executor::MockQueryExecutor;
-    use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-    use crate::store::{ChunkStore, WALStore};
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
+    use std::time::Duration;
+    use std::{env, fs};
+
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
@@ -984,13 +1042,18 @@ mod tests {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
-    use std::fs::File;
-    use std::io::Write;
-    use std::path::PathBuf;
-    use std::time::Duration;
-    use std::{env, fs};
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
+
+    use crate::cluster::MockCluster;
+    use crate::config::{Config, FileStoreProvider};
+    use crate::metastore::RocksMetaStore;
+    use crate::queryplanner::query_executor::MockQueryExecutor;
+    use crate::queryplanner::MockQueryPlanner;
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use crate::store::{ChunkStore, WALStore};
+
+    use super::*;
 
     #[tokio::test]
     async fn create_schema_test() {

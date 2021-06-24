@@ -56,14 +56,14 @@ export function PreAggregationStatus({
           </Button>
         )}
 
-        {external && extDbType !== 'cubestore' ? (
+        {isAggregated && external && extDbType !== 'cubestore' ? (
           <Alert
             message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets"
             type="warning"
           />
         ) : null}
 
-        {!external && preAggregationType !== 'originalSql' ? (
+        {isAggregated && !external && preAggregationType !== 'originalSql' ? (
           <Alert
             message={
               <>

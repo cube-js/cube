@@ -1,8 +1,9 @@
 import R from 'ramda';
 import fs from 'fs-extra';
 import path from 'path';
+import { executeCommand } from '@cubejs-backend/shared';
 
-import { executeCommand, fileContentsRecursive } from './utils';
+import { fileContentsRecursive } from './utils';
 import { SourceContainer } from './SourceContainer';
 
 export class AppContainer {

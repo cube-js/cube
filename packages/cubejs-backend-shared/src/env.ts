@@ -242,8 +242,6 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
-  jwkKey: () => get('CUBEJS_JWK_KEY')
-    .asUrlString(),
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
@@ -282,7 +280,7 @@ type Vars = typeof variables;
 
 export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
-    return <any>variables[key](opts);
+    return variables[key](opts);
   }
 
   throw new Error(

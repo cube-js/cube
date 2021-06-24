@@ -1,27 +1,17 @@
+import dayjs from 'dayjs';
 import {
   groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
   pluck, mergeAll, flatten,
 } from 'ramda';
-import Moment from 'moment';
-import { extendMoment } from 'moment-range';
-
-const moment = extendMoment(Moment);
 
 export const TIME_SERIES = {
-  day: (range) => Array.from(range.by('day'))
-    .map(d => d.format('YYYY-MM-DDT00:00:00.000')),
-  month: (range) => Array.from(range.snapTo('month').by('month'))
-    .map(d => d.format('YYYY-MM-01T00:00:00.000')),
-  year: (range) => Array.from(range.snapTo('year').by('year'))
-    .map(d => d.format('YYYY-01-01T00:00:00.000')),
-  hour: (range) => Array.from(range.by('hour'))
-    .map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
-  minute: (range) => Array.from(range.by('minute'))
-    .map(d => d.format('YYYY-MM-DDTHH:mm:00.000')),
-  second: (range) => Array.from(range.by('second'))
-    .map(d => d.format('YYYY-MM-DDTHH:mm:ss.000')),
-  week: (range) => Array.from(range.snapTo('isoweek').by('week'))
-    .map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
+  day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
+  month: (range) => range.snapTo('month').by('M').map(d => d.format('YYYY-MM-01T00:00:00.000')),
+  year: (range) => range.snapTo('year').by('y').map(d => d.format('YYYY-01-01T00:00:00.000')),
+  hour: (range) => range.by('h').map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
+  minute: (range) => range.by('m').map(d => d.format('YYYY-MM-DDTHH:mm:00.000')),
+  second: (range) => range.by('s').map(d => d.format('YYYY-MM-DDTHH:mm:ss.000')),
+  week: (range) => range.snapTo('isoweek').by('w').map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
 };
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
@@ -44,6 +34,25 @@ const groupByToPairs = (keyFn) => {
     return Array.from(acc.entries());
   };
 };
+
+export const dayRange = (from, to) => ({
+  by: (value) => {
+    const results = [];
+
+    let start = dayjs(from);
+    const end = dayjs(to);
+
+    while (start.isBefore(end) || start.isSame(end)) {
+      results.push(start);
+      start = start.add(1, value);
+    }
+
+    return results;
+  },
+  snapTo: (value) => dayRange(dayjs(from).startOf(value).toISOString(), dayjs(to).endOf(value).toISOString()),
+  start: dayjs(from),
+  end: dayjs(to),
+});
 
 export const QUERY_TYPE = {
   REGULAR_QUERY: 'regularQuery',
@@ -130,16 +139,14 @@ class ResultSet {
         const [cubeName, dimension, granularity] = member.split('.');
 
         if (granularity !== undefined) {
-          const range = moment.range(value, value).snapTo(
-            granularity
-          );
+          const range = dayRange(value, value).snapTo(granularity);
 
           timeDimensions.push({
             dimension: [cubeName, dimension].join('.'),
             dateRange: [
               range.start,
               range.end
-            ].map((dt) => dt.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)),
+            ].map((dt) => dt.format('YYYY-MM-DDTHH:mm:ss.SSS')),
           });
         } else if (value == null) {
           filters.push({
@@ -289,7 +296,7 @@ class ResultSet {
       const dates = pipe(
         map(
           row => row[ResultSet.timeDimensionMember(timeDimension)] &&
-            moment(row[ResultSet.timeDimensionMember(timeDimension)])
+            dayjs(row[ResultSet.timeDimensionMember(timeDimension)])
         ),
         filter(r => !!r)
       )(this.timeDimensionBackwardCompatibleData());
@@ -309,14 +316,14 @@ class ResultSet {
       !['hour', 'minute', 'second'].includes(timeDimension.granularity);
 
     const [start, end] = dateRange;
-    const range = moment.range(start, end);
+    const range = dayRange(start, end);
 
     if (!TIME_SERIES[timeDimension.granularity]) {
       throw new Error(`Unsupported time granularity: ${timeDimension.granularity}`);
     }
 
     return TIME_SERIES[timeDimension.granularity](
-      padToDay ? range.snapTo('day') : range
+      padToDay ? range.snapTo('d') : range
     );
   }
 
@@ -346,7 +353,7 @@ class ResultSet {
         if (series[0]) {
           groupByXAxis = (rows) => {
             const byXValues = groupBy(
-              ({ xValues }) => moment(xValues[0]).format(moment.HTML5_FMT.DATETIME_LOCAL_MS),
+              ({ xValues }) => dayjs(xValues[0]).format('YYYY-MM-DDTHH:mm:ss.SSS'),
               rows
             );
             return series[resultIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);

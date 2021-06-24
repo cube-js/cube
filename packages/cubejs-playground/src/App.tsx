@@ -4,7 +4,7 @@ import '@ant-design/compatible/assets/index.css';
 import { Layout, Alert } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { RouteComponentProps, withRouter } from 'react-router';
-import styled from "styled-components";
+import styled from 'styled-components';
 
 import Header from './components/Header';
 import GlobalStyles from './components/GlobalStyles';
@@ -16,7 +16,11 @@ import {
   setTelemetry,
   trackImpl,
 } from './events';
-import { useAppContext } from './components/AppContext';
+import {
+  AppContextConsumer,
+  PlaygroundContext,
+  useAppContext,
+} from './components/AppContext';
 import './index.less';
 
 const selectedTab = (pathname) => {
@@ -29,30 +33,13 @@ const selectedTab = (pathname) => {
 
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
-  
-  & > div {
-    background: var(--layout-body-background);
-  }
-`
-
-export type PlaygroundContext = {
-  anonymousId: string;
-  apiUrl: string;
-  cubejsToken: string;
-  basePath: string;
-  isDocker: boolean;
-  extDbType: string | null;
-  dbType: string;
-  telemetry: boolean;
-  shouldStartConnectionWizardFlow: boolean;
-  dockerVersion: string | null;
-  livePreview?: boolean;
-};
+`;
 
 type AppState = {
   fatalError: Error | null;
   context: PlaygroundContext | null;
   showLoader: boolean;
+  isAppContextSet: boolean;
 };
 
 class App extends Component<RouteComponentProps, AppState> {
@@ -64,6 +51,7 @@ class App extends Component<RouteComponentProps, AppState> {
     fatalError: null,
     context: null,
     showLoader: false,
+    isAppContextSet: false,
   };
 
   async componentDidMount() {
@@ -107,15 +95,20 @@ class App extends Component<RouteComponentProps, AppState> {
   }
 
   render() {
-    const { context, fatalError, showLoader } = this.state;
     const { location, children } = this.props;
+    const { context, fatalError, isAppContextSet, showLoader } = this.state;
 
-    if (!showLoader) {
-      return null;
-    }
+    if (context != null && !isAppContextSet) {
+      return (
+        <>
+          {showLoader ? <CubeLoader /> : null}
 
-    if (context == null) {
-      return <CubeLoader />;
+          <ContextSetter context={context} />
+          <AppContextConsumer
+            onReady={() => this.setState({ isAppContextSet: true })}
+          />
+        </>
+      );
     }
 
     if (fatalError) {
@@ -139,8 +132,6 @@ class App extends Component<RouteComponentProps, AppState> {
             children
           )}
         </StyledLayoutContent>
-
-        <ContextSetter context={context} />
       </Layout>
     );
   }
@@ -155,7 +146,10 @@ function ContextSetter({ context }: ContextSetterProps) {
 
   useEffect(() => {
     if (context !== null) {
-      setContext({ playgroundContext: context });
+      setContext({
+        playgroundContext: context,
+        identifier: context.identifier,
+      });
     }
   }, [context]);
 
