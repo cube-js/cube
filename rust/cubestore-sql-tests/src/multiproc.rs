@@ -6,6 +6,8 @@
 //! all processes when running the tests.
 
 use async_trait::async_trait;
+use cubestore::util::respawn::respawn;
+use ipc_channel::ipc::{IpcBytesReceiver, IpcBytesSender};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -35,29 +37,13 @@ where
     for inputs in worker_inputs {
         let (send_done, recv_done) = ipc_channel::ipc::bytes_channel().unwrap();
         let args = (send_init.clone(), recv_done, inputs, timeout);
-        let handle = procspawn::spawn(args, |(send_init, recv_done, inputs, timeout)| {
-            Runtime::new_current_thread().inner().block_on(async move {
-                let timed_out = tokio::time::timeout(
-                    timeout,
-                    T::WorkerProc::default().run(
-                        inputs,
-                        SignalInit { send_init },
-                        WaitCompletion { recv_done },
-                    ),
-                )
-                .await
-                .is_err();
-                if timed_out {
-                    eprintln!("ERROR: Stopping worker after timeout");
-                }
-            });
-        });
+        let handle = respawn(args, &[], &[]).unwrap();
         // Ensure we signal completion to all started workers even if errors occur along the way.
         join_workers.push(scopeguard::guard(
             (send_done, handle),
-            |(send_done, handle)| {
+            |(send_done, mut handle)| {
                 ack_error(send_done.send(&[]));
-                ack_error(handle.join());
+                ack_error(handle.wait());
             },
         ))
     }
@@ -85,9 +71,39 @@ where
     });
 }
 
+pub type ProcessArgs<T> = (
+    IpcBytesSender,
+    IpcBytesReceiver,
+    <T as MultiProcTest>::WorkerArgs,
+    Duration,
+);
+pub fn multiproc_child_main<T>((send_init, recv_done, inputs, timeout): ProcessArgs<T>) -> i32
+where
+    T: MultiProcTest,
+    T::WorkerProc: WorkerProc<T::WorkerArgs>,
+{
+    Runtime::new_current_thread().inner().block_on(async move {
+        let timed_out = tokio::time::timeout(
+            timeout,
+            T::WorkerProc::default().run(
+                inputs,
+                SignalInit { send_init },
+                WaitCompletion { recv_done },
+            ),
+        )
+        .await
+        .is_err();
+        if timed_out {
+            eprintln!("ERROR: Stopping worker after timeout");
+            return -1;
+        }
+        return 0;
+    })
+}
+
 #[async_trait]
 pub trait MultiProcTest {
-    type WorkerArgs;
+    type WorkerArgs: Serialize + DeserializeOwned;
     type WorkerProc;
 
     /// Inputs for worker_fn. Will spawn a worker for each WorkerArgs.

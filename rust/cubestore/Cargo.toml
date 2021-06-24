@@ -10,8 +10,8 @@ homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-procspawn = { version = "0.9.0", features = ["test-support"] }
 ipc-channel = { version = "0.14.1" }
+libc = { version = "0.2.97", optional = true }
 
 [dependencies]
 base64 = "0.13.0"
@@ -78,6 +78,12 @@ http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
 lru = "0.6.5"
+ctor = "0.1.20"
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"
+
+[features]
+# When enabled, child processes will die whenever parent process exits.
+# Highly recomended for production, available only on Linux with prctl system call.
+process-cleanup = ["libc"]

@@ -271,13 +271,6 @@ impl From<std::string::FromUtf8Error> for CubeError {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
-impl From<procspawn::SpawnError> for CubeError {
-    fn from(v: procspawn::SpawnError) -> Self {
-        CubeError::from_error(v)
-    }
-}
-
 impl From<tokio::sync::oneshot::error::RecvError> for CubeError {
     fn from(v: tokio::sync::oneshot::error::RecvError) -> Self {
         CubeError::from_error(v)

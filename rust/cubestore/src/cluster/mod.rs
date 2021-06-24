@@ -5,7 +5,7 @@ pub mod transport;
 pub mod worker_pool;
 
 #[cfg(not(target_os = "windows"))]
-use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
+use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
@@ -192,6 +192,14 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
             }
         }
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+#[ctor::ctor]
+fn proc_handler() {
+    crate::util::respawn::register_handler(
+        worker_main::<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>), WorkerProcessor>,
+    );
 }
 
 struct JobRunner {
