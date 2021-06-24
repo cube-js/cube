@@ -10,8 +10,12 @@ import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
 
-type QueryTuple = [sql: string, params: unknown[], external?: boolean];
-type QueryWithParams = QueryTuple | string;
+type QueryOptions = {
+  external?: boolean,
+  renewalThreshold?: number,
+};
+export type QueryTuple = [sql: string, params: unknown[], options?: QueryOptions];
+export type QueryWithParams = QueryTuple | string;
 type Query = {
   requestId?: string;
   dataSource: string;
@@ -179,12 +183,12 @@ export class QueryCache {
   }
 
   public static replacePreAggregationTableNames(queryAndParams: QueryWithParams, preAggregationsTablesToTempTables) {
-    const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
+    const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
       keyQuery
     );
-    return Array.isArray(queryAndParams) ? [replacedKeqQuery, params] : replacedKeqQuery;
+    return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] : replacedKeqQuery;
   }
 
   public queryWithRetryAndRelease(query, values, {
@@ -381,7 +385,7 @@ export class QueryCache {
     }
   ) {
     return cacheKeyQueries.map((q, i) => {
-      const [query, values, external]: QueryTuple = Array.isArray(q) ? q : [q, [], false];
+      const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
 
       return this.cacheQueryResult(
         query,
@@ -389,16 +393,13 @@ export class QueryCache {
         [query, values],
         expireSecs,
         {
-          renewalThreshold:
-            this.options.refreshKeyRenewalThreshold ||
-            (options.refreshKeyRenewalThresholds || [])[i] ||
-            2 * 60,
+          renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
           renewalKey: q,
           waitForRenew: !options.skipRefreshKeyWaitForRenew,
           requestId: options.requestId,
           dataSource: options.dataSource,
           useInMemory: true,
-          external,
+          external: queryOptions?.external,
         },
       );
     });

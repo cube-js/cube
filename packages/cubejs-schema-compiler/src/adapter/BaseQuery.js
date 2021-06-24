@@ -1746,20 +1746,26 @@ export class BaseQuery {
       return [`SELECT ${sql}`, external];
     };
 
-    const queries = cubes.map(cube => [cube, refreshKeyQueryByCube(cube)])
-      .map(([cube, sql]) => (transformFn ? transformFn(sql, cube) : sql))
-      .map(([sql, external]) => this.paramAllocator.buildSqlAndParams(sql).concat(external));
+    const refreshKeyThresholdQueryByCube = (cube) => {
+      const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
+      if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
+        return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey);
+      }
+
+      return this.defaultRefreshKeyRenewalThreshold();
+    };
+
+    const queries = cubes.map(cube => [cube, refreshKeyQueryByCube(cube), refreshKeyThresholdQueryByCube(cube)])
+      .map(
+        ([cube, [sql, external], renewalThreshold]) => (transformFn
+          ? transformFn(sql, cube).concat({ external, renewalThreshold })
+          : [sql, { external, renewalThreshold }])
+      )
+      .map(([sql, options]) => this.paramAllocator.buildSqlAndParams(sql).concat(options));
 
     return {
       queries,
       renewalThreshold: this.renewalThreshold(refreshKeyAllSetManually),
-      refreshKeyRenewalThresholds: cubes.map(c => {
-        const cubeFromPath = this.cubeEvaluator.cubeFromPath(c);
-        if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
-          return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey);
-        }
-        return this.defaultRefreshKeyRenewalThreshold();
-      })
     };
   }
 
@@ -2099,12 +2105,14 @@ export class BaseQuery {
         const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
           if (preAggregation.refreshKey.sql) {
-            return {
-              queries: [this.paramAllocator.buildSqlAndParams(
+            return [
+              this.paramAllocator.buildSqlAndParams(
                 preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
-              )],
-              refreshKeyRenewalThresholds: [this.defaultRefreshKeyRenewalThreshold()]
-            };
+              ).concat({
+                external: false,
+                renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
+              })
+            ];
           }
 
           let [refreshKey, refreshKeyExternal] = this.everyRefreshKeySql(preAggregation.refreshKey);
@@ -2133,10 +2141,12 @@ export class BaseQuery {
             }
           }
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
-            return {
-              queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`).concat(refreshKeyExternal)],
-              refreshKeyRenewalThresholds: [renewalThreshold]
-            };
+            return [
+              this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`).concat({
+                external: refreshKeyExternal,
+                renewalThreshold,
+              })
+            ];
           }
         }
 

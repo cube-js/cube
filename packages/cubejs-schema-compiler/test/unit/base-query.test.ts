@@ -12,10 +12,22 @@ describe('SQL Generation', () => {
       sql: \`
       select * from cards
       \`,
+      
+      refreshKey: {
+        every: '10 minute',
+      },
  
       measures: {
         count: {
           type: 'count'
+        },
+        sum: {
+          sql: \`amount\`,
+          type: \`sum\`
+        },
+        max: {
+          sql: \`amount\`,
+          type: \`max\`
         }
       },
 
@@ -29,6 +41,31 @@ describe('SQL Generation', () => {
           type: 'time',
           sql: 'created_at'
         },
+      },
+      
+      preAggregations: {
+          countCreatedAt: {
+              external: true,
+              measureReferences: [count],
+              timeDimensionReference: createdAt,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+              refreshKey: {
+                every: '1 hour',
+              },
+              scheduledRefresh: true,
+          },
+          maxCreatedAt: {
+              external: true,
+              measureReferences: [max],
+              timeDimensionReference: createdAt,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+              refreshKey: {
+                sql: 'SELECT MAX(created_at) FROM cards',
+              },
+              scheduledRefresh: true,
+          },
       }
     }) 
     `);
@@ -168,7 +205,73 @@ describe('SQL Generation', () => {
     }
   });
 
-  it('Test for everyRefreshKeySql with external', async () => {
+  it('cacheKeyQueries for cube with refreshKey.every (source)', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.sum'
+      ],
+      timeDimensions: [],
+      filters: [],
+      timezone: 'America/Los_Angeles',
+    });
+
+    // Query should not match any pre-aggregation!
+    expect(query.cacheKeyQueries()).toEqual({
+      queries: [
+        [
+          // Postgres dialect
+          "SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600)",
+          [],
+          {
+            // false, because there is no externalQueryClass
+            external: false,
+            renewalThreshold: 60,
+          }
+        ]
+      ],
+      renewalThreshold: 86400
+    });
+  });
+
+  it('cacheKeyQueries for cube with refreshKey.every (external)', async () => {
+    await compiler.compile();
+
+    // Query should not match any pre-aggregation!
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.sum'
+      ],
+      timeDimensions: [],
+      filters: [],
+      timezone: 'America/Los_Angeles',
+      externalQueryClass: MssqlQuery
+    });
+
+    // Query should not match any pre-aggregation!
+    expect(query.cacheKeyQueries()).toEqual({
+      queries: [
+        [
+          // MSSQL dialect, because externalQueryClass
+          "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600)",
+          [],
+          {
+            // true, because externalQueryClass
+            external: true,
+            renewalThreshold: 60,
+          }
+        ]
+      ],
+      renewalThreshold: 86400
+    });
+  });
+
+  /**
+   * Testing: pre-aggregation which use refreshKey.every & external database defined, should be executed in
+   * external database
+   */
+  it('preAggregationsDescription for query - refreshKey every (external)', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -181,7 +284,48 @@ describe('SQL Generation', () => {
       externalQueryClass: MssqlQuery
     });
 
-    expect(query.everyRefreshKeySql({ every: '1 hour' }))
-      .toEqual([`FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600)`, true]);
+    const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+    expect(preAggregations.length).toEqual(1);
+    expect(preAggregations[0].invalidateKeyQueries).toEqual([
+      [
+        // MSSQL dialect
+        "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600)",
+        [],
+        {
+          external: true,
+          renewalThreshold: 300,
+        }
+      ]
+    ]);
+  });
+
+  /**
+   * Testing: preAggregation which has refresh.sql, should be executed in source db
+   */
+  it('preAggregationsDescription for query - refreshKey manually (external)', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.max'
+      ],
+      timeDimensions: [],
+      filters: [],
+      timezone: 'America/Los_Angeles',
+      externalQueryClass: MssqlQuery
+    });
+
+    const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+    expect(preAggregations.length).toEqual(1);
+    expect(preAggregations[0].invalidateKeyQueries).toEqual([
+      [
+        "SELECT MAX(created_at) FROM cards",
+        [],
+        {
+          external: false,
+          renewalThreshold: 10,
+        }
+      ]
+    ]);
   });
 });

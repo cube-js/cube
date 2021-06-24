@@ -6,7 +6,7 @@ import { getEnv } from '@cubejs-backend/shared';
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
-import { QueryCache } from './QueryCache';
+import { QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
@@ -267,31 +267,29 @@ class PreAggregationLoadCache {
     return this.versionEntries[redisKey];
   }
 
-  protected async keyQueryResult(keyQuery, waitForRenew, priority, renewalThreshold) {
-    if (!this.queryResults[this.queryCache.queryRedisKey(keyQuery)]) {
-      const [query, values, external] = Array.isArray(keyQuery) ? keyQuery : [keyQuery, [], false];
+  protected async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew, priority) {
+    if (!this.queryResults[this.queryCache.queryRedisKey(sqlQuery)]) {
+      const [query, values, queryOptions]: QueryTuple = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
 
-      this.queryResults[this.queryCache.queryRedisKey(keyQuery)] = await this.queryCache.cacheQueryResult(
+      this.queryResults[this.queryCache.queryRedisKey(sqlQuery)] = await this.queryCache.cacheQueryResult(
         query,
         values,
         [query, values],
         60 * 60,
         {
-          renewalThreshold:
-            this.queryCache.options.refreshKeyRenewalThreshold ||
-            renewalThreshold ||
-            2 * 60,
-          renewalKey: keyQuery,
+          renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
+            || queryOptions?.renewalThreshold || 2 * 60,
+          renewalKey: sqlQuery,
           waitForRenew,
           priority,
           requestId: this.requestId,
           dataSource: this.dataSource,
           useInMemory: true,
-          external
+          external: queryOptions?.external
         }
       );
     }
-    return this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
+    return this.queryResults[this.queryCache.queryRedisKey(sqlQuery)];
   }
 
   protected hasKeyQueryResult(keyQuery) {
@@ -535,15 +533,9 @@ class PreAggregationLoader {
 
   protected getInvalidationKeyValues() {
     return Promise.all(
-      (this.preAggregation.invalidateKeyQueries || [])
-        .map(
-          (keyQuery, i) => this.loadCache.keyQueryResult(
-            keyQuery,
-            this.waitForRenew,
-            this.priority(10),
-            (this.preAggregation.refreshKeyRenewalThresholds || [])[i]
-          )
-        )
+      (this.preAggregation.invalidateKeyQueries || []).map(
+        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+      )
     );
   }
 

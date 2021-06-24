@@ -565,8 +565,9 @@ describe('QueryOrchestrator', () => {
         preAggregationsSchema: 'stb_pre_aggregations',
         tableName: 'stb_pre_aggregations.orders_d20181103',
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20181103 AS SELECT * FROM public.orders', []],
-        invalidateKeyQueries: [['SELECT NOW()', []]],
-        refreshKeyRenewalThresholds: [0.001]
+        invalidateKeyQueries: [['SELECT NOW()', [], {
+          renewalThreshold: 0.001
+        }]],
       }]
     };
 
@@ -617,18 +618,22 @@ describe('QueryOrchestrator', () => {
       query: 'SELECT * FROM orders',
       values: [],
       cacheKeyQueries: {
-        refreshKeyRenewalThresholds: [21600, 120],
         queries: [
-          ['SELECT NOW()', []],
-          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', []]
+          ['SELECT NOW()', [], {
+            renewalThreshold: 21600,
+          }],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
+            renewalThreshold: 120,
+          }]
         ]
       },
       preAggregations: [{
         preAggregationsSchema: 'stb_pre_aggregations',
         tableName: 'stb_pre_aggregations.orders_d20201103',
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
-        invalidateKeyQueries: [['SELECT NOW() as now', []]],
-        refreshKeyRenewalThresholds: [86400]
+        invalidateKeyQueries: [['SELECT NOW() as now', [], {
+          renewalThreshold: 86400,
+        }]]
       }],
       requestId: 'in memory cache',
     };
