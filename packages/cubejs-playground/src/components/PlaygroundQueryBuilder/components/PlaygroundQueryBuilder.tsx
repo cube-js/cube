@@ -28,7 +28,7 @@ import { dispatchPlaygroundEvent } from '../../../utils';
 import {
   useDeepEffect,
   useIsMounted,
-  useSecurityContext
+  useSecurityContext,
 } from '../../../hooks';
 import { Card, FatalError } from '../../../atoms';
 import { UIFramework } from '../../../types';
@@ -110,17 +110,20 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
-type TPivotChangeEmitterProps = {
+type PivotChangeEmitterProps = {
   iframeRef: RefObject<HTMLIFrameElement> | null;
+  chartType: ChartType;
   pivotConfig?: PivotConfig;
 };
 
 function PivotChangeEmitter({
   iframeRef,
   pivotConfig,
-}: TPivotChangeEmitterProps) {
+  chartType,
+}: PivotChangeEmitterProps) {
   useDeepEffect(() => {
-    if (iframeRef?.current) {
+    if (iframeRef?.current && chartType === 'table') {
+      console.log('@ pivot change', pivotConfig);
       dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
         pivotConfig,
       });
@@ -619,7 +622,11 @@ export function PlaygroundQueryBuilder({
               </Col>
             </Row>
 
-            <PivotChangeEmitter iframeRef={ref} pivotConfig={pivotConfig} />
+            <PivotChangeEmitter
+              iframeRef={ref}
+              chartType={chartType || 'line'}
+              pivotConfig={pivotConfig}
+            />
 
             <QueryChangeEmitter
               query1={query}
