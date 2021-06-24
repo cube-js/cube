@@ -205,6 +205,7 @@ export class QueryOrchestrator {
     const data = query && await this.fetchQuery({
       continueWait: true,
       external: preAggregation.external,
+      dataSource: preAggregation.dataSource,
       query,
       requestId
     });
