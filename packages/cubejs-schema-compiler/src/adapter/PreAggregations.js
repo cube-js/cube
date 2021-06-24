@@ -113,12 +113,12 @@ export class PreAggregations {
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
-
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
       tableName,
       external: preAggregation.external,
+      previewSql: this.query.preAggregationPreviewSql(tableName),
       preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),

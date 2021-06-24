@@ -17,7 +17,14 @@ import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { getPivotQuery, getQueryGranularity, normalizeQuery, normalizeQueryPreAggregations, QUERY_TYPE } from './query';
+import {
+  getPivotQuery,
+  getQueryGranularity,
+  normalizeQuery,
+  normalizeQueryPreAggregations,
+  normalizeQueryPreAggregationPreview,
+  QUERY_TYPE
+} from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -364,6 +371,14 @@ export class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+
+      app.post('/cubejs-system/v1/pre-aggregations/preview', jsonParser, systemMiddlewares, (async (req, res) => {
+        await this.getPreAggregationPreview({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -470,6 +485,43 @@ export class ApiGateway {
 
       res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
+      });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationPreview(
+    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      query = normalizeQueryPreAggregationPreview(this.parseQueryParam(query));
+      const { preAggregationId, refreshRange, versionEntry, timezone } = query;
+
+      const orchestratorApi = this.getAdapterApi(context);
+      const compilerApi = this.getCompilerApi(context);
+
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartitions(
+          context,
+          compilerApi,
+          {
+            timezones: [timezone],
+            preAggregations: [{ id: preAggregationId, refreshRange }]
+          }
+        );
+      const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
+      const preAggregationPartition = partitions && partitions.find(p => p.sql?.tableName === versionEntry.table_name);
+
+      res({
+        preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
+          context,
+          preAggregationPartition,
+          query.versionEntry
+        )
       });
     } catch (e) {
       this.handleError({

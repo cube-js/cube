@@ -234,3 +234,25 @@ export const normalizeQueryPreAggregations = (query, defaultValues) => {
     preAggregations: query.preAggregations
   };
 };
+
+const queryPreAggregationPreviewSchema = Joi.object().keys({
+  preAggregationId: Joi.string().required(),
+  timezone: Joi.string().required(),
+  refreshRange: Joi.array().items(Joi.string()).length(2),
+  versionEntry: Joi.object().required().keys({
+    content_version: Joi.string(),
+    last_updated_at: Joi.number(),
+    naming_version: Joi.number(),
+    structure_version: Joi.string(),
+    table_name: Joi.string()
+  })
+});
+
+export const normalizeQueryPreAggregationPreview = (query) => {
+  const { error } = Joi.validate(query, queryPreAggregationPreviewSchema);
+  if (error) {
+    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+  }
+
+  return query;
+};
