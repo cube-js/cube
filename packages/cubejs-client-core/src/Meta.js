@@ -25,6 +25,14 @@ const operators = {
     { name: 'lt', title: '<' },
     { name: 'lte', title: '<=' },
   ],
+  time: [
+    { name: 'equals', title: 'equals' },
+    { name: 'notEquals', title: 'does not equal' },
+    { name: 'inDateRange', title: 'in date range' },
+    { name: 'notInDateRange', title: 'not in date range' },
+    { name: 'afterDate', title: 'after date' },
+    { name: 'beforeDate', title: 'before date' },
+  ],
 };
 
 /**
@@ -38,7 +46,11 @@ class Meta {
     this.cubesMap = fromPairs(
       cubes.map((c) => [
         c.name,
-        { measures: memberMap(c.measures), dimensions: memberMap(c.dimensions), segments: memberMap(c.segments) },
+        {
+          measures: memberMap(c.measures),
+          dimensions: memberMap(c.dimensions),
+          segments: memberMap(c.segments),
+        },
       ])
     );
   }
@@ -76,16 +88,23 @@ class Meta {
 
   resolveMember(memberName, memberType) {
     const [cube] = memberName.split('.');
+
     if (!this.cubesMap[cube]) {
       return { title: memberName, error: `Cube not found ${cube} for path '${memberName}'` };
     }
+
     const memberTypes = Array.isArray(memberType) ? memberType : [memberType];
     const member = memberTypes
       .map((type) => this.cubesMap[cube][type] && this.cubesMap[cube][type][memberName])
       .find((m) => m);
+
     if (!member) {
-      return { title: memberName, error: `Path not found '${memberName}'` };
+      return {
+        title: memberName,
+        error: `Path not found '${memberName}'`,
+      };
     }
+
     return member;
   }
 
@@ -101,6 +120,7 @@ class Meta {
 
   filterOperatorsForMember(memberName, memberType) {
     const member = this.resolveMember(memberName, memberType);
+
     return operators[member.type] || operators.string;
   }
 }

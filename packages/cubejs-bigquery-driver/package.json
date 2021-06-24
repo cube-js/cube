@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.27.17",
+  "version": "0.27.39",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -11,6 +11,13 @@
   "engines": {
     "node": ">=10.8.0"
   },
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
   "files": [
     "dist/src",
     "index.js"
@@ -18,8 +25,8 @@
   "main": "index.js",
   "types": "dist/src/index.d.ts",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.27.17",
-    "@cubejs-backend/shared": "^0.27.17",
+    "@cubejs-backend/query-orchestrator": "^0.27.39",
+    "@cubejs-backend/shared": "^0.27.37",
     "@google-cloud/bigquery": "^5.6.0",
     "@google-cloud/storage": "^5.7.2",
     "ramda": "^0.27.1"
@@ -31,5 +38,8 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   }
 }

@@ -5,119 +5,14 @@ import jwt from 'jsonwebtoken';
 
 import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
 import { generateAuthToken } from './utils';
-
-const preAggregationsResultFactory = () => ([
-  {
-    preAggregationName: 'usages',
-    preAggregation: {
-      type: 'rollup',
-      scheduledRefresh: true,
-    },
-    cube: 'Usage',
-    references: {
-      dimensions: [
-        'Usage.deploymentId',
-        'Usage.tenantId'
-      ],
-      measures: [
-        'Usage.count'
-      ],
-      timeDimensions: [
-        {
-          dimension: 'Usage.createdAt',
-          granularity: 'day'
-        }
-      ],
-      rollups: []
-    }
-  }
-]);
-
-export const compilerApi = jest.fn().mockImplementation(() => ({
-  async getSql() {
-    return {
-      sql: ['SELECT * FROM test', []],
-      aliasNameToMember: {
-        foo__bar: 'Foo.bar',
-        foo__time: 'Foo.time',
-      },
-      order: [{ id: 'id', desc: true, }]
-    };
-  },
-
-  async metaConfig() {
-    return [
-      {
-        config: {
-          name: 'Foo',
-          measures: [
-            {
-              name: 'Foo.bar',
-            },
-          ],
-          dimensions: [
-            {
-              name: 'Foo.id',
-            },
-            {
-              name: 'Foo.time',
-            },
-          ],
-        },
-      },
-    ];
-  },
-
-  async preAggregations() {
-    return preAggregationsResultFactory();
-  }
-}));
-
-export class DataSourceStorageMock {
-  public $testConnectionsDone: boolean = false;
-
-  public $testOrchestratorConnectionsDone: boolean = false;
-
-  public async testConnections() {
-    this.$testConnectionsDone = true;
-
-    return [];
-  }
-
-  public async testOrchestratorConnections() {
-    this.$testOrchestratorConnectionsDone = true;
-
-    return [];
-  }
-}
-
-export class AdapterApiMock {
-  public $testConnectionsDone: boolean = false;
-
-  public $testOrchestratorConnectionsDone: boolean = false;
-
-  public async testConnection() {
-    this.$testConnectionsDone = true;
-
-    return [];
-  }
-
-  public async testOrchestratorConnections() {
-    this.$testOrchestratorConnectionsDone = true;
-
-    return [];
-  }
-
-  public async executeQuery() {
-    return {
-      data: [{ foo__bar: 42 }]
-    };
-  }
-
-  public addDataSeenSource() {
-    return undefined;
-  }
-}
+import {
+  preAggregationsResultFactory,
+  preAggregationPartitionsResultFactory,
+  compilerApi,
+  RefreshSchedulerMock,
+  DataSourceStorageMock,
+  AdapterApiMock
+} from './mocks';
 
 const logger = (type, message) => console.log({ type, ...message });
 
@@ -226,7 +121,7 @@ describe('API Gateway', () => {
   });
 
   test('query transform with checkAuth', async () => {
-    const queryTransformer = jest.fn(async (query: Query, context) => {
+    const queryRewrite = jest.fn(async (query: Query, context) => {
       expect(context.securityContext).toEqual({
         exp: 2475857705,
         iat: 1611857705,
@@ -251,7 +146,7 @@ describe('API Gateway', () => {
             req.authInfo = jwt.verify(authorization, API_SECRET);
           }
         },
-        queryTransformer
+        queryRewrite
       }
     );
 
@@ -266,11 +161,11 @@ describe('API Gateway', () => {
     console.log(res.body);
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
 
-    expect(queryTransformer.mock.calls.length).toEqual(1);
+    expect(queryRewrite.mock.calls.length).toEqual(1);
   });
 
   test('query transform with checkAuth (return securityContext as string)', async () => {
-    const queryTransformer = jest.fn(async (query: Query, context) => {
+    const queryRewrite = jest.fn(async (query: Query, context) => {
       expect(context.securityContext).toEqual(
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g'
       );
@@ -292,7 +187,7 @@ describe('API Gateway', () => {
             req.authInfo = authorization;
           }
         },
-        queryTransformer
+        queryRewrite
       }
     );
 
@@ -307,7 +202,7 @@ describe('API Gateway', () => {
     console.log(res.body);
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
 
-    expect(queryTransformer.mock.calls.length).toEqual(1);
+    expect(queryRewrite.mock.calls.length).toEqual(1);
   });
 
   test('null filter values', async () => {
@@ -530,6 +425,7 @@ describe('API Gateway', () => {
         {
           basePath: 'awesomepathtotest',
           playgroundAuthSecret,
+          refreshScheduler: () => new RefreshSchedulerMock(),
           scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
           scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
         }
@@ -539,58 +435,77 @@ describe('API Gateway', () => {
 
       return { app, token, tokenUser };
     };
-    
-    const notAllowedTestFactory = (route: String) => async () => {
+
+    const notAllowedTestFactory = ({ route, method = 'get' }) => async () => {
       const { app } = appPrepareFactory();
-      return request(app)
-        .get(`/cubejs-system/v1/${route}`)
+      return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(403);
     };
 
-    const notAllowedWithUserTokenTestFactory = (route: String) => async () => {
+    const notAllowedWithUserTokenTestFactory = ({ route, method = 'get' }) => async () => {
       const { app, tokenUser } = appPrepareFactory();
 
-      return request(app)
-        .get(`/cubejs-system/v1/${route}`)
+      return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .set('Authorization', `Bearer ${tokenUser}`)
         .expect(403);
     };
 
-    const notExistsTestFactory = (route: String) => async () => {
+    const notExistsTestFactory = ({ route, method = 'get' }) => async () => {
       const { app } = createApiGateway();
 
-      return request(app)
-        .get(`/cubejs-system/v1/${route}`)
+      return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(404);
     };
 
-    const successTestFactory = (route: String, result: any) => async () => {
+    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult }) => async () => {
       const { app, token } = appPrepareFactory();
-      const res = await request(app)
-        .get(`/cubejs-system/v1/${route}`)
+
+      const req = request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body).toMatchObject(result);
+      if (method === 'post') req.send(successBody);
+
+      const res = await req;
+      expect(res.body).toMatchObject(successResult);
     };
 
     const testConfigs = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },
       { route: 'pre-aggregations', successResult: { preAggregations: preAggregationsResultFactory() } },
       { route: 'pre-aggregations/security-contexts', successResult: { securityContexts: scheduledRefreshContextsFactory().map(obj => obj.securityContext) } },
-      { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } }
+      { route: 'pre-aggregations/timezones', successResult: { timezones: scheduledRefreshTimeZonesFactory() } },
+      {
+        route: 'pre-aggregations/partitions',
+        method: 'post',
+        successBody: {
+          query: {
+            timezones: ['UTC'],
+            preAggregations: [
+              {
+                id: 'cube.preAggregationName',
+                refreshRange: [
+                  '2020-01-01T00:00:00.000',
+                  '2020-01-01T23:59:59.999'
+                ]
+              }
+            ]
+          }
+        },
+        successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() }
+      }
     ];
 
-    testConfigs.forEach(({ route, successResult }) => {
-      describe(`/cubejs-system/v1/${route}`, () => {
-        test('not allowed', notAllowedTestFactory(route));
-        test('not allowed with user token', notAllowedWithUserTokenTestFactory(route));
-        test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(route));
-        test('success', successTestFactory(route, successResult));
+    testConfigs.forEach((config) => {
+      describe(`/cubejs-system/v1/${config.route}`, () => {
+        test('not allowed', notAllowedTestFactory(config));
+        test('not allowed with user token', notAllowedWithUserTokenTestFactory(config));
+        test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(config));
+        test('success', successTestFactory(config));
       });
     });
   });

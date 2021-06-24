@@ -5,6 +5,7 @@ use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
 use cubestore::sql::timestamp_from_string;
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
+use cubestore::util::decimal::Decimal;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -12,6 +13,7 @@ use std::fs::File;
 use std::future::Future;
 use std::io::Write;
 use std::panic::RefUnwindSafe;
+use std::path::Path;
 use std::pin::Pin;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
@@ -30,6 +32,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
         t("float_decimal_scale", float_decimal_scale),
+        t("float_merge", float_merge),
         t("join", join),
         t("three_tables_join", three_tables_join),
         t(
@@ -46,6 +49,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
+        t("coalesce", coalesce),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -56,6 +60,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("group_by_without_aggregates", group_by_without_aggregates),
         t("create_table_with_location", create_table_with_location),
         t("create_table_with_url", create_table_with_url),
+        t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
         t("bytes", bytes),
         t("hyperloglog", hyperloglog),
@@ -63,6 +68,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
+        t("hyperloglog_snowflake", hyperloglog_snowflake),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
@@ -75,6 +81,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
+        t("decimal_index", decimal_index),
+        t("float_index", float_index),
+        t("now", now),
+        t("dump", dump),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -285,11 +295,11 @@ async fn group_by_decimal(service: Box<dyn SqlClient>) {
         result.get_rows(),
         &vec![
             Row::new(vec![
-                TableValue::Decimal("100".to_string()),
+                TableValue::Decimal(Decimal::new(100 * 100_000)),
                 TableValue::Int(3)
             ]),
             Row::new(vec![
-                TableValue::Decimal("200".to_string()),
+                TableValue::Decimal(Decimal::new(200 * 100_000)),
                 TableValue::Int(2)
             ])
         ]
@@ -315,6 +325,44 @@ async fn float_decimal_scale(service: Box<dyn SqlClient>) {
     assert_eq!(
         result.get_rows(),
         &vec![Row::new(vec![TableValue::Float(7456503871042.786.into())])]
+    );
+}
+
+async fn float_merge(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.f1 (n float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.f1 (n) VALUES (1.0), (2.0)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.f2 (n float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.f2 (n) VALUES (1.0), (3.0)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT n \
+             FROM (SELECT * from s.f1 UNION ALL SELECT * FROM s.f2) \
+             GROUP BY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Float(1.0.into())],
+            vec![TableValue::Float(2.0.into())],
+            vec![TableValue::Float(3.0.into())],
+        ]
     );
 }
 
@@ -887,6 +935,89 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn coalesce(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.Data (n int, v int, s text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.Data (n, v, s) VALUES \
+            (1, 2, 'foo'),\
+            (null, 3, 'bar'),\
+            (null, null, 'baz'),\
+            (null, null, null)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT coalesce(1, 2, 3)")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(1)]]);
+    // TODO: the type should be 'int' here. Hopefully not a problem in practice.
+    let r = service
+        .exec_query("SELECT coalesce(NULL, 2, 3)")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::String("2".to_string())]]);
+    let r = service
+        .exec_query("SELECT coalesce(NULL, NULL, NULL)")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Null]]);
+    let r = service
+        .exec_query("SELECT coalesce(n, v) FROM s.Data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Null],
+            vec![TableValue::Null],
+            vec![TableValue::Int(1)],
+            vec![TableValue::Int(3)]
+        ]
+    );
+    // Coerces all args to text.
+    let r = service
+        .exec_query("SELECT coalesce(n, v, s) FROM s.Data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Null],
+            vec![TableValue::String("1".to_string())],
+            vec![TableValue::String("3".to_string())],
+            vec![TableValue::String("baz".to_string())]
+        ]
+    );
+
+    let r = service
+        .exec_query("SELECT coalesce(n+1,v+1,0) FROM s.Data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(0)],
+            vec![TableValue::Int(0)],
+            vec![TableValue::Int(2)],
+            vec![TableValue::Int(4)],
+        ]
+    );
+
+    service
+        .exec_query("SELECT n, coalesce() FROM s.Data ORDER BY 1")
+        .await
+        .unwrap_err();
+}
+
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS Foo")
@@ -1101,6 +1232,32 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) {
     assert_eq!(
         result.get_rows(),
         &vec![Row::new(vec![TableValue::Int(813)])]
+    );
+}
+
+async fn create_table_fail_and_retry(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data(n int, v int) INDEX reverse (v,n) LOCATION 'non-existing-file'",
+        )
+        .await
+        .unwrap_err();
+    service
+        .exec_query("CREATE TABLE s.Data(n int, v int) INDEX reverse (v,n)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(n, v) VALUES (1, -1), (2, -2)")
+        .await
+        .unwrap();
+    let rows = service
+        .exec_query("SELECT n FROM s.Data ORDER BY n")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&rows),
+        vec![vec![TableValue::Int(1)], vec![TableValue::Int(2)]]
     );
 }
 
@@ -1355,6 +1512,36 @@ async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     )
 }
 
+async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(id int, hll HLL_SNOWFLAKE) ")
+        .await
+        .unwrap();
+    service.exec_query(r#"INSERT INTO s.Data(id, hll) VALUES (1, '{"precision": 12,
+                          "sparse": {
+                            "indices": [223,736,976,1041,1256,1563,1811,2227,2327,2434,2525,2656,2946,2974,3256,3745,3771,4066],
+                            "maxLzCounts": [1,2,1,4,2,2,3,1,1,2,4,2,1,1,2,3,2,1]
+                          },
+                          "version": 4
+                        }')"#).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, cardinality(hll) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![TableValue::Int(1), TableValue::Int(18)]]
+    );
+
+    // Does not allow to import HLL in AirLift format.
+    service
+        .exec_query("INSERT INTO s.Data(id, hll) VALUES(2, X'020C0200C02FF58941D5F0C6')")
+        .await
+        .unwrap_err();
+}
+
 async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -1549,7 +1736,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, SUM(hits):hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
-           \n    ClusterSend, partitions: [[1], [2]]"
+           \n    ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
             pp_phys_plan_ext(p.worker.as_ref(), &verbose),
@@ -1760,11 +1947,11 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
+    // TODO: test MergeSort node is present if ClusterSend has multiple partitions.
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "FinalInplaceAggregate\
-           \n  MergeSort\
-           \n    ClusterSend, partitions: [[1], [1]]"
+           \n  ClusterSend, partitions: [[1, 1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
@@ -2108,7 +2295,7 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
             .map(|(s, i)| {
                 vec![
                     TableValue::String(s.to_string()),
-                    TableValue::Decimal(i.to_string()),
+                    TableValue::Decimal(Decimal::new(*i * 100_000)),
                 ]
             })
             .collect_vec()
@@ -2214,18 +2401,31 @@ async fn having(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("a", 2), ("b", 1)]));
 
+    // We diverge from datafusion here, which resolve `n` in the HAVING to `sum(n)` and fail.
+    // At the moment CubeJS sends requests like this, though, so we choose to remove support for
+    // filtering on aliases in the same query.
     let r = service
         .exec_query(
-            "SELECT `data`.id, count(`data`.n) `cnt` \
+            "SELECT `data`.id, sum(n) AS n \
              FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
-             WHERE n != 2 \
              GROUP BY 1 \
-             HAVING cnt = 2 \
+             HAVING sum(n) > 5 \
              ORDER BY 1",
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("a", 2), ("c", 2)]));
+    assert_eq!(to_rows(&r), rows(&[("b", 7), ("c", 9)]));
+    // Since we do not resolve aliases, this will fail.
+    let err = service
+        .exec_query(
+            "SELECT `data`.id, sum(n) AS n \
+             FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) `data` \
+             GROUP BY 1 \
+             HAVING n = 2 \
+             ORDER BY 1",
+        )
+        .await;
+    assert!(err.is_err());
 
     fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
         a.iter()
@@ -2348,6 +2548,153 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
             })
             .collect_vec()
     }
+}
+
+async fn decimal_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(x decimal, y decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE INDEX reverse on s.Data(y, x)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(x,y) VALUES (1, 2), (2, 3), (3, 4)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY x")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 2), (2, 3), (3, 4)]));
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY y DESC")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3, 4), (2, 3), (1, 2)]));
+
+    fn rows(a: &[(i64, i64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(x, y)| {
+                vec![
+                    TableValue::Decimal(Decimal::new(x * 100000)),
+                    TableValue::Decimal(Decimal::new(y * 100000)),
+                ]
+            })
+            .collect_vec()
+    }
+}
+
+async fn float_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(x float, y float)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE INDEX reverse on s.Data(y, x)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(x,y) VALUES (1, 2), (2, 3), (3, 4)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY x")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1., 2.), (2., 3.), (3., 4.)]));
+
+    let r = service
+        .exec_query("SELECT * FROM s.Data ORDER BY y DESC")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+
+    fn rows(a: &[(f64, f64)]) -> Vec<Vec<TableValue>> {
+        a.iter()
+            .map(|(x, y)| {
+                vec![
+                    TableValue::Float((*x).into()),
+                    TableValue::Float((*y).into()),
+                ]
+            })
+            .collect_vec()
+    }
+}
+
+async fn now(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SELECT now()").await.unwrap();
+    assert_eq!(r.get_rows().len(), 1);
+    assert_eq!(r.get_rows()[0].values().len(), 1);
+    match &r.get_rows()[0].values()[0] {
+        TableValue::Timestamp(_) => {} // all ok.
+        v => panic!("not a timestamp: {:?}", v),
+    }
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(i int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT i, now() FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(r.len(), 3);
+    let mut seen = None;
+    for r in r.get_rows() {
+        match &r.values()[1] {
+            TableValue::Timestamp(v) => match &seen {
+                None => seen = Some(v),
+                Some(seen) => assert_eq!(seen, &v),
+            },
+            v => panic!("not a timestamp: {:?}", v),
+        }
+    }
+
+    let r = service
+        .exec_query("SELECT i, now() FROM s.Data WHERE now() = now()")
+        .await
+        .unwrap();
+    assert_eq!(r.len(), 3);
+
+    let r = service
+        .exec_query("SELECT now(), unix_timestamp()")
+        .await
+        .unwrap();
+    match r.get_rows()[0].values().as_slice() {
+        &[TableValue::Timestamp(v), TableValue::Int(t)] => {
+            assert_eq!(v.get_time_stamp() / 1_000_000_000, t)
+        }
+        _ => panic!("unexpected values: {:?}", r.get_rows()[0]),
+    }
+}
+
+async fn dump(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("DUMP SELECT 1").await.unwrap();
+    let dump_dir = match &r.get_rows()[0].values()[0] {
+        TableValue::String(d) => d,
+        _ => panic!("invalid result"),
+    };
+
+    assert!(tokio::fs::metadata(dump_dir).await.unwrap().is_dir());
+    assert!(
+        tokio::fs::metadata(Path::new(dump_dir).join("metastore-backup"))
+            .await
+            .unwrap()
+            .is_dir()
+    );
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

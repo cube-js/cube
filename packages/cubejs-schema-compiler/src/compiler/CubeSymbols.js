@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
@@ -121,6 +122,14 @@ export class CubeSymbols {
       // Rollup is a default type for pre-aggregations
       if (!preAggregation.type) {
         preAggregation.type = 'rollup';
+      }
+
+      if (preAggregation.scheduledRefresh === undefined) {
+        preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+      }
+
+      if (preAggregation.external === undefined) {
+        preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
       }
     }
   }

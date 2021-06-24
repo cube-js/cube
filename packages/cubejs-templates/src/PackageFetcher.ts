@@ -2,8 +2,9 @@ import fs from 'fs-extra';
 import decompress from 'decompress';
 import decompressTargz from 'decompress-targz';
 import path from 'path';
+import { executeCommand } from '@cubejs-backend/shared';
 
-import { executeCommand, proxyFetch } from './utils';
+import { proxyFetch } from './utils';
 
 type Repository = {
   name: string;

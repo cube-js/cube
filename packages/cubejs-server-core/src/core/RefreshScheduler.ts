@@ -17,7 +17,19 @@ export interface ScheduledRefreshOptions {
 }
 
 type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concurrency' | 'workerIndices'> & {
-  timezones: string[]
+  contextSymbols: {
+    securityContext: object,
+  };
+  timezones: string[],
+  refreshRange?: [string, string]
+};
+
+type PreAggregationsQueryingOptions = {
+  timezones: string[],
+  preAggregations: {
+    id: string,
+    refreshRange?: [string, string]
+  }[]
 };
 
 export class RefreshScheduler {
@@ -38,27 +50,39 @@ export class RefreshScheduler {
       const dataSource = query.cubeDataSource(preAggregation.cube);
 
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-      const [startDate, endDate] =
-        await Promise.all(
-          compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
-            .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
-            .map(sql => orchestratorApi.executeQuery({
-              query: sql[0],
-              values: sql[1],
-              continueWait: true,
-              cacheKeyQueries: [],
-              dataSource,
-              scheduledRefresh: true,
-            }))
-        );
 
-      const extractDate = ({ data }: any) => {
-        // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
-        data = JSON.parse(JSON.stringify(data));
-        return data[0] && data[0][Object.keys(data[0])[0]];
-      };
+      let dateRange = queryingOptions.refreshRange;
+      if (!dateRange) {
+        const [startDate, endDate] =
+          await Promise.all(
+            compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
+              .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
+              .map(sql => orchestratorApi.executeQuery({
+                query: sql[0],
+                values: sql[1],
+                continueWait: true,
+                cacheKeyQueries: [],
+                dataSource,
+                scheduledRefresh: true,
+              }))
+          );
 
-      const dateRange = [extractDate(startDate), extractDate(endDate)];
+        const extractDate = ({ data }: any) => {
+          // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
+          data = JSON.parse(JSON.stringify(data));
+          return data[0] && data[0][Object.keys(data[0])[0]];
+        };
+        dateRange = [extractDate(startDate), extractDate(endDate)];
+
+        this.serverCore.logger('PreAggregation Refresh Range', {
+          securityContext: context.securityContext,
+          requestId: context.requestId,
+          preAggregationId: preAggregation.id,
+          timezone: queryingOptions.timezone,
+          refreshRange: dateRange
+        });
+      }
+
       if (!dateRange[0] || !dateRange[1]) {
         // Empty table. Nothing to refresh.
         return [];
@@ -74,6 +98,7 @@ export class RefreshScheduler {
       };
       const partitionQuery = compilerApi.createQueryByDataSource(compilers, baseQuery);
       const { partitionDimension } = partitionQuery.preAggregations.partitionDimension(preAggregation);
+
       return partitionDimension.timeSeries().map(range => ({
         ...baseQuery,
         timeDimensions: [{
@@ -111,18 +136,21 @@ export class RefreshScheduler {
   }
 
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
+    const context: RequestContext = {
+      authInfo: null,
+      securityContext: {},
+      ...ctx,
+      requestId: `scheduler-${ctx && ctx.requestId || uuid()}`,
+    };
+
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],
       ...options,
       concurrency: options.concurrency || 1,
       workerIndices: options.workerIndices || R.range(0, options.concurrency || 1),
-    };
-
-    const context: RequestContext = {
-      authInfo: null,
-      securityContext: null,
-      ...ctx,
-      requestId: `scheduler-${ctx && ctx.requestId || uuid()}`,
+      contextSymbols: {
+        securityContext: context.securityContext,
+      },
     };
 
     this.serverCore.logger('Refresh Scheduler Run', {
@@ -199,6 +227,64 @@ export class RefreshScheduler {
           loadRefreshKeysOnly: true
         });
       }));
+    }));
+  }
+
+  public async preAggregationPartitions(
+    context,
+    compilerApi: CompilerApi,
+    queryingOptions: PreAggregationsQueryingOptions
+  ) {
+    const preAggregationsQueringOptions = queryingOptions.preAggregations.reduce((obj, p) => {
+      obj[p.id] = p;
+      return obj;
+    }, {});
+
+    const preAggregations = await compilerApi.preAggregations({
+      preAggregationIds: Object.keys(preAggregationsQueringOptions)
+    });
+
+    return Promise.all(preAggregations.map(async preAggregation => {
+      const { timezones } = queryingOptions;
+      const { refreshRange } = preAggregationsQueringOptions[preAggregation.id] || {};
+
+      const queriesForPreAggregation = preAggregation && (await Promise.all(
+        timezones.map(
+          timezone => this.refreshQueriesForPreAggregation(
+            context,
+            compilerApi,
+            preAggregation,
+            // TODO: timezones, concurrency, workerIndices???
+            {
+              timezones: undefined,
+              concurrency: undefined,
+              workerIndices: undefined,
+              timezone,
+              refreshRange,
+              contextSymbols: {
+                securityContext: context.securityContext || {},
+              },
+            }
+          )
+        )
+      )).reduce((target, source) => [...target, ...source], []);
+
+      const partitions: any = queriesForPreAggregation && await Promise.all(
+        queriesForPreAggregation.map(
+          query => compilerApi
+            .getSql(query)
+            .then(sql => ({
+              ...query,
+              sql: sql.preAggregations.find(p => p.preAggregationId === preAggregation.id)
+            }))
+        )
+      );
+
+      return {
+        timezones,
+        preAggregation,
+        partitions
+      };
     }));
   }
 

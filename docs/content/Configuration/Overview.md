@@ -13,9 +13,16 @@ variables][link-env-vars].
 [link-config]: /config
 [link-env-vars]: /reference/environment-variables
 
+<!-- prettier-ignore-start -->
+[[info |]]
+| When using Docker, ensure that the `cube.js` configuration file and your
+| `schema/` folder are mounted to `/cube/conf` within the Docker container.
+<!-- prettier-ignore-end -->
+
 ## Configuration Precedence
 
-In Cube.js, values specified in `cube.js` take precedence over environment variables.
+In Cube.js, values specified in `cube.js` take precedence over environment
+variables.
 
 ## Development Mode
 
@@ -127,7 +134,8 @@ const server = new CubejsServer({
     req.securityContext = jwt.verify(auth, pem);
   },
   contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
-  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) =>
+    `pre_aggregations_${securityContext.userId}`,
 });
 
 server
@@ -158,6 +166,7 @@ module.exports = {
     req.securityContext = jwt.verify(auth, pem);
   },
   contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
-  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) =>
+    `pre_aggregations_${securityContext.userId}`,
 };
 ```

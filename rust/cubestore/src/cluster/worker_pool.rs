@@ -61,8 +61,9 @@ impl<
 
         let mut workers = Vec::new();
 
-        for _ in 0..num {
+        for i in 1..=num {
             let process = Arc::new(WorkerProcess::<T, R, P>::new(
+                format!("sel{}", i),
                 queue.clone(),
                 timeout.clone(),
                 stopped_rx.clone(),
@@ -109,6 +110,7 @@ pub struct WorkerProcess<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static,
 > {
+    name: String,
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     timeout: Duration,
     processor: PhantomData<P>,
@@ -123,11 +125,13 @@ impl<
     > WorkerProcess<T, R, P>
 {
     fn new(
+        name: String,
         queue: Arc<unlimited::Queue<Message<T, R>>>,
         timeout: Duration,
         stopped_rx: watch::Receiver<bool>,
     ) -> Self {
         WorkerProcess {
+            name,
             queue,
             timeout,
             stopped_rx: RwLock::new(stopped_rx),
@@ -232,7 +236,17 @@ impl<
         let (args_tx, args_rx) = ipc::channel()?;
         let (res_tx, res_rx) = ipc::channel()?;
 
-        let handle = procspawn::spawn((args_rx, res_tx), |(rx, tx)| {
+        let mut ctx = std::env::var("CUBESTORE_LOG_CONTEXT")
+            .ok()
+            .unwrap_or("".to_string());
+        if !ctx.is_empty() {
+            ctx += " ";
+        }
+        ctx += &self.name;
+
+        let mut b = procspawn::Builder::new();
+        b.env("CUBESTORE_LOG_CONTEXT", ctx);
+        let handle = b.spawn((args_rx, res_tx), |(rx, tx)| {
             let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
             loop {
                 let res = rx.recv();

@@ -7,12 +7,12 @@ use chrono::{DateTime, Utc};
 use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
-use s3::Bucket;
+use s3::{Bucket, Region};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::sync::Mutex;
@@ -20,7 +20,7 @@ use tokio::sync::Mutex;
 #[derive(Debug)]
 pub struct S3RemoteFs {
     dir: PathBuf,
-    bucket: Bucket,
+    bucket: std::sync::RwLock<Bucket>,
     sub_path: Option<String>,
     delete_mut: Mutex<()>,
 }
@@ -32,21 +32,83 @@ impl S3RemoteFs {
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        let credentials = Credentials::new(
-            env::var("CUBESTORE_AWS_ACCESS_KEY_ID").as_deref().ok(),
-            env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").as_deref().ok(),
-            None,
-            None,
-            None,
-        )?;
-        let bucket = Bucket::new(&bucket_name, region.parse()?, credentials)?;
-        Ok(Arc::new(Self {
+        let key_id = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
+        let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
+        let credentials =
+            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
+        let region = region.parse::<Region>()?;
+        let bucket =
+            std::sync::RwLock::new(Bucket::new(&bucket_name, region.clone(), credentials)?);
+        let fs = Arc::new(Self {
             dir,
             bucket,
             sub_path,
             delete_mut: Mutex::new(()),
-        }))
+        });
+        spawn_creds_refresh_loop(key_id, access_key, bucket_name, region, &fs);
+        Ok(fs)
     }
+}
+
+fn spawn_creds_refresh_loop(
+    key_id: Option<String>,
+    access_key: Option<String>,
+    bucket_name: String,
+    region: Region,
+    fs: &Arc<S3RemoteFs>,
+) {
+    // Refresh credentials. TODO: use expiration time.
+    let refresh_every = refresh_interval_from_env();
+    if refresh_every.as_secs() == 0 {
+        return;
+    }
+    let fs = Arc::downgrade(fs);
+    std::thread::spawn(move || {
+        log::debug!("Started S3 credentials refresh loop");
+        loop {
+            std::thread::sleep(refresh_every);
+            let fs = match fs.upgrade() {
+                None => {
+                    log::debug!("Stopping S3 credentials refresh loop");
+                    return;
+                }
+                Some(fs) => fs,
+            };
+            let c = match Credentials::new(
+                key_id.as_deref(),
+                access_key.as_deref(),
+                None,
+                None,
+                None,
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!("Failed to refresh S3 credentials: {}", e);
+                    continue;
+                }
+            };
+            let b = match Bucket::new(&bucket_name, region.clone(), c) {
+                Ok(b) => b,
+                Err(e) => {
+                    log::error!("Failed to refresh S3 credentials: {}", e);
+                    continue;
+                }
+            };
+            *fs.bucket.write().unwrap() = b;
+            log::debug!("Successfully refreshed S3 credentials")
+        }
+    });
+}
+
+fn refresh_interval_from_env() -> Duration {
+    let mut mins = 180; // 3 hours by default.
+    if let Ok(s) = std::env::var("CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS") {
+        match s.parse::<u64>() {
+            Ok(i) => mins = i,
+            Err(e) => log::error!("Could not parse CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS. Refreshing every {} minutes. Error: {}", mins, e),
+        };
+    };
+    Duration::from_secs(60 * mins)
 }
 
 di_service!(S3RemoteFs, [RemoteFs]);
@@ -61,7 +123,7 @@ impl RemoteFs for S3RemoteFs {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let path = self.s3_path(remote_path);
-        let bucket = self.bucket.clone();
+        let bucket = self.bucket.read().unwrap().clone();
         let temp_upload_path_copy = temp_upload_path.to_string();
         let status_code = tokio::task::spawn_blocking(move || {
             bucket.put_object_stream_blocking(temp_upload_path_copy, path)
@@ -102,7 +164,7 @@ impl RemoteFs for S3RemoteFs {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(remote_path);
-            let bucket = self.bucket.clone();
+            let bucket = self.bucket.read().unwrap().clone();
             let status_code = tokio::task::spawn_blocking(move || -> Result<u16, CubeError> {
                 let (mut temp_file, temp_path) =
                     NamedTempFile::new_in(&downloads_dir)?.into_parts();
@@ -130,7 +192,7 @@ impl RemoteFs for S3RemoteFs {
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         let path = self.s3_path(remote_path);
-        let bucket = self.bucket.clone();
+        let bucket = self.bucket.read().unwrap().clone();
         let (_, status_code) =
             tokio::task::spawn_blocking(move || bucket.delete_object_blocking(path)).await??;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
@@ -163,7 +225,7 @@ impl RemoteFs for S3RemoteFs {
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(remote_prefix);
-        let bucket = self.bucket.clone();
+        let bucket = self.bucket.read().unwrap().clone();
         let list = tokio::task::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list

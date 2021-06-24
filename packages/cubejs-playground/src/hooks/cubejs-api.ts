@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import cubejs from '@cubejs-client/core';
 
 export function useCubejsApi(apiUrl, token) {
-  const cubejsApiInstance = useMemo(() => {
+  return useMemo(() => {
     if (!token || !apiUrl || token === 'undefined') {
       return null;
     }
@@ -11,6 +11,4 @@ export function useCubejsApi(apiUrl, token) {
       apiUrl,
     });
   }, [apiUrl, token]);
-
-  return cubejsApiInstance;
 }

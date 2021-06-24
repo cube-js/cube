@@ -51,6 +51,7 @@ use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
+use rocksdb::backup::BackupEngineOptions;
 use rocksdb::checkpoint::Checkpoint;
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
@@ -284,7 +285,7 @@ impl DataFrameValue<String> for Option<Row> {
                             TableValue::Timestamp(t) => format!("{:?}", t),
                             TableValue::Bytes(b) => format!("{:?}", b),
                             TableValue::Boolean(b) => format!("{:?}", b),
-                            TableValue::Decimal(v) => format!("{}", v),
+                            TableValue::Decimal(v) => format!("{}", v.raw_value()),
                             TableValue::Float(v) => format!("{}", v),
                         })
                         .join(", ")
@@ -297,10 +298,20 @@ impl DataFrameValue<String> for Option<Row> {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum HllFlavour {
     Airlift,    // Compatible with Presto, Athena, etc.
+    Snowflake,  // Same storage as Airlift, imports from Snowflake JSON.
     ZetaSketch, // Compatible with BigQuery.
 }
 
-pub fn is_valid_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
+impl HllFlavour {
+    pub fn imports_from_binary(&self) -> bool {
+        match self {
+            HllFlavour::Airlift | HllFlavour::ZetaSketch => true,
+            HllFlavour::Snowflake => false,
+        }
+    }
+}
+
+pub fn is_valid_binary_hll_input(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
     // TODO: do no memory allocations for better performance, this is run on hot path.
     match f {
         HllFlavour::Airlift => {
@@ -308,6 +319,9 @@ pub fn is_valid_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
         }
         HllFlavour::ZetaSketch => {
             HyperLogLogPlusPlus::read(data)?;
+        }
+        HllFlavour::Snowflake => {
+            panic!("string formats should be handled separately")
         }
     }
     return Ok(());
@@ -438,6 +452,7 @@ impl fmt::Display for Column {
             ColumnType::Bytes => "BYTES".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Airlift) => "HYPERLOGLOG".to_string(),
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "HYPERLOGLOGPP".to_string(),
+            ColumnType::HyperLogLog(HllFlavour::Snowflake) => "HLL_SNOWFLAKE".to_string(),
             ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))
@@ -678,7 +693,7 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Table>, CubeError>;
     async fn get_table_by_id(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
     async fn get_tables(&self) -> Result<Vec<IdRow<Table>>, CubeError>;
-    async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError>;
+    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError>;
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
 
     fn partition_table(&self) -> PartitionMetaStoreTable;
@@ -775,6 +790,8 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         table_name: Vec<(String, String)>,
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError>;
+
+    async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
 }
 
 /// Information required to produce partition name on remote fs.
@@ -946,6 +963,7 @@ pub struct RocksMetaStore {
     last_check_seq: Arc<RwLock<u64>>,
     upload_loop: Arc<WorkerLoop>,
     config: Arc<dyn ConfigObj>,
+    cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
 }
 
 trait BaseRocksSecondaryIndex<T>: Debug {
@@ -1519,7 +1537,7 @@ impl RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
-        opts.set_merge_operator("meta_store merge", meta_store_merge, None);
+        opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
 
         let db = DB::open(&opts, path).unwrap();
         let db_arc = Arc::new(db);
@@ -1536,6 +1554,7 @@ impl RocksMetaStore {
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             upload_loop: Arc::new(WorkerLoop::new("Meta Store Upload")),
             config,
+            cached_tables: Arc::new(Mutex::new(None)),
         };
         meta_store
     }
@@ -1669,6 +1688,7 @@ impl RocksMetaStore {
                 Ok((res, write_result))
             })
             .await??;
+        self.invalidate_caches();
 
         mem::drop(db);
         mem::drop(db_span);
@@ -1680,7 +1700,6 @@ impl RocksMetaStore {
                 listener.send(event.clone())?;
             }
         }
-
         Ok(spawn_res)
     }
 
@@ -2102,6 +2121,10 @@ impl RocksMetaStore {
         }
         return Ok(activated_row_count);
     }
+
+    fn invalidate_caches(&self) {
+        *self.cached_tables.lock().unwrap() = None;
+    }
 }
 
 #[async_trait]
@@ -2270,7 +2293,7 @@ impl MetaStore for RocksMetaStore {
 
             let schema_id =
                 rocks_schema.get_single_row_by_index(&schema_name, &SchemaRocksIndex::Name)?;
-            let index_cols = columns.clone();
+            let table_columns = columns.clone();
             let table = Table::new(
                 table_name,
                 schema_id.get_id(),
@@ -2285,36 +2308,29 @@ impl MetaStore for RocksMetaStore {
                     batch_pipe,
                     &rocks_index,
                     &rocks_partition,
-                    &index_cols,
+                    &table_columns,
                     &table_id,
                     index_def,
                 )?;
             }
-
-            let (mut sorted, mut unsorted) =
-                index_cols.clone().into_iter().partition::<Vec<_>, _>(|c| {
-                    match c.get_column_type() {
-                        ColumnType::Decimal { .. } | ColumnType::Bytes | ColumnType::Float => false,
-                        _ => true,
-                    }
-                });
-
-            let sorted_key_size = sorted.len() as u64;
-            sorted.append(&mut unsorted);
-
-            let index = Index::try_new(
-                "default".to_string(),
-                table_id.get_id(),
-                sorted
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, c)| c.replace_index(i))
-                    .collect::<Vec<_>>(),
-                sorted_key_size,
+            let def_index_columns = table_columns
+                .iter()
+                .filter_map(|c| match c.get_column_type() {
+                    ColumnType::Bytes => None,
+                    _ => Some(c.get_name().clone()),
+                })
+                .collect_vec();
+            RocksMetaStore::add_index(
+                batch_pipe,
+                &rocks_index,
+                &rocks_partition,
+                &table_columns,
+                &table_id,
+                IndexDef {
+                    name: "default".to_string(),
+                    columns: def_index_columns,
+                },
             )?;
-            let index_id = rocks_index.insert(index, batch_pipe)?;
-            let partition = Partition::new(index_id.id, None, None);
-            let _ = rocks_partition.insert(partition, batch_pipe)?;
 
             Ok(table_id)
         })
@@ -2350,19 +2366,29 @@ impl MetaStore for RocksMetaStore {
             .await
     }
 
-    async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError> {
-        self.read_operation(|db_ref| {
+    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError> {
+        let cache = self.cached_tables.clone();
+        self.read_operation(move |db_ref| {
+            let cached = cache.lock().unwrap().clone();
+            if let Some(t) = cached {
+                return Ok(t);
+            }
             let tables = TableRocksTable::new(db_ref.clone())
                 .all_rows()?
                 .into_iter()
                 .filter(|t| t.get_row().is_ready())
                 .collect::<Vec<_>>();
             let schemas = SchemaRocksTable::new(db_ref);
-            Ok(schemas.build_path_rows(
+            let tables = Arc::new(schemas.build_path_rows(
                 tables,
                 |t| t.get_row().get_schema_id(),
                 |table, schema| TablePath { table, schema },
-            )?)
+            )?);
+
+            let to_cache = tables.clone();
+            *cache.lock().unwrap() = Some(to_cache);
+
+            Ok(tables)
         })
         .await
     }
@@ -3078,6 +3104,15 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
+
+    async fn debug_dump(&self, out_path: String) -> Result<(), CubeError> {
+        self.read_operation(|db| {
+            let mut e =
+                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), out_path)?;
+            Ok(e.create_new_backup_flush(db.db, true)?)
+        })
+        .await
+    }
 }
 
 fn get_table_impl(
@@ -3386,6 +3421,7 @@ mod tests {
                 },
                 2,
             ));
+            columns.push(Column::new("col4".to_string(), ColumnType::Bytes, 3));
 
             let table1 = meta_store
                 .create_table(

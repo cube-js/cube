@@ -8,24 +8,36 @@ export interface TableColumn {
 }
 export type TableStructure = TableColumn[];
 
-export interface DownloadTableMemoryData {
+// It's more easy to use this interface with optional method release as a base interface instead of type assertion
+export interface DownloadTableBase {
+  /**
+   * Optional function to release stream/cursor/connection
+   */
+  release?: () => Promise<void>;
+}
+
+export interface DownloadTableMemoryData extends DownloadTableBase {
   rows: Record<string, unknown>[];
+  /**
+   * Some drivers know types of response
+   */
+  types?: TableStructure;
 }
 
-export interface DownloadTableCSVData {
+export interface DownloadTableCSVData extends DownloadTableBase {
   csvFile: string[];
+  /**
+   * Some drivers know types of response
+   */
+  types?: TableStructure;
 }
 
-export interface StreamTableData {
+export interface StreamTableData extends DownloadTableBase {
   rowStream: NodeJS.ReadableStream;
   /**
    * Some drivers know types of response
    */
   types?: TableStructure;
-  /**
-   * Optional function to release stream/cursor/connection
-   */
-  release?: () => Promise<void>;
 }
 export type StreamTableDataWithTypes = StreamTableData & {
   /**
@@ -59,6 +71,7 @@ export type UnloadOptions = {
 };
 
 export type QueryOptions = {};
+export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData);
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
@@ -68,8 +81,12 @@ export interface DriverInterface {
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
+  // eslint-disable-next-line camelcase
+  getTablesQuery: (schemaName: string) => Promise<({ table_name?: string, TABLE_NAME?: string })[]>;
+  // Remove table from database
+  dropTable: (tableName: string, options?: QueryOptions) => Promise<unknown>;
   // Download data from Query (for readOnly)
-  downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData)>;
+  downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
   downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
   // Some drivers can implement streaming from SQL

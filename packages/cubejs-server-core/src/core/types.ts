@@ -1,4 +1,11 @@
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
+import {
+  CheckAuthFn,
+  CheckAuthMiddlewareFn,
+  ExtendContextFn,
+  JWTOptions,
+  UserBackgroundContext,
+  QueryRewriteFn,
+} from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
@@ -74,15 +81,17 @@ export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOpt
 
 export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
+// internal
+export type DbTypeFn = (context: DriverContext) => DatabaseType;
+export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
+export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
+
+// external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
-
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
-
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type DbTypeFn = (context: DriverContext) => DatabaseType;
-
-export type LoggerFn = (msg: string, params: any) => void;
+export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
@@ -92,17 +101,20 @@ export interface CreateOptions {
   devServer?: boolean;
   apiSecret?: string;
   logger?: LoggerFn;
-  driverFactory?: (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
-  dialectFactory?: (context: DialectContext) => BaseQuery;
+  driverFactory?: DriverFactoryFn;
+  dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
+  cacheAndQueueDriver?: 'redis' | 'memory';
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: (context: RequestContext) => string;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   jwt?: JWTOptions;
-  queryTransformer?: QueryTransformerFn;
+  // @deprecated Please use queryRewrite
+  queryTransformer?: QueryRewriteFn;
+  queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string;
   extendContext?: ExtendContextFn;
@@ -126,3 +138,7 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
 }
+
+export type SystemOptions = {
+  isCubeConfigEmpty: boolean;
+};

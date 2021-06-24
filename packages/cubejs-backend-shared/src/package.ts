@@ -34,14 +34,16 @@ type RequireBaseOptions = {
 
 type RequireOptions = RequireBaseOptions & { silent?: true };
 
-export function requireFromPackage<T = unknown|null>(
+export function requireFromPackage<T = unknown | null>(
   pkg: string,
   opts: RequireBaseOptions & { silent: true }
-): T|null;
+): T | null;
+
 export function requireFromPackage<T = unknown>(
   pkg: string,
   opts?: RequireBaseOptions
 ): T;
+
 export function requireFromPackage<T = unknown|null>(pkg: string, options?: RequireOptions): T|null {
   const { basePath = process.cwd(), relative = false, silent = undefined } = options || {};
 

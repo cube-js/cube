@@ -18,9 +18,14 @@ fn main() {
     const WORKER_PORTS: [u16; 2] = [51337, 51338];
 
     // We run only 1 test in parallel to avoid using the ports concurrently.
+    // We skip `planning_inplace_aggregate2` as planning results differ on cluster with 2 nodes.
     run_sql_tests(
         "cluster",
-        vec!["--test-threads=1".to_string()],
+        vec![
+            "--test-threads=1".to_string(),
+            "--skip".to_string(),
+            "planning_inplace_aggregate2".to_string(),
+        ],
         |test_name, test_fn| {
             // Add a suffix to avoid clashes with other configurations run concurrently.
             // TODO: run each test in unique temp folder.

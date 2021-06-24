@@ -21,7 +21,7 @@ history.listen((location) => {
   page(props);
 });
 
-async function getToken(payload: string = '') {
+async function onTokenPayloadChange(payload: string = '') {
   const response = await fetch('/playground/token', {
     method: 'post',
     headers: {
@@ -45,7 +45,7 @@ ReactDOM.render(
           path="/build"
           component={(props) => {
             return (
-              <SecurityContextProvider getToken={getToken}>
+              <SecurityContextProvider onTokenPayloadChange={onTokenPayloadChange}>
                 <ExplorePage {...props} />
               </SecurityContextProvider>
             );

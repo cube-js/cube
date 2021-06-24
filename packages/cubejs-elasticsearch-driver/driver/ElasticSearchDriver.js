@@ -73,6 +73,11 @@ class ElasticSearchDriver extends BaseDriver {
     }
   }
 
+  readOnly() {
+    // Both ES X-Pack & Open Distro don't support table creation
+    return true;
+  }
+
   async query(query, values) {
     try {
       const result = (await this.sqlClient.sql.query({ // TODO cursor

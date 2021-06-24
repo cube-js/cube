@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import LRUCache from 'lru-cache';
+import { MaybeCancelablePromise } from '@cubejs-backend/shared';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -7,6 +8,7 @@ import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { BaseDriver } from '../driver';
 
 type QueryWithParams = [string, any[]] | string;
 type Query = {
@@ -253,7 +255,12 @@ export class QueryCache {
     return this.externalQueue;
   }
 
-  public static createQueue(redisPrefix, clientFactory: DriverFactory, executeFn, options: Record<string, any> = {}) {
+  public static createQueue(
+    redisPrefix: string,
+    clientFactory: DriverFactory,
+    executeFn: (client: BaseDriver, q: any) => any,
+    options: Record<string, any> = {}
+  ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
       queryHandlers: {
         query: async (q, setCancelHandle) => {
@@ -384,6 +391,12 @@ export class QueryCache {
       },
     ));
   }
+
+  public withLock = <T = any>(
+    key: string,
+    ttl: number,
+    callback: () => MaybeCancelablePromise<T>,
+  ) => this.cacheDriver.withLock(`lock:${key}`, callback, ttl, true);
 
   public async cacheQueryResult(query, values, cacheKey, expiration, options: {
     renewalThreshold?: number,

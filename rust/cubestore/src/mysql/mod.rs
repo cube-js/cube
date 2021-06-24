@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use hex::ToHex;
 use log::{error, info, warn};
 use msql_srv::*;
+use std::convert::TryFrom;
 use std::io;
 use std::sync::Arc;
 use std::time::Duration;
@@ -63,7 +64,11 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             )
             .await;
         if let Err(e) = res {
-            error!("Error during processing {}: {}", query, e.message);
+            error!(
+                "Error during processing {}: {}",
+                query,
+                e.display_with_backtrace()
+            );
             results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
             return Ok(());
         }
@@ -91,12 +96,18 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
         let mut rw = results.start(&columns)?;
         for row in data_frame.get_rows().iter() {
-            for value in row.values().iter() {
+            for (i, value) in row.values().iter().enumerate() {
                 match value {
                     TableValue::String(s) => rw.write_col(s)?,
                     TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
                     TableValue::Int(i) => rw.write_col(i)?,
-                    TableValue::Decimal(v) => rw.write_col(v.to_string())?,
+                    TableValue::Decimal(v) => {
+                        let scale = u8::try_from(
+                            data_frame.get_columns()[i].get_column_type().target_scale(),
+                        )
+                        .unwrap();
+                        rw.write_col(v.to_string(scale))?
+                    }
                     TableValue::Boolean(v) => rw.write_col(v.to_string())?,
                     TableValue::Float(v) => rw.write_col(v.to_string())?,
                     TableValue::Bytes(b) => {

@@ -139,6 +139,13 @@ declare module '@cubejs-client/core' {
     sortedTimeDimensions: [[string, string]];
   };
 
+  export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
+
+  type UsedPreAggregation = {
+    targetTableName: string;
+    type: PreAggregationType;
+  }
+
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
@@ -146,7 +153,8 @@ declare module '@cubejs-client/core' {
     data: T[];
     external: boolean | null;
     dbType: string;
-    usedPreAggregations?: Record<string, any>;
+    extDbType: string;
+    usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
   };
 
@@ -317,7 +325,7 @@ declare module '@cubejs-client/core' {
      * });
      * ```
      */
-    decompose(): Object;
+    decompose(): ResultSet[];
 
     /**
      * @hidden
@@ -850,8 +858,13 @@ declare module '@cubejs-client/core' {
   };
 
   export type MetaResponse = {
-    cubes: Cube[]
-  }
+    cubes: Cube[];
+  };
+
+  type FilterOperator = {
+    name: string;
+    title: string;
+  };
 
   /**
    * Contains information about available cubes and it's members.
@@ -901,7 +914,7 @@ declare module '@cubejs-client/core' {
       memberType: T | T[]
     ): { title: string; error: string } | TCubeMemberByType<T>;
     defaultTimeDimensionNameFor(memberName: string): string;
-    filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): any;
+    filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): FilterOperator[];
   }
 
   /**

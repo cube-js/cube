@@ -10,6 +10,8 @@ import get from 'lodash/get';
 import last from 'lodash/last';
 import { renameCategory } from '../rename-category';
 
+import "gatsby-remark-mathjax-ssr/mathjax.css";
+
 import ScrollLink, {
   SCROLL_OFFSET,
 } from '../components/templates/ScrollSpyLink';

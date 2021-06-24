@@ -1,7 +1,7 @@
 use crate::CubeError;
 use chrono::{SecondsFormat, Utc};
 use core::mem;
-use log::{Level, LevelFilter, Log, Metadata, Record};
+use log::{Level, Log, Metadata, Record};
 use nanoid::nanoid;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -121,11 +121,8 @@ pub struct ReportingLogger {
 }
 
 impl ReportingLogger {
-    pub fn init(logger: Box<dyn Log>, max_level: LevelFilter) -> Result<(), CubeError> {
-        let reporting_logger = Self { logger };
-        log::set_boxed_logger(Box::new(reporting_logger))?;
-        log::set_max_level(max_level);
-        Ok(())
+    pub fn new(logger: Box<dyn Log>) -> Self {
+        Self { logger }
     }
 }
 

@@ -17,12 +17,12 @@ import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
 import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
 import { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { getPivotQuery, getQueryGranularity, normalizeQuery, QUERY_TYPE } from './query';
+import { getPivotQuery, getQueryGranularity, normalizeQuery, normalizeQueryPreAggregations, QUERY_TYPE } from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
   ExtendContextFn,
-  QueryTransformerFn,
+  QueryRewriteFn,
   RequestContext,
   RequestLoggerMiddlewareFn,
   Request,
@@ -179,7 +179,7 @@ export interface ApiGatewayOptions {
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   jwt?: JWTOptions;
   requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
-  queryTransformer?: QueryTransformerFn;
+  queryRewrite?: QueryRewriteFn;
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
   playgroundAuthSecret?: string;
@@ -194,7 +194,7 @@ export class ApiGateway {
 
   protected readonly basePath: string;
 
-  protected readonly queryTransformer: QueryTransformerFn;
+  protected readonly queryRewrite: QueryRewriteFn;
 
   protected readonly subscriptionStore: any;
 
@@ -225,7 +225,7 @@ export class ApiGateway {
     protected readonly compilerApi: any,
     protected readonly adapterApi: any,
     protected readonly logger: any,
-    options: ApiGatewayOptions,
+    protected readonly options: ApiGatewayOptions,
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
@@ -235,7 +235,7 @@ export class ApiGateway {
     this.basePath = options.basePath;
     this.playgroundAuthSecret = options.playgroundAuthSecret;
 
-    this.queryTransformer = options.queryTransformer || (async (query) => query);
+    this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
@@ -345,13 +345,23 @@ export class ApiGateway {
       app.get('/cubejs-system/v1/pre-aggregations/security-contexts', systemMiddlewares, (async (req, res) => {
         const contexts = this.scheduledRefreshContexts ? await this.scheduledRefreshContexts() : [];
         this.resToResultFn(res)({
-          securityContexts: contexts.map(context => context.securityContext)
+          securityContexts: contexts
+            .map(ctx => ctx && (ctx.securityContext || ctx.authInfo))
+            .filter(ctx => ctx)
         });
       }));
 
       app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, (async (req, res) => {
         this.resToResultFn(res)({
-          timezones: this.scheduledRefreshTimeZones
+          timezones: this.scheduledRefreshTimeZones || []
+        });
+      }));
+
+      app.post('/cubejs-system/v1/pre-aggregations/partitions', jsonParser, systemMiddlewares, (async (req, res) => {
+        await this.getPreAggregationPartitions({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res)
         });
       }));
     }
@@ -405,11 +415,62 @@ export class ApiGateway {
   public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
-      const preAggregations = await this
-        .getCompilerApi(context)
-        .preAggregations({ requestId: context.requestId });
+      const preAggregations = await this.getCompilerApi(context).preAggregations();
 
       res({ preAggregations });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationPartitions(
+    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      query = normalizeQueryPreAggregations(
+        this.parseQueryParam(query),
+        { timezones: this.scheduledRefreshTimeZones }
+      );
+      const orchestratorApi = this.getAdapterApi(context);
+      const compilerApi = this.getCompilerApi(context);
+
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartitions(
+          context,
+          compilerApi,
+          query
+        );
+
+      const preAggregationVersionEntries = preAggregationPartitions &&
+        await orchestratorApi.getPreAggregationVersionEntries(
+          context,
+          preAggregationPartitions,
+          compilerApi.preAggregationsSchema
+        );
+
+      const mergePartitionsAndVersionEntries = () => {
+        const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntry) => {
+          if (!obj[versionEntry.table_name]) obj[versionEntry.table_name] = [];
+          obj[versionEntry.table_name].push(versionEntry);
+          return obj;
+        }, {});
+
+        return ({ preAggregation, partitions, ...props }) => ({
+          ...props,
+          preAggregation,
+          partitions: partitions.map(partition => {
+            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql?.tableName] || [];
+            return partition;
+          }),
+        });
+      };
+
+      res({
+        preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
+      });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
@@ -432,7 +493,7 @@ export class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
-      queries.map((currentQuery) => this.queryTransformer(normalizeQuery(currentQuery), context))
+      queries.map((currentQuery) => this.queryRewrite(normalizeQuery(currentQuery), context))
     );
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
@@ -645,6 +706,7 @@ export class ApiGateway {
           annotation,
           dataSource: response.dataSource,
           dbType: response.dbType,
+          extDbType: response.extDbType,
           external: response.external,
           slowQuery: Boolean(response.slowQuery)
         };
@@ -653,7 +715,9 @@ export class ApiGateway {
       this.log({
         type: 'Load Request Success',
         query,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
+        queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length).length,
+        queriesWithData: results.filter((r: any) => r.data?.length).length
       }, context);
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {

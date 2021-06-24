@@ -1,8 +1,10 @@
 ---
 title: Cube IDE
-permalink: /cloud/cube-ide
+permalink: /cloud/dev-tools/cube-ide
 category: Developer Tools
 menuOrder: 1
+redirect_from:
+  - /cloud/cube-ide
 ---
 
 With the Cube IDE, you can write and test and your Cube.js data schemas from

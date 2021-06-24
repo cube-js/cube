@@ -128,6 +128,19 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
     .asString(),
+  // Export bucket options for Integration based
+  dbExportIntegration: () => get('CUBEJS_DB_EXPORT_INTEGRATION')
+    .asString(),
+  // Export bucket options for GCS
+  dbExportGCSCredentials: () => {
+    const credentials = get('CUBEJS_DB_EXPORT_GCS_CREDENTIALS')
+      .asString();
+    if (credentials) {
+      return JSON.parse(Buffer.from(credentials, 'base64').toString('utf8'));
+    }
+
+    return undefined;
+  },
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
@@ -229,8 +242,6 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
-  jwkKey: () => get('CUBEJS_JWK_KEY')
-    .asUrlString(),
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
@@ -260,13 +271,16 @@ const variables: Record<string, (...args: any) => any> = {
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('false')
     .asBoolStrict(),
+  scheduledRefreshDefault: () => get('CUBEJS_SCHEDULED_REFRESH_DEFAULT')
+    .default('false')
+    .asBoolStrict(),
 };
 
 type Vars = typeof variables;
 
 export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
-    return <any>variables[key](opts);
+    return variables[key](opts);
   }
 
   throw new Error(

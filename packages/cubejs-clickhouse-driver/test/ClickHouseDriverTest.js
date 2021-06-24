@@ -1,6 +1,6 @@
 /* globals describe, before, after, it */
 const { GenericContainer } = require('testcontainers');
-const ClickHouseDriver = require('../driver/ClickHouseDriver');
+const { ClickHouseDriver } = require('../src/ClickHouseDriver');
 
 require('should');
 
@@ -24,7 +24,7 @@ describe('ClickHouseDriver', () => {
 
     const version = process.env.TEST_CLICKHOUSE_VERSION || 'latest';
 
-    container = await new GenericContainer('yandex/clickhouse-server', version)
+    container = await new GenericContainer(`yandex/clickhouse-server:${version}`)
       .withExposedPorts(8123)
       .start();
 

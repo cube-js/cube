@@ -190,4 +190,13 @@ export default bundle(
         vue: 'Vue',
       },
     })
+  )
+  .concat(
+    bundle('cubejs-client-vue3', 'cubejsVue3', {
+      input: 'packages/cubejs-client-vue3/src/index.js',
+      external: ['vue'],
+      globals: {
+        vue: 'Vue',
+      },
+    })
   );

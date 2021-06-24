@@ -16,9 +16,8 @@ use crate::table::data::{
     cmp_row_key, cmp_row_key_heap, convert_row_to_heap_allocated, MutRows, Rows, RowsView,
     TableValueR,
 };
-use bigdecimal::{BigDecimal, Num, ToPrimitive};
+use crate::util::decimal::Decimal;
 use num::integer::div_ceil;
-use num::BigInt;
 use std::sync::Arc;
 
 pub struct ParquetTableStore {
@@ -55,12 +54,7 @@ impl TableStore for ParquetTableStore {
     ) -> Result<Vec<(u64, (Row, Row))>, CubeError> {
         let mut writers = Vec::new();
         for f in dest_files.iter() {
-            writers.push(RowParquetWriter::open(
-                &self.table,
-                f,
-                self.row_group_size,
-                sort_key_size,
-            )?);
+            writers.push(RowParquetWriter::open(&self.table, f, self.row_group_size)?);
         }
         if source_file.is_none() {
             let mut split_writer = SplitRowParquetWriter::new(writers, rows.len(), sort_key_size);
@@ -364,13 +358,7 @@ impl<'a> RowParquetReader<'a> {
                                         result.set_interned(
                                             i,
                                             col_i,
-                                            TableValueR::Decimal(
-                                                &BigDecimal::new(
-                                                    BigInt::from(value),
-                                                    col.get_column_type().target_scale() as i64,
-                                                )
-                                                .to_string(),
-                                            ),
+                                            TableValueR::Decimal(Decimal::new(value)),
                                         );
                                         cur_value_index += 1;
                                     } else {
@@ -598,7 +586,6 @@ impl RowParquetWriter {
         table: &'a Index,
         file: &'a str,
         row_group_size: usize,
-        _sort_key_size: usize,
     ) -> Result<RowParquetWriter, CubeError> {
         let file = File::create(file)?;
 
@@ -672,19 +659,7 @@ impl RowParquetWriter {
                                 {
                                     TableValueR::Int(val) => Ok(*val),
                                     TableValueR::Decimal(val) => match column.get_column_type() {
-                                        ColumnType::Decimal { .. } => {
-                                            Ok((BigDecimal::from_str_radix(val, 10)?)
-                                                .with_scale(
-                                                    column.get_column_type().target_scale() as i64
-                                                )
-                                                .as_bigint_and_exponent()
-                                                .0
-                                                .to_i64()
-                                                .ok_or(CubeError::internal(format!(
-                                                    "Can't convert to i64 decimal: {}",
-                                                    val
-                                                )))?)
-                                        }
+                                        ColumnType::Decimal { .. } => Ok(val.raw_value()),
                                         x => panic!("Unexpected type: {:?}", x),
                                     },
                                     TableValueR::Timestamp(t) => {
@@ -958,23 +933,25 @@ impl RowParquetWriter {
 #[cfg(test)]
 mod tests {
     use crate::metastore::{Column, ColumnType, Index};
-    use crate::table::parquet::{ColumnAccessor, ParquetTableStore, RowParquetReader};
+    use crate::table::parquet::{
+        ColumnAccessor, ParquetTableStore, RowParquetReader, RowParquetWriter,
+    };
     use crate::table::{Row, TableStore, TableValue};
     use std::{fs, io};
 
     extern crate test;
 
-    use crate::table::data::convert_row_to_heap_allocated;
-    use bigdecimal::BigDecimal;
+    use crate::table::data::{convert_row_to_heap_allocated, RowsView, TableValueR};
+    use crate::util::decimal::Decimal;
     use csv::ReaderBuilder;
     use itertools::Itertools;
-    use num::BigInt;
     use parquet::file::reader::FileReader;
     use parquet::file::statistics::Statistics;
     use std::fs::File;
     use std::io::BufReader;
     use std::mem::swap;
     use std::time::SystemTime;
+    use tempfile::NamedTempFile;
     use test::Bencher;
 
     #[test]
@@ -1020,7 +997,7 @@ mod tests {
                     },
                     TableValue::Boolean(i % 5 == 0),
                     if i % 5 != 0 {
-                        TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string())
+                        TableValue::Decimal(Decimal::new(i * 10000))
                     } else {
                         TableValue::Null
                     },
@@ -1045,7 +1022,7 @@ mod tests {
                     TableValue::String(format!("Foo {}", i)),
                     TableValue::String(format!("Boo {}", i)),
                     TableValue::Boolean(false),
-                    TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()),
+                    TableValue::Decimal(Decimal::new(i * 10000)),
                 ])
             })
             .collect::<Vec<_>>();
@@ -1083,7 +1060,7 @@ mod tests {
                     TableValue::String(format!("Foo {}", i)),
                     TableValue::String(format!("Boo {}", i)),
                     TableValue::Boolean(false),
-                    TableValue::Decimal(BigDecimal::new(BigInt::from(i * 10000), 5).to_string()),
+                    TableValue::Decimal(Decimal::new(i * 10000)),
                 ])
             })
             .collect::<Vec<_>>();
@@ -1155,6 +1132,47 @@ mod tests {
         fs::remove_file(next_file).unwrap();
         fs::remove_file(split_1).unwrap();
         fs::remove_file(split_2).unwrap();
+    }
+
+    #[test]
+    fn failed_rle_run_bools() {
+        const NUM_ROWS: usize = 16384;
+
+        let check_bools = |bools: &[TableValueR]| {
+            let index = Index::try_new(
+                "test".to_string(),
+                0,
+                vec![Column::new("b".to_string(), ColumnType::Boolean, 0)],
+                1,
+            )
+            .unwrap();
+            let tmp_file = NamedTempFile::new().unwrap();
+            let mut w = RowParquetWriter::open(&index, tmp_file.path().to_str().unwrap(), NUM_ROWS)
+                .unwrap();
+            w.write_rows(RowsView::new(&bools, 1)).unwrap();
+            w.close().unwrap()
+        };
+
+        // Maximize the data to write with RLE encoding.
+        // First, in bit-packed encoding.
+        let mut bools = Vec::with_capacity(NUM_ROWS);
+        for _ in 0..NUM_ROWS / 2 {
+            bools.push(TableValueR::Boolean(true));
+            bools.push(TableValueR::Boolean(false));
+        }
+        check_bools(&bools);
+
+        // Second, in RLE encoding.
+        let mut bools = Vec::with_capacity(NUM_ROWS);
+        for _ in 0..NUM_ROWS / 16 {
+            for _ in 0..8 {
+                bools.push(TableValueR::Boolean(true));
+            }
+            for _ in 0..8 {
+                bools.push(TableValueR::Boolean(false));
+            }
+        }
+        check_bools(&bools);
     }
 
     #[bench]

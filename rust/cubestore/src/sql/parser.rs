@@ -1,4 +1,4 @@
-use sqlparser::ast::{HiveDistributionStyle, ObjectName, Statement as SQLStatement};
+use sqlparser::ast::{HiveDistributionStyle, ObjectName, Query, Statement as SQLStatement};
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
@@ -37,6 +37,7 @@ pub enum Statement {
         schema_name: ObjectName,
         if_not_exists: bool,
     },
+    Dump(Box<Query>),
 }
 
 pub struct CubeStoreParser<'a> {
@@ -59,6 +60,19 @@ impl<'a> CubeStoreParser<'a> {
                 Keyword::CREATE => {
                     self.parser.next_token();
                     self.parse_create()
+                }
+                _ if w.value.eq_ignore_ascii_case("dump") => {
+                    self.parser.next_token();
+                    let s = self.parser.parse_statement()?;
+                    let q = match s {
+                        SQLStatement::Query(q) => q,
+                        _ => {
+                            return Err(ParserError::ParserError(
+                                "Expected select query after 'dump'".to_string(),
+                            ))
+                        }
+                    };
+                    Ok(Statement::Dump(q))
                 }
                 _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
             },
