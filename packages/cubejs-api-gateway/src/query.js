@@ -237,7 +237,7 @@ export const normalizeQueryPreAggregations = (query, defaultValues) => {
 
 const queryPreAggregationPreviewSchema = Joi.object().keys({
   preAggregationId: Joi.string().required(),
-  timezone: Joi.string(),
+  timezone: Joi.string().required(),
   refreshRange: Joi.array().items(Joi.string()).length(2),
   versionEntry: Joi.object().required().keys({
     content_version: Joi.string(),
@@ -248,14 +248,11 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
   })
 });
 
-export const normalizeQueryPreAggregationPreview = (query, defaultValues) => {
+export const normalizeQueryPreAggregationPreview = (query) => {
   const { error } = Joi.validate(query, queryPreAggregationPreviewSchema);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  return {
-    ...query,
-    timezone: query.timezones || defaultValues.timezone || 'UTC'
-  };
+  return query;
 };
