@@ -34,7 +34,7 @@ fn main() {
     app_metrics::STARTUPS.increment();
 
     #[cfg(not(target_os = "windows"))]
-    procspawn::init();
+    cubestore::util::respawn::init();
 
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 

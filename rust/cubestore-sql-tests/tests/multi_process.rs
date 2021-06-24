@@ -1,5 +1,6 @@
 //! Runs the SQL tests with 2 select worker processes.
 use cubestore::config::Config;
+use cubestore::util::respawn;
 use cubestore_sql_tests::run_sql_tests;
 use tokio::runtime::Builder;
 
@@ -7,7 +8,7 @@ use tokio::runtime::Builder;
 fn main() {
     // Prepare workers.
     Config::configure_worker_services();
-    procspawn::init(); // TODO: logs on workers.
+    respawn::init(); // TODO: logs on workers.
 
     run_sql_tests("multi_process", vec![], |test_name, test_fn| {
         let r = Builder::new_current_thread().enable_all().build().unwrap();
