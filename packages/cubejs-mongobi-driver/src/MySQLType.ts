@@ -34,6 +34,7 @@ export enum MySQLType {
  */
 const MySqlNativeToMySqlType: Record<number, string> = {
   [MySQLType.DECIMAL]: 'decimal',
+  [MySQLType.NEWDECIMAL]: 'decimal',
   [MySQLType.TINY]: 'tinyint',
   [MySQLType.SHORT]: 'smallint',
   [MySQLType.LONG]: 'int',

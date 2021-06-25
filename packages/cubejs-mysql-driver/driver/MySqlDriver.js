@@ -15,6 +15,7 @@ const GenericTypeToMySql = {
  */
 const MySqlNativeToMySqlType = {
   [mysql.Types.DECIMAL]: 'decimal',
+  [mysql.Types.NEWDECIMAL]: 'decimal',
   [mysql.Types.TINY]: 'tinyint',
   [mysql.Types.SHORT]: 'smallint',
   [mysql.Types.LONG]: 'int',
