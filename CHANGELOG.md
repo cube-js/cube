@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.43](https://github.com/cube-js/cube.js/compare/v0.27.42...v0.27.43) (2021-06-25)
+
+
+### Bug Fixes
+
+* **mysql-driver:** Empty tables with streaming ([da90b36](https://github.com/cube-js/cube.js/commit/da90b36c2e6eac0a1e2ddc8882d49f44b3c062f3))
+
+
+
+
+
 ## [0.27.42](https://github.com/cube-js/cube.js/compare/v0.27.41...v0.27.42) (2021-06-25)
 
 
