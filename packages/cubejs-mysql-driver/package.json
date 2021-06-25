@@ -16,7 +16,8 @@
   "scripts": {
     "integration": "npm run integration:mysql",
     "integration:mysql": "jest --verbose",
-    "lint": "eslint driver/*.js test/*.js"
+    "lint": "eslint driver/*.js test/*.js",
+    "lint:fix": "eslint --fix driver/*.js test/*.js"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.27.41",
@@ -30,6 +31,7 @@
     "@types/generic-pool": "^3.1.9",
     "@types/jest": "^26.0.23",
     "jest": "^26.6.3",
+    "stream-to-array": "^2.3.0",
     "testcontainers": "^7.6.2"
   },
   "eslintConfig": {

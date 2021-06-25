@@ -1,5 +1,6 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
 const { MysqlDBRunner } = require('@cubejs-backend/testing');
+const streamToArray = require('stream-to-array');
 
 const { createDriver } = require('./mysql.db.runner');
 
@@ -28,13 +29,13 @@ describe('MySqlDriver', () => {
   });
 
   test('truncated wrong value', async () => {
-    await mySqlDriver.uploadTable(`test.wrong_value`, [{ name: 'value', type: 'string' }], {
-      rows: [{ value: "Tekirdağ" }]
+    await mySqlDriver.uploadTable('test.wrong_value', [{ name: 'value', type: 'string' }], {
+      rows: [{ value: 'Tekirdağ' }]
     });
     expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.wrong_value'))))
-      .toStrictEqual([{ value: "Tekirdağ" }]);
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
     expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.wrong_value')).rows)))
-      .toStrictEqual([{ value: "Tekirdağ" }]);
+      .toStrictEqual([{ value: 'Tekirdağ' }]);
   });
 
   test('mysql to generic type', async () => {
@@ -51,7 +52,7 @@ describe('MySqlDriver', () => {
   });
 
   test('boolean field', async () => {
-    await mySqlDriver.uploadTable(`test.boolean`, [{ name: 'b_value', type: 'boolean' }], {
+    await mySqlDriver.uploadTable('test.boolean', [{ name: 'b_value', type: 'boolean' }], {
       rows: [
         { b_value: true },
         { b_value: true },
@@ -65,5 +66,51 @@ describe('MySqlDriver', () => {
       .toStrictEqual([{ b_value: 1 }, { b_value: 1 }, { b_value: 1 }]);
     expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.boolean where b_value = ?', [false]))))
       .toStrictEqual([{ b_value: 0 }, { b_value: 0 }]);
+  });
+
+  test('stream', async () => {
+    await mySqlDriver.uploadTable(
+      'test.streaming_test',
+      [
+        { name: 'id', type: 'bigint' },
+        { name: 'created', type: 'date' },
+        { name: 'price', type: 'decimal' }
+      ],
+      {
+        rows: [
+          { id: 1, created: '2020-01-01', price: '100' },
+          { id: 2, created: '2020-01-02', price: '200' },
+          { id: 3, created: '2020-01-03', price: '300' }
+        ]
+      }
+    );
+
+    const tableData = await mySqlDriver.stream('select * from test.streaming_test', [], {
+      highWaterMark: 1000,
+    });
+
+    try {
+      expect(await tableData.types).toEqual([
+        {
+          name: 'id',
+          type: 'int'
+        },
+        {
+          name: 'created',
+          type: 'date'
+        },
+        {
+          name: 'price',
+          type: 'decimal'
+        },
+      ]);
+      expect(await streamToArray(tableData.rowStream)).toEqual([
+        { id: 1, created: '2020-01-01', price: 100 },
+        { id: 2, created: '2020-01-02', price: 200 },
+        { id: 3, created: '2020-01-03', price: 300 }
+      ]);
+    } finally {
+      await tableData.release();
+    }
   });
 });
