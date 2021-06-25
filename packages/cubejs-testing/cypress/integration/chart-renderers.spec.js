@@ -1,4 +1,4 @@
-import { countWithTimedimenionQuery, tableQuery } from 'packages/cubejs-testing/cypress/queries';
+import { countWithTimedimenionQuery, tableQuery } from '../queries';
 import crypto from 'crypto';
 
 context('Playground: Chart Renderers', () => {
