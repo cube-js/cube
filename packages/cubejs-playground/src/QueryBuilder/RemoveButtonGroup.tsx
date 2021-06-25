@@ -46,7 +46,7 @@ function color(props) {
 const RemoveButtonGroup = styled(UnstyledRemoveButtonGroup)`
   && {
     border-radius: calc(var(--border-radius-base) + 1px);
-    
+
     .ant-btn {
       border: none;
 

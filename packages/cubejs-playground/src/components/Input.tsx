@@ -7,8 +7,10 @@ const StyledInput = styled(AntdInput)`
     height: auto;
     border-color: 1px solid var(--dark-05-color);
     color: var(--text-color);
-    
-    &:hover, &:active, &:focus {
+
+    &:hover,
+    &:active,
+    &:focus {
       border-color: var(--purple-04-color);
       color: var(--primary-color);
     }

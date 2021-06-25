@@ -91,7 +91,9 @@ export function ConnectionWizardPage({ history }) {
   const [isDriverInstallationInProgress, setDriverInstallationInProgress] =
     useState<boolean>(false);
   const [dependencyName, setDependencyName] = useState<string | null>(null);
-  const [installationError, setInstallationError] = useState<string | null>(null);
+  const [installationError, setInstallationError] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     playgroundAction('connection_wizard_open');
@@ -205,9 +207,7 @@ export function ConnectionWizardPage({ history }) {
   if (isDriverInstallationInProgress && dependencyName) {
     return (
       <Layout>
-        <Title>
-          Set Up a Database connection
-        </Title>
+        <Title>Set Up a Database connection</Title>
 
         <Space align="center" size="middle">
           <Spin />

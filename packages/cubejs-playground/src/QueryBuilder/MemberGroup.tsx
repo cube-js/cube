@@ -5,6 +5,7 @@ import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import { SectionRow } from '../components';
 import MissingMemberTooltip from './MissingMemberTooltip';
+import { useCallback } from 'react';
 
 type MemberGroupProps = {
   disalbed?: boolean;
@@ -12,53 +13,58 @@ type MemberGroupProps = {
   [key: string]: any;
 };
 
-const MemberGroup = ({
+export default function MemberGroup({
   disabled = false,
   members,
   availableMembers,
   missingMembers,
   addMemberName,
   updateMethods,
-}: MemberGroupProps) => (
-  <SectionRow>
-    {members.map((m) => {
-      const isMissing = missingMembers.includes(m.title);
+}: MemberGroupProps) {
+  const handleClick = useCallback((m) => updateMethods.add(m), []);
 
-      const buttonGroup = (
-        <RemoveButtonGroup
-          key={m.index || m.name}
-          disabled={disabled}
-          className={disabled ? 'disabled' : null}
-          color={isMissing ? 'danger' : 'primary'}
-          onRemoveClick={() => updateMethods.remove(m)}
-        >
-          <MemberDropdown
+  return (
+    <SectionRow>
+      {members.map((m) => {
+        const isMissing = missingMembers.includes(m.title);
+
+        const buttonGroup = (
+          <RemoveButtonGroup
+            key={m.index || m.name}
             disabled={disabled}
-            availableMembers={availableMembers}
-            onClick={(updateWith) => updateMethods.update(m, updateWith)}
+            className={disabled ? 'disabled' : null}
+            color={isMissing ? 'danger' : 'primary'}
+            onRemoveClick={() => updateMethods.remove(m)}
           >
-            {m.title}
-          </MemberDropdown>
-        </RemoveButtonGroup>
-      );
+            <MemberDropdown
+              disabled={disabled}
+              availableMembers={availableMembers}
+              onClick={(updateWith) => updateMethods.update(m, updateWith)}
+            >
+              {m.title}
+            </MemberDropdown>
+          </RemoveButtonGroup>
+        );
 
-      return isMissing ? (
-        <MissingMemberTooltip key={m.index || m.name}>{buttonGroup}</MissingMemberTooltip>
-      ) : (
-        buttonGroup
-      );
-    })}
-    <MemberDropdown
-      disabled={disabled}
-      availableMembers={availableMembers}
-      type="dashed"
-      data-testid={addMemberName}
-      icon={<PlusOutlined />}
-      onClick={(m) => updateMethods.add(m)}
-    >
-      {!members.length ? addMemberName : null}
-    </MemberDropdown>
-  </SectionRow>
-);
+        return isMissing ? (
+          <MissingMemberTooltip key={m.index || m.name}>
+            {buttonGroup}
+          </MissingMemberTooltip>
+        ) : (
+          buttonGroup
+        );
+      })}
 
-export default MemberGroup;
+      <MemberDropdown
+        data-testid={addMemberName}
+        disabled={disabled}
+        availableMembers={availableMembers}
+        type="dashed"
+        icon={<PlusOutlined />}
+        onClick={handleClick}
+      >
+        {!members.length ? addMemberName : null}
+      </MemberDropdown>
+    </SectionRow>
+  );
+}

@@ -1,3 +1,5 @@
+import equals from 'fast-deep-equal';
+
 import { PlaygroundWrapper } from './PlaygroundWrapper';
 import {
   SecurityContextProps,
@@ -5,6 +7,7 @@ import {
 } from '../../components/SecurityContext/SecurityContextProvider';
 import { PlaygroundQueryBuilderProps } from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
+import { memo } from 'react';
 
 type QueryBuilderProps = {
   token: string;
@@ -21,11 +24,12 @@ type QueryBuilderProps = {
   Pick<SecurityContextProps, 'onTokenPayloadChange'> &
   Pick<SecurityContextProviderProps, 'tokenUpdater'>;
 
-export function QueryBuilder({
+function QueryBuilderComponent({
   token,
   identifier,
   ...props
 }: QueryBuilderProps) {
+  console.log('render: QueryBuilder');
   return (
     <PlaygroundWrapper
       identifier={identifier}
@@ -37,3 +41,10 @@ export function QueryBuilder({
     </PlaygroundWrapper>
   );
 }
+
+export const QueryBuilder = memo(
+  QueryBuilderComponent,
+  (prevProps, nextProps) => {
+    return equals(prevProps, nextProps);
+  }
+);

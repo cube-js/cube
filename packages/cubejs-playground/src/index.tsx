@@ -45,7 +45,9 @@ ReactDOM.render(
           path="/build"
           component={(props) => {
             return (
-              <SecurityContextProvider onTokenPayloadChange={onTokenPayloadChange}>
+              <SecurityContextProvider
+                onTokenPayloadChange={onTokenPayloadChange}
+              >
                 <ExplorePage {...props} />
               </SecurityContextProvider>
             );

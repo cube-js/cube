@@ -26,7 +26,7 @@ import { SectionHeader, SectionRow } from '../../../components';
 import ChartContainer from '../../../ChartContainer';
 import { dispatchPlaygroundEvent } from '../../../utils';
 import {
-  useDeepCompareMemoize,
+  useDeepEffect,
   useIsMounted,
   useSecurityContext,
 } from '../../../hooks';
@@ -110,22 +110,25 @@ const playgroundActionUpdateMethods = (updateMethods, memberName) =>
     }))
     .reduce((a, b) => ({ ...a, ...b }), {});
 
-type TPivotChangeEmitterProps = {
+type PivotChangeEmitterProps = {
   iframeRef: RefObject<HTMLIFrameElement> | null;
+  chartType: ChartType;
   pivotConfig?: PivotConfig;
 };
 
 function PivotChangeEmitter({
   iframeRef,
   pivotConfig,
-}: TPivotChangeEmitterProps) {
-  useEffect(() => {
-    if (iframeRef?.current) {
+  chartType,
+}: PivotChangeEmitterProps) {
+  useDeepEffect(() => {
+    if (iframeRef?.current && chartType === 'table') {
+      console.log('@ pivot change', pivotConfig);
       dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
         pivotConfig,
       });
     }
-  }, useDeepCompareMemoize([iframeRef, pivotConfig]));
+  }, [iframeRef, pivotConfig]);
 
   return null;
 }
@@ -619,7 +622,11 @@ export function PlaygroundQueryBuilder({
               </Col>
             </Row>
 
-            <PivotChangeEmitter iframeRef={ref} pivotConfig={pivotConfig} />
+            <PivotChangeEmitter
+              iframeRef={ref}
+              chartType={chartType || 'line'}
+              pivotConfig={pivotConfig}
+            />
 
             <QueryChangeEmitter
               query1={query}

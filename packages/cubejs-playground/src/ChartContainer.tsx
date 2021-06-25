@@ -435,7 +435,7 @@ class ChartContainer extends Component<
         );
       } else if (showCode === 'code') {
         if (error) {
-          return <FatalError error={error} />
+          return <FatalError error={error} />;
         }
 
         return <PrismCode code={codeExample} />;
@@ -448,7 +448,7 @@ class ChartContainer extends Component<
             query={query}
             render={({ sqlQuery, error }) => {
               if (error) {
-                return <FatalError error={error} />
+                return <FatalError error={error} />;
               }
 
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
