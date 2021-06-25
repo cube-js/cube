@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.41](https://github.com/cube-js/cube.js/compare/v0.27.40...v0.27.41) (2021-06-25)
+
+
+### Bug Fixes
+
+* Use CUBEJS_REDIS_URL in serverless templates, fix [#2970](https://github.com/cube-js/cube.js/issues/2970) ([ca5d89e](https://github.com/cube-js/cube.js/commit/ca5d89ef9851ffff346e0f9262e2e4e5ac2cf8ba))
+
+
+
+
+
 ## [0.27.40](https://github.com/cube-js/cube.js/compare/v0.27.39...v0.27.40) (2021-06-23)
 
 **Note:** Version bump only for package cubejs-cli
