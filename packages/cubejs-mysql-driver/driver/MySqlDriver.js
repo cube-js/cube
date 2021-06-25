@@ -194,23 +194,27 @@ class MySqlDriver extends BaseDriver {
     try {
       await this.setTimeZone(conn);
 
-      return await new Promise((resolve, reject) => {
-        const response = conn.query(query, values, (err, result, fields) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({
-              // eslint-disable-next-line no-underscore-dangle
-              rowStream: response.stream({ highWaterMark }),
-              types: this.mapFieldsToGenericTypes(fields),
-              release: async () => {
-                // eslint-disable-next-line no-underscore-dangle
-                await this.pool._factory.destroy(conn);
-              }
-            });
-          }
-        });
-      });
+      const [rowStream, fields] = await (
+        new Promise((resolve, reject) => {
+          const stream = conn.query(query, values).stream({ highWaterMark });
+
+          stream.on('fields', (f) => {
+            resolve([stream, f]);
+          });
+          stream.on('error', (e) => {
+            reject(e);
+          });
+        })
+      );
+
+      return {
+        rowStream,
+        types: this.mapFieldsToGenericTypes(fields),
+        release: async () => {
+          // eslint-disable-next-line no-underscore-dangle
+          await this.pool._factory.destroy(conn);
+        }
+      };
     } catch (e) {
       // eslint-disable-next-line no-underscore-dangle
       await this.pool._factory.destroy(conn);
