@@ -63,9 +63,10 @@ impl SqlResultCache {
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
+        let key = SqlResultCacheKey::from_plan(query, &plan);
         let (sender, mut receiver) = {
+            let key = key.clone();
             let mut cache = self.cache.write().await;
-            let key = SqlResultCacheKey::from_plan(query, &plan);
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
@@ -79,6 +80,10 @@ impl SqlResultCache {
             trace!("Missing cache for '{}'", query);
             let result = exec(plan).await.map(|d| Arc::new(d));
             sender.send(Some(result.clone()))?;
+            if result.is_err() {
+                trace!("Removing error result from cache");
+                self.cache.write().await.pop(&key);
+            }
             return result;
         }
 
