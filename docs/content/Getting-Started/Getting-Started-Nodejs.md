@@ -85,8 +85,7 @@ cube(`Users`, {
 The Cube.js client provides set of methods to access Cube.js API and to work
 with query result. The client itself doesn't provide any visualizations and is
 designed to work with existing chart libraries. You can find more information
-about [the Cube.js client as well as our frontend integrations here]
-[ref-frontend-intro].
+about [the Cube.js client as well as our frontend integrations here][ref-frontend-intro].
 
 As a shortcut you can run your dev server first:
 
