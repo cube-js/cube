@@ -21,10 +21,11 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   datetime: 'timestamp',
   datetime64: 'timestamp',
   date: 'date',
+  decimal: 'decimal',
   // integers
   int8: 'int',
   int16: 'int',
-  int32: 'bigint',
+  int32: 'int',
   int64: 'bigint',
   // unsigned int
   uint8: 'int',
@@ -178,7 +179,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
               row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
             } else if (meta.type.includes('Date')) {
               row[field] = `${value}T00:00:00.000`;
-            } else if (meta.type.includes('Int') || meta.type.includes('Float')) {
+            } else if (meta.type.includes('Int') || meta.type.includes('Float') || meta.type.includes('Decimal')) {
               // convert all numbers into strings
               row[field] = `${value}`;
             }
@@ -208,6 +209,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   public async stream(
     query: string,
     values: unknown[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
     // eslint-disable-next-line no-underscore-dangle

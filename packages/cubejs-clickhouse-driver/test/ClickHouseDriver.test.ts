@@ -1,5 +1,8 @@
 import { GenericContainer } from 'testcontainers';
+
 import { ClickHouseDriver } from '../src/ClickHouseDriver';
+
+const streamToArray = require('stream-to-array');
 
 describe('ClickHouseDriver', () => {
   let container: any;
@@ -29,11 +32,53 @@ describe('ClickHouseDriver', () => {
       host: 'localhost',
       port: container.getMappedPort(8123),
     };
+
+    await doWithDriver(async (driver) => {
+      await driver.createSchemaIfNotExists('test');
+      // Unsupported in old servers
+      // datetime64 DateTime64,
+      await driver.query(
+        `
+            CREATE TABLE test.types_test (
+              date Date,
+              datetime DateTime,
+              int8 Int8,
+              int16 Int16,
+              int32 Int32,
+              int64 Int64,
+              uint8 UInt8,
+              uint16 UInt16,
+              uint32 UInt32,
+              uint64 UInt64,
+              float32 Float32,
+              float64 Float64,
+              decimal32 Decimal32(2),
+              decimal64 Decimal64(2),
+              decimal128 Decimal128(2)
+            ) ENGINE Log
+        `,
+        []
+      );
+
+      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        '2020-01-01', '2020-01-01 00:00:00', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01
+      ]);
+      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        '2020-01-02', '2020-01-02 00:00:00', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02
+      ]);
+      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        '2020-01-03', '2020-01-03 00:00:00', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03
+      ]);
+    });
   });
 
   // eslint-disable-next-line func-names
   afterAll(async () => {
     jest.setTimeout(10 * 1000);
+
+    await doWithDriver(async (driver) => {
+      await driver.query('DROP DATABASE test', []);
+    });
 
     if (container) {
       await container.stop();
@@ -109,40 +154,28 @@ describe('ClickHouseDriver', () => {
     });
   });
 
-  // Int8
-  // Int16
-  // Int32
-  // Int64
-  // UInt8
-  // UInt16
-  // UInt32
-  // UInt64
-  // Float32
-  // Float64
   it('should normalise all numbers as strings', async () => {
     await doWithDriver(async (driver) => {
-      const name = `temp_${Date.now()}`;
-      try {
-        await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.a (int8 Int8, int16 Int16, int32 Int32, int64 Int64, uint8 UInt8, uint16 UInt16, uint32 UInt32, uint64 UInt64, float32 Float32, float64 Float64) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.a VALUES (1,1,1,1,1,1,1,1,1,1)`, []);
-
-        const values = await driver.query(`SELECT * FROM ${name}.a`, []);
-        expect(values).toEqual([{
-          int8: '1',
-          int16: '1',
-          int32: '1',
-          int64: '1',
-          uint8: '1',
-          uint16: '1',
-          uint32: '1',
-          uint64: '1',
-          float32: '1',
-          float64: '1',
-        }]);
-      } finally {
-        await driver.query(`DROP DATABASE ${name}`, []);
-      }
+      const values = await driver.query('SELECT * FROM test.types_test LIMIT 1', []);
+      expect(values).toEqual([{
+        date: '2020-01-01T00:00:00.000',
+        datetime: '2020-01-01T00:00:00.000',
+        // Unsupported in old servers
+        // datetime64: '2020-01-01T00:00:00.00.000',
+        int8: '1',
+        int16: '1',
+        int32: '1',
+        int64: '1',
+        uint8: '1',
+        uint16: '1',
+        uint32: '1',
+        uint64: '1',
+        float32: '1',
+        float64: '1',
+        decimal32: '1.01',
+        decimal64: '1.01',
+        decimal128: '1.01'
+      }]);
     });
   });
 
@@ -205,6 +238,44 @@ describe('ClickHouseDriver', () => {
         ]);
       } finally {
         await driver.query(`DROP DATABASE ${name}`, []);
+      }
+    });
+  });
+
+  it('stream', async () => {
+    await doWithDriver(async (driver) => {
+      const tableData = await driver.stream('SELECT * FROM test.types_test ORDER BY int8', [], {
+        highWaterMark: 100,
+      });
+
+      try {
+        expect(tableData.types).toEqual([
+          { name: 'date', type: 'date' },
+          { name: 'datetime', type: 'timestamp' },
+          // Unsupported in old servers
+          // { name: 'datetime64', type: 'timestamp' },
+          { name: 'int8', type: 'int' },
+          { name: 'int16', type: 'int' },
+          { name: 'int32', type: 'int' },
+          { name: 'int64', type: 'bigint' },
+          { name: 'uint8', type: 'int' },
+          { name: 'uint16', type: 'int' },
+          { name: 'uint32', type: 'int' },
+          { name: 'uint64', type: 'bigint' },
+          { name: 'float32', type: 'float' },
+          { name: 'float64', type: 'double' },
+          { name: 'decimal32', type: 'decimal' },
+          { name: 'decimal64', type: 'decimal' },
+          { name: 'decimal128', type: 'decimal' },
+        ]);
+        expect(await streamToArray(tableData.rowStream)).toEqual([
+          ['2020-01-01T00:00:00.000', '2020-01-01T00:00:00.000', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1.01', '1.01', '1.01'],
+          ['2020-01-02T00:00:00.000', '2020-01-02T00:00:00.000', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2.02', '2.02', '2.02'],
+          ['2020-01-03T00:00:00.000', '2020-01-03T00:00:00.000', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3.03', '3.03', '3.03'],
+        ]);
+      } finally {
+        // @ts-ignore
+        await tableData.release();
       }
     });
   });
