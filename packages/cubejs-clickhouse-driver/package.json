@@ -23,8 +23,8 @@
     "watch": "tsc -w",
     "lint": "eslint src/* test/* --ext .ts",
     "lint:fix": "eslint --fix src/* test/* --ext .ts",
-    "integration": "mocha dist/test",
-    "integration:clickhouse": "mocha dist/test"
+    "integration": "jest dist/test",
+    "integration:clickhouse": "jest dist/test"
   },
   "dependencies": {
     "@apla/clickhouse": "^1.5.5",
@@ -37,13 +37,17 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.27.0",
-    "mocha": "^8.0.1",
-    "should": "^13.2.3",
+    "@types/jest": "^26.0.23",
+    "jest": "26.6.3",
+    "stream-to-array": "^2.3.0",
     "testcontainers": "^7.11.1",
     "typescript": "~4.1.5"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "jest": {
+    "testEnvironment": "node"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

@@ -15,7 +15,10 @@ export class HydrationStream extends stream.Transform {
               row[<any>index] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
             } else if (metaForField.type.includes('Date')) {
               row[<any>index] = `${value}T00:00:00.000`;
-            } else if (metaForField.type.includes('Int') || metaForField.type.includes('Float')) {
+            } else if (metaForField.type.includes('Int')
+              || metaForField.type.includes('Float')
+              || metaForField.type.includes('Decimal')
+            ) {
               // convert all numbers into strings
               row[<any>index] = `${value}`;
             }
