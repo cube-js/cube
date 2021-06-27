@@ -1,9 +1,11 @@
 /* eslint-disable no-restricted-syntax */
 import {
   BaseDriver,
-  DownloadQueryResultsOptions, DownloadQueryResultsResult,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
   DriverInterface,
-  StreamOptions, StreamTableData, StreamTableDataWithTypes,
+  StreamOptions,
+  StreamTableDataWithTypes,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
 import genericPool, { Pool } from 'generic-pool';

@@ -1,26 +1,23 @@
-/* globals describe, before, after, it */
-const { GenericContainer } = require('testcontainers');
-const { ClickHouseDriver } = require('../src/ClickHouseDriver');
-
-require('should');
+import { GenericContainer } from 'testcontainers';
+import { ClickHouseDriver } from '../src/ClickHouseDriver';
 
 describe('ClickHouseDriver', () => {
-  let container;
-  let config;
+  let container: any;
+  let config: any;
 
-  const doWithDriver = async (callback) => {
+  const doWithDriver = async (cb: (driver: ClickHouseDriver) => Promise<any>) => {
     const driver = new ClickHouseDriver(config);
 
     try {
-      await callback(driver);
+      await cb(driver);
     } finally {
       await driver.release();
     }
   };
 
   // eslint-disable-next-line func-names
-  before(async function () {
-    this.timeout(20 * 1000);
+  beforeAll(async () => {
+    jest.setTimeout(20 * 1000);
 
     const version = process.env.TEST_CLICKHOUSE_VERSION || 'latest';
 
@@ -35,8 +32,8 @@ describe('ClickHouseDriver', () => {
   });
 
   // eslint-disable-next-line func-names
-  after(async function () {
-    this.timeout(10 * 1000);
+  afterAll(async () => {
+    jest.setTimeout(10 * 1000);
 
     if (container) {
       await container.stop();
@@ -44,7 +41,7 @@ describe('ClickHouseDriver', () => {
   });
 
   it('should construct', async () => {
-    await doWithDriver(() => {
+    await doWithDriver(async () => {
       //
     });
   });
@@ -57,8 +54,8 @@ describe('ClickHouseDriver', () => {
 
   it('should select raw sql', async () => {
     await doWithDriver(async (driver) => {
-      const numbers = await driver.query('SELECT number FROM system.numbers LIMIT 10');
-      numbers.should.be.deepEqual([
+      const numbers = await driver.query('SELECT number FROM system.numbers LIMIT 10', []);
+      expect(numbers).toEqual([
         { number: '0' },
         { number: '1' },
         { number: '2' },
@@ -75,16 +72,16 @@ describe('ClickHouseDriver', () => {
 
   it('should select raw sql multiple times', async () => {
     await doWithDriver(async (driver) => {
-      let numbers = await driver.query('SELECT number FROM system.numbers LIMIT 5');
-      numbers.should.be.deepEqual([
+      let numbers = await driver.query('SELECT number FROM system.numbers LIMIT 5', []);
+      expect(numbers).toEqual([
         { number: '0' },
         { number: '1' },
         { number: '2' },
         { number: '3' },
         { number: '4' },
       ]);
-      numbers = await driver.query('SELECT number FROM system.numbers LIMIT 5');
-      numbers.should.be.deepEqual([
+      numbers = await driver.query('SELECT number FROM system.numbers LIMIT 5', []);
+      expect(numbers).toEqual([
         { number: '0' },
         { number: '1' },
         { number: '2' },
@@ -97,9 +94,7 @@ describe('ClickHouseDriver', () => {
   it('should get tables', async () => {
     await doWithDriver(async (driver) => {
       const tables = await driver.getTablesQuery('system');
-      tables.should.containDeep([
-        { table_name: 'numbers' },
-      ]);
+      expect(tables).toContainEqual({ table_name: 'numbers' });
     });
   });
 
@@ -109,7 +104,7 @@ describe('ClickHouseDriver', () => {
       try {
         await driver.createSchemaIfNotExists(name);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`);
+        await driver.query(`DROP DATABASE ${name}`, []);
       }
     });
   });
@@ -129,11 +124,11 @@ describe('ClickHouseDriver', () => {
       const name = `temp_${Date.now()}`;
       try {
         await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.a (int8 Int8, int16 Int16, int32 Int32, int64 Int64, uint8 UInt8, uint16 UInt16, uint32 UInt32, uint64 UInt64, float32 Float32, float64 Float64) ENGINE Log`);
-        await driver.query(`INSERT INTO ${name}.a VALUES (1,1,1,1,1,1,1,1,1,1)`);
+        await driver.query(`CREATE TABLE ${name}.a (int8 Int8, int16 Int16, int32 Int32, int64 Int64, uint8 UInt8, uint16 UInt16, uint32 UInt32, uint64 UInt64, float32 Float32, float64 Float64) ENGINE Log`, []);
+        await driver.query(`INSERT INTO ${name}.a VALUES (1,1,1,1,1,1,1,1,1,1)`, []);
 
-        const values = await driver.query(`SELECT * FROM ${name}.a`);
-        values.should.deepEqual([{
+        const values = await driver.query(`SELECT * FROM ${name}.a`, []);
+        expect(values).toEqual([{
           int8: '1',
           int16: '1',
           int32: '1',
@@ -146,7 +141,7 @@ describe('ClickHouseDriver', () => {
           float64: '1',
         }]);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`);
+        await driver.query(`DROP DATABASE ${name}`, []);
       }
     });
   });
@@ -156,16 +151,16 @@ describe('ClickHouseDriver', () => {
       const name = `temp_${Date.now()}`;
       try {
         await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.a (dateTime DateTime, date Date) ENGINE Log`);
-        await driver.query(`INSERT INTO ${name}.a VALUES ('2019-04-30 11:55:00', '2019-04-30')`);
+        await driver.query(`CREATE TABLE ${name}.a (dateTime DateTime, date Date) ENGINE Log`, []);
+        await driver.query(`INSERT INTO ${name}.a VALUES ('2019-04-30 11:55:00', '2019-04-30')`, []);
 
-        const values = await driver.query(`SELECT * FROM ${name}.a`);
-        values.should.deepEqual([{
+        const values = await driver.query(`SELECT * FROM ${name}.a`, []);
+        expect(values).toEqual([{
           dateTime: '2019-04-30T11:55:00.000',
           date: '2019-04-30T00:00:00.000',
         }]);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`);
+        await driver.query(`DROP DATABASE ${name}`, []);
       }
     });
   });
@@ -175,12 +170,12 @@ describe('ClickHouseDriver', () => {
       const name = `temp_${Date.now()}`;
       try {
         await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`);
+        await driver.query(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`, []);
         await driver.query(`INSERT INTO ${name}.test VALUES (?, ?), (?, ?), (?, ?)`, [1, 'str1', 2, 'str2', 3, 'str3']);
-        const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = ?`, 2);
-        values.should.deepEqual([{ x: '2', s: 'str2' }]);
+        const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = ?`, [2]);
+        expect(values).toEqual([{ x: '2', s: 'str2' }]);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`);
+        await driver.query(`DROP DATABASE ${name}`, []);
       }
     });
   });
@@ -190,14 +185,14 @@ describe('ClickHouseDriver', () => {
       const name = `temp_${Date.now()}`;
       try {
         await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.a (x Int32, s String) ENGINE Log`);
+        await driver.query(`CREATE TABLE ${name}.a (x Int32, s String) ENGINE Log`, []);
         await driver.query(`INSERT INTO ${name}.a VALUES (?, ?), (?, ?), (?, ?)`, [1, 'str1', 2, 'str2', 3, 'str3']);
 
-        await driver.query(`CREATE TABLE ${name}.b (x Int32, s String) ENGINE Log`);
+        await driver.query(`CREATE TABLE ${name}.b (x Int32, s String) ENGINE Log`, []);
         await driver.query(`INSERT INTO ${name}.b VALUES (?, ?), (?, ?), (?, ?)`, [2, 'str2', 3, 'str3', 4, 'str4']);
 
-        const values = await driver.query(`SELECT * FROM ${name}.a LEFT OUTER JOIN ${name}.b ON a.x = b.x`);
-        values.should.deepEqual([
+        const values = await driver.query(`SELECT * FROM ${name}.a LEFT OUTER JOIN ${name}.b ON a.x = b.x`, []);
+        expect(values).toEqual([
           {
             x: '1', s: 'str1', 'b.x': null, 'b.s': null
           },
@@ -209,7 +204,7 @@ describe('ClickHouseDriver', () => {
           }
         ]);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`);
+        await driver.query(`DROP DATABASE ${name}`, []);
       }
     });
   });
