@@ -84,14 +84,28 @@ const variables: Record<string, (...args: any) => any> = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
+  rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
+    .default('false')
+    .asBoolStrict(),
+  refreshWorkerMode: () => {
+    const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
+    if (refreshWorkerMode !== undefined) {
+      return refreshWorkerMode;
+    }
+
+    // It's true by default for development
+    return process.env.NODE_ENV !== 'production';
+  },
+  // @deprecated Please use CUBEJS_REFRESH_WORKER
   refreshTimer: () => {
     if (process.env.CUBEJS_SCHEDULED_REFRESH_TIMER) {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
 
-    // Refresh timer is true by default for development
+    // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
+  // @deprecated Please use CUBEJS_REFRESH_WORKER
   scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
     .asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
