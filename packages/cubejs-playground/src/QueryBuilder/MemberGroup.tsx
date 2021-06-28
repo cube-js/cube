@@ -1,11 +1,11 @@
 import { PlusOutlined } from '@ant-design/icons';
 import { AvailableCube } from '@cubejs-client/react';
+import { useCallback } from 'react';
 
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import { SectionRow } from '../components';
 import MissingMemberTooltip from './MissingMemberTooltip';
-import { useCallback } from 'react';
 
 type MemberGroupProps = {
   disalbed?: boolean;

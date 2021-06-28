@@ -34,6 +34,8 @@
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.27.41",
     "@cubejs-client/react": "^0.27.41",
+    "camel-case": "^4.1.2",
+    "camelcase": "^6.2.0",
     "codesandbox-import-utils": "^2.1.1",
     "customize-cra": "^1.0.0",
     "fast-deep-equal": "^3.1.3",

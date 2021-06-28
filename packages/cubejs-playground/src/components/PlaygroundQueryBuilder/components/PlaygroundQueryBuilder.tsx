@@ -475,7 +475,11 @@ export function PlaygroundQueryBuilder({
                   />
 
                   {queryStatus() ? (
-                    <PreAggregationStatus {...(queryStatus() as QueryStatus)} />
+                    <PreAggregationStatus
+                      availableMembers={availableMembers}
+                      query={query}
+                      {...(queryStatus() as QueryStatus)}
+                    />
                   ) : null}
                 </SectionRow>
               </Col>

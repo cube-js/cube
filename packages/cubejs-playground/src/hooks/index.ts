@@ -7,3 +7,4 @@ export * from './identifier';
 export * from './is-mounted';
 export * from './deep-effect';
 export * from './deep-memo';
+export * from './toggle';

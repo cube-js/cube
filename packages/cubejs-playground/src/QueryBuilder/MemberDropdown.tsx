@@ -7,6 +7,7 @@ import { TCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
 import useDeepMemo from '../hooks/deep-memo';
+import { getNameMemberPairs } from '../shared/helpers';
 
 const Menu = styled(AntdMenu)`
   max-height: 320px;
@@ -41,18 +42,6 @@ const SearchMenuItem = styled(Menu.Item)`
     );
   }
 `;
-
-function getNameMemberPairs(members) {
-  const items: [string, TCubeMember][] = [];
-
-  members.forEach((cube) =>
-    cube.members.forEach((member) => {
-      items.push([member.name, member]);
-    })
-  );
-
-  return items;
-}
 
 function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
   const cubeNames = keys.map((key) => key.split('.')[0]);
