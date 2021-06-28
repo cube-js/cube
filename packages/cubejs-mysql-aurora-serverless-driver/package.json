@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-mysql-aurora-serverless-driver"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "main": "driver/AuroraServerlessMySqlDriver.js",
   "typings": "driver/index.d.ts",

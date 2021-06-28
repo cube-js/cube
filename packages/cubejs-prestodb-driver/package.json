@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-prestodb-driver"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "main": "driver/PrestoDriver.js",
   "scripts": {

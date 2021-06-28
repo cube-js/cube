@@ -44,10 +44,11 @@ features:
 | Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)               | v0.25.4    | v0.30.0   |
 | Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)       | v0.25.21   | v0.32.0   |
 | Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                      | v0.26.0    |           |
-| Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    |           |
+| Deprecated | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    | v0.28.0   |
 | Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |           |
 | Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |           |
 | Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)              | v0.27.0    |           |
+| Deprecated | [Node.js 12](#nodejs-12)                                                                                           | v0.26.0    |           |
 
 ### Node.js 8
 
@@ -55,8 +56,6 @@ features:
 
 Node.js 8 reached [End of Life on December 31, 2019][link-nodejs-eol]. This
 means no more updates. Please upgrade to Node.js 10 or higher.
-
-[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
 
 ### `hearBeatInterval`
 
@@ -191,8 +190,6 @@ documentation][link-custom-auth]
 Node.js 10 reaches [End of Life on April 30, 2021][link-nodejs-eol]. This means
 no more updates. Please upgrade to Node.js 12 or higher.
 
-[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
-
 ### `USER_CONTEXT`
 
 **Deprecated in Release: v0.26.0**
@@ -300,3 +297,12 @@ CUBEJS_REDIS_URL=XXXX
 CUBEJS_REDIS_PASSWORD=XXX
 CUBEJS_REDIS_TLS=true
 ```
+
+### Node.js 12
+
+**Removed in Release: v0.28.0**
+
+Node.js 12 reached [End of Life on May 19, 2021][link-nodejs-eol]. This
+means no more updates. Please upgrade to Node.js 14 or higher.
+
+[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases

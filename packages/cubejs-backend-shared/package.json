@@ -17,7 +17,7 @@
     "dist/src/*"
   ],
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",

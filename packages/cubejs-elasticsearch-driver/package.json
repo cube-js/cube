@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-elasticsearch-driver"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "main": "driver/ElasticSearchDriver.js",
   "typings": "driver/index.d.ts",

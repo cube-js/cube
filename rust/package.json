@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "bin": {
     "cubestore-dev": "bin/cubestore-dev"

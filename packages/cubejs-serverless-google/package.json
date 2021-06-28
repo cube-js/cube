@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-serverless-google"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "main": "index.js",
   "dependencies": {

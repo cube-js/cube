@@ -7,7 +7,7 @@
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "scripts": {
     "cypress:open": "kill-port 4000 && TEST_PLAYGROUND_PORT=3080 yarn cypress:birdbox",
