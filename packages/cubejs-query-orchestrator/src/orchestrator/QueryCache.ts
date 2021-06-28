@@ -79,7 +79,6 @@ export class QueryCache {
       this.cacheKeyQueriesFrom(queryBody).map(replacePreAggregationTableNames);
 
     const renewalThreshold = queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.renewalThreshold;
-    const refreshKeyRenewalThresholds = this.getRefreshKeyRenewalThresholds(queryBody);
 
     const expireSecs = this.getExpireSecs(queryBody);
 
@@ -102,7 +101,6 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
-        refreshKeyRenewalThresholds
       });
     }
 
@@ -111,7 +109,6 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
-        refreshKeyRenewalThresholds,
         skipRefreshKeyWaitForRenew: true
       });
 
@@ -119,7 +116,6 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
-        refreshKeyRenewalThresholds
       });
 
       return resultPromise;
@@ -145,7 +141,6 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
-        refreshKeyRenewalThresholds
       });
     }
 
@@ -153,11 +148,6 @@ export class QueryCache {
       data: await mainPromise,
       lastRefreshTime: await this.lastRefreshTime(cacheKey)
     };
-  }
-
-  private getRefreshKeyRenewalThresholds(queryBody) {
-    return queryBody.cacheKeyQueries &&
-      queryBody.cacheKeyQueries.refreshKeyRenewalThresholds;
   }
 
   private getExpireSecs(queryBody): number {
@@ -305,7 +295,6 @@ export class QueryCache {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
-    refreshKeyRenewalThresholds?: Array<number>
     dataSource: string
   }) {
     this.renewQuery(
@@ -323,7 +312,6 @@ export class QueryCache {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
-    refreshKeyRenewalThresholds?: Array<number>
     dataSource: string
   }) {
     options = options || { dataSource: 'default' };
@@ -368,7 +356,6 @@ export class QueryCache {
         {
           requestId: query.requestId,
           dataSource: query.dataSource,
-          refreshKeyRenewalThresholds: this.getRefreshKeyRenewalThresholds(query)
         }
       )
     );
@@ -380,7 +367,6 @@ export class QueryCache {
     options: {
       requestId?: string;
       skipRefreshKeyWaitForRenew?: boolean;
-      refreshKeyRenewalThresholds?: Array<number>;
       dataSource: string
     }
   ) {
