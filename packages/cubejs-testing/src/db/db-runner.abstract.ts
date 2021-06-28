@@ -1,5 +1,5 @@
 export interface DBRunnerContainerOptions {
-  volumes: {
+  volumes?: {
     source: string,
     target: string,
     bindMode?: 'rw' | 'ro'

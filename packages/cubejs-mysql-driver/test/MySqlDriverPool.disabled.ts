@@ -1,7 +1,5 @@
-/* globals describe, afterAll, beforeAll, test, expect, jest */
-const { MysqlDBRunner } = require('@cubejs-backend/testing');
-
-const { createDriver } = require('./mysql.db.runner');
+import { MysqlDBRunner } from '@cubejs-backend/testing';
+import { createDriver } from './mysql.db.runner';
 
 describe('MySqlDriver Pool', () => {
   jest.setTimeout(2 * 60 * 1000);
@@ -12,7 +10,7 @@ describe('MySqlDriver Pool', () => {
     let databasePoolErrorLogged = false;
 
     const poolErrorDriver = createDriver(poolErrorContainer);
-    poolErrorDriver.setLogger((msg, event) => {
+    poolErrorDriver.setLogger((msg: any, event: any) => {
       if (msg === 'Database Pool Error') {
         databasePoolErrorLogged = true;
       }
@@ -21,13 +19,13 @@ describe('MySqlDriver Pool', () => {
 
     try {
       await poolErrorDriver.createSchemaIfNotExists('test');
-      await poolErrorDriver.query('DROP SCHEMA test');
+      await poolErrorDriver.query('DROP SCHEMA test', []);
       await poolErrorDriver.createSchemaIfNotExists('test');
-      await poolErrorDriver.query('SELECT 1');
+      await poolErrorDriver.query('SELECT 1', []);
       await poolErrorContainer.stop();
 
       try {
-        await poolErrorDriver.query('SELECT 1');
+        await poolErrorDriver.query('SELECT 1', []);
 
         throw new Error('Pool must throw an exception');
       } catch (e) {

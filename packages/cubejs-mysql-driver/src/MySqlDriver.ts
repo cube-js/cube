@@ -1,9 +1,15 @@
-const mysql = require('mysql');
-const genericPool = require('generic-pool');
-const { promisify } = require('util');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+import mysql, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from 'mysql';
+import genericPool from 'generic-pool';
+import { promisify } from 'util';
+import {
+  BaseDriver,
+  GenericDataBaseType,
+  DriverInterface,
+  StreamOptions,
+  DownloadQueryResultsOptions, TableStructure, DownloadTableData, IndexesSQL, DownloadTableMemoryData,
+} from '@cubejs-backend/query-orchestrator';
 
-const GenericTypeToMySql = {
+const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
   text: 'varchar(255) CHARACTER SET utf8mb4',
   decimal: 'decimal(38,10)',
@@ -33,7 +39,7 @@ const MySqlNativeToMySqlType = {
   [mysql.Types.STRING]: 'binary',
 };
 
-const MySqlToGenericType = {
+const MySqlToGenericType: Record<string, GenericDataBaseType> = {
   mediumtext: 'text',
   longtext: 'text',
   mediumint: 'int',
@@ -46,15 +52,31 @@ const MySqlToGenericType = {
   'tinyint unsigned': 'int',
 };
 
-class MySqlDriver extends BaseDriver {
-  constructor(config) {
+export interface MySqlDriverConfiguration extends ConnectionConfig {
+  readOnly?: boolean,
+  loadPreAggregationWithoutMetaLock?: boolean,
+  storeTimezone?: string,
+  pool?: any
+}
+
+interface MySQLConnection extends Connection {
+  execute: (options: string | QueryOptions, values?: any) => Promise<any>
+}
+
+export class MySqlDriver extends BaseDriver implements DriverInterface {
+  protected readonly config: MySqlDriverConfiguration;
+
+  protected readonly pool: genericPool.Pool<MySQLConnection>;
+
+  public constructor(config: MySqlDriverConfiguration = {}) {
     super();
-    const { pool, ...restConfig } = config || {};
+
+    const { pool, ...restConfig } = config;
 
     this.config = {
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
-      port: process.env.CUBEJS_DB_PORT,
+      port: <any>process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
       socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
@@ -67,7 +89,7 @@ class MySqlDriver extends BaseDriver {
 
     this.pool = genericPool.createPool({
       create: async () => {
-        const conn = mysql.createConnection(this.config);
+        const conn: any = mysql.createConnection(this.config);
         const connect = promisify(conn.connect.bind(conn));
 
         if (conn.on) {
@@ -103,17 +125,18 @@ class MySqlDriver extends BaseDriver {
     });
   }
 
-  readOnly() {
+  public readOnly() {
     return !!this.config.readOnly;
   }
 
-  withConnection(fn) {
+  protected withConnection(fn: (conn: MySQLConnection) => Promise<any>) {
     const self = this;
     const connectionPromise = this.pool.acquire();
 
     let cancelled = false;
-    const cancelObj = {};
-    const promise = connectionPromise.then(async conn => {
+    const cancelObj: any = {};
+
+    const promise: any = connectionPromise.then(async conn => {
       const [{ connectionId }] = await conn.execute('select connection_id() as connectionId');
       cancelObj.cancel = async () => {
         cancelled = true;
@@ -139,63 +162,67 @@ class MySqlDriver extends BaseDriver {
     return promise;
   }
 
-  async testConnection() {
+  public async testConnection() {
     // eslint-disable-next-line no-underscore-dangle
-    const conn = await this.pool._factory.create();
+    const conn: MySQLConnection = await (<any> this.pool)._factory.create();
+
     try {
       return await conn.execute('SELECT 1');
     } finally {
       // eslint-disable-next-line no-underscore-dangle
-      await this.pool._factory.destroy(conn);
+      await (<any> this.pool)._factory.destroy(conn);
     }
   }
 
-  query(query, values) {
-    return this.withConnection(db => this.setTimeZone(db)
-      .then(() => db.execute(query, values))
-      .then(res => res));
+  public async query(query: string, values: unknown[]) {
+    return this.withConnection(async (conn) => {
+      await this.setTimeZone(conn);
+
+      return conn.execute(query, values);
+    });
   }
 
-  setTimeZone(db) {
-    return db.execute(`SET time_zone = '${this.config.storeTimezone || '+00:00'}'`, []);
+  protected setTimeZone(conn: MySQLConnection) {
+    return conn.execute(`SET time_zone = '${this.config.storeTimezone || '+00:00'}'`, []);
   }
 
-  async release() {
+  public async release() {
     await this.pool.drain();
     await this.pool.clear();
   }
 
-  informationSchemaQuery() {
+  public informationSchemaQuery() {
     return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
   }
 
-  quoteIdentifier(identifier) {
+  public quoteIdentifier(identifier: string) {
     return `\`${identifier}\``;
   }
 
-  fromGenericType(columnType) {
+  public fromGenericType(columnType: GenericDataBaseType) {
     return GenericTypeToMySql[columnType] || super.fromGenericType(columnType);
   }
 
-  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx) {
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: any, params: any, tx: any) {
     if (this.config.loadPreAggregationWithoutMetaLock) {
-      return this.cancelCombinator(async saveCancelFn => {
+      return this.cancelCombinator(async (saveCancelFn: any) => {
         await saveCancelFn(this.query(`${loadSql} LIMIT 0`, params));
         await saveCancelFn(this.query(loadSql.replace(/^CREATE TABLE (\S+) AS/i, 'INSERT INTO $1'), params));
       });
     }
+
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }
 
-  async stream(query, values, { highWaterMark }) {
+  public async stream(query: string, values: unknown[], { highWaterMark }: StreamOptions) {
     // eslint-disable-next-line no-underscore-dangle
-    const conn = await this.pool._factory.create();
+    const conn: MySQLConnection = await (<any> this.pool)._factory.create();
 
     try {
       await this.setTimeZone(conn);
 
       const [rowStream, fields] = await (
-        new Promise((resolve, reject) => {
+        new Promise<[any, mysql.FieldInfo[]]>((resolve, reject) => {
           const stream = conn.query(query, values).stream({ highWaterMark });
 
           stream.on('fields', (f) => {
@@ -212,33 +239,35 @@ class MySqlDriver extends BaseDriver {
         types: this.mapFieldsToGenericTypes(fields),
         release: async () => {
           // eslint-disable-next-line no-underscore-dangle
-          await this.pool._factory.destroy(conn);
+          await (<any> this.pool)._factory.destroy(conn);
         }
       };
     } catch (e) {
       // eslint-disable-next-line no-underscore-dangle
-      await this.pool._factory.destroy(conn);
+      await (<any> this.pool)._factory.destroy(conn);
 
       throw e;
     }
   }
 
-  mapFieldsToGenericTypes(fields) {
+  protected mapFieldsToGenericTypes(fields: mysql.FieldInfo[]) {
     return fields.map((field) => {
-      let type = mysql.Types[field.type];
+      // @ts-ignore
+      let dbType = mysql.Types[field.type];
 
       if (field.type in MySqlNativeToMySqlType) {
-        type = MySqlNativeToMySqlType[field.type];
+        // @ts-ignore
+        dbType = MySqlNativeToMySqlType[field.type];
       }
 
       return {
         name: field.name,
-        type: this.toGenericType(type)
+        type: this.toGenericType(dbType)
       };
     });
   }
 
-  async downloadQueryResults(query, values, options) {
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
     if ((options || {}).streamImport) {
       return this.stream(query, values, options);
     }
@@ -253,7 +282,7 @@ class MySqlDriver extends BaseDriver {
           } else {
             resolve({
               rows,
-              types: this.mapFieldsToGenericTypes(fields),
+              types: this.mapFieldsToGenericTypes(<FieldInfo[]>fields),
             });
           }
         });
@@ -261,7 +290,7 @@ class MySqlDriver extends BaseDriver {
     });
   }
 
-  toColumnValue(value, genericType) {
+  public toColumnValue(value: any, genericType: GenericDataBaseType) {
     if (genericType === 'timestamp' && typeof value === 'string') {
       return value && value.replace('Z', '');
     }
@@ -276,11 +305,22 @@ class MySqlDriver extends BaseDriver {
     return super.toColumnValue(value, genericType);
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
-    if (!tableData.rows) {
+  protected isDownloadTableDataRow(tableData: DownloadTableData): tableData is DownloadTableMemoryData {
+    return (<DownloadTableMemoryData> tableData).rows !== undefined;
+  }
+
+  public async uploadTableWithIndexes(
+    table: string,
+    columns: TableStructure,
+    tableData: DownloadTableData,
+    indexesSql: IndexesSQL
+  ) {
+    if (!this.isDownloadTableDataRow(tableData)) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
+
     await this.createTable(table, columns);
+
     try {
       const batchSize = 1000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
@@ -310,11 +350,9 @@ class MySqlDriver extends BaseDriver {
     }
   }
 
-  toGenericType(columnType) {
+  public toGenericType(columnType: string) {
     return MySqlToGenericType[columnType.toLowerCase()] ||
       MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
       super.toGenericType(columnType);
   }
 }
-
-module.exports = MySqlDriver;
