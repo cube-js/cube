@@ -1,0 +1,31 @@
+
+[package]
+name = "cubestore-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arrow = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-05-17', version = "5.0.0-SNAPSHOT" }
+datafusion = { git = 'https://github.com/cube-js/arrow', branch = 'cubestore-2021-05-17', version = "5.0.0-SNAPSHOT" }
+futures = "0.3.5"
+itertools = "0.10.1"
+tokio = { version = "1.0", features = ["full", "rt"] }
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[patch.crates-io]
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs', tag = 'v0.9.0-cube' }
+
+[[bin]]
+name = "merge_sort_stream"
+path = "fuzz_targets/merge_sort_stream.rs"
+test = false
+doc = false
