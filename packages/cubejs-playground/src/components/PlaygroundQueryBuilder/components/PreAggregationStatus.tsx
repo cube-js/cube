@@ -31,7 +31,7 @@ export function PreAggregationStatus({
   preAggregationType,
   ...props
 }: PreAggregationStatusProps) {
-  const [isModalOpen, toggleModal] = useToggle(true);
+  const [isModalOpen, toggleModal] = useToggle(false);
   // hide it for the time being
   // const renderTime = () => (
   //   <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
