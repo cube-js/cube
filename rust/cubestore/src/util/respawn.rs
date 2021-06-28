@@ -91,11 +91,9 @@ const PARENT_PID_ENV: &'static str = "__CUBESTORE_RESPAWN_PPID";
 const IPC_ENV: &'static str = "__CUBESTORE_IPC_NAME";
 
 static USE_TEST_CMD_ARGS: AtomicBool = AtomicBool::new(false);
-#[cfg(test)]
 pub fn replace_cmd_args_in_tests() {
     USE_TEST_CMD_ARGS.store(true, Ordering::Release);
 }
-#[cfg(test)]
 #[test]
 fn test_init() {
     init();
