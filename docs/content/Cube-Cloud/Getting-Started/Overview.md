@@ -15,7 +15,7 @@ Choose one of the options below:
       <a href="getting-started/create">
         <div class="gettingStartedItemContent">
           <div class="gettingStartedItemImage">
-            <img src="create-new.svg" alt="Create new" height="25" width="25" />
+            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Getting-Started/create-new.svg" alt="Create new" height="25" width="25" />
           </div>
           <div class="gettingStartedItemLink">Create new</div>
         </div>
@@ -25,7 +25,7 @@ Choose one of the options below:
       <div class="gettingStartedItemContent">
         <a href="getting-started/cli">
           <div class="gettingStartedItemImage">
-            <img src="upload-with-cli.svg" alt="Upload with CLI" height="25" width="25" />
+            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Getting-Started/upload-with-cli.svg" alt="Upload with CLI" height="25" width="25" />
           </div>
           <div class="gettingStartedItemLink">Upload with CLI</div>
         </a>
