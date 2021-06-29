@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.44](https://github.com/cube-js/cube.js/compare/v0.27.43...v0.27.44) (2021-06-29)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Correct support for Decimal ([#3011](https://github.com/cube-js/cube.js/issues/3011)) ([e61a775](https://github.com/cube-js/cube.js/commit/e61a77540e9840b7d6034a942e9baf02e29e5031))
+
+
+
+
+
 ## [0.27.41](https://github.com/cube-js/cube.js/compare/v0.27.40...v0.27.41) (2021-06-25)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver
