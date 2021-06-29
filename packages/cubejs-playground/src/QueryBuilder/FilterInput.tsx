@@ -35,7 +35,7 @@ export default function FilterInput({
   const Filter = FilterInputs[member.dimension.type] || FilterInputs.string;
 
   const ref = useRef(
-    debounce<(values: string[]) => void>(500, (values) => {
+    debounce<(member: any, values: string[]) => void>(500, (member, values) => {
       updateMethods.update(member, { ...member, values });
     })
   );
@@ -48,7 +48,7 @@ export default function FilterInput({
       values={values}
       onChange={(values) => {
         setValues(values);
-        ref.current(values);
+        ref.current(member, values);
       }}
     />
   );
