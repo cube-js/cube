@@ -2,12 +2,12 @@ import styled from 'styled-components';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
 import Icon from '@ant-design/icons';
 import { AvailableMembers } from '@cubejs-client/react';
+import { Query } from '@cubejs-client/core';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { QueryStatus } from './PlaygroundQueryBuilder';
 import { RollupDesigner } from '../../RollupDesigner';
 import { useToggle } from '../../../hooks';
-import {Query} from '@cubejs-client/core';
 
 const { Link } = Typography;
 
@@ -97,7 +97,7 @@ export function PreAggregationStatus({
           </Link>
         }
         bodyStyle={{
-          padding: 16
+          padding: 16,
         }}
         width={1024}
         onCancel={toggleModal}
