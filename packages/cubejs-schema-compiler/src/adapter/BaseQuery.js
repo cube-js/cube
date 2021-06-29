@@ -1942,7 +1942,18 @@ export class BaseQuery {
     }
 
     const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);
-    return this.floorSql(`(${utcOffset} + ${dayOffset} + ${this.unixTimestampSql()}) / ${interval}`);
+
+    /**
+     * Small explanation how it works for every `0 8 * * *`
+     * 28800 is a $dayOffset
+     *
+     * SELECT ((3600 * 8 - 28800) / 86400); -- 0
+     * SELECT ((3600 * 16 - 28800) / 86400); -- 0
+     * SELECT ((3600 * 24 - 28800) / 86400); -- 0
+     * SELECT ((3600 * (24 + 8) - 28800) / 86400); -- 1
+     * SELECT ((3600 * (48 + 8) - 28800) / 86400); -- 2
+     */
+    return this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()} - ${dayOffset}) / ${interval}`);
   }
 
   granularityFor(momentDate) {

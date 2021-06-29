@@ -132,27 +132,27 @@ describe('SQL Generation', () => {
 
     // Standard syntax (minutes hours day month dow)
     expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
+      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 3600)`);
 
     expect(query.everyRefreshKeySql({ every: '0 10 * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + 36000 + EXTRACT(EPOCH FROM NOW())) / 86400)`);
+      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 36000) / 86400)`);
 
     // Additional syntax with seconds (seconds minutes hours day month dow)
     expect(query.everyRefreshKeySql({ every: '0 * * * * *', timezone, }))
-      .toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 60)`);
+      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 60)`);
 
     expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + 0 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
+      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 0) / 3600)`);
 
     expect(query.everyRefreshKeySql({ every: '30 * * * *', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + 1800 + EXTRACT(EPOCH FROM NOW())) / 3600)`);
+      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 1800) / 3600)`);
 
     expect(query.everyRefreshKeySql({ every: '30 5 * * 5', timezone }))
-      .toEqual(`FLOOR((${utcOffset} + 365400 + EXTRACT(EPOCH FROM NOW())) / 604800)`);
+      .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 365400) / 604800)`);
 
     for (let i = 1; i < 59; i++) {
       expect(query.everyRefreshKeySql({ every: `${i} * * * *`, timezone }))
-        .toEqual(`FLOOR((${utcOffset} + ${i * 60} + EXTRACT(EPOCH FROM NOW())) / ${1 * 60 * 60})`);
+        .toEqual(`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - ${i * 60}) / ${1 * 60 * 60})`);
     }
 
     try {
