@@ -32,8 +32,8 @@ import {
 } from '../../../hooks';
 import { Card, FatalError } from '../../../atoms';
 import { UIFramework } from '../../../types';
-import DashboardSource from '../../../DashboardSource';
 import { PreAggregationStatus } from './PreAggregationStatus';
+import DashboardSource from '../../../DashboardSource';
 
 const Section = styled.div`
   display: flex;
@@ -512,6 +512,7 @@ export function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}
+                    dashboardSource={dashboardSource}
                     setFramework={(currentFramework) => {
                       if (currentFramework !== framework) {
                         setQueryLoading(false);
@@ -531,7 +532,6 @@ export function PlaygroundQueryBuilder({
                       setChartingLibrary(value);
                     }}
                     chartLibraries={frameworkChartLibraries}
-                    dashboardSource={dashboardSource}
                     isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
                       if (metaError) {

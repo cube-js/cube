@@ -1,4 +1,5 @@
 import equals from 'fast-deep-equal';
+import { memo } from 'react';
 
 import { PlaygroundWrapper } from './PlaygroundWrapper';
 import {
@@ -7,7 +8,6 @@ import {
 } from '../../components/SecurityContext/SecurityContextProvider';
 import { PlaygroundQueryBuilderProps } from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
-import { memo } from 'react';
 
 type QueryBuilderProps = {
   token: string;
@@ -29,7 +29,6 @@ function QueryBuilderComponent({
   identifier,
   ...props
 }: QueryBuilderProps) {
-  console.log('render: QueryBuilder');
   return (
     <PlaygroundWrapper
       identifier={identifier}
