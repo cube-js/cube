@@ -11,7 +11,7 @@ export type SecurityContextProps = {
   setIsModalOpen: any;
   saveToken: (token: string | null) => void;
   refreshToken: () => Promise<void>;
-  onTokenPayloadChange: (payload: string) => Promise<string>;
+  onTokenPayloadChange: (payload: Record<string, any>) => Promise<string>;
 };
 
 export const SecurityContextContext = createContext<SecurityContextProps>(
@@ -59,7 +59,7 @@ export function SecurityContextProvider({
         setPayload(JSON.stringify(payload, null, 2));
       } catch (error) {
         setPayload('');
-        console.error('Invalid JWT token');
+        console.error('Invalid JWT token', token);
       }
     } else {
       setPayload('');

@@ -1,4 +1,6 @@
 import { Input } from 'antd';
+import { debounce } from 'throttle-debounce';
+import { useRef, useState } from 'react';
 
 import { Select } from '../components';
 
@@ -20,7 +22,7 @@ const FilterInputs = {
       disabled={disabled}
       style={{ width: 300 }}
       onChange={(e) => onChange([e.target.value])}
-      value={(values && values[0]) || ''}
+      value={values?.[0] || ''}
     />
   ),
 };
@@ -31,12 +33,23 @@ export default function FilterInput({
   updateMethods,
 }) {
   const Filter = FilterInputs[member.dimension.type] || FilterInputs.string;
+
+  const ref = useRef(
+    debounce<(values: string[]) => void>(500, (values) => {
+      updateMethods.update(member, { ...member, values });
+    })
+  );
+  const [values, setValues] = useState<string[]>(member.values);
+
   return (
     <Filter
       key="filter"
       disabled={disabled}
-      values={member.values}
-      onChange={(values) => updateMethods.update(member, { ...member, values })}
+      values={values}
+      onChange={(values) => {
+        setValues(values);
+        ref.current(values);
+      }}
     />
   );
 }

@@ -1,5 +1,3 @@
-import { isQueryPresent } from '@cubejs-client/core';
-
 import QueryRenderer from './QueryRenderer.jsx';
 import QueryRendererWithTotals from './QueryRendererWithTotals.jsx';
 import QueryBuilder from './QueryBuilder.jsx';
@@ -12,8 +10,6 @@ export {
   QueryRenderer,
   QueryRendererWithTotals,
   QueryBuilder,
-  // todo: remove as the function has moved to core
-  isQueryPresent,
   CubeContext,
   CubeProvider,
   useDryRun,

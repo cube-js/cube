@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, Tabs, Input, Button, Space, Typography, Form } from 'antd';
 import { CheckOutlined, CopyOutlined, EditOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
+import jwtDecode from 'jwt-decode';
 
 import { useSecurityContext } from '../../hooks';
 import { copyToClipboard } from '../../utils';
@@ -55,10 +56,17 @@ export function SecurityContext() {
     });
   }, [form, token, payload]);
 
-  function handleTokenSave(values) {
-    saveToken(values?.token || null);
-    setEditingToken(false);
-    setIsModalOpen(false);
+  async function handleTokenSave(values) {
+    try {
+      setSubmitting(true);
+      saveToken(await onTokenPayloadChange(jwtDecode(values?.token)));
+    } catch (_) {
+      saveToken(values?.token || null);
+    } finally {
+      setEditingToken(false);
+      setIsModalOpen(false);
+      setSubmitting(false);
+    }
   }
 
   function handlePayloadChange(event) {
@@ -84,7 +92,7 @@ export function SecurityContext() {
       setSubmitting(true);
 
       try {
-        saveToken(await onTokenPayloadChange(tmpPayload || ''));
+        saveToken(await onTokenPayloadChange(JSON.parse(tmpPayload || '{}')));
       } catch (error) {
         console.error(error);
       }
@@ -198,8 +206,9 @@ export function SecurityContext() {
                     ) : (
                       <Button
                         type="primary"
-                        icon={<CheckOutlined />}
                         htmlType="submit"
+                        loading={isSubmitting}
+                        icon={<CheckOutlined />}
                       />
                     )}
                   </FlexBox>
