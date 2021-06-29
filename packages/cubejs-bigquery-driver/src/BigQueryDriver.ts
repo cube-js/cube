@@ -166,12 +166,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async getTablesQuery(schemaName: string) {
     try {
-      const dataSet = await this.bigquery.dataset(schemaName);
-      if (!dataSet) {
-        return [];
-      }
-      const [tables] = await this.bigquery.dataset(schemaName).getTables();
-      return tables.map(t => ({ table_name: t.id }));
+      const tables = await this.query(`SELECT * FROM \`${schemaName}.INFORMATION_SCHEMA.TABLES\``, []);
+      return tables.map((t: any) => ({ table_name: t.table_name }));
     } catch (e) {
       if (e.toString().indexOf('Not found')) {
         return [];
