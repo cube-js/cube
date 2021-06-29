@@ -89,6 +89,8 @@ export interface DriverInterface {
   downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
   downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
+  // Optional method, which extract types from query
+  describeQuery?: (query: string, params: unknown[]) => Promise<TableStructure>;
   // Some drivers can implement streaming from SQL
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
   // Some drivers can implement UNLOAD data to external storage

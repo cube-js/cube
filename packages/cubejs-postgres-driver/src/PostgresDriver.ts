@@ -127,7 +127,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         rowStream,
         types: meta.map((f: any) => ({
           name: f.name,
-          type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+          type: this.dataTypeToColumnType(f.dataTypeID)
         })),
         release: async () => {
           await conn.release();
@@ -174,9 +174,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       rows: res.rows,
       types: res.fields.map(f => ({
         name: f.name,
-        type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+        type: this.dataTypeToColumnType(f.dataTypeID)
       })),
     };
+  }
+
+  public dataTypeToColumnType(dataType: number): string {
+    return super.toGenericType(DataTypeMapping[dataType].toLowerCase());
   }
 
   public readOnly() {

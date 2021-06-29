@@ -1,5 +1,10 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/query-orchestrator';
+import {
+  DownloadQueryResultsOptions,
+  DownloadTableCSVData,
+  TableStructure,
+  UnloadOptions,
+} from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -70,6 +75,28 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     }
 
     return false;
+  }
+
+  public async describeQuery(query: string, values: unknown[]): Promise<TableStructure> {
+    const conn = await this.pool.connect();
+
+    if (!this.config.database) {
+      throw new Error(`Default database should be defined to be used for temporary tables during query results downloads`);
+    }
+
+    try {
+      await this.prepareConnection(conn);
+
+      const stmt = await conn.query(`${query} LIMIT 0`, values);
+      console.log(stmt.fields);
+
+      return stmt.fields.map(f => ({
+        name: f.name,
+        type: this.dataTypeToColumnType(f.dataTypeID)
+      }));
+    } finally {
+      await conn.release();
+    }
   }
 
   public async unload(table: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
@@ -164,5 +191,24 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
       await conn.release();
     }
+  }
+
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
+    if (options.csvImport) {
+      return this.unload(query, values, options);
+    }
+
+    if (options.streamImport) {
+      return this.stream(query, values, options);
+    }
+
+    const res = await this.queryResponse(query, values);
+    return {
+      rows: res.rows,
+      types: res.fields.map(f => ({
+        name: f.name,
+        type: this.dataTypeToColumnType(f.dataTypeID)
+      })),
+    };
   }
 }
