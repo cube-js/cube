@@ -128,7 +128,8 @@ asyncModule(async () => {
       measures,
       preAggregations: {
         main: {
-          type: `originalSql`,
+          type: `rollup`,
+          ...
         },
       },
     });
@@ -199,7 +200,8 @@ asyncModule(async () => {
       measures,
       preAggregations: {
         main: {
-          type: `originalSql`,
+          type: `rollup`,
+          ...
         },
       },
     });
@@ -243,7 +245,8 @@ asyncModule(async () => {
       measures,
       preAggregations: {
         main: {
-          type: `originalSql`,
+          type: `rollup`,
+          ...
         },
       },
     });
