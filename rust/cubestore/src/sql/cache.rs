@@ -79,7 +79,12 @@ impl SqlResultCache {
         if let Some(sender) = sender {
             trace!("Missing cache for '{}'", query);
             let result = exec(plan).await.map(|d| Arc::new(d));
-            sender.send(Some(result.clone()))?;
+            if let Err(e) = sender.send(Some(result.clone())) {
+                trace!(
+                    "Failed to set cached query result, possibly flushed from LRU cache: {}",
+                    e
+                );
+            }
             if result.is_err() {
                 trace!("Removing error result from cache");
                 self.cache.write().await.pop(&key);
