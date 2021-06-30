@@ -22,13 +22,13 @@ class ElasticSearchDriver extends BaseDriver {
     // They have different dialects according to their respective documentation
     this.config = {
       url: process.env.CUBEJS_DB_URL,
-      ssl: this.getSslOptions(),
       auth,
       openDistro:
         (process.env.CUBEJS_DB_ELASTIC_OPENDISTRO || 'false').toLowerCase() === 'true' ||
         process.env.CUBEJS_DB_TYPE === 'odelasticsearch',
       queryFormat: process.env.CUBEJS_DB_ELASTIC_QUERY_FORMAT || 'jdbc',
-      ...config
+      ...config,
+      ssl: config.ssl ? this.mapSSLOptions(config.ssl) : this.getSslOptions(),
     };
 
     this.client = new Client({

@@ -59,10 +59,10 @@ class MySqlDriver extends BaseDriver {
       password: process.env.CUBEJS_DB_PASS,
       socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
       timezone: 'Z',
-      ssl: this.getSslOptions(),
       dateStrings: true,
       readOnly: true,
       ...restConfig,
+      ssl: restConfig.ssl ? this.mapSSLOptions(restConfig.ssl) : this.getSslOptions(),
     };
 
     this.pool = genericPool.createPool({

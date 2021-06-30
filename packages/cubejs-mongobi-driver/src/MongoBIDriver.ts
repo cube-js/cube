@@ -28,7 +28,6 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       port: <any>process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ssl: this.getSslOptions(),
       authPlugins: {
         mysql_clear_password: () => async () => {
           const password = config.password || process.env.CUBEJS_DB_PASS || '';
@@ -44,7 +43,8 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
 
         return next();
       },
-      ...config
+      ...config,
+      ssl: config.ssl ? this.mapSSLOptions(config.ssl) : this.getSslOptions(),
     };
     this.pool = genericPool.createPool({
       create: async () => {
