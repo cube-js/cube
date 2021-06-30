@@ -82,12 +82,6 @@ const BasePreAggregationWithoutPartitionGranularity = {
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   scheduledRefresh: Joi.boolean(),
-  refreshRangeStart: {
-    sql: Joi.func().required()
-  },
-  refreshRangeEnd: {
-    sql: Joi.func().required()
-  },
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({
       sql: Joi.func().required()
@@ -96,6 +90,20 @@ const BasePreAggregationWithoutPartitionGranularity = {
       columns: Joi.func().required()
     })
   )),
+  // refreshRange was deprecated
+  refreshRangeStart: {
+    sql: Joi.func().required()
+  },
+  refreshRangeEnd: {
+    sql: Joi.func().required()
+  },
+  // new api
+  buildRangeStart: {
+    sql: Joi.func().required()
+  },
+  buildRangeEnd: {
+    sql: Joi.func().required()
+  },
 };
 
 const BasePreAggregation = {
