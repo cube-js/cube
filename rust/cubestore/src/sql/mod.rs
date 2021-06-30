@@ -121,6 +121,7 @@ impl SqlServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
+        max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
@@ -132,7 +133,7 @@ impl SqlServiceImpl {
             rows_per_chunk,
             query_timeout,
             remote_fs,
-            cache: SqlResultCache::new(10000), // TODO config
+            cache: SqlResultCache::new(max_cached_queries),
         })
     }
 
@@ -1091,6 +1092,7 @@ mod tests {
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
+                10_000, // max_cached_queries
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -1141,6 +1143,7 @@ mod tests {
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
+                10_000, // max_cached_queries
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
