@@ -268,10 +268,10 @@ class PreAggregationLoadCache {
   }
 
   protected async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew, priority) {
-    if (!this.queryResults[this.queryCache.queryRedisKey(sqlQuery)]) {
-      const [query, values, queryOptions]: QueryTuple = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+    const [query, values, queryOptions]: QueryTuple = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
 
-      this.queryResults[this.queryCache.queryRedisKey(sqlQuery)] = await this.queryCache.cacheQueryResult(
+    if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
+      this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
         query,
         values,
         [query, values],
@@ -279,7 +279,7 @@ class PreAggregationLoadCache {
         {
           renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
             || queryOptions?.renewalThreshold || 2 * 60,
-          renewalKey: sqlQuery,
+          renewalKey: [query, values],
           waitForRenew,
           priority,
           requestId: this.requestId,
@@ -289,7 +289,7 @@ class PreAggregationLoadCache {
         }
       );
     }
-    return this.queryResults[this.queryCache.queryRedisKey(sqlQuery)];
+    return this.queryResults[this.queryCache.queryRedisKey([query, values])];
   }
 
   protected hasKeyQueryResult(keyQuery) {
