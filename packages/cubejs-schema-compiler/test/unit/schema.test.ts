@@ -1,8 +1,7 @@
 import { prepareCompiler } from './PrepareCompiler';
 
-describe('Schema Testing', () => {
-  const schemaCompile = async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler(` 
+export function makeCubeSchema({ preAggregations }) {
+  return ` 
       cube('CubeA', {
         sql: \`select * from test\`,
    
@@ -35,17 +34,40 @@ describe('Schema Testing', () => {
         },
 
         preAggregations: {
-            main: {
+          ${preAggregations}
+        },
+      }) 
+    `;
+}
+
+describe('Schema Testing', () => {
+  const schemaCompile = async () => {
+    const { compiler, cubeEvaluator } = prepareCompiler(
+      makeCubeSchema({
+        preAggregations: `
+          main: {
                 type: 'originalSql',
                 timeDimension: createdAt,
                 partitionGranularity: \`month\`,
+                refreshRangeStart: {
+                  sql: 'SELECT NOW()',
+                },
+                refreshRangeEnd: {
+                  sql: 'SELECT NOW()',
+                }
             },
             // Pre-aggregation without type, rollup is used by default
             countCreatedAt: {
                 measureReferences: [count],
                 timeDimensionReference: createdAt,
                 granularity: \`day\`,
-                partitionGranularity: \`month\`
+                partitionGranularity: \`month\`,
+                buildRangeStart: {
+                  sql: 'SELECT NOW()',
+                },
+                buildRangeEnd: {
+                  sql: 'SELECT NOW()',
+                }
             },
             countCreatedAtWithoutReferences: {
                 dimensions: [type],
@@ -53,11 +75,17 @@ describe('Schema Testing', () => {
                 timeDimension: [createdAt],
                 segments: [sfUsers],
                 granularity: \`day\`,
-                partitionGranularity: \`month\`
+                partitionGranularity: \`month\`,
+                buildRangeStart: {
+                  sql: 'SELECT NOW()',
+                },
+                buildRangeEnd: {
+                  sql: 'SELECT NOW()',
+                }
             }
-        },
-      }) 
-    `);
+        `
+      })
+    );
     await compiler.compile();
 
     return { compiler, cubeEvaluator };
@@ -73,6 +101,12 @@ describe('Schema Testing', () => {
         timeDimensionReference: expect.any(Function),
         partitionGranularity: 'month',
         type: 'originalSql',
+        refreshRangeStart: {
+          sql: expect.any(Function),
+        },
+        refreshRangeEnd: {
+          sql: expect.any(Function),
+        },
       },
       countCreatedAt: {
         external: false,
@@ -82,6 +116,12 @@ describe('Schema Testing', () => {
         timeDimensionReference: expect.any(Function),
         partitionGranularity: 'month',
         type: 'rollup',
+        refreshRangeStart: {
+          sql: expect.any(Function),
+        },
+        refreshRangeEnd: {
+          sql: expect.any(Function),
+        },
       },
       countCreatedAtWithoutReferences: {
         // because preview
@@ -94,6 +134,12 @@ describe('Schema Testing', () => {
         dimensionReferences: expect.any(Function),
         partitionGranularity: 'month',
         type: 'rollup',
+        refreshRangeStart: {
+          sql: expect.any(Function),
+        },
+        refreshRangeEnd: {
+          sql: expect.any(Function),
+        },
       }
     });
   });
@@ -114,6 +160,12 @@ describe('Schema Testing', () => {
         timeDimensionReference: expect.any(Function),
         partitionGranularity: 'month',
         type: 'originalSql',
+        refreshRangeStart: {
+          sql: expect.any(Function),
+        },
+        refreshRangeEnd: {
+          sql: expect.any(Function),
+        },
       },
       countCreatedAt: {
         // because preview
@@ -124,6 +176,12 @@ describe('Schema Testing', () => {
         timeDimensionReference: expect.any(Function),
         partitionGranularity: 'month',
         type: 'rollup',
+        refreshRangeStart: {
+          sql: expect.any(Function),
+        },
+        refreshRangeEnd: {
+          sql: expect.any(Function),
+        },
       },
       countCreatedAtWithoutReferences: {
         // because preview
@@ -136,7 +194,58 @@ describe('Schema Testing', () => {
         timeDimensionReference: expect.any(Function),
         partitionGranularity: 'month',
         type: 'rollup',
+        refreshRangeStart: {
+          sql: expect.any(Function),
+        },
+        refreshRangeEnd: {
+          sql: expect.any(Function),
+        },
       }
     });
+  });
+
+  it('invalid schema', async () => {
+    const logger = jest.fn();
+
+    const { compiler } = prepareCompiler(
+      makeCubeSchema({
+        preAggregations: `
+            main: {
+                type: 'originalSql',
+                timeDimension: createdAt,
+                partitionGranularity: \`month\`,
+                refreshRangeStart: {
+                  sql: 'SELECT NOW()',
+                },
+                buildRangeStart: {
+                  sql: 'SELECT NOW()',
+                },
+                refreshRangeEnd: {
+                  sql: 'SELECT NOW()',
+                },
+                buildRangeEnd: {
+                  sql: 'SELECT NOW()',
+                }
+            },
+          `
+      }),
+      {
+        omitErrors: true,
+        errorReport: {
+          logger,
+        }
+      }
+    );
+
+    await compiler.compile();
+    compiler.throwIfAnyErrors();
+
+    expect(logger.mock.calls.length).toEqual(2);
+    expect(logger.mock.calls[0]).toEqual([
+      'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+    ]);
+    expect(logger.mock.calls[1]).toEqual([
+      'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+    ]);
   });
 });

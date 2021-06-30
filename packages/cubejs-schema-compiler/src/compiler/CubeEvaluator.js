@@ -17,7 +17,7 @@ export class CubeEvaluator extends CubeSymbols {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
 
-    Object.values(validCubes).map(this.prepareCube);
+    Object.values(validCubes).map((cube) => this.prepareCube(cube, errorReporter));
 
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
@@ -30,7 +30,7 @@ export class CubeEvaluator extends CubeSymbols {
     }));
   }
 
-  prepareCube(cube) {
+  prepareCube(cube, errorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
       for (const preAggregation of Object.values(cube.preAggregations)) {
@@ -57,6 +57,28 @@ export class CubeEvaluator extends CubeSymbols {
         if (preAggregation.rollups) {
           preAggregation.rollupReferences = preAggregation.rollups;
           delete preAggregation.rollups;
+        }
+
+        if (preAggregation.buildRangeStart) {
+          if (preAggregation.refreshRangeStart) {
+            errorReporter.warning({
+              message: 'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+            });
+          }
+
+          preAggregation.refreshRangeStart = preAggregation.buildRangeStart;
+          delete preAggregation.buildRangeStart;
+        }
+
+        if (preAggregation.buildRangeEnd) {
+          if (preAggregation.refreshRangeEnd) {
+            errorReporter.warning({
+              message: 'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+            });
+          }
+
+          preAggregation.refreshRangeEnd = preAggregation.buildRangeEnd;
+          delete preAggregation.buildRangeEnd;
         }
       }
     }
