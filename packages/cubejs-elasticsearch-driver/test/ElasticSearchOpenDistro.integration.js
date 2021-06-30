@@ -6,7 +6,7 @@ describe('ElasticSearchDriver OpenDistro', () => {
   let container;
   let elasticSearchDriver;
 
-  jest.setTimeout(50000);
+  jest.setTimeout(60 * 2 * 1000);
 
   const version = process.env.TEST_ELASTIC_OPENDISTRO_VERSION || '1.13.1';
 

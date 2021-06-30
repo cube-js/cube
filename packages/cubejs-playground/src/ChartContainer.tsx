@@ -80,7 +80,7 @@ export const frameworks: FrameworkDescriptor[] = [
   },
 ];
 
-type TChartContainerProps = {
+type ChartContainerProps = {
   query: Query;
   hideActions: boolean;
   dashboardSource?: DashboardSource;
@@ -90,7 +90,7 @@ type TChartContainerProps = {
 };
 
 class ChartContainer extends Component<
-  TChartContainerProps & RouteComponentProps,
+  ChartContainerProps & RouteComponentProps,
   any
 > {
   static defaultProps = {

@@ -153,7 +153,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#07c19971bd9034234d160083baaa79695b7d1a2a"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#0daaaea6c47fc20ff4b6c03ec965b0d07d6d2259"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#07c19971bd9034234d160083baaa79695b7d1a2a"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#0daaaea6c47fc20ff4b6c03ec965b0d07d6d2259"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -472,7 +472,6 @@ dependencies = [
  "miniz_oxide",
  "object",
  "rustc-demangle",
- "serde",
 ]
 
 [[package]]
@@ -982,9 +981,9 @@ dependencies = [
 
 [[package]]
 name = "ctor"
-version = "0.1.19"
+version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8f45d9ad417bcef4817d614a501ab55cdd96a6fdb24f49aab89a54acfd66b19"
+checksum = "5e98e2ad1a782e33928b96fc3948e7c355e5af34ba4de7670fe8bac2a3b2006d"
 dependencies = [
  "quote",
  "syn",
@@ -1037,6 +1036,7 @@ dependencies = [
  "chrono",
  "cloud-storage",
  "csv",
+ "ctor",
  "cubehll",
  "cuberpc",
  "cubezetasketch",
@@ -1052,6 +1052,7 @@ dependencies = [
  "ipc-channel",
  "itertools 0.9.0",
  "lazy_static",
+ "libc",
  "log",
  "lru",
  "mockall",
@@ -1064,7 +1065,6 @@ dependencies = [
  "paste",
  "pin-project-lite 0.2.6",
  "pretty_assertions",
- "procspawn",
  "rand 0.8.3",
  "regex",
  "reqwest 0.11.2",
@@ -1099,9 +1099,9 @@ dependencies = [
  "futures 0.3.13",
  "ipc-channel",
  "itertools 0.9.0",
+ "lazy_static",
  "log",
  "pretty_assertions",
- "procspawn",
  "scopeguard",
  "serde",
  "serde_derive",
@@ -1119,7 +1119,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#07c19971bd9034234d160083baaa79695b7d1a2a"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#0daaaea6c47fc20ff4b6c03ec965b0d07d6d2259"
 dependencies = [
  "ahash 0.7.2",
  "arrow",
@@ -1357,16 +1357,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca5faf057445ce5c9d4329e382b2ce7ca38550ef3b73a5348362d5f24e0c7fe3"
 dependencies = [
  "instant",
-]
-
-[[package]]
-name = "findshlibs"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1260d61e4fe2a6ab845ffdc426a0bd68ffb240b91cf0ec5a8d1170cec535bd8"
-dependencies = [
- "lazy_static",
- "libc",
 ]
 
 [[package]]
@@ -2164,9 +2154,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.88"
+version = "0.2.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03b07a082330a35e43f63177cc01689da34fbffa0105e1246cf0311472cac73a"
+checksum = "12b8adadd720df158f4d70dfe7ccc6adb0472d7c55ca83445f6a5ab3e36f8fb6"
 
 [[package]]
 name = "libloading"
@@ -2885,7 +2875,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#07c19971bd9034234d160083baaa79695b7d1a2a"
+source = "git+https://github.com/cube-js/arrow?branch=cubestore-2021-05-17#0daaaea6c47fc20ff4b6c03ec965b0d07d6d2259"
 dependencies = [
  "arrow",
  "base64 0.12.3",
@@ -3095,20 +3085,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0704ee1a7e00d7bb417d0770ea303c1bccbabf0ef1667dae92b5967f5f8a71"
 dependencies = [
  "unicode-xid",
-]
-
-[[package]]
-name = "procspawn"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22d4628f0f2a777c58aa7b64654ffc577c4057a50e611c4d69cbe9fe207bf9b6"
-dependencies = [
- "backtrace",
- "ctor",
- "findshlibs",
- "ipc-channel",
- "libc",
- "serde",
 ]
 
 [[package]]
@@ -3991,9 +3967,9 @@ checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"
-version = "1.0.63"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fd9bc7ccc2688b3344c2f48b9b546648b25ce0b20fc717ee7fa7981a8ca9717"
+checksum = "6498a9efc342871f91cc2d0d694c674368b4ceb40f62b65a7a08c3792935e702"
 dependencies = [
  "proc-macro2",
  "quote",

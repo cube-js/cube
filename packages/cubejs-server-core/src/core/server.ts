@@ -384,6 +384,13 @@ export class CubejsServerCore {
       }
     }
 
+    let scheduledRefreshTimer = getEnv('refreshWorkerMode');
+    if (scheduledRefreshTimer === undefined) {
+      scheduledRefreshTimer = getEnv('scheduledRefresh') !== undefined
+        ? getEnv('scheduledRefresh')
+        : getEnv('refreshTimer');
+    }
+
     const options: ServerCoreInitializedOptions = {
       dbType: <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE,
       externalDbType,
@@ -414,7 +421,7 @@ export class CubejsServerCore {
         devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
       ),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
-      scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
+      scheduledRefreshTimer,
       sqlCache: true,
       livePreview: getEnv('livePreview'),
       ...opts,
@@ -629,6 +636,18 @@ export class CubejsServerCore {
     let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
 
     const externalDbType = this.contextToExternalDbType(context);
+    const orchestratorOptions = {
+      ...this.options.orchestratorOptions,
+      // OrchestratorOptionsFn should have an ability to override static configuration form cube.js file
+      ...this.orchestratorOptions(context),
+    };
+
+    const refreshWorkerMode = getEnv('refreshWorkerMode');
+    const rollupOnlyMode = getEnv('rollupOnlyMode');
+
+    // External refresh is enabled for refreshWorkerMode or rollupOnlyMode, but it's disabled
+    // when it's both refreshWorkerMode & rollupOnlyMode
+    const externalRefresh: boolean = (!refreshWorkerMode !== !rollupOnlyMode);
 
     const orchestratorApi = this.createOrchestratorApi(
       async (dataSource = 'default') => {
@@ -695,9 +714,12 @@ export class CubejsServerCore {
         redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-        ...this.options.orchestratorOptions,
-        // OrchestratorOptionsFn should have an ability to override static configuration form cube.js file
-        ...this.orchestratorOptions(context),
+        rollupOnlyMode,
+        ...orchestratorOptions,
+        preAggregationsOptions: {
+          ...orchestratorOptions.preAggregationsOptions,
+          externalRefresh,
+        }
       }
     );
 

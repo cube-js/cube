@@ -1,23 +1,26 @@
-use crate::CubeError;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::panic;
+use std::process::Child;
+use std::sync::Arc;
+use std::time::Duration;
+
 use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
-use procspawn::JoinHandle;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::panic;
-use std::sync::Arc;
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
 use tokio::runtime::Builder;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
+
+use crate::util::respawn::respawn;
+use crate::CubeError;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -205,7 +208,7 @@ impl<
         }
     }
 
-    fn kill(handle: &mut JoinHandle<()>) {
+    fn kill(handle: &mut Child) {
         if let Err(e) = handle.kill() {
             error!("Error during kill: {:?}", e);
         }
@@ -225,14 +228,7 @@ impl<
 
     fn spawn_process(
         &self,
-    ) -> Result<
-        (
-            IpcSender<T>,
-            IpcReceiver<Result<R, CubeError>>,
-            JoinHandle<()>,
-        ),
-        CubeError,
-    > {
+    ) -> Result<(IpcSender<T>, IpcReceiver<Result<R, CubeError>>, Child), CubeError> {
         let (args_tx, args_rx) = ipc::channel()?;
         let (res_tx, res_rx) = ipc::channel()?;
 
@@ -244,58 +240,73 @@ impl<
         }
         ctx += &self.name;
 
-        let mut b = procspawn::Builder::new();
-        b.env("CUBESTORE_LOG_CONTEXT", ctx);
-        let handle = b.spawn((args_rx, res_tx), |(rx, tx)| {
-            let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-            loop {
-                let res = rx.recv();
-                match res {
-                    Ok(args) => {
-                        let send_res = tx.send(runtime.block_on(P::process(args)));
-                        if let Err(e) = send_res {
-                            error!("Worker message send error: {:?}", e);
-                            return;
-                        }
-                    }
-                    Err(e) => {
-                        error!("Worker message receive error: {:?}", e);
-                        return;
-                    }
+        let handle = respawn(
+            WorkerProcessArgs {
+                args: args_rx,
+                results: res_tx,
+                processor: PhantomData::<P>::default(),
+            },
+            &["--sel-worker".to_string()],
+            &[("CUBESTORE_LOG_CONTEXT".to_string(), ctx)],
+        )?;
+        Ok((args_tx, res_rx, handle))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct WorkerProcessArgs<T, R, P: ?Sized> {
+    args: IpcReceiver<T>,
+    results: IpcSender<Result<R, CubeError>>,
+    processor: PhantomData<P>,
+}
+
+pub fn worker_main<T, R, P>(a: WorkerProcessArgs<T, R, P>) -> i32
+where
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
+    R: Serialize + DeserializeOwned + Sync + Send + 'static,
+    P: MessageProcessor<T, R>,
+{
+    let (rx, tx) = (a.args, a.results);
+    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+    loop {
+        let res = rx.recv();
+        match res {
+            Ok(args) => {
+                let send_res = tx.send(runtime.block_on(P::process(args)));
+                if let Err(e) = send_res {
+                    error!("Worker message send error: {:?}", e);
+                    return 0;
                 }
             }
-        });
-        Ok((args_tx, res_rx, handle))
+            Err(e) => {
+                error!("Worker message receive error: {:?}", e);
+                return 0;
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::time::Duration;
 
-    use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
-    use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
-    use crate::CubeError;
     use arrow::datatypes::{DataType, Field, Schema};
     use async_trait::async_trait;
     use datafusion::logical_plan::ToDFSchema;
     use futures_timer::Delay;
-    use procspawn::{self};
     use serde::{Deserialize, Serialize};
-    use std::sync::Arc;
     use tokio::runtime::Builder;
 
-    // Code from procspawn::enable_test_support!();
-    #[procspawn::testsupport::ctor]
-    fn __procspawn_test_support_init() {
-        // strip the crate name from the module path
-        let module_path = std::module_path!().splitn(2, "::").nth(1);
-        procspawn::testsupport::enable(module_path);
-    }
+    use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+    use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
+    use crate::util::respawn;
+    use crate::CubeError;
 
-    #[test]
-    fn procspawn_test_helper() {
-        procspawn::init();
+    #[ctor::ctor]
+    fn test_support_init() {
+        respawn::replace_cmd_args_in_tests();
+        respawn::register_handler(worker_main::<Message, Response, Processor>)
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]

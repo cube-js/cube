@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useHistory } from 'react-router';
 
 import { useSecurityContext } from '../../hooks';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
 import { useAppContext } from '../../components/AppContext';
+import DashboardSource from '../../DashboardSource';
 
 type LivePreviewContext = {
   apiUrl: string;
@@ -20,6 +21,8 @@ export function buildApiUrl(
 
 export function ExplorePage() {
   const { push } = useHistory();
+
+  const dashboardSource = useMemo(() => new DashboardSource(), []);
 
   const { playgroundContext } = useAppContext();
   const { token } = useSecurityContext();
@@ -79,6 +82,7 @@ export function ExplorePage() {
         apiUrl={apiUrl}
         token={currentToken}
         schemaVersion={schemaVersion}
+        dashboardSource={dashboardSource}
         onVizStateChanged={({ query }) =>
           push(`/build?query=${JSON.stringify(query)}`)
         }

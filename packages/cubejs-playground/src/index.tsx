@@ -21,14 +21,14 @@ history.listen((location) => {
   page(props);
 });
 
-async function onTokenPayloadChange(payload: string = '') {
+async function onTokenPayloadChange(payload: Record<string, any>) {
   const response = await fetch('/playground/token', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      payload: JSON.parse(payload),
+      payload
     }),
   });
   const { token } = await response.json();

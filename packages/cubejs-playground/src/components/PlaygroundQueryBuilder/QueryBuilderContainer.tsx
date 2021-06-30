@@ -37,6 +37,7 @@ type QueryBuilderContainerProps = {
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
+  | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
 >;
@@ -44,19 +45,14 @@ type QueryBuilderContainerProps = {
 export function QueryBuilderContainer({
   apiUrl,
   token,
+  dashboardSource,
   ...props
 }: QueryBuilderContainerProps) {
-  const dashboardSource = useMemo(() => new DashboardSource(), []);
-
   const { location } = useHistory();
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || '{}');
 
-  const {
-    token: securityContextToken,
-    setIsModalOpen,
-    refreshToken,
-  } = useSecurityContext();
+  const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
   const livePreviewContext = useLivePreviewContext();
 
   const currentToken = securityContextToken || token;

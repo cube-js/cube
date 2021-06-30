@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.27.41",
+  "version": "0.27.45",
   "engines": {},
   "repository": {
     "type": "git",
@@ -33,9 +33,8 @@
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
     "@cubejs-client/core": "^0.27.41",
-    "@cubejs-client/react": "^0.27.41",
+    "@cubejs-client/react": "^0.27.44",
     "camel-case": "^4.1.2",
-    "camelcase": "^6.2.0",
     "codesandbox-import-utils": "^2.1.1",
     "customize-cra": "^1.0.0",
     "fast-deep-equal": "^3.1.3",
@@ -60,6 +59,7 @@
     "react-scripts": "4.0.1",
     "react-source-render": "4.0.0-1",
     "sql-formatter": "^4.0.2",
+    "throttle-debounce": "^3.0.1",
     "uuid": "^3.3.3",
     "whatwg-fetch": "^3.0.0"
   },

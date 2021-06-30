@@ -6,6 +6,7 @@ import CubeContext from './CubeContext';
 import { generateAnsiHTML } from './utils';
 
 export default class QueryRenderer extends React.Component {
+  // @deprected use `isQueryPresent` from `@cubejs-client/core`
   static isQueryPresent(query) {
     return isQueryPresent(query);
   }
@@ -69,7 +70,7 @@ export default class QueryRenderer extends React.Component {
     const { loadSql } = this.props;
     const cubejsApi = this.cubejsApi();
 
-    if (query && QueryRenderer.isQueryPresent(query)) {
+    if (query && isQueryPresent(query)) {
       if (loadSql === 'only') {
         cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
           .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))

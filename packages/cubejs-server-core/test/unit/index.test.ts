@@ -1,24 +1,22 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
 import { withTimeout } from '@cubejs-backend/shared';
-import { DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 
-import { CubejsServerCore } from '../../src';
+import { CubejsServerCore, ServerCoreInitializedOptions } from '../../src';
 import { DatabaseType } from '../../src/core/types';
 import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
+// It's just a mock to open protected methods
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public detectScheduledRefreshTimer(scheduledRefreshTimer: number|boolean) {
-    return super.detectScheduledRefreshTimer(scheduledRefreshTimer);
-  }
+  public readonly options: ServerCoreInitializedOptions;
 
-  public getRefreshScheduler() {
-    return super.getRefreshScheduler();
-  }
+  public detectScheduledRefreshTimer = super.detectScheduledRefreshTimer;
 
-  public isReadyForQueryProcessing() {
-    return super.isReadyForQueryProcessing();
-  }
+  public getRefreshScheduler = super.getRefreshScheduler;
+
+  public isReadyForQueryProcessing = super.isReadyForQueryProcessing;
+
+  public createOrchestratorApi = super.createOrchestratorApi;
 }
 
 describe('index.test', () => {
@@ -26,6 +24,8 @@ describe('index.test', () => {
     delete process.env.CUBEJS_EXT_DB_TYPE;
     delete process.env.CUBEJS_DEV_MODE;
     delete process.env.CUBEJS_DB_TYPE;
+    delete process.env.CUBEJS_REFRESH_WORKER;
+    delete process.env.CUBEJS_ROLLUP_ONLY;
 
     process.env.NODE_ENV = 'development';
     process.env.CUBEJS_API_SECRET = 'api-secret';
@@ -170,16 +170,7 @@ describe('index.test', () => {
       livePreview: true
     };
 
-    class CubejsServerCoreMock extends CubejsServerCore {
-      public createOrchestratorApi(
-        getDriver: DriverFactoryByDataSource,
-        opts: OrchestratorApiOptions
-      ) {
-        return super.createOrchestratorApi(getDriver, opts);
-      }
-    }
-
-    const cubejsServerCore = new CubejsServerCoreMock(<any>options);
+    const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
@@ -226,11 +217,6 @@ describe('index.test', () => {
       //
     });
 
-    class CubejsServerCoreLocalMock extends CubejsServerCore {
-      // Just return true to emulate that package exists
-      protected isCubeStoreDriverInstalled = () => <any>true;
-    }
-
     try {
       process.env.CUBEJS_DB_TYPE = 'mysql';
       process.env.CUBEJS_DEV_MODE = 'true';
@@ -239,10 +225,12 @@ describe('index.test', () => {
         value: 'MockOS'
       });
 
-      const cubejsServerCore = new CubejsServerCoreLocalMock({ logger });
+      const cubejsServerCore = new CubejsServerCoreOpen({ logger });
       await cubejsServerCore.beforeShutdown();
       await cubejsServerCore.shutdown();
     } finally {
+      jest.restoreAllMocks();
+
       Object.defineProperty(process, 'platform', {
         value: originalPlatform
       });
@@ -348,6 +336,68 @@ describe('index.test', () => {
   expectRefreshTimerOption(10, 10000);
   expectRefreshTimerOption(true, 30000);
   expectRefreshTimerOption(false, false);
+
+  test('scheduledRefreshTimer is disabled with CUBEJS_REFRESH_WORKER', async () => {
+    process.env.CUBEJS_REFRESH_WORKER = 'false';
+
+    const cubejsServerCore = new CubejsServerCoreOpen({
+      dbType: 'mysql',
+      apiSecret: 'secret',
+    });
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    expect(cubejsServerCore.options.scheduledRefreshTimer).toBe(false);
+
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
+  });
+
+  const testRefreshWorkerAndRollupModes = (
+    setRefreshWorker: boolean,
+    rollupOnlyMode: boolean,
+    assertFn: (options: OrchestratorApiOptions) => void
+  ) => {
+    test(`scheduledRefreshTimer option setRefreshWorker: ${setRefreshWorker} & rollupOnlyMode: ${rollupOnlyMode}`, async () => {
+      process.env.CUBEJS_REFRESH_WORKER = setRefreshWorker ? 'true' : 'false';
+      process.env.CUBEJS_ROLLUP_ONLY = rollupOnlyMode ? 'true' : 'false';
+
+      const cubejsServerCore = new CubejsServerCoreOpen({
+        dbType: 'mysql',
+        apiSecret: 'secret',
+      });
+      expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+
+      const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
+
+      cubejsServerCore.getOrchestratorApi({
+        requestId: 'XXX',
+        authInfo: null,
+        securityContext: null,
+      });
+      expect(createOrchestratorApiSpy.mock.calls.length).toEqual(1);
+      assertFn(createOrchestratorApiSpy.mock.calls[0][1]);
+
+      createOrchestratorApiSpy.mockRestore();
+
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    });
+  };
+
+  testRefreshWorkerAndRollupModes(true, false, (options) => {
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+    expect(options.rollupOnlyMode).toEqual(false);
+  });
+
+  testRefreshWorkerAndRollupModes(false, true, (options) => {
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+    expect(options.rollupOnlyMode).toEqual(true);
+  });
+
+  testRefreshWorkerAndRollupModes(true, true, (options) => {
+    expect(options.rollupOnlyMode).toEqual(true);
+    // externalRefresh is false when both refreshWorkerMode & rollupOnlyMode are enabled
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+  });
 
   test('scheduledRefreshContexts option', async () => {
     const cubejsServerCore = new CubejsServerCoreOpen({

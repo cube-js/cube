@@ -5,6 +5,7 @@ import {
   defaultOrder,
   flattenFilters,
   getQueryMembers,
+  isQueryPresent,
   moveItemInArray,
   movePivotItem,
   ResultSet
@@ -476,7 +477,12 @@ export default class QueryBuilder extends React.Component {
 
     handleVizStateChange(finalState);
 
-    if (QueryRenderer.isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
+    const shouldFetchDryRun = !equals(
+      pick(['measures', 'dimensions', 'timeDimensions'], stateQuery),
+      pick(['measures', 'dimensions', 'timeDimensions'], finalState.query)
+    );
+
+    if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
       try {
         const response = await this.cubejsApi().dryRun(finalState.query, {
           mutexObj: this.mutexObj,
@@ -491,7 +497,7 @@ export default class QueryBuilder extends React.Component {
         finalState.dryRunResponse = response;
 
         // deprecated
-        if (QueryRenderer.isQueryPresent(stateQuery)) {
+        if (isQueryPresent(stateQuery)) {
           runSetters({
             ...this.state,
             ...finalState,
