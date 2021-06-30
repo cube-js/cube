@@ -59,8 +59,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       port: <any>process.env.CUBEJS_DB_PORT,
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
-      ssl: this.getSslOptions(),
-      ...config
+      ...config,
+      ssl: config.ssl ? this.mapSSLOptions(config.ssl) : this.getSslOptions(),
     });
     this.pool.on('error', (err) => {
       console.log(`Unexpected error on idle client: ${err.stack || err}`); // TODO

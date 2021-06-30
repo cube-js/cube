@@ -108,13 +108,57 @@ export class BaseDriver {
    `;
   }
 
+  mapSSLOptions(sslOptions) {
+    const sslMapping = [
+      { name: 'ca', canBeFile: true, validate: isSslCert },
+      { name: 'cert', canBeFile: true, validate: isSslCert },
+      { name: 'key', canBeFile: true, validate: isSslKey },
+    ];
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const { name, canBeFile, validate } of sslMapping) {
+      if (name in sslOptions) {
+        if (validate(sslOptions[name])) {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+
+        if (canBeFile && isFilePath(sslOptions[name])) {
+          if (!fs.existsSync(sslOptions[name])) {
+            throw new Error(
+              `Unable to find ${name} from path: "${sslOptions[name]}"`,
+            );
+          }
+
+          const file = fs.readFileSync(sslOptions[name], 'utf8');
+          if (validate(file)) {
+            sslOptions[name] = file;
+
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+
+          throw new Error(
+            `Content of the file from ${name} is not a valid SSL.`,
+          );
+        }
+
+        throw new Error(
+          `${name} is not a valid SSL. If it's a path, please specify it correctly`,
+        );
+      }
+    }
+
+    return sslOptions;
+  }
+
   getSslOptions() {
     let ssl;
 
     const sslOptions = [
-      { name: 'ca', canBeFile: true, envKey: 'CUBEJS_DB_SSL_CA', validate: isSslCert },
-      { name: 'cert', canBeFile: true, envKey: 'CUBEJS_DB_SSL_CERT', validate: isSslCert },
-      { name: 'key', canBeFile: true, envKey: 'CUBEJS_DB_SSL_KEY', validate: isSslKey },
+      { name: 'ca', envKey: 'CUBEJS_DB_SSL_CA' },
+      { name: 'cert', envKey: 'CUBEJS_DB_SSL_CERT' },
+      { name: 'key', envKey: 'CUBEJS_DB_SSL_KEY' },
       { name: 'ciphers', envKey: 'CUBEJS_DB_SSL_CIPHERS' },
       { name: 'passphrase', envKey: 'CUBEJS_DB_SSL_PASSPHRASE' },
       { name: 'servername', envKey: 'CUBEJS_DB_SSL_SERVERNAME' },
@@ -125,46 +169,22 @@ export class BaseDriver {
       getEnv('dbSslRejectUnauthorized') ||
       sslOptions.find(o => !!process.env[o.value])
     ) {
-      ssl = sslOptions.reduce(
-        (agg, { name, envKey, canBeFile, validate }) => {
-          if (process.env[envKey]) {
-            const value = process.env[envKey];
+      ssl = this.mapSSLOptions(
+        sslOptions.reduce(
+          (agg, { name, envKey }) => {
+            if (process.env[envKey]) {
+              const value = process.env[envKey];
 
-            if (validate(value)) {
               return {
                 ...agg,
                 ...{ [name]: value }
               };
             }
 
-            if (canBeFile && isFilePath(value)) {
-              if (!fs.existsSync(value)) {
-                throw new Error(
-                  `Unable to find ${name} from path: "${value}"`,
-                );
-              }
-
-              const file = fs.readFileSync(value, 'utf8');
-              if (validate(file)) {
-                return {
-                  ...agg,
-                  ...{ [name]: file }
-                };
-              }
-
-              throw new Error(
-                `Content of the file from ${envKey} is not a valid SSL ${name}.`,
-              );
-            }
-
-            throw new Error(
-              `${envKey} is not a valid SSL ${name}. If it's a path, please specify it correctly`,
-            );
-          }
-
-          return agg;
-        },
-        {}
+            return agg;
+          },
+          {}
+        )
       );
 
       ssl.rejectUnauthorized = getEnv('dbSslRejectUnauthorized');
