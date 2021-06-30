@@ -86,9 +86,9 @@ services:
 <!-- prettier-ignore-end -->
 
 Scaling Cube Store for a higher concurrency is relatively simple when running in
-cluster mode. Because [the storage layer](#running-in-production-storage) is
-decoupled from the query processing engine, you can horizontally scale your Cube
-Store cluster for as much concurrency as you require.
+cluster mode. Because [the storage layer](#storage) is decoupled from the query
+processing engine, you can horizontally scale your Cube Store cluster for as
+much concurrency as you require.
 
 In cluster mode, Cube Store runs two kinds of nodes:
 
