@@ -42,7 +42,7 @@ cube(`Users`, {
 ```
 
 As with other cube member definitions segments can be
-[generated](/schema-generation):
+[generated](/schema/advanced/schema-generation):
 
 ```javascript
 const userSegments = {

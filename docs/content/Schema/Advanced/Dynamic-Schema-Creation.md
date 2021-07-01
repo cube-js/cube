@@ -1,9 +1,11 @@
 ---
 title: Dynamic Schema Creation
-permalink: /schema/dynamic-schema-creation
+permalink: /schema/advanced/dynamic-schema-creation
 category: Data Schema
 subCategory: Advanced
 menuOrder: 1
+redirect_from:
+  - /schema/dynamic-schema-creation
 ---
 
 Cube.js allows schemas to be created on-the-fly using a special
@@ -31,7 +33,7 @@ Cube.js supports importing JavaScript logic from other files in a schema, so it
 is useful to declare utility functions for handling the above differences in a
 separate file:
 
-[ref-import-export]: /export-import
+[ref-import-export]: /schema/advanced/extending-cubes
 
 ```javascript
 // schema/utils.js

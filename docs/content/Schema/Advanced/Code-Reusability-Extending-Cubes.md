@@ -1,10 +1,12 @@
 ---
 title: 'Code Reusability: Extending Cubes'
-permalink: /extending-cubes
+permalink: /schema/advanced/extending-cubes
 scope: cubejs
 category: Data Schema
 subCategory: Advanced
 menuOrder: 5
+redirect_from:
+  - /extending-cubes
 ---
 
 [comment]: # 'PROOFREAD: DONE'

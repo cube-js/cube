@@ -116,7 +116,7 @@ Schemas can be externally stored and retrieved through an asynchronous operation
 using the `asyncModule()`. For more information, consult the [Dynamic Schema
 Creation][ref-dynamic-schemas] page.
 
-[ref-dynamic-schemas]: /schema/dynamic-schema-creation
+[ref-dynamic-schemas]: /schema/advanced/dynamic-schema-creation
 
 ## Context symbols transpile
 

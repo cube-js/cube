@@ -1,10 +1,12 @@
 ---
 title: Polymorphic Cubes
-permalink: /polymorphic-cubes
+permalink: /schema/advanced/polymorphic-cubes
 scope: cubejs
 category: Data Schema
 subCategory: Advanced
 menuOrder: 3
+redirect_from:
+  - /polymorphic-cubes
 ---
 
 [comment]: # 'PROOFREAD: DONE'
@@ -40,7 +42,9 @@ feature and prevents you from duplicating code, while preserving the correct
 domain logic.
 
 <div class="block help-block">
-<a href="extending-cubes">Learn more about using the extends feature.</a>
+
+[Learn more about using the extends feature](/schema/advanced/extending-cubes).
+
 </div>
 
 The first step is to create a `User` cube, which will act as a base cube for our
@@ -101,5 +105,17 @@ cube(`Lessons`, {
       sql: `${CUBE}.teacher_id = ${Teachers}.id`,
     },
   },
+});
+```
+
+Now that we have all required cubes joined correctly, the last step is to
+**present it to end users in the Insights in an easy-to-consume way**. We don’t
+want to show the `Users` cube so as to not confuse the end users. We can use the
+[context feature](context) for this and expose only `Lessons`, `Teachers`, and
+`Students` into the Insights.
+
+```javascript
+context(`Lessons`, {
+  contextMembers: [Lessons, Students, Teachers],
 });
 ```

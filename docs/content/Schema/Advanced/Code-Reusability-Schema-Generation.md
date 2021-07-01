@@ -1,10 +1,12 @@
 ---
 title: 'Code Reusability: Schema Generation'
-permalink: /schema-generation
+permalink: /schema/advanced/schema-generation
 scope: cubejs
 category: Data Schema
 subCategory: Advanced
 menuOrder: 6
+redirect_from:
+  - /schema-generation
 ---
 
 Cube.js Schema is Javascript code, which means the full power of this language
@@ -54,7 +56,7 @@ and
 to add user count measure definitions based on `events` array. This approach
 allows you to maintain list of events in very concise manner without boilerplate
 code. This configuration can be reused using
-[export / import feature](export-import).
+[export / import feature](/schema/advanced/extending-cubes).
 
 Please refer to
 [asyncModule](/schema/reference/execution-environment#async-module)
