@@ -93,11 +93,13 @@ const variables: Record<string, (...args: any) => any> = {
       return refreshWorkerMode;
     }
 
-    // It's true by default for development
-    return process.env.NODE_ENV !== 'production';
-  },
-  // @deprecated Please use CUBEJS_REFRESH_WORKER
-  refreshTimer: () => {
+    // @deprecated Please use CUBEJS_REFRESH_WORKER
+    const scheduledRefresh = get('CUBEJS_SCHEDULED_REFRESH').asBool();
+    if (scheduledRefresh !== undefined) {
+      return scheduledRefresh;
+    }
+
+    // @deprecated Please use CUBEJS_REFRESH_WORKER
     if (process.env.CUBEJS_SCHEDULED_REFRESH_TIMER) {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
@@ -105,9 +107,6 @@ const variables: Record<string, (...args: any) => any> = {
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
-  // @deprecated Please use CUBEJS_REFRESH_WORKER
-  scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
-    .asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')

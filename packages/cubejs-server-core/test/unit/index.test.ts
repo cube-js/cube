@@ -2,7 +2,7 @@
 
 import { withTimeout } from '@cubejs-backend/shared';
 
-import { CubejsServerCore, ServerCoreInitializedOptions } from '../../src';
+import { CreateOptions, CubejsServerCore, ServerCoreInitializedOptions } from '../../src';
 import { DatabaseType } from '../../src/core/types';
 import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
@@ -26,6 +26,8 @@ describe('index.test', () => {
     delete process.env.CUBEJS_DB_TYPE;
     delete process.env.CUBEJS_REFRESH_WORKER;
     delete process.env.CUBEJS_ROLLUP_ONLY;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
 
     process.env.NODE_ENV = 'development';
     process.env.CUBEJS_API_SECRET = 'api-secret';
@@ -352,17 +354,42 @@ describe('index.test', () => {
   });
 
   const testRefreshWorkerAndRollupModes = (
-    setRefreshWorker: boolean,
+    { setRefreshWorker, setScheduledRefresh, setScheduledRefreshTimer, testName, options }: {
+      setRefreshWorker?: boolean,
+      setScheduledRefresh?: boolean,
+      setScheduledRefreshTimer?: boolean|number,
+      testName?: string,
+      options?: CreateOptions
+    },
     rollupOnlyMode: boolean,
-    assertFn: (options: OrchestratorApiOptions) => void
+    assertFn: (options: OrchestratorApiOptions) => void,
   ) => {
-    test(`scheduledRefreshTimer option setRefreshWorker: ${setRefreshWorker} & rollupOnlyMode: ${rollupOnlyMode}`, async () => {
-      process.env.CUBEJS_REFRESH_WORKER = setRefreshWorker ? 'true' : 'false';
-      process.env.CUBEJS_ROLLUP_ONLY = rollupOnlyMode ? 'true' : 'false';
+    const paramsToName = JSON.stringify({
+      setRefreshWorker,
+      setScheduledRefresh,
+      setScheduledRefreshTimer,
+      rollupOnlyMode
+    });
+
+    test(testName || `scheduledRefreshTimer option setRefreshWorker: ${paramsToName})}`, async () => {
+      if (setRefreshWorker !== undefined) {
+        process.env.CUBEJS_REFRESH_WORKER = setRefreshWorker.toString();
+      }
+
+      if (setScheduledRefresh !== undefined) {
+        process.env.CUBEJS_SCHEDULED_REFRESH = setScheduledRefresh.toString();
+      }
+
+      if (setScheduledRefreshTimer !== undefined) {
+        process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = setScheduledRefreshTimer.toString();
+      }
+
+      process.env.CUBEJS_ROLLUP_ONLY = rollupOnlyMode.toString();
 
       const cubejsServerCore = new CubejsServerCoreOpen({
         dbType: 'mysql',
         apiSecret: 'secret',
+        ...options,
       });
       expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
@@ -383,22 +410,92 @@ describe('index.test', () => {
     });
   };
 
-  testRefreshWorkerAndRollupModes(true, false, (options) => {
+  testRefreshWorkerAndRollupModes({ setRefreshWorker: true }, false, (options) => {
     expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
     expect(options.rollupOnlyMode).toEqual(false);
   });
 
-  testRefreshWorkerAndRollupModes(false, true, (options) => {
+  testRefreshWorkerAndRollupModes({ setRefreshWorker: false }, true, (options) => {
     expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
     expect(options.rollupOnlyMode).toEqual(true);
   });
 
-  testRefreshWorkerAndRollupModes(true, true, (options) => {
+  testRefreshWorkerAndRollupModes({ setRefreshWorker: true }, true, (options) => {
     expect(options.rollupOnlyMode).toEqual(true);
     // External refresh is enabled for rollupOnlyMode, but it's disabled
     // when it's both refreshWorkerMode & rollupOnlyMode
     expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
   });
+
+  // Old env, but anyway we should handle it
+  testRefreshWorkerAndRollupModes({ setScheduledRefresh: true }, true, (options) => {
+    expect(options.rollupOnlyMode).toEqual(true);
+    // External refresh is enabled for rollupOnlyMode, but it's disabled
+    // when it's both refreshWorkerMode & rollupOnlyMode
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+  });
+
+  // Old env, but anyway we should handle it
+  testRefreshWorkerAndRollupModes({ setScheduledRefreshTimer: false }, true, (options) => {
+    expect(options.rollupOnlyMode).toEqual(true);
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+  });
+
+  // Old env, but anyway we should handle it
+  testRefreshWorkerAndRollupModes({ setScheduledRefreshTimer: true }, true, (options) => {
+    expect(options.rollupOnlyMode).toEqual(true);
+    // External refresh is enabled for rollupOnlyMode, but it's disabled
+    // when it's both refreshWorkerMode & rollupOnlyMode
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+  });
+
+  // Old env, but anyway we should handle it
+  testRefreshWorkerAndRollupModes({ setScheduledRefreshTimer: 30 }, true, (options) => {
+    expect(options.rollupOnlyMode).toEqual(true);
+    // External refresh is enabled for rollupOnlyMode, but it's disabled
+    // when it's both refreshWorkerMode & rollupOnlyMode
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+  });
+
+  // Cube.js can override env
+  testRefreshWorkerAndRollupModes(
+    {
+      testName: 'Override scheduledRefreshTimer (true) & rollupOnlyMode from cube.js',
+      // cube.js
+      options: {
+        scheduledRefreshTimer: true,
+        orchestratorOptions: {
+          rollupOnlyMode: true,
+        }
+      }
+    },
+    false,
+    (options) => {
+      expect(options.rollupOnlyMode).toEqual(true);
+      // External refresh is enabled for rollupOnlyMode, but it's disabled
+      // when it's both refreshWorkerMode & rollupOnlyMode
+      expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+    }
+  );
+
+  // Cube.js can override env
+  testRefreshWorkerAndRollupModes(
+    {
+      testName: 'Override scheduledRefreshTimer (false) & rollupOnlyMode from cube.js',
+      // cube.js
+      options: {
+        scheduledRefreshTimer: false,
+        orchestratorOptions: {
+          rollupOnlyMode: true,
+        }
+      }
+    },
+    false,
+    (options) => {
+      expect(options.rollupOnlyMode).toEqual(true);
+      expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+    }
+  );
 
   test('scheduledRefreshContexts option', async () => {
     const cubejsServerCore = new CubejsServerCoreOpen({
