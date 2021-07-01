@@ -218,21 +218,18 @@ describe('SQL Generation', () => {
     });
 
     // Query should not match any pre-aggregation!
-    expect(query.cacheKeyQueries()).toEqual({
-      queries: [
-        [
-          // Postgres dialect
-          "SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600)",
-          [],
-          {
-            // false, because there is no externalQueryClass
-            external: false,
-            renewalThreshold: 60,
-          }
-        ]
-      ],
-      renewalThreshold: 86400
-    });
+    expect(query.cacheKeyQueries()).toEqual([
+      [
+        // Postgres dialect
+        "SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600)",
+        [],
+        {
+          // false, because there is no externalQueryClass
+          external: false,
+          renewalThreshold: 60,
+        }
+      ]
+    ]);
   });
 
   it('cacheKeyQueries for cube with refreshKey.every (external)', async () => {
@@ -250,21 +247,18 @@ describe('SQL Generation', () => {
     });
 
     // Query should not match any pre-aggregation!
-    expect(query.cacheKeyQueries()).toEqual({
-      queries: [
-        [
-          // MSSQL dialect, because externalQueryClass
-          "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600)",
-          [],
-          {
-            // true, because externalQueryClass
-            external: true,
-            renewalThreshold: 60,
-          }
-        ]
-      ],
-      renewalThreshold: 86400
-    });
+    expect(query.cacheKeyQueries()).toEqual([
+      [
+        // MSSQL dialect, because externalQueryClass
+        "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600)",
+        [],
+        {
+          // true, because externalQueryClass
+          external: true,
+          renewalThreshold: 60,
+        }
+      ]
+    ]);
   });
 
   /**

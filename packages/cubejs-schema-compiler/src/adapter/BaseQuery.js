@@ -1714,10 +1714,7 @@ export class BaseQuery {
     if (!this.safeEvaluateSymbolContext().preAggregationQuery) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery) {
-        return {
-          renewalThreshold: this.renewalThreshold(!!preAggregationForQuery.preAggregation.refreshKey),
-          queries: []
-        };
+        return [];
       }
     }
 
@@ -1725,8 +1722,6 @@ export class BaseQuery {
   }
 
   refreshKeysByCubes(cubes, transformFn) {
-    let refreshKeyAllSetManually = true;
-
     const refreshKeyQueryByCube = (cube) => {
       const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
       if (cubeFromPath.refreshKey) {
@@ -1739,8 +1734,6 @@ export class BaseQuery {
           return [`SELECT ${sql}`, external];
         }
       }
-
-      refreshKeyAllSetManually = false;
 
       const [sql, external] = this.everyRefreshKeySql(this.defaultEveryRefreshKey());
       return [`SELECT ${sql}`, external];
@@ -1763,10 +1756,7 @@ export class BaseQuery {
       )
       .map(([sql, options]) => this.paramAllocator.buildSqlAndParams(sql).concat(options));
 
-    return {
-      queries,
-      renewalThreshold: this.renewalThreshold(refreshKeyAllSetManually),
-    };
+    return queries;
   }
 
   aggSelectForDimension(cube, dimension, aggFunction) {
