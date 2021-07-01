@@ -176,12 +176,12 @@ export type UserBackgroundContext = {
 type BaseRequest = {
  context: RequestContext;
  res: ResponseResultFn
-}
+};
 
 type QueryRequest = BaseRequest & {
   query: Record<string, any> | Record<string, any>[];
   queryType?: 'multi'
-}
+};
 
 export interface ApiGatewayOptions {
   standalone: boolean;
