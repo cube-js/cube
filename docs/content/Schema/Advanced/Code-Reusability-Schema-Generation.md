@@ -2,9 +2,9 @@
 title: 'Code Reusability: Schema Generation'
 permalink: /schema-generation
 scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 22
+category: Data Schema
+subCategory: Advanced
+menuOrder: 6
 ---
 
 Cube.js Schema is Javascript code, which means the full power of this language

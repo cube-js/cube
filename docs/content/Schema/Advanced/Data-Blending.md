@@ -2,14 +2,14 @@
 title: Data Blending
 permalink: /data-blending
 scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 24
+category: Data Schema
+subCategory: Advanced
+menuOrder: 2
 ---
 
 <!-- prettier-ignore-start -->
 [[info | ]]
-| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/).
 | We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/data-blending-cube/).
 <!-- prettier-ignore-end -->
 In case you want to plot two measures from different cubes on one chart or

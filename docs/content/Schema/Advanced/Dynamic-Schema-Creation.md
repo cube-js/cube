@@ -2,7 +2,8 @@
 title: Dynamic Schema Creation
 permalink: /schema/dynamic-schema-creation
 category: Data Schema
-menuOrder: 2
+subCategory: Advanced
+menuOrder: 1
 ---
 
 Cube.js allows schemas to be created on-the-fly using a special

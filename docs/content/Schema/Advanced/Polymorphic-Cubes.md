@@ -2,9 +2,9 @@
 title: Polymorphic Cubes
 permalink: /polymorphic-cubes
 scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 26
+category: Data Schema
+subCategory: Advanced
+menuOrder: 3
 ---
 
 [comment]: # 'PROOFREAD: DONE'
