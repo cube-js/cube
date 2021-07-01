@@ -194,16 +194,17 @@ export class QueryOrchestrator {
   }
 
   public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {
+    if (!preAggregation.sql) return [];
+
+    const { previewSql, tableName, external, dataSource } = preAggregation.sql;
     const targetTableName = PreAggregations.targetTableName(versionEntry);
-    const querySql = preAggregation.sql && QueryCache.replacePreAggregationTableNames(
-      preAggregation.sql.previewSql,
-      [[preAggregation.sql.tableName, { targetTableName }]]
-    );
+    const querySql = QueryCache.replacePreAggregationTableNames(previewSql, [[tableName, { targetTableName }]]);
     const query = querySql && querySql[0];
+
     const data = query && await this.fetchQuery({
       continueWait: true,
-      external: preAggregation.external,
-      dataSource: preAggregation.dataSource,
+      external,
+      dataSource,
       query,
       requestId
     });
