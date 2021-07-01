@@ -78,7 +78,5 @@ export function updateQuery(
     }
   }
 
-  console.log('upd', updatedQuery)
-
   return updatedQuery;
 }
