@@ -42,4 +42,8 @@ EXPOSE 3306
 
 ENV RUST_BACKTRACE=true
 
+RUN chown nobody /cube
+
+USER nobody
+
 CMD ["./cubestored"]
