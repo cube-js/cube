@@ -1,10 +1,12 @@
 ---
 title: Types and Formats
-permalink: /types-and-formats
+permalink: /schema/reference/types-and-formats
 scope: cubejs
 category: Reference
 subCategory: Reference
 menuOrder: 7
+redirect_from:
+  - /types-and-formats
 ---
 
 ## Measures Types
@@ -15,8 +17,9 @@ A measure can only have one type.
 ### number
 
 The `sql` parameter is required and can take any valid SQL expression that
-results in a number or integer. Type `number` is usually used, when performing arithmetic operations on measures.
-[Learn more about Calculated Measures.](measures#calculated-measures)
+results in a number or integer. Type `number` is usually used, when performing
+arithmetic operations on measures.
+[Learn more about Calculated Measures.](/schema/reference/measures#calculated-measures)
 
 ```javascript
 purchasesRatio: {
@@ -26,7 +29,8 @@ purchasesRatio: {
 }
 ```
 
-You can put any sql into `number` measure as soon as it's an aggregate expression:
+You can put any sql into `number` measure as soon as it's an aggregate
+expression:
 
 ```javascript
 ratio: {
@@ -39,12 +43,12 @@ ratio: {
 
 Performs a table count, similar to SQL’s `COUNT` function. However, unlike
 writing raw SQL, Cube.js will properly calculate counts even if your query’s
-joins will produce row multiplication.
-You do not need to include a `sql` parameter for this type.
+joins will produce row multiplication. You do not need to include a `sql`
+parameter for this type.
 
 `drillMembers` parameter is commonly used with type `count`. It allows users to
-click on the measure in the UI and inspect individual records that make up a count.
-[Learn more about Drill Downs.](drill-downs)
+click on the measure in the UI and inspect individual records that make up a
+count. [Learn more about Drill Downs.](drill-downs)
 
 ```javascript
 numberOfUsers: {
@@ -53,8 +57,6 @@ numberOfUsers: {
   drillMembers: [id, name, email, company]
 }
 ```
-
-
 
 ### countDistinct
 
@@ -73,12 +75,14 @@ uniqueUserCount: {
 
 ### countDistinctApprox
 
-Calculates approximate number of distinct values in a given field.
-Unlike `countDistinct` measure type, `countDistinctApprox` is decomposable aggregate function or *Additive*.
-This allows it's usage in *Additive* [rollup pre-aggregations](pre-aggregations#rollup) which are much more versatile than *Not Additive* ones.
-It uses special SQL backend dependent functions to estimate distinct counts.
-It usually based on HyperLogLog or similar algorithms.
-Where possible Cube.js will use multi-stage HLL which significantly improves calculation of distinct counts on scale.
+Calculates approximate number of distinct values in a given field. Unlike
+`countDistinct` measure type, `countDistinctApprox` is decomposable aggregate
+function or _Additive_. This allows it's usage in _Additive_
+[rollup pre-aggregations](/schema/reference/pre-aggregations#rollup) which are
+much more versatile than _Not Additive_ ones. It uses special SQL backend
+dependent functions to estimate distinct counts. It usually based on HyperLogLog
+or similar algorithms. Where possible Cube.js will use multi-stage HLL which
+significantly improves calculation of distinct counts on scale.
 
 The `sql` parameter is required and can take any valid SQL expression.
 
@@ -96,8 +100,9 @@ However, unlike writing raw SQL, Cube.js will properly calculate sums even if
 your query’s joins will result in row duplication.
 
 The `sql` parameter is required and can take any valid SQL expression that
-results in a numeric table column, or interpolated Javascript expression.
-`sql` parameter should contain only expression to sum without actual aggregate function.
+results in a numeric table column, or interpolated Javascript expression. `sql`
+parameter should contain only expression to sum without actual aggregate
+function.
 
 ```javascript
 revenue: {
@@ -121,9 +126,10 @@ revenue: {
 ```
 
 ### avg
+
 Averages the values in a given field. It is similar to SQL’s AVG function.
-However, unlike writing raw SQL, Cube.js will properly calculate averages even if
-your query’s joins will result in row duplication.
+However, unlike writing raw SQL, Cube.js will properly calculate averages even
+if your query’s joins will result in row duplication.
 
 The sql parameter for type: average measures can take any valid SQL expression
 that results in a numeric table column, or interpolated Javascript expression.
@@ -136,6 +142,7 @@ averageTransaction: {
 ```
 
 ### min
+
 Type of measure `min` is calculated as a minimum of values defined in `sql`.
 
 ```javascript
@@ -146,6 +153,7 @@ dateFirstPurchase: {
 ```
 
 ### max
+
 Type of measure `max` is calculated as a maximum of values defined in `sql`.
 
 ```javascript
@@ -156,7 +164,9 @@ dateLastPurchase: {
 ```
 
 ### runningTotal
-Type of measure `runningTotal` is calculated as summation of values defined in `sql`. Use it to calculate cumulative measures.
+
+Type of measure `runningTotal` is calculated as summation of values defined in
+`sql`. Use it to calculate cumulative measures.
 
 ```javascript
 totalSubscriptions: {
@@ -166,9 +176,12 @@ totalSubscriptions: {
 ```
 
 ## Measures Formats
-When creating a **measure** you can explicitly define the format you’d like to see as output.
+
+When creating a **measure** you can explicitly define the format you’d like to
+see as output.
 
 ### percent
+
 `percent` is used for formatting numbers with a percent symbol.
 
 ```javascript
@@ -180,6 +193,7 @@ purchaseConversion: {
 ```
 
 ### currency
+
 `currency` is used for monetary values.
 
 ```javascript
@@ -192,15 +206,18 @@ totalAmount: {
 
 ## Dimensions Types
 
-This section describes the various types that can be assigned to a **dimension**.
-A dimension can only have one type.
+This section describes the various types that can be assigned to a
+**dimension**. A dimension can only have one type.
 
 ### time
 
-In order to be able to create time series charts, Cube.js needs to identify time dimension which is a timestamp column in your database.
+In order to be able to create time series charts, Cube.js needs to identify time
+dimension which is a timestamp column in your database.
 
-You can define several time dimensions in schemas and apply each when creating charts.
-Note that type of target column should be TIMESTAMP. Please use [this guide](working-with-string-time-dimensions) if your datetime information stored as a string.
+You can define several time dimensions in schemas and apply each when creating
+charts. Note that type of target column should be TIMESTAMP. Please use
+[this guide](working-with-string-time-dimensions) if your datetime information
+stored as a string.
 
 ```javascript
 completedAt: {
@@ -211,11 +228,12 @@ completedAt: {
 
 ### string
 
-`string` is typically used with fields that contain letters or special characters.
-The `sql` parameter is required and can take any valid SQL expression.
+`string` is typically used with fields that contain letters or special
+characters. The `sql` parameter is required and can take any valid SQL
+expression.
 
-
-The following JS code creates a field `fullName` by combining 2 fields: `firstName` and `lastName`:
+The following JS code creates a field `fullName` by combining 2 fields:
+`firstName` and `lastName`:
 
 ```javascript
 fullName: {
@@ -237,8 +255,8 @@ amount: {
 
 ### boolean
 
-`boolean` is used with fields that contain boolean data or data coercible to boolean.
-For example:
+`boolean` is used with fields that contain boolean data or data coercible to
+boolean. For example:
 
 ```javascript
 isEnabled: {
@@ -249,7 +267,8 @@ isEnabled: {
 
 ### geo
 
-`geo` dimension is used to display data on the map. Unlike other dimension types it requires to set two fields: latitude and longitude.
+`geo` dimension is used to display data on the map. Unlike other dimension types
+it requires to set two fields: latitude and longitude.
 
 ```javascript
 location: {
@@ -266,8 +285,9 @@ location: {
 ## Dimensions Formats
 
 ### imageUrl
-`imageUrl` is used for displaying images in table visualization.
-In this case `sql` parameter should contain full path to the image.
+
+`imageUrl` is used for displaying images in table visualization. In this case
+`sql` parameter should contain full path to the image.
 
 ```javascript
 image: {
@@ -278,8 +298,10 @@ image: {
 ```
 
 ### id
-`id` is used for IDs. It allows to eliminate applying of comma for 5+ digit numbers which is default for type `number`.
-The `sql` parameter is required and can take any valid SQL expression.
+
+`id` is used for IDs. It allows to eliminate applying of comma for 5+ digit
+numbers which is default for type `number`. The `sql` parameter is required and
+can take any valid SQL expression.
 
 ```javascript
 image: {
@@ -290,7 +312,10 @@ image: {
 ```
 
 ### link
-`link` is used for creating hyperlinks. `link` parameter could be either String or Object. Use Object, when you want to give a specific label to link. See examples below for details.
+
+`link` is used for creating hyperlinks. `link` parameter could be either String
+or Object. Use Object, when you want to give a specific label to link. See
+examples below for details.
 
 The `sql` parameter is required and can take any valid SQL expression.
 
@@ -324,6 +349,7 @@ amount: {
 ```
 
 ### percent
+
 `percent` is used for formatting numbers with a percent symbol.
 
 ```javascript

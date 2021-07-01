@@ -39,8 +39,8 @@ interface CubejsConfiguration {
   preAggregationsSchema: string | ((context: RequestContext) => string);
   schemaVersion: (context: RequestContext) => string;
   scheduledRefreshTimer: boolean | number;
-  scheduledRefreshTimeZones: string[],
-  scheduledRefreshContexts: () => Promise<object[]>,
+  scheduledRefreshTimeZones: string[];
+  scheduledRefreshContexts: () => Promise<object[]>;
   extendContext: (req: ExpressRequest) => any;
   compilerCacheSize: number;
   maxCompilerCacheKeepAlive: number;
@@ -57,8 +57,8 @@ interface CubejsConfiguration {
       maxAge: number;
       preflightContinue: boolean;
       optionsSuccessStatus: number;
-    },
-  },
+    };
+  };
   jwt: {
     jwkUrl?: ((payload: any) => string) | string;
     key?: string;
@@ -67,11 +67,15 @@ interface CubejsConfiguration {
     audience?: string;
     subject?: string;
     claimsNamespace?: string;
-  },
+  };
   externalDbType: string | ((context: RequestContext) => string);
-  externalDriverFactory: (context: RequestContext) => BaseDriver | Promise<BaseDriver>;
+  externalDriverFactory: (
+    context: RequestContext
+  ) => BaseDriver | Promise<BaseDriver>;
   cacheAndQueueDriver: 'memory' | 'redis';
-  orchestratorOptions: OrchestratorOptions | ((context: RequestContext) => OrchestratorOptions);
+  orchestratorOptions:
+    | OrchestratorOptions
+    | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
 }
 
@@ -81,10 +85,10 @@ interface OrchestratorOptions {
     refreshKeyRenewalThreshold: number;
     backgroundRenew: boolean;
     queueOptions: QueueOptions;
-  }
+  };
   preAggregationsOptions: {
     queueOptions: QueueOptions;
-  }
+  };
 }
 
 interface QueueOptions {
@@ -276,8 +280,8 @@ your app needs and transform input query accordingly.
 
 Called on each request.
 
-For example you can use `queryRewrite` to add row level security filter
-where needed.
+For example you can use `queryRewrite` to add row level security filter where
+needed.
 
 ```javascript
 module.exports = {
@@ -691,8 +695,9 @@ the additional transpiler for check duplicates.
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_databas
 [ref-caching-up-to-date]: /caching#keeping-cache-up-to-date
-[ref-cube-refresh-key]: /cube#parameters-refresh-key
-[ref-cube-ctx-sec-ctx]: /cube#context-variables-security-context
+[ref-cube-refresh-key]: /schema/reference/cube#parameters-refresh-key
+[ref-cube-ctx-sec-ctx]:
+  /schema/reference/cube#context-variables-security-context
 [ref-multitenancy]: /multitenancy-setup
 [ref-ext-driverfactory]: #external-driver-factory
 [ref-opts-req-ctx]: #request-context
@@ -701,7 +706,7 @@ the additional transpiler for check duplicates.
 [ref-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
 [ref-opts-sched-refresh-ctxs]: #options-reference-scheduled-refresh-contexts
 [ref-opts-sched-refresh-tz]: #options-reference-scheduled-refresh-time-zones
-[ref-preagg-ext-rollup]: /pre-aggregations#external-rollup
+[ref-preagg-ext-rollup]: /schema/reference/pre-aggregations#external-rollup
 [ref-repofactory]: #repositoryFactory
 [ref-schemafilerepo]: #SchemaFileRepository
 [ref-schemapath]: #schemaPath
@@ -710,4 +715,5 @@ the additional transpiler for check duplicates.
 [ref-rest-api]: /rest-api
 [ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
 [ref-development-mode]: /overview#development-mode
-[ref-pre-aggregations-refresh-key]: /pre-aggregations#refresh-key
+[ref-pre-aggregations-refresh-key]:
+  /schema/reference/pre-aggregations#refresh-key

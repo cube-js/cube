@@ -1,10 +1,12 @@
 ---
 title: Execution Environment
-permalink: /schema-execution-environment
+permalink: /schema/reference/execution-environment
 scope: cubejs
 category: Reference
 menuOrder: 9
 subCategory: Reference
+redirect_from:
+  - /schema-execution-environment
 ---
 
 Cube.js Schema Compiler uses [Node.js VM](https://nodejs.org/api/vm.html) to

@@ -1,10 +1,12 @@
 ---
 title: Pre-aggregations
-permalink: /pre-aggregations
+permalink: /schema/reference/pre-aggregations
 scope: cubejs
 category: Reference
 subCategory: Reference
 menuOrder: 8
+redirect_from:
+  - /pre-aggregations
 ---
 
 <!-- prettier-ignore-start -->
@@ -320,8 +322,8 @@ cube(`Companies`, {
 
   measures: {
     count: {
-      type: `count`
-    }
+      type: `count`,
+    },
   },
 
   dimensions: {
@@ -329,8 +331,8 @@ cube(`Companies`, {
       sql: `name`,
       type: `string`,
       primaryKey: true,
-      shown: true
-    }
+      shown: true,
+    },
   },
 
   preAggregations: {
@@ -354,8 +356,8 @@ cube('Users', {
   },
   measures: {
     count: {
-      type: `count`
-    }
+      type: `count`,
+    },
   },
   dimensions: {
     id: {
@@ -470,14 +472,14 @@ cube(`Orders`, {
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
 `updateWindow` from the current time. In the provided example, it will refresh
-today's and the last 7 days of partitions once a day. Partitions before the `7 day`
-interval **will not** be refreshed once they are built unless the rollup SQL is
-changed.
+today's and the last 7 days of partitions once a day. Partitions before the
+`7 day` interval **will not** be refreshed once they are built unless the rollup
+SQL is changed.
 
-Partition tables are refreshed as a whole.
-When new partition table is available it replaces the old one.
-Old partition tables are collected by [Garbage Collection][ref-garbage-collection].
-Append is never used to add new rows to the existing tables.
+Partition tables are refreshed as a whole. When new partition table is available
+it replaces the old one. Old partition tables are collected by [Garbage
+Collection][ref-garbage-collection]. Append is never used to add new rows to the
+existing tables.
 
 An original SQL pre-aggregation can also be used with time partitioning and
 incremental `refreshKey`. It requires using `FILTER_PARAMS` inside the Cube's
@@ -696,10 +698,10 @@ cube(`Orders`, {
   /connecting-to-the-database#external-pre-aggregations-database
 [ref-config-driverfactory]: /config/#options-reference-driver-factory
 [ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
-[ref-cube-refreshkey]: /cube#parameters-refresh-key
+[ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
-[ref-sqlalias]: /cube#parameters-sql-alias
+[ref-sqlalias]: /schema/reference/cube#parameters-sql-alias
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions

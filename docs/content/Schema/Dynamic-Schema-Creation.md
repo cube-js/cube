@@ -17,8 +17,8 @@ schema properties can be dynamically updated through an API, for example.
 | Each `asyncModule` call will be invoked only once per schema compilation.
 <!-- prettier-ignore-end -->
 
-[ref-schema-env]: /schema-execution-environment
-[ref-async-module]: /schema-execution-environment#asyncmodule
+[ref-schema-env]: /schema/reference/execution-environment
+[ref-async-module]: /schema/reference/execution-environment#asyncmodule
 
 When creating schemas via `asyncModule()`, it is important to be aware of the
 following differences compared to statically defining schemas with `cube()`:
@@ -82,7 +82,8 @@ using `fetch()`, transform some of the properties to be functions that return a
 string, and then finally use the [`cube()` global function][ref-globals] to
 generate schemas from that data:
 
-[ref-globals]: /schema-execution-environment#cube-js-globals-cube-and-others
+[ref-globals]:
+  /schema/reference/execution-environment#cube-js-globals-cube-and-others
 
 ```javascript
 // schema/DynamicSchema.js
@@ -169,7 +170,11 @@ dimensions and measures, you could do the following:
 ```javascript
 // schema/DynamicSchema.js
 const fetch = require('node-fetch');
-import { convertStringPropToFunction, transformDimensions, transformMeasures } from './utils';
+import {
+  convertStringPropToFunction,
+  transformDimensions,
+  transformMeasures,
+} from './utils';
 
 asyncModule(async () => {
   const {
@@ -215,7 +220,7 @@ schemas, as well as ensuring the corresponding database drivers are set up with
 [`driverFactory()`][ref-config-driverfactory] in your [`cube.js` configuration
 file][ref-config].
 
-[ref-schema-datasource]: /cube#parameters-data-source
+[ref-schema-datasource]: /schema/reference/cube#parameters-data-source
 [ref-config-driverfactory]: /config#options-reference-driver-factory
 [ref-config]: /config
 
@@ -225,7 +230,11 @@ databases, you could do the following:
 ```javascript
 // schema/DynamicSchema.js
 const fetch = require('node-fetch');
-import { convertStringPropToFunction, transformDimensions, transformMeasures } from './utils';
+import {
+  convertStringPropToFunction,
+  transformDimensions,
+  transformMeasures,
+} from './utils';
 
 asyncModule(async () => {
   const dynamicCubes = await (

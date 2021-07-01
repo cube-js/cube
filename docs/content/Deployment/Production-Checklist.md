@@ -97,7 +97,8 @@ using another [external database][ref-pre-aggregations], you'll need to
 configure it.
 
 [ref-caching-cubestore]: /caching/running-in-production
-[ref-pre-aggregations]: /pre-aggregations#external-pre-aggregations
+[ref-pre-aggregations]:
+  /schema/reference/pre-aggregations#external-pre-aggregations
 
 By default, Cube.js will use `prod_pre_aggregations` as the schema name for
 storing pre-aggregations. This behavior can be modified by the
@@ -113,7 +114,7 @@ pre-aggregations][link-scheduled-refresh] in the background, we recommend
 running a separate Cube.js refresh worker instance. This allows your main
 Cube.js instance to continue to serve requests with high availability.
 
-[link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
+[link-scheduled-refresh]: /schema/reference/pre-aggregations#scheduled-refresh
 
 ```bash
 # Set to true so a Cube.js instance acts as a refresh worker
