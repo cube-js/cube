@@ -294,44 +294,4 @@ export function RollupDesigner({
       </Wrapper>
     </Space>
   );
-
-  // return (
-  //   <>
-  //     {preAggregation?.code ? (
-  //       <>
-  //         <Paragraph>
-  //           Add the following pre-aggregation to the <b>{cubeName}</b> cube.
-  //         </Paragraph>
-  //
-  //         <CodeSnippet style={{ marginBottom: 16 }} code={preAggregation.code} />
-  //       </>
-  //     ) : (
-  //       <Paragraph>
-  //         <Link
-  //           href="!https://cube.dev/docs/pre-aggregations#rollup-rollup-selection-rules"
-  //           target="_blank"
-  //         >
-  //           Current query cannot be rolled up due to it is not additive
-  //         </Link>
-  //         . Please consider removing not additive measures like `countDistinct`
-  //         or `avg`. You can also try to use{' '}
-  //         <Link
-  //           href="!https://cube.dev/docs/pre-aggregations#original-sql"
-  //           target="_blank"
-  //         >
-  //           originalSql
-  //         </Link>{' '}
-  //         pre-aggregation instead.
-  //       </Paragraph>
-  //     )}
-  //
-  //     <Link
-  //       style={{ paddingTop: 16 }}
-  //       href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
-  //       target="_blank"
-  //     >
-  //       Further reading about pre-aggregations for reference.
-  //     </Link>
-  //   </>
-  // );
 }
