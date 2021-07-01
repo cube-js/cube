@@ -25,6 +25,7 @@ COPY packages/cubejs-linter packages/cubejs-linter
 COPY rust/package.json rust/package.json
 COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
+COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
@@ -69,6 +70,7 @@ RUN yarn install
 # Backend
 COPY rust/ rust/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
+COPY packages/cubejs-testing/ packages/cubejs-testing/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
