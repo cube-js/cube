@@ -1,19 +1,27 @@
 import { Alert, Button, Input, Space, Tabs, Typography, Divider } from 'antd';
-import { Query, TransformedQuery } from '@cubejs-client/core';
+import {
+  Query,
+  TimeDimensionBase,
+  TransformedQuery,
+} from '@cubejs-client/core';
 import styled from 'styled-components';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { camelCase } from 'camel-case';
+import { AvailableMembers, useLazyDryRun } from '@cubejs-client/react';
 
 import { CodeSnippet } from '../../atoms';
-import { getPreAggregationDefinition, PreAggregationDefinition } from './utils';
+import {
+  getPreAggregationDefinition,
+  PreAggregationDefinition,
+  updateQuery,
+} from './utils';
 import { useToggle } from '../../hooks';
-import { AvailableMembers } from '@cubejs-client/react';
 import { getMembersByCube, getNameMemberPairs } from '../../shared/helpers';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
 import { TimeDimension } from './components/TimeDimension';
 
-const { Paragraph } = Typography;
+const { Paragraph, Link } = Typography;
 const { TabPane } = Tabs;
 
 const Wrapper = styled.div`
@@ -34,23 +42,56 @@ const Flex = styled.div`
   display: flex;
   justify-content: space-between;
   gap: 20px;
+  margin-bottom: 16px;
 `;
 
 type RollupDesignerProps = {
-  query: Query;
-  transformedQuery: TransformedQuery;
+  defaultQuery: Query;
+  defaultTransformedQuery: TransformedQuery;
   availableMembers: AvailableMembers;
 };
 
 export function RollupDesigner({
-  query,
+  defaultQuery,
   availableMembers,
-  transformedQuery,
+  defaultTransformedQuery,
 }: RollupDesignerProps) {
+  const [load, { isLoading, response, error }] = useLazyDryRun();
+
+  const [query, setQuery] = useState<Query>(defaultQuery);
+  const [transformedQuery, setTransformedQuery] = useState<TransformedQuery>(
+    defaultTransformedQuery
+  );
   const [preAggName, setPreAggName] = useState<string>('main');
   const [isRollupCodeVisible, toggleRollupCode] = useToggle();
 
   let preAggregation: null | PreAggregationDefinition = null;
+
+  const { order, limit, filters, ...matchedQuery } = query;
+
+  const defaultSelectedKeys = useMemo(() => {
+    const keys: string[] = [];
+
+    ['measures', 'dimensions', 'timeDimensions'].map((memberKey) => {
+      if (memberKey === 'timeDimensions') {
+        const { dimension } = query[memberKey]?.[0] || {};
+
+        if (dimension) {
+          keys.push(dimension);
+        }
+      } else {
+        query[memberKey]?.map((key) => keys.push(key));
+      }
+    });
+
+    return keys;
+  }, [query]);
+
+  useEffect(() => {
+    if (!isLoading && response) {
+      setTransformedQuery(response.transformedQueries[0]);
+    }
+  }, [isLoading, response]);
 
   if (
     transformedQuery.leafMeasureAdditive &&
@@ -62,14 +103,6 @@ export function RollupDesigner({
     );
   }
 
-  const indexedMembers = Object.fromEntries(
-    getNameMemberPairs([
-      ...availableMembers.measures,
-      ...availableMembers.dimensions,
-      ...availableMembers.timeDimensions,
-    ])
-  );
-
   const cubeName =
     transformedQuery &&
     (
@@ -78,23 +111,96 @@ export function RollupDesigner({
       'your'
     ).split('.')[0];
 
-  const { order, limit, filters, ...matchedQuery } = query;
+  const indexedMembers = Object.fromEntries(
+    getNameMemberPairs([
+      ...availableMembers.measures,
+      ...availableMembers.dimensions,
+      ...availableMembers.timeDimensions,
+    ])
+  );
+
+  async function handleRollupButtonClick() {
+    await load({ query });
+    toggleRollupCode();
+  }
+
+  function handleMemberRemove(memberType) {
+    return (key) => setQuery(updateQuery(query, memberType, key));
+  }
+
+  function rollupBody() {
+    if (isRollupCodeVisible) {
+      if (error) {
+        return <Alert type="error" message={error.toString()} />
+      }
+
+      if (!preAggregation) {
+        return (
+          <Paragraph>
+            <Link
+              href="!https://cube.dev/docs/pre-aggregations#rollup-rollup-selection-rules"
+              target="_blank"
+            >
+              Current query cannot be rolled up due to it is not additive
+            </Link>
+            . Please consider removing not additive measures like
+            `countDistinct` or `avg`. You can also try to use{' '}
+            <Link
+              href="!https://cube.dev/docs/pre-aggregations#original-sql"
+              target="_blank"
+            >
+              originalSql
+            </Link>{' '}
+            pre-aggregation instead.
+          </Paragraph>
+        )
+      }
+
+      return (
+        <div>
+          <Paragraph>
+            Add the following pre-aggregation to the <b>{cubeName}</b>{' '}
+            cube.
+          </Paragraph>
+
+          <CodeSnippet
+            style={{ marginBottom: 16 }}
+            code={preAggregation.code}
+          />
+        </div>
+      )
+    }
+
+    return null;
+  }
 
   return (
     <Space direction="vertical" style={{ width: '100%' }}>
       <Wrapper>
-        <div>
-          <Cubes membersByCube={getMembersByCube(availableMembers)} />
-        </div>
+        {!isRollupCodeVisible ? (
+          <div>
+            <Cubes
+              defaultSelectedKeys={defaultSelectedKeys}
+              membersByCube={getMembersByCube(availableMembers)}
+              onSelect={(memberType, key) => {
+                setQuery(updateQuery(query, memberType, key));
+              }}
+            />
+          </div>
+        ) : null}
 
         <MainWrapper>
           <Space direction="vertical" style={{ width: '100%' }}>
             <Flex>
-              <Button type="primary" onClick={toggleRollupCode}>
-                {isRollupCodeVisible
-                  ? 'Back to editing'
-                  : 'Preview rollup definition'}
-              </Button>
+              {isRollupCodeVisible ? (
+                <Button type="primary" onClick={toggleRollupCode}>
+                  Back to editing
+                </Button>
+              ) : (
+                <Button type="primary" onClick={handleRollupButtonClick}>
+                  Preview rollup definition
+                </Button>
+              )}
 
               {isRollupCodeVisible ? (
                 <Input
@@ -104,60 +210,74 @@ export function RollupDesigner({
               ) : null}
             </Flex>
 
-            <Tabs>
-              <TabPane tab="Members" key="members">
-                {preAggregation ? (
-                  isRollupCodeVisible ? (
-                    <>
-                      <Paragraph>
-                        Add the following pre-aggregation to the{' '}
-                        <b>{cubeName}</b> cube.
-                      </Paragraph>
+            {rollupBody()}
 
-                      <CodeSnippet
-                        style={{ marginBottom: 16 }}
-                        code={preAggregation.code}
-                      />
-                    </>
-                  ) : (
+            {!isRollupCodeVisible ? (
+              <Tabs>
+                <TabPane tab="Members" key="members">
+                  {!isRollupCodeVisible ? (
                     <div>
-                      <Members
-                        title="Measures"
-                        members={preAggregation.measures.map((name) => {
-                          return indexedMembers[name];
-                        })}
-                      />
+                      {query.measures?.length ? (
+                        <>
+                          <Members
+                            title="Measures"
+                            members={query.measures.map(
+                              (name) => indexedMembers[name]
+                            )}
+                            onRemove={handleMemberRemove('measures')}
+                          />
 
-                      <Divider />
+                          <Divider />
+                        </>
+                      ) : null}
 
-                      <Members
-                        title="Dimensions"
-                        members={preAggregation.dimensions.map((name) => {
-                          return indexedMembers[name];
-                        })}
-                      />
+                      {query.dimensions?.length ? (
+                        <>
+                          <Members
+                            title="Dimensions"
+                            members={query.dimensions.map(
+                              (name) => indexedMembers[name]
+                            )}
+                            onRemove={handleMemberRemove('dimensions')}
+                          />
 
-                      <Divider />
+                          <Divider />
+                        </>
+                      ) : null}
 
-                      {preAggregation.timeDimension ? (
+                      {query.timeDimensions ? (
                         <TimeDimension
-                          member={indexedMembers[preAggregation.timeDimension]}
-                          granularity={preAggregation.granularity}
+                          member={
+                            indexedMembers[query.timeDimensions[0]?.dimension]
+                          }
+                          granularity={query.timeDimensions[0]?.granularity}
+                          onGranularityChange={(granularity) => {
+                            setQuery({
+                              ...query,
+                              timeDimensions: [
+                                {
+                                  ...(query.timeDimensions?.[0] || {}),
+                                  ...(granularity ? { granularity } : null),
+                                } as TimeDimensionBase,
+                              ],
+                            });
+                          }}
+                          onRemove={handleMemberRemove('timeDimensions')}
                         />
                       ) : null}
                     </div>
-                  )
-                ) : null}
-              </TabPane>
+                  ) : null}
+                </TabPane>
 
-              <TabPane tab="Settings" key="settings">
-                settings
-              </TabPane>
+                {/*<TabPane tab="Settings" key="settings">*/}
+                {/*  settings*/}
+                {/*</TabPane>*/}
 
-              <TabPane tab="Queries" key="queries">
-                queries
-              </TabPane>
-            </Tabs>
+                {/*<TabPane tab="Queries" key="queries">*/}
+                {/*  queries*/}
+                {/*</TabPane>*/}
+              </Tabs>
+            ) : null}
           </Space>
         </MainWrapper>
 

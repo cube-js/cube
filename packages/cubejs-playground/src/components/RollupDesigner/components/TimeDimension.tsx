@@ -1,6 +1,13 @@
-import { TCubeMember, TimeDimensionGranularity } from '@cubejs-client/core';
-import { Typography, Button } from 'antd';
+import {
+  GRANULARITIES,
+  TCubeMember,
+  TimeDimensionGranularity,
+} from '@cubejs-client/core';
+import { Typography, Button, Menu } from 'antd';
 import styled from 'styled-components';
+import ButtonDropdown from '../../../QueryBuilder/ButtonDropdown';
+import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
+import RemoveButtonGroup from '../../../QueryBuilder/RemoveButtonGroup';
 
 const Flex = styled.div`
   display: flex;
@@ -10,9 +17,18 @@ const Flex = styled.div`
 type TimeDimensionProps = {
   member: TCubeMember;
   granularity?: TimeDimensionGranularity;
+  onGranularityChange: (
+    granularity: TimeDimensionGranularity | undefined
+  ) => void;
+  onRemove: (key: string) => void;
 };
 
-export function TimeDimension({ member, granularity }: TimeDimensionProps) {
+export function TimeDimension({
+  member,
+  granularity,
+  onGranularityChange,
+  onRemove,
+}: TimeDimensionProps) {
   return (
     <>
       <Typography.Paragraph>
@@ -20,8 +36,37 @@ export function TimeDimension({ member, granularity }: TimeDimensionProps) {
       </Typography.Paragraph>
 
       <Flex>
-        <Button>{member.title}</Button>
-        {granularity ? <Button>{granularity}</Button> : null}
+        <RemoveButtonGroup
+          key={member.name}
+          onRemoveClick={() => onRemove(member.name)}
+        >
+          <MemberDropdown
+            showNoMembersPlaceholder={false}
+            availableMembers={[]}
+            onClick={() => undefined}
+          >
+            {member.title}
+          </MemberDropdown>
+        </RemoveButtonGroup>
+
+        {granularity ? (
+          <ButtonDropdown
+            overlay={
+              <Menu>
+                {GRANULARITIES.map(({ name, title }) => (
+                  <Menu.Item
+                    key={title}
+                    onClick={() => onGranularityChange(name)}
+                  >
+                    {title}
+                  </Menu.Item>
+                ))}
+              </Menu>
+            }
+          >
+            {granularity}
+          </ButtonDropdown>
+        ) : null}
       </Flex>
     </>
   );

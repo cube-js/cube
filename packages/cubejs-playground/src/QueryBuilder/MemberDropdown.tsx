@@ -58,11 +58,13 @@ function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
 
 type MemberDropdownProps = {
   availableMembers: AvailableCube[];
+  showNoMembersPlaceholder?: boolean;
   onClick: (member: TCubeMember) => void;
 } & ButtonProps;
 
 export default function MemberMenu({
   availableMembers,
+  showNoMembersPlaceholder = true,
   onClick,
   ...buttonProps
 }: MemberDropdownProps) {
@@ -136,10 +138,7 @@ export default function MemberMenu({
                 cube.members.length > 0 ? (
                   <Menu.ItemGroup key={cube.cubeName} title={cube.cubeTitle}>
                     {cube.members.map((m) => (
-                      <Menu.Item
-                        key={m.name}
-                        data-testid={m.name}
-                      >
+                      <Menu.Item key={m.name} data-testid={m.name}>
                         {m.shortTitle}
                       </Menu.Item>
                     ))}
@@ -147,9 +146,9 @@ export default function MemberMenu({
                 ) : null
               )}
             </>
-          ) : (
+          ) : showNoMembersPlaceholder ? (
             <Menu.Item disabled>No members found</Menu.Item>
-          )}
+          ) : null}
         </Menu>
       }
     />

@@ -1,15 +1,15 @@
 import { useState } from 'react';
 
-export function useSetter<T = undefined>(
-  setter: (value: T | undefined) => T | undefined,
-  initialValue?: T
-): [T | undefined, (value: T | undefined) => void] {
-  const [value, setValue] = useState(setter(initialValue));
+export function useSetter<S, T>(
+  setter: (state: S, value?: T) => S,
+  initialValue: S
+): [S, (value?: T) => void] {
+  const [state, setValue] = useState<S>(setter(initialValue));
 
   return [
-    value,
+    state,
     (value) => {
-      setValue(setter(value));
+      setValue(setter(state, value));
     },
   ];
 }

@@ -2,28 +2,46 @@ import { TCubeMember } from '@cubejs-client/core';
 import { Button, Typography } from 'antd';
 import styled from 'styled-components';
 
-const Box = styled.div`
-  /* padding: 20px 24px; */
-  /* background: #a5a3a3; */
+import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
+import RemoveButtonGroup from '../../../QueryBuilder/RemoveButtonGroup';
+
+const Flex = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 `;
 
 type MembersProps = {
   title: string;
   members: TCubeMember[];
+  onRemove: (key: string) => void;
 };
 
-export function Members({ title, members }: MembersProps) {
+export function Members({ title, members, onRemove }: MembersProps) {
   return (
-    <Box>
+    <>
       <Typography.Paragraph>
         <Typography.Text>{title}</Typography.Text>
       </Typography.Paragraph>
 
-      <div>
+      <Flex>
         {members.map((member) => (
-          <Button>{member.title}</Button>
+          <div>
+            <RemoveButtonGroup
+              key={member.name}
+              onRemoveClick={() => onRemove(member.name)}
+            >
+              <MemberDropdown
+                showNoMembersPlaceholder={false}
+                availableMembers={[]}
+                onClick={() => undefined}
+              >
+                {member.title}
+              </MemberDropdown>
+            </RemoveButtonGroup>
+          </div>
         ))}
-      </div>
-    </Box>
+      </Flex>
+    </>
   );
 }

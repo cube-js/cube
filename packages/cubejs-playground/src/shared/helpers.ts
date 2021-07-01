@@ -1,12 +1,12 @@
 import { AvailableCube, AvailableMembers } from '@cubejs-client/react';
-import { TCubeMember } from '@cubejs-client/core';
+import { MemberType, TCubeMember } from '@cubejs-client/core';
 
 export function ucfirst(s: string): string {
   return s[0].toUpperCase() + s.slice(1);
 }
 
 export function getNameMemberPairs(members: AvailableCube[]) {
-  const items: [string, TCubeMember][] = [];
+  const items: [string, TCubeMember & MemberType][] = [];
 
   members.forEach((cube) =>
     cube.members.forEach((member) => {
@@ -35,11 +35,11 @@ export function getMembersByCube(availableMembers: AvailableMembers): MembersByC
           cubeName: cube.cubeName,
           cubeTitle: cube.cubeTitle,
           measures: [],
-          dimensions: [], 
+          dimensions: [],
           timeDimensions: [],
         }
       }
-      
+
       cube.members.forEach((member) => {
         membersByCube[cube.cubeName] = {
           ...membersByCube[cube.cubeName],

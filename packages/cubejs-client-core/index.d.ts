@@ -842,11 +842,12 @@ declare module '@cubejs-client/core' {
     ? TCubeSegment
     : never;
 
-  type TDryRunResponse = {
+  type DryRunResponse = {
     queryType: QueryType;
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
+    transformedQueries: TransformedQuery[]
   };
 
   export type Cube = {
@@ -989,11 +990,11 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 
-    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<TDryRunResponse>;
+    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<TDryRunResponse>): void;
+    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
   }
 
   /**

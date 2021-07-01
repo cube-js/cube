@@ -1,7 +1,13 @@
 import styled from 'styled-components';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
 import Icon from '@ant-design/icons';
-import { AvailableMembers } from '@cubejs-client/react';
+// @ts-ignore
+import {
+  useCubeSql,
+  AvailableMembers,
+  useDryRun,
+  useLazyDryRun,
+} from '@cubejs-client/react';
 import { Query } from '@cubejs-client/core';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
@@ -31,7 +37,7 @@ export function PreAggregationStatus({
   preAggregationType,
   ...props
 }: PreAggregationStatusProps) {
-  const [isModalOpen, toggleModal] = useToggle(false);
+  const [isModalOpen, toggleModal] = useToggle(true);
   // hide it for the time being
   // const renderTime = () => (
   //   <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
@@ -104,9 +110,9 @@ export function PreAggregationStatus({
       >
         {props.transformedQuery ? (
           <RollupDesigner
-            query={props.query}
+            defaultQuery={props.query}
             availableMembers={props.availableMembers}
-            transformedQuery={props.transformedQuery}
+            defaultTransformedQuery={props.transformedQuery}
           />
         ) : null}
       </Modal>
