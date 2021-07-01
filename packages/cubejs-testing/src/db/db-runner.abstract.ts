@@ -1,9 +1,11 @@
+export interface ContainerVolumeDefinition {
+  source: string,
+  target: string,
+  bindMode?: 'rw' | 'ro'
+}
+
 export interface DBRunnerContainerOptions {
-  volumes: {
-    source: string,
-    target: string,
-    bindMode?: 'rw' | 'ro'
-  }[]
+  volumes?: ContainerVolumeDefinition[]
 }
 
 // @todo Finish with old one PR for it

@@ -1,22 +1,25 @@
-/* globals describe, afterAll, beforeAll, test, expect, jest */
-const { MysqlDBRunner } = require('@cubejs-backend/testing');
+import { MysqlDBRunner } from '@cubejs-backend/testing';
+
+import { StartedTestContainer } from 'testcontainers';
+import { createDriver } from './mysql.db.runner';
+
+import { MySqlDriver } from '../src';
+
 const streamToArray = require('stream-to-array');
 
-const { createDriver } = require('./mysql.db.runner');
-
 describe('MySqlDriver', () => {
-  let container;
-  let mySqlDriver;
+  let container: StartedTestContainer;
+  let mySqlDriver: MySqlDriver;
 
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
     container = await MysqlDBRunner.startContainer({});
     mySqlDriver = createDriver(container);
-    mySqlDriver.setLogger((msg, event) => console.log(`${msg}: ${JSON.stringify(event)}`));
+    mySqlDriver.setLogger((msg: any, event: any) => console.log(`${msg}: ${JSON.stringify(event)}`));
 
     await mySqlDriver.createSchemaIfNotExists('test');
-    await mySqlDriver.query('DROP SCHEMA test');
+    await mySqlDriver.query('DROP SCHEMA test', []);
     await mySqlDriver.createSchemaIfNotExists('test');
   });
 
@@ -32,16 +35,16 @@ describe('MySqlDriver', () => {
     await mySqlDriver.uploadTable('test.wrong_value', [{ name: 'value', type: 'string' }], {
       rows: [{ value: 'Tekirdağ' }]
     });
-    expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.wrong_value'))))
+    expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.wrong_value', []))))
       .toStrictEqual([{ value: 'Tekirdağ' }]);
-    expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.wrong_value')).rows)))
+    expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.wrong_value', [], { highWaterMark: 1000 })).rows)))
       .toStrictEqual([{ value: 'Tekirdağ' }]);
   });
 
   test('mysql to generic type', async () => {
-    await mySqlDriver.query('CREATE TABLE test.var_types (some_big bigint(9), some_medium mediumint(9), some_small smallint(3), med_text mediumtext, long_text longtext)');
-    await mySqlDriver.query('INSERT INTO test.var_types (some_big, some_medium, some_small) VALUES (123, 345, 4)');
-    expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.var_types')).types)))
+    await mySqlDriver.query('CREATE TABLE test.var_types (some_big bigint(9), some_medium mediumint(9), some_small smallint(3), med_text mediumtext, long_text longtext)', []);
+    await mySqlDriver.query('INSERT INTO test.var_types (some_big, some_medium, some_small) VALUES (123, 345, 4)', []);
+    expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.var_types', [], { highWaterMark: 1000 })).types)))
       .toStrictEqual([
         { name: 'some_big', type: 'int' },
         { name: 'some_medium', type: 'int' },
