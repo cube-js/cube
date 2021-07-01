@@ -197,7 +197,6 @@ export class QueryOrchestrator {
     if (!preAggregation.sql) return [];
 
     const { previewSql, tableName, external, dataSource } = preAggregation.sql;
-
     const targetTableName = PreAggregations.targetTableName(versionEntry);
     const querySql = QueryCache.replacePreAggregationTableNames(previewSql, [[tableName, { targetTableName }]]);
     const query = querySql && querySql[0];
