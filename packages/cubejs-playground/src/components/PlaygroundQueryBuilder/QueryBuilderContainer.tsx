@@ -19,7 +19,7 @@ import {
 } from './components/PlaygroundQueryBuilder';
 import { QueryTabs } from '../QueryTabs/QueryTabs';
 
-const StyledCard: typeof Card = styled(Card)`
+const StyledCard = styled(Card)`
   border-radius: 0;
   border-bottom: 1px;
   min-height: 100%;

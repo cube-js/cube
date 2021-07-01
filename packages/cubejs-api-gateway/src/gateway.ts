@@ -40,7 +40,7 @@ import {
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 
-type ResponseResultFn = (message: object, extra?: { status: number }) => void;
+type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
 type MetaConfig = {
   config: {
@@ -171,6 +171,16 @@ export type UserBackgroundContext = {
   // @deprecated Renamed to securityContext, please use securityContext.
   authInfo?: any;
   securityContext: any;
+};
+
+type BaseRequest = {
+ context: RequestContext;
+ res: ResponseResultFn
+};
+
+type QueryRequest = BaseRequest & {
+  query: Record<string, any> | Record<string, any>[];
+  queryType?: 'multi'
 };
 
 export interface ApiGatewayOptions {
@@ -566,14 +576,14 @@ export class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  public async sql({ query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }) {
+  public async sql({ query, context, res }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
       query = this.parseQueryParam(query);
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
-      const sqlQueries = await Promise.all(
+      const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
           { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
@@ -652,7 +662,7 @@ export class ApiGateway {
     };
   }
 
-  protected async dryRun({ query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }) {
+  protected async dryRun({ query, context, res }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -671,6 +681,7 @@ export class ApiGateway {
         queryOrder: sqlQueries.map((sqlQuery) => R.fromPairs(
           sqlQuery.order.map(({ id: member, desc }) => [member, desc ? 'desc' : 'asc'])
         )),
+        transformedQueries: sqlQueries.map((sqlQuery) => sqlQuery.canUseTransformedQuery),
         pivotQuery: getPivotQuery(queryType, normalizedQueries)
       });
     } catch (e) {
@@ -680,7 +691,7 @@ export class ApiGateway {
     }
   }
 
-  public async load({ query, context, res, ...props }: any) {
+  public async load({ query, context, res, ...props }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -715,7 +726,7 @@ export class ApiGateway {
       );
 
       let slowQuery = false;
-      const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
+      const results = await Promise.all<any[]>(normalizedQueries.map(async (normalizedQuery, index) => {
         const sqlQuery = sqlQueries[index];
         const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
         const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
@@ -816,7 +827,7 @@ export class ApiGateway {
         query,
         context,
         res: (message, opts) => {
-          if (message.error) {
+          if (!Array.isArray(message) && message.error) {
             error = { message, opts };
           } else {
             result = { message, opts };

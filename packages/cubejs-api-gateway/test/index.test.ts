@@ -251,7 +251,8 @@ describe('API Gateway', () => {
             dimensions: [],
             timeDimensions: [],
             queryType: 'regularQuery'
-          }
+          },
+          transformedQueries: [null]
         });
       }
     );

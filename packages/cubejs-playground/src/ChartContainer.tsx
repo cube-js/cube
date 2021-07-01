@@ -366,6 +366,7 @@ class ChartContainer extends Component<
               onClick={async () => {
                 this.setState({ addingToDashboard: true });
                 const canAddChart = await dashboardSource.canAddChart();
+
                 if (typeof canAddChart === 'boolean' && canAddChart) {
                   playgroundAction('Add to Dashboard');
                   await dashboardSource.addChart(codeExample);

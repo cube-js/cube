@@ -1,11 +1,21 @@
 import styled from 'styled-components';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
-import { useState } from 'react';
 import Icon from '@ant-design/icons';
+// @ts-ignore
+import {
+  useCubeSql,
+  AvailableMembers,
+  useDryRun,
+  useLazyDryRun,
+} from '@cubejs-client/react';
+import { Query } from '@cubejs-client/core';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
-import { PreAggregationHelper } from './PreAggregationHelper';
 import { QueryStatus } from './PlaygroundQueryBuilder';
+import { RollupDesigner } from '../../RollupDesigner';
+import { useToggle } from '../../../hooks';
+
+const { Link } = Typography;
 
 const Badge = styled.div`
   display: flex;
@@ -15,16 +25,19 @@ const Badge = styled.div`
   background: var(--warning-bg-color);
 `;
 
-type PreAggregationStatusProps = QueryStatus;
+type PreAggregationStatusProps = QueryStatus & {
+  availableMembers: AvailableMembers;
+  query: Query;
+};
 
 export function PreAggregationStatus({
   isAggregated,
-  transformedQuery,
   external,
   extDbType,
   preAggregationType,
+  ...props
 }: PreAggregationStatusProps) {
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isModalOpen, toggleModal] = useToggle();
   // hide it for the time being
   // const renderTime = () => (
   //   <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
@@ -51,7 +64,7 @@ export function PreAggregationStatus({
             Query was accelerated with pre-aggregation
           </Typography.Text>
         ) : (
-          <Button type="link" onClick={() => setIsModalOpen(true)}>
+          <Button type="link" onClick={toggleModal}>
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
         )}
@@ -78,18 +91,29 @@ export function PreAggregationStatus({
       </Space>
 
       <Modal
-        title="Pre-aggregation"
+        title="Rollup Designer"
         visible={isModalOpen}
-        footer={null}
+        footer={
+          <Link
+            style={{ paddingTop: 16 }}
+            href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
+            target="_blank"
+          >
+            Further reading about pre-aggregations for reference.
+          </Link>
+        }
         bodyStyle={{
-          paddingTop: 16,
+          padding: 16,
         }}
-        onCancel={() => {
-          setIsModalOpen(false);
-        }}
+        width={1024}
+        onCancel={toggleModal}
       >
-        {transformedQuery ? (
-          <PreAggregationHelper transformedQuery={transformedQuery} />
+        {props.transformedQuery ? (
+          <RollupDesigner
+            defaultQuery={props.query}
+            availableMembers={props.availableMembers}
+            defaultTransformedQuery={props.transformedQuery}
+          />
         ) : null}
       </Modal>
     </>

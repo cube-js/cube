@@ -7,6 +7,7 @@ import { TCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
 import useDeepMemo from '../hooks/deep-memo';
+import { getNameMemberPairs } from '../shared/helpers';
 
 const Menu = styled(AntdMenu)`
   max-height: 320px;
@@ -42,18 +43,6 @@ const SearchMenuItem = styled(Menu.Item)`
   }
 `;
 
-function getNameMemberPairs(members) {
-  const items: [string, TCubeMember][] = [];
-
-  members.forEach((cube) =>
-    cube.members.forEach((member) => {
-      items.push([member.name, member]);
-    })
-  );
-
-  return items;
-}
-
 function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
   const cubeNames = keys.map((key) => key.split('.')[0]);
 
@@ -69,11 +58,13 @@ function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
 
 type MemberDropdownProps = {
   availableMembers: AvailableCube[];
+  showNoMembersPlaceholder?: boolean;
   onClick: (member: TCubeMember) => void;
 } & ButtonProps;
 
 export default function MemberMenu({
   availableMembers,
+  showNoMembersPlaceholder = true,
   onClick,
   ...buttonProps
 }: MemberDropdownProps) {
@@ -147,10 +138,7 @@ export default function MemberMenu({
                 cube.members.length > 0 ? (
                   <Menu.ItemGroup key={cube.cubeName} title={cube.cubeTitle}>
                     {cube.members.map((m) => (
-                      <Menu.Item
-                        key={m.name}
-                        data-testid={m.name}
-                      >
+                      <Menu.Item key={m.name} data-testid={m.name}>
                         {m.shortTitle}
                       </Menu.Item>
                     ))}
@@ -158,9 +146,9 @@ export default function MemberMenu({
                 ) : null
               )}
             </>
-          ) : (
+          ) : showNoMembersPlaceholder ? (
             <Menu.Item disabled>No members found</Menu.Item>
-          )}
+          ) : null}
         </Menu>
       }
     />

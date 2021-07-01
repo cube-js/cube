@@ -11,11 +11,11 @@ const { TabPane } = Tabs;
 const { TextArea } = Input;
 const { Text, Link } = Typography;
 
-type TFlexBoxProps = {
+type FlexBoxProps = {
   editing: boolean;
 };
 
-const FlexBox = styled.div<TFlexBoxProps>`
+const FlexBox = styled.div<FlexBoxProps>`
   display: flex;
   gap: 8px;
 
