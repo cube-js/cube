@@ -384,7 +384,7 @@ describe('index.test', () => {
   };
 
   testRefreshWorkerAndRollupModes(true, false, (options) => {
-    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
     expect(options.rollupOnlyMode).toEqual(false);
   });
 
@@ -395,7 +395,8 @@ describe('index.test', () => {
 
   testRefreshWorkerAndRollupModes(true, true, (options) => {
     expect(options.rollupOnlyMode).toEqual(true);
-    // externalRefresh is false when both refreshWorkerMode & rollupOnlyMode are enabled
+    // External refresh is enabled for rollupOnlyMode, but it's disabled
+    // when it's both refreshWorkerMode & rollupOnlyMode
     expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
   });
 
