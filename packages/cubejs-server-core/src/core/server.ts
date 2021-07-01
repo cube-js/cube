@@ -645,9 +645,9 @@ export class CubejsServerCore {
     const refreshWorkerMode = getEnv('refreshWorkerMode');
     const rollupOnlyMode = getEnv('rollupOnlyMode');
 
-    // External refresh is enabled for refreshWorkerMode or rollupOnlyMode, but it's disabled
+    // External refresh is enabled for rollupOnlyMode, but it's disabled
     // when it's both refreshWorkerMode & rollupOnlyMode
-    const externalRefresh: boolean = (!refreshWorkerMode !== !rollupOnlyMode);
+    const externalRefresh: boolean = rollupOnlyMode && !refreshWorkerMode;
 
     const orchestratorApi = this.createOrchestratorApi(
       async (dataSource = 'default') => {
