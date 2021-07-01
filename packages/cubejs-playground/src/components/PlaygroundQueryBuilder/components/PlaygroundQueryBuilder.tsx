@@ -126,7 +126,11 @@ function PivotChangeEmitter({
   chartType,
 }: PivotChangeEmitterProps) {
   useDeepEffect(() => {
+<<<<<<< HEAD
     if (iframeRef?.current && ['table', 'bar'].includes(chartType)) {
+=======
+    if (iframeRef?.current && chartType === 'table') {
+>>>>>>> c74880117 (feat(@cubejs-client/react): useCubeMeta hook)
       dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
         pivotConfig,
       });
