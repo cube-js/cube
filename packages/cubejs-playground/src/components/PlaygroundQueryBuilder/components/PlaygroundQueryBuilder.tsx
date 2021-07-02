@@ -57,6 +57,10 @@ export const frameworkChartLibraries: Record<
 > = {
   react: [
     {
+      value: 'chartjs',
+      title: 'Chart.js',
+    },
+    {
       value: 'bizcharts',
       title: 'Bizcharts',
     },
@@ -67,10 +71,6 @@ export const frameworkChartLibraries: Record<
     {
       value: 'd3',
       title: 'D3',
-    },
-    {
-      value: 'chartjs',
-      title: 'Chart.js',
     },
   ],
   angular: [
@@ -122,8 +122,7 @@ function PivotChangeEmitter({
   chartType,
 }: PivotChangeEmitterProps) {
   useDeepEffect(() => {
-    if (iframeRef?.current && chartType === 'table') {
-      console.log('@ pivot change', pivotConfig);
+    if (iframeRef?.current && ['table', 'bar'].includes(chartType)) {
       dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
         pivotConfig,
       });
@@ -202,7 +201,7 @@ export function PlaygroundQueryBuilder({
     Record<string, QueryStatus | null>
   >({});
   const [framework, setFramework] = useState<UIFramework>('react');
-  const [chartingLibrary, setChartingLibrary] = useState<string>('bizcharts');
+  const [chartingLibrary, setChartingLibrary] = useState<string>('chartjs');
   const [chartRendererState, setChartRendererReady] = useState<
     Record<string, boolean>
   >({});
