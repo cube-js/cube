@@ -21,7 +21,11 @@ history.listen((location) => {
   page(props);
 });
 
-async function onTokenPayloadChange(payload: Record<string, any>) {
+async function onTokenPayloadChange(payload: Record<string, any>, token) {
+  if (token != null) {
+    return token;
+  }
+
   const response = await fetch('/playground/token', {
     method: 'post',
     headers: {
@@ -31,8 +35,8 @@ async function onTokenPayloadChange(payload: Record<string, any>) {
       payload
     }),
   });
-  const { token } = await response.json();
-  return token;
+  const json = await response.json();
+  return json.token;
 }
 
 ReactDOM.render(
