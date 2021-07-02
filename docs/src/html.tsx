@@ -1,5 +1,6 @@
 import React from 'react';
 import Head from './Head';
+import EventBanner from './components/EventBanner';
 
 export type HTMLProps = {
   css?: any;
@@ -17,6 +18,7 @@ class HTML extends React.Component<HTMLProps> {
       <html {...this.props.htmlAttributes}>
         <Head headComponents={this.props.headComponents} />
         <body {...this.props.bodyAttributes}>
+          <EventBanner />
           {this.props.preBodyComponents}
           <div
             key={`body`}
