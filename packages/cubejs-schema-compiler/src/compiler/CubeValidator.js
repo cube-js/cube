@@ -69,7 +69,10 @@ const BaseMeasure = {
 const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: Joi.alternatives().try(
     Joi.object().keys({
-      sql: Joi.func().required()
+      sql: Joi.func().required(),
+      // We dont support timezone for this, because it's useless
+      // We cannot support cron interval
+      every: Joi.alternatives().try(everyInterval),
     }),
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
@@ -116,7 +119,10 @@ const cubeSchema = Joi.object().keys({
   sql: Joi.func().required(),
   refreshKey: Joi.alternatives().try(
     Joi.object().keys({
-      sql: Joi.func().required()
+      sql: Joi.func().required(),
+      // We dont support timezone for this, because it's useless
+      // We cannot support cron interval
+      every: Joi.alternatives().try(everyInterval),
     }),
     Joi.object().keys({
       immutable: Joi.boolean().required()

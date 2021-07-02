@@ -502,4 +502,102 @@ describe('SQL Generation', () => {
       ]);
     });
   });
+
+  it('refreshKey (sql + every) in cube', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+      createCubeSchema({
+        name: 'cards',
+        refreshKey: `
+          refreshKey: {
+            sql: 'SELECT MAX(created) FROM cards',
+            every: '2 hours'
+          },
+        `,
+        preAggregations: `
+          countCreatedAt: {
+              type: 'rollup',
+              external: true,
+              measureReferences: [count],
+              timeDimensionReference: createdAt,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+              scheduledRefresh: true,
+          },
+        `
+      })
+    );
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.count'
+      ],
+      timeDimensions: [],
+      filters: [],
+      timezone: 'America/Los_Angeles',
+      externalQueryClass: MssqlQuery
+    });
+
+    const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+    expect(preAggregations.length).toEqual(1);
+    expect(preAggregations[0].invalidateKeyQueries).toEqual([
+      [
+        'SELECT MAX(created) FROM cards',
+        [],
+        {
+          external: false,
+          renewalThreshold: 720,
+        }
+      ]
+    ]);
+  });
+
+  it('refreshKey (sql + every) in preAggregation', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+      createCubeSchema({
+        name: 'cards',
+        refreshKey: ``,
+        preAggregations: `
+          countCreatedAt: {
+              type: 'rollup',
+              external: true,
+              measureReferences: [count],
+              timeDimensionReference: createdAt,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+              scheduledRefresh: true,
+              refreshKey: {
+                sql: 'SELECT MAX(created) FROM cards',
+                every: '2 hour'
+              },
+          },
+        `
+      })
+    );
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards.count'
+      ],
+      timeDimensions: [],
+      filters: [],
+      timezone: 'America/Los_Angeles',
+      externalQueryClass: MssqlQuery
+    });
+
+    const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+    expect(preAggregations.length).toEqual(1);
+    expect(preAggregations[0].invalidateKeyQueries).toEqual([
+      [
+        'SELECT MAX(created) FROM cards',
+        [],
+        {
+          external: false,
+          // 60 * 60 *2
+          renewalThreshold: 720,
+        }
+      ]
+    ]);
+  });
 });
