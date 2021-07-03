@@ -11,7 +11,7 @@ export type SecurityContextProps = {
   setIsModalOpen: any;
   saveToken: (token: string | null) => void;
   refreshToken: () => Promise<void>;
-  onTokenPayloadChange: (payload: Record<string, any>) => Promise<string>;
+  onTokenPayloadChange: (payload: Record<string, any>, token: string | null) => Promise<string>;
 };
 
 export const SecurityContextContext = createContext<SecurityContextProps>(
