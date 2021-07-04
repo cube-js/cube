@@ -30,9 +30,6 @@ export class CubeEvaluator extends CubeSymbols {
     }));
   }
 
-  /**
-   * @protected
-   */
   prepareCube(cube, errorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax

@@ -10,12 +10,7 @@ import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
 
-type QueryOptions = {
-  external?: boolean,
-  renewalThreshold?: number,
-};
-export type QueryTuple = [sql: string, params: unknown[], options?: QueryOptions];
-export type QueryWithParams = QueryTuple | string;
+type QueryWithParams = [string, any[]] | string;
 type Query = {
   requestId?: string;
   dataSource: string;
@@ -79,6 +74,7 @@ export class QueryCache {
       this.cacheKeyQueriesFrom(queryBody).map(replacePreAggregationTableNames);
 
     const renewalThreshold = queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.renewalThreshold;
+    const refreshKeyRenewalThresholds = this.getRefreshKeyRenewalThresholds(queryBody);
 
     const expireSecs = this.getExpireSecs(queryBody);
 
@@ -101,6 +97,7 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
+        refreshKeyRenewalThresholds
       });
     }
 
@@ -109,6 +106,7 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
+        refreshKeyRenewalThresholds,
         skipRefreshKeyWaitForRenew: true
       });
 
@@ -116,6 +114,7 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
+        refreshKeyRenewalThresholds
       });
 
       return resultPromise;
@@ -141,6 +140,7 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
+        refreshKeyRenewalThresholds
       });
     }
 
@@ -148,6 +148,11 @@ export class QueryCache {
       data: await mainPromise,
       lastRefreshTime: await this.lastRefreshTime(cacheKey)
     };
+  }
+
+  private getRefreshKeyRenewalThresholds(queryBody) {
+    return queryBody.cacheKeyQueries &&
+      queryBody.cacheKeyQueries.refreshKeyRenewalThresholds;
   }
 
   private getExpireSecs(queryBody): number {
@@ -173,12 +178,12 @@ export class QueryCache {
   }
 
   public static replacePreAggregationTableNames(queryAndParams: QueryWithParams, preAggregationsTablesToTempTables) {
-    const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
+    const [keyQuery, params] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
       keyQuery
     );
-    return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] : replacedKeqQuery;
+    return Array.isArray(queryAndParams) ? [replacedKeqQuery, params] : replacedKeqQuery;
   }
 
   public queryWithRetryAndRelease(query, values, {
@@ -295,6 +300,7 @@ export class QueryCache {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
+    refreshKeyRenewalThresholds?: Array<number>
     dataSource: string
   }) {
     this.renewQuery(
@@ -312,6 +318,7 @@ export class QueryCache {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
+    refreshKeyRenewalThresholds?: Array<number>
     dataSource: string
   }) {
     options = options || { dataSource: 'default' };
@@ -349,16 +356,11 @@ export class QueryCache {
   }
 
   public async loadRefreshKeysFromQuery(query: Query) {
-    return Promise.all(
-      this.loadRefreshKeys(
-        this.cacheKeyQueriesFrom(query),
-        this.getExpireSecs(query),
-        {
-          requestId: query.requestId,
-          dataSource: query.dataSource,
-        }
-      )
-    );
+    return Promise.all(this.loadRefreshKeys(this.cacheKeyQueriesFrom(query), this.getExpireSecs(query), {
+      requestId: query.requestId,
+      dataSource: query.dataSource,
+      refreshKeyRenewalThresholds: this.getRefreshKeyRenewalThresholds(query)
+    }));
   }
 
   public loadRefreshKeys(
@@ -367,28 +369,27 @@ export class QueryCache {
     options: {
       requestId?: string;
       skipRefreshKeyWaitForRenew?: boolean;
+      refreshKeyRenewalThresholds?: Array<number>;
       dataSource: string
     }
   ) {
-    return cacheKeyQueries.map((q, i) => {
-      const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
-
-      return this.cacheQueryResult(
-        query,
-        values,
-        [query, values],
-        expireSecs,
-        {
-          renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
-          renewalKey: q,
-          waitForRenew: !options.skipRefreshKeyWaitForRenew,
-          requestId: options.requestId,
-          dataSource: options.dataSource,
-          useInMemory: true,
-          external: queryOptions?.external,
-        },
-      );
-    });
+    return cacheKeyQueries.map((q, i) => this.cacheQueryResult(
+      Array.isArray(q) ? q[0] : q,
+      Array.isArray(q) ? q[1] : [],
+      q,
+      expireSecs,
+      {
+        renewalThreshold:
+          this.options.refreshKeyRenewalThreshold ||
+          (options.refreshKeyRenewalThresholds || [])[i] ||
+          2 * 60,
+        renewalKey: q,
+        waitForRenew: !options.skipRefreshKeyWaitForRenew,
+        requestId: options.requestId,
+        dataSource: options.dataSource,
+        useInMemory: true
+      },
+    ));
   }
 
   public withLock = <T = any>(

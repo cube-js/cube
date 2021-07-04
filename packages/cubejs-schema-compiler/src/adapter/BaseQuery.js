@@ -136,10 +136,6 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
-    /**
-     * @protected
-     * @type {ParamAllocator}
-     */
     this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
@@ -1714,7 +1710,10 @@ export class BaseQuery {
     if (!this.safeEvaluateSymbolContext().preAggregationQuery) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery) {
-        return [];
+        return {
+          renewalThreshold: this.renewalThreshold(!!preAggregationForQuery.preAggregation.refreshKey),
+          queries: []
+        };
       }
     }
 
@@ -1722,41 +1721,35 @@ export class BaseQuery {
   }
 
   refreshKeysByCubes(cubes, transformFn) {
-    const refreshKeyQueryByCube = (cube) => {
+    let refreshKeyAllSetManually = true;
+    const refreshKeyQueryByCube = cube => {
       const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
       if (cubeFromPath.refreshKey) {
         if (cubeFromPath.refreshKey.sql) {
-          return [this.evaluateSql(cube, cubeFromPath.refreshKey.sql), false];
+          return this.evaluateSql(cube, cubeFromPath.refreshKey.sql);
         }
-
         if (cubeFromPath.refreshKey.every) {
-          const [sql, external] = this.everyRefreshKeySql(cubeFromPath.refreshKey);
-          return [`SELECT ${sql}`, external];
+          return `SELECT ${this.everyRefreshKeySql(cubeFromPath.refreshKey)}`;
         }
       }
-
-      const [sql, external] = this.everyRefreshKeySql(this.defaultEveryRefreshKey());
-      return [`SELECT ${sql}`, external];
+      refreshKeyAllSetManually = false;
+      return `SELECT ${this.everyRefreshKeySql(this.defaultEveryRefreshKey())}`;
     };
-
-    const refreshKeyThresholdQueryByCube = (cube) => {
-      const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
-      if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
-        return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey);
-      }
-
-      return this.defaultRefreshKeyRenewalThreshold();
+    const queries = cubes
+      .map(cube => [cube, refreshKeyQueryByCube(cube)])
+      .map(([cube, sql]) => (transformFn ? transformFn(sql, cube) : sql))
+      .map(paramAnnotatedSql => this.paramAllocator.buildSqlAndParams(paramAnnotatedSql));
+    return {
+      queries,
+      renewalThreshold: this.renewalThreshold(refreshKeyAllSetManually),
+      refreshKeyRenewalThresholds: cubes.map(c => {
+        const cubeFromPath = this.cubeEvaluator.cubeFromPath(c);
+        if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
+          return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey);
+        }
+        return this.defaultRefreshKeyRenewalThreshold();
+      })
     };
-
-    const queries = cubes.map(cube => [cube, refreshKeyQueryByCube(cube), refreshKeyThresholdQueryByCube(cube)])
-      .map(
-        ([cube, [sql, external], renewalThreshold]) => (transformFn
-          ? transformFn(sql, cube).concat({ external, renewalThreshold })
-          : [sql, { external, renewalThreshold }])
-      )
-      .map(([sql, options]) => this.paramAllocator.buildSqlAndParams(sql).concat(options));
-
-    return queries;
   }
 
   aggSelectForDimension(cube, dimension, aggFunction) {
@@ -1814,7 +1807,6 @@ export class BaseQuery {
     if (preAggregation.external && this.externalQueryClass) {
       return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
     }
-
     if (index.columns) {
       const escapedColumns = this.evaluateIndexColumns(cube, index);
       return this.paramAllocator.buildSqlAndParams(this.createIndexSql(indexName, tableName, escapedColumns));
@@ -1942,15 +1934,11 @@ export class BaseQuery {
     };
   }
 
-  everyRefreshKeySql(refreshKey, external = false) {
-    if (this.externalQueryClass) {
-      return this.externalQuery().everyRefreshKeySql(refreshKey, true);
-    }
-
+  everyRefreshKeySql(refreshKey) {
     const every = refreshKey.every || '1 hour';
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      return [this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`), external];
+      return this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`);
     }
 
     const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);
@@ -1965,7 +1953,7 @@ export class BaseQuery {
      * SELECT ((3600 * (24 + 8) - 28800) / 86400); -- 1
      * SELECT ((3600 * (48 + 8) - 28800) / 86400); -- 2
      */
-    return [this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()} - ${dayOffset}) / ${interval}`), external];
+    return this.floorSql(`(${utcOffset} + ${this.unixTimestampSql()} - ${dayOffset}) / ${interval}`);
   }
 
   granularityFor(momentDate) {
@@ -2095,17 +2083,15 @@ export class BaseQuery {
         const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
           if (preAggregation.refreshKey.sql) {
-            return [
-              this.paramAllocator.buildSqlAndParams(
+            return {
+              queries: [this.paramAllocator.buildSqlAndParams(
                 preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
-              ).concat({
-                external: false,
-                renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
-              })
-            ];
+              )],
+              refreshKeyRenewalThresholds: [this.defaultRefreshKeyRenewalThreshold()]
+            };
           }
 
-          let [refreshKey, refreshKeyExternal] = this.everyRefreshKeySql(preAggregation.refreshKey);
+          let refreshKey = this.everyRefreshKeySql(preAggregation.refreshKey);
           let renewalThreshold = this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey);
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
@@ -2122,7 +2108,6 @@ export class BaseQuery {
                 refreshKey,
                 { window: preAggregation.refreshKey.updateWindow }
               );
-              refreshKeyExternal = false;
               renewalThreshold = this.incrementalRefreshKeyRenewalThreshold(
                 preAggregationQueryForSql,
                 renewalThreshold,
@@ -2131,22 +2116,18 @@ export class BaseQuery {
             }
           }
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
-            return [
-              this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`).concat({
-                external: refreshKeyExternal,
-                renewalThreshold,
-              })
-            ];
+            return {
+              queries: [this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`)],
+              refreshKeyRenewalThresholds: [renewalThreshold]
+            };
           }
         }
-
         if (preAggregation.type === 'originalSql') {
           return this.evaluateSymbolSqlWithContext(
             () => this.refreshKeysByCubes([cube]),
             { preAggregationQuery: true }
           );
         }
-
         if (
           preAggregation.partitionGranularity &&
           !preAggregationQueryForSql.allCubeNames.find(c => {
@@ -2159,18 +2140,12 @@ export class BaseQuery {
             () => preAggregationQueryForSql.cacheKeyQueries(
               (originalRefreshKey, refreshKeyCube) => {
                 if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
-                  return [
-                    `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`,
-                    false
-                  ];
+                  return `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`;
                 } else if (!cubeFromPath.refreshKey) {
-                  const [sql, external] = this.everyRefreshKeySql({
+                  return `SELECT ${this.everyRefreshKeySql({
                     every: '1 hour'
-                  });
-
-                  return [`SELECT ${sql}`, external];
+                  })}`;
                 }
-
                 return originalRefreshKey;
               }
             ),

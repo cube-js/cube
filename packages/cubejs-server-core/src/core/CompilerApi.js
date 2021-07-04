@@ -46,16 +46,15 @@ export class CompilerApi {
     return this.compilers;
   }
 
-  getDbType(dataSource = 'default') {
+  getDbType(dataSource) {
     if (typeof this.dbType === 'function') {
-      return this.dbType({ dataSource, });
+      return this.dbType({ dataSource: dataSource || 'default' });
     }
-
     return this.dbType;
   }
 
-  getDialectClass(dataSource = 'default', dbType) {
-    return this.dialectClass && this.dialectClass({ dataSource, dbType });
+  getDialectClass(dataSource, dbType) {
+    return this.dialectClass && this.dialectClass({ dataSource: dataSource || 'default', dbType });
   }
 
   async getSql(query, options = {}) {
