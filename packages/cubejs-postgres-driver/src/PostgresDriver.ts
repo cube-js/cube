@@ -14,12 +14,16 @@ const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   double: 'decimal',
 };
 
-const DataTypeMapping: Record<string, any> = {};
+const NativeTypeToPostgresType: Record<string, string> = {};
 
-Object.entries(types.builtins).forEach(pair => {
-  const [key, value] = pair;
-  DataTypeMapping[value] = key;
+Object.entries(types.builtins).forEach(([key, value]) => {
+  NativeTypeToPostgresType[value] = key;
 });
+
+const PostgresToGenericType: Record<string, GenericDataBaseType> = {
+  // bpchar (“blank-padded char”, the internal name of the character data type)
+  bpchar: 'varchar',
+};
 
 const timestampDataTypes = [1114, 1184];
 const timestampTypeParser = (val: any) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
@@ -127,7 +131,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         rowStream,
         types: meta.map((f: any) => ({
           name: f.name,
-          type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+          type: this.toGenericType(NativeTypeToPostgresType[f.dataTypeID].toLowerCase())
         })),
         release: async () => {
           await conn.release();
@@ -174,9 +178,17 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       rows: res.rows,
       types: res.fields.map(f => ({
         name: f.name,
-        type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+        type: this.toGenericType(NativeTypeToPostgresType[f.dataTypeID].toLowerCase())
       })),
     };
+  }
+
+  public toGenericType(columnType: string): GenericDataBaseType {
+    if (columnType in PostgresToGenericType) {
+      return PostgresToGenericType[columnType];
+    }
+
+    return super.toGenericType(columnType);
   }
 
   public readOnly() {
