@@ -1726,37 +1726,31 @@ export class BaseQuery {
       const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
       if (cubeFromPath.refreshKey) {
         if (cubeFromPath.refreshKey.sql) {
-          return [this.evaluateSql(cube, cubeFromPath.refreshKey.sql), false];
+          return [this.evaluateSql(cube, cubeFromPath.refreshKey.sql), {
+            external: false,
+            renewalThreshold: this.defaultRefreshKeyRenewalThreshold()
+          }];
         }
 
         if (cubeFromPath.refreshKey.every) {
           const [sql, external] = this.everyRefreshKeySql(cubeFromPath.refreshKey);
-          return [`SELECT ${sql}`, external];
+          return [this.refreshKeySelect(sql), {
+            external,
+            renewalThreshold: this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey)
+          }];
         }
       }
 
       const [sql, external] = this.everyRefreshKeySql(this.defaultEveryRefreshKey());
-      return [`SELECT ${sql}`, external];
+      return [this.refreshKeySelect(sql), {
+        external,
+        renewalThreshold: this.defaultRefreshKeyRenewalThreshold()
+      }];
     };
 
-    const refreshKeyThresholdQueryByCube = (cube) => {
-      const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
-      if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.every) {
-        return this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey);
-      }
-
-      return this.defaultRefreshKeyRenewalThreshold();
-    };
-
-    const queries = cubes.map(cube => [cube, refreshKeyQueryByCube(cube), refreshKeyThresholdQueryByCube(cube)])
-      .map(
-        ([cube, [sql, external], renewalThreshold]) => (transformFn
-          ? transformFn(sql, cube).concat({ external, renewalThreshold })
-          : [sql, { external, renewalThreshold }])
-      )
+    return cubes.map(cube => [cube, refreshKeyQueryByCube(cube)])
+      .map(([cube, [sql, options]]) => (transformFn ? transformFn(cube, [sql, options]) : [sql, options]))
       .map(([sql, options]) => this.paramAllocator.buildSqlAndParams(sql).concat(options));
-
-    return queries;
   }
 
   aggSelectForDimension(cube, dimension, aggFunction) {
@@ -1785,7 +1779,7 @@ export class BaseQuery {
   }
 
   nowTimestampSql() {
-    return `NOW()`;
+    return 'NOW()';
   }
 
   unixTimestampSql() {
@@ -2088,6 +2082,26 @@ export class BaseQuery {
     };
   }
 
+  /**
+   * Some databases can return dynamically column name, for example Cube Store
+   *
+   * SELECT FLOOR((UNIX_TIMESTAMP()) / 60);
+   * +-------------------------------------------+
+   * | floor(Int64(1625395697) Divide Int64(60)) |
+   * +-------------------------------------------+
+   * | 27089928                                  |
+   * +-------------------------------------------+
+   * 1 row in set (0.00 sec)
+   *
+   * @protected
+   *
+   * @param {string} sql
+   * @return {string}
+   */
+  refreshKeySelect(sql) {
+    return `SELECT ${sql} as refresh_key`;
+  }
+
   preAggregationInvalidateKeyQueries(cube, preAggregation) {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
@@ -2107,6 +2121,7 @@ export class BaseQuery {
 
           let [refreshKey, refreshKeyExternal] = this.everyRefreshKeySql(preAggregation.refreshKey);
           let renewalThreshold = this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey);
+
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
               throw new UserError('Incremental refresh key can only be used for partitioned pre-aggregations');
@@ -2130,9 +2145,10 @@ export class BaseQuery {
               );
             }
           }
+
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
             return [
-              this.paramAllocator.buildSqlAndParams(`SELECT ${refreshKey}`).concat({
+              this.paramAllocator.buildSqlAndParams(this.refreshKeySelect(refreshKey)).concat({
                 external: refreshKeyExternal,
                 renewalThreshold,
               })
@@ -2157,21 +2173,27 @@ export class BaseQuery {
           const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
           return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
             () => preAggregationQueryForSql.cacheKeyQueries(
-              (originalRefreshKey, refreshKeyCube) => {
+              (refreshKeyCube, [originalRefreshKeySQL, originalRefreshKeyQueryOptions]) => {
                 if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
                   return [
-                    `SELECT ${this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKey})`)}`,
-                    false
+                    this.refreshKeySelect(this.incrementalRefreshKey(preAggregationQueryForSql, `(${originalRefreshKeySQL})`)),
+                    {
+                      external: false,
+                      renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
+                    }
                   ];
                 } else if (!cubeFromPath.refreshKey) {
                   const [sql, external] = this.everyRefreshKeySql({
                     every: '1 hour'
                   });
 
-                  return [`SELECT ${sql}`, external];
+                  return [this.refreshKeySelect(sql), {
+                    external,
+                    renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
+                  }];
                 }
 
-                return originalRefreshKey;
+                return [originalRefreshKeySQL, originalRefreshKeyQueryOptions];
               }
             ),
             { preAggregationQuery: true }

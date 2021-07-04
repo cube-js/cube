@@ -221,7 +221,7 @@ describe('SQL Generation', () => {
     expect(query.cacheKeyQueries()).toEqual([
       [
         // Postgres dialect
-        "SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600)",
+        "SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key",
         [],
         {
           // false, because there is no externalQueryClass
@@ -250,7 +250,7 @@ describe('SQL Generation', () => {
     expect(query.cacheKeyQueries()).toEqual([
       [
         // MSSQL dialect, because externalQueryClass
-        "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600)",
+        "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600) as refresh_key",
         [],
         {
           // true, because externalQueryClass
@@ -283,7 +283,7 @@ describe('SQL Generation', () => {
     expect(preAggregations[0].invalidateKeyQueries).toEqual([
       [
         // MSSQL dialect
-        "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600)",
+        "SELECT FLOOR((DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600) as refresh_key",
         [],
         {
           external: true,
