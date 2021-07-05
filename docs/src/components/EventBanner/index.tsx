@@ -22,10 +22,9 @@ const query = {
 };
 async function getBannerDataFromApi(set, setIsLoaded) {
   const resultSet = await cubejsApi.load(query);
-  // @TODO real data
-  if (resultSet?.tablePivot()?.length || true) {
-    // resultSet.tablePivot()[0]
-    set({'Banner.text': 'text', 'Banner.link': '/cloud'});
+
+  if (resultSet?.tablePivot()?.length) {
+    set(resultSet.tablePivot()[0]);
     setIsLoaded(true);
   }
   return resultSet;
