@@ -80,11 +80,7 @@ class App extends Component<RouteComponentProps, AppState> {
       dockerVersion: context.dockerVersion,
     });
 
-    this.setState({ context }, () => {
-      if (context.shouldStartConnectionWizardFlow) {
-        history.push('/connection');
-      }
-    });
+    this.setState({ context });
   }
 
   componentDidCatch(error, info) {

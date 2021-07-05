@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
-import { executeCommand, packageExists } from '@cubejs-backend/shared';
+import { executeCommand, getEnv, packageExists } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
@@ -97,7 +97,8 @@ export class DevServer {
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
-        identifier: this.getIdentifier(options.apiSecret)
+        identifier: this.getIdentifier(options.apiSecret),
+        previewFeatures: getEnv('previewFeatures'),
       });
     }));
 

@@ -16,6 +16,7 @@ export type PlaygroundContext = {
   shouldStartConnectionWizardFlow: boolean;
   dockerVersion: string | null;
   identifier: string;
+  previewFeatures: boolean;
   livePreview?: boolean;
 };
 
@@ -78,4 +79,10 @@ export function AppContextConsumer({ onReady }: AppContextConsumerProps) {
 
 export function useAppContext() {
   return useContext(AppContext);
+}
+
+export function usePlaygroundContext() {
+  const { playgroundContext } =  useAppContext();
+
+  return playgroundContext;
 }

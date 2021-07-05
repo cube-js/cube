@@ -1,5 +1,5 @@
 import { TCubeMember } from '@cubejs-client/core';
-import { Button, Typography } from 'antd';
+import { Typography } from 'antd';
 import styled from 'styled-components';
 
 import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
@@ -26,7 +26,7 @@ export function Members({ title, members, onRemove }: MembersProps) {
 
       <Flex>
         {members.map((member) => (
-          <div>
+          <div key={member.name}>
             <RemoveButtonGroup
               key={member.name}
               onRemoveClick={() => onRemove(member.name)}
