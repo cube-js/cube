@@ -7,6 +7,7 @@ import { StaticQuery, graphql } from 'gatsby';
 import FrameworkOfChoiceStore, {
   useFrameworkOfChoice,
 } from '../../stores/frameworkOfChoice';
+import EventBanner from '../EventBanner';
 import Search from '../Search';
 import Header from '../Header';
 import MobileFooter from './MobileFooter';
@@ -214,6 +215,7 @@ class AppLayout extends React.Component<
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
             <Row>
+              <EventBanner />
               <Header
                 className={cx(styles.header, {
                   [styles.fixed]: this.state.mobileMode === MobileModes.MENU,

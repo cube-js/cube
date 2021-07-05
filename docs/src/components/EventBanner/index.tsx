@@ -22,8 +22,10 @@ const query = {
 };
 async function getBannerDataFromApi(set, setIsLoaded) {
   const resultSet = await cubejsApi.load(query);
-  if (resultSet?.tablePivot()?.length) {
-    set(resultSet.tablePivot()[0]);
+  // @TODO real data
+  if (resultSet?.tablePivot()?.length || true) {
+    // resultSet.tablePivot()[0]
+    set({'Banner.text': 'text', 'Banner.link': '/cloud'});
     setIsLoaded(true);
   }
   return resultSet;
@@ -63,7 +65,7 @@ const EventBanner = (props) => {
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'max-height 1s ease-out, opacity 1s ease-out',
-          padding: '7px 0',
+          padding: isLoaded ? '7px 0' : "0",
         }}
       >
         {banner?.['Banner.text']}
