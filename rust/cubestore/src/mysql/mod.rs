@@ -4,6 +4,7 @@ use crate::table::TableValue;
 use crate::util::time_span::warn_long;
 use crate::{metastore, CubeError};
 use async_trait::async_trait;
+use datafusion::cube_ext;
 use hex::ToHex;
 use log::{error, info, warn};
 use msql_srv::*;
@@ -187,7 +188,7 @@ impl ProcessingLoop for MySqlServer {
 
             let sql_service = self.sql_service.clone();
             let auth = self.auth.clone();
-            tokio::spawn(async move {
+            cube_ext::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Backend {
                         sql_service,

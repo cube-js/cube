@@ -14,6 +14,7 @@ use crate::table::TableValue;
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use async_std::fs::File;
+use datafusion::cube_ext;
 use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
 use hex::ToHex;
 use http_auth_basic::Credentials;
@@ -192,7 +193,7 @@ impl HttpServer {
                     command,
                 },
             )| {
-                tokio::spawn(async move {
+                cube_ext::spawn(async move {
                     let res =
                         HttpServer::process_command(sql_service, sql_query_context, command).await;
                     let message = match res {

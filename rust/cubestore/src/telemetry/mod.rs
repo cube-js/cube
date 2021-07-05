@@ -1,6 +1,7 @@
 use crate::CubeError;
 use chrono::{SecondsFormat, Utc};
 use core::mem;
+use datafusion::cube_ext;
 use log::{Level, Log, Metadata, Record};
 use nanoid::nanoid;
 use std::collections::HashMap;
@@ -104,7 +105,7 @@ pub async fn track_event(event: String, properties: HashMap<String, String>) {
 }
 
 pub fn track_event_spawn(event: String, properties: HashMap<String, String>) {
-    tokio::spawn(async move { SENDER.track_event(event, properties).await });
+    cube_ext::spawn(async move { SENDER.track_event(event, properties).await });
 }
 
 pub async fn start_track_event_loop() {

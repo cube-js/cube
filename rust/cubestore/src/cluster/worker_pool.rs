@@ -21,6 +21,7 @@ use tracing_futures::WithSubscriber;
 
 use crate::util::respawn::respawn;
 use crate::CubeError;
+use datafusion::cube_ext;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -222,7 +223,7 @@ impl<
         res_rx: IpcReceiver<Result<R, CubeError>>,
     ) -> Result<(R, IpcSender<T>, IpcReceiver<Result<R, CubeError>>), CubeError> {
         args_tx.send(message)?;
-        let (res, res_rx) = tokio::task::spawn_blocking(move || (res_rx.recv(), res_rx)).await?;
+        let (res, res_rx) = cube_ext::spawn_blocking(move || (res_rx.recv(), res_rx)).await?;
         Ok((res??, args_tx, res_rx))
     }
 
@@ -302,6 +303,7 @@ mod tests {
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
+    use datafusion::cube_ext;
 
     #[ctor::ctor]
     fn test_support_init() {
@@ -343,7 +345,7 @@ mod tests {
                 Duration::from_millis(1000),
             ));
             let pool_to_move = pool.clone();
-            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
             assert_eq!(
                 pool.process(Message::Delay(100)).await.unwrap(),
                 Response::Foo(100)
@@ -362,7 +364,7 @@ mod tests {
                 Duration::from_millis(1000),
             ));
             let pool_to_move = pool.clone();
-            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..10 {
                 futures.push((i, pool.process(Message::Delay(i * 100))));
@@ -385,7 +387,7 @@ mod tests {
                 Duration::from_millis(450),
             ));
             let pool_to_move = pool.clone();
-            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..5 {
                 futures.push((i, pool.process(Message::Delay(i * 300))));

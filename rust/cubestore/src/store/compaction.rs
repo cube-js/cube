@@ -8,6 +8,7 @@ use crate::table::parquet::ParquetTableStore;
 use crate::table::TableStore;
 use crate::CubeError;
 use async_trait::async_trait;
+use datafusion::cube_ext;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
 use std::mem::swap;
@@ -111,7 +112,7 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let new_partition_file_names = new_partition_local_files.clone();
-        let count_and_min_max = tokio::task::spawn_blocking(move || {
+        let count_and_min_max = cube_ext::spawn_blocking(move || {
             let mut merge_buffer = Vec::with_capacity(total_data_rows * num_columns);
             for d in &data {
                 merge_buffer.extend_from_slice(d.all_values());

@@ -5,6 +5,7 @@ use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use core::fmt;
+use datafusion::cube_ext;
 use deadqueue::unlimited;
 use futures::future::join_all;
 use log::error;
@@ -14,7 +15,6 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::{broadcast, watch, RwLock};
-use tokio::task::spawn_blocking;
 use tokio::time::Duration;
 
 pub struct QueueRemoteFs {
@@ -80,7 +80,7 @@ impl QueueRemoteFs {
         let mut futures = Vec::new();
         for _ in 0..queue_remote_fs.config.upload_concurrency() {
             let to_move = queue_remote_fs.clone();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 let mut stopped_rx = to_move.stopped_rx.clone();
                 loop {
                     let to_process = tokio::select! {
@@ -104,7 +104,7 @@ impl QueueRemoteFs {
 
         for _ in 0..queue_remote_fs.config.download_concurrency() {
             let to_move = queue_remote_fs.clone();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 let mut stopped_rx = to_move.stopped_rx.clone();
                 loop {
                     let to_process = tokio::select! {
@@ -211,7 +211,7 @@ impl QueueRemoteFs {
             // it available on the local filesystem.
             let local_dir_copy = local_dir.clone();
             let res_local_files =
-                spawn_blocking(move || -> Result<HashSet<String>, std::io::Error> {
+                cube_ext::spawn_blocking(move || -> Result<HashSet<String>, std::io::Error> {
                     let mut local_files = HashSet::new();
                     for res_entry in Path::new(&local_dir_copy).read_dir()? {
                         let entry = match res_entry {
@@ -273,7 +273,7 @@ impl QueueRemoteFs {
             }
 
             let local_dir_copy = local_dir.clone();
-            tokio::task::spawn_blocking(move || {
+            cube_ext::spawn_blocking(move || {
                 for f in local_files {
                     let _ = std::fs::remove_file(Path::new(&local_dir_copy).join(f));
                 }

@@ -41,7 +41,7 @@ use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRe
 use datafusion::prelude::ExecutionConfig;
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
-use datafusion::{datasource::TableProvider, prelude::ExecutionContext};
+use datafusion::{cube_ext, datasource::TableProvider, prelude::ExecutionContext};
 use itertools::Itertools;
 use log::{debug, trace};
 use mockall::automock;
@@ -115,7 +115,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let plan_ctx = ctx.clone();
         let plan_to_move = plan.clone();
         let physical_plan =
-            tokio::task::spawn_blocking(move || plan_ctx.create_physical_plan(&plan_to_move))
+            cube_ext::spawn_blocking(move || plan_ctx.create_physical_plan(&plan_to_move))
                 .await??;
 
         let execution_time = SystemTime::now();
@@ -123,8 +123,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let execution_time = execution_time.elapsed()?;
         app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         debug!("Meta query data processing time: {:?}", execution_time,);
-        let data_frame =
-            tokio::task::spawn_blocking(move || batch_to_dataframe(&results)).await??;
+        let data_frame = cube_ext::spawn_blocking(move || batch_to_dataframe(&results)).await??;
         Ok(data_frame)
     }
 }
