@@ -56,7 +56,7 @@ export function updateQuery(
   const updatedQuery: Query = JSON.parse(JSON.stringify(query));
 
   if (memberType === 'timeDimensions') {
-    if (updatedQuery.timeDimensions?.[0].dimension === key) {
+    if (updatedQuery.timeDimensions?.[0]?.dimension === key) {
       delete updatedQuery.timeDimensions;
     } else {
       updatedQuery.timeDimensions = [

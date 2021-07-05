@@ -1,54 +1,49 @@
-import { Component } from 'react';
-import { fetch } from 'whatwg-fetch';
 import { Spin } from 'antd';
-import { Redirect } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useHistory } from 'react-router';
+import { fetch } from 'whatwg-fetch';
 
-export default class IndexPage extends Component<any, any> {
-  protected mounted: boolean = false;
+import { usePlaygroundContext } from '../../components/AppContext';
+import { useIsMounted } from '../../hooks';
 
-  constructor(props) {
-    super(props);
-    this.state = {};
-  }
+export function IndexPage() {
+  const { push } = useHistory();
+  const isMounted = useIsMounted();
+  const context = usePlaygroundContext();
 
-  async componentDidMount() {
-    this.mounted = true;
-    await this.loadFiles();
-  }
+  const [files, setFiles] = useState<any[] | null>(null);
 
-  componentWillUnmount() {
-    this.mounted = false;
-  }
+  useEffect(() => {
+    async function loadFiles() {
+      const res = await fetch('/playground/files');
+      const result = await res.json();
 
-  async loadFiles() {
-    const res = await fetch('/playground/files');
-    const result = await res.json();
-
-    if (this.mounted) {
-      this.setState({
-        files: result.files,
-      });
+      if (isMounted()) {
+        setFiles(result.files);
+      }
     }
-  }
 
-  render() {
-    if (!this.state.files) {
-      return (
-        <div style={{ textAlign: 'center', padding: 24 }}>
-          <Spin />
-        </div>
-      );
+    loadFiles();
+  }, []);
+
+  useEffect(() => {
+    if (context && files != null) {
+      if (context.shouldStartConnectionWizardFlow) {
+        push('/connection');
+      } else if (
+        !files.length ||
+        (files.length === 1 && files[0].fileName === 'Orders.js')
+      ) {
+        push('/schema');
+      } else {
+        push('/build');
+      }
     }
-    return (
-      <Redirect
-        to={
-          !this.state.files.length ||
-          (this.state.files.length === 1 &&
-            this.state.files[0].fileName === 'Orders.js')
-            ? '/schema'
-            : '/build'
-        }
-      />
-    );
-  }
+  }, [context, files]);
+
+  return (
+    <div style={{ textAlign: 'center', padding: 24 }}>
+      <Spin />
+    </div>
+  );
 }

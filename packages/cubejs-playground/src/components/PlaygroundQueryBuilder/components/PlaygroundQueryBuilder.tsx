@@ -253,7 +253,7 @@ export function PlaygroundQueryBuilder({
     (async () => {
       await refreshToken();
 
-      if (isMounted) {
+      if (isMounted()) {
         setTokenRefreshed(true);
       }
     })();

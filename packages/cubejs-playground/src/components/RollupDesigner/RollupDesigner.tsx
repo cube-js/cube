@@ -69,7 +69,7 @@ export function RollupDesigner({
 
   const { order, limit, filters, ...matchedQuery } = query;
 
-  const defaultSelectedKeys = useMemo(() => {
+  const selectedKeys = useMemo(() => {
     const keys: string[] = [];
 
     ['measures', 'dimensions', 'timeDimensions'].map((memberKey) => {
@@ -180,7 +180,7 @@ export function RollupDesigner({
         {!isRollupCodeVisible ? (
           <div>
             <Cubes
-              defaultSelectedKeys={defaultSelectedKeys}
+              selectedKeys={selectedKeys}
               membersByCube={getMembersByCube(availableMembers)}
               onSelect={(memberType, key) => {
                 setQuery(updateQuery(query, memberType, key));
@@ -245,7 +245,7 @@ export function RollupDesigner({
                         </>
                       ) : null}
 
-                      {query.timeDimensions ? (
+                      {query.timeDimensions?.length ? (
                         <TimeDimension
                           member={
                             indexedMembers[query.timeDimensions[0]?.dimension]

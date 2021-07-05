@@ -1,6 +1,4 @@
 import { Menu } from 'antd';
-import { useMemo } from 'react';
-import { useSetter } from '../../../hooks/setter';
 
 import { MembersByCube, ucfirst } from '../../../shared/helpers';
 import { QueryMemberKey } from '../../../types';
@@ -8,7 +6,7 @@ import { QueryMemberKey } from '../../../types';
 const { SubMenu } = Menu;
 
 type CubesProps = {
-  defaultSelectedKeys: string[];
+  selectedKeys: string[];
   membersByCube: MembersByCube[];
   onSelect: (memberType: QueryMemberKey, key: string) => void;
 };
@@ -16,24 +14,11 @@ type CubesProps = {
 const MEMBER_TYPES = ['measures', 'dimensions', 'timeDimensions'];
 
 export function Cubes({
-  defaultSelectedKeys,
+  selectedKeys,
   membersByCube,
   onSelect,
 }: CubesProps) {
-  const [selectedKeys, toggleSelectedKey] = useSetter<string[], string>(
-    (state, key) => {
-      if (!key) {
-        return state;
-      }
-
-      return state.includes(key)
-        ? state.filter((v) => v !== key)
-        : [...state, key];
-    },
-    defaultSelectedKeys
-  );
-
-  const defaultOpenKeys = defaultSelectedKeys.map((key) => key.split('.')[0]);
+  const defaultOpenKeys = selectedKeys.map((key) => key.split('.')[0]);
 
   return (
     <Menu
@@ -44,7 +29,6 @@ export function Cubes({
       onClick={(event) => {
         // @ts-ignore
         const { membertype } = event.domEvent.target.dataset;
-        toggleSelectedKey(event.key.toString());
 
         onSelect(membertype as QueryMemberKey, event.key.toString());
       }}
@@ -57,7 +41,7 @@ export function Cubes({
                 <Menu.ItemGroup key={memberType} title={ucfirst(memberType)}>
                   {cube[memberType].map((member) => {
                     return (
-                      <Menu.Item key={member.name} data-memberType={memberType}>
+                      <Menu.Item key={member.name} data-membertype={memberType}>
                         {member.title}
                       </Menu.Item>
                     );
