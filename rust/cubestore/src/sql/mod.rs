@@ -55,6 +55,7 @@ use crate::{
     metastore::{Column, ColumnType, MetaStore},
     store::DataFrame,
 };
+use datafusion::cube_ext;
 use tempfile::TempDir;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -615,7 +616,7 @@ impl SqlService for SqlServiceImpl {
                                             .map(|r| r.read())
                                             .collect::<Result<Vec<_>, _>>()?;
                                     }
-                                    Ok(tokio::task::spawn_blocking(
+                                    Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {
                                             let df = batch_to_dataframe(&records)?;
                                             Ok(df)

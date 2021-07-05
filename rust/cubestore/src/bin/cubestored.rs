@@ -4,6 +4,7 @@ use cubestore::telemetry::track_event;
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
 use cubestore::util::{metrics, spawn_malloc_trim_loop};
+use datafusion::cube_ext;
 use log::debug;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -50,7 +51,7 @@ fn main() {
 
 async fn stop_on_ctrl_c(s: &CubeServices) {
     let s = s.clone();
-    tokio::spawn(async move {
+    cube_ext::spawn(async move {
         let mut counter = 0;
         loop {
             if let Err(e) = tokio::signal::ctrl_c().await {

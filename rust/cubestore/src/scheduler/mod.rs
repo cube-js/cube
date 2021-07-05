@@ -5,6 +5,7 @@ use crate::metastore::{MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
 use crate::CubeError;
+use datafusion::cube_ext;
 use flatbuffers::bitflags::_core::time::Duration;
 use log::error;
 use std::sync::Arc;
@@ -57,7 +58,7 @@ impl SchedulerImpl {
     ) -> Vec<JoinHandle<Result<(), CubeError>>> {
         let scheduler2 = scheduler.clone();
         vec![
-            tokio::spawn(async move {
+            cube_ext::spawn(async move {
                 let mut gc_loop = scheduler
                     .gc_loop
                     .try_lock()
@@ -65,7 +66,7 @@ impl SchedulerImpl {
                 gc_loop.run().await;
                 Ok(())
             }),
-            tokio::spawn(async move { Self::run_scheduler(scheduler2).await }),
+            cube_ext::spawn(async move { Self::run_scheduler(scheduler2).await }),
         ]
     }
 
@@ -86,7 +87,7 @@ impl SchedulerImpl {
                 }
             };
             let scheduler_to_move = scheduler.clone();
-            tokio::spawn(async move {
+            cube_ext::spawn(async move {
                 let res = scheduler_to_move.process_event(event.clone()).await;
                 if let Err(e) = res {
                     error!("Error processing event {:?}: {}", event, e);
