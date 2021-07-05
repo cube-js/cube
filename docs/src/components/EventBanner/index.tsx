@@ -35,7 +35,7 @@ const EventBanner = (props) => {
   const [isLoaded, setIsLoaded] = useState(null);
   const [isMobile, setIsMobile] = useState(null);
   useEffect(() => {
-    if (window?.screen?.availWidth && window?.screen?.availWidth < 887) {
+    if (window?.screen?.availWidth && window?.screen?.availWidth < 768) {
       setIsMobile(true);
     }
     getBannerDataFromApi(setBanner, setIsLoaded);
@@ -62,13 +62,14 @@ const EventBanner = (props) => {
           width: "100%",
           zIndex: "99",
           textDecoration: decoration,
-          height: isLoaded ? (isMobile ? '80px' : '40px') : '0',
+          minHeight: isLoaded ? (isMobile ? '80px' : '40px') : '0',
           opacity: isLoaded ? '1' : '0',
           backgroundColor: 'rgb(122, 119, 255)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'height 1s linear, opacity 1s linear, padding 1s linear',
+          lineHeight: 'normal',
+          transition: 'min-height 1s linear, opacity 1s linear, padding 1s linear',
           textOverflow: "ellipsis",
           padding: isLoaded ? '7px 16px' : "0 16px",
         }}
