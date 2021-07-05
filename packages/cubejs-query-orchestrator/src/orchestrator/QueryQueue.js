@@ -13,8 +13,8 @@ export class QueryQueue {
     this.executionTimeout = options.executionTimeout || 600;
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
-    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
-    this.sendCancelMessageFn = options.sendCancelMessageFn || ((query) => { this.processCancel(query); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || (async (queryKey) => this.processQuery(queryKey));
+    this.sendCancelMessageFn = options.sendCancelMessageFn || (async (query) => this.processCancel(query));
     this.queryHandlers = options.queryHandlers;
     this.cancelHandlers = options.cancelHandlers;
     this.logger = options.logger || ((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
