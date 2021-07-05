@@ -35,7 +35,7 @@ const EventBanner = (props) => {
   const [isLoaded, setIsLoaded] = useState(null);
   const [isMobile, setIsMobile] = useState(null);
   useEffect(() => {
-    if (window?.screen?.availWidth && window?.screen?.availWidth < 640) {
+    if (window?.screen?.availWidth && window?.screen?.availWidth < 887) {
       setIsMobile(true);
     }
     getBannerDataFromApi(setBanner, setIsLoaded);
@@ -45,7 +45,7 @@ const EventBanner = (props) => {
       href={getLinkWithUTM(banner?.['Banner.link'], 'docs')}
       target="_blank"
       style={{
-        paddingBottom: isLoaded ? '40px' : "0",
+        paddingBottom: isLoaded ? (isMobile ? '80px' : '40px') : "0",
         color: 'rgb(255,255,255)',
         textDecoration: 'none',
         fontSize: isMobile ? '16px' : '18px',
@@ -62,14 +62,15 @@ const EventBanner = (props) => {
           width: "100%",
           zIndex: "99",
           textDecoration: decoration,
-          maxHeight: isLoaded ? '40px' : '0',
+          height: isLoaded ? (isMobile ? '80px' : '40px') : '0',
           opacity: isLoaded ? '1' : '0',
           backgroundColor: 'rgb(122, 119, 255)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'max-height 1s linear, opacity 1s linear, padding 1s linear',
-          padding: isLoaded ? '7px 0' : "0",
+          transition: 'height 1s linear, opacity 1s linear, padding 1s linear',
+          textOverflow: "ellipsis",
+          padding: isLoaded ? '7px 16px' : "0 16px",
         }}
       >
         {banner?.['Banner.text']}
