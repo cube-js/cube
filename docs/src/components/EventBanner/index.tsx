@@ -46,17 +46,22 @@ const EventBanner = (props) => {
       href={getLinkWithUTM(banner?.['Banner.link'], 'docs')}
       target="_blank"
       style={{
-        paddingBottom: '40px',
+        paddingBottom: isLoaded ? '40px' : "0",
         color: 'rgb(255,255,255)',
         textDecoration: 'none',
         fontSize: isMobile ? '16px' : '18px',
         fontWeight: '500',
+        display: isLoaded ? "block" : "auto",
+        transition: 'padding 1s ease-out, opacity 1s ease-out',
       }}
       onMouseEnter={() => setDecoration('underline')}
       onMouseLeave={() => setDecoration('none')}
     >
       <div
         style={{
+          position: "fixed",
+          width: "100%",
+          zIndex: "99",
           textDecoration: decoration,
           maxHeight: isLoaded ? '40px' : '0',
           opacity: isLoaded ? '1' : '0',

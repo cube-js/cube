@@ -214,8 +214,9 @@ class AppLayout extends React.Component<
         <StaticQuery
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
+            <>
+               <EventBanner />
             <Row>
-              <EventBanner />
               <Header
                 className={cx(styles.header, {
                   [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
@@ -268,6 +269,7 @@ class AppLayout extends React.Component<
                 setMobileMode={this.setMobileMode}
               />
             </Row>
+            </>
           )}
         />
       </FrameworkOfChoiceStore>
