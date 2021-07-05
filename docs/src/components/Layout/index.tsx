@@ -215,7 +215,7 @@ class AppLayout extends React.Component<
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
             <>
-               <EventBanner />
+            <EventBanner />
             <Row>
               <Header
                 className={cx(styles.header, {

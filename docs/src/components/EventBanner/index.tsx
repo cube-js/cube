@@ -52,7 +52,7 @@ const EventBanner = (props) => {
         fontSize: isMobile ? '16px' : '18px',
         fontWeight: '500',
         display: isLoaded ? "block" : "auto",
-        transition: 'padding 1s ease-out, opacity 1s ease-out',
+        transition: 'padding 1s ease-out',
       }}
       onMouseEnter={() => setDecoration('underline')}
       onMouseLeave={() => setDecoration('none')}
