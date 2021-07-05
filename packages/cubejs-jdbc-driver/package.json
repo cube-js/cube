@@ -18,7 +18,9 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "lint:fix": "eslint --fix src/* --ext .ts",
+    "snyk-protect": "snyk protect",
+    "prepare": "yarn run snyk-protect"
   },
   "files": [
     "dist/src",
@@ -28,7 +30,8 @@
     "@cubejs-backend/query-orchestrator": "^0.27.46",
     "generic-pool": "^3.1.7",
     "node-java-maven": "^0.1.2",
-    "sqlstring": "^2.3.0"
+    "sqlstring": "^2.3.0",
+    "snyk": "^1.653.0"
   },
   "optionalDependencies": {
     "java": "^0.12.1",
@@ -47,5 +50,6 @@
     "@types/node": "^10.17.55",
     "@types/sqlstring": "^2.3.0",
     "typescript": "~4.1.5"
-  }
+  },
+  "snyk": true
 }
