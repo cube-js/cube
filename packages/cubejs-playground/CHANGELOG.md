@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** security context update ([#3056](https://github.com/cube-js/cube.js/issues/3056)) ([2a879e2](https://github.com/cube-js/cube.js/commit/2a879e2695f58d9204b05c98d7bd80b7f55f572c))
+* **@cubejs-client/playground:** wrong redirect to schema page ([#3064](https://github.com/cube-js/cube.js/issues/3064)) ([2c6f9e8](https://github.com/cube-js/cube.js/commit/2c6f9e878604055e051ea37420379ea0a1cdca13))
+
+
+### Features
+
+* **@cubejs-client/playground:** rollup designer v2 ([#3018](https://github.com/cube-js/cube.js/issues/3018)) ([07e2427](https://github.com/cube-js/cube.js/commit/07e2427bb8050a74bae3a4d9206a7cfee6944022))
+
+
+
+
+
 ## [0.27.45](https://github.com/cube-js/cube.js/compare/v0.27.44...v0.27.45) (2021-06-30)
 
 

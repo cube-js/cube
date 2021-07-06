@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+
+### Features
+
+* **cubestore:** add some configuration variables ([23e26fa](https://github.com/cube-js/cube.js/commit/23e26fae914f2dd20c82bc61ae3836b4a384b1cf))
+
+
+
+
+
 ## [0.27.46](https://github.com/cube-js/cube.js/compare/v0.27.45...v0.27.46) (2021-07-01)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

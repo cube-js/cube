@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+
+### Bug Fixes
+
+* **postgres-driver:** Catch error in streaming ([f73b648](https://github.com/cube-js/cube.js/commit/f73b6487cbf3403f0ea5a5c0081807b99664f619))
+* **postgres-driver:** Convert Date column to UTC date ([d1d0944](https://github.com/cube-js/cube.js/commit/d1d094462425c82a795ad5bf0bfae151bffbdf7d))
+* **postgres-driver:** Map numeric to decimal ([22b3536](https://github.com/cube-js/cube.js/commit/22b35367477cce7a03b77b9145617a6d7b1f601d))
+* **postgres-driver:** Support mapping for bpchar ([46a3860](https://github.com/cube-js/cube.js/commit/46a386047a3bf4bcab7e1d5dec3aaf2f0f98900c))
+
+
+
+
+
 ## [0.27.46](https://github.com/cube-js/cube.js/compare/v0.27.45...v0.27.46) (2021-07-01)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
