@@ -21,11 +21,14 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "integration": "npm run integration:postgres",
+    "integration:postgres": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.27.46",
+    "@cubejs-backend/testing": "^0.27.46",
     "@types/pg": "^8.6.0",
     "@types/pg-query-stream": "^1.0.3",
     "moment": "^2.24.0",
