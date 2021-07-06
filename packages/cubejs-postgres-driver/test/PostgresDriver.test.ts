@@ -32,6 +32,31 @@ describe('PostgresDriver', () => {
     }
   });
 
+  test('type coercion', async () => {
+    const data = await driver.query(
+      `
+        SELECT
+          CAST('2020-01-01' as DATE) as date,
+          CAST('2020-01-01 00:00:00' as TIMESTAMP) as timestamp,
+          CAST('2020-01-01 00:00:00+02' as TIMESTAMPTZ) as timestamptz,
+          CAST('1.0' as DECIMAL(10,2)) as decimal
+      `,
+      []
+    );
+
+    expect(data).toEqual([
+      {
+        // Date in UTC
+        date: '2020-01-01T00:00:00.000',
+        timestamp: '2020-01-01T00:00:00.000',
+        // converted to utc
+        timestamptz: '2019-12-31T22:00:00.000',
+        // Numerics as string
+        decimal: '1.00'
+      }
+    ]);
+  });
+
   test('stream', async () => {
     await driver.uploadTable(
       'test.streaming_test',
@@ -69,9 +94,9 @@ describe('PostgresDriver', () => {
         },
       ]);
       expect(await streamToArray(tableData.rowStream)).toEqual([
-        { id: '1', created: expect.any(Date), price: '100' },
-        { id: '2', created: expect.any(Date), price: '200' },
-        { id: '3', created: expect.any(Date), price: '300' }
+        { id: '1', created: '2020-01-01T00:00:00.000', price: '100' },
+        { id: '2', created: '2020-01-02T00:00:00.000', price: '200' },
+        { id: '3', created: '2020-01-03T00:00:00.000', price: '300' }
       ]);
     } finally {
       await (<any> tableData).release();
