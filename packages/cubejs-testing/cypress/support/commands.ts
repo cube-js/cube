@@ -31,7 +31,7 @@ Cypress.Commands.add('getByTestId', (selector, ...args) => {
 });
 
 Cypress.Commands.add('setQuery', (query, ...args) => {
-  cy.clearLocalStorage('queryTabs');
+  cy.clearLocalStorage(/queryTabs/);
   cy.visit(`/#/build?query=${JSON.stringify(query)}`, ...args);
   cy.wait(100);
 });
