@@ -23,6 +23,8 @@ Object.entries(types.builtins).forEach(([key, value]) => {
 const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // bpchar (“blank-padded char”, the internal name of the character data type)
   bpchar: 'varchar',
+  // Numeric is an alias
+  numeric: 'decimal',
 };
 
 const timestampDataTypes = [
