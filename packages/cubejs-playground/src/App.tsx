@@ -143,6 +143,7 @@ function ContextSetter({ context }: ContextSetterProps) {
   useEffect(() => {
     if (context !== null) {
       setContext({
+        ready: true,
         playgroundContext: context,
         identifier: context.identifier,
       });

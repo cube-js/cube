@@ -18,7 +18,7 @@ export default function Settings({
   onOrderChange,
   isQueryPresent,
 }) {
-  const [limit, setLimit] = useState(initialLimit);
+  const [limit, setLimit] = useState<number>(initialLimit);
   const [isLimitPopoverVisible, setIsLimitPopoverVisible] = useState<boolean>(false);
 
   return (
