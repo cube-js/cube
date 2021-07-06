@@ -440,9 +440,25 @@ export class ApiGateway {
   public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
-      const preAggregations = await this.getCompilerApi(context).preAggregations();
+      const compilerApi = this.getCompilerApi(context);
+      const preAggregations = await compilerApi.preAggregations();
 
-      res({ preAggregations });
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartitions(
+          context,
+          compilerApi,
+          normalizeQueryPreAggregations(
+            {
+              timezones: this.scheduledRefreshTimeZones,
+              preAggregations: preAggregations.map(p => ({
+                id: p.id,
+                refreshRange: [moment().format('YYYY-MM-DD'), moment().format('YYYY-MM-DD')]
+              }))
+            },
+          )
+        );
+
+      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted

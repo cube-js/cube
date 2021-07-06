@@ -223,14 +223,14 @@ const queryPreAggregationsSchema = Joi.object().keys({
   }))
 });
 
-export const normalizeQueryPreAggregations = (query, defaultValues) => {
+export const normalizeQueryPreAggregations = (query, defaultValues = {}) => {
   const { error } = Joi.validate(query, queryPreAggregationsSchema);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
   return {
-    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues.timezones,
+    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues.timezones || ['UTC'],
     preAggregations: query.preAggregations
   };
 };

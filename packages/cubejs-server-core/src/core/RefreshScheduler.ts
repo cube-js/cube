@@ -280,9 +280,24 @@ export class RefreshScheduler {
         )
       );
 
+      const partition = partitions && partitions[0];
+      const { refreshRangeStart, refreshRangeEnd, refreshKey } = partition.sql || {};
+
       return {
         timezones,
-        preAggregation,
+        preAggregation: {
+          ...preAggregation,
+          refreshKeyReferences: {
+            refreshKey: preAggregation.refreshKey && {
+              ...preAggregation.refreshKey,
+              sql: refreshKey
+            }
+          },
+          refreshRangeReferences: (refreshRangeStart || refreshRangeEnd) && {
+            refreshRangeStart: refreshRangeStart && { sql: refreshRangeStart },
+            refreshRangeEnd: refreshRangeEnd && { sql: refreshRangeEnd }
+          },
+        },
         partitions
       };
     }));
