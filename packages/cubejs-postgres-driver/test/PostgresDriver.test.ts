@@ -90,7 +90,7 @@ describe('PostgresDriver', () => {
         },
         {
           name: 'price',
-          type: 'numeric'
+          type: 'decimal'
         },
       ]);
       expect(await streamToArray(tableData.rowStream)).toEqual([
