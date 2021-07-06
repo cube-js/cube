@@ -54,11 +54,11 @@ Cypress.Commands.add('runQuery', () => {
 });
 
 Cypress.Commands.add('addMeasure', (name) => {
-  cy.getByTestId('Measure').click();
+  cy.getByTestId('Measure', { timeout: 5 * 1000 }).click();
   cy.getByTestId(name).click();
 });
 
 Cypress.Commands.add('addDimension', (name) => {
-  cy.getByTestId('Dimension').click();
+  cy.getByTestId('Dimension', { timeout: 5 * 1000 }).click();
   cy.getByTestId(name).click();
 });

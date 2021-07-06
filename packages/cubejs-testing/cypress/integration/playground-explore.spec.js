@@ -5,10 +5,6 @@ import { blockAllAnalytics } from '../utils';
 import { ordersCountQuery, tableQuery } from '../queries';
 
 context('Playground: Explore Page', () => {
-  before(() => {
-    cy.viewport(3840, 2160);
-  });
-
   beforeEach(() => {
     blockAllAnalytics();
     cy.restoreLocalStorage();
@@ -56,7 +52,6 @@ context('Playground: Explore Page', () => {
 
   it('applies default heuristics', () => {
     cy.visit('/');
-    cy.wait(300);
     cy.addMeasure('Events.count');
     cy.wait(300);
     cy.getByTestId('TimeDimension').contains('Events Created at');
