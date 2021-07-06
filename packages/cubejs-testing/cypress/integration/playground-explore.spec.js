@@ -52,6 +52,7 @@ context('Playground: Explore Page', () => {
 
   it('applies default heuristics', () => {
     cy.visit('/');
+    cy.wait(1000);
     cy.addMeasure('Events.count');
     cy.wait(300);
     cy.getByTestId('TimeDimension').contains('Events Created at');
