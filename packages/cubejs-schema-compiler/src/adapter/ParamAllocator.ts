@@ -20,7 +20,7 @@ export class ParamAllocator {
     ];
   }
 
-  protected allocateParam(param) {
+  public allocateParam(param) {
     const paramIndex = this.params.length;
     this.params.push(param);
 
