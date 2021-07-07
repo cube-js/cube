@@ -104,7 +104,7 @@ class App extends Component<RouteComponentProps, AppState> {
     }
 
     if (context == null && !isAppContextSet) {
-      return <CubeLoader />;
+      return showLoader ? <CubeLoader /> : null;
     }
 
     if (fatalError) {
