@@ -27,6 +27,7 @@ export type SystemContext = {
 };
 
 export type ContextProps = {
+  ready: boolean;
   identifier?: string | null;
   playgroundContext?: PlaygroundContext;
   setContext: (context: Partial<ContextProps> | null) => void;
@@ -34,7 +35,7 @@ export type ContextProps = {
 
 export type AppContextProps = {
   children: ReactNode;
-} & Omit<ContextProps, 'setContext'>;
+} & Omit<ContextProps, 'ready' | 'setContext'>;
 
 export const AppContext = createContext<ContextProps>({} as ContextProps);
 
@@ -49,6 +50,7 @@ export function AppContextProvider({
   return (
     <AppContext.Provider
       value={{
+        ready: false,
         ...context,
         setContext(context: Partial<ContextProps> | null) {
           setContext((currentContext) => ({

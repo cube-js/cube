@@ -55,8 +55,6 @@ class App extends Component<RouteComponentProps, AppState> {
   };
 
   async componentDidMount() {
-    const { history } = this.props;
-
     setTimeout(() => this.setState({ showLoader: true }), 700);
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
@@ -97,14 +95,16 @@ class App extends Component<RouteComponentProps, AppState> {
     if (context != null && !isAppContextSet) {
       return (
         <>
-          {showLoader ? <CubeLoader /> : null}
-
           <ContextSetter context={context} />
           <AppContextConsumer
             onReady={() => this.setState({ isAppContextSet: true })}
           />
         </>
       );
+    }
+
+    if (context == null && !isAppContextSet) {
+      return showLoader ? <CubeLoader /> : null;
     }
 
     if (fatalError) {
@@ -143,6 +143,7 @@ function ContextSetter({ context }: ContextSetterProps) {
   useEffect(() => {
     if (context !== null) {
       setContext({
+        ready: true,
         playgroundContext: context,
         identifier: context.identifier,
       });

@@ -83,9 +83,9 @@ export function ExplorePage() {
         token={currentToken}
         schemaVersion={schemaVersion}
         dashboardSource={dashboardSource}
-        onVizStateChanged={({ query }) =>
-          push(`/build?query=${JSON.stringify(query)}`)
-        }
+        onVizStateChanged={({ query }) => {
+          push(`/build?query=${JSON.stringify(query)}`);
+        }}
       />
     </LivePreviewContextProvider>
   );

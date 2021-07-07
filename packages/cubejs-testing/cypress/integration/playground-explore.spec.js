@@ -5,10 +5,6 @@ import { blockAllAnalytics } from '../utils';
 import { ordersCountQuery, tableQuery } from '../queries';
 
 context('Playground: Explore Page', () => {
-  before(() => {
-    cy.viewport(3840, 2160);
-  });
-
   beforeEach(() => {
     blockAllAnalytics();
     cy.restoreLocalStorage();
@@ -55,8 +51,14 @@ context('Playground: Explore Page', () => {
   });
 
   it('applies default heuristics', () => {
+    cy.intercept('/playground/context').as('context');
+    cy.intercept('/playground/files').as('files');
+
     cy.visit('/');
-    cy.wait(300);
+    cy.wait(['@context', '@files']);
+
+    cy.getByTestId('cube-loader', { timeout: 10 * 1000 }).should('not.exist');
+
     cy.addMeasure('Events.count');
     cy.wait(300);
     cy.getByTestId('TimeDimension').contains('Events Created at');
@@ -100,7 +102,23 @@ context('Playground: Explore Page', () => {
 
   describe('Security Context', () => {
     it('has no a cubejs token initially', () => {
+      cy.intercept('get', '/playground/context', (req) => {
+        delete req.headers['if-none-match'];
+
+        req.reply((res) => {
+          res.body = {
+            ...res.body,
+            identifier: ''
+          };
+        });
+      }).as('context');
+
+      cy.clearLocalStorage(/cubejsToken/);
+
       cy.visit('/');
+      cy.wait('@context');
+      cy.getByTestId('cube-loader', { timeout: 10 * 1000 }).should('not.exist');
+
       cy.getByTestId('security-context-btn').contains('Add').should('exist');
       cy.getLocalStorage('cubejsToken').should('be.null');
     });

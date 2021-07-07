@@ -2,6 +2,10 @@ import { countWithTimedimenionQuery, tableQuery } from '../queries';
 import crypto from 'crypto';
 
 context('Playground: Chart Renderers', () => {
+  before(() => {
+    cy.viewport(3840, 2160);
+  });
+
   describe('Chart Renderers', () => {
     const chartTypeByQuery = [
       [countWithTimedimenionQuery, ['line', 'area', 'bar']],
