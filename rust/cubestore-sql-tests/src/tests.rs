@@ -50,6 +50,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
         t("coalesce", coalesce),
+        t("count_distinct_crash", count_distinct_crash),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -1016,6 +1017,37 @@ async fn coalesce(service: Box<dyn SqlClient>) {
         .exec_query("SELECT n, coalesce() FROM s.Data ORDER BY 1")
         .await
         .unwrap_err();
+}
+
+async fn count_distinct_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data (n int)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+
+    service
+        .exec_query("INSERT INTO s.Data(n) VALUES (1), (2), (3), (3), (4), (4), (4)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data WHERE n > 4")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT CASE WHEN n > 4 THEN n END) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
