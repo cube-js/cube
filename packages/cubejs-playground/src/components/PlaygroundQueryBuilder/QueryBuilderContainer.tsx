@@ -72,10 +72,6 @@ export function QueryBuilderContainer({
 
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
 
-  if (!ready) {
-    return <CubeLoader />;
-  }
-
   return (
     <CubeProvider cubejsApi={cubejsApi}>
       <ChartRendererStateProvider>
