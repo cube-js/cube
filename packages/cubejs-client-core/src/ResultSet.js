@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import {
-  groupBy, pipe, fromPairs, uniq, filter, map, unnest, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
+  groupBy, pipe, fromPairs, uniq, filter, map, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
   pluck, mergeAll, flatten,
 } from 'ramda';
 
@@ -33,6 +33,15 @@ const groupByToPairs = (keyFn) => {
 
     return Array.from(acc.entries());
   };
+};
+
+const unnest = (arr) => {
+  const res = [];
+  arr.forEach((subArr) => {
+    subArr.forEach(element => res.push(element));
+  });
+
+  return res;
 };
 
 export const dayRange = (from, to) => ({
@@ -291,14 +300,14 @@ class ResultSet {
     if (!timeDimension.granularity) {
       return null;
     }
+
     let { dateRange } = timeDimension;
+
     if (!dateRange) {
+      const member = ResultSet.timeDimensionMember(timeDimension);
       const dates = pipe(
-        map(
-          row => row[ResultSet.timeDimensionMember(timeDimension)] &&
-            dayjs(row[ResultSet.timeDimensionMember(timeDimension)])
-        ),
-        filter(r => !!r)
+        map(row => row[member] && dayjs(row[member])),
+        filter(Boolean)
       )(this.timeDimensionBackwardCompatibleData());
 
       dateRange = dates.length && [
@@ -342,7 +351,7 @@ class ResultSet {
         (equals(
           pivotConfig.x,
           (query.timeDimensions || [])
-            .filter(td => !!td.granularity)
+            .filter(td => Boolean(td.granularity))
             .map(td => ResultSet.timeDimensionMember(td))
         ))
       ) {
@@ -369,35 +378,40 @@ class ResultSet {
         groupByXAxis
       )(this.timeDimensionBackwardCompatibleData(resultIndex));
 
-      const allYValues = pipe(
-        map(
-          ([, rows]) => unnest(
-            // collect Y values only from filled rows
-            rows.filter(({ row }) => Object.keys(row).length > 0)
-              .map(({ row }) => this.axisValues(pivotConfig.y, resultIndex)(row))
-          )
-        ),
-        unnest,
-        uniq
-      )(xGrouped);
+      const yValuesMap = {};
+      xGrouped.forEach(([, rows]) => {
+        rows.forEach(({ row }) => {
+          this.axisValues(pivotConfig.y, resultIndex)(row).forEach((values) => {
+            if (Object.keys(row).length > 0) {
+              yValuesMap[values.join()] = values;
+            }
+          });
+        });
+      });
+      const allYValues = Object.values(yValuesMap);
+
+      const measureOnX = Boolean(pivotConfig.x.find(d => d === 'measures'));
 
       return xGrouped.map(([, rows]) => {
         const { xValues } = rows[0];
-        const yGrouped = pipe(
-          map(({ row }) => this.axisValues(pivotConfig.y, resultIndex)(row).map(yValues => ({ yValues, row }))),
-          unnest,
-          groupBy(({ yValues }) => this.axisValuesString(yValues))
-        )(rows);
+        const yGrouped = {};
+
+        rows.forEach(({ row }) => {
+          const arr = this.axisValues(pivotConfig.y, resultIndex)(row).map(yValues => ({ yValues, row }));
+          arr.forEach((res) => {
+            yGrouped[this.axisValuesString(res.yValues)] = res;
+          });
+        });
 
         return {
           xValues,
           yValuesArray: unnest(allYValues.map(yValues => {
-            const measure = pivotConfig.x.find(d => d === 'measures') ?
+            const measure = measureOnX ?
               ResultSet.measureFromAxis(xValues) :
               ResultSet.measureFromAxis(yValues);
 
-            return (yGrouped[this.axisValuesString(yValues)] ||
-              [{ row: {} }]).map(({ row }) => [yValues, measureValue(row, measure)]);
+            return [[yValues, measureValue((yGrouped[this.axisValuesString(yValues)] ||
+              ({ row: {} })).row, measure)]];
           }))
         };
       });
@@ -460,18 +474,21 @@ class ResultSet {
       return [yValues];
     };
 
-    return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => ({
-      category: this.axisValuesString(xValues, ','), // TODO deprecated
-      x: this.axisValuesString(xValues, ','),
-      xValues,
-      ...(
-        yValuesArray
-          .map(([yValues, m], i) => ({
-            [this.axisValuesString(aliasSeries(yValues, i), ',')]: m && validate(m),
-          }))
-          .reduce((a, b) => Object.assign(a, b), {})
-      )
-    }));
+    return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => {
+      const yValuesMap = {};
+
+      yValuesArray
+        .forEach(([yValues, m], i) => {
+          yValuesMap[this.axisValuesString(aliasSeries(yValues, i), ',')] = m && validate(m);
+        });
+
+      return ({
+        category: this.axisValuesString(xValues, ','), // TODO deprecated
+        x: this.axisValuesString(xValues, ','),
+        xValues,
+        ...yValuesMap
+      });
+    });
   }
 
   tablePivot(pivotConfig) {
