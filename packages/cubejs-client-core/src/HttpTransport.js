@@ -20,7 +20,7 @@ class HttpTransport {
 
     let url = `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`;
 
-    let requestMethod = this.method || (url.length < 2000 ? 'GET' : 'POST');
+    const requestMethod = this.method || (url.length < 2000 ? 'GET' : 'POST');
     if (requestMethod === 'POST') {
       url = `${this.apiUrl}/${method}`;
       this.headers['Content-Type'] = 'application/json';
