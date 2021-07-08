@@ -1,8 +1,14 @@
 import dayjs from 'dayjs';
+import en from 'dayjs/locale/en';
 import {
   groupBy, pipe, fromPairs, uniq, filter, map, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
   pluck, mergeAll, flatten,
 } from 'ramda';
+
+dayjs.locale({
+  ...en,
+  weekStart: 1,
+});
 
 export const TIME_SERIES = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
@@ -11,7 +17,7 @@ export const TIME_SERIES = {
   hour: (range) => range.by('h').map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
   minute: (range) => range.by('m').map(d => d.format('YYYY-MM-DDTHH:mm:00.000')),
   second: (range) => range.by('s').map(d => d.format('YYYY-MM-DDTHH:mm:ss.000')),
-  week: (range) => range.snapTo('isoweek').by('w').map(d => d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'))
+  week: (range) => range.snapTo('week').by('w').map(d => d.startOf('week').format('YYYY-MM-DDT00:00:00.000'))
 };
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
@@ -58,7 +64,7 @@ export const dayRange = (from, to) => ({
 
     return results;
   },
-  snapTo: (value) => dayRange(dayjs(from).startOf(value).toISOString(), dayjs(to).endOf(value).toISOString()),
+  snapTo: (value) => dayRange(dayjs(from).startOf(value), dayjs(to).endOf(value)),
   start: dayjs(from),
   end: dayjs(to),
 });
@@ -362,7 +368,7 @@ class ResultSet {
         if (series[0]) {
           groupByXAxis = (rows) => {
             const byXValues = groupBy(
-              ({ xValues }) => dayjs(xValues[0]).format('YYYY-MM-DDTHH:mm:ss.SSS'),
+              ({ xValues }) => xValues[0],
               rows
             );
             return series[resultIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
@@ -708,7 +714,7 @@ class ResultSet {
   timeDimensionBackwardCompatibleData(resultIndex = 0) {
     if (!this.backwardCompatibleData[resultIndex]) {
       const { data, query } = this.loadResponses[resultIndex];
-      const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+      const timeDimensions = (query.timeDimensions || []).filter(td => Boolean(td.granularity));
 
       this.backwardCompatibleData[resultIndex] = data.map(row => (
         {
