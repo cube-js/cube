@@ -15,8 +15,6 @@ disabled. Running Cube.js in development mode in a production environment can
 lead to security vulnerabilities. You can read more on the differences between
 [production and development mode here][link-cubejs-dev-vs-prod].
 
-[link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
-
 <!-- prettier-ignore-start -->
 [[info | Note]]
 | Development mode is disabled by default.
@@ -42,7 +40,7 @@ at least 15 concurrent connections.
 ### Redis Sentinel
 
 Redis provides functionality for high availability through
-[`Redis Sentinel`][redis-sentinel].
+[`Redis Sentinel`][link-redis-sentinel].
 
 For Redis Sentinel support, the npm package [`ioredis`][gh-ioredis] needs to be
 used instead of[`redis`][gh-node-redis]. This is done by setting the
@@ -50,10 +48,6 @@ used instead of[`redis`][gh-node-redis]. This is done by setting the
 `CUBEJS_REDIS_URL` to the
 `redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js
 to connect to the Redis Sentinel.
-
-[redis-sentinel]: https://redis.io/topics/sentinel
-[gh-ioredis]: https://github.com/luin/ioredis
-[gh-node-redis]: https://github.com/NodeRedis/node-redis
 
 <!-- prettier-ignore-start -->
 [[warning | Note]]
@@ -92,28 +86,25 @@ If you want to run Cube.js in production without Redis, you can use
 ## Set up Pre-aggregations Storage
 
 Currently, we recommend using Cube Store for external pre-aggregations storage.
-Follow the [instructions here][ref-caching-cubestore] to set it up. If you are
-using another [external database][ref-pre-aggregations], you'll need to
-configure it.
+Follow the [instructions here][ref-caching-cubestore] to set it up.
 
-[ref-caching-cubestore]: /caching/running-in-production
-[ref-pre-aggregations]: /pre-aggregations#external-pre-aggregations
+<!-- prettier-ignore-start -->
+[[warning |]]
+| If you are using another [external database][ref-pre-aggregations] for
+| pre-aggregation storage, you'll need to configure it.
+<!-- prettier-ignore-end -->
 
 By default, Cube.js will use `prod_pre_aggregations` as the schema name for
 storing pre-aggregations. This behavior can be modified by the
 `CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable; see the [Environment
 Variables][ref-env-vars-general] page for more details.
 
-[ref-env-vars-general]: /reference/environment-variables#general
-
 ## Set up Refresh Worker
 
 To refresh in-memory cache and [scheduled
-pre-aggregations][link-scheduled-refresh] in the background, we recommend
-running a separate Cube.js refresh worker instance. This allows your main
-Cube.js instance to continue to serve requests with high availability.
-
-[link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
+pre-aggregations][ref-scheduled-refresh] in the background, we recommend running
+a separate Cube.js refresh worker instance. This allows your main Cube.js
+instance to continue to serve requests with high availability.
 
 ```bash
 # Set to true so a Cube.js instance acts as a refresh worker
@@ -123,7 +114,12 @@ CUBEJS_SCHEDULED_REFRESH_TIMER=true
 For Serverless deployments, use the [Run Scheduled Refresh endpoint of the REST
 API][ref-api-scheduled-refresh] instead of a refresh worker.
 
-[ref-api-scheduled-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+## Enable export bucket
+
+Enabling an export bucket allows Cube.js to build and serve pre-aggregations in
+a much faster and performant manner. Check [the relevant documentation for your
+configured database][ref-config-connect-db-notes] to see if it supports export
+buckets.
 
 ## Enable HTTPS
 
@@ -134,16 +130,10 @@ should use a reverse proxy, like [NGINX][link-nginx], [Kong][link-kong],
 [Caddy][link-caddy] or your cloud provider's load balancer SSL termination
 features.
 
-[link-nginx]: https://www.nginx.com/
-[link-kong]: https://konghq.com/kong/
-[link-caddy]: https://caddyserver.com/
-
 ### NGINX Sample Configuration
 
 Below you can find a sample `nginx.conf` to proxy requests to Cube.js. To learn
 how to set up SSL with NGINX please refer to [NGINX docs][link-nginx-docs].
-
-[link-nginx-docs]: https://nginx.org/en/docs/http/configuring_https_servers.html
 
 ```nginx
 server {
@@ -168,9 +158,6 @@ authentication provider's configuration under [the `jwt` property of your
 environment variables (`CUBEJS_JWK_URL`,
 `CUBEJS_JWT_*`)][ref-config-env-vars-general].
 
-[ref-sec-ctx]: /security/context
-[ref-config-jwt]: /config#options-reference-jwt
-
 ## Set up health checks
 
 Cube.js provides [Kubernetes-API compatible][link-k8s-healthcheck-api] health
@@ -179,8 +166,24 @@ your monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
 [`/livez`][ref-api-livez] API endpoints so you can check on the Cube.js
 deployment's health and be alerted to any issues.
 
-[ref-config-env-vars-general]: /reference/environment-variables#general
+[gh-ioredis]: https://github.com/luin/ioredis
+[gh-node-redis]: https://github.com/NodeRedis/node-redis
+[link-caddy]: https://caddyserver.com/
+[link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
+[link-kong]: https://konghq.com/kong/
+[link-nginx]: https://www.nginx.com/
+[link-nginx-docs]: https://nginx.org/en/docs/http/configuring_https_servers.html
+[link-redis-sentinel]: https://redis.io/topics/sentinel
+[ref-config-connect-db-notes]: /connecting-to-the-database#notes
+[ref-caching-cubestore]: /caching/running-in-production
+[ref-pre-aggregations]: /pre-aggregations#external-pre-aggregations
+[ref-env-vars-general]: /reference/environment-variables#general
+[ref-scheduled-refresh]: /pre-aggregations#scheduled-refresh
+[ref-api-scheduled-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-sec-ctx]: /security/context
+[ref-config-jwt]: /config#options-reference-jwt
+[ref-config-env-vars-general]: /reference/environment-variables#general
 [ref-api-readyz]: /rest-api#api-reference-readyz
 [ref-api-livez]: /rest-api#api-reference-livez
