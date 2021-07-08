@@ -1,12 +1,10 @@
 /// <reference types="cypress" />
 import 'cypress-wait-until';
 
-import { blockAllAnalytics } from '../utils';
 import { ordersCountQuery, tableQuery } from '../queries';
 
 context('Playground: Explore Page', () => {
   beforeEach(() => {
-    blockAllAnalytics();
     cy.restoreLocalStorage();
   });
 
