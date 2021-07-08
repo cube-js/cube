@@ -179,4 +179,9 @@ export class OrchestratorApi {
   public getPreAggregationPreview(context: RequestContext, preAggregation, versionEntry) {
     return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, versionEntry);
   }
+
+  public async getPreAggregationQueueStates(context: RequestContext, preAggregation, versionEntry) {
+    const result = await this.orchestrator.getPreAggregationQueueStates();
+    return result;
+  }
 }

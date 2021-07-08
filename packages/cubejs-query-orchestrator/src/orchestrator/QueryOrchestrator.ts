@@ -211,4 +211,9 @@ export class QueryOrchestrator {
 
     return data || [];
   }
+
+  public async getPreAggregationQueueStates() {
+    const result = await this.preAggregations.getQueueStates();
+    return result;
+  }
 }

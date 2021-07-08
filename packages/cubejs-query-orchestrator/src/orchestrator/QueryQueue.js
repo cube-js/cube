@@ -63,7 +63,9 @@ export class QueryQueue {
         throw new Error('Priority should be between -10000 and 10000');
       }
       let result = await redisClient.getResult(queryKey);
+      
       if (result) {
+        console.log('Result exists');
         return this.parseResult(result);
       }
       const time = new Date().getTime();
@@ -149,6 +151,37 @@ export class QueryQueue {
     }
 
     return this.reconcilePromise;
+  }
+
+  async getQueries() {
+    const redisClient = await this.queueDriver.createConnection();
+    try {
+      const [stalledQueries, orphanedQueries, activeQueries, toProcessQueries] = await Promise.all([
+        redisClient.getStalledQueries(),
+        redisClient.getOrphanedQueries(),
+        redisClient.getActiveQueries(),
+        redisClient.getToProcessQueries()
+      ]);
+      const mapWithDefinition = (arr) => Promise.all(arr.map(async queryKey => ({
+        ...(await redisClient.getQueryDef(queryKey)),
+        queryKey
+      })));
+
+      const [stalled, orphaned, active, toProcess] = await Promise.all(
+        [stalledQueries, orphanedQueries, activeQueries, toProcessQueries].map(arr => mapWithDefinition(arr))
+      );
+
+      return {
+        toCancel: [
+          ...stalled,
+          ...orphaned
+        ],
+        active,
+        toProcess
+      };
+    } finally {
+      this.queueDriver.release(redisClient);
+    }
   }
 
   async reconcileQueueImpl() {
