@@ -6,7 +6,7 @@ import { getEnv } from '@cubejs-backend/shared';
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
-import { QueryCache } from './QueryCache';
+import { QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
@@ -267,28 +267,29 @@ class PreAggregationLoadCache {
     return this.versionEntries[redisKey];
   }
 
-  protected async keyQueryResult(keyQuery, waitForRenew, priority, renewalThreshold) {
-    if (!this.queryResults[this.queryCache.queryRedisKey(keyQuery)]) {
-      this.queryResults[this.queryCache.queryRedisKey(keyQuery)] = await this.queryCache.cacheQueryResult(
-        Array.isArray(keyQuery) ? keyQuery[0] : keyQuery,
-        Array.isArray(keyQuery) ? keyQuery[1] : [],
-        keyQuery,
+  protected async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew, priority) {
+    const [query, values, queryOptions]: QueryTuple = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+
+    if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
+      this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
+        query,
+        values,
+        [query, values],
         60 * 60,
         {
-          renewalThreshold:
-            this.queryCache.options.refreshKeyRenewalThreshold ||
-            renewalThreshold ||
-            2 * 60,
-          renewalKey: keyQuery,
+          renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
+            || queryOptions?.renewalThreshold || 2 * 60,
+          renewalKey: [query, values],
           waitForRenew,
           priority,
           requestId: this.requestId,
           dataSource: this.dataSource,
-          useInMemory: true
+          useInMemory: true,
+          external: queryOptions?.external
         }
       );
     }
-    return this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
+    return this.queryResults[this.queryCache.queryRedisKey([query, values])];
   }
 
   protected hasKeyQueryResult(keyQuery) {
@@ -412,12 +413,12 @@ class PreAggregationLoader {
         });
         return this.targetTableName(versionEntryByStructureVersion);
       } else {
-        // no rollup has been built yet - build it syncronously as part of responding to this request
+        // no rollup has been built yet - build it synchronously as part of responding to this request
         return this.loadPreAggregationWithKeys();
       }
     } else {
       // either we have no data cached for this rollup or waitForRenew is true, either way,
-      // syncronously renew what data is needed so that the most current data will be returned for the current request
+      // synchronously renew what data is needed so that the most current data will be returned for the current request
       return {
         targetTableName: await this.loadPreAggregationWithKeys(),
         refreshKeyValues: await this.getInvalidationKeyValues()
@@ -532,15 +533,9 @@ class PreAggregationLoader {
 
   protected getInvalidationKeyValues() {
     return Promise.all(
-      (this.preAggregation.invalidateKeyQueries || [])
-        .map(
-          (keyQuery, i) => this.loadCache.keyQueryResult(
-            keyQuery,
-            this.waitForRenew,
-            this.priority(10),
-            (this.preAggregation.refreshKeyRenewalThresholds || [])[i]
-          )
-        )
+      (this.preAggregation.invalidateKeyQueries || []).map(
+        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+      )
     );
   }
 
