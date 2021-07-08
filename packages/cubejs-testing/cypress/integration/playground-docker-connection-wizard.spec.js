@@ -1,15 +1,12 @@
 /// <reference types="cypress" />
 import 'cypress-wait-until';
 
-import { blockAllAnalytics } from '../utils';
 import { eventsCountQuery } from '../queries';
 
 context('Playground: Connection Wizard', () => {
   let shouldStartConnectionWizardFlow = true;
 
   beforeEach(() => {
-    blockAllAnalytics();
-
     cy.intercept('/playground/context', (req) => {
       delete req.headers['if-none-match'];
       req.reply((res) => {
