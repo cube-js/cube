@@ -122,7 +122,7 @@ export function QueryBuilderContainer({
               </Space>
             }
             onTabChange={({ query }) => {
-              push(`/build?query=${JSON.stringify(query)}`);
+              push({ search: `?query=${JSON.stringify(query)}` });
             }}
           >
             {({ id, query, chartType }, saveTab) => (

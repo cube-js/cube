@@ -1,7 +1,7 @@
 import { ChartType, Query } from '@cubejs-client/core';
 import { Tabs } from 'antd';
 import equals from 'fast-deep-equal';
-import { ReactNode, useEffect, useLayoutEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import { event } from '../../events';
