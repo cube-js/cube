@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.49](https://github.com/cube-js/cube.js/compare/v0.27.48...v0.27.49) (2021-07-08)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** push only the query param on tab change ([a08153b](https://github.com/cube-js/cube.js/commit/a08153bf91065baa2a95de9749bd786c4057f191))
+
+
+
+
+
 ## [0.27.48](https://github.com/cube-js/cube.js/compare/v0.27.47...v0.27.48) (2021-07-08)
 
 
