@@ -25,8 +25,8 @@ const menuOrderCloud = [
 ];
 
 const menuOrder = [
-  'Getting Started',
   'Cube.js Introduction',
+  'Getting Started',
   'Configuration',
   'Caching',
   'Authentication & Authorization',
