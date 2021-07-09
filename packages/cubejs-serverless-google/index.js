@@ -11,7 +11,7 @@ class GoogleHandlers extends Handlers {
   }
 
   topicName() {
-    return `${process.env.CUBEJS_APP || 'cubejs'}-process`;
+    return `${process.env.CUBEJS_TOPIC_NAME || process.env.CUBEJS_APP || 'cubejs'}-process`;
   }
 
   async sendNotificationMessage(message, type, context) {

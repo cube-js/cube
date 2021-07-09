@@ -18,7 +18,7 @@ class AWSHandlers extends Handlers {
   async sendNotificationMessage(message, type, context) {
     const params = {
       Message: JSON.stringify({ message, type, context }),
-      TopicArn: this.topicArn(`${process.env.CUBEJS_APP || 'cubejs'}-process`)
+      TopicArn: this.topicArn(`${process.env.CUBEJS_TOPIC_NAME || process.env.CUBEJS_APP || 'cubejs'}-process`)
     };
     await sns.publish(params).promise();
   }
