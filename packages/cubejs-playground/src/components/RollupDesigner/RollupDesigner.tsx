@@ -58,6 +58,7 @@ export function RollupDesigner({
 }: RollupDesignerProps) {
   const [load, { isLoading, response, error }] = useLazyDryRun();
 
+  const [matching, toggleMatching] = useToggle(true);
   const [query, setQuery] = useState<Query>(defaultQuery);
   const [transformedQuery, setTransformedQuery] = useState<TransformedQuery>(
     defaultTransformedQuery
@@ -67,7 +68,7 @@ export function RollupDesigner({
 
   let preAggregation: null | PreAggregationDefinition = null;
 
-  const { order, limit, filters, ...matchedQuery } = query;
+  const { order, limit, filters, ...matchedQuery } = defaultQuery;
 
   const selectedKeys = useMemo(() => {
     const keys: string[] = [];
@@ -131,14 +132,14 @@ export function RollupDesigner({
   function rollupBody() {
     if (isRollupCodeVisible) {
       if (error) {
-        return <Alert type="error" message={error.toString()} />
+        return <Alert type="error" message={error.toString()} />;
       }
 
       if (!preAggregation) {
         return (
           <Paragraph>
             <Link
-              href="!https://cube.dev/docs/pre-aggregations#rollup-rollup-selection-rules"
+              href="https://cube.dev/docs/pre-aggregations#rollup-rollup-selection-rules"
               target="_blank"
             >
               Current query cannot be rolled up due to it is not additive
@@ -146,21 +147,20 @@ export function RollupDesigner({
             . Please consider removing not additive measures like
             `countDistinct` or `avg`. You can also try to use{' '}
             <Link
-              href="!https://cube.dev/docs/pre-aggregations#original-sql"
+              href="https://cube.dev/docs/pre-aggregations#original-sql"
               target="_blank"
             >
               originalSql
             </Link>{' '}
             pre-aggregation instead.
           </Paragraph>
-        )
+        );
       }
 
       return (
         <div>
           <Paragraph>
-            Add the following pre-aggregation to the <b>{cubeName}</b>{' '}
-            cube.
+            Add the following pre-aggregation to the <b>{cubeName}</b> cube.
           </Paragraph>
 
           <CodeSnippet
@@ -168,7 +168,7 @@ export function RollupDesigner({
             code={preAggregation.code}
           />
         </div>
-      )
+      );
     }
 
     return null;
@@ -197,7 +197,11 @@ export function RollupDesigner({
                   Back to editing
                 </Button>
               ) : (
-                <Button type="primary" onClick={handleRollupButtonClick}>
+                <Button
+                  type="primary"
+                  loading={isLoading}
+                  onClick={handleRollupButtonClick}
+                >
                   Preview rollup definition
                 </Button>
               )}
@@ -283,7 +287,14 @@ export function RollupDesigner({
 
         <RightSidePanel>
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Alert message="This pre-aggregation will match and accelerate this query:" />
+            {matching ? (
+              <Alert message="This pre-aggregation will match and accelerate this query:" />
+            ) : (
+              <Alert
+                type="warning"
+                message="This pre-aggregation will not match this query:"
+              />
+            )}
 
             <CodeSnippet
               style={{ marginBottom: 16 }}
