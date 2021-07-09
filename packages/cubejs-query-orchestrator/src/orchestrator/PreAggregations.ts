@@ -582,7 +582,8 @@ class PreAggregationLoader {
         preAggregationsTablesToTempTables: this.preAggregationsTablesToTempTables,
         newVersionEntry,
         requestId: this.requestId,
-        invalidationKeys
+        invalidationKeys,
+        forceBuild: this.forceBuild
       },
       priority,
       // eslint-disable-next-line no-use-before-define

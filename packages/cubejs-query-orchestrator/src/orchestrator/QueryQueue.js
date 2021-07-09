@@ -62,10 +62,9 @@ export class QueryQueue {
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }
-      let result = await redisClient.getResult(queryKey);
+      let result = !query.forceBuild && await redisClient.getResult(queryKey);
       
       if (result) {
-        console.log('Result exists');
         return this.parseResult(result);
       }
       const time = new Date().getTime();
