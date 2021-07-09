@@ -431,14 +431,14 @@ export class RefreshScheduler {
     compilerApi: CompilerApi,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, compilerApi, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
     
-    await Promise.all(preAggregations.map(async (p: any) => {
+    Promise.all(preAggregations.map(async (p: any) => {
       const { partitions } = p;
       return Promise.all(partitions.map(async query => {
         const sqlQuery = await compilerApi.getSql(query);
-        const orchestratorApi = this.serverCore.getOrchestratorApi(context);
 
         await orchestratorApi.executeQuery({
           ...sqlQuery,
@@ -451,7 +451,14 @@ export class RefreshScheduler {
           preAggregationsLoadCacheByDataSource
         });
       }));
-    }));
+    })).catch(e => {
+      this.serverCore.logger('Manual Build Pre-aggregations Error', {
+        error: e.error || e.stack || e.toString(),
+        securityContext: context.securityContext,
+        requestId: context.requestId
+      });
+    });
+
     return true;
   }
 }
