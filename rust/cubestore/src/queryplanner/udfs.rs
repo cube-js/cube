@@ -1,8 +1,12 @@
+use crate::metastore::ColumnType::Timestamp;
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::Hll;
 use crate::CubeError;
-use arrow::array::{Array, BinaryArray, UInt64Builder};
-use arrow::datatypes::{DataType, TimeUnit};
+use arrow::array::{
+    Array, BinaryArray, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder,
+};
+use arrow::datatypes::{DataType, IntervalUnit, TimeUnit, TimestampNanosecondType};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
 use datafusion::physical_plan::udaf::AggregateUDF;
@@ -20,6 +24,7 @@ pub enum CubeScalarUDFKind {
     Coalesce,
     Now,
     UnixTimestamp,
+    DateAdd,
 }
 
 pub trait CubeScalarUDF {
@@ -34,6 +39,7 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Box<dyn CubeScalarUDF> {
         CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
         CubeScalarUDFKind::Now => Box::new(Now {}),
         CubeScalarUDFKind::UnixTimestamp => Box::new(UnixTimestamp {}),
+        CubeScalarUDFKind::DateAdd => Box::new(DateAdd {}),
     }
 }
 
@@ -50,6 +56,9 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     }
     if n == "UNIX_TIMESTAMP" {
         return Some(CubeScalarUDFKind::UnixTimestamp);
+    }
+    if n == "DATE_ADD" {
+        return Some(CubeScalarUDFKind::DateAdd);
     }
     return None;
 }
@@ -175,6 +184,108 @@ impl CubeScalarUDF for UnixTimestamp {
                 Err(DataFusionError::Internal(
                     "UNIX_TIMESTAMP() was not optimized away".to_string(),
                 ))
+            }),
+        };
+    }
+}
+
+struct DateAdd {}
+impl DateAdd {
+    fn signature() -> Signature {
+        Signature::Any(2)
+    }
+}
+impl CubeScalarUDF for DateAdd {
+    fn kind(&self) -> CubeScalarUDFKind {
+        CubeScalarUDFKind::DateAdd
+    }
+
+    fn name(&self) -> &str {
+        "DATE_ADD"
+    }
+
+    fn descriptor(&self) -> ScalarUDF {
+        return ScalarUDF {
+            name: self.name().to_string(),
+            signature: Self::signature(),
+            return_type: Arc::new(|inputs| {
+                assert!(inputs.len() == 2);
+
+                // Right now, We support only TimeUnit::Nanosecond without TZ
+                Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
+            }),
+            fun: Arc::new(|inputs| {
+                if inputs.len() != 2 {
+                    return Err(DataFusionError::Plan(
+                        "Expected two arguments in DATE_ADD".to_string(),
+                    ));
+                }
+
+                let mut result_date = match &inputs[0] {
+                    ColumnarValue::Scalar(scalar) => match (scalar.get_datatype(), scalar) {
+                        // Right now, We support only TimeUnit::Nanosecond without TZ
+                        (
+                            DataType::Timestamp(TimeUnit::Nanosecond, None),
+                            ScalarValue::TimestampNanosecond(Some(v)),
+                        ) => Utc.timestamp_nanos(*v),
+                        _ => {
+                            return Err(DataFusionError::Plan(
+                                "First argument of `DATE_PART` must be non-null scalar TimestampNanosecond without timezone"
+                                    .to_string(),
+                            ));
+                        }
+                    },
+                    _ => {
+                        return Err(DataFusionError::Plan(
+                            "First argument of `DATE_PART` must be non-null scalar TimestampNanosecond without timezone"
+                                .to_string(),
+                        ));
+                    }
+                };
+
+                match &inputs[1] {
+                    ColumnarValue::Scalar(scalar) => match scalar {
+                        ScalarValue::IntervalYearMonth(Some(v)) => {
+                            let years_to_add = (*v as f64 / 12_f64).floor() as i32;
+                            let months_to_add = (*v - (years_to_add * 12)) as u32;
+
+                            let mut year = result_date.year() + years_to_add;
+                            let mut month = result_date.month();
+
+                            if month + months_to_add > 12 {
+                                year += 1;
+                                month = (month + months_to_add) - 12;
+                            } else {
+                                month += months_to_add;
+                            }
+
+                            result_date = result_date.with_year(year).unwrap();
+                            result_date = result_date.with_month(month).unwrap();
+                        }
+                        ScalarValue::IntervalDayTime(Some(v)) => {
+                            let days_parts: i64 = (((*v as u64) & 0xFFFFFFFF00000000) >> 32) as i64;
+                            let milliseconds_part: i64 = ((*v as u64) & 0xFFFFFFFF) as i64;
+
+                            result_date = result_date + Duration::days(days_parts);
+                            result_date = result_date + Duration::milliseconds(milliseconds_part);
+                        }
+                        _ => {
+                            return Err(DataFusionError::Plan(
+                                "Second argument of `DATE_PART` must be non-null scalar of Interval type"
+                                    .to_string(),
+                            ));
+                        }
+                    },
+                    _ => return Err(DataFusionError::Plan(
+                        "Second argument of `DATE_PART` must be non-null scalar of Interval type"
+                            .to_string(),
+                    )),
+                }
+
+                let result =
+                    TimestampNanosecondArray::from_vec(vec![result_date.timestamp_nanos()], None);
+
+                return Ok(ColumnarValue::Array(Arc::new(result)));
             }),
         };
     }
