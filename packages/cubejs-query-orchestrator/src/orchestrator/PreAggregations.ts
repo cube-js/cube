@@ -1169,7 +1169,7 @@ export class PreAggregations {
     return data.filter(res => res);
   }
 
-  public async getQueueStates(dataSource = undefined) {
+  public async getQueueState(dataSource = undefined) {
     const queries = await this.getQueue(dataSource).getQueries();
     return queries;
   }

@@ -583,11 +583,8 @@ export class ApiGateway {
     const requestStarted = new Date();
     try {
       const orchestratorApi = this.getAdapterApi(context);
-      const result = await orchestratorApi.getPreAggregationQueueStates();
-      console.log(JSON.stringify(result, null, 2));
-
       res({
-        result
+        result: await orchestratorApi.getPreAggregationQueueStates()
       });
     } catch (e) {
       this.handleError({
