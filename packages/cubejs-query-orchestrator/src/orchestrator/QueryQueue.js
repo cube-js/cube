@@ -70,9 +70,11 @@ export class QueryQueue {
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
 
+      const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
+      const orphanedTime = time + (orphanedTimeout * 1000);
       // eslint-disable-next-line no-unused-vars
       const [added, b, c, queueSize] = await redisClient.addToQueue(
-        keyScore, queryKey, time, queryHandler, query, priority, options
+        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
       if (added > 0) {

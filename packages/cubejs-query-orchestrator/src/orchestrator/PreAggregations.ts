@@ -332,6 +332,8 @@ class PreAggregationLoader {
 
   private forceBuild: boolean;
 
+  private orphanedTimeout: number;
+
   private externalDriverFactory: DriverFactory;
 
   private requestId: string;
@@ -358,6 +360,7 @@ class PreAggregationLoader {
     this.loadCache = loadCache;
     this.waitForRenew = options.waitForRenew;
     this.forceBuild = options.forceBuild;
+    this.orphanedTimeout = options.orphanedTimeout;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
@@ -580,7 +583,8 @@ class PreAggregationLoader {
         newVersionEntry,
         requestId: this.requestId,
         invalidationKeys,
-        forceBuild: this.forceBuild
+        forceBuild: this.forceBuild,
+        orphanedTimeout: this.orphanedTimeout
       },
       priority,
       // eslint-disable-next-line no-use-before-define
@@ -1029,6 +1033,7 @@ export class PreAggregations {
           waitForRenew: queryBody.renewQuery,
           forceBuild: queryBody.forceBuildPreAggregations,
           requestId: queryBody.requestId,
+          orphanedTimeout: queryBody.orphanedTimeout,
           externalRefresh: this.externalRefresh
         }
       );
