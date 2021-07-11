@@ -485,6 +485,17 @@ class PreAggregationLoader {
       return this.targetTableName(lastVersion);
     };
 
+    if (this.forceBuild) {
+      this.logger('Force build pre-aggregation', {
+        preAggregation: this.preAggregation,
+        requestId: this.requestId,
+        queryKey: this.preAggregationQueryKey(invalidationKeys),
+        newVersionEntry
+      });
+      await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
+      return mostRecentTargetTableName();
+    }
+
     if (versionEntry) {
       if (versionEntry.structure_version !== newVersionEntry.structure_version) {
         this.logger('Invalidating pre-aggregation structure', {
@@ -508,15 +519,6 @@ class PreAggregationLoader {
         } else {
           this.scheduleRefresh(invalidationKeys, newVersionEntry);
         }
-      } else if (this.forceBuild) {
-        this.logger('Force build pre-aggregation', {
-          preAggregation: this.preAggregation,
-          requestId: this.requestId,
-          queryKey: this.preAggregationQueryKey(invalidationKeys),
-          newVersionEntry
-        });
-        await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
-        return mostRecentTargetTableName();
       }
     } else {
       this.logger('Creating pre-aggregation from scratch', {
