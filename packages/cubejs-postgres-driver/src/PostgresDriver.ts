@@ -23,9 +23,18 @@ Object.entries(types.builtins).forEach(([key, value]) => {
 const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // bpchar (“blank-padded char”, the internal name of the character data type)
   bpchar: 'varchar',
+  // Numeric is an alias
+  numeric: 'decimal',
 };
 
-const timestampDataTypes = [1114, 1184];
+const timestampDataTypes = [
+  // @link TypeId.DATE
+  1082,
+  // @link TypeId.TIMESTAMP
+  1114,
+  // @link TypeId.TIMESTAMPTZ
+  1184
+];
 const timestampTypeParser = (val: any) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 
 export type PostgresDriverConfiguration = Partial<PoolConfig> & {

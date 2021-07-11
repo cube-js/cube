@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.49](https://github.com/cube-js/cube.js/compare/v0.27.48...v0.27.49) (2021-07-08)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** push only the query param on tab change ([a08153b](https://github.com/cube-js/cube.js/commit/a08153bf91065baa2a95de9749bd786c4057f191))
+
+
+### Features
+
+* Execute refreshKeys in externalDb (only for every) ([#3061](https://github.com/cube-js/cube.js/issues/3061)) ([75167a0](https://github.com/cube-js/cube.js/commit/75167a0e92028dbdd6f24aca85331b84be8ec3c3))
+
+
+
+
+
+## [0.27.48](https://github.com/cube-js/cube.js/compare/v0.27.47...v0.27.48) (2021-07-08)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Long Query 413 URL too large ([#3072](https://github.com/cube-js/cube.js/issues/3072)) ([67de4bc](https://github.com/cube-js/cube.js/commit/67de4bc3de69a4da86d4c8d241abe5d921d0e658))
+* **@cubejs-client/core:** week granularity ([#3076](https://github.com/cube-js/cube.js/issues/3076)) ([80812ea](https://github.com/cube-js/cube.js/commit/80812ea4027a929729187b096088f38829e9fa27))
+* **@cubejs-client/playground:** new tab opening, tabs refactoring, limit ([#3071](https://github.com/cube-js/cube.js/issues/3071)) ([9eb0950](https://github.com/cube-js/cube.js/commit/9eb09505f5d807cff3aef36a36140ff7a8b4c650))
+* **cubestore:** fix panic 'Unexpected accumulator state List([NULL])' ([cfe8647](https://github.com/cube-js/cube.js/commit/cfe8647d9ffd03dfde3d0fc028249a3c43ecb527))
+
+
+### Performance Improvements
+
+* **@cubejs-client/core:** speed up the pivot implementaion ([#3075](https://github.com/cube-js/cube.js/issues/3075)) ([d6d7a85](https://github.com/cube-js/cube.js/commit/d6d7a858ea8e3940b034cd12ed1630c53e55ea6d))
+
+
+
+
+
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** security context update ([#3056](https://github.com/cube-js/cube.js/issues/3056)) ([2a879e2](https://github.com/cube-js/cube.js/commit/2a879e2695f58d9204b05c98d7bd80b7f55f572c))
+* **@cubejs-client/playground:** wrong redirect to schema page ([#3064](https://github.com/cube-js/cube.js/issues/3064)) ([2c6f9e8](https://github.com/cube-js/cube.js/commit/2c6f9e878604055e051ea37420379ea0a1cdca13))
+* **postgres-driver:** Catch error in streaming ([f73b648](https://github.com/cube-js/cube.js/commit/f73b6487cbf3403f0ea5a5c0081807b99664f619))
+* **postgres-driver:** Convert Date column to UTC date ([d1d0944](https://github.com/cube-js/cube.js/commit/d1d094462425c82a795ad5bf0bfae151bffbdf7d))
+* **postgres-driver:** Map numeric to decimal ([22b3536](https://github.com/cube-js/cube.js/commit/22b35367477cce7a03b77b9145617a6d7b1f601d))
+* **postgres-driver:** Support mapping for bpchar ([46a3860](https://github.com/cube-js/cube.js/commit/46a386047a3bf4bcab7e1d5dec3aaf2f0f98900c))
+
+
+### Features
+
+* **@cubejs-client/playground:** rollup designer v2 ([#3018](https://github.com/cube-js/cube.js/issues/3018)) ([07e2427](https://github.com/cube-js/cube.js/commit/07e2427bb8050a74bae3a4d9206a7cfee6944022))
+* **cubestore:** add some configuration variables ([23e26fa](https://github.com/cube-js/cube.js/commit/23e26fae914f2dd20c82bc61ae3836b4a384b1cf))
+
+
+
+
+
 ## [0.27.46](https://github.com/cube-js/cube.js/compare/v0.27.45...v0.27.46) (2021-07-01)
 
 

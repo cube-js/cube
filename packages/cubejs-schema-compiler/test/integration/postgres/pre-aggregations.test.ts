@@ -911,8 +911,8 @@ describe('PreAggregations', () => {
     const partitionedTables = preAggregationsDescription
       .filter(({ tableName }) => tableName.indexOf('visitors_partitioned') === 0);
 
-    expect(partitionedTables[0].refreshKeyRenewalThresholds[0]).toEqual(86400);
-    expect(partitionedTables[partitionedTables.length - 1].refreshKeyRenewalThresholds[0]).toEqual(300);
+    expect(partitionedTables[0].invalidateKeyQueries[0][2].renewalThreshold).toEqual(86400);
+    expect(partitionedTables[partitionedTables.length - 1].invalidateKeyQueries[0][2].renewalThreshold).toEqual(300);
 
     const queries = tempTablePreAggregations(preAggregationsDescription);
 

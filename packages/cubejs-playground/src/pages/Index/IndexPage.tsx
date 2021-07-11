@@ -1,8 +1,8 @@
-import { Spin } from 'antd';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
+import { CubeLoader } from '../../atoms';
 import { usePlaygroundContext } from '../../components/AppContext';
 import { useIsMounted } from '../../hooks';
 
@@ -26,7 +26,7 @@ export function IndexPage() {
     loadFiles();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (context && files != null) {
       if (context.shouldStartConnectionWizardFlow) {
         push('/connection');
@@ -41,9 +41,5 @@ export function IndexPage() {
     }
   }, [context, files]);
 
-  return (
-    <div style={{ textAlign: 'center', padding: 24 }}>
-      <Spin />
-    </div>
-  );
+  return null;
 }

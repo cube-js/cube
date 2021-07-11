@@ -106,10 +106,6 @@ const GlobalStyles = createGlobalStyle`
     monospace;
   }
 
-  #playground-root {
-    height: 100%;
-  }
-
   .schema-sidebar,
   .schema-sidebar .ant-tabs,
   .schema-sidebar .ant-tabs-content {

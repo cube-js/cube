@@ -357,4 +357,4 @@ For more information on deploying with the Serverless Framework, consult the
 [ref-docker-deployment-guide]: /deployment#docker
 [ref-sls-aws-deployment-guide]: /deployment#aws-serverless-deploy
 [ref-connecting-to-the-database]: /connecting-to-the-database
-[ref-cubejs-schema]: /getting-started-cubejs-schema
+[ref-cubejs-schema]: /schema/getting-started

@@ -9,12 +9,11 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::{app_metrics, CubeError};
 use arrow::array::{
-    Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
-    Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
-    Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
-    TimestampNanosecondArray, UInt64Array,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array,
+    Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
+    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, MutableArrayData, StringArray,
+    TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
 };
-use arrow::compute::take;
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
 use arrow::ipc::writer::MemStreamWriter;
@@ -969,7 +968,7 @@ fn regroup_batches(
                 b.columns()
                     .iter()
                     .map(|c| slice_copy(c.as_ref(), row, slice_len))
-                    .collect::<Result<Vec<_>, _>>()?,
+                    .collect(),
             )?);
             row += slice_len
         }
@@ -977,11 +976,9 @@ fn regroup_batches(
     Ok(r)
 }
 
-fn slice_copy(a: &dyn Array, start: usize, len: usize) -> Result<ArrayRef, CubeError> {
+fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
     // If we use [Array::slice], serialization will still copy the whole contents.
-    Ok(take(
-        a,
-        &UInt64Array::from_iter_values(start as u64..(start + len) as u64),
-        None,
-    )?)
+    let mut a = MutableArrayData::new(vec![a.data()], false, len);
+    a.extend(0, start, start + len);
+    make_array(a.freeze())
 }
