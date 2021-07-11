@@ -4,6 +4,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
+import { inDbTimeZone } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -1667,7 +1668,14 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    return this.inIntegrationTimeZone(date).clone().utc().format();
+    return inDbTimeZone(this.timezone, this.timestampFormat(), date);
+  }
+
+  /**
+   * @return {string}
+   */
+  timestampFormat() {
+    return 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]';
   }
 
   /**
@@ -1815,7 +1823,7 @@ export class BaseQuery {
   }
 
   preAggregationPreviewSql(tableName) {
-    return [`SELECT * FROM ${tableName} LIMIT 1000`];
+    return this.paramAllocator.buildSqlAndParams(`SELECT * FROM ${tableName} LIMIT 1000`);
   }
 
   indexSql(cube, preAggregation, index, indexName, tableName) {
@@ -2076,22 +2084,6 @@ export class BaseQuery {
     }]);
   }
 
-  incrementalRefreshKeyRenewalThreshold(query, originalThreshold, updateWindow) {
-    const timeDimension = query.timeDimensions[0];
-    if (
-      updateWindow
-    ) {
-      const dateToDate = this.inIntegrationTimeZone(timeDimension.dateToFormatted())
-        .add(this.parseSecondDuration(updateWindow), 'second')
-        .toDate();
-      if (dateToDate < new Date()) {
-        // if dateTo passed just moments ago we want to renew it earlier in case of server and db clock don't match
-        return Math.min(Math.round((new Date().getTime() - dateToDate.getTime()) / 1000), 24 * 60 * 60);
-      }
-    }
-    return originalThreshold;
-  }
-
   defaultRefreshKeyRenewalThreshold() {
     return 10;
   }
@@ -2141,8 +2133,7 @@ export class BaseQuery {
 
           // eslint-disable-next-line prefer-const
           let [refreshKey, refreshKeyExternal, refreshKeyQuery] = this.everyRefreshKeySql(preAggregation.refreshKey);
-          let renewalThreshold = this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey);
-
+          const renewalThreshold = this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey);
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
               throw new UserError('Incremental refresh key can only be used for partitioned pre-aggregations');
@@ -2158,11 +2149,6 @@ export class BaseQuery {
                 refreshKey,
                 { window: preAggregation.refreshKey.updateWindow, refreshKeyQuery }
               );
-              renewalThreshold = this.incrementalRefreshKeyRenewalThreshold(
-                preAggregationQueryForSql,
-                renewalThreshold,
-                preAggregation.refreshKey.updateWindow
-              );
             }
           }
 
@@ -2171,6 +2157,11 @@ export class BaseQuery {
               refreshKeyQuery.paramAllocator.buildSqlAndParams(this.refreshKeySelect(refreshKey)).concat({
                 external: refreshKeyExternal,
                 renewalThreshold,
+                incremental: preAggregation.refreshKey.incremental,
+                updateWindowSeconds: preAggregation.refreshKey.updateWindow &&
+                  this.parseSecondDuration(preAggregation.refreshKey.updateWindow),
+                renewalThresholdOutsideUpdateWindow: preAggregation.refreshKey.incremental &&
+                  24 * 60 * 60
               })
             ];
           }

@@ -59,6 +59,7 @@
   "devDependencies": {
     "@apla/clickhouse": "^1.5.5",
     "@cubejs-backend/linter": "^0.27.0",
+    "@cubejs-backend/query-orchestrator": "^0.27.34",
     "@types/babel__code-frame": "^7.0.2",
     "@types/babel__generator": "^7.6.2",
     "@types/babel__parser": "^7.1.1",

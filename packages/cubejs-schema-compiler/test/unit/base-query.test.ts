@@ -342,16 +342,19 @@ describe('SQL Generation', () => {
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-      expect(preAggregations.length).toEqual(2);
+      expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
           'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIME2) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
           [
-            '2017-01-01T07:59:59Z',
+            '__TO_PARTITION_RANGE',
           ],
           {
             external: true,
+            incremental: true,
             renewalThreshold: 300,
+            renewalThresholdOutsideUpdateWindow: 86400,
+            updateWindowSeconds: undefined
           }
         ]
       ]);
@@ -399,12 +402,12 @@ describe('SQL Generation', () => {
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-      expect(preAggregations.length).toEqual(2);
+      expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
           'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST($1 AS DATETIME2) THEN (SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 10) as refresh_key) END as refresh_key',
           [
-            '2017-01-01T07:59:59Z'
+            '__TO_PARTITION_RANGE'
           ],
           {
             external: true,
@@ -455,7 +458,7 @@ describe('SQL Generation', () => {
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-      expect(preAggregations.length).toEqual(2);
+      expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
           'SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
@@ -486,7 +489,7 @@ describe('SQL Generation', () => {
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-      expect(preAggregations.length).toEqual(2);
+      expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
           'SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',

@@ -132,9 +132,7 @@ describe('MySqlPreAggregations', () => {
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -177,9 +175,7 @@ describe('MySqlPreAggregations', () => {
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 42))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -271,9 +267,7 @@ describe('MySqlPreAggregations', () => {
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 142))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
