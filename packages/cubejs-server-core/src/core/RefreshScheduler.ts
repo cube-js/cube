@@ -444,7 +444,6 @@ export class RefreshScheduler {
           ...sqlQuery,
           continueWait: true,
           renewQuery: true,
-          priority: 10,
           forceBuildPreAggregations: true,
           requestId: context.requestId,
           timezone: query.timezone,

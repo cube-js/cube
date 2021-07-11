@@ -492,7 +492,7 @@ class PreAggregationLoader {
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
-      await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
+      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
       return mostRecentTargetTableName();
     }
 
