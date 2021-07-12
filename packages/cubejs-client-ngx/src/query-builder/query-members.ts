@@ -4,6 +4,8 @@ import {
   TQueryOrderArray,
   moveItemInArray,
   Filter,
+  UnaryFilter,
+  BinaryFilter,
 } from '@cubejs-client/core';
 import { BehaviorSubject } from 'rxjs';
 import equal from 'fast-deep-equal';
@@ -227,7 +229,8 @@ export class FilterMember {
   constructor(private query: Query) {}
 
   private get filters() {
-    return this.query.asCubeQuery().filters || [];
+    // TODO: update this type assertion once the QueryBuilder supports logical and/or
+    return (this.query.asCubeQuery().filters || []) as (UnaryFilter | BinaryFilter)[];
   }
 
   update(by: string | number, updateWith: Partial<Filter>) {
