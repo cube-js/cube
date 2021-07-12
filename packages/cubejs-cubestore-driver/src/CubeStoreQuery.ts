@@ -43,11 +43,11 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL ${interval})`;
+    return `DATE_SUB(${date}, INTERVAL '${interval}')`;
   }
 
   public addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL ${interval})`;
+    return `DATE_ADD(${date}, INTERVAL '${interval}')`;
   }
 
   public timeGroupedColumn(granularity, dimension) {
