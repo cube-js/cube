@@ -730,7 +730,9 @@ export class CubejsServerCore {
       logger: this.logger,
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
-      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey || getEnv('allowUngroupedWithoutPrimaryKey'),
+      allowUngroupedWithoutPrimaryKey:
+        this.options.allowUngroupedWithoutPrimaryKey ||
+        getEnv("allowUngroupedWithoutPrimaryKey"),
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
