@@ -51,6 +51,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("convert_tz", convert_tz),
         t("coalesce", coalesce),
         t("count_distinct_crash", count_distinct_crash),
+        t(
+            "count_distinct_group_by_crash",
+            count_distinct_group_by_crash,
+        ),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -1049,6 +1053,48 @@ async fn count_distinct_crash(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+}
+
+async fn count_distinct_group_by_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data (n string)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data (n) VALUES ('a'), ('b'), ('c'), ('b'), ('c')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT n, COUNT(DISTINCT CASE WHEN n <> 'a' THEN n END), COUNT(*) \
+             FROM s.Data \
+             GROUP BY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![
+                TableValue::String("a".to_string()),
+                TableValue::Int(0),
+                TableValue::Int(1)
+            ],
+            vec![
+                TableValue::String("b".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+            vec![
+                TableValue::String("c".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+        ]
+    );
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
