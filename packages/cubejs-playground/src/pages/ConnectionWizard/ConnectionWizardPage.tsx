@@ -251,17 +251,24 @@ export function ConnectionWizardPage({ history }) {
                 </Typography.Paragraph>
               )}
 
-              <Typography.Paragraph>
-                For advanced configuration, use the <code>cube.js</code>{' '}
-                configuration file inside mount volume or environment variables.
-                <br />
-                <Typography.Link
-                  href="https://cube.dev/docs/connecting-to-the-database"
-                  target="_blank"
-                >
-                  Learn more about connecting to databases in the documentation.
-                </Typography.Link>
-              </Typography.Paragraph>
+              <Alert
+                type="info"
+                message={
+                  <>
+                    For advanced configuration, use the <b>cube.js</b> or <b>.env</b>{' '}
+                    configuration file inside mount volume or environment
+                    variables.
+                    <br />
+                    <Typography.Link
+                      href="https://cube.dev/docs/connecting-to-the-database"
+                      target="_blank"
+                    >
+                      Learn more about connecting to databases in the
+                      documentation.
+                    </Typography.Link>
+                  </>
+                }
+              />
 
               {db.title === 'MongoDB' ? (
                 <Alert
