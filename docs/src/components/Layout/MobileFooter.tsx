@@ -5,7 +5,7 @@ import siderMobile from '../../pages/images/mobile-sider.svg';
 import siderMobileInactive from '../../pages/images/mobile-sider-inactive.svg';
 import close from '../../pages/images/close.svg';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import { MobileModes } from '../../types';
 
 type Props = {
