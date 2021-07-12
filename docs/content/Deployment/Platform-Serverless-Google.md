@@ -1,13 +1,13 @@
 ---
-title: Deploy with Serverless Framework on AWS
-permalink: /deployment/platforms/serverless/aws
+title: Deploy with Serverless Framework on GCP
+permalink: /deployment/platforms/serverless/google-cloud
 category: Deployment
 subCategory: Platforms
-menuOrder: 2
+menuOrder: 3
 ---
 
 This guide walks you through deploying Cube.js with the [Serverless
-Framework][link-sls] on [AWS][link-aws].
+Framework][link-sls] on [Google Cloud][link-google-cloud].
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -19,8 +19,8 @@ Framework][link-sls] on [AWS][link-aws].
 
 ## Prerequisites
 
-- An AWS account
-- An [Elasticache Redis][aws-redis] cluster URL for caching and queuing
+- A Google Cloud account
+- A [Memorystore][gcp-redis] cluster URL for caching and queuing
 - A separate Cube Store deployment for pre-aggregations
 - Node.js 12+
 - Serverless Framework
@@ -30,24 +30,27 @@ Framework][link-sls] on [AWS][link-aws].
 Create a Serverless Framework project by creating a `serverless.yml`. A
 production-ready stack would at minimum consist of:
 
-- A [Lambda function][aws-lambda] for a Cube.js API instance
-- A [Lambda function][aws-lambda] for a Cube.js Refresh Worker
+- A [Cloud Function][gcp-cloud-funcs] for a Cube.js API instance
+- A [Cloud Function][gcp-cloud-funcs] for a Cube.js Refresh Worker
 
 The `serverless.yml` for an example project is provided below:
 
 ```yaml
-service: hello-cube-sls
+service: hello-cube-sls # NOTE: Don't put the word "google" in here
 
 provider:
-  name: aws
-  runtime: nodejs12.x
-  iamRoleStatements:
-    - Effect: 'Allow'
-      Action:
-        - 'sns:*'
-      Resource: '*'
+  name: google
+  stage: dev
+  runtime: nodejs12
+  region: us-central1
+  project: <YOUR_GOOGLE_PROJECT_ID_HERE>
+  # The GCF credentials can be a little tricky to set up. Luckily we've documented this for you here:
+  # https://serverless.com/framework/docs/providers/google/guide/credentials/
+  #
+  # the path to the credentials file needs to be absolute
+  credentials: </path/to/service/account/keyfile.json>
   environment:
-    CUBEJS_DB_TYPE: <YOUR_DB_TYPE_HERE>
+    CUBEJS_DB_TYPE: postgres
     CUBEJS_DB_HOST: <YOUR_DB_HOST_HERE>
     CUBEJS_DB_NAME: <YOUR_DB_NAME_HERE>
     CUBEJS_DB_USER: <YOUR_DB_USER_HERE>
@@ -56,40 +59,31 @@ provider:
     CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_API_SECRET: <YOUR_API_SECRET_HERE>
     CUBEJS_APP: '${self:service.name}-${self:provider.stage}'
-    NODE_ENV: production
-    AWS_ACCOUNT_ID:
-      Fn::Join:
-        - ''
-        - - Ref: 'AWS::AccountId'
+    CUBEJS_SERVERLESS_PLATFORM: '${self:provider.name}'
+
+plugins:
+  - serverless-google-cloudfunctions
+  - serverless-express
+
+# needs more granular excluding in production as only the serverless provider npm
+# package should be excluded (and not the whole node_modules directory)
+package:
+  exclude:
+    - node_modules/**
+    - .gitignore
+    - .git/**
 
 functions:
   cubejs:
-    handler: index.api
-    timeout: 30
+    handler: api
     events:
-      - http:
-          path: /
-          method: GET
-      - http:
-          path: /{proxy+}
-          method: ANY
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - Authorization
-              - X-Request-Id
-              - X-Amz-Date
-              - X-Amz-Security-Token
-              - X-Api-Key
+      - http: ANY
   cubejsProcess:
-    handler: index.process
-    timeout: 630
+    handler: process
     events:
-      - sns: '${self:service.name}-${self:provider.stage}-process'
-
-plugins:
-  - serverless-express
+      - event:
+          eventType: providers/cloud.pubsub/eventTypes/topic.publish
+          resource: 'projects/${self:provider.project}/topics/${self:service.name}-${self:provider.stage}-process'
 ```
 
 ### Refresh Worker
@@ -118,24 +112,25 @@ once they are successfully built, the response will change to:
 Unfortunately, Cube Store currently cannot be run using serverless platforms; we
 recommend using [Cube Cloud][link-cube-cloud] which provides a similar
 "serverless" experience instead. If you prefer self-hosting, you can use a PaaS
-such as [AWS ECS][aws-ecs] or [AWS EKS][aws-eks]. More instructions can be found
-in the [Running in Production page under Caching][ref-caching-prod].
+such as [Compute Engine][gcp-compute] or [Google Kubernetes Engine][gcp-k8s].
+More instructions can be found in the [Running in Production page under
+Caching][ref-caching-prod].
 
 ## Security
 
 ### Networking
 
-To run Cube.js within a VPC, add a `vpc` property to the `serverless.yml`:
+To run Cube.js within a VPC, add a `vpc` property to the function definition in
+`serverless.yml`:
 
 ```yaml
-provider:
-  ...
-  vpc:
-    securityGroupIds:
-      - sg-12345678901234567 # Add your DB and Redis security groups here
-    subnetIds:
-      # Add any subnets with access to your DB, Redis and the Internet
-      - subnet-12345678901234567
+functions:
+  cubejs:
+    ...
+    vpc: 'projects/<PROJECT_ID>/locations/<LOCATION>/connectors/<VPC_CONNECTOR_NAME>'
+  cubejsProcess:
+    ...
+    vpc: 'projects/<PROJECT_ID>/locations/<LOCATION>/connectors/<VPC_CONNECTOR_NAME>'
 ```
 
 ### Use JSON Web Tokens
@@ -164,10 +159,18 @@ provider:
 ...
 ```
 
+### Cube Store
+
+All Cube Store nodes (both router and workers) should only be accessible to
+Cube.js API instances and refresh workers.
+
 ## Monitoring
 
-All Cube.js logs can be found in the [AWS CloudWatch][aws-cloudwatch] log group
-for the Serverless project.
+All Cube.js logs can be found in the [Google Cloud Console for Cloud
+Functions][gcp-cloud-funcs-logs].
+
+[gcp-cloud-funcs-logs]:
+  https://console.cloud.google.com/project/_/logs?service=cloudfunctions.googleapis.com
 
 ## Update to the latest version
 
@@ -177,19 +180,17 @@ npm][link-cubejs-sls-npm]. Then update your `package.json` to use the version:
 ```json
 {
   "dependencies": {
-    "@cubejs-backend/serverless-aws": "%CURRENT_VERSION",
+    "@cubejs-backend/serverless-google": "%CURRENT_VERSION",
     "@cubejs-backend/serverless": "%CURRENT_VERSION"
   }
 }
 ```
 
-[aws-cloudwatch]: https://aws.amazon.com/cloudwatch/
-[aws-ec2]: https://aws.amazon.com/ec2/
-[aws-ecs]: https://aws.amazon.com/ecs/
-[aws-eks]: https://aws.amazon.com/eks/
-[aws-lambda]: https://aws.amazon.com/lambda/
-[aws-redis]: https://aws.amazon.com/elasticache/redis/
-[link-aws]: https://aws.amazon.com/
+[gcp-cloud-funcs]: https://cloud.google.com/functions/
+[gcp-compute]: https://cloud.google.com/compute/
+[gcp-k8s]: https://cloud.google.com/kubernetes-engine/
+[gcp-redis]: https://cloud.google.com/memorystore/
+[link-google-cloud]: https://cloud.google.com/
 [link-sls]: https://www.serverless.com/
 [link-cube-cloud]: https://cubecloud.dev
 [link-cubejs-sls-npm]: https://www.npmjs.com/package/@cubejs-backend/serverless

@@ -354,7 +354,7 @@ For more information on deploying with the Serverless Framework, consult the
 [link-serverless-framework]: https://www.serverless.com/
 [ref-dev-playground]: /dev-tools/dev-playground
 [ref-frontend-intro]: /frontend-introduction
-[ref-docker-deployment-guide]: /deployment#docker
-[ref-sls-aws-deployment-guide]: /deployment#aws-serverless-deploy
+[ref-docker-deployment-guide]: /deployment/platforms/docker
+[ref-sls-aws-deployment-guide]: /deployment/serverless/aws
 [ref-connecting-to-the-database]: /connecting-to-the-database
 [ref-cubejs-schema]: /schema/getting-started

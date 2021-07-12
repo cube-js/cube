@@ -472,11 +472,11 @@ span.group-header {
           color: $dark-01;
 
           .ant-menu-item {
+            padding: 0.25rem 0;
             margin-left: 20px;
             font-size: 15px;
-            line-height: 25px;
-            height: 29px;
-            min-height: 20px;
+            line-height: 1.5rem;
+            min-height: 1.25rem;
 
             &:first-child {
               margin-top: 6px !important;
