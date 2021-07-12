@@ -185,11 +185,11 @@ export class QueryQueue {
           if (!obj[query.queryKey]) {
             obj[query.queryKey] = {
               ...query,
-              statuses: []
+              status: []
             };
           }
   
-          obj[query.queryKey].statuses.push(status);
+          obj[query.queryKey].status.push(status);
         });
         return obj;
       }, {}));
