@@ -1,11 +1,8 @@
-use crate::metastore::ColumnType::Timestamp;
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::Hll;
 use crate::CubeError;
-use arrow::array::{
-    Array, BinaryArray, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder,
-};
-use arrow::datatypes::{DataType, IntervalUnit, TimeUnit, TimestampNanosecondType};
+use arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
+use arrow::datatypes::{DataType, TimeUnit, TimestampNanosecondType};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
@@ -270,7 +267,7 @@ impl CubeScalarUDF for DateAdd {
                                 ));
                             }
 
-                            let years_to_add = (*v / 12);
+                            let years_to_add = *v / 12;
                             let months_to_add = (*v % 12) as u32;
 
                             let mut year = result_date.year() + years_to_add;
