@@ -55,6 +55,9 @@ pub mod table;
 pub mod telemetry;
 pub mod util;
 
+pub use datafusion::cube_ext::spawn;
+pub use datafusion::cube_ext::spawn_blocking;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
     pub message: String,
@@ -71,7 +74,7 @@ pub enum CubeErrorCauseType {
 }
 
 impl CubeError {
-    fn display_with_backtrace(&'a self) -> impl Display + 'a {
+    pub fn display_with_backtrace(&'a self) -> impl Display + 'a {
         struct WithBt<'a>(&'a CubeError);
         impl Display for WithBt<'_> {
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -110,7 +113,7 @@ impl CubeError {
         }
     }
 
-    fn from_debug_error<E: Debug>(error: E) -> CubeError {
+    pub fn from_debug_error<E: Debug>(error: E) -> CubeError {
         CubeError {
             message: format!("{:?}", error),
             backtrace: Backtrace::capture().to_string(),

@@ -565,8 +565,9 @@ describe('QueryOrchestrator', () => {
         preAggregationsSchema: 'stb_pre_aggregations',
         tableName: 'stb_pre_aggregations.orders_d20181103',
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20181103 AS SELECT * FROM public.orders', []],
-        invalidateKeyQueries: [['SELECT NOW()', []]],
-        refreshKeyRenewalThresholds: [0.001]
+        invalidateKeyQueries: [['SELECT NOW()', [], {
+          renewalThreshold: 0.001
+        }]],
       }]
     };
 
@@ -617,18 +618,22 @@ describe('QueryOrchestrator', () => {
       query: 'SELECT * FROM orders',
       values: [],
       cacheKeyQueries: {
-        refreshKeyRenewalThresholds: [21600, 120],
         queries: [
-          ['SELECT NOW()', []],
-          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', []]
+          ['SELECT NOW()', [], {
+            renewalThreshold: 21600,
+          }],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
+            renewalThreshold: 120,
+          }]
         ]
       },
       preAggregations: [{
         preAggregationsSchema: 'stb_pre_aggregations',
         tableName: 'stb_pre_aggregations.orders_d20201103',
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
-        invalidateKeyQueries: [['SELECT NOW() as now', []]],
-        refreshKeyRenewalThresholds: [86400]
+        invalidateKeyQueries: [['SELECT NOW() as now', [], {
+          renewalThreshold: 86400,
+        }]]
       }],
       requestId: 'in memory cache',
     };
@@ -637,17 +642,17 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[0])
+        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[0].slice(0, 2))
       )
     ).toBe(true);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[1])
+        queryOrchestrator.queryCache.queryRedisKey(query.cacheKeyQueries.queries[1].slice(0, 2))
       )
     ).toBe(false);
     expect(
       queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.queryRedisKey(query.preAggregations[0].invalidateKeyQueries[0])
+        queryOrchestrator.queryCache.queryRedisKey(query.preAggregations[0].invalidateKeyQueries[0].slice(0, 2))
       )
     ).toBe(true);
   });
@@ -745,5 +750,64 @@ describe('QueryOrchestrator', () => {
       structure_version: 'ezlvkhjl',
       naming_version: 2
     });
+  });
+
+  test('loadRefreshKeys', async () => {
+    const preAggregationsLoadCacheByDataSource = {};
+    const preAggregationExternalRefreshKey = {
+      preAggregationsLoadCacheByDataSource,
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [
+          ['SELECT refreshKey in source database', [], {
+            renewalThreshold: 21600,
+            external: false,
+          }],
+          ['SELECT refreshKey in external database', [], {
+            renewalThreshold: 21600,
+            external: true,
+          }]
+        ]
+      },
+      preAggregations: [],
+      renewQuery: true,
+      requestId: 'loadRefreshKeys should respect external flag'
+    };
+
+    const driverQueryMock = jest.spyOn(mockDriver, 'query').mockImplementation(async () => []);
+    const externalDriverQueryMock = jest.spyOn(externalMockDriver, 'query').mockImplementation(async () => []);
+
+    const refreshKeys = await queryOrchestrator.loadRefreshKeys(preAggregationExternalRefreshKey);
+    console.log(refreshKeys);
+
+    expect(driverQueryMock.mock.calls.length).toEqual(1);
+    expect(driverQueryMock.mock.calls[0]).toEqual([
+      'SELECT refreshKey in source database',
+      [],
+      {
+        queryKey: [
+          'SELECT refreshKey in source database',
+          [],
+        ],
+        query: 'SELECT refreshKey in source database',
+        values: [],
+        requestId: preAggregationExternalRefreshKey.requestId,
+      }
+    ]);
+
+    expect(externalDriverQueryMock.mock.calls.length).toEqual(1);
+    expect(externalDriverQueryMock.mock.calls[0]).toEqual([
+      'SELECT refreshKey in external database',
+      [],
+      {
+        queryKey: [
+          'SELECT refreshKey in external database',
+          [],
+        ],
+        query: 'SELECT refreshKey in external database',
+        values: [],
+        requestId: preAggregationExternalRefreshKey.requestId,
+      }
+    ]);
   });
 });

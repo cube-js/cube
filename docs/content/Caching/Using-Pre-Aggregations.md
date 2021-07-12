@@ -298,13 +298,8 @@ Cube Store to ingest.
 </div>
 
 The performance scales to the amount of memory available on the Cube.js
-instance. Support is currently available for:
-
-- [AWS Athena][ref-connect-db-athena] (coming soon)
-- [AWS Redshift][ref-connect-db-redshift]
-- [BigQuery][ref-connect-db-bigquery]
-- [MySQL][ref-connect-db-mysql]
-- [Postgres][ref-connect-db-postgres]
+instance. Batching is automatically enabled for any databases that can support
+it.
 
 ### Export bucket
 
@@ -324,7 +319,8 @@ Cube Store in parallel:
   />
 </div>
 
-Export buckets are currently supported for the following databases:
+Enabling the export bucket functionality requires extra configuration; please
+refer to the database-specific documentation for more details:
 
 - [AWS Athena][ref-connect-db-athena] (coming soon)
 - [AWS Redshift][ref-connect-db-redshift]

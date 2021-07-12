@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { Tabs as AntdTabs } from 'antd';
 
-const StyledTabs: any = styled(AntdTabs)`
+const StyledTabs = styled(AntdTabs)`
   && {
     .ant-tabs-nav {
       padding: 0 16px;
@@ -11,11 +11,6 @@ const StyledTabs: any = styled(AntdTabs)`
     .ant-tabs-content-holder {
       padding: 0 16px;
     }
-  }
-`;
-
-StyledTabs.TabPane = styled(AntdTabs.TabPane)`
-  && {
   }
 `;
 

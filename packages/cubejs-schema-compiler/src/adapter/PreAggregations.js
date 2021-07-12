@@ -110,16 +110,15 @@ export class PreAggregations {
 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
-
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
-    const refreshKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
-    
+
     const {
       refreshRangeStart,
       refreshRangeEnd,
       refreshKey
     } = this.query.preAggregationRefreshSql(cube, preAggregation);
 
+    const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
@@ -127,14 +126,13 @@ export class PreAggregations {
       refreshRangeStart,
       refreshRangeEnd,
       refreshKey,
+      invalidateKeyQueries,
       external: preAggregation.external,
       previewSql: this.query.preAggregationPreviewSql(tableName),
       preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
       dataSource: this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dataSource,
-      invalidateKeyQueries: refreshKeyQueries.queries,
-      refreshKeyRenewalThresholds: refreshKeyQueries.refreshKeyRenewalThresholds,
       indexesSql: Object.keys(preAggregation.indexes || {}).map(
         index => {
           // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
