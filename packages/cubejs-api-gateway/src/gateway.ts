@@ -578,7 +578,7 @@ export class ApiGateway {
   }
 
   public async getPreAggregationsInQueue(
-    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+    { context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
     try {
