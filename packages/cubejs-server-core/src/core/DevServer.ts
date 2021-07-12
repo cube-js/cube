@@ -1,5 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
+import { CubePreAggregationConverter, CubeSchemaConverter } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -416,7 +417,7 @@ export class DevServer {
     app.post('/playground/test-connection', catchErrors(async (req, res) => {
       const { variables = {} } = req.body || {};
 
-      let driver: BaseDriver|null = null;
+      let driver: BaseDriver | null = null;
 
       try {
         if (!variables.CUBEJS_DB_TYPE) {
@@ -491,6 +492,32 @@ export class DevServer {
       const token = jwt.sign(payload, options.apiSecret, jwtOptions);
 
       res.json({ token });
+    }));
+
+    app.post('/playground/schema/pre-aggregation', catchErrors(async (req, res) => {
+      // todo: check for existing pre-aggregations
+      const { cubeName, preAggregationName, code } = req.body;
+
+      const schemaConverter = new CubeSchemaConverter(this.cubejsServer.repository, [
+        new CubePreAggregationConverter({
+          cubeName,
+          preAggregationName,
+          code
+        })
+      ]);
+      await schemaConverter.generate();
+
+      schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
+        if (currentCubeName === cubeName) {
+          this.cubejsServer.repository.saveDataSchemaFile(fileName, source);
+        }
+      })
+
+      res.json({
+        cubeName,
+        preAggregationName,
+        code
+      });
     }));
   }
 

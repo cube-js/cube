@@ -163,6 +163,8 @@ export function RollupDesigner({
             cube.
           </Paragraph>
 
+          <Button onClick={handleAddToSchemaClick}>Add to Schema</Button>
+
           <CodeSnippet
             style={{ marginBottom: 16 }}
             code={preAggregation.code}
@@ -172,6 +174,10 @@ export function RollupDesigner({
     }
 
     return null;
+  }
+
+  function handleAddToSchemaClick() {
+
   }
 
   return (

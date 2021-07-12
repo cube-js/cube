@@ -57,7 +57,7 @@ export type ServerCoreInitializedOptions = Required<
   'scheduledRefreshContexts'
 >;
 
-function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
+function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   if (typeof possibleFn === 'function') {
     return <any>possibleFn;
   }
@@ -68,7 +68,7 @@ function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
 export class CubejsServerCore {
   public readonly repository: FileRepository;
 
-  protected devServer: DevServer|undefined;
+  protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
