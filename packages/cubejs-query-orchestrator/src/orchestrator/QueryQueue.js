@@ -161,6 +161,7 @@ export class QueryQueue {
         redisClient.getActiveQueries(),
         redisClient.getToProcessQueries()
       ]);
+
       const mapWithDefinition = (arr) => Promise.all(arr.map(async queryKey => ({
         ...(await redisClient.getQueryDef(queryKey)),
         queryKey
@@ -170,14 +171,26 @@ export class QueryQueue {
         [stalledQueries, orphanedQueries, activeQueries, toProcessQueries].map(arr => mapWithDefinition(arr))
       );
 
-      return {
-        toCancel: [
-          ...stalled,
-          ...orphaned
-        ],
+      const result = {
+        orphaned,
+        stalled,
         active,
         toProcess
       };
+
+      return Object.values(Object.keys(result).reduce((obj, status) => {
+        result[status].forEach(query => {
+          if (!obj[query.queryKey]) {
+            obj[query.queryKey] = {
+              ...query,
+              statuses: []
+            };
+          }
+  
+          obj[query.queryKey].statuses.push(status);
+        });
+        return obj;
+      }, {}));
     } finally {
       this.queueDriver.release(redisClient);
     }
