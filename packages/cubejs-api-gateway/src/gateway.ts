@@ -400,7 +400,6 @@ export class ApiGateway {
 
       app.post('/cubejs-system/v1/pre-aggregations/queue', jsonParser, systemMiddlewares, (async (req, res) => {
         await this.getPreAggregationsInQueue({
-          query: req.body.query,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -578,7 +577,7 @@ export class ApiGateway {
   }
 
   public async getPreAggregationsInQueue(
-    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+    { context, res }: { context: RequestContext, res: ResponseResultFn }
   ) {
     const requestStarted = new Date();
     try {
