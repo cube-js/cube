@@ -58,6 +58,7 @@
     "gatsby-plugin-root-import": "^2.0.5",
     "gatsby-plugin-s3": "^0.2.5",
     "gatsby-plugin-sass": "^4",
+    "gatsby-plugin-sharp": "^3",
     "gatsby-plugin-sitemap": "^4",
     "gatsby-redirect-from": "^0.2.4",
     "gatsby-remark-copy-linked-files": "^3",
