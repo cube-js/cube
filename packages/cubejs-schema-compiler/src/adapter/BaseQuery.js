@@ -1734,37 +1734,42 @@ export class BaseQuery {
               external: false,
               renewalThreshold: this.defaultRefreshKeyRenewalThreshold()
             },
-            this
+            this,
+            false,
           ];
         }
 
         if (cubeFromPath.refreshKey.every) {
           const [sql, external, query] = this.everyRefreshKeySql(cubeFromPath.refreshKey);
           return [
-            this.refreshKeySelect(sql),
+            sql,
             {
               external,
               renewalThreshold: this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey)
             },
-            query
+            query,
+            true,
           ];
         }
       }
 
       const [sql, external, query] = this.everyRefreshKeySql(this.defaultEveryRefreshKey());
       return [
-        this.refreshKeySelect(sql),
+        sql,
         {
           external,
           renewalThreshold: this.defaultRefreshKeyRenewalThreshold()
         },
-        query
+        query,
+        true,
       ];
     };
 
     return cubes.map(cube => [cube, refreshKeyQueryByCube(cube)])
-      .map(([cube, refreshKeyTuple]) => (transformFn ? transformFn(cube, refreshKeyTuple) : refreshKeyTuple))
-      .map(([sql, options, query]) => query.paramAllocator.buildSqlAndParams(sql).concat(options));
+      .map(([cube, queryTuple]) => (transformFn ? transformFn(cube, queryTuple) : queryTuple))
+      .map(([sql, options, query, addSelect]) => query.paramAllocator
+        .buildSqlAndParams(addSelect ? this.refreshKeySelect(sql) : sql)
+        .concat(options));
   }
 
   aggSelectForDimension(cube, dimension, aggFunction) {
@@ -2193,19 +2198,18 @@ export class BaseQuery {
           const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
           return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
             () => preAggregationQueryForSql.cacheKeyQueries(
-              (refreshKeyCube, [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery]) => {
+              (refreshKeyCube, [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery, refreshKeyAddSelect]) => {
                 if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
                   return [
-                    this.refreshKeySelect(
-                      this.incrementalRefreshKey(preAggregationQueryForSql, `(${refreshKeySQL})`, {
-                        refreshKeyQuery
-                      })
-                    ),
+                    this.incrementalRefreshKey(preAggregationQueryForSql, `(${refreshKeySQL})`, {
+                      refreshKeyQuery
+                    }),
                     {
                       external: refreshKeyQueryOptions.external,
                       renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
                     },
-                    refreshKeyQuery
+                    refreshKeyQuery,
+                    true
                   ];
                 } else if (!cubeFromPath.refreshKey) {
                   const [sql, external, query] = this.everyRefreshKeySql({
@@ -2213,16 +2217,17 @@ export class BaseQuery {
                   });
 
                   return [
-                    this.refreshKeySelect(sql),
+                    sql,
                     {
                       external,
                       renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
                     },
-                    query
+                    query,
+                    true
                   ];
                 }
 
-                return [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery];
+                return [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery, refreshKeyAddSelect];
               }
             ),
             { preAggregationQuery: true }

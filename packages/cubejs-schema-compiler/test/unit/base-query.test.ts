@@ -402,7 +402,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(2);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST($1 AS DATETIME2) THEN (SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 10) as refresh_key) END as refresh_key',
+          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST($1 AS DATETIME2) THEN (FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 10)) END as refresh_key',
           [
             '2017-01-01T07:59:59Z'
           ],
