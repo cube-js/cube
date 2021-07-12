@@ -2,7 +2,7 @@ use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::Hll;
 use crate::CubeError;
 use arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
-use arrow::datatypes::{DataType, TimeUnit, TimestampNanosecondType};
+use arrow::datatypes::{DataType, TimeUnit};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
