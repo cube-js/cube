@@ -17,7 +17,6 @@ use serde_derive::{Deserialize, Serialize};
 use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::sync::Arc;
-use mysql_common::time::is_leap_year;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeScalarUDFKind {
@@ -200,6 +199,13 @@ fn datetime_safety_unwrap(opt: Option<DateTime<Utc>>) -> Result<DateTime<Utc>, D
     ));
 }
 
+fn last_day_of_month(year: i32, month: u32) -> u32 {
+    NaiveDate::from_ymd_opt(year, month + 1, 1)
+        .unwrap_or(NaiveDate::from_ymd(year + 1, 1, 1))
+        .pred()
+        .day()
+}
+
 struct DateAdd {}
 impl DateAdd {
     fn signature() -> Signature {
@@ -261,11 +267,11 @@ impl CubeScalarUDF for DateAdd {
                                 return Err(DataFusionError::Plan(
                                     "Second argument of `DATE_PART` must be a positive Interval"
                                         .to_string(),
-                                ))
+                                ));
                             }
 
                             let years_to_add = (*v / 12);
-                            let months_to_add = (*v % 12 ) as u32;
+                            let months_to_add = (*v % 12) as u32;
 
                             let mut year = result_date.year() + years_to_add;
                             let mut month = result_date.month();
@@ -280,26 +286,25 @@ impl CubeScalarUDF for DateAdd {
 
                             assert!(month <= 12);
 
-                            if !is_leap_year(year) {
-                                if (month == 2) && (day == 29) {
-                                    day = 1;
-                                    month += 1;
-                                }
+                            let days_in_month = last_day_of_month(year, month);
+
+                            if day > days_in_month {
+                                day = days_in_month;
                             }
 
                             result_date = datetime_safety_unwrap(result_date.with_day(1))?;
 
                             // @todo Optimize? Chrono is using string -> parsing and applying it back to obj
                             result_date = datetime_safety_unwrap(result_date.with_month(month))?;
-                            result_date = datetime_safety_unwrap(result_date.with_day(day))?;
                             result_date = datetime_safety_unwrap(result_date.with_year(year))?;
+                            result_date = datetime_safety_unwrap(result_date.with_day(day))?;
                         }
                         ScalarValue::IntervalDayTime(Some(v)) => {
                             if *v < 0 {
                                 return Err(DataFusionError::Plan(
                                     "Second argument of `DATE_PART` must be a positive Interval"
                                         .to_string(),
-                                ))
+                                ));
                             }
 
                             let days_parts: i64 = (((*v as u64) & 0xFFFFFFFF00000000) >> 32) as i64;

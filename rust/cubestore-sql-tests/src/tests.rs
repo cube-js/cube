@@ -2677,8 +2677,12 @@ async fn date_add(service: Box<dyn SqlClient>) {
             DATE_ADD(CAST('2021-12-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
             DATE_ADD(CAST('2021-12-31T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
             DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2020-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
             DATE_ADD(CAST('2021-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
-            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 year')\
+            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 year'),\
+            DATE_ADD(CAST('2021-01-30T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2020-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2021-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month')\
         ",
         )
         .await
@@ -2702,8 +2706,12 @@ async fn date_add(service: Box<dyn SqlClient>) {
             TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
             TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
             TableValue::Timestamp(timestamp_from_string("2020-03-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
             TableValue::Timestamp(timestamp_from_string("2021-03-01T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-03-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
         ],]
     );
 }
