@@ -17,6 +17,7 @@ use serde_derive::{Deserialize, Serialize};
 use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::sync::Arc;
+use mysql_common::time::is_leap_year;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeScalarUDFKind {
@@ -189,6 +190,16 @@ impl CubeScalarUDF for UnixTimestamp {
     }
 }
 
+fn datetime_safety_unwrap(opt: Option<DateTime<Utc>>) -> Result<DateTime<Utc>, DataFusionError> {
+    if opt.is_some() {
+        return Ok(opt.unwrap());
+    }
+
+    return Err(DataFusionError::Internal(
+        "Unable to calculate operation between DateTime and Interval".to_string(),
+    ));
+}
+
 struct DateAdd {}
 impl DateAdd {
     fn signature() -> Signature {
@@ -211,7 +222,7 @@ impl CubeScalarUDF for DateAdd {
             return_type: Arc::new(|inputs| {
                 assert!(inputs.len() == 2);
 
-                // Right now, We support only TimeUnit::Nanosecond without TZ
+                // Right now, we support only TimeUnit::Nanosecond without TZ
                 Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
             }),
             fun: Arc::new(|inputs| {
@@ -223,7 +234,7 @@ impl CubeScalarUDF for DateAdd {
 
                 let mut result_date = match &inputs[0] {
                     ColumnarValue::Scalar(scalar) => match (scalar.get_datatype(), scalar) {
-                        // Right now, We support only TimeUnit::Nanosecond without TZ
+                        // Right now, we support only TimeUnit::Nanosecond without TZ
                         (
                             DataType::Timestamp(TimeUnit::Nanosecond, None),
                             ScalarValue::TimestampNanosecond(Some(v)),
@@ -246,11 +257,19 @@ impl CubeScalarUDF for DateAdd {
                 match &inputs[1] {
                     ColumnarValue::Scalar(scalar) => match scalar {
                         ScalarValue::IntervalYearMonth(Some(v)) => {
-                            let years_to_add = (*v as f64 / 12_f64).floor() as i32;
-                            let months_to_add = (*v - (years_to_add * 12)) as u32;
+                            if *v < 0 {
+                                return Err(DataFusionError::Plan(
+                                    "Second argument of `DATE_PART` must be a positive Interval"
+                                        .to_string(),
+                                ))
+                            }
+
+                            let years_to_add = (*v / 12);
+                            let months_to_add = (*v % 12 ) as u32;
 
                             let mut year = result_date.year() + years_to_add;
                             let mut month = result_date.month();
+                            let mut day = result_date.day();
 
                             if month + months_to_add > 12 {
                                 year += 1;
@@ -259,10 +278,30 @@ impl CubeScalarUDF for DateAdd {
                                 month += months_to_add;
                             }
 
-                            result_date = result_date.with_year(year).unwrap();
-                            result_date = result_date.with_month(month).unwrap();
+                            assert!(month <= 12);
+
+                            if !is_leap_year(year) {
+                                if (month == 2) && (day == 29) {
+                                    day = 1;
+                                    month += 1;
+                                }
+                            }
+
+                            result_date = datetime_safety_unwrap(result_date.with_day(1))?;
+
+                            // @todo Optimize? Chrono is using string -> parsing and applying it back to obj
+                            result_date = datetime_safety_unwrap(result_date.with_month(month))?;
+                            result_date = datetime_safety_unwrap(result_date.with_day(day))?;
+                            result_date = datetime_safety_unwrap(result_date.with_year(year))?;
                         }
                         ScalarValue::IntervalDayTime(Some(v)) => {
+                            if *v < 0 {
+                                return Err(DataFusionError::Plan(
+                                    "Second argument of `DATE_PART` must be a positive Interval"
+                                        .to_string(),
+                                ))
+                            }
+
                             let days_parts: i64 = (((*v as u64) & 0xFFFFFFFF00000000) >> 32) as i64;
                             let milliseconds_part: i64 = ((*v as u64) & 0xFFFFFFFF) as i64;
 
