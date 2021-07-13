@@ -1,5 +1,6 @@
 import equals from 'fast-deep-equal';
 import { memo } from 'react';
+import { PlaygroundContext } from '../../components/AppContext';
 
 import { PlaygroundWrapper } from './PlaygroundWrapper';
 import {
@@ -12,6 +13,7 @@ import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/Q
 type QueryBuilderProps = {
   token: string;
   identifier?: string;
+  playgroundContext?: PlaygroundContext;
 } & Pick<
   PlaygroundQueryBuilderProps,
   | 'apiUrl'
@@ -34,6 +36,7 @@ function QueryBuilderComponent({
       identifier={identifier}
       token={token}
       tokenUpdater={props.tokenUpdater}
+      playgroundContext={props.playgroundContext}
       onTokenPayloadChange={props.onTokenPayloadChange}
     >
       <QueryBuilderContainer token={token} {...props} />

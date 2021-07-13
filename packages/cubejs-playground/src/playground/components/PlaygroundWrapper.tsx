@@ -36,7 +36,6 @@ export function PlaygroundWrapper({
     <StyledWrapper>
       <BrowserRouter>
         <AppContextProvider
-          isCloud
           identifier={identifier}
           playgroundContext={playgroundContext}
         >
