@@ -115,6 +115,8 @@ export class CubejsServerCore {
   public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
 
+    this.coreServerVersion = version;
+
     this.logger = opts.logger || (
       process.env.NODE_ENV !== 'production'
         ? devLogger(process.env.CUBEJS_LOG_LEVEL)
@@ -174,10 +176,6 @@ export class CubejsServerCore {
 
       if (!this.anonymousId) {
         this.anonymousId = getAnonymousId();
-      }
-
-      if (!this.coreServerVersion) {
-        this.coreServerVersion = version;
       }
 
       const internalExceptionsEnv = getEnv('internalExceptions');
@@ -576,6 +574,7 @@ export class CubejsServerCore {
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
+        serverCoreVersion: this.coreServerVersion
       }
     );
   }

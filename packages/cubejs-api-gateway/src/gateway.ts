@@ -200,6 +200,7 @@ export interface ApiGatewayOptions {
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
   playgroundAuthSecret?: string;
+  serverCoreVersion?: string;
 }
 
 export class ApiGateway {
@@ -1320,6 +1321,8 @@ export class ApiGateway {
   protected createSystemContextHandler = (basePath: string): RequestHandler => {
     const body: Readonly<Record<string, any>> = {
       basePath,
+      dockerVersion: getEnv('dockerImageVersion') || null,
+      serverCoreVersion: this.options.serverCoreVersion || null
     };
 
     return (req, res) => {
