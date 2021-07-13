@@ -233,7 +233,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12.x]
-        db: ['clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb', 'mysql-aurora-serverless']
+        db: ['clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb', 'mysql-aurora-serverless', 'cubestore']
       fail-fast: false
 
     steps:

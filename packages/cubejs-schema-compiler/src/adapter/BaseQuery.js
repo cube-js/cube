@@ -2195,6 +2195,11 @@ export class BaseQuery {
             () => preAggregationQueryForSql.cacheKeyQueries(
               (refreshKeyCube, [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery]) => {
                 if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
+                  /**
+                   * It's not supported in Cube Store, because it doesnt support Sub Query
+                   * There is a PR with fix for that https://github.com/cube-js/cube.js/pull/3098
+                   * But probably we will remove immutable refreshKeys in the future
+                   */
                   return [
                     this.refreshKeySelect(
                       this.incrementalRefreshKey(preAggregationQueryForSql, `(${refreshKeySQL})`, {

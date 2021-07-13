@@ -23,7 +23,9 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src/*.ts",
-    "lint:fix": "eslint --fix src/*.ts"
+    "lint:fix": "eslint --fix src/*.ts",
+    "integration": "jest",
+    "integration:cubestore": "jest"
   },
   "dependencies": {
     "@cubejs-backend/cubestore": "^0.27.52",
@@ -42,6 +44,7 @@
     "ws": "^7.4.3"
   },
   "devDependencies": {
+    "@cubejs-backend/testing": "^0.27.51",
     "@cubejs-backend/linter": "^0.27.0",
     "@types/flatbuffers": "^1.10.0",
     "@types/generic-pool": "^3.1.9",
@@ -53,6 +56,12 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/dist/test/*.(test|spec).(ts|js)"
+    ],
+    "testEnvironment": "node"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
