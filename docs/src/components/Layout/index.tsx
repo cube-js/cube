@@ -15,7 +15,7 @@ import MainMenu from './MainMenu';
 import ScrollMenu from './ScrollMenu';
 import FrameworkSwitcher from '../templates/FrameworkSwitcher';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import '../../../static/styles/prism.scss';
 import { renameCategory } from '../../rename-category';
 import {

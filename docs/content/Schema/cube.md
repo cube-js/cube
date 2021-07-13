@@ -356,7 +356,7 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 
 Each cube in schema can have it's own `dataSource` name to support scenarios where data should be fetched from multiple databases.
 Value of `dataSource` parameter will be passed to [`dbType`][ref-config-dbtype] and
-[`driverFactory`][ref-config-driverfactory] functions as part of the context paramameter.
+[`driverFactory`][ref-config-driverfactory] functions as part of the context parameter.
 By default, each cube has a `default` value for it's `dataSource`.
 To override it you can use:
 
