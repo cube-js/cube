@@ -13,8 +13,7 @@ import { ErrorReporter } from './ErrorReporter';
 const moduleFileCache = {};
 
 export class DataSchemaCompiler {
-  constructor(repository, options) {
-    options = options || {};
+  constructor(repository, options = {}) {
     this.repository = repository;
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
@@ -46,7 +45,6 @@ export class DataSchemaCompiler {
   }
 
   compile() {
-    const self = this;
     if (!this.compilePromise) {
       this.compilePromise = this.repository.dataSchemaFiles().then((files) => {
         const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
@@ -56,7 +54,7 @@ export class DataSchemaCompiler {
         // TODO: required in order to get pre transpile compilation work
         const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
 
-        const compilePhase = (compilers) => self.compileCubeFiles(compilers, transpile(), errorsReport);
+        const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
 
         return compilePhase({ cubeCompilers: this.cubeNameCompilers })
           .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
@@ -71,6 +69,7 @@ export class DataSchemaCompiler {
         return res;
       });
     }
+
     return this.compilePromise;
   }
 
@@ -120,7 +119,6 @@ export class DataSchemaCompiler {
   }
 
   async compileCubeFiles(compilers, toCompile, errorsReport) {
-    const self = this;
     const cubes = [];
     const exports = {};
     const contexts = [];
@@ -141,8 +139,8 @@ export class DataSchemaCompiler {
         );
       });
     await asyncModules.reduce((a, b) => a.then(() => b()), Promise.resolve());
-    return self.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
-      .then(() => self.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
+    return this.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
+      .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
   }
 
   throwIfAnyErrors() {
@@ -152,10 +150,10 @@ export class DataSchemaCompiler {
   compileFile(
     file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules
   ) {
-    const self = this;
     if (compiledFiles[file.fileName]) {
       return;
     }
+
     compiledFiles[file.fileName] = true;
     const err = syntaxCheck(file.content, file.fileName);
     if (err) {
@@ -182,10 +180,10 @@ export class DataSchemaCompiler {
           asyncModules.push(fn);
         },
         require: (extensionName) => {
-          if (self.extensions[extensionName]) {
-            return new (self.extensions[extensionName])(this.cubeFactory, self);
+          if (this.extensions[extensionName]) {
+            return new (this.extensions[extensionName])(this.cubeFactory, this);
           } else {
-            const foundFile = self.resolveModuleFile(file, extensionName, toCompile, errorsReport);
+            const foundFile = this.resolveModuleFile(file, extensionName, toCompile, errorsReport);
             if (!foundFile && this.allowNodeRequire) {
               if (extensionName.indexOf('.') === 0) {
                 extensionName = path.resolve(this.repository.localPath(), extensionName);
@@ -193,7 +191,7 @@ export class DataSchemaCompiler {
               // eslint-disable-next-line global-require,import/no-dynamic-require
               return require(extensionName);
             }
-            self.compileFile(
+            this.compileFile(
               foundFile,
               errorsReport,
               cubes,

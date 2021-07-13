@@ -195,6 +195,7 @@ export class RefreshScheduler {
   ) {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
+
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;

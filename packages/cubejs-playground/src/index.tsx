@@ -32,7 +32,7 @@ async function onTokenPayloadChange(payload: Record<string, any>, token) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      payload
+      payload,
     }),
   });
   const json = await response.json();
@@ -41,7 +41,11 @@ async function onTokenPayloadChange(payload: Record<string, any>, token) {
 
 ReactDOM.render(
   <Router history={history}>
-    <AppContextProvider>
+    <AppContextProvider
+      playgroundContext={{
+        isCloud: false,
+      }}
+    >
       <App>
         <Route key="index" exact path="/" component={IndexPage} />
         <Route

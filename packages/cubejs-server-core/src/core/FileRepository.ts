@@ -37,15 +37,18 @@ export class FileRepository implements SchemaFileRepository {
   }
 
   public async dataSchemaFiles(includeDependencies: boolean = false): Promise<FileContent[]> {
-    const self = this;
-    const files = await self.getFiles('');
+    const files = await this.getFiles('');
 
     let result = await Promise.all(
       files
         .filter(file => R.endsWith('.js', file))
         .map(async file => {
-          const content = await fs.readFile(path.join(self.localPath(), file), 'utf-8');
-          return { fileName: file, content };
+          const content = await fs.readFile(path.join(this.localPath(), file), 'utf-8');
+
+          return {
+            fileName: file,
+            content
+          };
         })
     );
 
@@ -54,6 +57,12 @@ export class FileRepository implements SchemaFileRepository {
     }
 
     return result;
+  }
+
+  public writeDataSchemaFile(fileName: string, source: string) {
+    fs.writeFileSync(path.join(this.localPath(), fileName), source, {
+      encoding: 'utf-8'
+    });
   }
 
   protected async readModules() {

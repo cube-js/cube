@@ -8,3 +8,4 @@ export * from './is-mounted';
 export * from './deep-effect';
 export * from './deep-memo';
 export * from './toggle';
+export * from './server-core-version';

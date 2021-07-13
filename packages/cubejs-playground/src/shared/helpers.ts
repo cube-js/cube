@@ -1,5 +1,6 @@
 import { AvailableCube, AvailableMembers } from '@cubejs-client/react';
 import { MemberType, TCubeMember } from '@cubejs-client/core';
+import { fetch } from 'whatwg-fetch';
 
 export function ucfirst(s: string): string {
   return s[0].toUpperCase() + s.slice(1);
@@ -53,4 +54,29 @@ export function getMembersByCube(availableMembers: AvailableMembers): MembersByC
   });
 
   return Object.values(membersByCube);
+}
+
+export function playgroundFetch(url, options: any = {}) {
+  const { retries = 0, ...restOptions } = options;
+
+  return fetch(url, restOptions)
+    .then(async (r) => {
+      if (r.status === 500) {
+        let errorText = await r.text();
+        try {
+          const json = JSON.parse(errorText);
+          errorText = json.error;
+        } catch (e) {
+          // Nothing
+        }
+        throw errorText;
+      }
+      return r;
+    })
+    .catch((e) => {
+      if (e.message === 'Network request failed' && retries > 0) {
+        return playgroundFetch(url, { options, retries: retries - 1 });
+      }
+      throw e;
+    });
 }
