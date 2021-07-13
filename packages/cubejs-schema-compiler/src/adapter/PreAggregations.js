@@ -235,6 +235,7 @@ export class PreAggregations {
   }
 
   canUsePreAggregationFn(query, refs) {
+    console.log('>>>', refs);
     return PreAggregations.canUsePreAggregationForTransformedQueryFn(
       PreAggregations.transformQueryToCanUseForm(query), refs
     );

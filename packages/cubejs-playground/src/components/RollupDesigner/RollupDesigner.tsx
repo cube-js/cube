@@ -1,8 +1,9 @@
 import { Alert, Button, Input, Space, Tabs, Typography, Divider } from 'antd';
 import {
+  areQueriesEqual,
   Query,
   TimeDimensionBase,
-  TransformedQuery,
+  TransformedQuery
 } from '@cubejs-client/core';
 import styled from 'styled-components';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,11 +12,12 @@ import { AvailableMembers, useLazyDryRun } from '@cubejs-client/react';
 
 import { CodeSnippet } from '../../atoms';
 import {
+  canUsePreAggregationForTransformedQuery,
   getPreAggregationDefinition,
   PreAggregationDefinition,
-  updateQuery,
+  updateQuery
 } from './utils';
-import { useToggle } from '../../hooks';
+import { useIsMounted, useToggle } from '../../hooks';
 import { getMembersByCube, getNameMemberPairs } from '../../shared/helpers';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
@@ -58,7 +60,7 @@ export function RollupDesigner({
 }: RollupDesignerProps) {
   const [load, { isLoading, response, error }] = useLazyDryRun();
 
-  const [matching, toggleMatching] = useToggle(true);
+  const [matching, setMatching] = useState<boolean>(true);
   const [query, setQuery] = useState<Query>(defaultQuery);
   const [transformedQuery, setTransformedQuery] = useState<TransformedQuery>(
     defaultTransformedQuery
@@ -89,10 +91,19 @@ export function RollupDesigner({
   }, [query]);
 
   useEffect(() => {
+    load({ query });
+  }, [query]);
+
+  useEffect(() => {
     if (!isLoading && response) {
-      setTransformedQuery(response.transformedQueries[0]);
+      const [transformedQuery] = response.transformedQueries;
+
+      console.log('transformedQuery', JSON.stringify(transformedQuery));
+
+      setTransformedQuery(transformedQuery);
+      setMatching(canUsePreAggregationForTransformedQuery(transformedQuery, defaultQuery));
     }
-  }, [isLoading, response]);
+  }, [isLoading, response, defaultQuery]);
 
   if (
     transformedQuery.leafMeasureAdditive &&

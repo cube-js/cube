@@ -671,7 +671,9 @@ export class ApiGateway {
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
+          {
+            includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret
+          }
         ))
       );
 

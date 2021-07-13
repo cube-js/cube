@@ -1,4 +1,9 @@
-import { Query, TimeDimensionGranularity } from '@cubejs-client/core';
+import {
+  Query,
+  TimeDimensionGranularity,
+  TransformedQuery,
+} from '@cubejs-client/core';
+import { all, allPass, anyPass, contains, equals, sortBy } from 'ramda';
 
 import { QueryMemberKey } from '../../types';
 
@@ -74,9 +79,105 @@ export function updateQuery(
         (k) => key !== k
       );
     } else {
-      updatedQuery[memberType] = [...updatedQuery[memberType] || [], key];
+      updatedQuery[memberType] = [...(updatedQuery[memberType] || []), key];
     }
   }
 
   return updatedQuery;
+}
+
+// todo: refactor without Ramda
+export function canUsePreAggregationForTransformedQuery(
+  transformedQuery: TransformedQuery,
+  query: Query
+) {
+  function sortTimeDimensions(timeDimensions) {
+    return (
+      (timeDimensions &&
+        sortBy(
+          // @ts-ignore
+          (d) => d.join('.'),
+          timeDimensions.map((d) => [d.dimension, d.granularity || 'day']) // TODO granularity shouldn't be null?
+        )) ||
+      []
+    );
+  }
+  // TimeDimension :: [Dimension, Granularity]
+  // TimeDimension -> [TimeDimension]
+  function expandTimeDimension(timeDimension) {
+    const [dimension, granularity] = timeDimension;
+    const makeTimeDimension = (newGranularity) => [dimension, newGranularity];
+
+    return (
+      transformedQuery.granularityHierarchies[granularity] || [granularity]
+    ).map(makeTimeDimension);
+  }
+  // [[TimeDimension]]
+  const queryTimeDimensionsList =
+    transformedQuery.sortedTimeDimensions.map(expandTimeDimension);
+
+  function canUsePreAggregationNotAdditive(references) {
+    return (
+      transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
+      transformedQuery.allFiltersWithinSelectedDimensions &&
+      equals(
+        references.sortedDimensions || references.dimensions,
+        transformedQuery.sortedDimensions
+      ) &&
+      (all(
+        (m) => references.measures.includes(m),
+        transformedQuery.measures
+      ) ||
+        all(
+          (m) => references.measures.includes(m),
+          transformedQuery.leafMeasures
+        )) &&
+      equals(
+        transformedQuery.sortedTimeDimensions,
+        references.sortedTimeDimensions ||
+          sortTimeDimensions(references.timeDimensions)
+      )
+    );
+  }
+
+  function canUsePreAggregationLeafMeasureAdditive(references) {
+    return (
+      all(
+        (d) =>
+          (references.sortedDimensions || references.dimensions).includes(d),
+        transformedQuery.sortedDimensions
+      ) &&
+      all(
+        (m) => references.measures.includes(m),
+        transformedQuery.leafMeasures
+      ) &&
+      allPass(
+        queryTimeDimensionsList.map((tds) =>
+          anyPass(tds.map((td) => contains(td)))
+        )
+      )(
+        references.sortedTimeDimensions ||
+          sortTimeDimensions(references.timeDimensions)
+      )
+    );
+  }
+
+  let canUseFn;
+
+  if (
+    transformedQuery.leafMeasureAdditive &&
+    !transformedQuery.hasMultipliedMeasures
+  ) {
+    canUseFn = (query) =>
+      canUsePreAggregationLeafMeasureAdditive(query) ||
+      canUsePreAggregationNotAdditive(query);
+  } else {
+    canUseFn = canUsePreAggregationNotAdditive;
+  }
+
+  if (query) {
+    return canUseFn(query);
+  } else {
+    return canUseFn;
+  }
 }
