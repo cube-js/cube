@@ -34,6 +34,8 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.27.49",
+    "@cubejs-backend/schema-compiler": "^0.27.49",
     "@cubejs-backend/shared": "^0.27.47",
     "@cubejs-client/ws-transport": "^0.27.51",
     "fs-extra": "^8.1.0",
