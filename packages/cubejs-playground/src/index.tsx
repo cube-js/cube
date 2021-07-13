@@ -41,7 +41,7 @@ async function onTokenPayloadChange(payload: Record<string, any>, token) {
 
 ReactDOM.render(
   <Router history={history}>
-    <AppContextProvider>
+    <AppContextProvider isCloud={false}>
       <App>
         <Route key="index" exact path="/" component={IndexPage} />
         <Route

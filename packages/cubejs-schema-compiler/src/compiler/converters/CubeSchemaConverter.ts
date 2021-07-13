@@ -3,6 +3,14 @@ import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
 
+export type AstSet = {
+  fileName: string;
+  ast: t.File;
+  cubeDefinition: t.ObjectExpression;
+};
+
+export type AstByCubeName = Record<string, AstSet>;
+
 export interface CubeConverterInterface {
   convert(astByCubeName: AstByCubeName): void;
 }
@@ -12,20 +20,12 @@ type SchemaFile = {
   content: string;
 };
 
-export type AstSet = {
-  fileName: string;
-  ast: t.File;
-  cubeDefinition: t.ObjectExpression;
-};
-
-export type AstByCubeName = Record<string, AstSet>;
-
 export class CubeSchemaConverter {
   protected dataSchemaFiles: SchemaFile[] = [];
 
   protected parsedFiles: AstByCubeName = {};
 
-  constructor(protected fileRepository: any, protected converters: CubeConverterInterface[]) {}
+  public constructor(protected fileRepository: any, protected converters: CubeConverterInterface[]) {}
 
   protected async prepare(): Promise<void> {
     this.dataSchemaFiles = await this.fileRepository.dataSchemaFiles();
@@ -67,7 +67,7 @@ export class CubeSchemaConverter {
     });
   }
 
-  parse(file: SchemaFile) {
+  protected parse(file: SchemaFile) {
     try {
       return parse(file.content, {
         sourceFilename: file.fileName,
@@ -95,12 +95,10 @@ export class CubeSchemaConverter {
   }
 
   public getSourceFiles() {
-    return Object.entries(this.parsedFiles).map(([cubeName, file]) => {
-      return {
-        cubeName,
-        fileName: file.fileName,
-        source: generator(file.ast, {}).code,
-      };
-    });
+    return Object.entries(this.parsedFiles).map(([cubeName, file]) => ({
+      cubeName,
+      fileName: file.fileName,
+      source: generator(file.ast, {}).code,
+    }));
   }
 }

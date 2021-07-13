@@ -144,6 +144,7 @@ function ContextSetter({ context }: ContextSetterProps) {
     if (context !== null) {
       setContext({
         ready: true,
+        isCloud: false,
         playgroundContext: context,
         identifier: context.identifier,
       });

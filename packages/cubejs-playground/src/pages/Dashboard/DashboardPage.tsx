@@ -4,7 +4,7 @@ import { Spin, Button, Alert } from 'antd';
 import { Link, withRouter, Redirect } from 'react-router-dom';
 
 import DashboardSource from '../../DashboardSource';
-import fetch from '../../playground-fetch';
+import { playgroundFetch } from '../../shared/helpers';
 
 const Frame = ({ children }) => (
   <div style={{ textAlign: 'center', marginTop: 50 }}>{children}</div>
@@ -48,7 +48,7 @@ class DashboardPage extends Component<any, any> {
         loadError: this.dashboardSource.loadError,
       });
       const dashboardStatus = await (
-        await fetch('/playground/dashboard-app-status')
+        await playgroundFetch('/playground/dashboard-app-status')
       ).json();
       this.setState({
         dashboardRunning: dashboardStatus.running,

@@ -1,6 +1,8 @@
 import { parse } from '@babel/parser';
 import * as t from '@babel/types';
 
+import { UserError } from '../UserError';
+
 import { AstByCubeName, CubeConverterInterface } from './CubeSchemaConverter';
 
 export type PreAggregationDefinition = {
@@ -10,9 +12,9 @@ export type PreAggregationDefinition = {
 };
 
 export class CubePreAggregationConverter implements CubeConverterInterface {
-  constructor(protected preAggregationDefinition: PreAggregationDefinition) {}
+  public constructor(protected preAggregationDefinition: PreAggregationDefinition) {}
 
-  convert(astByCubeName: AstByCubeName): void {
+  public convert(astByCubeName: AstByCubeName): void {
     const { cubeName, preAggregationName, code } = this.preAggregationDefinition;
     const { cubeDefinition } = astByCubeName[cubeName];
 
@@ -31,17 +33,35 @@ export class CubePreAggregationConverter implements CubeConverterInterface {
       throw new Error('Pre-aggregation definition is malformed');
     }
 
-    // todo: insert `preAggregations` if it doesn't exist
+    let anchor: t.ObjectExpression | null = null;
+
     cubeDefinition.properties.forEach((prop) => {
       if (t.isObjectProperty(prop) && t.isIdentifier(prop.key)) {
-        if (prop.key.name === 'preAggregations') {
-          if (t.isObjectExpression(prop.value)) {
-            prop.value.properties.push(
-              t.objectProperty(t.identifier(preAggregationName), <t.ObjectExpression>preAggregationNode)
-            );
-          }
+        if (prop.key.name === 'preAggregations' && t.isObjectExpression(prop.value)) {
+          anchor = prop.value;
+
+          prop.value.properties.forEach((p) => {
+            if (t.isObjectProperty(p) && t.isIdentifier(p.key)) {
+              if (p.key.name === preAggregationName) {
+                throw new UserError(`Pre-aggregation '${preAggregationName}' is already defined`);
+              }
+            }
+          });
         }
       }
     });
+
+    if (anchor === null) {
+      cubeDefinition.properties.push(
+        t.objectProperty(
+          t.identifier('preAggregations'),
+          t.objectExpression([t.objectProperty(t.identifier(preAggregationName), preAggregationNode)])
+        )
+      );
+    } else {
+      (<t.ObjectExpression>anchor).properties.push(
+        t.objectProperty(t.identifier(preAggregationName), <t.ObjectExpression>preAggregationNode)
+      );
+    }
   }
 }

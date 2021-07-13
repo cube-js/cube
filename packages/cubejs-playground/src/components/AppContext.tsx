@@ -27,6 +27,7 @@ export type SystemContext = {
 };
 
 export type ContextProps = {
+  isCloud: boolean;
   ready: boolean;
   identifier?: string | null;
   playgroundContext?: PlaygroundContext;
@@ -40,6 +41,7 @@ export type AppContextProps = {
 export const AppContext = createContext<ContextProps>({} as ContextProps);
 
 export function AppContextProvider({
+  isCloud = false,
   children,
   ...contextProps
 }: AppContextProps) {
@@ -50,6 +52,7 @@ export function AppContextProvider({
   return (
     <AppContext.Provider
       value={{
+        isCloud,
         ready: false,
         ...context,
         setContext(context: Partial<ContextProps> | null) {
@@ -87,4 +90,10 @@ export function usePlaygroundContext() {
   const { playgroundContext } =  useAppContext();
 
   return playgroundContext;
+}
+
+export function useIsCloud() {
+  const { isCloud } =  useAppContext();
+
+  return isCloud;
 }

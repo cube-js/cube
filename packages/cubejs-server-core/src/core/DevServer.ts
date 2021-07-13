@@ -494,8 +494,7 @@ export class DevServer {
       res.json({ token });
     }));
 
-    app.post('/playground/schema/pre-aggregation', catchErrors(async (req, res) => {
-      // todo: check for existing pre-aggregations
+    app.post('/playground/schema/pre-aggregation', catchErrors(async (req: Request, res: Response) => {
       const { cubeName, preAggregationName, code } = req.body;
 
       const schemaConverter = new CubeSchemaConverter(this.cubejsServer.repository, [
@@ -505,19 +504,20 @@ export class DevServer {
           code
         })
       ]);
-      await schemaConverter.generate();
+
+      try {
+        await schemaConverter.generate();
+      } catch (error) {
+        res.status(400).json({ error: error.message || error });
+      }
 
       schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
         if (currentCubeName === cubeName) {
-          this.cubejsServer.repository.saveDataSchemaFile(fileName, source);
+          this.cubejsServer.repository.writeDataSchemaFile(fileName, source);
         }
       })
 
-      res.json({
-        cubeName,
-        preAggregationName,
-        code
-      });
+      res.json('ok');
     }));
   }
 

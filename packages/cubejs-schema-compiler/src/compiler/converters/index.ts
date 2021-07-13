@@ -1,2 +1,2 @@
-export * from './CubeSchemaConverter'
-export * from './CubePreAggregationConverter'
+export * from './CubeSchemaConverter';
+export * from './CubePreAggregationConverter';

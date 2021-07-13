@@ -1,6 +1,5 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';

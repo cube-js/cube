@@ -59,7 +59,7 @@ export class FileRepository implements SchemaFileRepository {
     return result;
   }
 
-  public saveDataSchemaFile(fileName: string, source: string) {
+  public writeDataSchemaFile(fileName: string, source: string) {
     fs.writeFileSync(path.join(this.localPath(), fileName), source, {
       encoding: 'utf-8'
     });

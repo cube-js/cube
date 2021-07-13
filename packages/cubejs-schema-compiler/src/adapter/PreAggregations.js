@@ -165,8 +165,7 @@ export class PreAggregations {
     const preAggregates = this.query.cubeEvaluator.preAggregationsForCube(cube);
     const originalSqlPreAggregations = R.pipe(
       R.toPairs,
-      // eslint-disable-next-line no-unused-vars
-      R.filter(([k, a]) => a.type === 'originalSql')
+      R.filter(([, a]) => a.type === 'originalSql')
     )(preAggregates);
     if (originalSqlPreAggregations.length) {
       const [preAggregationName, preAggregation] = originalSqlPreAggregations[0];

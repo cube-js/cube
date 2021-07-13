@@ -3,6 +3,7 @@ import { Query, TimeDimensionGranularity } from '@cubejs-client/core';
 import { QueryMemberKey } from '../../types';
 
 export type PreAggregationDefinition = {
+  value: string;
   code: string;
   measures: string[];
   dimensions: string[];
@@ -14,7 +15,7 @@ export function getPreAggregationDefinition(
   transformedQuery,
   preAggregationName = 'main'
 ): PreAggregationDefinition {
-  const members: Omit<PreAggregationDefinition, 'code'> = {
+  const members: Omit<PreAggregationDefinition, 'code' | 'value'> = {
     measures: [],
     dimensions: [],
   };
@@ -40,10 +41,11 @@ export function getPreAggregationDefinition(
     );
   }
 
+  const value = `{\n${lines.map((l) => `  ${l}`).join(',\n')}\n}`;
+
   return {
-    code: `${preAggregationName}: {\n${lines
-      .map((l) => `  ${l}`)
-      .join(',\n')}\n}`,
+    code: `${preAggregationName}: ${value}`,
+    value,
     ...members,
   };
 }
@@ -74,7 +76,7 @@ export function updateQuery(
         (k) => key !== k
       );
     } else {
-      updatedQuery[memberType] = [...updatedQuery[memberType] || [], key];
+      updatedQuery[memberType] = [...(updatedQuery[memberType] || []), key];
     }
   }
 
