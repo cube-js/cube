@@ -31,7 +31,10 @@ export function getPreAggregationDefinition(
     lines.push(`dimensions: [${transformedQuery.sortedDimensions.join(', ')}]`);
   }
 
-  if (transformedQuery?.sortedTimeDimensions.length) {
+  if (
+    transformedQuery?.sortedTimeDimensions.length &&
+    transformedQuery.sortedTimeDimensions[0]?.[1] != null
+  ) {
     members.timeDimension = transformedQuery.sortedTimeDimensions[0][0];
     members.granularity = transformedQuery.sortedTimeDimensions[0][1];
 
