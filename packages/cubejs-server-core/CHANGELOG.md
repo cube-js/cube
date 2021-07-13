@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.51](https://github.com/cube-js/cube.js/compare/v0.27.50...v0.27.51) (2021-07-13)
+
+
+### Bug Fixes
+
+* Use orphaned timeout from query body, pre-aggregations queue, debug API ([#3088](https://github.com/cube-js/cube.js/issues/3088)) ([83e0a0a](https://github.com/cube-js/cube.js/commit/83e0a0a2d68fe94f193cfbb4fedb3f44d0b3cc27))
+
+
+### Features
+
+* Manual build pre-aggregations, getter for queue state, debug API   ([#3080](https://github.com/cube-js/cube.js/issues/3080)) ([692372e](https://github.com/cube-js/cube.js/commit/692372e1da6ffa7b7c1718d8332d80d1e2ce2b2d))
+
+
+
+
+
 ## [0.27.50](https://github.com/cube-js/cube.js/compare/v0.27.49...v0.27.50) (2021-07-12)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

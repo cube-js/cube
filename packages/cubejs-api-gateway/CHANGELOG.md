@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.51](https://github.com/cube-js/cube.js/compare/v0.27.50...v0.27.51) (2021-07-13)
+
+
+### Features
+
+* Manual build pre-aggregations, getter for queue state, debug API   ([#3080](https://github.com/cube-js/cube.js/issues/3080)) ([692372e](https://github.com/cube-js/cube.js/commit/692372e1da6ffa7b7c1718d8332d80d1e2ce2b2d))
+
+
+
+
+
 ## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
 
 

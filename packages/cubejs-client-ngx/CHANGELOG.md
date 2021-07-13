@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.51](https://github.com/cube-js/cube.js/compare/v0.27.50...v0.27.51) (2021-07-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** incorrect types for logical and/or in query filters ([#3083](https://github.com/cube-js/cube.js/issues/3083)) ([d7014a2](https://github.com/cube-js/cube.js/commit/d7014a21add8d264d92987a3c840d98d09545457))
+
+
+
+
+
 ## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
 
 
