@@ -62,7 +62,8 @@ export class QueryQueue {
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }
-      let result = await redisClient.getResult(queryKey);
+      let result = !query.forceBuild && await redisClient.getResult(queryKey);
+      
       if (result) {
         return this.parseResult(result);
       }
@@ -149,6 +150,50 @@ export class QueryQueue {
     }
 
     return this.reconcilePromise;
+  }
+
+  async getQueries() {
+    const redisClient = await this.queueDriver.createConnection();
+    try {
+      const [stalledQueries, orphanedQueries, activeQueries, toProcessQueries] = await Promise.all([
+        redisClient.getStalledQueries(),
+        redisClient.getOrphanedQueries(),
+        redisClient.getActiveQueries(),
+        redisClient.getToProcessQueries()
+      ]);
+
+      const mapWithDefinition = (arr) => Promise.all(arr.map(async queryKey => ({
+        ...(await redisClient.getQueryDef(queryKey)),
+        queryKey
+      })));
+
+      const [stalled, orphaned, active, toProcess] = await Promise.all(
+        [stalledQueries, orphanedQueries, activeQueries, toProcessQueries].map(arr => mapWithDefinition(arr))
+      );
+
+      const result = {
+        orphaned,
+        stalled,
+        active,
+        toProcess
+      };
+
+      return Object.values(Object.keys(result).reduce((obj, status) => {
+        result[status].forEach(query => {
+          if (!obj[query.queryKey]) {
+            obj[query.queryKey] = {
+              ...query,
+              status: []
+            };
+          }
+  
+          obj[query.queryKey].status.push(status);
+        });
+        return obj;
+      }, {}));
+    } finally {
+      this.queueDriver.release(redisClient);
+    }
   }
 
   async reconcileQueueImpl() {

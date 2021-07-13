@@ -28,7 +28,8 @@ type PreAggregationsQueryingOptions = {
   timezones: string[],
   preAggregations: {
     id: string,
-    refreshRange?: [string, string]
+    refreshRange?: [string, string],
+    partitions?: string[]
   }[]
 };
 
@@ -246,7 +247,7 @@ export class RefreshScheduler {
 
     return Promise.all(preAggregations.map(async preAggregation => {
       const { timezones } = queryingOptions;
-      const { refreshRange } = preAggregationsQueringOptions[preAggregation.id] || {};
+      const { refreshRange, partitions: partitionsFilter } = preAggregationsQueringOptions[preAggregation.id] || {};
 
       const queriesForPreAggregation = preAggregation && (await Promise.all(
         timezones.map(
@@ -283,7 +284,9 @@ export class RefreshScheduler {
       return {
         timezones,
         preAggregation,
-        partitions
+        partitions: partitions.filter(p => !partitionsFilter ||
+          !partitionsFilter.length ||
+          partitionsFilter.includes(p.sql?.tableName))
       };
     }));
   }
@@ -421,5 +424,43 @@ export class RefreshScheduler {
           }
         }
       }));
+  }
+
+  public async buildPreAggregations(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    queryingOptions: PreAggregationsQueryingOptions
+  ) {
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const preAggregations = await this.preAggregationPartitions(context, compilerApi, queryingOptions);
+    const preAggregationsLoadCacheByDataSource = {};
+    
+    Promise.all(preAggregations.map(async (p: any) => {
+      const { partitions } = p;
+      return Promise.all(partitions.map(async query => {
+        const sqlQuery = await compilerApi.getSql(query);
+
+        await orchestratorApi.executeQuery({
+          ...sqlQuery,
+          continueWait: true,
+          renewQuery: true,
+          forceBuildPreAggregations: true,
+          requestId: context.requestId,
+          timezone: query.timezone,
+          scheduledRefresh: false,
+          preAggregationsLoadCacheByDataSource
+        });
+      }));
+    })).catch(e => {
+      if (e.error !== 'Continue wait') {
+        this.serverCore.logger('Manual Build Pre-aggregations Error', {
+          error: e.error || e.stack || e.toString(),
+          securityContext: context.securityContext,
+          requestId: context.requestId
+        });
+      }
+    });
+
+    return true;
   }
 }
