@@ -445,7 +445,7 @@ export class RefreshScheduler {
           continueWait: true,
           renewQuery: true,
           forceBuildPreAggregations: true,
-          orphanedTimeout: 24 * 60 * 60,
+          orphanedTimeout: 60 * 60,
           requestId: context.requestId,
           timezone: query.timezone,
           scheduledRefresh: false,
