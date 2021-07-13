@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.50](https://github.com/cube-js/cube.js/compare/v0.27.49...v0.27.50) (2021-07-12)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Use correct syntax for Intervals ([53392d7](https://github.com/cube-js/cube.js/commit/53392d7b91c8308f033fa23a303ade265af30912))
+
+
+
+
+
 ## [0.27.49](https://github.com/cube-js/cube.js/compare/v0.27.48...v0.27.49) (2021-07-08)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

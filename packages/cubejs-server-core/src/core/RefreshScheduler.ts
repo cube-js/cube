@@ -453,11 +453,13 @@ export class RefreshScheduler {
         });
       }));
     })).catch(e => {
-      this.serverCore.logger('Manual Build Pre-aggregations Error', {
-        error: e.error || e.stack || e.toString(),
-        securityContext: context.securityContext,
-        requestId: context.requestId
-      });
+      if (e.error !== 'Continue wait') {
+        this.serverCore.logger('Manual Build Pre-aggregations Error', {
+          error: e.error || e.stack || e.toString(),
+          securityContext: context.securityContext,
+          requestId: context.requestId
+        });
+      }
     });
 
     return true;

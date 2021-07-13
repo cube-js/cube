@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.27.50](https://github.com/cube-js/cube.js/compare/v0.27.49...v0.27.50) (2021-07-12)
+
+
+### Features
+
+* **cubestore:** Introduce support for DATE_ADD ([#3085](https://github.com/cube-js/cube.js/issues/3085)) ([071d7b4](https://github.com/cube-js/cube.js/commit/071d7b430566b0f42e2fc209b1888f9b4b9bb4e7))
+
+
+
+
+
 ## [0.27.48](https://github.com/cube-js/cube.js/compare/v0.27.47...v0.27.48) (2021-07-08)
 
 

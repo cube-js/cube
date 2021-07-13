@@ -561,14 +561,14 @@ export class ApiGateway {
     const requestStarted = new Date();
     try {
       query = normalizeQueryPreAggregations(this.parseQueryParam(query));
-      await this.refreshScheduler()
+      const result = await this.refreshScheduler()
         .buildPreAggregations(
           context,
           this.getCompilerApi(context),
           query
         );
 
-      res({});
+      res({ result });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted

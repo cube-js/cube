@@ -16,7 +16,7 @@ import ScrollLink, {
   SCROLL_OFFSET,
 } from '../components/templates/ScrollSpyLink';
 
-import styles from '../../static/styles/index.module.scss';
+import * as styles from '../../static/styles/index.module.scss';
 import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
 
 const mdContentCallback = () => {
@@ -50,7 +50,7 @@ type Props = {
   changePage(page: Page): void;
   setScrollSectionsAndGithubUrl: SetScrollSectionsAndGithubUrlFunction;
   data: any;
-  pathContext: any;
+  pageContext: any;
 };
 
 type State = {
@@ -73,7 +73,7 @@ class DocTemplate extends Component<Props, State> {
     this.createAnchors(
       html,
       frontmatter.title,
-      getGithubUrl(this.props.pathContext.fileAbsolutePath)
+      getGithubUrl(this.props.pageContext.fileAbsolutePath)
     );
   }
 
