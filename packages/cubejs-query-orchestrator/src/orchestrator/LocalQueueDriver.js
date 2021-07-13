@@ -5,7 +5,6 @@ export class LocalQueueDriverConnection {
   constructor(driver, options) {
     this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
-    this.orphanedTimeout = options.orphanedTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
     this.driver = driver;
@@ -66,7 +65,7 @@ export class LocalQueueDriverConnection {
     )(queueObj);
   }
 
-  addToQueue(keyScore, queryKey, time, queryHandler, query, priority, options) {
+  addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
     const queryQueueObj = {
       queryHandler,
       query,
@@ -88,7 +87,7 @@ export class LocalQueueDriverConnection {
       };
       added = 1;
     }
-    this.recent[key] = { order: time, key };
+    this.recent[key] = { order: orphanedTime, key };
 
     return [added, null, null, Object.keys(this.toProcess).length]; // TODO nulls
   }
@@ -136,7 +135,7 @@ export class LocalQueueDriverConnection {
   }
 
   getOrphanedQueries() {
-    return this.queueArray(this.recent, new Date().getTime() - this.orphanedTimeout * 1000);
+    return this.queueArray(this.recent, new Date().getTime());
   }
 
   getStalledQueries() {

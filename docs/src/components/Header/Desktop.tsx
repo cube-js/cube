@@ -1,9 +1,9 @@
 import React from 'react';
 import { Layout, Row, Col, Button, Icon } from 'antd';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import { DocsSwitcher } from '../DocsSwitcher';
-import switchStyles from '../DocsSwitcher/styles.module.scss';
+import * as switchStyles from '../DocsSwitcher/styles.module.scss';
 
 const layout = {
   leftSidebar: {

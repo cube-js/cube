@@ -51,6 +51,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("convert_tz", convert_tz),
         t("coalesce", coalesce),
         t("count_distinct_crash", count_distinct_crash),
+        t(
+            "count_distinct_group_by_crash",
+            count_distinct_group_by_crash,
+        ),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -84,6 +88,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("rolling_window_join", rolling_window_join),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
+        t("date_add", date_add),
         t("now", now),
         t("dump", dump),
     ];
@@ -1048,6 +1053,48 @@ async fn count_distinct_crash(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+}
+
+async fn count_distinct_group_by_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data (n string)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data (n) VALUES ('a'), ('b'), ('c'), ('b'), ('c')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT n, COUNT(DISTINCT CASE WHEN n <> 'a' THEN n END), COUNT(*) \
+             FROM s.Data \
+             GROUP BY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![
+                TableValue::String("a".to_string()),
+                TableValue::Int(0),
+                TableValue::Int(1)
+            ],
+            vec![
+                TableValue::String("b".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+            vec![
+                TableValue::String("c".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+        ]
+    );
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
@@ -2658,6 +2705,61 @@ async fn float_index(service: Box<dyn SqlClient>) {
             })
             .collect_vec()
     }
+}
+
+async fn date_add(service: Box<dyn SqlClient>) {
+    let r = service
+        .exec_query(
+            "SELECT
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 second'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 minute'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 hour'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 day 1 hour 1 minute 1 second'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 year'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '13 month'),\
+            DATE_ADD(CAST('2021-01-01T23:59:00Z' as TIMESTAMP), INTERVAL '1 minute'),\
+            DATE_ADD(CAST('2021-12-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2021-12-31T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2020-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2021-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 year'),\
+            DATE_ADD(CAST('2021-01-30T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2020-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2021-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month')\
+        ",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![
+            // Simple tests for IntervalDayTime
+            TableValue::Timestamp(timestamp_from_string("2021-01-01T00:00:01Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-01T00:01:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-01T01:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-02T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-02T01:01:01Z").unwrap()),
+            // Simple tests for IntervalYearMonth
+            TableValue::Timestamp(timestamp_from_string("2021-02-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-02-01T00:00:00Z").unwrap()),
+            // Calculation logic
+            TableValue::Timestamp(timestamp_from_string("2021-01-02T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-03-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-03-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+        ],]
+    );
 }
 
 async fn now(service: Box<dyn SqlClient>) {

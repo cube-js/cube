@@ -330,6 +330,10 @@ class PreAggregationLoader {
 
   private waitForRenew: boolean;
 
+  private forceBuild: boolean;
+
+  private orphanedTimeout: number;
+
   private externalDriverFactory: DriverFactory;
 
   private requestId: string;
@@ -355,6 +359,8 @@ class PreAggregationLoader {
     this.preAggregationsTablesToTempTables = preAggregationsTablesToTempTables;
     this.loadCache = loadCache;
     this.waitForRenew = options.waitForRenew;
+    this.forceBuild = options.forceBuild;
+    this.orphanedTimeout = options.orphanedTimeout;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
@@ -436,7 +442,7 @@ class PreAggregationLoader {
     const getVersionEntryByContentVersion = ({ byContent }: VersionEntriesObj) => byContent[`${this.preAggregation.tableName}_${contentVersion}`];
 
     const versionEntryByContentVersion = getVersionEntryByContentVersion(versionEntries);
-    if (versionEntryByContentVersion) {
+    if (versionEntryByContentVersion && !this.forceBuild) {
       return this.targetTableName(versionEntryByContentVersion);
     }
 
@@ -481,6 +487,17 @@ class PreAggregationLoader {
       }
       return this.targetTableName(lastVersion);
     };
+
+    if (this.forceBuild) {
+      this.logger('Force build pre-aggregation', {
+        preAggregation: this.preAggregation,
+        requestId: this.requestId,
+        queryKey: this.preAggregationQueryKey(invalidationKeys),
+        newVersionEntry
+      });
+      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+      return mostRecentTargetTableName();
+    }
 
     if (versionEntry) {
       if (versionEntry.structure_version !== newVersionEntry.structure_version) {
@@ -565,7 +582,9 @@ class PreAggregationLoader {
         preAggregationsTablesToTempTables: this.preAggregationsTablesToTempTables,
         newVersionEntry,
         requestId: this.requestId,
-        invalidationKeys
+        invalidationKeys,
+        forceBuild: this.forceBuild,
+        orphanedTimeout: this.orphanedTimeout
       },
       priority,
       // eslint-disable-next-line no-use-before-define
@@ -1012,7 +1031,9 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource),
         {
           waitForRenew: queryBody.renewQuery,
+          forceBuild: queryBody.forceBuildPreAggregations,
           requestId: queryBody.requestId,
+          orphanedTimeout: queryBody.orphanedTimeout,
           externalRefresh: this.externalRefresh
         }
       );
@@ -1149,5 +1170,10 @@ export class PreAggregations {
       )
     );
     return data.filter(res => res);
+  }
+
+  public async getQueueState(dataSource = undefined) {
+    const queries = await this.getQueue(dataSource).getQueries();
+    return queries;
   }
 }

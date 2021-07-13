@@ -9,7 +9,7 @@ import imgForDevs from './images/for-devs.svg';
 import imgInsights from './images/insights.svg';
 import imgDashboards from './images/dashboards.svg';
 
-import styles from '../../static/styles/index.module.scss';
+import * as styles from '../../static/styles/index.module.scss';
 import { Page, Scopes, SetScrollSectionsAndGithubUrlFunction } from '../types';
 
 type Props = {
