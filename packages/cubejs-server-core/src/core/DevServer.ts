@@ -515,7 +515,7 @@ export class DevServer {
         if (currentCubeName === cubeName) {
           this.cubejsServer.repository.writeDataSchemaFile(fileName, source);
         }
-      })
+      });
 
       res.json('ok');
     }));
