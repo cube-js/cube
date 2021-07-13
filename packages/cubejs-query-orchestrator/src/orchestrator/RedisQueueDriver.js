@@ -7,7 +7,6 @@ export class RedisQueueDriverConnection {
     this.redisClient = options.redisClient;
     this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
-    this.orphanedTimeout = options.orphanedTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
   }
@@ -31,10 +30,10 @@ export class RedisQueueDriverConnection {
     return result && JSON.parse(result);
   }
 
-  addToQueue(keyScore, queryKey, time, queryHandler, query, priority, options) {
+  addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
     return this.redisClient.multi()
       .zadd([this.toProcessRedisKey(), 'NX', keyScore, this.redisHash(queryKey)])
-      .zadd([this.recentRedisKey(), time, this.redisHash(queryKey)])
+      .zadd([this.recentRedisKey(), orphanedTime, this.redisHash(queryKey)])
       .hsetnx([
         this.queriesDefKey(),
         this.redisHash(queryKey),
@@ -97,7 +96,7 @@ export class RedisQueueDriverConnection {
 
   getOrphanedQueries() {
     return this.redisClient.zrangebyscoreAsync(
-      [this.recentRedisKey(), 0, (new Date().getTime() - this.orphanedTimeout * 1000)]
+      [this.recentRedisKey(), 0, new Date().getTime()]
     );
   }
 
