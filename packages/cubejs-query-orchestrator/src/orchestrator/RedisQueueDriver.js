@@ -31,7 +31,6 @@ export class RedisQueueDriverConnection {
   }
 
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
-    console.log('addToQueue', new Date(orphanedTime));
     return this.redisClient.multi()
       .zadd([this.toProcessRedisKey(), 'NX', keyScore, this.redisHash(queryKey)])
       .zadd([this.recentRedisKey(), orphanedTime, this.redisHash(queryKey)])
