@@ -40,13 +40,6 @@ const RightSidePanel = styled.div`
   max-width: 300px;
 `;
 
-// const Flex = styled.div`
-//   display: flex;
-//   justify-content: space-between;
-//   gap: 20px;
-//   margin-bottom: 16px;
-// `;
-
 type RollupDesignerProps = {
   defaultQuery: Query;
   defaultTransformedQuery: TransformedQuery;

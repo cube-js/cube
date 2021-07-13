@@ -52,9 +52,9 @@ export function AppContextProvider({
   return (
     <AppContext.Provider
       value={{
-        isCloud,
-        ready: false,
         ...context,
+        ready: false,
+        isCloud,
         setContext(context: Partial<ContextProps> | null) {
           setContext((currentContext) => ({
             ...context,
