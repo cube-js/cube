@@ -20,7 +20,8 @@ import { WebSocketConnection } from './WebSocketConnection';
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
-  text: 'varchar(255)'
+  text: 'varchar(255)',
+  uuid: 'varchar(64)'
 };
 
 type Column = {
