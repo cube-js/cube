@@ -8,7 +8,7 @@ menuOrder: 13
 
 <!-- prettier-ignore-start -->
 [[info | ]]
-| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/).
 | We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/funnels-a-series-of-events-that-lead-users-towards-a-defined-goal).
 <!-- prettier-ignore-end -->
 
@@ -55,8 +55,8 @@ even for such a small funnel.
 
 <a href="#" class="accordion-trigger" id="show-sql-accordion"> Show Funnel's SQL </a>
 <div class="accordion" id="show-sql-accordion-body">
-  <pre class="language-sql">
-    <code class="language-sql">
+
+```sql
 SELECT
   purchase_funnel.step "purchase_funnel.step",
   count(purchase_funnel.user_id) "purchase_funnel.conversions"
@@ -142,8 +142,7 @@ ORDER BY
   2 DESC
 LIMIT
   5000
-    </code>
-  </pre>
+```
 </div>
 
 ## Funnel parameters
@@ -268,9 +267,7 @@ to display a classic bar chart showing the funnel's steps.
 ## Performance considerations
 
 Funnel joins are extremely heavy for most modern databases and complexity grows in a non-linear way with the addition of steps.
-However, if the cardinality of the first event isn't too high, very simple optimization can be applied: [originalSql pre-aggregation](pre-aggregations#original-sql).
-
-Just add it to `Funnel` cube as follows:
+It is best to use [partitioned rollups][ref-partitioned-rollups] to cache the steps instead. Add one to the `PurchaseFunnel` cube as follows:
 
 ```javascript
 cube(`PurchaseFunnel`, {
@@ -280,12 +277,10 @@ cube(`PurchaseFunnel`, {
 
   preAggregations: {
     main: {
-      type: `originalSql`
+      type: `originalSql`,
     }
   }
 });
 ```
 
-In this case, the heavy Funnel join will be materialized and stored as a table, which will save significant amount of time for subsequent Funnel queries.
-
-In the case where the cardinality of the first event is too high for `originalSql` pre-aggregation, [partitioned rollups](pre-aggregations#rollup-time-partitioning) can be used.
+[ref-partitioned-rollups]: /pre-aggregations#rollup-time-partitioning
