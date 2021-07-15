@@ -40,7 +40,7 @@ mode does the following:
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors
 
-[link-scheduled-refresh]: /pre-aggregations#scheduled-refresh
+[link-scheduled-refresh]: /schema/reference/pre-aggregations#scheduled-refresh
 [link-dev-playground]: /dev-tools/dev-playground
 
 ## Configuring CORS

@@ -207,9 +207,9 @@ As with other measures, `payingPercentage` can be used with dimensions.
 4. [Schema reference documentation][ref-schema-cube]
 
 [ref-backend-restapi]: /rest-api
-[ref-schema-cube]: /cube
-[ref-schema-measures]: /measures
-[ref-schema-dimensions]: /dimensions
-[ref-schema-types-formats]: /types-and-formats
+[ref-schema-cube]: /schema/reference/cube
+[ref-schema-measures]: /schema/reference/measures
+[ref-schema-dimensions]: /schema/reference/dimensions
+[ref-schema-types-formats]: /schema/reference/types-and-formats
 [ref-examples]: /examples
 [ref-backend-query-format]: /query-format

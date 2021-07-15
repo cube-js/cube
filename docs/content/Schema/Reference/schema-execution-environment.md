@@ -1,27 +1,27 @@
 ---
 title: Execution Environment
-permalink: /schema-execution-environment
+permalink: /schema/reference/execution-environment
 scope: cubejs
 category: Reference
 menuOrder: 9
 subCategory: Reference
+redirect_from:
+  - /schema-execution-environment
 ---
 
-Cube.js Schema Compiler uses [Node.js VM](https://nodejs.org/api/vm.html) to
-execute schema compiler code. It gives required flexibility allowing transpiling
-schema files before they get executed, storing schemas in external databases and
-executing untrusted code in a safe manner. Cube.js Schema JavaScript is standard
-JavaScript supported by Node.js starting in version 8 with the following
-exceptions.
+Cube.js Schema Compiler uses [Node.js VM][nodejs-vm] to execute schema compiler
+code. It gives required flexibility allowing transpiling schema files before
+they get executed, storing schemas in external databases and executing untrusted
+code in a safe manner. Cube.js Schema JavaScript is standard JavaScript
+supported by Node.js starting in version 8 with the following exceptions.
 
 ## Require
 
 Being executed in VM data schema, JavaScript code doesn't have access to
-[Node.js require](https://nodejs.org/api/modules.html#modules_require_id)
-directly. Instead `require()` is implemented by Schema Compiler to provide
-access to other data schema files and to regular Node.js modules. Besides that,
-the data schema `require()` can resolve Cube.js packages such as `Funnels`
-unlike standard Node.js `require()`.
+[Node.js require][nodejs-require] directly. Instead `require()` is implemented
+by Schema Compiler to provide access to other data schema files and to regular
+Node.js modules. Besides that, the data schema `require()` can resolve Cube.js
+packages such as `Funnels` unlike standard Node.js `require()`.
 
 ## Node.js globals (process.env, console.log and others)
 
@@ -49,11 +49,11 @@ cube(`Users`, {
 
 ## console.log
 
-Data schema cannot access `console.log` due to a separate
-[VM instance](https://nodejs.org/api/vm.html) that runs it. Suppose you find
-yourself writing complex logic for SQL generation that depends on a lot of
-external input. In that case, you probably want to introduce a helper service
-outside of `schema` directory that you can debug as usual Node.js code.
+Data schema cannot access `console.log` due to a separate [VM
+instance][nodejs-vm] that runs it. Suppose you find yourself writing complex
+logic for SQL generation that depends on a lot of external input. In that case,
+you probably want to introduce a helper service outside of `schema` directory
+that you can debug as usual Node.js code.
 
 ## Cube.js globals (cube and others)
 
@@ -65,7 +65,7 @@ accessible outside of Cube.js schema.
 
 Data schema JavaScript files are transpiled to convert ES6 `import` and `export`
 expressions to corresponding Node.js calls. In fact `import` is routed to
-[Require](#require) method.
+[Require][self-require] method.
 
 `export` can be used to define named exports as well as default ones:
 
@@ -114,11 +114,9 @@ Schemas can be externally stored and retrieved through an asynchronous operation
 using the `asyncModule()`. For more information, consult the [Dynamic Schema
 Creation][ref-dynamic-schemas] page.
 
-[ref-dynamic-schemas]: /schema/dynamic-schema-creation
-
 ## Context symbols transpile
 
-Cube.js uses custom transpiler to optimize boilerplate code around referencing
+Cube.js uses a custom transpiler to optimize boilerplate code around referencing
 cubes and cube members. There are reserved property names inside `cube`
 definition that undergo reference resolve transpiling process:
 
@@ -132,9 +130,7 @@ definition that undergo reference resolve transpiling process:
 - `contextMembers`
 
 Each of these properties inside `cube` and `context` definitions are transpiled
-to functions with resolved arguments.
-
-For example:
+to functions with resolved arguments. For example:
 
 ```javascript
 cube(`Users`, {
@@ -172,8 +168,8 @@ cube(`Users`, {
 });
 ```
 
-So for example if you want to pass definition of `ratio` outside of the cube you
-should define it as:
+So for example if you want to pass the definition of `ratio` outside of the
+cube, you would define it as:
 
 ```javascript
 const measureRatioDefinition = {
@@ -193,3 +189,8 @@ cube(`Users`, {
   },
 });
 ```
+
+[nodejs-vm]: https://nodejs.org/api/vm.html
+[nodejs-require]: https://nodejs.org/api/modules.html#modules_require_id
+[ref-dynamic-schemas]: /schema/dynamic-schema-creation
+[self-require]: #require

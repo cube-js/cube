@@ -1,10 +1,12 @@
 ---
 title: Pre-aggregations
-permalink: /pre-aggregations
+permalink: /schema/reference/pre-aggregations
 scope: cubejs
 category: Reference
 subCategory: Reference
 menuOrder: 8
+redirect_from:
+  - /pre-aggregations
 ---
 
 <!-- prettier-ignore-start -->
@@ -308,6 +310,36 @@ today's and the last 7 days of partitions once a day. Partitions before the
 `7 day` interval **will not** be refreshed once they are built unless the rollup
 SQL is changed.
 
+Partition tables are refreshed as a whole. When new partition table is available
+it replaces the old one. Old partition tables are collected by [Garbage
+Collection][ref-garbage-collection]. Append is never used to add new rows to the
+existing tables.
+
+An original SQL pre-aggregation can also be used with time partitioning and
+incremental `refreshKey`. It requires using `FILTER_PARAMS` inside the Cube's
+`sql` property.
+
+Below you can find an example of the partitioned `originalSql` pre-aggregation.
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from visitors WHERE ${FILTER_PARAMS.visitors.created_at.filter(
+    'created_at'
+  )}`,
+
+  preAggregations: {
+    main: {
+      type: `originalSql`,
+      timeDimensionReference: created_at,
+      partitionGranularity: `month`,
+      refreshKey: {
+        every: `1 day`,
+        incremental: true,
+        updateWindow: `7 day`,
+      },
+    },
+  },
+
 Partition tables are refreshed as a whole. When a new partition table is
 available, it replaces the old one. Old partition tables are collected by
 [Garbage Collection][ref-caching-garbage-collection]. Append is never used to
@@ -506,10 +538,10 @@ cube(`Orders`, {
   /connecting-to-the-database#external-pre-aggregations-database
 [ref-config-driverfactory]: /config/#options-reference-driver-factory
 [ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
-[ref-cube-refreshkey]: /cube#parameters-refresh-key
+[ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
-[ref-sqlalias]: /cube#parameters-sql-alias
+[ref-sqlalias]: /schema/reference/cube#parameters-sql-alias
 [ref-schema-funnels]: /funnels
 [self-origsql-preaggs]: #use-original-sql-pre-aggregations
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
