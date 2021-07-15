@@ -581,21 +581,21 @@ cube(`Orders`, {
 });
 ```
 
-## refreshRangeStart and refreshRangeEnd
+## buildRangeStart and buildRangeEnd
 
-The refresh range defines what partitions should be refreshed by a scheduled
-refresh. Scheduled refreshes will never look beyond this range.
+The build range defines what partitions should be built by a scheduled refresh.
+Scheduled refreshes will **never** look beyond this range.
 
 It can be used together with `updateWindow` to define granular update settings.
 Set the `updateWindow` property to the interval in which your data can change
-and `refreshRangeStart` to the earliest point of time when history should be
-available. For example if `updateWindow` is `1 week` and `refreshRangeStart` is
+and `buildRangeStart` to the earliest point of time when history should be
+available. For example if `updateWindow` is `1 week` and `buildRangeStart` is
 `SELECT NOW() - interval '365 day'` scheduled refresh will build historic
 partitions for 365 days in past and will refresh only one last week according to
 the `refreshKey` setting.
 
 The refresh range for partitioned pre-aggregations can be controlled using
-`refreshRangeStart` and `refreshRangeEnd` properties:
+`buildRangeStart` and `buildRangeEnd` properties:
 
 ```javascript
 cube(`Orders`, {
@@ -611,10 +611,10 @@ cube(`Orders`, {
       granularity: `day`,
       partitionGranularity: `month`,
       scheduledRefresh: true,
-      refreshRangeStart: {
+      buildRangeStart: {
         sql: `SELECT NOW() - interval '300 day'`,
       },
-      refreshRangeEnd: {
+      buildRangeEnd: {
         sql: `SELECT NOW()`,
       },
     },
