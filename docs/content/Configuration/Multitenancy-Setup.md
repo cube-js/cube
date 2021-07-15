@@ -419,7 +419,7 @@ maximum number of Redis connections **per-tenant**.
 [ref-config-refresh-ctx]: /config#options-reference-scheduled-refresh-contexts
 [ref-config-refresh-tz]: /config#options-reference-scheduled-refresh-time-zones
 [ref-config-security-ctx]: /config#request-context-security-context
-[ref-deployment-sls]: /deployment#serverless
+[ref-deployment-sls]: /deployment/serverless/aws
 [ref-security]: /security
 [ref-cube-datasource]: /cube#parameters-data-source
 [ref-cube-security-ctx]: /cube#context-variables-security-context
