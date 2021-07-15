@@ -281,8 +281,7 @@ cube(`Orders`, {
 
 ## Original SQL
 
-Original SQL pre-aggregation is the simplest type of pre-aggregation. As the
-name suggests, it persists the results of the `sql` property of the cube.
+As the name suggests, it persists the results of the `sql` property of the cube.
 Pre-aggregations of type `originalSql` should **only** be used when the cube's
 `sql` is a complex query (i.e. nested, window functions and/or multiple joins).
 We **strongly** recommend only persisting results of `originalSql` back to the
