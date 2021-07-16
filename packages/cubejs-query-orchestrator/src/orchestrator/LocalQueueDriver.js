@@ -3,7 +3,6 @@ const { BaseQueueDriver } = require('./BaseQueueDriver');
 
 export class LocalQueueDriverConnection {
   constructor(driver, options) {
-    this.queueEventsBus = options.queueEventsBus;
     this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
@@ -18,6 +17,7 @@ export class LocalQueueDriverConnection {
     this.heartBeat = driver.heartBeat;
     this.processingCounter = driver.processingCounter;
     this.processingLocks = driver.processingLocks;
+    this.queueEventsBus = options.queueEventsBus;
   }
 
   getResultPromise(resultListKey) {
@@ -90,12 +90,14 @@ export class LocalQueueDriverConnection {
     }
     this.recent[key] = { order: orphanedTime, key };
 
-    this.queueEventsBus.emit({
-      event: 'addedToQueue',
-      redisQueuePrefix: this.redisQueuePrefix,
-      queryKey: this.redisHash(queryKey),
-      payload: queryQueueObj
-    });
+    if (this.queueEventsBus) {
+      this.queueEventsBus.emit({
+        event: 'addedToQueue',
+        redisQueuePrefix: this.redisQueuePrefix,
+        queryKey: this.redisHash(queryKey),
+        payload: queryQueueObj
+      });
+    }
 
     return [added, null, null, Object.keys(this.toProcess).length]; // TODO nulls
   }
