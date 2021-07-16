@@ -1,6 +1,7 @@
 import R from 'ramda';
 import uuid from 'uuid/v4';
 import { Required } from '@cubejs-backend/shared';
+import { ContinueWaitError } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
@@ -441,17 +442,22 @@ export class RefreshScheduler {
       return Promise.all(partitions.map(async query => {
         const sqlQuery = await compilerApi.getSql(query);
 
-        await orchestratorApi.executeQuery({
-          ...sqlQuery,
-          continueWait: true,
-          renewQuery: true,
-          forceBuildPreAggregations: true,
-          orphanedTimeout: 60 * 60,
-          requestId: context.requestId,
-          timezone: query.timezone,
-          scheduledRefresh: false,
-          preAggregationsLoadCacheByDataSource
-        });
+        try {
+          await orchestratorApi.executeQuery({
+            ...sqlQuery,
+            continueWait: true,
+            renewQuery: true,
+            forceBuildPreAggregations: true,
+            orphanedTimeout: 60 * 60,
+            requestId: context.requestId,
+            timezone: query.timezone,
+            scheduledRefresh: false,
+            preAggregationsLoadCacheByDataSource
+          });
+        } catch (err) {
+          if (err instanceof ContinueWaitError) return;
+          throw err;
+        }
       }));
     }));
 
