@@ -76,6 +76,7 @@ export class QueryQueue {
       const [added, b, c, queueSize] = await redisClient.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
+      if (query.forceBuild) return result;
 
       if (added > 0) {
         this.logger('Added to queue', {

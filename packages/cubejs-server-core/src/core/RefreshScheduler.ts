@@ -436,7 +436,7 @@ export class RefreshScheduler {
     const preAggregations = await this.preAggregationPartitions(context, compilerApi, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
     
-    Promise.all(preAggregations.map(async (p: any) => {
+    await Promise.all(preAggregations.map(async (p: any) => {
       const { partitions } = p;
       return Promise.all(partitions.map(async query => {
         const sqlQuery = await compilerApi.getSql(query);
@@ -453,15 +453,7 @@ export class RefreshScheduler {
           preAggregationsLoadCacheByDataSource
         });
       }));
-    })).catch(e => {
-      if (e.error !== 'Continue wait') {
-        this.serverCore.logger('Manual Build Pre-aggregations Error', {
-          error: e.error || e.stack || e.toString(),
-          securityContext: context.securityContext,
-          requestId: context.requestId
-        });
-      }
-    });
+    }));
 
     return true;
   }
