@@ -9,6 +9,7 @@ export class RedisQueueDriverConnection {
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
+    this.queueEventsBus = options.queueEventsBus;
   }
 
   async getResultBlocking(queryKey) {
@@ -31,23 +32,33 @@ export class RedisQueueDriverConnection {
   }
 
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
+    const data = {
+      queryHandler,
+      query,
+      queryKey,
+      stageQueryKey: options.stageQueryKey,
+      priority,
+      requestId: options.requestId,
+      addedToQueueTime: new Date().getTime()
+    };
     return this.redisClient.multi()
       .zadd([this.toProcessRedisKey(), 'NX', keyScore, this.redisHash(queryKey)])
       .zadd([this.recentRedisKey(), orphanedTime, this.redisHash(queryKey)])
       .hsetnx([
         this.queriesDefKey(),
         this.redisHash(queryKey),
-        JSON.stringify({
-          queryHandler,
-          query,
-          queryKey,
-          stageQueryKey: options.stageQueryKey,
-          priority,
-          requestId: options.requestId,
-          addedToQueueTime: new Date().getTime()
-        })
+        JSON.stringify(data)
       ])
       .zcard(this.toProcessRedisKey())
+      .publish(
+        this.queueEventsBus.eventsChannel,
+        JSON.stringify({
+          event: 'addedToQueue',
+          redisQueuePrefix: this.redisQueuePrefix,
+          queryKey: this.redisHash(queryKey),
+          payload: data
+        })
+      )
       .execAsync();
   }
 

@@ -37,6 +37,19 @@ export class SubscriptionServer {
         message = JSON.parse(message);
       }
 
+      if (message.subscribePreAggregationsQueue) {
+        await this.apiGateway.checkAuthSystemFn(authContext, message.authorization);
+        await this.subscriptionStore.setAuthContext(connectionId, authContext);
+        await this.apiGateway.subscribeQueueEvents(
+          authContext,
+          connectionId,
+          event => {
+            this.sendMessage(connectionId, event);
+          }
+        );
+        return;
+      }
+
       if (message.authorization) {
         authContext = { isSubscription: true };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
@@ -120,6 +133,9 @@ export class SubscriptionServer {
   }
 
   public async disconnect(connectionId: string) {
+    const authContext = await this.subscriptionStore.getAuthContext(connectionId);
+    await this.apiGateway.unSubscribeQueueEvents(authContext, connectionId);
+
     await this.subscriptionStore.cleanupSubscriptions(connectionId);
   }
 

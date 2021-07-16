@@ -5,6 +5,8 @@ import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { RedisQueueEventsBus } from './RedisQueueEventsBus';
+import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory';
 
@@ -27,6 +29,8 @@ export class QueryOrchestrator {
   protected readonly redisPool: RedisPool|undefined;
 
   protected readonly rollupOnlyMode: boolean;
+
+  private readonly queueEventsBus: RedisQueueEventsBus|LocalQueueEventsBus;
 
   public constructor(
     protected readonly redisPrefix: string,
@@ -63,6 +67,7 @@ export class QueryOrchestrator {
       }
     );
 
+    this.queueEventsBus = cacheAndQueueDriver === 'redis' ? new RedisQueueEventsBus({ redisPool }) : new LocalQueueEventsBus();
     this.preAggregations = new PreAggregations(
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
@@ -70,7 +75,8 @@ export class QueryOrchestrator {
         redisPool,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
-        ...options.preAggregationsOptions
+        ...options.preAggregationsOptions,
+        queueEventsBus: this.queueEventsBus
       }
     );
   }
@@ -214,5 +220,13 @@ export class QueryOrchestrator {
 
   public async getPreAggregationQueueStates() {
     return this.preAggregations.getQueueState();
+  }
+
+  public async subscribeQueueEvents(id, callback) {
+    return this.queueEventsBus.subscribe(id, callback);
+  }
+
+  public async unSubscribeQueueEvents(id) {
+    return this.queueEventsBus.unsubscribe(id);
   }
 }

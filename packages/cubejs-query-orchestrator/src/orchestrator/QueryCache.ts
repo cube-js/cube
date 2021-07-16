@@ -257,6 +257,7 @@ export class QueryCache {
     options: Record<string, any> = {}
   ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
+      queueEventsBus: options.queueEventsBus,
       queryHandlers: {
         query: async (q, setCancelHandle) => {
           const client = await clientFactory();
