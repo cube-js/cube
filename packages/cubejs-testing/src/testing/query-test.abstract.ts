@@ -3,6 +3,7 @@ import { jest, describe, it, beforeAll, afterAll, expect } from '@jest/globals';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 import { StartedTestContainer } from 'testcontainers';
+import { TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { createCubeSchema } from '../utils';
 
@@ -58,7 +59,6 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
     });
 
     const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-    expect(preAggregations.length).toEqual(2);
 
     const [sql, params] = preAggregations[0].invalidateKeyQueries[0];
 
@@ -105,9 +105,12 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
     });
 
     const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-    expect(preAggregations.length).toEqual(2);
 
-    const [sql, params] = preAggregations[0].invalidateKeyQueries[0];
+    // eslint-disable-next-line prefer-const
+    let [sql, params] = preAggregations[0].invalidateKeyQueries[0];
+    // TODO Introduce full cycle testing through BaseDbRunner / QueryOrchestrator.
+    // TODO Internal structures shouldn't be never accessed in tests.
+    params = params.map((p: any) => (p === TO_PARTITION_RANGE ? '2017-01-05T00:00:00' : p));
 
     console.log('Executing ', [sql, params]);
 

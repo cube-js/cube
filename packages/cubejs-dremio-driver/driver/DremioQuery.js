@@ -42,8 +42,8 @@ class DremioQuery extends BaseQuery {
     return `TO_TIMESTAMP(${value}, 'YYYY-MM-DD"T"HH24:MI:SS.FFF')`;
   }
 
-  inDbTimeZone(date) {
-    return this.inIntegrationTimeZone(date).clone().utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  timestampFormat() {
+    return moment.HTML5_FMT.DATETIME_LOCAL_MS;
   }
 
   dateTimeCast(value) {

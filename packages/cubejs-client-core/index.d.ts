@@ -785,13 +785,11 @@ declare module '@cubejs-client/core' {
     timeElapsed(): string;
   }
 
-  export type SqlQueryTuple = [string, boolean | string | number];
+  export type SqlQueryTuple = [string, any[], any];
 
   export type SqlData = {
     aliasNameToMember: Record<string, string>;
-    cacheKeyQueries: {
-      queries: SqlQueryTuple[];
-    };
+    cacheKeyQueries: SqlQueryTuple[];
     dataSource: boolean;
     external: boolean;
     sql: SqlQueryTuple;
