@@ -104,7 +104,7 @@ export class RedisQueueDriverConnection {
         .del(this.queryProcessingLockKey(queryKey));
       
       if (this.queueEventsBus) {
-        await this.redisClient.publish(
+        tx.publish(
           this.queueEventsBus.eventsChannel,
           JSON.stringify({
             event: 'setResultAndRemoveQuery',
