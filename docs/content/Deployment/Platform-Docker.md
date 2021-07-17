@@ -1,5 +1,5 @@
 ---
-title: Deploy with Docker
+title: Docker
 permalink: /deployment/platforms/docker
 category: Deployment
 subCategory: Platforms
