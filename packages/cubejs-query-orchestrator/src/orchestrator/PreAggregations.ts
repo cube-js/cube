@@ -434,6 +434,9 @@ class PreAggregationLoader {
 
   protected async loadPreAggregationWithKeys() {
     const invalidationKeys = await this.getInvalidationKeyValues();
+
+    if (this.forceBuild) invalidationKeys.push(Math.random());
+
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
 
@@ -495,7 +498,7 @@ class PreAggregationLoader {
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
-      await this.executeInQueue([...invalidationKeys, Math.random()], this.priority(10), newVersionEntry);
+      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
       return mostRecentTargetTableName();
     }
 
