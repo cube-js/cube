@@ -495,7 +495,7 @@ class PreAggregationLoader {
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
-      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+      await this.executeInQueue([...invalidationKeys, Math.random()], this.priority(10), newVersionEntry);
       return mostRecentTargetTableName();
     }
 
@@ -1113,6 +1113,7 @@ export class PreAggregations {
           );
           return loadCache.fetchTables(preAggregation);
         }, {
+          queueEventsBus: this.queueEventsBus,
           concurrency: 4,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,

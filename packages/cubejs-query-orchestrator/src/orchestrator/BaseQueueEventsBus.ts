@@ -6,7 +6,7 @@ export class BaseQueueEventsBus {
   }
 
   public subscribe(id, callback) {
-    this.subscribers[id] = callback;
+    this.subscribers[id] = { id, callback };
   }
   
   public unsubscribe(id) {

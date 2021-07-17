@@ -27,7 +27,7 @@ export class RedisQueueEventsBus extends BaseQueueEventsBus {
     redisClientSubscriber.on('message', async (channel, message) => {
       try {
         message = JSON.parse(message);
-        await Promise.all(this.subscribers.map(subscriber => subscriber(message)));
+        await Promise.all(Object.values(this.subscribers).map(subscriber => subscriber.callback(message)));
       } catch (error) {
         console.error(error.stack || error);
       }
