@@ -136,6 +136,15 @@ export class LocalQueueDriverConnection {
     delete this.processingLocks[key];
     promise.resolved = true;
     promise.resolve(executionResult);
+
+    if (this.queueEventsBus) {
+      this.queueEventsBus.emit({
+        event: 'setResultAndRemoveQuery',
+        redisQueuePrefix: this.redisQueuePrefix,
+        queryKey: this.redisHash(queryKey)
+      });
+    }
+
     return true;
   }
 
@@ -182,6 +191,16 @@ export class LocalQueueDriverConnection {
       added = 1;
     }
     this.heartBeat[key] = { key, order: new Date().getTime() };
+
+    if (this.queueEventsBus) {
+      this.queueEventsBus.emit({
+        event: 'retrievedForProcessing',
+        redisQueuePrefix: this.redisQueuePrefix,
+        queryKey: this.redisHash(queryKey),
+        payload: this.queryDef[key]
+      });
+    }
+
     return [
       added, null, this.queueArray(this.active), Object.keys(this.toProcess).length, this.queryDef[key], lockAcquired
     ]; // TODO nulls
