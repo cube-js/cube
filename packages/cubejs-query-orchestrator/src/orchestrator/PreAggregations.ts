@@ -435,8 +435,6 @@ class PreAggregationLoader {
   protected async loadPreAggregationWithKeys() {
     const invalidationKeys = await this.getInvalidationKeyValues();
 
-    if (this.forceBuild) invalidationKeys.push(Math.random());
-
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
 

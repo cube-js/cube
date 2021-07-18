@@ -68,6 +68,12 @@ export class QueryQueue {
       if (result) {
         return this.parseResult(result);
       }
+
+      if (query.forceBuild) {
+        const jobExists = await redisClient.getQueryDef(queryKey);
+        if (jobExists) return null;
+      }
+
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
 

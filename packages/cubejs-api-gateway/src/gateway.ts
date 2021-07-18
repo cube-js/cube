@@ -857,12 +857,12 @@ export class ApiGateway {
     }
   }
 
-  public subscribeQueueEvents(context, id, callback) {
-    return this.getAdapterApi(context).subscribeQueueEvents(id, callback);
+  public subscribeQueueEvents({ context, connectionId, res }) {
+    return this.getAdapterApi(context).subscribeQueueEvents(connectionId, res);
   }
 
-  public unSubscribeQueueEvents(context, id) {
-    return this.getAdapterApi(context).unSubscribeQueueEvents(id);
+  public unSubscribeQueueEvents({ context, connectionId }) {
+    return this.getAdapterApi(context).unSubscribeQueueEvents(connectionId);
   }
 
   public async subscribe({
