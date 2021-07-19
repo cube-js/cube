@@ -398,19 +398,34 @@ async fn join(service: Box<dyn SqlClient>) {
     let result = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON o.customer_id = c.id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
     assert_eq!(
-        result.get_rows()[0],
-        Row::new(vec![
-            TableValue::String("San Francisco".to_string()),
-            TableValue::Int(10)
-        ])
+        to_rows(&result),
+        vec![
+            vec![
+                TableValue::String("San Francisco".to_string()),
+                TableValue::Int(10)
+            ],
+            vec![
+                TableValue::String("New York".to_string()),
+                TableValue::Int(5)
+            ]
+        ]
     );
-    assert_eq!(
-        result.get_rows()[1],
-        Row::new(vec![
-            TableValue::String("New York".to_string()),
-            TableValue::Int(5)
-        ])
-    );
+
+    // Same query, reverse comparison order.
+    let result2 = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON c.id = o.customer_id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+    assert_eq!(result.get_rows(), result2.get_rows());
+
+    // Join on non-existing field.
+    assert!(service.exec_query("SELECT c.id, sum(o.amount) FROM foo.customers c JOIN foo.orders o ON c.id = o.not_found")
+        .await.is_err());
+    assert!(service.exec_query("SELECT c.id, sum(o.amount) FROM foo.customers c JOIN foo.orders o ON o.not_found = c.id")
+        .await.is_err());
+
+    // Join on ambiguous fields.
+    assert!(service
+        .exec_query("SELECT c.id, k.id FROM foo.customers c JOIN foo.customers k ON id = id")
+        .await
+        .is_err());
 }
 
 async fn three_tables_join(service: Box<dyn SqlClient>) {
