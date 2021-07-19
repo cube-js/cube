@@ -11,14 +11,14 @@ export class RedisQueueEventsBus extends BaseQueueEventsBus {
   public constructor(options) {
     super();
     this.redisPool = options.redisPool;
-    this.eventsChannel = 'queue:events';
+    this.eventsChannel = 'QUERY_QUEUES:EVENTS';
     this.initSubscriber();
   }
 
   public async initSubscriber() {
     const redisClientSubscriber = await this.redisPool.getClient();
     
-    redisClientSubscriber.subscribe('queue:events', (err) => {
+    redisClientSubscriber.subscribe(this.eventsChannel, (err) => {
       if (err) {
         console.error('Failed to subscribe: %s', err.message);
       }
