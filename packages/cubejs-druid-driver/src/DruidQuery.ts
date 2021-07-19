@@ -11,7 +11,18 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   year: date => `DATE_TRUNC('year', ${date})`
 };
 
+class DruidFilter extends BaseFilter {
+  likeIgnoreCase(column, not, param) {
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  }
+}
+
 export class DruidQuery extends BaseQuery {
+  
+  newFilter(filter) {
+    return new DruidFilter(this, filter);
+  }
+  
   public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
