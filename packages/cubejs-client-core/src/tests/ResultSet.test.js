@@ -121,7 +121,7 @@ describe('ResultSet', () => {
       expect(resultSet.chartPivot()).toEqual([
         {
           x: 'Name 1',
-          category: 'Name 1',
+          
           'Foo.count': 'Some string',
           xValues: [
             'Name 1'
@@ -170,7 +170,7 @@ describe('ResultSet', () => {
       expect(resultSet.chartPivot()).toEqual([
         {
           x: 'Name 1',
-          category: 'Name 1',
+          
           'Foo.count': null,
           xValues: [
             'Name 1'
@@ -219,7 +219,7 @@ describe('ResultSet', () => {
       expect(resultSet.chartPivot()).toEqual([
         {
           x: 'Name 1',
-          category: 'Name 1',
+          
           'Foo.count': undefined,
           xValues: [
             'Name 1'
@@ -268,7 +268,7 @@ describe('ResultSet', () => {
       expect(resultSet.chartPivot()).toEqual([
         {
           x: 'Name 1',
-          category: 'Name 1',
+          
           'Foo.count': 10,
           xValues: [
             'Name 1'
@@ -320,7 +320,7 @@ describe('ResultSet', () => {
       expect(resultSet.chartPivot()).toEqual([
         {
           x: 'Name 1',
-          category: 'Name 1',
+          
           'Foo.latestRun': new Date('2020-03-11T18:06:09.403Z'),
           xValues: [
             'Name 1'
