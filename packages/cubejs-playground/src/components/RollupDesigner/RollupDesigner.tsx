@@ -1,6 +1,5 @@
 import { Alert, Button, Input, Space, Tabs, Typography, Divider, notification } from 'antd';
 import {
-  areQueriesEqual,
   Query,
   TimeDimensionBase,
   TransformedQuery
@@ -19,7 +18,7 @@ import {
   PreAggregationDefinition,
   updateQuery
 } from './utils';
-import { useIsMounted, useToggle } from '../../hooks';
+import { useToggle } from '../../hooks';
 import { getMembersByCube, getNameMemberPairs } from '../../shared/helpers';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
