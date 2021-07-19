@@ -2,8 +2,8 @@
   "name": "@cubejs-backend/cubestore",
   "version": "0.28.0",
   "description": "Cube.js pre-aggregation storage layer.",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
   "engines": {
     "node": ">=10.8.0"
   },
@@ -21,7 +21,7 @@
     "postinstall": "node bin/post-install"
   },
   "files": [
-    "dist",
+    "dist/src",
     "bin"
   ],
   "author": "Cube Dev, Inc.",
@@ -46,7 +46,7 @@
   },
   "jest": {
     "testMatch": [
-      "<rootDir>/dist/*.(test|spec).(js)"
+      "<rootDir>/dist/test/*.(test|spec).(js)"
     ],
     "testEnvironment": "node"
   }
