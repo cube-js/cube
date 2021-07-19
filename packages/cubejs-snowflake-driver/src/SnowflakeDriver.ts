@@ -214,29 +214,36 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1 as number');
   }
 
+  protected async initConnection() {
+    try {
+      const connection = snowflake.createConnection(this.config);
+      await new Promise(
+        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+      );
+
+      await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
+      await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
+
+      return connection;
+    } catch (e) {
+      this.connection = null;
+
+      throw e;
+    }
+  }
+
   protected async getConnection(): Promise<Connection> {
     if (this.connection) {
-      return this.connection;
+      const connection = await this.connection;
+
+      // Return a connection if not in a fatal state.
+      if (connection.isUp()) {
+        return connection;
+      }
     }
 
     // eslint-disable-next-line no-return-assign
-    return this.connection = (async () => {
-      try {
-        const connection = snowflake.createConnection(this.config);
-        await new Promise(
-          (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-        );
-
-        await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
-        await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
-
-        return connection;
-      } catch (e) {
-        this.connection = null;
-
-        throw e;
-      }
-    })();
+    return this.connection = this.initConnection();
   }
 
   public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
