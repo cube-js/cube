@@ -25,7 +25,7 @@ export class QueryQueue {
       orphanedTimeout: this.orphanedTimeout,
       heartBeatTimeout: this.heartBeatInterval * 4,
       redisPool: options.redisPool,
-      queueEventsBus: options.queueEventsBus
+      getQueueEventsBus: options.getQueueEventsBus
     };
     this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :

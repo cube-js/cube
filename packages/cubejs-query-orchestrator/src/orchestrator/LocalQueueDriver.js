@@ -17,7 +17,7 @@ export class LocalQueueDriverConnection {
     this.heartBeat = driver.heartBeat;
     this.processingCounter = driver.processingCounter;
     this.processingLocks = driver.processingLocks;
-    this.queueEventsBus = options.queueEventsBus;
+    this.getQueueEventsBus = options.getQueueEventsBus;
   }
 
   getResultPromise(resultListKey) {
@@ -90,8 +90,8 @@ export class LocalQueueDriverConnection {
     }
     this.recent[key] = { order: orphanedTime, key };
 
-    if (this.queueEventsBus) {
-      this.queueEventsBus.emit({
+    if (this.getQueueEventsBus) {
+      this.getQueueEventsBus().emit({
         event: 'addedToQueue',
         redisQueuePrefix: this.redisQueuePrefix,
         queryKey: this.redisHash(queryKey),
@@ -137,8 +137,8 @@ export class LocalQueueDriverConnection {
     promise.resolved = true;
     promise.resolve(executionResult);
 
-    if (this.queueEventsBus) {
-      this.queueEventsBus.emit({
+    if (this.getQueueEventsBus()) {
+      this.getQueueEventsBus().emit({
         event: 'setResultAndRemoveQuery',
         redisQueuePrefix: this.redisQueuePrefix,
         queryKey: this.redisHash(queryKey)
@@ -192,8 +192,8 @@ export class LocalQueueDriverConnection {
     }
     this.heartBeat[key] = { key, order: new Date().getTime() };
 
-    if (this.queueEventsBus) {
-      this.queueEventsBus.emit({
+    if (this.getQueueEventsBus) {
+      this.getQueueEventsBus().emit({
         event: 'retrievedForProcessing',
         redisQueuePrefix: this.redisQueuePrefix,
         queryKey: this.redisHash(queryKey),

@@ -9,7 +9,7 @@ export class RedisQueueDriverConnection {
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
-    this.queueEventsBus = options.queueEventsBus;
+    this.getQueueEventsBus = options.getQueueEventsBus;
   }
 
   async getResultBlocking(queryKey) {
@@ -52,9 +52,9 @@ export class RedisQueueDriverConnection {
       ])
       .zcard(this.toProcessRedisKey());
 
-    if (this.queueEventsBus) {
+    if (this.getQueueEventsBus) {
       tx.publish(
-        this.queueEventsBus.eventsChannel,
+        this.getQueueEventsBus().eventsChannel,
         JSON.stringify({
           event: 'addedToQueue',
           redisQueuePrefix: this.redisQueuePrefix,
@@ -103,9 +103,9 @@ export class RedisQueueDriverConnection {
         .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
         .del(this.queryProcessingLockKey(queryKey));
       
-      if (this.queueEventsBus) {
+      if (this.getQueueEventsBus) {
         tx.publish(
-          this.queueEventsBus.eventsChannel,
+          this.getQueueEventsBus().eventsChannel,
           JSON.stringify({
             event: 'setResultAndRemoveQuery',
             redisQueuePrefix: this.redisQueuePrefix,
@@ -180,9 +180,9 @@ export class RedisQueueDriverConnection {
       if (result) {
         result[4] = JSON.parse(result[4]);
 
-        if (this.queueEventsBus) {
+        if (this.getQueueEventsBus) {
           await this.redisClient.publish(
-            this.queueEventsBus.eventsChannel,
+            this.getQueueEventsBus().eventsChannel,
             JSON.stringify({
               event: 'retrievedForProcessing',
               redisQueuePrefix: this.redisQueuePrefix,

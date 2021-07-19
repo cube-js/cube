@@ -30,7 +30,9 @@ export class QueryOrchestrator {
 
   protected readonly rollupOnlyMode: boolean;
 
-  private readonly queueEventsBus: RedisQueueEventsBus|LocalQueueEventsBus;
+  private queueEventsBus: RedisQueueEventsBus|LocalQueueEventsBus;
+
+  private readonly cacheAndQueueDriver: string;
 
   public constructor(
     protected readonly redisPrefix: string,
@@ -45,12 +47,14 @@ export class QueryOrchestrator {
         ? 'redis'
         : 'memory'
     );
+    this.cacheAndQueueDriver = cacheAndQueueDriver;
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
       throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
+    this.redisPool = redisPool;
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
     this.queryCache = new QueryCache(
@@ -66,8 +70,6 @@ export class QueryOrchestrator {
         ...options.queryCacheOptions,
       }
     );
-
-    this.queueEventsBus = cacheAndQueueDriver === 'redis' ? new RedisQueueEventsBus({ redisPool }) : new LocalQueueEventsBus();
     this.preAggregations = new PreAggregations(
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
@@ -76,9 +78,19 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        queueEventsBus: this.queueEventsBus
+        getQueueEventsBus: this.getQueueEventsBus.bind(this)
       }
     );
+  }
+
+  private getQueueEventsBus() {
+    if (!this.queueEventsBus) {
+      const isRedis = this.cacheAndQueueDriver === 'redis';
+      this.queueEventsBus = isRedis ?
+        new RedisQueueEventsBus({ redisPool: this.redisPool }) :
+        new LocalQueueEventsBus();
+    }
+    return this.queueEventsBus;
   }
 
   public async fetchQuery(queryBody: any): Promise<any> {
@@ -227,10 +239,10 @@ export class QueryOrchestrator {
   }
 
   public async subscribeQueueEvents(id, callback) {
-    return this.queueEventsBus.subscribe(id, callback);
+    return this.getQueueEventsBus().subscribe(id, callback);
   }
 
   public async unSubscribeQueueEvents(id) {
-    return this.queueEventsBus.unsubscribe(id);
+    return this.getQueueEventsBus().unsubscribe(id);
   }
 }
