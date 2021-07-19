@@ -7,7 +7,7 @@ import * as path from 'path';
 import { getTarget } from './utils';
 
 export function getCubeStorePath() {
-  return path.join(path.resolve(__dirname, '..'), 'downloaded', 'latest');
+  return path.join(path.resolve(__dirname, '..', '..'), 'downloaded', 'latest');
 }
 
 export function getBinaryPath() {
@@ -58,7 +58,7 @@ function parseInfoFromAssetName(assetName: string): { target: string, type: stri
 
 export async function downloadBinaryFromRelease() {
   // eslint-disable-next-line global-require
-  const { version } = require('../package.json');
+  const { version } = require('../../package.json');
 
   const release = await fetchRelease(version);
   if (release) {

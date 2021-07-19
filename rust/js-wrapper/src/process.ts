@@ -26,6 +26,7 @@ async function startProcess(pathToExecutable: string, config: Readonly<StartProc
 
   const cubeStore = spawn(pathToExecutable, {
     env,
+    detached: false,
   });
 
   return new Promise<ChildProcess>((resolve, reject) => {
@@ -64,19 +65,34 @@ async function startProcess(pathToExecutable: string, config: Readonly<StartProc
 
     cubeStore.on('exit', startupExitListener);
 
+    const processExitListener = () => {
+      process.off('exit', processExitListener);
+
+      cubeStore.kill();
+    };
+
+    // Just a workaround for https://github.com/nodejs/node/issues/13538
+    // It's ok because we dont use CubeStoreHandler.release with force = true
+    process.on('exit', processExitListener);
+
     const startResolver = (data: Buffer) => {
       if (data.toString().includes('MySQL port open on')) {
         // Clear startup timeout killer
         startupTimeout.cancel();
         // Disable start listener, because we resolve Promise
         cubeStore.stdout.off('data', startResolver);
+
         // Clear startup exit code listener
         if (startupExitListener) {
           cubeStore.off('exit', startupExitListener);
         }
 
         // Restart can be done, if Cube Store started. Without it we change state to null status and wait next query.
-        cubeStore.on('exit', config.onExit);
+        cubeStore.on('exit', (code) => {
+          process.off('exit', processExitListener);
+
+          config.onExit(code);
+        });
         resolve(cubeStore);
       }
     };
