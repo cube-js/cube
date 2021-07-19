@@ -4,7 +4,7 @@ import { Col, Menu } from 'antd';
 import omit from 'lodash/omit';
 
 import MenuItem from '../templates/MenuItem';
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import { useFrameworkOfChoice } from '../../stores/frameworkOfChoice';
 import {
   Frontmatter,
@@ -25,8 +25,8 @@ const menuOrderCloud = [
 ];
 
 const menuOrder = [
-  'Getting Started',
   'Cube.js Introduction',
+  'Getting Started',
   'Configuration',
   'Caching',
   'Authentication & Authorization',

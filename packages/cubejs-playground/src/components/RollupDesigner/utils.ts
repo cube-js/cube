@@ -8,6 +8,7 @@ import { all, allPass, anyPass, contains, equals, sortBy } from 'ramda';
 import { QueryMemberKey } from '../../types';
 
 export type PreAggregationDefinition = {
+  value: string;
   code: string;
   measures: string[];
   dimensions: string[];
@@ -19,7 +20,7 @@ export function getPreAggregationDefinition(
   transformedQuery,
   preAggregationName = 'main'
 ): PreAggregationDefinition {
-  const members: Omit<PreAggregationDefinition, 'code'> = {
+  const members: Omit<PreAggregationDefinition, 'code' | 'value'> = {
     measures: [],
     dimensions: [],
   };
@@ -35,7 +36,10 @@ export function getPreAggregationDefinition(
     lines.push(`dimensions: [${transformedQuery.sortedDimensions.join(', ')}]`);
   }
 
-  if (transformedQuery?.sortedTimeDimensions.length) {
+  if (
+    transformedQuery?.sortedTimeDimensions.length &&
+    transformedQuery.sortedTimeDimensions[0]?.[1] != null
+  ) {
     members.timeDimension = transformedQuery.sortedTimeDimensions[0][0];
     members.granularity = transformedQuery.sortedTimeDimensions[0][1];
 
@@ -45,10 +49,11 @@ export function getPreAggregationDefinition(
     );
   }
 
+  const value = `{\n${lines.map((l) => `  ${l}`).join(',\n')}\n}`;
+
   return {
-    code: `${preAggregationName}: {\n${lines
-      .map((l) => `  ${l}`)
-      .join(',\n')}\n}`,
+    code: `${preAggregationName}: ${value}`,
+    value,
     ...members,
   };
 }

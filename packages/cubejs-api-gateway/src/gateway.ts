@@ -200,6 +200,7 @@ export interface ApiGatewayOptions {
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
   playgroundAuthSecret?: string;
+  serverCoreVersion?: string;
 }
 
 export class ApiGateway {
@@ -389,6 +390,21 @@ export class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+
+      app.post('/cubejs-system/v1/pre-aggregations/build', jsonParser, systemMiddlewares, (async (req, res) => {
+        await this.buildPreAggregations({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
+
+      app.post('/cubejs-system/v1/pre-aggregations/queue', jsonParser, systemMiddlewares, (async (req, res) => {
+        await this.getPreAggregationsInQueue({
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -532,6 +548,43 @@ export class ApiGateway {
           preAggregationPartition,
           query.versionEntry
         )
+      });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async buildPreAggregations(
+    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      query = normalizeQueryPreAggregations(this.parseQueryParam(query));
+      const result = await this.refreshScheduler()
+        .buildPreAggregations(
+          context,
+          this.getCompilerApi(context),
+          query
+        );
+
+      res({ result });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async getPreAggregationsInQueue(
+    { context, res }: { context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      const orchestratorApi = this.getAdapterApi(context);
+      res({
+        result: await orchestratorApi.getPreAggregationQueueStates()
       });
     } catch (e) {
       this.handleError({
@@ -804,6 +857,14 @@ export class ApiGateway {
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  public subscribeQueueEvents({ context, connectionId, res }) {
+    return this.getAdapterApi(context).subscribeQueueEvents(connectionId, res);
+  }
+
+  public unSubscribeQueueEvents({ context, connectionId }) {
+    return this.getAdapterApi(context).unSubscribeQueueEvents(connectionId);
   }
 
   public async subscribe({
@@ -1270,6 +1331,8 @@ export class ApiGateway {
   protected createSystemContextHandler = (basePath: string): RequestHandler => {
     const body: Readonly<Record<string, any>> = {
       basePath,
+      dockerVersion: getEnv('dockerImageVersion') || null,
+      serverCoreVersion: this.options.serverCoreVersion || null
     };
 
     return (req, res) => {

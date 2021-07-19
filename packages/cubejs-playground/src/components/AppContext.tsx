@@ -17,6 +17,10 @@ export type PlaygroundContext = {
   dockerVersion: string | null;
   identifier: string;
   previewFeatures: boolean;
+  serverCoreVersion: string;
+  // @deprecated
+  coreServerVersion: string;
+  isCloud: boolean;
   livePreview?: boolean;
 };
 
@@ -29,7 +33,7 @@ export type SystemContext = {
 export type ContextProps = {
   ready: boolean;
   identifier?: string | null;
-  playgroundContext?: PlaygroundContext;
+  playgroundContext?: Partial<PlaygroundContext>;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
 
@@ -54,8 +58,12 @@ export function AppContextProvider({
         ...context,
         setContext(context: Partial<ContextProps> | null) {
           setContext((currentContext) => ({
-            ...context,
             ...currentContext,
+            ...context,
+            playgroundContext: {
+              ...currentContext?.playgroundContext,
+              ...context?.playgroundContext,
+            }
           }));
         },
       }}
@@ -87,4 +95,10 @@ export function usePlaygroundContext() {
   const { playgroundContext } =  useAppContext();
 
   return playgroundContext;
+}
+
+export function useIsCloud() {
+  const { playgroundContext } = useAppContext();
+
+  return playgroundContext?.isCloud || false;
 }

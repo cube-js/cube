@@ -243,6 +243,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
             "coalesce" | "COALESCE" => CubeScalarUDFKind::Coalesce,
             "now" | "NOW" => CubeScalarUDFKind::Now,
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
+            "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));

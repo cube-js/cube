@@ -8,9 +8,6 @@
       "path": "packages/cubejs-templates"
     },
     {
-      "path": "packages/cubejs-testing"
-    },
-    {
       "path": "packages/cubejs-backend-cloud"
     },
     {
@@ -20,10 +17,13 @@
       "path": "packages/cubejs-api-gateway"
     },
     {
+      "path": "packages/cubejs-query-orchestrator"
+    },
+    {
       "path": "packages/cubejs-schema-compiler"
     },
     {
-      "path": "packages/cubejs-query-orchestrator"
+      "path": "packages/cubejs-testing"
     },
     {
       "path": "packages/cubejs-druid-driver"
@@ -72,6 +72,6 @@
     },
     {
       "path": "rust"
-    }
+    },
   ]
 }

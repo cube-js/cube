@@ -1,10 +1,12 @@
 ---
 title: Pre-aggregations
-permalink: /pre-aggregations
+permalink: /schema/reference/pre-aggregations
 scope: cubejs
 category: Reference
 subCategory: Reference
 menuOrder: 8
+redirect_from:
+  - /pre-aggregations
 ---
 
 <!-- prettier-ignore-start -->
@@ -97,193 +99,26 @@ built according to the standard rules of cubes joining.
 
 ### Rollup selection rules
 
-Rollup pre-aggregation defines a set of measures and dimensions used to
-construct the query for pre-aggregation table. Each query issued against cube
-where pre-aggregation is defined will be checked if specific rollup
-pre-aggregation can be used by following algorithm:
-
-1. Determine the type of the query as one of **Leaf Measure Additive** or **Not
-   Additive**.
-
-2. If query is **Leaf Measure Additive**, check if rollup contains all
-   dimensions, filter dimensions and **Leaf Measures** are used in query and
-   measures aren't multiplied.
-
-3. If query is **Not Additive** check if query time dimension granularity is
-   set, all query filter dimensions are included in query dimensions and that
-   the rollup defines exact set of dimensions and all measures used in the
-   query.
-
-**Explanation of terms:**
-
-- A query is **Leaf Measure Additive** if all of its **Leaf Measures** are
-  either `count`, `sum`, `min`, `max` or `countDistinctApprox` type.
-
-- A query is **Not Additive** if it's not **Additive** and not **Leaf Measure
-  Additive**.
-
-- **Leaf Measures** are measures that do not reference any other measures in
-  their definition.
-
-- Time dimension together with granularity constitute dimension. If the date
-  range isn't aligned with granularity, a common granularity is used. To match
-  granularity date range, its start date and end date should match. For example,
-  for month it's `['2020-01-01T00:00:00.000', '2020-01-31T23:59:59.999']` and
-  for day it's `['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']`. Date
-  ranges are inclusive. The minimum granularity is `second`.
-
-- Multiplied measures are measures of cubes that define `hasMany` relations
-  involved in pre-aggregation definition joins.
-
-Also the order of pre-aggregation definitions in cubes matters. The first
-matched pre-aggregation wins. Cubes of a measures and then cubes of dimensions
-are checked to find a matching `rollup`. However `rollup` pre-aggregations
-always have priority over `originalSql`. Thus, if you have both `originalSql`
-and `rollup` defined, Cube.js will try to find matching `rollup` before trying
-to find matching `originalSql`. Furthermore, you can instruct Cube.js to use
-original sql pre-aggregations using
-[`useOriginalSqlPreAggregations`][ref-orig-sql].
-
-### Rollup examples
-
-There are two types of definitions allowed for rollup pre-aggregation: with or
-without time dimension.
-
-Let's consider an example:
-
-```javascript
-cube(`Orders`, {
-  sql: `select * from orders`,
-
-  measures: {
-    count: {
-      type: `count`,
-    },
-
-    revenue: {
-      sql: `amount`,
-      type: `sum`,
-    },
-
-    averageRevenue: {
-      sql: `${revenue} / ${count}`,
-      type: `number`,
-    },
-  },
-
-  dimensions: {
-    category: {
-      sql: `category`,
-      type: `string`,
-    },
-
-    customerName: {
-      sql: `customer_name`,
-      type: `string`,
-    },
-
-    createdAt: {
-      sql: `created_at`,
-      type: `time`,
-    },
-  },
-
-  preAggregations: {
-    categoryAndDate: {
-      type: `rollup`,
-      external: true,
-      measureReferences: [Orders.count, revenue],
-      dimensionReferences: [category],
-      timeDimensionReference: createdAt,
-      granularity: `day`,
-    },
-  },
-});
-```
-
-Granularity can be either `hour`, `day`, `week` or `month`. If a
-`timeDimensionReference` is set, `granularity` must also be specified.
-
-In this particular example, these queries will use the `categoryAndDate`
-pre-aggregation:
-
-- Order Revenue by Category this month
-- Order Count by Created At Day this year
-- Order Count for all time
-- Order Average Revenue by Category this month
-- Order Revenue by Created At Week this year
-- Order Revenue by Created At Month this year
-
-These queries won't use `categoryAndDate` pre-aggregation:
-
-- Order Count by Customer Name this year
-
-### Time partitioning
-
-Any `rollup` pre-aggregations can be partitioned by time using the
-`partitionGranularity` property:
-
-This can reduce rollup refreshing time and cost significantly. Partitioned
-rollups currently cannot be used by queries without time dimensions.
-
-```javascript
-cube(`Orders`, {
-  sql: `select * from orders`,
-
-  //...
-
-  preAggregations: {
-    categoryAndDate: {
-      type: `rollup`,
-      external: true,
-      measureReferences: [Orders.count, revenue],
-      dimensionReferences: [category],
-      timeDimensionReference: createdAt,
-      granularity: `day`,
-      partitionGranularity: `month`,
-    },
-  },
-});
-```
-
-`partitionGranularity` can be either `day`, `week` or `month`. For example, if
-the `partitionGranularity` is set to `month`, Cube.js will generate separate
-`rollup` tables for each month.
-
-### Segment Partitioning
-
-Any rollup can be automatically filtered to particular segments by using the
-`segmentReferences` property:
-
-```javascript
-cube(`Orders`, {
-  sql: `select * from orders`,
-
-  segments: {
-    toys: {
-      sql: `category = 'toys'`,
-    },
-  },
-
-  preAggregations: {
-    categoryAndDate: {
-      type: `rollup`,
-      external: true,
-      measureReferences: [Orders.count, revenue],
-      segmentReferences: [toys],
-      timeDimensionReference: createdAt,
-      granularity: `day`,
-      partitionGranularity: `month`,
-    },
-  },
-});
-```
+Rollups are selected based on the properties found in queries made to the
+Cube.js REST API. A thorough explanation can be found under [Getting Started
+with Pre-Aggregations][ref-caching-preaggs-target].
 
 ## Original SQL
 
-Original SQL pre-aggregation is the simplest type of pre-aggregation. As the
-name suggests, it persists the results of the SQL query of the cube in which it
-is defined.
+As the name suggests, it persists the results of the `sql` property of the cube.
+Pre-aggregations of type `originalSql` should **only** be used when the cube's
+`sql` is a complex query (i.e. nested, window functions and/or multiple joins).
+We **strongly** recommend only persisting results of `originalSql` back to the
+source database i.e. [set `internal: true`][ref-caching-using-preaggs-internal].
+They often do not provide much in the way of performance directly, but there are
+two specific applications:
+
+1. They can be used in tandem with the
+   [`useOriginalSqlPreAggregations`][self-origsql-preaggs] option in other
+   rollup pre-aggregations.
+
+2. Situations where it is not possible to use a `rollup` pre-aggregations, such
+   as [funnels][ref-schema-funnels].
 
 For example, to pre-aggregate all completed orders, you could do the following:
 
@@ -294,6 +129,7 @@ cube(`CompletedOrders`, {
   preAggregations: {
     main: {
       type: `originalSql`,
+      internal: true,
     },
   },
 });
@@ -320,8 +156,8 @@ cube(`Companies`, {
 
   measures: {
     count: {
-      type: `count`
-    }
+      type: `count`,
+    },
   },
 
   dimensions: {
@@ -329,8 +165,8 @@ cube(`Companies`, {
       sql: `name`,
       type: `string`,
       primaryKey: true,
-      shown: true
-    }
+      shown: true,
+    },
   },
 
   preAggregations: {
@@ -354,8 +190,8 @@ cube('Users', {
   },
   measures: {
     count: {
-      type: `count`
-    }
+      type: `count`,
+    },
   },
   dimensions: {
     id: {
@@ -470,14 +306,14 @@ cube(`Orders`, {
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
 `updateWindow` from the current time. In the provided example, it will refresh
-today's and the last 7 days of partitions once a day. Partitions before the `7 day`
-interval **will not** be refreshed once they are built unless the rollup SQL is
-changed.
+today's and the last 7 days of partitions once a day. Partitions before the
+`7 day` interval **will not** be refreshed once they are built unless the rollup
+SQL is changed.
 
-Partition tables are refreshed as a whole.
-When new partition table is available it replaces the old one.
-Old partition tables are collected by [Garbage Collection][ref-garbage-collection].
-Append is never used to add new rows to the existing tables.
+Partition tables are refreshed as a whole. When new partition table is available
+it replaces the old one. Old partition tables are collected by [Garbage
+Collection][ref-garbage-collection]. Append is never used to add new rows to the
+existing tables.
 
 An original SQL pre-aggregation can also be used with time partitioning and
 incremental `refreshKey`. It requires using `FILTER_PARAMS` inside the Cube's
@@ -504,28 +340,27 @@ cube(`Orders`, {
     },
   },
 
-  dimensions: {
-    id: {
-      type: 'number',
-      sql: 'id',
-      primaryKey: true,
-    },
-    created_at: {
-      type: 'time',
-      sql: 'created_at',
-    },
-  },
-});
-```
+Partition tables are refreshed as a whole. When a new partition table is
+available, it replaces the old one. Old partition tables are collected by
+[Garbage Collection][ref-caching-garbage-collection]. Append is never used to
+add new rows to the existing tables.
 
 ## useOriginalSqlPreAggregations
 
 Cube.js supports multi-stage pre-aggregations by reusing original SQL
 pre-aggregations in rollups through the `useOriginalSqlPreAggregations`
 property. It is helpful in cases where you want to re-use a heavy SQL query
-calculation in multiple rollups. Without `useOriginalSqlPreAggregations` set to
-`true`, Cube.js will always re-execute all underlying SQL calculations every
-time it builds new rollup tables.
+calculation in multiple `rollup` pre-aggregations. Without
+`useOriginalSqlPreAggregations` enabled, Cube.js will always re-execute all
+underlying SQL calculations every time it builds new rollup tables.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| `originalSql` pre-aggregations **must only** be used when [storing
+| pre-aggregations on the source database][ref-caching-using-preaggs-internal].
+| This also means that `originalSql` pre-aggregations require
+| [`readOnly: false`][ref-caching-readonly].
+<!-- prettier-ignore-end -->
 
 ```javascript
 cube(`Orders`, {
@@ -600,21 +435,21 @@ cube(`Orders`, {
 });
 ```
 
-## refreshRangeStart and refreshRangeEnd
+## buildRangeStart and buildRangeEnd
 
-The refresh range defines what partitions should be refreshed by a scheduled
-refresh. Scheduled refreshes will never look beyond this range.
+The build range defines what partitions should be built by a scheduled refresh.
+Scheduled refreshes will **never** look beyond this range.
 
 It can be used together with `updateWindow` to define granular update settings.
 Set the `updateWindow` property to the interval in which your data can change
-and `refreshRangeStart` to the earliest point of time when history should be
-available. For example if `updateWindow` is `1 week` and `refreshRangeStart` is
+and `buildRangeStart` to the earliest point of time when history should be
+available. For example if `updateWindow` is `1 week` and `buildRangeStart` is
 `SELECT NOW() - interval '365 day'` scheduled refresh will build historic
 partitions for 365 days in past and will refresh only one last week according to
 the `refreshKey` setting.
 
 The refresh range for partitioned pre-aggregations can be controlled using
-`refreshRangeStart` and `refreshRangeEnd` properties:
+`buildRangeStart` and `buildRangeEnd` properties:
 
 ```javascript
 cube(`Orders`, {
@@ -630,10 +465,10 @@ cube(`Orders`, {
       granularity: `day`,
       partitionGranularity: `month`,
       scheduledRefresh: true,
-      refreshRangeStart: {
+      buildRangeStart: {
         sql: `SELECT NOW() - interval '300 day'`,
       },
-      refreshRangeEnd: {
+      buildRangeEnd: {
         sql: `SELECT NOW()`,
       },
     },
@@ -692,16 +527,23 @@ cube(`Orders`, {
 });
 ```
 
+[ref-caching-garbage-collection]:
+  /caching/using-pre-aggregations#caching-garbage-collection
+[ref-caching-preaggs-target]:
+  /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
+[ref-caching-readonly]: /caching/using-pre-aggregations#read-only-data-source
+[ref-caching-using-preaggs-internal]:
+  /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-connect-db-ext]:
   /connecting-to-the-database#external-pre-aggregations-database
 [ref-config-driverfactory]: /config/#options-reference-driver-factory
 [ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
-[ref-cube-refreshkey]: /cube#parameters-refresh-key
+[ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
-[ref-sqlalias]: /cube#parameters-sql-alias
+[ref-sqlalias]: /schema/reference/cube#parameters-sql-alias
+[ref-schema-funnels]: /funnels
+[self-origsql-preaggs]: #use-original-sql-pre-aggregations
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions
-[ref-orig-sql]: #use-original-sql-pre-aggregations
-[ref-garbage-collection]: /caching/using-pre-aggregations#garbage-collection

@@ -1,5 +1,5 @@
 ---
-title: Deploy with Serverless Framework on AWS
+title: Serverless Framework on AWS
 permalink: /deployment/platforms/serverless/aws
 category: Deployment
 subCategory: Platforms
@@ -22,7 +22,7 @@ Framework][link-sls] on [AWS][link-aws].
 - An AWS account
 - An [Elasticache Redis][aws-redis] cluster URL for caching and queuing
 - A separate Cube Store deployment for pre-aggregations
-- Node.js 10+
+- Node.js 12+
 - Serverless Framework
 
 ## Configuration
@@ -30,8 +30,8 @@ Framework][link-sls] on [AWS][link-aws].
 Create a Serverless Framework project by creating a `serverless.yml`. A
 production-ready stack would at minimum consist of:
 
-- One or more Cube.js API instance
-- A Cube.js Refresh Worker
+- A [Lambda function][aws-lambda] for a Cube.js API instance
+- A [Lambda function][aws-lambda] for a Cube.js Refresh Worker
 
 The `serverless.yml` for an example project is provided below:
 
@@ -47,13 +47,13 @@ provider:
         - 'sns:*'
       Resource: '*'
   environment:
+    CUBEJS_DB_TYPE: <YOUR_DB_TYPE_HERE>
     CUBEJS_DB_HOST: <YOUR_DB_HOST_HERE>
     CUBEJS_DB_NAME: <YOUR_DB_NAME_HERE>
     CUBEJS_DB_USER: <YOUR_DB_USER_HERE>
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
     CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
-    CUBEJS_DB_TYPE: <YOUR_DB_TYPE_HERE>
     CUBEJS_API_SECRET: <YOUR_API_SECRET_HERE>
     CUBEJS_APP: '${self:service.name}-${self:provider.stage}'
     NODE_ENV: production
@@ -102,7 +102,7 @@ plugins:
 | do this will prevent pre-aggregations from being built.
 <!-- prettier-ignore-end -->
 
-To begin the scheduled refresh, we must call the
+To begin the scheduled refresh, first call the
 [`/v1/run-scheduled-refresh`][ref-restapi-sched-refresh] endpoint. The endpoint
 will return `{ "finished": false }` whilst the pre-aggregations are being built;
 once they are successfully built, the response will change to:
@@ -164,17 +164,10 @@ provider:
 ...
 ```
 
-### Cube Store
-
-All Cube Store nodes (both router and workers) should only be accessible to
-Cube.js API instances and refresh workers.
-
 ## Monitoring
 
-All Cube.js logs can be found in the AWS CloudWatch log group for the Serverless
-project:
-
-> Add logs example?
+All Cube.js logs can be found in the [AWS CloudWatch][aws-cloudwatch] log group
+for the Serverless project.
 
 ## Update to the latest version
 
@@ -190,9 +183,11 @@ npm][link-cubejs-sls-npm]. Then update your `package.json` to use the version:
 }
 ```
 
+[aws-cloudwatch]: https://aws.amazon.com/cloudwatch/
 [aws-ec2]: https://aws.amazon.com/ec2/
 [aws-ecs]: https://aws.amazon.com/ecs/
 [aws-eks]: https://aws.amazon.com/eks/
+[aws-lambda]: https://aws.amazon.com/lambda/
 [aws-redis]: https://aws.amazon.com/elasticache/redis/
 [link-aws]: https://aws.amazon.com/
 [link-sls]: https://www.serverless.com/

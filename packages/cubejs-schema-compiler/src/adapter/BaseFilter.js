@@ -1,6 +1,7 @@
 import inlection from 'inflection';
 import * as momentRange from 'moment-range';
 import { contains, join, map } from 'ramda';
+import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { BaseDimension } from './BaseDimension';
 
@@ -88,7 +89,7 @@ export class BaseFilter extends BaseDimension {
   }
 
   filterParams() {
-    if (contains(this.camelizeOperator, DATE_OPERATORS)) {
+    if (this.isDateOperator()) {
       return [this.inDbTimeZoneDateFrom(this.values[0]), this.inDbTimeZoneDateTo(this.values[1])];
     }
     if (this.camelizeOperator === 'set' || this.camelizeOperator === 'notSet' || this.camelizeOperator === 'expressionEquals') {
@@ -101,6 +102,10 @@ export class BaseFilter extends BaseDimension {
     }
 
     return params;
+  }
+
+  isDateOperator() {
+    return contains(this.camelizeOperator, DATE_OPERATORS);
   }
 
   valuesArray() {
@@ -274,12 +279,15 @@ export class BaseFilter extends BaseDimension {
       return `${date}T00:00:00.000`;
     }
     if (!date) {
-      return moment.tz(date, this.query.timezone).format('YYYY-MM-DD 00:00:00');
+      return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT00:00:00.000');
     }
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
   inDbTimeZoneDateFrom(date) {
+    if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
+      return date;
+    }
     return this.query.inDbTimeZone(this.formatFromDate(date));
   }
 
@@ -297,7 +305,14 @@ export class BaseFilter extends BaseDimension {
   }
 
   inDbTimeZoneDateTo(date) {
+    if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
+      return date;
+    }
     return this.query.inDbTimeZone(this.formatToDate(date));
+  }
+
+  formattedDateRange() {
+    return [this.formatFromDate(this.values[0]), this.formatToDate(this.values[1])];
   }
 
   unescapedAliasName() {

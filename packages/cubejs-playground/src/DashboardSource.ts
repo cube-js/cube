@@ -1,7 +1,7 @@
-import fetch from './playground-fetch';
+import { playgroundFetch } from './shared/helpers';
 
-const fetchWithRetry = (url, options, retries) =>
-  fetch(url, { ...options, retries });
+const playgroundFetchWithRetry = (url, options, retries) =>
+  playgroundFetch(url, { ...options, retries });
 
 class DashboardSource {
   public loadError: Error | null = null;
@@ -13,7 +13,7 @@ class DashboardSource {
   protected playgroundContext: any;
 
   async load(instant = false) {
-    const res = await fetchWithRetry(
+    const res = await playgroundFetchWithRetry(
       `/playground/dashboard-app-create-status${
         instant ? '?instant=true' : ''
       }`,
@@ -33,7 +33,7 @@ class DashboardSource {
     if (!this.playgroundContext) {
       this.playgroundContext = await this.loadContext();
     }
-    return fetch('/playground/apply-template-packages', {
+    return playgroundFetch('/playground/apply-template-packages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -48,7 +48,7 @@ class DashboardSource {
   }
 
   async loadContext() {
-    const res = await fetch('/playground/context');
+    const res = await playgroundFetch('/playground/context');
     const result = await res.json();
     return {
       cubejsToken: result.cubejsToken,
@@ -115,7 +115,7 @@ class DashboardSource {
   }
 
   async templates() {
-    const { templates } = await (await fetch('/playground/manifest')).json();
+    const { templates } = await (await playgroundFetch('/playground/manifest')).json();
     return templates;
   }
 }

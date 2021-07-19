@@ -17,8 +17,7 @@ export class CompilerApi {
     this.sqlCache = options.sqlCache;
   }
 
-  async getCompilers(options) {
-    const { requestId } = options || {};
+  async getCompilers({ requestId } = {}) {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'

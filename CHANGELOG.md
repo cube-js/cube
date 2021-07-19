@@ -3,6 +3,84 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.28.0](https://github.com/cube-js/cube.js/compare/v0.27.53...v0.28.0) (2021-07-17)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server-core:** update Production Checklist URL ([244f7a2](https://github.com/cube-js/cube.js/commit/244f7a251f206fa03dc3b45dc6ce7c46ec4bf810))
+
+
+### Features
+
+* Move partition range evaluation from Schema Compiler to Query Orchestrator to allow unbounded queries on partitioned pre-aggregations ([8ea654e](https://github.com/cube-js/cube.js/commit/8ea654e93b57014fb2409e070b3a4c381985a9fd))
+
+
+
+
+
+## [0.27.53](https://github.com/cube-js/cube.js/compare/v0.27.52...v0.27.53) (2021-07-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** Rollup Designer time dimension granularity ([c4a19bd](https://github.com/cube-js/cube.js/commit/c4a19bdeabf362f6084623df18cdef6245f62ca8))
+
+
+### Features
+
+* **@cubejs-client/playground:** save pre-aggregations from the Rollup Designer ([#3096](https://github.com/cube-js/cube.js/issues/3096)) ([866f949](https://github.com/cube-js/cube.js/commit/866f949f2fc05e189a30b943a963aa7a3f697c81))
+
+
+
+
+
+## [0.27.52](https://github.com/cube-js/cube.js/compare/v0.27.51...v0.27.52) (2021-07-13)
+
+
+### Bug Fixes
+
+* **cubestore:** crash on count(distinct ...) ([516924d](https://github.com/cube-js/cube.js/commit/516924d2615ff201a7b92d88e723acb0527c0b94))
+* **cubestore-driver:** Map UUID to VARCHAR(64) ([#3101](https://github.com/cube-js/cube.js/issues/3101)) ([f87e60e](https://github.com/cube-js/cube.js/commit/f87e60e5b1b326ddd5d6b95f0d231be688728338))
+
+
+
+
+
+## [0.27.51](https://github.com/cube-js/cube.js/compare/v0.27.50...v0.27.51) (2021-07-13)
+
+
+### Bug Fixes
+
+* Use orphaned timeout from query body, pre-aggregations queue, debug API ([#3088](https://github.com/cube-js/cube.js/issues/3088)) ([83e0a0a](https://github.com/cube-js/cube.js/commit/83e0a0a2d68fe94f193cfbb4fedb3f44d0b3cc27))
+* **@cubejs-client/core:** incorrect types for logical and/or in query filters ([#3083](https://github.com/cube-js/cube.js/issues/3083)) ([d7014a2](https://github.com/cube-js/cube.js/commit/d7014a21add8d264d92987a3c840d98d09545457))
+
+
+### Features
+
+* Manual build pre-aggregations, getter for queue state, debug API   ([#3080](https://github.com/cube-js/cube.js/issues/3080)) ([692372e](https://github.com/cube-js/cube.js/commit/692372e1da6ffa7b7c1718d8332d80d1e2ce2b2d))
+
+
+
+
+
+## [0.27.50](https://github.com/cube-js/cube.js/compare/v0.27.49...v0.27.50) (2021-07-12)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** docs links ([7c06822](https://github.com/cube-js/cube.js/commit/7c06822208744cb2c00cdf1fc6ee3d0ad3c59379))
+* **cubestore-driver:** Use correct syntax for Intervals ([53392d7](https://github.com/cube-js/cube.js/commit/53392d7b91c8308f033fa23a303ade265af30912))
+
+
+### Features
+
+* **cubestore:** Introduce support for DATE_ADD ([#3085](https://github.com/cube-js/cube.js/issues/3085)) ([071d7b4](https://github.com/cube-js/cube.js/commit/071d7b430566b0f42e2fc209b1888f9b4b9bb4e7))
+
+
+
+
+
 ## [0.27.49](https://github.com/cube-js/cube.js/compare/v0.27.48...v0.27.49) (2021-07-08)
 
 

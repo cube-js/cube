@@ -34,6 +34,10 @@ export class MySqlDbRunner extends BaseDbRunner {
     };
   }
 
+  tempTableSql(desc) {
+    return desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMPORARY TABLE');
+  }
+
   async prepareFixture(conn) {
     const query = conn.execute;
     await query('CREATE TEMPORARY TABLE visitors (id INT, amount INT, created_at datetime, updated_at datetime, status INT, source VARCHAR(255), latitude DECIMAL, longitude DECIMAL)');

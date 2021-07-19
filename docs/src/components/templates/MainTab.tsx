@@ -3,7 +3,7 @@ import Link from 'gatsby-link';
 import cx from 'classnames';
 import { Row, Col } from 'antd';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 
 type Props = {
   title: string;

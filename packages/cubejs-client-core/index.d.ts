@@ -708,22 +708,26 @@ declare module '@cubejs-client/core' {
     annotation(): QueryAnnotations;
   }
 
-  export type Filter = BinaryFilter | UnaryFilter;
+  export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
+  type LogicalAndFilter = {
+    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[]
+  };
+
+  type LogicalOrFilter = {
+    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[]
+  };
+
   type BinaryFilter = {
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-    and?: BinaryFilter[];
-    or?: BinaryFilter[];
   };
   type UnaryFilter = {
     dimension?: string;
     member?: string;
     operator: UnaryOperator;
     values?: never;
-    and?: UnaryFilter[];
-    or?: UnaryFilter[];
   };
   type UnaryOperator = 'set' | 'notSet';
   type BinaryOperator =
@@ -781,13 +785,11 @@ declare module '@cubejs-client/core' {
     timeElapsed(): string;
   }
 
-  export type SqlQueryTuple = [string, boolean | string | number];
+  export type SqlQueryTuple = [string, any[], any];
 
   export type SqlData = {
     aliasNameToMember: Record<string, string>;
-    cacheKeyQueries: {
-      queries: SqlQueryTuple[];
-    };
+    cacheKeyQueries: SqlQueryTuple[];
     dataSource: boolean;
     external: boolean;
     sql: SqlQueryTuple;

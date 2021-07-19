@@ -1,4 +1,4 @@
-import { Alert, Button, Input, Space, Tabs, Typography, Divider } from 'antd';
+import { Alert, Button, Input, Space, Tabs, Typography, Divider, notification } from 'antd';
 import {
   areQueriesEqual,
   Query,
@@ -11,6 +11,8 @@ import { camelCase } from 'camel-case';
 import { AvailableMembers, useLazyDryRun } from '@cubejs-client/react';
 
 import { CodeSnippet } from '../../atoms';
+import { Flex, Box } from '../../grid';
+import { useIsCloud } from '../AppContext';
 import {
   canUsePreAggregationForTransformedQuery,
   getPreAggregationDefinition,
@@ -40,13 +42,6 @@ const RightSidePanel = styled.div`
   max-width: 300px;
 `;
 
-const Flex = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 16px;
-`;
-
 type RollupDesignerProps = {
   defaultQuery: Query;
   defaultTransformedQuery: TransformedQuery;
@@ -59,12 +54,14 @@ export function RollupDesigner({
   defaultTransformedQuery,
 }: RollupDesignerProps) {
   const [load, { isLoading, response, error }] = useLazyDryRun();
+  const isCloud = useIsCloud();
 
   const [matching, setMatching] = useState<boolean>(true);
   const [query, setQuery] = useState<Query>(defaultQuery);
   const [transformedQuery, setTransformedQuery] = useState<TransformedQuery>(
     defaultTransformedQuery
   );
+  const [saving, setSaving] = useState<boolean>(false);
   const [preAggName, setPreAggName] = useState<string>('main');
   const [isRollupCodeVisible, toggleRollupCode] = useToggle();
 
@@ -136,6 +133,36 @@ export function RollupDesigner({
     toggleRollupCode();
   }
 
+
+  async function handleAddToSchemaClick() {
+    setSaving(true);
+
+    const response = await fetch('/playground/schema/pre-aggregation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        preAggregationName: preAggName,
+        cubeName,
+        code: preAggregation?.value || ''
+      }),
+    });
+
+    setSaving(false);
+
+    if (response.ok) {
+      notification.success({
+        message: `Pre-aggregation has been added to the ${cubeName} cube`,
+      });
+    } else {
+      const { error } = await response.json();
+      notification.error({
+        message: error
+      });
+    }
+  }
+
   function handleMemberRemove(memberType) {
     return (key) => setQuery(updateQuery(query, memberType, key));
   }
@@ -178,6 +205,16 @@ export function RollupDesigner({
             style={{ marginBottom: 16 }}
             code={preAggregation.code}
           />
+
+          <Flex justifyContent="flex-end" gap={2}>
+            <Button onClick={toggleRollupCode}>Back to editing</Button>
+
+            {!isCloud ? (
+              <Button type="primary" loading={saving} onClick={handleAddToSchemaClick}>
+                Add to the Data Schema
+              </Button>
+            ) : null}
+          </Flex>
         </div>
       );
     }
@@ -202,12 +239,8 @@ export function RollupDesigner({
 
         <MainWrapper>
           <Space direction="vertical" style={{ width: '100%' }}>
-            <Flex>
-              {isRollupCodeVisible ? (
-                <Button type="primary" onClick={toggleRollupCode}>
-                  Back to editing
-                </Button>
-              ) : (
+            {!isRollupCodeVisible && (
+              <Flex justifyContent="flex-end">
                 <Button
                   type="primary"
                   loading={isLoading}
@@ -215,17 +248,19 @@ export function RollupDesigner({
                 >
                   Preview rollup definition
                 </Button>
-              )}
+              </Flex>
+            )}
 
+            <Flex direction="column" gap={2}>
               {isRollupCodeVisible ? (
                 <Input
                   value={preAggName}
                   onChange={(event) => setPreAggName(event.target.value)}
                 />
               ) : null}
-            </Flex>
 
-            {rollupBody()}
+              <Box>{rollupBody()}</Box>
+            </Flex>
 
             {!isRollupCodeVisible ? (
               <Tabs>

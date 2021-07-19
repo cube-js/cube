@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-scroll';
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 
 export const SCROLL_OFFSET = -66;
 export const SCROLL_DURATION = 300;

@@ -4,7 +4,7 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
-describe('PreAggregations', () => {
+describe('PreAggregationsAlias', () => {
   jest.setTimeout(200000);
 
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
@@ -371,9 +371,7 @@ describe('PreAggregations', () => {
     expect(preAggregationsDescription[0].tableName).toEqual('rvis_rollupalias');
     expect(query.buildSqlAndParams()[0]).toContain('rvis_rollupalias');
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           { rvis__created_at_day: '2017-01-02T00:00:00.000Z', rvis__count: '1' },
@@ -403,12 +401,10 @@ describe('PreAggregations', () => {
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    expect(preAggregationsDescription[0].tableName).toEqual('rvis_rollupalias20170101');
-    expect(query.buildSqlAndParams()[0]).toContain('rvis_rollupalias20170101');
+    expect(preAggregationsDescription[0].tableName).toEqual('rvis_rollupalias');
+    expect(query.buildSqlAndParams()[0]).toContain('rvis_rollupalias');
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           { rvis__created_at_day: '2017-01-02T00:00:00.000Z', rvis__count: '1' },
@@ -438,11 +434,9 @@ describe('PreAggregations', () => {
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    expect(preAggregationsDescription[0].tableName).toEqual('vis_visitors_alias_d20170101');
+    expect(preAggregationsDescription[0].tableName).toEqual('vis_visitors_alias_d');
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -486,12 +480,10 @@ describe('PreAggregations', () => {
       preAggregationsSchema: ''
     });
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    expect(preAggregationsDescription[0].tableName).toEqual('googlevis_visitors_alias_d20170101');
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => {
+    expect(preAggregationsDescription[0].tableName).toEqual('googlevis_visitors_alias_d');
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
-        [{ googlevis__source: 'google', googlevis__created_at_day: '2017-01-05T00:00:00.000Z', googlevis__checkins_total: '900' }]
+        [{ googlevis__source: 'google', googlevis__created_at_day: '2017-01-05T00:00:00.000Z', googlevis__checkins_total: '1' }]
       );
     });
   }));
