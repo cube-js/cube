@@ -109,7 +109,8 @@ export class RedisQueueDriverConnection {
           JSON.stringify({
             event: 'setResultAndRemoveQuery',
             redisQueuePrefix: this.redisQueuePrefix,
-            queryKey: this.redisHash(queryKey)
+            queryKey: this.redisHash(queryKey),
+            payload: executionResult
           })
         );
       }

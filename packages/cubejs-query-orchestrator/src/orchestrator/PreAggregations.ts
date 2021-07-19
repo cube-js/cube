@@ -1220,6 +1220,7 @@ export class PreAggregations {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver({ pool: options.redisPool }) :
       new LocalCacheDriver();
+
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
     this.usedTablePersistTime = options.usedTablePersistTime || 600;
