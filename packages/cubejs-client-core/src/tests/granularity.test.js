@@ -99,13 +99,11 @@ describe('ResultSet Granularity', () => {
 
       expect(result.chartPivot()).toStrictEqual([
         {
-          category: '2019-01-07T00:00:00.000',
           x: '2019-01-07T00:00:00.000',
           xValues: ['2019-01-07T00:00:00.000'],
           'LineItems.count': 2,
         },
         {
-          category: '2019-01-14T00:00:00.000',
           x: '2019-01-14T00:00:00.000',
           xValues: ['2019-01-14T00:00:00.000'],
           'LineItems.count': 0,

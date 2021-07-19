@@ -345,35 +345,30 @@ describe('data blending', () => {
     expect(resultSet.chartPivot()).toEqual([
       {
         x: '2020-07-01T00:00:00.000',
-        category: '2020-07-01T00:00:00.000',
         '0,Users.count': 0,
         '1,Users.count': 0,
         xValues: ['2020-07-01T00:00:00.000'],
       },
       {
         x: '2020-08-01T00:00:00.000',
-        category: '2020-08-01T00:00:00.000',
         '0,Users.count': 14,
         '1,Users.count': 2,
         xValues: ['2020-08-01T00:00:00.000'],
       },
       {
         x: '2020-09-01T00:00:00.000',
-        category: '2020-09-01T00:00:00.000',
         '0,Users.count': 23,
         '1,Users.count': 4,
         xValues: ['2020-09-01T00:00:00.000'],
       },
       {
         x: '2020-10-01T00:00:00.000',
-        category: '2020-10-01T00:00:00.000',
         '0,Users.count': 0,
         '1,Users.count': 7,
         xValues: ['2020-10-01T00:00:00.000'],
       },
       {
         x: '2020-11-01T00:00:00.000',
-        category: '2020-11-01T00:00:00.000',
         '0,Users.count': 0,
         '1,Users.count': 0,
         xValues: ['2020-11-01T00:00:00.000'],
@@ -511,35 +506,30 @@ describe('data blending', () => {
     expect(resultSet.chartPivot({ aliasSeries: ['one', 'two'] })).toEqual([
       {
         x: '2020-07-01T00:00:00.000',
-        category: '2020-07-01T00:00:00.000',
         'one,Users.count': 0,
         'two,Users.count': 0,
         xValues: ['2020-07-01T00:00:00.000'],
       },
       {
         x: '2020-08-01T00:00:00.000',
-        category: '2020-08-01T00:00:00.000',
         'one,Users.count': 14,
         'two,Users.count': 2,
         xValues: ['2020-08-01T00:00:00.000'],
       },
       {
         x: '2020-09-01T00:00:00.000',
-        category: '2020-09-01T00:00:00.000',
         'one,Users.count': 23,
         'two,Users.count': 4,
         xValues: ['2020-09-01T00:00:00.000'],
       },
       {
         x: '2020-10-01T00:00:00.000',
-        category: '2020-10-01T00:00:00.000',
         'one,Users.count': 0,
         'two,Users.count': 7,
         xValues: ['2020-10-01T00:00:00.000'],
       },
       {
         x: '2020-11-01T00:00:00.000',
-        category: '2020-11-01T00:00:00.000',
         'one,Users.count': 0,
         'two,Users.count': 0,
         xValues: ['2020-11-01T00:00:00.000'],

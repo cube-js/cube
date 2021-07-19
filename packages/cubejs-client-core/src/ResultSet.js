@@ -200,7 +200,7 @@ class ResultSet {
     return this.seriesNames(pivotConfig).map(({ title, key }) => ({
       title,
       key,
-      series: this.chartPivot(pivotConfig).map(({ category, x, ...obj }) => ({ value: obj[key], category, x }))
+      series: this.chartPivot(pivotConfig).map(({ x, ...obj }) => ({ value: obj[key], x }))
     }));
   }
 
@@ -489,7 +489,6 @@ class ResultSet {
         });
 
       return ({
-        category: this.axisValuesString(xValues, ','), // TODO deprecated
         x: this.axisValuesString(xValues, ','),
         xValues,
         ...yValuesMap
