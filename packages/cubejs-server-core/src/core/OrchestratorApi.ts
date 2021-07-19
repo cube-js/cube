@@ -188,4 +188,12 @@ export class OrchestratorApi {
     const result = await this.orchestrator.getPreAggregationQueueStates();
     return result;
   }
+
+  public async subscribeQueueEvents(id, callback) {
+    return this.orchestrator.subscribeQueueEvents(id, callback);
+  }
+
+  public async unSubscribeQueueEvents(id) {
+    return this.orchestrator.unSubscribeQueueEvents(id);
+  }
 }

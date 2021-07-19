@@ -11,7 +11,8 @@ const methodParams: Record<string, string[]> = {
   'dry-run': ['query'],
   meta: [],
   subscribe: ['query', 'queryType'],
-  unsubscribe: []
+  unsubscribe: [],
+  'subscribe.queue.events': []
 };
 
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
@@ -87,6 +88,7 @@ export class SubscriptionServer {
       const method = message.method.replace(/[^a-z]+(.)/g, (m, chr) => chr.toUpperCase());
       await this.apiGateway[method]({
         ...params,
+        connectionId,
         context,
         isSubscription,
         res: this.resultFn(connectionId, message.messageId),
@@ -120,6 +122,8 @@ export class SubscriptionServer {
   }
 
   public async disconnect(connectionId: string) {
+    const authContext = await this.subscriptionStore.getAuthContext(connectionId);
+    await this.apiGateway.unSubscribeQueueEvents({ context: authContext, connectionId });
     await this.subscriptionStore.cleanupSubscriptions(connectionId);
   }
 

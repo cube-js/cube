@@ -17,6 +17,7 @@ export class LocalQueueDriverConnection {
     this.heartBeat = driver.heartBeat;
     this.processingCounter = driver.processingCounter;
     this.processingLocks = driver.processingLocks;
+    this.getQueueEventsBus = options.getQueueEventsBus;
   }
 
   getResultPromise(resultListKey) {
@@ -89,6 +90,15 @@ export class LocalQueueDriverConnection {
     }
     this.recent[key] = { order: orphanedTime, key };
 
+    if (this.getQueueEventsBus) {
+      this.getQueueEventsBus().emit({
+        event: 'addedToQueue',
+        redisQueuePrefix: this.redisQueuePrefix,
+        queryKey: this.redisHash(queryKey),
+        payload: queryQueueObj
+      });
+    }
+
     return [added, null, null, Object.keys(this.toProcess).length]; // TODO nulls
   }
 
@@ -126,6 +136,16 @@ export class LocalQueueDriverConnection {
     delete this.processingLocks[key];
     promise.resolved = true;
     promise.resolve(executionResult);
+
+    if (this.getQueueEventsBus) {
+      this.getQueueEventsBus().emit({
+        event: 'setResultAndRemoveQuery',
+        redisQueuePrefix: this.redisQueuePrefix,
+        queryKey: this.redisHash(queryKey),
+        payload: executionResult
+      });
+    }
+
     return true;
   }
 
@@ -172,6 +192,16 @@ export class LocalQueueDriverConnection {
       added = 1;
     }
     this.heartBeat[key] = { key, order: new Date().getTime() };
+
+    if (this.getQueueEventsBus) {
+      this.getQueueEventsBus().emit({
+        event: 'retrievedForProcessing',
+        redisQueuePrefix: this.redisQueuePrefix,
+        queryKey: this.redisHash(queryKey),
+        payload: this.queryDef[key]
+      });
+    }
+
     return [
       added, null, this.queueArray(this.active), Object.keys(this.toProcess).length, this.queryDef[key], lockAcquired
     ]; // TODO nulls

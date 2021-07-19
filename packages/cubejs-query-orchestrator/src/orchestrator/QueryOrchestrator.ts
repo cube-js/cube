@@ -5,6 +5,8 @@ import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { RedisQueueEventsBus } from './RedisQueueEventsBus';
+import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory';
 
@@ -28,6 +30,10 @@ export class QueryOrchestrator {
 
   protected readonly rollupOnlyMode: boolean;
 
+  private queueEventsBus: RedisQueueEventsBus|LocalQueueEventsBus;
+
+  private readonly cacheAndQueueDriver: string;
+
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -41,12 +47,14 @@ export class QueryOrchestrator {
         ? 'redis'
         : 'memory'
     );
+    this.cacheAndQueueDriver = cacheAndQueueDriver;
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
       throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
+    this.redisPool = redisPool;
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
     this.queryCache = new QueryCache(
@@ -62,7 +70,6 @@ export class QueryOrchestrator {
         ...options.queryCacheOptions,
       }
     );
-
     this.preAggregations = new PreAggregations(
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
@@ -70,9 +77,20 @@ export class QueryOrchestrator {
         redisPool,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
-        ...options.preAggregationsOptions
+        ...options.preAggregationsOptions,
+        getQueueEventsBus: this.getQueueEventsBus.bind(this)
       }
     );
+  }
+
+  private getQueueEventsBus() {
+    if (!this.queueEventsBus) {
+      const isRedis = this.cacheAndQueueDriver === 'redis';
+      this.queueEventsBus = isRedis ?
+        new RedisQueueEventsBus({ redisPool: this.redisPool }) :
+        new LocalQueueEventsBus();
+    }
+    return this.queueEventsBus;
   }
 
   public async fetchQuery(queryBody: any): Promise<any> {
@@ -218,5 +236,13 @@ export class QueryOrchestrator {
 
   public async getPreAggregationQueueStates() {
     return this.preAggregations.getQueueState();
+  }
+
+  public async subscribeQueueEvents(id, callback) {
+    return this.getQueueEventsBus().subscribe(id, callback);
+  }
+
+  public async unSubscribeQueueEvents(id) {
+    return this.getQueueEventsBus().unsubscribe(id);
   }
 }

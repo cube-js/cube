@@ -24,7 +24,8 @@ export class QueryQueue {
       continueWaitTimeout: this.continueWaitTimeout,
       orphanedTimeout: this.orphanedTimeout,
       heartBeatTimeout: this.heartBeatInterval * 4,
-      redisPool: options.redisPool
+      redisPool: options.redisPool,
+      getQueueEventsBus: options.getQueueEventsBus
     };
     this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :
@@ -67,6 +68,12 @@ export class QueryQueue {
       if (result) {
         return this.parseResult(result);
       }
+
+      if (query.forceBuild) {
+        const jobExists = await redisClient.getQueryDef(queryKey);
+        if (jobExists) return null;
+      }
+
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
 

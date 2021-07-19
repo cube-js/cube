@@ -9,6 +9,7 @@ export class RedisQueueDriverConnection {
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
+    this.getQueueEventsBus = options.getQueueEventsBus;
   }
 
   async getResultBlocking(queryKey) {
@@ -31,24 +32,38 @@ export class RedisQueueDriverConnection {
   }
 
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
-    return this.redisClient.multi()
+    const data = {
+      queryHandler,
+      query,
+      queryKey,
+      stageQueryKey: options.stageQueryKey,
+      priority,
+      requestId: options.requestId,
+      addedToQueueTime: new Date().getTime()
+    };
+
+    const tx = this.redisClient.multi()
       .zadd([this.toProcessRedisKey(), 'NX', keyScore, this.redisHash(queryKey)])
       .zadd([this.recentRedisKey(), orphanedTime, this.redisHash(queryKey)])
       .hsetnx([
         this.queriesDefKey(),
         this.redisHash(queryKey),
-        JSON.stringify({
-          queryHandler,
-          query,
-          queryKey,
-          stageQueryKey: options.stageQueryKey,
-          priority,
-          requestId: options.requestId,
-          addedToQueueTime: new Date().getTime()
-        })
+        JSON.stringify(data)
       ])
-      .zcard(this.toProcessRedisKey())
-      .execAsync();
+      .zcard(this.toProcessRedisKey());
+
+    if (this.getQueueEventsBus) {
+      tx.publish(
+        this.getQueueEventsBus().eventsChannel,
+        JSON.stringify({
+          event: 'addedToQueue',
+          redisQueuePrefix: this.redisQueuePrefix,
+          queryKey: this.redisHash(queryKey),
+          payload: data
+        })
+      );
+    }
+    return tx.execAsync();
   }
 
   getToProcessQueries() {
@@ -79,16 +94,27 @@ export class RedisQueueDriverConnection {
       if (processingId !== currentProcessId) {
         return false;
       }
-
-      return this.redisClient.multi()
+      const tx = this.redisClient.multi()
         .lpush([this.resultListKey(queryKey), JSON.stringify(executionResult)])
         .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
         .zrem([this.heartBeatRedisKey(), this.redisHash(queryKey)])
         .zrem([this.toProcessRedisKey(), this.redisHash(queryKey)])
         .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
         .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
-        .del(this.queryProcessingLockKey(queryKey))
-        .execAsync();
+        .del(this.queryProcessingLockKey(queryKey));
+      
+      if (this.getQueueEventsBus) {
+        tx.publish(
+          this.getQueueEventsBus().eventsChannel,
+          JSON.stringify({
+            event: 'setResultAndRemoveQuery',
+            redisQueuePrefix: this.redisQueuePrefix,
+            queryKey: this.redisHash(queryKey),
+            payload: executionResult
+          })
+        );
+      }
+      return tx.execAsync();
     } finally {
       await this.redisClient.unwatchAsync();
     }
@@ -154,6 +180,18 @@ export class RedisQueueDriverConnection {
           .execAsync();
       if (result) {
         result[4] = JSON.parse(result[4]);
+
+        if (this.getQueueEventsBus) {
+          await this.redisClient.publish(
+            this.getQueueEventsBus().eventsChannel,
+            JSON.stringify({
+              event: 'retrievedForProcessing',
+              redisQueuePrefix: this.redisQueuePrefix,
+              queryKey: this.redisHash(queryKey),
+              payload: result[4]
+            })
+          );
+        }
       }
       return result;
     } finally {

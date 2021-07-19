@@ -1206,6 +1206,8 @@ export class PreAggregations {
 
   private readonly queue: Record<string, QueryQueue> = {};
 
+  private readonly getQueueEventsBus: any;
+
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactoryByDataSource,
@@ -1218,10 +1220,12 @@ export class PreAggregations {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisCacheDriver({ pool: options.redisPool }) :
       new LocalCacheDriver();
+
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
     this.usedTablePersistTime = options.usedTablePersistTime || 600;
     this.externalRefresh = options.externalRefresh;
+    this.getQueueEventsBus = options.getQueueEventsBus;
   }
 
   protected tablesUsedRedisKey(tableName) {
@@ -1365,7 +1369,8 @@ export class PreAggregations {
         ...(typeof this.options.queueOptions === 'function' ?
           this.options.queueOptions(dataSource) :
           this.options.queueOptions
-        )
+        ),
+        getQueueEventsBus: this.getQueueEventsBus
       });
     }
     return this.queue[dataSource];
@@ -1388,6 +1393,7 @@ export class PreAggregations {
           );
           return loadCache.fetchTables(preAggregation);
         }, {
+          getQueueEventsBus: this.getQueueEventsBus,
           concurrency: 4,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,

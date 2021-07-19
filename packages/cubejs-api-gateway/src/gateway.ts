@@ -857,6 +857,14 @@ export class ApiGateway {
     }
   }
 
+  public subscribeQueueEvents({ context, connectionId, res }) {
+    return this.getAdapterApi(context).subscribeQueueEvents(connectionId, res);
+  }
+
+  public unSubscribeQueueEvents({ context, connectionId }) {
+    return this.getAdapterApi(context).unSubscribeQueueEvents(connectionId);
+  }
+
   public async subscribe({
     query, context, res, subscribe, subscriptionState, queryType
   }) {
