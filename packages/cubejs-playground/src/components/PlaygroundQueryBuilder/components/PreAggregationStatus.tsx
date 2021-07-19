@@ -113,7 +113,7 @@ export function PreAggregationStatus({
           <RollupDesigner
             defaultQuery={props.query}
             availableMembers={props.availableMembers}
-            defaultTransformedQuery={props.transformedQuery}
+            transformedQuery={props.transformedQuery}
           />
         ) : null}
       </Modal>

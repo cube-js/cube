@@ -276,6 +276,8 @@ export class PreAggregations {
   }
 
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
+    console.log('refs>>>>>>>', refs);
+
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         d => d.join('.'),
