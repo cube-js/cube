@@ -22,7 +22,15 @@ class MockDriver {
     }
 
     if (query.match(/^SELECT NOW\(\)$/)) {
-      promise = promise.then(() => new Date().toJSON());
+      promise = promise.then(() => [{ now: new Date().toJSON() }]);
+    }
+
+    if (query.match(/^SELECT MAX\(timestamp\)/)) {
+      promise = promise.then(() => [{ max: new Date('2021-06-01T00:00:00.000Z').toJSON() }]);
+    }
+
+    if (query.match(/^SELECT MIN\(timestamp\)/)) {
+      promise = promise.then(() => [{ min: new Date('2021-05-01T00:00:00.000Z').toJSON() }]);
     }
 
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
@@ -110,37 +118,43 @@ describe('QueryOrchestrator', () => {
   let mockDriver = null;
   let fooMockDriver = null;
   let barMockDriver = null;
-  let csvMockDriver = null;
   let externalMockDriver = null;
-  const queryOrchestrator = new QueryOrchestrator(
-    'TEST', (dataSource) => {
-      if (dataSource === 'foo') {
-        return fooMockDriver;
-      } else if (dataSource === 'bar') {
-        return barMockDriver;
-      } else if (dataSource === 'csv') {
-        return csvMockDriver;
-      } else {
-        return mockDriver;
-      }
-    },
-    (msg, params) => console.log(new Date().toJSON(), msg, params), {
-      preAggregationsOptions: {
-        queueOptions: {
-          executionTimeout: 2
-        },
-        usedTablePersistTime: 1
-      },
-      externalDriverFactory: () => externalMockDriver
-    }
-  );
+  let queryOrchestrator = null;
+  let testCount = 1;
 
   beforeEach(() => {
-    mockDriver = new MockDriver();
-    fooMockDriver = new MockDriver();
-    barMockDriver = new MockDriver();
-    csvMockDriver = new MockDriver({ csvImport: 'true' });
-    externalMockDriver = new ExternalMockDriver();
+    const mockDriverLocal = new MockDriver();
+    const fooMockDriverLocal = new MockDriver();
+    const barMockDriverLocal = new MockDriver();
+    const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
+    const externalMockDriverLocal = new ExternalMockDriver();
+
+    queryOrchestrator = new QueryOrchestrator(
+      `ORCHESTRATOR_TEST_${testCount++}`, (dataSource) => {
+        if (dataSource === 'foo') {
+          return fooMockDriverLocal;
+        } else if (dataSource === 'bar') {
+          return barMockDriverLocal;
+        } else if (dataSource === 'csv') {
+          return csvMockDriverLocal;
+        } else {
+          return mockDriverLocal;
+        }
+      },
+      (msg, params) => console.log(new Date().toJSON(), msg, params), {
+        preAggregationsOptions: {
+          queueOptions: {
+            executionTimeout: 2
+          },
+          usedTablePersistTime: 1
+        },
+        externalDriverFactory: () => externalMockDriverLocal,
+      }
+    );
+    mockDriver = mockDriverLocal;
+    fooMockDriver = fooMockDriverLocal;
+    barMockDriver = barMockDriverLocal;
+    externalMockDriver = externalMockDriverLocal;
   });
 
   afterEach(async () => {
@@ -750,6 +764,86 @@ describe('QueryOrchestrator', () => {
       structure_version: 'ezlvkhjl',
       naming_version: 2
     });
+  });
+
+  test('range partitions', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_d_main ON stb_pre_aggregations.orders_d ("orders__created_at")', []],
+          indexName: 'orders_d_main'
+        }],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        partitionGranularity: 'day',
+        timezone: 'UTC'
+      }],
+      requestId: 'range partitions',
+    };
+    await queryOrchestrator.fetchQuery(query);
+    console.log(JSON.stringify(mockDriver.executedQueries));
+    const nowQueries = mockDriver.executedQueries.filter(q => q.match(/NOW/)).length;
+    await mockDriver.delay(2000);
+    await queryOrchestrator.fetchQuery(query);
+    console.log(JSON.stringify(mockDriver.executedQueries));
+    expect(mockDriver.executedQueries.filter(q => q.match(/NOW/)).length).toEqual(nowQueries);
+  });
+
+  test('empty intersection', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_d_main ON stb_pre_aggregations.orders_d ("orders__created_at")', []],
+          indexName: 'orders_d_main'
+        }],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        matchedTimeDimensionDateRange: ['2021-08-01T00:00:00.000', '2021-08-30T00:00:00.000'],
+        partitionGranularity: 'day',
+        timezone: 'UTC'
+      }],
+      requestId: 'empty intersection',
+    };
+    const result = await queryOrchestrator.fetchQuery(query);
+    expect(result.data[0]).toMatch(/orders_d20210601/);
   });
 
   test('loadRefreshKeys', async () => {

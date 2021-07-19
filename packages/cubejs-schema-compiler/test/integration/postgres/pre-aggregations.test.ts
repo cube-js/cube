@@ -1,4 +1,4 @@
-import R from 'ramda';
+import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
@@ -11,6 +11,7 @@ describe('PreAggregations', () => {
     cube(\`visitors\`, {
       sql: \`
       select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
+      AND \${FILTER_PARAMS.ReferenceOriginalSql.createdAt.filter('created_at')}
       \`,
       
       joins: {
@@ -364,31 +365,6 @@ describe('PreAggregations', () => {
     })
     `);
 
-  function replaceTableName(query, preAggregation, suffix) {
-    const [toReplace, params] = query;
-    console.log(toReplace);
-    preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
-    return [
-      preAggregation.reduce(
-        (replacedQuery, desc) => replacedQuery
-          .replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`)
-          .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`),
-        toReplace
-      ),
-      params
-    ];
-  }
-
-  function tempTablePreAggregations(preAggregationsDescriptions) {
-    return R.unnest(preAggregationsDescriptions.map(
-      desc => desc.invalidateKeyQueries.concat([
-        [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), desc.loadSql[1]]
-      ]).concat(
-        (desc.indexesSql || []).map(({ sql }) => sql)
-      )
-    ));
-  }
-
   it('simple pre-aggregation', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
@@ -406,14 +382,7 @@ describe('PreAggregations', () => {
       preAggregationsSchema: ''
     });
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -460,9 +429,7 @@ describe('PreAggregations', () => {
     console.log(preAggregationsDescription);
     expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/visitors_ratio/);
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 10))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -508,9 +475,7 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 1))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -549,9 +514,7 @@ describe('PreAggregations', () => {
 
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][0]).toMatch(/NOW\(\) </);
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 101))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -590,11 +553,11 @@ describe('PreAggregations', () => {
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][0]).toMatch(/NOW\(\) </);
-    expect(preAggregationsDescription[0].invalidateKeyQueries[0][1][0]).toEqual('2017-02-01T07:59:59Z');
+    expect(preAggregationsDescription[0].invalidateKeyQueries[0][1][0]).toEqual(
+      PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE
+    );
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 103))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -634,9 +597,7 @@ describe('PreAggregations', () => {
 
     expect(preAggregationsDescription[0].tableName).toEqual('visitors_default');
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 104))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -742,9 +703,7 @@ describe('PreAggregations', () => {
 
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][0]).toMatch(/FLOOR/);
 
-    return dbRunner.testQueries(tempTablePreAggregations(preAggregationsDescription).concat([
-      query.buildSqlAndParams()
-    ]).map(q => replaceTableName(q, preAggregationsDescription, 102))).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
           {
@@ -814,14 +773,12 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
     expect(preAggregationsDescription[1].loadSql[0]).toMatch(/vc_main/);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 2))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -856,19 +813,17 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
-    const desc = preAggregationsDescription.find(e => e.tableName === 'visitors_multi_stage20170101');
-    expect(desc.invalidateKeyQueries[0][1][0]).toEqual('2017-01-02T07:59:59Z');
+    const desc = preAggregationsDescription.find(e => e.tableName === 'visitors_multi_stage');
+    expect(desc.invalidateKeyQueries[0][1][0]).toEqual(PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE);
 
     const vcMainDesc = preAggregationsDescription.find(e => e.tableName === 'vc_main');
     expect(vcMainDesc.invalidateKeyQueries.length).toEqual(1);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 3))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -895,8 +850,8 @@ describe('PreAggregations', () => {
         dimension: 'visitors.createdAt',
         granularity: 'day',
         dateRange: [
-          new Date(new Date().getTime() - 60 * 24 * 60 * 60 * 1000).toJSON().substring(0, 10),
-          new Date().toJSON().substring(0, 10)
+          '2017-01-06',
+          '2017-01-31'
         ]
       }],
       order: [{
@@ -911,19 +866,21 @@ describe('PreAggregations', () => {
     const partitionedTables = preAggregationsDescription
       .filter(({ tableName }) => tableName.indexOf('visitors_partitioned') === 0);
 
-    expect(partitionedTables[0].invalidateKeyQueries[0][2].renewalThreshold).toEqual(86400);
-    expect(partitionedTables[partitionedTables.length - 1].invalidateKeyQueries[0][2].renewalThreshold).toEqual(300);
+    expect(partitionedTables[0].invalidateKeyQueries[0][2].updateWindowSeconds).toEqual(86400 * 7);
+    expect(partitionedTables[0].invalidateKeyQueries[0][2].renewalThresholdOutsideUpdateWindow).toEqual(86400);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1042))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
-        []
+        [{
+          visitors__checkins_total: '0',
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__source: null,
+        }]
       );
     });
   }));
@@ -953,13 +910,11 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 42))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1008,13 +963,11 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 12342))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1056,13 +1009,11 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 242))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1107,13 +1058,11 @@ describe('PreAggregations', () => {
     console.log(preAggregationsDescription);
     expect(preAggregationsDescription.length).toEqual(2);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 342))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1156,13 +1105,11 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 142))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1194,13 +1141,11 @@ describe('PreAggregations', () => {
 
     console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 342)),
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1235,13 +1180,11 @@ describe('PreAggregations', () => {
 
     console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 341)),
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1279,13 +1222,11 @@ describe('PreAggregations', () => {
 
     console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 442)),
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1318,13 +1259,11 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 43))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [
@@ -1339,9 +1278,10 @@ describe('PreAggregations', () => {
   it('partitioned huge span', () => compiler.compile().then(() => {
     let queryAndParams;
     let preAggregationsDescription;
+    let query;
 
     for (let i = 0; i < 10; i++) {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.checkinsTotal'
         ],
@@ -1366,13 +1306,11 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     console.log(preAggregationsDescription);
 
-    const queries = tempTablePreAggregations(preAggregationsDescription);
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
-    return dbRunner.testQueries(
-      queries.concat([queryAndParams]).map(q => replaceTableName(q, preAggregationsDescription, 1142))
-    ).then(res => {
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [

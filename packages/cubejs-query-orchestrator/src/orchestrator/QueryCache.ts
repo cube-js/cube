@@ -11,11 +11,14 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
 
 type QueryOptions = {
-  external?: boolean,
-  renewalThreshold?: number,
+  external?: boolean;
+  renewalThreshold?: number;
+  updateWindowSeconds?: number;
+  renewalThresholdOutsideUpdateWindow?: number;
+  incremental?: boolean;
 };
 export type QueryTuple = [sql: string, params: unknown[], options?: QueryOptions];
-export type QueryWithParams = QueryTuple | string;
+export type QueryWithParams = QueryTuple;
 type Query = {
   requestId?: string;
   dataSource: string;

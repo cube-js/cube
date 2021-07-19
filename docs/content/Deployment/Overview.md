@@ -3,17 +3,21 @@ title: Overview
 permalink: /deployment/overview
 category: Deployment
 menuOrder: 1
+redirect_from:
+  - /deployment/
+  - /deployment/guide
 ---
 
 This section contains a general overview of deploying Cube.js cluster in
-production. You can find platform-specific guides on the [Deployment guides
-page.][link-deployment-guides]
+production. You can find platform-specific guides for:
 
-If you are moving Cube.js to production, check this guide:
+- [Docker][ref-deploy-docker]
+- [AWS Serverless][ref-deploy-sls-aws]
+- [GCP Serverless][ref-deploy-sls-gcp]
+- [Cube Cloud][ref-deploy-cubecloud]
 
-[Production Checklist](/deployment/production-checklist)
-
-[link-deployment-guides]: /deployment/guide
+If you are moving Cube.js to production, check out the [Production
+Checklist][ref-deploy-prod-list].
 
 As shown in the diagram below, a typical production Cube.js cluster consists of
 one or multiple API instances, a Refresh Worker, Redis and a Cube Store cluster.
@@ -35,10 +39,9 @@ Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
 ingests pre-aggregations built by Refresh Worker and responds to queries from
 API instances. **Redis** is used to manage the queue and query-level cache.
 
-API instances and Refresh Worker can be configured via
-[environment variables](/reference/environment-variables) or
-[cube.js configuration file](/config). The also need access to the data schema
-files.
+API instances and Refresh Worker can be configured via [environment
+variables][ref-config-env] or [cube.js configuration file][ref-config-js]. They
+also need access to the data schema files.
 
 Cube Store cluster can be configured via environment variables.
 
@@ -141,8 +144,7 @@ for pre-aggregated data or connected database(s) for raw data. It is possible to
 horizontally scale API instances and use load balancer to balance incoming
 requests between multiple API instances.
 
-[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for API
-Instance.
+The [Cube.js Docker image][dh-cubejs] is used for API Instance.
 
 API instance needs to be configured via environment variables, cube.js file and
 has access to the data schema files.
@@ -152,9 +154,9 @@ has access to the data schema files.
 Refresh Worker updates the pre-aggregations and in-memory cache in the
 background.
 
-[Cube.js docker image](https://hub.docker.com/r/cubejs/cube) is used for Refresh
-Worker too. To make service act as a Refresh Worker
-`CUBEJS_SCHEDULED_REFRESH_TIMER=true` should be set.
+[Cube.js docker image][dh-cubejs] is used for Refresh Worker too. To make
+service act as a Refresh Worker `CUBEJS_SCHEDULED_REFRESH_TIMER=true` should be
+set.
 
 ## Cube Store
 
@@ -172,9 +174,10 @@ cluster:
 ![](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png)
 
 By default, Cube Store listens on the port `3030` for queries coming from
-Cube.js. The port could be changed by setting `CUBESTORE_HTTP_PORT` environment variable. In a case of
-using custom port, please make sure to change `CUBEJS_CUBESTORE_PORT`
-environment variable for Cube.js API Instances and Refresh Worker.
+Cube.js. The port could be changed by setting `CUBESTORE_HTTP_PORT` environment
+variable. In a case of using custom port, please make sure to change
+`CUBEJS_CUBESTORE_PORT` environment variable for Cube.js API Instances and
+Refresh Worker.
 
 ### Scaling
 
@@ -191,8 +194,7 @@ Cube Store has two "kinds" of nodes:
   metadata and serves simple queries
 - Multiple **worker** nodes which execute SQL queries received from Cube.js
 
-Both the router and worker use the
-[Cube Store Docker image](https://hub.docker.com/r/cubejs/cubestore). The
+Both the router and worker use the [Cube Store Docker image][dh-cubestore]. The
 following environment variables should be used to manage the roles:
 
 | Environment Variable    | Specify on Router? | Specify on Worker? |
@@ -330,3 +332,13 @@ If you want to run Cube.js in production without Redis, you can use
 | Serverless and clustered deployments can't be run without Redis as it is used
 | to manage the query queue.
 <!-- prettier-ignore-end -->
+
+[dh-cubejs]: https://hub.docker.com/r/cubejs/cube
+[dh-cubestore]: https://hub.docker.com/r/cubejs/cubestore
+[ref-deploy-prod-list]: /deployment/production-checklist
+[ref-deploy-cubecloud]: /deployment/platforms/cube-cloud
+[ref-deploy-docker]: /deployment/platforms/docker
+[ref-deploy-sls-aws]: /deployment/platforms/serverless/aws
+[ref-deploy-sls-gcp]: /deployment/platforms/serverless/gcp
+[ref-config-env]: /reference/environment-variables
+[ref-config-js]: /config

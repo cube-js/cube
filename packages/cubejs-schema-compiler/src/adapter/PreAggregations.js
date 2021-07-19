@@ -63,11 +63,14 @@ export class PreAggregations {
     return preAggregations.map(preAggregation => {
       if (this.canPartitionsBeUsed(preAggregation)) {
         const { dimension, partitionDimension } = this.partitionDimension(preAggregation);
-        return R.unnest(partitionDimension.timeSeries().map(
-          range => this.preAggregationDescriptionsForRecursive(
-            preAggregation.cube, this.addPartitionRangeTo(preAggregation, dimension, range)
+        return this.preAggregationDescriptionsForRecursive(
+          preAggregation.cube, this.addPartitionRangeTo(
+            preAggregation,
+            dimension,
+            partitionDimension.wildcardRange(),
+            partitionDimension.boundaryDateRange || partitionDimension.dateRange
           )
-        ));
+        );
       }
       return this.preAggregationDescriptionsForRecursive(preAggregation.cube, preAggregation);
     }).reduce((a, b) => a.concat(b), []);
@@ -75,29 +78,29 @@ export class PreAggregations {
 
   canPartitionsBeUsed(foundPreAggregation) {
     return foundPreAggregation.preAggregation.partitionGranularity &&
-      this.query.timeDimensions.length &&
       foundPreAggregation.references.timeDimensions &&
-      foundPreAggregation.references.timeDimensions.length &&
-      this.query.timeDimensions.find(td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension);
+      foundPreAggregation.references.timeDimensions.length;
   }
 
-  addPartitionRangeTo(foundPreAggregation, dimension, range) {
+  addPartitionRangeTo(foundPreAggregation, dimension, range, boundaryDateRange) {
     return Object.assign({}, foundPreAggregation, {
       preAggregation: Object.assign({}, foundPreAggregation.preAggregation, {
         partitionTimeDimensions: [{
           dimension,
-          dateRange: range
+          dateRange: range,
+          boundaryDateRange
         }],
       })
     });
   }
 
   partitionDimension(foundPreAggregation) {
-    const { dimension } = this.query.timeDimensions[0];
+    const { dimension } = foundPreAggregation.references.timeDimensions[0];
     const partitionDimension = this.query.newTimeDimension({
       dimension,
       granularity: this.castGranularity(foundPreAggregation.preAggregation.partitionGranularity),
-      dateRange: this.query.timeDimensions[0].dateRange
+      dateRange: this.query.timeDimensions[0] && this.query.timeDimensions[0].dateRange,
+      boundaryDateRange: this.query.timeDimensions[0] && this.query.timeDimensions[0].boundaryDateRange
     });
     return { dimension, partitionDimension };
   }
@@ -113,9 +116,21 @@ export class PreAggregations {
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
+
+    const matchedTimeDimension = preAggregation.partitionGranularity && this.query.timeDimensions.find(
+      td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension &&
+        td.dateRange
+    );
+    const filters = preAggregation.partitionGranularity && this.query.filters.filter(
+      td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension &&
+        td.isDateOperator() &&
+        td.camelizeOperator === 'inDateRange' // TODO support all date operators
+    );
+    const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
+      timestampFormat: queryForSqlEvaluation.timestampFormat(),
       tableName,
       invalidateKeyQueries,
       external: preAggregation.external,
@@ -123,7 +138,16 @@ export class PreAggregations {
       preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
-      dataSource: this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dataSource,
+      dataSource: queryForSqlEvaluation.dataSource,
+      partitionGranularity: preAggregation.partitionGranularity,
+      preAggregationStartEndQueries:
+        preAggregation.partitionGranularity &&
+        this.refreshRangeQuery().preAggregationStartEndQueries(cube, preAggregation),
+      matchedTimeDimensionDateRange:
+        preAggregation.partitionGranularity && (
+          matchedTimeDimension && matchedTimeDimension.boundaryDateRangeFormatted() ||
+          filters && filters[0] && filters[0].formattedDateRange() // TODO intersect all date ranges
+        ),
       indexesSql: Object.keys(preAggregation.indexes || {}).map(
         index => {
           // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
@@ -144,19 +168,10 @@ export class PreAggregations {
   }
 
   preAggregationTableName(cube, preAggregationName, preAggregation, skipSchema) {
-    let partitionSuffix = '';
-    if (preAggregation.partitionTimeDimensions) {
-      const partitionTimeDimension = preAggregation.partitionTimeDimensions[0];
-      partitionSuffix = partitionTimeDimension.dateRange[0].substring(
-        0,
-        preAggregation.partitionGranularity === 'hour' ? 13 : 10
-      ).replace(/[-T:]/g, '');
-    }
-
     const name = preAggregation.sqlAlias || preAggregationName;
     return this.query.preAggregationTableName(
       cube,
-      name + partitionSuffix,
+      name,
       skipSchema
     );
   }
@@ -538,6 +553,13 @@ export class PreAggregations {
     return { preAggregations, result };
   }
 
+  refreshRangeQuery() {
+    return this.query.newSubQuery({
+      rowLimit: null,
+      preAggregationQuery: true,
+    });
+  }
+
   originalSqlPreAggregationQuery(cube, aggregation) {
     return this.query.newSubQuery({
       rowLimit: null,
@@ -578,7 +600,7 @@ export class PreAggregations {
       const toMerge = partitionTimeDimensions.find(
         qd => qd.dimension === d.dimension
       );
-      return toMerge ? Object.assign({}, d, { dateRange: toMerge.dateRange }) : d;
+      return toMerge ? { ...d, dateRange: toMerge.dateRange, boundaryDateRange: toMerge.boundaryDateRange } : d;
     });
   }
 
@@ -599,10 +621,6 @@ export class PreAggregations {
   }
 
   originalSqlPreAggregationTable(preAggregationDescription) {
-    if (this.canPartitionsBeUsed(preAggregationDescription)) {
-      return this.partitionUnion(preAggregationDescription);
-    }
-
     // eslint-disable-next-line prefer-const
     let { preAggregationName, preAggregation } = preAggregationDescription;
 
@@ -653,8 +671,7 @@ export class PreAggregations {
     const from = this.query.joinSql(
       toJoin.map(j => ({
         ...j,
-        sql: this.canPartitionsBeUsed(j.preAggregation) ?
-          this.partitionUnion(j.preAggregation) :
+        sql:
           this.query.preAggregationTableName(
             j.preAggregation.cube,
             // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
@@ -706,24 +723,5 @@ export class PreAggregations {
         rollupGranularity,
       }
     );
-  }
-
-  partitionUnion(preAggregationForQuery) {
-    const { dimension, partitionDimension } = this.partitionDimension(preAggregationForQuery);
-
-    const tables = partitionDimension.timeSeries().map(range => {
-      const preAggregationDescription = this.addPartitionRangeTo(preAggregationForQuery, dimension, range);
-      return this.preAggregationTableName(
-        preAggregationForQuery.cube,
-        // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
-        preAggregationForQuery.sqlAlias || preAggregationForQuery.preAggregationName,
-        preAggregationDescription.preAggregation
-      );
-    });
-    if (tables.length === 1) {
-      return tables[0];
-    }
-    const union = tables.map(table => `SELECT * FROM ${table}`).join(' UNION ALL ');
-    return `(${union})`;
   }
 }

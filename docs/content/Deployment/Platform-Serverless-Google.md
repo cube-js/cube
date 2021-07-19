@@ -1,5 +1,5 @@
 ---
-title: Deploy with Serverless Framework on GCP
+title: Serverless Framework on GCP
 permalink: /deployment/platforms/serverless/google-cloud
 category: Deployment
 subCategory: Platforms

@@ -180,6 +180,10 @@ export class OrchestratorApi {
     return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, versionEntry);
   }
 
+  public expandPartitionsInPreAggregations(queryBody) {
+    return this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+  }
+
   public async getPreAggregationQueueStates() {
     const result = await this.orchestrator.getPreAggregationQueueStates();
     return result;

@@ -10,3 +10,4 @@ export * from './type-helpers';
 export * from './http-utils';
 export * from './cli';
 export * from './proxy';
+export * from './time';

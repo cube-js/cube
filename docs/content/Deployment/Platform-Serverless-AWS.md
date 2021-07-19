@@ -1,5 +1,5 @@
 ---
-title: Deploy with Serverless Framework on AWS
+title: Serverless Framework on AWS
 permalink: /deployment/platforms/serverless/aws
 category: Deployment
 subCategory: Platforms

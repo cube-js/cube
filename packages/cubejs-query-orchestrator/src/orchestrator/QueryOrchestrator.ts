@@ -218,6 +218,10 @@ export class QueryOrchestrator {
     return data || [];
   }
 
+  public async expandPartitionsInPreAggregations(queryBody) {
+    return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
+  }
+
   public async getPreAggregationQueueStates() {
     return this.preAggregations.getQueueState();
   }
