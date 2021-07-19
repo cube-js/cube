@@ -466,7 +466,6 @@ export class PreAggregationLoader {
 
   protected async loadPreAggregationWithKeys() {
     const invalidationKeys = await this.getInvalidationKeyValues();
-
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
 
