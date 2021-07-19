@@ -137,7 +137,7 @@ export class LocalQueueDriverConnection {
     promise.resolved = true;
     promise.resolve(executionResult);
 
-    if (this.getQueueEventsBus()) {
+    if (this.getQueueEventsBus) {
       this.getQueueEventsBus().emit({
         event: 'setResultAndRemoveQuery',
         redisQueuePrefix: this.redisQueuePrefix,
