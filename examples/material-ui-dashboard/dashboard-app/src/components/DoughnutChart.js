@@ -62,7 +62,7 @@ const DoughnutChart = (props) => {
       theme.palette.secondary.main,
     ];
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
