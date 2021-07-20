@@ -61,11 +61,12 @@ const EventBanner = (props) => {
       href={getLinkWithUTM(banner?.['Banner.link'], 'docs')}
       target="_blank"
       style={{
-        paddingBottom: isLoaded ? (isMobile ? '80px' : '40px') : "0",
+        paddingBottom: isLoaded ? (isMobile ? '54px' : '40px') : "0",
         color: 'rgb(255,255,255)',
         textDecoration: 'none',
         fontSize: '16px',
         fontWeight: '500',
+        wordSpacing: '2px',
         display: isLoaded ? "block" : "auto",
         transition:  isLoaded === 'localStorage'
               ? null : 'padding 1s ease-in-out',
@@ -79,7 +80,9 @@ const EventBanner = (props) => {
           width: "100%",
           zIndex: "99",
           textDecoration: decoration,
-          minHeight: isLoaded ? (isMobile ? '80px' : '40px') : '0',
+          minHeight: isLoaded ? (isMobile ? '54px' : '40px') : '0',
+          maxHeight: isLoaded ? (isMobile ? '54px' : '40px') : '0',
+          overflow: 'hidden',
           opacity: isLoaded ? '1' : '0',
           backgroundColor: 'rgb(122, 119, 255)',
           display: 'flex',
