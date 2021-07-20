@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.4](https://github.com/cube-js/cube.js/compare/v0.28.3...v0.28.4) (2021-07-20)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server:** ready for query processing check ([#3133](https://github.com/cube-js/cube.js/issues/3133)) ([e3bf9e1](https://github.com/cube-js/cube.js/commit/e3bf9e19019da4dd76226704f3035ce7c8a845eb))
+* **@cubejs-client/playground:** white strip at the bottom ([2eb972d](https://github.com/cube-js/cube.js/commit/2eb972d302e8b67ec77449cfbf28a32e4c6bdb5f))
+
+
+### Features
+
+* **@cubejs-client/playground:** rollup designer v2 updates ([#3124](https://github.com/cube-js/cube.js/issues/3124)) ([e69b79c](https://github.com/cube-js/cube.js/commit/e69b79c276c867c6c8f64cf4667aaf16e479e4d8))
+* **athena-driver:** Use AWS-SDK v3 (modular) ([f14b7c1](https://github.com/cube-js/cube.js/commit/f14b7c1a12d25fc9e140bfb352a1eb4ca4a11cda))
+
+
+
+
+
 ## [0.28.3](https://github.com/cube-js/cube.js/compare/v0.28.2...v0.28.3) (2021-07-20)
 
 

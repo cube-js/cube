@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.4](https://github.com/cube-js/cube.js/compare/v0.28.3...v0.28.4) (2021-07-20)
+
+
+### Features
+
+* **athena-driver:** Use AWS-SDK v3 (modular) ([f14b7c1](https://github.com/cube-js/cube.js/commit/f14b7c1a12d25fc9e140bfb352a1eb4ca4a11cda))
+
+
+
+
+
 ## [0.28.3](https://github.com/cube-js/cube.js/compare/v0.28.2...v0.28.3) (2021-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

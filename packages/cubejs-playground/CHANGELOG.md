@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.4](https://github.com/cube-js/cube.js/compare/v0.28.3...v0.28.4) (2021-07-20)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** white strip at the bottom ([2eb972d](https://github.com/cube-js/cube.js/commit/2eb972d302e8b67ec77449cfbf28a32e4c6bdb5f))
+
+
+### Features
+
+* **@cubejs-client/playground:** rollup designer v2 updates ([#3124](https://github.com/cube-js/cube.js/issues/3124)) ([e69b79c](https://github.com/cube-js/cube.js/commit/e69b79c276c867c6c8f64cf4667aaf16e479e4d8))
+
+
+
+
+
 ## [0.28.1](https://github.com/cube-js/cube.js/compare/v0.28.0...v0.28.1) (2021-07-19)
 
 **Note:** Version bump only for package @cubejs-client/playground
