@@ -44,7 +44,7 @@ export class DoughnutChartComponent implements OnInit {
     this.cubejs.load(this.query).subscribe(
       resultSet => {
         const COLORS_SERIES = ["#FF6492", "#F3F3FB", "#FFA2BE"];
-        this.barChartLabels = resultSet.chartPivot().map((c) => c.category);
+        this.barChartLabels = resultSet.chartPivot().map((c) => c.x);
         this.barChartData = resultSet.series().map((s) => ({
           label: s.title,
           data: s.series.map((r) => r.value),
