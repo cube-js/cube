@@ -30,10 +30,8 @@ import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
 import { TimeDimension } from './components/TimeDimension';
 import {
-  canUsePreAggregationForTransformedQuery,
   getPreAggregationDefinitionFromReferences,
   getPreAggregationReferences,
-  PreAggregationDefinition,
   PreAggregationReferences,
   updateQuery,
 } from './utils';

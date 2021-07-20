@@ -5,7 +5,6 @@ import {
   TransformedQuery,
 } from '@cubejs-client/core';
 import { camelCase } from 'camel-case';
-import * as R from 'ramda';
 
 import { QueryMemberKey } from '../../types';
 
@@ -156,7 +155,7 @@ export function updateQuery(
 
   if (memberType === 'timeDimensions') {
     if (updatedQuery.timeDimensions?.[0]?.dimension === key) {
-      delete updatedQuery.timeDimensions;
+      updatedQuery.timeDimensions = [];
     } else {
       updatedQuery.timeDimensions = [
         {
@@ -178,97 +177,4 @@ export function updateQuery(
   }
 
   return updatedQuery;
-}
-
-// todo: refactor without Ramda
-export function canUsePreAggregationForTransformedQuery(
-  transformedQuery: any,
-  refs: any
-) {
-  function sortTimeDimensions(timeDimensions) {
-    return (
-      (timeDimensions &&
-        R.sortBy(
-          (d: any) => d.join('.'),
-          timeDimensions.map((d) => [d.dimension, d.granularity || 'day']) // TODO granularity shouldn't be null?
-        )) ||
-      []
-    );
-  }
-  // TimeDimension :: [Dimension, Granularity]
-  // TimeDimension -> [TimeDimension]
-  function expandTimeDimension(timeDimension) {
-    const [dimension, granularity] = timeDimension;
-    const makeTimeDimension = (newGranularity) => [dimension, newGranularity];
-    return (
-      transformedQuery.granularityHierarchies[granularity] || [granularity]
-    ).map(makeTimeDimension);
-  }
-  // [[TimeDimension]]
-  const queryTimeDimensionsList =
-    transformedQuery.sortedTimeDimensions.map(expandTimeDimension);
-
-  const canUsePreAggregationNotAdditive = (references) => {
-    return (
-      transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
-      transformedQuery.allFiltersWithinSelectedDimensions &&
-      R.equals(
-        references.sortedDimensions || references.dimensions,
-        transformedQuery.sortedDimensions
-      ) &&
-      (R.all(
-        (m) => references.measures.indexOf(m) !== -1,
-        transformedQuery.measures
-      ) ||
-        R.all(
-          (m) => references.measures.indexOf(m) !== -1,
-          transformedQuery.leafMeasures
-        )) &&
-      R.equals(
-        transformedQuery.sortedTimeDimensions,
-        references.sortedTimeDimensions ||
-          sortTimeDimensions(references.timeDimensions)
-      )
-    );
-  };
-
-  const canUsePreAggregationLeafMeasureAdditive = (references) => {
-    return (
-      R.all(
-        (d) =>
-          (references.sortedDimensions || references.dimensions).indexOf(d) !==
-          -1,
-        transformedQuery.sortedDimensions
-      ) &&
-      R.all(
-        (m) => references.measures.indexOf(m) !== -1,
-        transformedQuery.leafMeasures
-      ) &&
-      R.allPass(
-        queryTimeDimensionsList.map((tds) =>
-          R.anyPass(tds.map((td) => R.contains(td)))
-        )
-      )(
-        references.sortedTimeDimensions ||
-          sortTimeDimensions(references.timeDimensions)
-      )
-    );
-  };
-
-  let canUseFn;
-  if (
-    transformedQuery.leafMeasureAdditive &&
-    !transformedQuery.hasMultipliedMeasures
-  ) {
-    canUseFn = (r) =>
-      canUsePreAggregationLeafMeasureAdditive(r) ||
-      canUsePreAggregationNotAdditive(r);
-  } else {
-    canUseFn = canUsePreAggregationNotAdditive;
-  }
-  if (refs) {
-    return canUseFn(refs);
-  } else {
-    return canUseFn;
-  }
 }
