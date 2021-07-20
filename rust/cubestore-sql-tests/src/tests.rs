@@ -92,6 +92,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("date_add", date_add),
         t("now", now),
         t("dump", dump),
+        t("unsorted_merge_assertion", unsorted_merge_assertion),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2723,6 +2724,39 @@ async fn date_add(service: Box<dyn SqlClient>) {
             TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
         ],]
     );
+}
+
+async fn unsorted_merge_assertion(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(x int, y int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data1(x,y) VALUES (1, 4), (2, 3), (3, 2)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.Data2(x int, y int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(x,y) VALUES (1, 4), (2, 3), (3, 2)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT x, y, count(x) \
+             FROM (SELECT * FROM s.Data1 UNION ALL \
+                   SELECT * FROM s.Data2)\
+             GROUP BY y, x \
+             ORDER BY y, x",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3, 2, 2), (2, 3, 2), (1, 4, 2)]));
 }
 
 async fn now(service: Box<dyn SqlClient>) {
