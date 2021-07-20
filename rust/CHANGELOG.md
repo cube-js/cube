@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.3](https://github.com/cube-js/cube.js/compare/v0.28.2...v0.28.3) (2021-07-20)
+
+
+### Bug Fixes
+
+* **cubestore:** Installer (bad path) ([fe3458f](https://github.com/cube-js/cube.js/commit/fe3458ff492c1104c8719ec0b90a5c3b5e93a588))
+
+
+
+
+
 ## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
 
 
