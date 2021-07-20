@@ -78,7 +78,7 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        getQueueEventsBus: this.getQueueEventsBus.bind(this)
+        getQueueEventsBus: getEnv('preAggregationsQueueEventsBus') && this.getQueueEventsBus.bind(this)
       }
     );
   }
