@@ -2594,6 +2594,16 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.4.0.tgz#c3c5ae543c897caa9c2a68630bed355be5f9990f"
   integrity sha512-JZButFdZ1+/xAfpguQHoabIXkcqRRKpMrWKBkpEZZyxfY9C1DpADFB8PEqGSTeFr135SaTRfKqGKx5xSCLI7ZQ==
 
+"@cubejs-backend/athena-driver@^0.28.4":
+  version "0.28.4"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/athena-driver/-/athena-driver-0.28.4.tgz#a96a85c6008b936160e63740895ef13c8e2dfb50"
+  integrity sha512-E+oWXv9PFUyanJGnlagzxESFXWupAiLWiNp+ChjjuDfzi9+Aoj6Mob8ZVVkpj9IXEYb9cv4iW9Ximzy2/8hDCQ==
+  dependencies:
+    "@aws-sdk/client-athena" "^3.22.0"
+    "@cubejs-backend/query-orchestrator" "^0.28.3"
+    "@cubejs-backend/shared" "^0.28.2"
+    sqlstring "^2.3.1"
+
 "@cubejs-backend/dotenv@^9.0.2":
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
@@ -4509,10 +4519,10 @@
     "@octokit/types" "^6.0.3"
     universal-user-agent "^6.0.0"
 
-"@octokit/openapi-types@^8.3.0":
-  version "8.3.0"
-  resolved "https://registry.yarnpkg.com/@octokit/openapi-types/-/openapi-types-8.3.0.tgz#8bc912edae8c03e002882cf1e29b595b7da9b441"
-  integrity sha512-ZFyQ30tNpoATI7o+Z9MWFUzUgWisB8yduhcky7S4UYsRijgIGSnwUKzPBDGzf/Xkx1DuvUtqzvmuFlDSqPJqmQ==
+"@octokit/openapi-types@^9.0.0":
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/@octokit/openapi-types/-/openapi-types-9.0.0.tgz#05d33f999326785445c915d25167d68bd5eddb24"
+  integrity sha512-GSpv5VUFqarOXZl6uWPsDnjChkKCxnaMALmQhzvCWGiMxONQxX7ZwlomCMS+wB1KqxLPCA5n6gYt016oEMkHmQ==
 
 "@octokit/plugin-enterprise-rest@^6.0.1":
   version "6.0.1"
@@ -4599,11 +4609,11 @@
     "@types/node" ">= 8"
 
 "@octokit/types@^6.0.3", "@octokit/types@^6.16.1":
-  version "6.19.0"
-  resolved "https://registry.yarnpkg.com/@octokit/types/-/types-6.19.0.tgz#e2b6fedb10c8b53cf4574aa5d1a8a5611295297a"
-  integrity sha512-9wdZFiJfonDyU6DjIgDHxAIn92vdSUBOwAXbO2F9rOFt6DJwuAkyGLu1CvdJPphCbPBoV9iSDMX7y4fu0v6AtA==
+  version "6.19.1"
+  resolved "https://registry.yarnpkg.com/@octokit/types/-/types-6.19.1.tgz#6ea5f759d8d37e892e59c0a65f10892789b84a25"
+  integrity sha512-hMI2EokQzMG8ABWcnvcrabqQFuFHqUdN0HUOG4DPTaOtnf/jqhzhK1SHOGu5vDlI/x+hWJ60e28VxB7QhOP0CQ==
   dependencies:
-    "@octokit/openapi-types" "^8.3.0"
+    "@octokit/openapi-types" "^9.0.0"
 
 "@oozcitak/dom@1.15.8":
   version "1.15.8"
