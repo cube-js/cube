@@ -17,9 +17,9 @@
   "main": "driver/AthenaDriver.js",
   "types": "driver/index.d.ts",
   "dependencies": {
+    "@aws-sdk/client-athena": "^3.22.0",
     "@cubejs-backend/query-orchestrator": "^0.28.3",
     "@cubejs-backend/shared": "^0.28.2",
-    "aws-sdk": "^2.403.0",
     "sqlstring": "^2.3.1"
   },
   "devDependencies": {
