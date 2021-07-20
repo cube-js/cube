@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
+
+
+### Bug Fixes
+
+* **cubestore:** allow to specify join columns in any order, fix [#2987](https://github.com/cube-js/cube.js/issues/2987) ([b59aaab](https://github.com/cube-js/cube.js/commit/b59aaabc765c123dfa680e1866f79e6225219c76))
+* Close Cube Store process on process exit ([#3082](https://github.com/cube-js/cube.js/issues/3082)) ([f22f71a](https://github.com/cube-js/cube.js/commit/f22f71a4fe2240a9db58c035cb87d1b0d47e5b72))
+
+
+
+
+
 # [0.28.0](https://github.com/cube-js/cube.js/compare/v0.27.53...v0.28.0) (2021-07-17)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

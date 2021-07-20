@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
+
+
+### Bug Fixes
+
+* Use experimental flag for pre-aggregations queue events bus, debug API ([#3130](https://github.com/cube-js/cube.js/issues/3130)) ([4f141d7](https://github.com/cube-js/cube.js/commit/4f141d789cd0058b2e7c07af6a16642d6c145834))
+
+
+
+
+
 ## [0.28.1](https://github.com/cube-js/cube.js/compare/v0.28.0...v0.28.1) (2021-07-19)
 
 

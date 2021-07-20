@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
+
+
+### Features
+
+* Support every for refreshKey with SQL ([63cd8f4](https://github.com/cube-js/cube.js/commit/63cd8f4673f9312f9b685352c18bb3ed01a40e6c))
+
+
+
+
+
 ## [0.28.1](https://github.com/cube-js/cube.js/compare/v0.28.0...v0.28.1) (2021-07-19)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
