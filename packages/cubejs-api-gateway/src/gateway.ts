@@ -413,7 +413,8 @@ export class ApiGateway {
     app.post(`${this.basePath}/v1/pre-aggregations/can-use`, userMiddlewares, (req: Request, res: Response) => {
       const { transformedQuery, references } = req.body;
 
-      const canUsePreAggregationForTransformedQuery = this.compilerApi(req.context).canUsePreAggregationForTransformedQuery(transformedQuery, references);
+      const canUsePreAggregationForTransformedQuery = this.compilerApi(req.context)
+        .canUsePreAggregationForTransformedQuery(transformedQuery, references);
 
       res.json({ canUsePreAggregationForTransformedQuery });
     });
