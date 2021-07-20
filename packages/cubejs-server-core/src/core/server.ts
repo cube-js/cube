@@ -248,9 +248,12 @@ export class CubejsServerCore {
   }
 
   protected isReadyForQueryProcessing(): boolean {
+    const hasDbCredentials = Object.keys(process.env)
+      .filter((key) => key.startsWith('CUBEJS_DB') && key !== 'CUBEJS_DB_TYPE')
+      .length > 0;
+
     return (
-      Boolean(process.env.CUBEJS_DB_HOST) ||
-      Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
+      hasDbCredentials ||
       this.systemOptions?.isCubeConfigEmpty === undefined ||
       !this.systemOptions?.isCubeConfigEmpty
     );
