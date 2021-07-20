@@ -19,8 +19,12 @@ import styled from 'styled-components';
 
 import { CodeSnippet } from '../../atoms';
 import { Box, Flex } from '../../grid';
-import { useDeepEffect, useToggle } from '../../hooks';
-import { getMembersByCube, getNameMemberPairs } from '../../shared/helpers';
+import { useDeepEffect, useIsMounted, useToggle } from '../../hooks';
+import {
+  getMembersByCube,
+  getNameMemberPairs,
+  request,
+} from '../../shared/helpers';
 import { useIsCloud } from '../AppContext';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
@@ -52,16 +56,19 @@ const RightSidePanel = styled.div`
 `;
 
 type RollupDesignerProps = {
+  apiUrl: string;
   transformedQuery: TransformedQuery;
   defaultQuery: Query;
   availableMembers: AvailableMembers;
 };
 
 export function RollupDesigner({
+  apiUrl,
   defaultQuery,
   availableMembers,
   transformedQuery,
 }: RollupDesignerProps) {
+  const isMounted = useIsMounted();
   const isCloud = useIsCloud();
 
   const canBeRolledUp =
@@ -100,14 +107,27 @@ export function RollupDesigner({
   useDeepEffect(() => {
     const { measures, dimensions, timeDimensions } = references;
 
-    setMatching(
-      canUsePreAggregationForTransformedQuery(transformedQuery, {
-        measures,
-        dimensions,
-        timeDimensions,
-      })
-    );
-  }, [references]);
+    async function load() {
+      const { json } = await request(
+        `${apiUrl}/pre-aggregations/can-use`,
+        'POST',
+        {
+          transformedQuery,
+          references: {
+            measures,
+            dimensions,
+            timeDimensions,
+          },
+        }
+      );
+
+      if (isMounted()) {
+        setMatching(json.canUsePreAggregationForTransformedQuery);
+      }
+    }
+
+    load();
+  }, [isMounted, references]);
 
   const cubeName =
     transformedQuery &&
@@ -128,18 +148,16 @@ export function RollupDesigner({
   async function handleAddToSchemaClick() {
     setSaving(true);
 
-    const response = await fetch('/playground/schema/pre-aggregation', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await request(
+      '/playground/schema/pre-aggregation',
+      'POST',
+      {
         preAggregationName: preAggName,
         cubeName,
         code: getPreAggregationDefinitionFromReferences(references, preAggName)
           .value,
-      }),
-    });
+      }
+    );
 
     setSaving(false);
 
@@ -148,7 +166,7 @@ export function RollupDesigner({
         message: `Pre-aggregation has been added to the ${cubeName} cube`,
       });
     } else {
-      const { error } = await response.json();
+      const { error } = response.json;
       notification.error({
         message: error,
       });

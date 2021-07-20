@@ -81,3 +81,22 @@ export function playgroundFetch(url, options: any = {}) {
       throw e;
     });
 }
+
+export async function request(
+  endpoint: string,
+  method: string = 'GET',
+  body?: Record<string, any>
+) {
+  const response = await fetch(endpoint, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...(body ? { body: JSON.stringify(body) } : null),
+  });
+
+  return {
+    ok: response.ok,
+    json: await response.json()
+  };
+}

@@ -5,13 +5,12 @@ import { useLayoutEffect } from 'react';
 import { useHistory } from 'react-router';
 import styled from 'styled-components';
 
-import { Button, CubeLoader } from '../../atoms';
+import { Button } from '../../atoms';
 import {
   useCubejsApi,
   useLivePreviewContext,
   useSecurityContext,
 } from '../../hooks';
-import { useAppContext } from '../AppContext';
 import LivePreviewBar from '../LivePreviewContext/LivePreviewBar';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs } from '../QueryTabs/QueryTabs';
@@ -49,7 +48,6 @@ export function QueryBuilderContainer({
   dashboardSource,
   ...props
 }: QueryBuilderContainerProps) {
-  const { ready } = useAppContext();
   const { location, push } = useHistory();
 
   const params = new URLSearchParams(location.search);
