@@ -23,6 +23,7 @@ const StyledCard = styled(Card)`
   border-radius: 0;
   border-bottom: 1px;
   min-height: 100%;
+  background: var(--layout-body-background);
 
   & .ant-card-body {
     padding: 0;

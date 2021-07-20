@@ -38,8 +38,9 @@ export function PreAggregationStatus({
   preAggregationType,
   ...props
 }: PreAggregationStatusProps) {
-  const isVersionGt = useServerCoreVersionGt('0.27.49');
+  const isVersionGt = useServerCoreVersionGt('0.28.4');
   const [isModalOpen, toggleModal] = useToggle();
+
   // hide it for the time being
   // const renderTime = () => (
   //   <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
