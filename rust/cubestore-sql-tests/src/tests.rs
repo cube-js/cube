@@ -1,3 +1,4 @@
+use crate::rows::rows;
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -2342,12 +2343,6 @@ async fn topk_query(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, i)| vec![TableValue::String(s.to_string()), TableValue::Int(*i)])
-            .collect_vec()
-    }
 }
 
 async fn topk_decimals(service: Box<dyn SqlClient>) {
@@ -2382,18 +2377,10 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("z", 100), ("y", 80), ("b", 52)]));
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, i)| {
-                vec![
-                    TableValue::String(s.to_string()),
-                    TableValue::Decimal(Decimal::new(*i * 100_000)),
-                ]
-            })
-            .collect_vec()
-    }
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
+    );
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -2444,12 +2431,6 @@ async fn offset(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["h", "g", "f"]));
-
-    fn rows(a: &[&str]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|s| vec![TableValue::String(s.to_string())])
-            .collect_vec()
-    }
 }
 
 async fn having(service: Box<dyn SqlClient>) {
@@ -2520,12 +2501,6 @@ async fn having(service: Box<dyn SqlClient>) {
         )
         .await;
     assert!(err.is_err());
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, n)| vec![TableValue::String(s.to_string()), TableValue::Int(*n)])
-            .collect_vec()
-    }
 }
 
 async fn rolling_window_join(service: Box<dyn SqlClient>) {
@@ -2630,18 +2605,6 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
             ])
         );
     }
-
-    fn rows(a: &[(TimestampValue, &str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(t, s, n)| {
-                vec![
-                    TableValue::Timestamp(*t),
-                    TableValue::String(s.to_string()),
-                    TableValue::Int(*n),
-                ]
-            })
-            .collect_vec()
-    }
 }
 
 async fn decimal_index(service: Box<dyn SqlClient>) {
@@ -2663,24 +2626,20 @@ async fn decimal_index(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * FROM s.Data ORDER BY x")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[(1, 2), (2, 3), (3, 4)]));
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(dec5(1), dec5(2)), (dec5(2), dec5(3)), (dec5(3), dec5(4))])
+    );
 
     let r = service
         .exec_query("SELECT * FROM s.Data ORDER BY y DESC")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[(3, 4), (2, 3), (1, 2)]));
-
-    fn rows(a: &[(i64, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(x, y)| {
-                vec![
-                    TableValue::Decimal(Decimal::new(x * 100000)),
-                    TableValue::Decimal(Decimal::new(y * 100000)),
-                ]
-            })
-            .collect_vec()
-    }
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(dec5(3), dec5(4)), (dec5(2), dec5(3)), (dec5(1), dec5(2))])
+    );
 }
 
 async fn float_index(service: Box<dyn SqlClient>) {
@@ -2709,17 +2668,6 @@ async fn float_index(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
-
-    fn rows(a: &[(f64, f64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(x, y)| {
-                vec![
-                    TableValue::Float((*x).into()),
-                    TableValue::Float((*y).into()),
-                ]
-            })
-            .collect_vec()
-    }
 }
 
 async fn date_add(service: Box<dyn SqlClient>) {
@@ -2852,4 +2800,8 @@ fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
         .iter()
         .map(|r| r.values().clone())
         .collect_vec();
+}
+
+fn dec5(i: i64) -> Decimal {
+    Decimal::new(i * 100_000)
 }
