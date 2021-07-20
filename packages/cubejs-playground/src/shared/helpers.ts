@@ -23,10 +23,13 @@ export type MembersByCube = {
   cubeTitle: string;
   measures: TCubeMember[];
   dimensions: TCubeMember[];
+  segments: TCubeMember[];
   timeDimensions: TCubeMember[];
-}
+};
 
-export function getMembersByCube(availableMembers: AvailableMembers): MembersByCube[] {
+export function getMembersByCube(
+  availableMembers: AvailableMembers
+): MembersByCube[] {
   const membersByCube: Record<string, MembersByCube> = {};
 
   Object.entries(availableMembers).forEach(([memberType, cubes]) => {
@@ -37,20 +40,18 @@ export function getMembersByCube(availableMembers: AvailableMembers): MembersByC
           cubeTitle: cube.cubeTitle,
           measures: [],
           dimensions: [],
+          segments: [],
           timeDimensions: [],
-        }
+        };
       }
 
       cube.members.forEach((member) => {
         membersByCube[cube.cubeName] = {
           ...membersByCube[cube.cubeName],
-          [memberType]: [
-            ...membersByCube[cube.cubeName][memberType],
-            member
-          ]
-        }
-      })
-    })
+          [memberType]: [...membersByCube[cube.cubeName][memberType], member],
+        };
+      });
+    });
   });
 
   return Object.values(membersByCube);
@@ -79,4 +80,23 @@ export function playgroundFetch(url, options: any = {}) {
       }
       throw e;
     });
+}
+
+export async function request(
+  endpoint: string,
+  method: string = 'GET',
+  body?: Record<string, any>
+) {
+  const response = await fetch(endpoint, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...(body ? { body: JSON.stringify(body) } : null),
+  });
+
+  return {
+    ok: response.ok,
+    json: await response.json()
+  };
 }

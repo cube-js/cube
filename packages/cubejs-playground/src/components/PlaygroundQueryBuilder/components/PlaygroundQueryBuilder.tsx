@@ -440,6 +440,7 @@ export function PlaygroundQueryBuilder({
 
                   {queryStatus ? (
                     <PreAggregationStatus
+                      apiUrl={apiUrl}
                       availableMembers={availableMembers}
                       query={query}
                       {...(queryStatus as QueryStatus)}

@@ -26,6 +26,7 @@ const Badge = styled.div`
 `;
 
 type PreAggregationStatusProps = QueryStatus & {
+  apiUrl: string;
   availableMembers: AvailableMembers;
   query: Query;
 };
@@ -111,9 +112,10 @@ export function PreAggregationStatus({
       >
         {props.transformedQuery ? (
           <RollupDesigner
+            apiUrl={props.apiUrl}
             defaultQuery={props.query}
             availableMembers={props.availableMembers}
-            defaultTransformedQuery={props.transformedQuery}
+            transformedQuery={props.transformedQuery}
           />
         ) : null}
       </Modal>

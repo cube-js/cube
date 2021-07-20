@@ -723,8 +723,7 @@ export class CubejsServerCore {
     return orchestratorApi;
   }
 
-  protected createCompilerApi(repository, options) {
-    options = options || {};
+  protected createCompilerApi(repository, options: Record<string, any> = {}) {
     return new CompilerApi(repository, options.dbType || this.options.dbType, {
       schemaVersion: options.schemaVersion || this.options.schemaVersion,
       devServer: this.options.devServer,

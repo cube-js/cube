@@ -410,6 +410,15 @@ export class ApiGateway {
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
+    app.post(`${this.basePath}/v1/pre-aggregations/can-use`, userMiddlewares, (req: Request, res: Response) => {
+      const { transformedQuery, references } = req.body;
+
+      const canUsePreAggregationForTransformedQuery = this.compilerApi(req.context)
+        .canUsePreAggregationForTransformedQuery(transformedQuery, references);
+
+      res.json({ canUsePreAggregationForTransformedQuery });
+    });
+
     app.use(this.handleErrorMiddleware);
   }
 
@@ -724,7 +733,9 @@ export class ApiGateway {
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
+          {
+            includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret
+          }
         ))
       );
 

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { createQuery, compile } from '@cubejs-backend/schema-compiler';
+import { createQuery, compile, PreAggregations } from '@cubejs-backend/schema-compiler';
 
 export class CompilerApi {
   constructor(repository, dbType, options) {
@@ -140,5 +140,9 @@ export class CompilerApi {
 
   async metaConfig(options) {
     return (await this.getCompilers(options)).metaTransformer.cubes;
+  }
+
+  canUsePreAggregationForTransformedQuery(transformedQuery, refs) {
+    return PreAggregations.canUsePreAggregationForTransformedQueryFn(transformedQuery, refs);
   }
 }
