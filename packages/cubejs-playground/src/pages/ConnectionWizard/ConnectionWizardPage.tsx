@@ -1,6 +1,7 @@
 import { Alert, Col, Row, Space, Spin, Typography } from 'antd';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import styled from 'styled-components';
+import { usePlaygroundContext } from '../../hooks';
 
 import envVarsDatabaseMap from '../../shared/env-vars-db-map';
 import { fetchPoll, fetchWithTimeout } from '../../utils';
@@ -10,7 +11,6 @@ import DatabaseForm from './components/DatabaseForm';
 import { Button, FatalError } from '../../atoms';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
 import { event, playgroundAction } from '../../events';
-import { useAppContext } from '../../components/AppContext';
 
 const { Title, Paragraph } = Typography;
 
@@ -81,7 +81,7 @@ export type Database = {
 };
 
 export function ConnectionWizardPage({ history }) {
-  const { playgroundContext } = useAppContext();
+  const playgroundContext = usePlaygroundContext();
 
   const [hostname, setHostname] = useState<string>('');
   const [isLoading, setLoading] = useState(false);

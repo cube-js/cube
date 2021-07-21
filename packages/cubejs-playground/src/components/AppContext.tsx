@@ -1,10 +1,11 @@
 import {
   createContext,
   ReactNode,
-  useContext,
+  useCallback,
   useEffect,
-  useState,
+  useState
 } from 'react';
+import { useAppContext } from '../hooks';
 
 export type PlaygroundContext = {
   anonymousId: string;
@@ -32,8 +33,9 @@ export type SystemContext = {
 
 export type ContextProps = {
   ready: boolean;
+  playgroundContext: Partial<PlaygroundContext>;
+  token?: string | null;
   identifier?: string | null;
-  playgroundContext?: Partial<PlaygroundContext>;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
 
@@ -47,25 +49,29 @@ export function AppContextProvider({
   children,
   ...contextProps
 }: AppContextProps) {
-  const [context, setContext] = useState<Partial<ContextProps> | null>(
+  const [context, setContextState] = useState<Partial<ContextProps> | null>(
     contextProps || null
   );
+
+  const setContext = useCallback<(context: Partial<ContextProps> | null) => any>((context) => {
+    setContextState((currentContext) => ({
+      ...currentContext,
+      ...context,
+      playgroundContext: {
+        ...currentContext?.playgroundContext,
+        ...context?.playgroundContext,
+      }
+    }));
+  }, []);
 
   return (
     <AppContext.Provider
       value={{
         ready: false,
         ...context,
-        setContext(context: Partial<ContextProps> | null) {
-          setContext((currentContext) => ({
-            ...currentContext,
-            ...context,
-            playgroundContext: {
-              ...currentContext?.playgroundContext,
-              ...context?.playgroundContext,
-            }
-          }));
-        },
+        token: context?.token || null,
+        playgroundContext: context?.playgroundContext || {},
+        setContext
       }}
     >
       {children}
@@ -85,20 +91,4 @@ export function AppContextConsumer({ onReady }: AppContextConsumerProps) {
   }, [context]);
 
   return null;
-}
-
-export function useAppContext() {
-  return useContext(AppContext);
-}
-
-export function usePlaygroundContext() {
-  const { playgroundContext } =  useAppContext();
-
-  return playgroundContext;
-}
-
-export function useIsCloud() {
-  const { playgroundContext } = useAppContext();
-
-  return playgroundContext?.isCloud || false;
 }
