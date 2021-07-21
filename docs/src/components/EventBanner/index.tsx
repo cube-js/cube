@@ -17,41 +17,59 @@ const query = {
       values: [formatDate()],
     },
   ],
-  dimensions: ['Banner.text', 'Banner.link'],
+  dimensions: ['Banner.text', 'Banner.link', 'Banner.campaign'],
   limit: 1,
 };
 async function getBannerDataFromApi(set, setIsLoaded) {
   const resultSet = await cubejsApi.load(query);
-
   if (resultSet?.tablePivot()?.length) {
-    set(resultSet.tablePivot()[0]);
-    setIsLoaded(true);
+    const response = resultSet?.tablePivot?.()?.[0];
+    if (response) {
+      set(response);
+      setIsLoaded(true);
+      // set result to localStorage by date
+      if (window?.localStorage) {
+        window?.localStorage?.setItem(`website-banner-${formatDate()}`, JSON.stringify(response));
+      }
+    }
   }
   return resultSet;
+}
+function getBannerDataFromLocalStorage(set, setIsLoaded) {
+  let item = window?.localStorage?.getItem(`website-banner-${formatDate()}`);
+  set(JSON.parse(item));
+  setIsLoaded('localStorage');
 }
 const EventBanner = (props) => {
   const [banner, setBanner] = useState(null);
   const [decoration, setDecoration] = useState('none');
   const [isLoaded, setIsLoaded] = useState(null);
   const [isMobile, setIsMobile] = useState(null);
+
   useEffect(() => {
+    if (window?.localStorage && window.localStorage.getItem(`website-banner-${formatDate()}`)) {
+      getBannerDataFromLocalStorage(setBanner, setIsLoaded);
+    } else {
+      getBannerDataFromApi(setBanner, setIsLoaded);
+    }
     if (window?.screen?.availWidth && window?.screen?.availWidth < 640) {
       setIsMobile(true);
     }
-    getBannerDataFromApi(setBanner, setIsLoaded);
   }, []);
   return (
     <a
-      href={getLinkWithUTM(banner?.['Banner.link'], 'docs')}
+      href={getLinkWithUTM(banner?.['Banner.link'], 'docs', banner?.['Banner.campaign'])}
       target="_blank"
       style={{
-        paddingBottom: isLoaded ? '40px' : "0",
+        paddingBottom: isLoaded ? (isMobile ? '54px' : '40px') : "0",
         color: 'rgb(255,255,255)',
         textDecoration: 'none',
-        fontSize: isMobile ? '16px' : '18px',
+        fontSize: '16px',
         fontWeight: '500',
+        wordSpacing: '2px',
         display: isLoaded ? "block" : "auto",
-        transition: 'padding 1s linear',
+        transition:  isLoaded === 'localStorage'
+              ? null : 'padding 1s ease-in-out',
       }}
       onMouseEnter={() => setDecoration('underline')}
       onMouseLeave={() => setDecoration('none')}
@@ -62,14 +80,20 @@ const EventBanner = (props) => {
           width: "100%",
           zIndex: "99",
           textDecoration: decoration,
-          maxHeight: isLoaded ? '40px' : '0',
+          minHeight: isLoaded ? (isMobile ? '54px' : '40px') : '0',
+          maxHeight: isLoaded ? (isMobile ? '54px' : '40px') : '0',
+          overflow: 'hidden',
           opacity: isLoaded ? '1' : '0',
           backgroundColor: 'rgb(122, 119, 255)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'max-height 1s linear, opacity 1s linear, padding 1s linear',
-          padding: isLoaded ? '7px 0' : "0",
+          lineHeight: 'normal',
+          transition:
+            isLoaded === 'localStorage'
+              ? null
+              : 'max-height 1s ease-in-out, opacity 1s ease-in-out, padding 1s ease-in-out',
+          padding: isLoaded ? '7px 16px' : "0 16px",
         }}
       >
         {banner?.['Banner.text']}
@@ -87,14 +111,14 @@ function formatDate() {
   if (day.length < 2) day = '0' + day;
   return [year, month, day].join('-');
 }
-function getLinkWithUTM(link, source) {
+function getLinkWithUTM(link, source, compagin) {
   if (!link) {
     return null;
   }
   const lastSymbol = link.charAt(link.length - 1);
-  const utm = `?utm_campaign=${formatDate().replaceAll('-', '')}&utm_medium=purple&utm_source=${source}`;
-  if (lastSymbol === '/') {
-    return link.substring(0, link.length - 1) + utm;
+  const utm = `?utm_campaign=${compagin}&utm_medium=purple&utm_source=${source}`;
+  if (lastSymbol !== '/') {
+    return link + '/' + utm;
   }
   return link + utm;
 }
