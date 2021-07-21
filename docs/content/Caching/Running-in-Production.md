@@ -86,9 +86,9 @@ services:
 <!-- prettier-ignore-end -->
 
 Scaling Cube Store for a higher concurrency is relatively simple when running in
-cluster mode. Because [the storage layer](#running-in-production-storage) is
-decoupled from the query processing engine, you can horizontally scale your Cube
-Store cluster for as much concurrency as you require.
+cluster mode. Because [the storage layer](#storage) is decoupled from the query
+processing engine, you can horizontally scale your Cube Store cluster for as
+much concurrency as you require.
 
 In cluster mode, Cube Store runs two kinds of nodes:
 
@@ -175,8 +175,10 @@ services:
 <!-- prettier-ignore-end -->
 
 Cube Store makes use of a separate storage layer for storing metadata as well as
-for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
-and Google Cloud, or if desired, a local path on the server.
+for persisting pre-aggregations as Parquet files. Cube Store [can be configured
+to use either AWS S3 or Google Cloud][ref-config-env-cloud-storage]. If desired,
+a path on the server can also be used (this includes network shares and NFS
+mounts).
 
 A simplified example using AWS S3 might look like:
 
@@ -217,3 +219,5 @@ allows requests from the Cube.js deployment.
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/environment-variables#cube-store
+[ref-config-env-cloud-storage]:
+  /reference/environment-variables#cube-store-cloud-storage

@@ -11,14 +11,38 @@ applications from a variety of templates for different frontend frameworks and
 data visualization libraries.
 
 Developer Playground is available on `http://localhost:4000` when Cube.js is run
-in [development mode][link-dev-mode]
+in [development mode][link-dev-mode].
 
 Here's an example of building a query and plotting the results in Developer
 Playground:
 
-![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Developer-Tools/playground.gif)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Playground Query and Results Example"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Developer-Tools/playground.gif"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
-[link-dev-mode]: /configuration/overview
+## Using query tabs
+
+You can use query tabs to keep results of previous queries while still being
+able to make new queries. The query tabs can be found at the top of the
+Developer Playground:
+
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Cube.js Developer Playground Tabs"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Developer-Tools/playground-tabs.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 ## Editing the Security Context
 
@@ -49,6 +73,16 @@ inside the Cube Cloud.
 | an account yet, you can [sign up to the waitlist here][link-cube-cloud].
 <!-- prettier-ignore-end -->
 
-![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Developer-Tools/cube-cloud-playground.png)
+<div
+  style="text-align: center"
+>
+  <img
+  alt="Cube.js Developer Playground"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Developer-Tools/cube-cloud-playground.png"
+  style="border: none"
+  width="100%"
+  />
+</div>
 
 [link-cube-cloud]: https://cube.dev/cloud
+[link-dev-mode]: /configuration/overview

@@ -2,7 +2,7 @@
 name: Question
 about: Ask any question about Cube.js
 title: ''
-labels: ''
+labels: 'question'
 assignees: ''
 
 ---

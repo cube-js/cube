@@ -1,23 +1,27 @@
-use crate::CubeError;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::panic;
+use std::process::Child;
+use std::sync::Arc;
+use std::time::Duration;
+
 use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
-use procspawn::JoinHandle;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::panic;
-use std::sync::Arc;
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
 use tokio::runtime::Builder;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
+
+use crate::util::respawn::respawn;
+use crate::CubeError;
+use datafusion::cube_ext;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -61,8 +65,9 @@ impl<
 
         let mut workers = Vec::new();
 
-        for _ in 0..num {
+        for i in 1..=num {
             let process = Arc::new(WorkerProcess::<T, R, P>::new(
+                format!("sel{}", i),
                 queue.clone(),
                 timeout.clone(),
                 stopped_rx.clone(),
@@ -109,6 +114,7 @@ pub struct WorkerProcess<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static,
 > {
+    name: String,
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     timeout: Duration,
     processor: PhantomData<P>,
@@ -123,11 +129,13 @@ impl<
     > WorkerProcess<T, R, P>
 {
     fn new(
+        name: String,
         queue: Arc<unlimited::Queue<Message<T, R>>>,
         timeout: Duration,
         stopped_rx: watch::Receiver<bool>,
     ) -> Self {
         WorkerProcess {
+            name,
             queue,
             timeout,
             stopped_rx: RwLock::new(stopped_rx),
@@ -201,7 +209,7 @@ impl<
         }
     }
 
-    fn kill(handle: &mut JoinHandle<()>) {
+    fn kill(handle: &mut Child) {
         if let Err(e) = handle.kill() {
             error!("Error during kill: {:?}", e);
         }
@@ -215,73 +223,92 @@ impl<
         res_rx: IpcReceiver<Result<R, CubeError>>,
     ) -> Result<(R, IpcSender<T>, IpcReceiver<Result<R, CubeError>>), CubeError> {
         args_tx.send(message)?;
-        let (res, res_rx) = tokio::task::spawn_blocking(move || (res_rx.recv(), res_rx)).await?;
+        let (res, res_rx) = cube_ext::spawn_blocking(move || (res_rx.recv(), res_rx)).await?;
         Ok((res??, args_tx, res_rx))
     }
 
     fn spawn_process(
         &self,
-    ) -> Result<
-        (
-            IpcSender<T>,
-            IpcReceiver<Result<R, CubeError>>,
-            JoinHandle<()>,
-        ),
-        CubeError,
-    > {
+    ) -> Result<(IpcSender<T>, IpcReceiver<Result<R, CubeError>>, Child), CubeError> {
         let (args_tx, args_rx) = ipc::channel()?;
         let (res_tx, res_rx) = ipc::channel()?;
 
-        let handle = procspawn::spawn((args_rx, res_tx), |(rx, tx)| {
-            let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-            loop {
-                let res = rx.recv();
-                match res {
-                    Ok(args) => {
-                        let send_res = tx.send(runtime.block_on(P::process(args)));
-                        if let Err(e) = send_res {
-                            error!("Worker message send error: {:?}", e);
-                            return;
-                        }
-                    }
-                    Err(e) => {
-                        error!("Worker message receive error: {:?}", e);
-                        return;
-                    }
+        let mut ctx = std::env::var("CUBESTORE_LOG_CONTEXT")
+            .ok()
+            .unwrap_or("".to_string());
+        if !ctx.is_empty() {
+            ctx += " ";
+        }
+        ctx += &self.name;
+
+        let handle = respawn(
+            WorkerProcessArgs {
+                args: args_rx,
+                results: res_tx,
+                processor: PhantomData::<P>::default(),
+            },
+            &["--sel-worker".to_string()],
+            &[("CUBESTORE_LOG_CONTEXT".to_string(), ctx)],
+        )?;
+        Ok((args_tx, res_rx, handle))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct WorkerProcessArgs<T, R, P: ?Sized> {
+    args: IpcReceiver<T>,
+    results: IpcSender<Result<R, CubeError>>,
+    processor: PhantomData<P>,
+}
+
+pub fn worker_main<T, R, P>(a: WorkerProcessArgs<T, R, P>) -> i32
+where
+    T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
+    R: Serialize + DeserializeOwned + Sync + Send + 'static,
+    P: MessageProcessor<T, R>,
+{
+    let (rx, tx) = (a.args, a.results);
+    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+    loop {
+        let res = rx.recv();
+        match res {
+            Ok(args) => {
+                let send_res = tx.send(runtime.block_on(P::process(args)));
+                if let Err(e) = send_res {
+                    error!("Worker message send error: {:?}", e);
+                    return 0;
                 }
             }
-        });
-        Ok((args_tx, res_rx, handle))
+            Err(e) => {
+                error!("Worker message receive error: {:?}", e);
+                return 0;
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::time::Duration;
 
-    use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
-    use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
-    use crate::CubeError;
     use arrow::datatypes::{DataType, Field, Schema};
     use async_trait::async_trait;
     use datafusion::logical_plan::ToDFSchema;
     use futures_timer::Delay;
-    use procspawn::{self};
     use serde::{Deserialize, Serialize};
-    use std::sync::Arc;
     use tokio::runtime::Builder;
 
-    // Code from procspawn::enable_test_support!();
-    #[procspawn::testsupport::ctor]
-    fn __procspawn_test_support_init() {
-        // strip the crate name from the module path
-        let module_path = std::module_path!().splitn(2, "::").nth(1);
-        procspawn::testsupport::enable(module_path);
-    }
+    use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+    use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
+    use crate::util::respawn;
+    use crate::CubeError;
+    use datafusion::cube_ext;
 
-    #[test]
-    fn procspawn_test_helper() {
-        procspawn::init();
+    #[ctor::ctor]
+    fn test_support_init() {
+        respawn::replace_cmd_args_in_tests();
+        respawn::register_handler(worker_main::<Message, Response, Processor>)
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -318,7 +345,7 @@ mod tests {
                 Duration::from_millis(1000),
             ));
             let pool_to_move = pool.clone();
-            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
             assert_eq!(
                 pool.process(Message::Delay(100)).await.unwrap(),
                 Response::Foo(100)
@@ -337,7 +364,7 @@ mod tests {
                 Duration::from_millis(1000),
             ));
             let pool_to_move = pool.clone();
-            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..10 {
                 futures.push((i, pool.process(Message::Delay(i * 100))));
@@ -360,7 +387,7 @@ mod tests {
                 Duration::from_millis(450),
             ));
             let pool_to_move = pool.clone();
-            tokio::spawn(async move { pool_to_move.wait_processing_loops().await });
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
             let mut futures = Vec::new();
             for i in 0..5 {
                 futures.push((i, pool.process(Message::Delay(i * 300))));

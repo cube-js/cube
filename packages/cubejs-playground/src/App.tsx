@@ -4,12 +4,24 @@ import '@ant-design/compatible/assets/index.css';
 import { Layout, Alert } from 'antd';
 import { fetch } from 'whatwg-fetch';
 import { RouteComponentProps, withRouter } from 'react-router';
+import styled from 'styled-components';
 
 import Header from './components/Header';
 import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
-import { event, setAnonymousId, setTracker, setTelemetry, trackImpl } from './events';
-import { useAppContext } from './components/AppContext';
+import {
+  event,
+  setAnonymousId,
+  setTracker,
+  setTelemetry,
+  trackImpl,
+} from './events';
+import {
+  AppContextConsumer,
+  PlaygroundContext,
+} from './components/AppContext';
+import { useAppContext } from './hooks';
+
 import './index.less';
 
 const selectedTab = (pathname) => {
@@ -20,27 +32,30 @@ const selectedTab = (pathname) => {
   }
 };
 
-type TAppState = {
+const StyledLayoutContent = styled(Layout.Content)`
+  height: 100%;
+`;
+
+type AppState = {
   fatalError: Error | null;
-  context: Record<string, any> | null;
+  context: PlaygroundContext | null;
   showLoader: boolean;
+  isAppContextSet: boolean;
 };
 
-class App extends Component<RouteComponentProps, TAppState> {
+class App extends Component<RouteComponentProps, AppState> {
   static getDerivedStateFromError(error) {
     return { fatalError: error };
   }
 
-  state: TAppState = {
+  state: AppState = {
     fatalError: null,
     context: null,
     showLoader: false,
+    isAppContextSet: false,
   };
 
   async componentDidMount() {
-    const { history } = this.props;
-
-
     setTimeout(() => this.setState({ showLoader: true }), 700);
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
@@ -64,11 +79,7 @@ class App extends Component<RouteComponentProps, TAppState> {
       dockerVersion: context.dockerVersion,
     });
 
-    this.setState({ context }, () => {
-      if (context.shouldStartConnectionWizardFlow) {
-        history.push('/connection');
-      }
-    });
+    this.setState({ context });
   }
 
   componentDidCatch(error, info) {
@@ -79,26 +90,35 @@ class App extends Component<RouteComponentProps, TAppState> {
   }
 
   render() {
-    const { context, fatalError, showLoader } = this.state;
     const { location, children } = this.props;
+    const { context, fatalError, isAppContextSet, showLoader } = this.state;
 
-    if (!showLoader) {
-      return null;
+    if (context != null && !isAppContextSet) {
+      return (
+        <>
+          <ContextSetter context={context} />
+          <AppContextConsumer
+            onReady={() => this.setState({ isAppContextSet: true })}
+          />
+        </>
+      );
     }
 
-    if (context == null) {
-      return <CubeLoader />;
+    if (context == null && !isAppContextSet) {
+      return showLoader ? <CubeLoader /> : null;
     }
 
     if (fatalError) {
-      console.log(fatalError.stack)
+      console.log(fatalError.stack);
     }
 
     return (
       <Layout>
         <GlobalStyles />
+
         <Header selectedKeys={selectedTab(location.pathname)} />
-        <Layout.Content style={{ height: '100%' }}>
+
+        <StyledLayoutContent>
           {fatalError ? (
             <Alert
               message="Error occured while rendering"
@@ -108,20 +128,29 @@ class App extends Component<RouteComponentProps, TAppState> {
           ) : (
             children
           )}
-        </Layout.Content>
-
-        <ContextSetter context={context} />
+        </StyledLayoutContent>
       </Layout>
     );
   }
 }
 
-function ContextSetter({ context }: Pick<TAppState, 'context'>) {
+type ContextSetterProps = {
+  context: PlaygroundContext;
+};
+
+function ContextSetter({ context }: ContextSetterProps) {
   const { setContext } = useAppContext();
 
   useEffect(() => {
     if (context !== null) {
-      setContext({ extDbType: context.extDbType });
+      setContext({
+        ready: true,
+        playgroundContext: {
+          ...context,
+          isCloud: false
+        },
+        identifier: context.identifier,
+      });
     }
   }, [context]);
 

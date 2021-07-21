@@ -1,11 +1,21 @@
 import styled from 'styled-components';
-import { Button, Modal, Space, Typography } from 'antd';
-import { useState } from 'react';
-import { TransformedQuery } from '@cubejs-client/core';
+import { Alert, Button, Modal, Space, Typography } from 'antd';
 import Icon from '@ant-design/icons';
+// @ts-ignore
+import {
+  useCubeSql,
+  AvailableMembers,
+  useDryRun,
+  useLazyDryRun,
+} from '@cubejs-client/react';
+import { Query } from '@cubejs-client/core';
 
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
-import { PreAggregationHelper } from './PreAggregationHelper';
+import { QueryStatus } from './PlaygroundQueryBuilder';
+import { RollupDesigner } from '../../RollupDesigner';
+import { useServerCoreVersionGte, useToggle } from '../../../hooks';
+
+const { Link } = Typography;
 
 const Badge = styled.div`
   display: flex;
@@ -15,17 +25,22 @@ const Badge = styled.div`
   background: var(--warning-bg-color);
 `;
 
-type PreAggregationStatusProps = {
-  timeElapsed: number;
-  isAggregated: boolean;
-  transformedQuery?: TransformedQuery;
+type PreAggregationStatusProps = QueryStatus & {
+  apiUrl: string;
+  availableMembers: AvailableMembers;
+  query: Query;
 };
 
 export function PreAggregationStatus({
   isAggregated,
-  transformedQuery,
+  external,
+  extDbType,
+  preAggregationType,
+  ...props
 }: PreAggregationStatusProps) {
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const isVersionGte = useServerCoreVersionGte('0.28.4');
+  const [isModalOpen, toggleModal] = useToggle();
+
   // hide it for the time being
   // const renderTime = () => (
   //   <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
@@ -51,26 +66,58 @@ export function PreAggregationStatus({
           <Typography.Text>
             Query was accelerated with pre-aggregation
           </Typography.Text>
-        ) : (
-          <Button type="link" onClick={() => setIsModalOpen(true)}>
+        ) : isVersionGte ? (
+          <Button type="link" onClick={toggleModal}>
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
-        )}
+        ) : null}
+
+        {isAggregated && external && extDbType !== 'cubestore' ? (
+          <Alert
+            message="Consider migrating your pre-aggregations to Cube Store for better performance with larger datasets"
+            type="warning"
+          />
+        ) : null}
+
+        {isAggregated && !external && preAggregationType !== 'originalSql' ? (
+          <Alert
+            message={
+              <>
+                For optimized performance, consider using <b>external</b>{' '}
+                {preAggregationType} pre-aggregation, rather than the source
+                database (internal)
+              </>
+            }
+            type="warning"
+          />
+        ) : null}
       </Space>
 
       <Modal
-        title="Pre-aggregation"
+        title="Rollup Designer"
         visible={isModalOpen}
-        footer={null}
+        footer={
+          <Link
+            style={{ paddingTop: 16 }}
+            href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
+            target="_blank"
+          >
+            Further reading about pre-aggregations for reference.
+          </Link>
+        }
         bodyStyle={{
-          paddingTop: 16,
+          padding: 16,
         }}
-        onCancel={() => {
-          setIsModalOpen(false);
-        }}
+        width={1024}
+        onCancel={toggleModal}
       >
-        {transformedQuery ? (
-          <PreAggregationHelper transformedQuery={transformedQuery} />
+        {props.transformedQuery ? (
+          <RollupDesigner
+            apiUrl={props.apiUrl}
+            defaultQuery={props.query}
+            availableMembers={props.availableMembers}
+            transformedQuery={props.transformedQuery}
+          />
         ) : null}
       </Modal>
     </>

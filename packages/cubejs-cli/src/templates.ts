@@ -32,15 +32,12 @@ const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 const sharedDotEnvVars = env => `CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}
-CUBEJS_EXTERNAL_DEFAULT=true`;
+CUBEJS_EXTERNAL_DEFAULT=true
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
 
 const defaultDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
-CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_WEB_SOCKETS=true
-${sharedDotEnvVars(env)}`;
+${sharedDotEnvVars(env)}
+CUBEJS_WEB_SOCKETS=true`;
 
 const athenaDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
 CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
@@ -103,7 +100,7 @@ provider:
     CUBEJS_DB_USER: <YOUR_DB_USER_HERE>
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
-    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_DB_TYPE: ${env.dbType}
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
@@ -164,7 +161,7 @@ provider:
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
     CUBEJS_DB_BQ_PROJECT_ID: "\${self:provider.project}"
-    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
     CUBEJS_SERVERLESS_PLATFORM: "\${self:provider.name}"
@@ -206,6 +203,11 @@ const ordersJs = `cube(\`Orders\`, {
   UNION ALL
   select 5 as id, 600 as amount, 'shipped' status
   \`,
+
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  },
 
   measures: {
     count: {

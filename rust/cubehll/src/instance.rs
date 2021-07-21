@@ -223,7 +223,11 @@ impl SparseHll {
         let mut entries = indices;
         for i in 0..values.len() {
             // TODO: validate range of index values.
-            entries[i] = Self::encode_entry(entries[i], values[i]);
+            // High bits are bucket index, followed by zeros and the actual value.
+            // Airlift stores actual bits of the hash in the available bits, but inputs of this
+            // function do not have this information, so we set those bits to 0.
+            let bucket = entries[i];
+            entries[i] = (bucket << (32 - index_bit_len)) | (values[i] as u32);
         }
         Ok(SparseHll {
             index_bit_len,
@@ -1048,10 +1052,12 @@ mod tests {
             assert_eq!(
                 &sparse.entries,
                 &[
-                    14273, 47106, 62465, 66628, 80386, 100034, 115907, 142529, 148929, 155778,
-                    161604, 169986, 188545, 190337, 208386, 239683, 241346, 260225
+                    233832449, 771751938, 1023410177, 1091567620, 1317011458, 1638924290,
+                    1898971139, 2335178753, 2440036353, 2552233986, 2647654404, 2785017858,
+                    3089104897, 3118465025, 3414163458, 3926917123, 3954180098, 4263510017
                 ]
             );
+            assert_eq!(sparse.to_dense().cardinality(), 18);
 
             let dense = HllInstance::read_snowflake(
                 r#"{

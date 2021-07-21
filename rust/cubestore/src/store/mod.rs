@@ -26,6 +26,7 @@ use crate::table::data::{cmp_row_key, cmp_row_key_heap, MutRows, Rows};
 use crate::table::parquet::ParquetTableStore;
 use arrow::array::{Array, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
+use datafusion::cube_ext;
 use futures::future::join_all;
 use itertools::Itertools;
 use log::trace;
@@ -225,7 +226,7 @@ impl WALDataStore for WALStore {
             .await?;
         let remote_path = WALStore::wal_remote_path(wal.get_id()).clone();
         let local_file = self.remote_fs.local_file(&remote_path).await?;
-        tokio::task::spawn_blocking(move || -> Result<(), CubeError> {
+        cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
             save(local_file, data)?;
             Ok(())
         })
@@ -250,7 +251,7 @@ impl WALDataStore for WALStore {
         self.remote_fs.download_file(&remote_path).await?;
         let local_file = self.remote_fs.local_file(&remote_path).await?;
         Ok(
-            tokio::task::spawn_blocking(move || -> Result<DataFrame, CubeError> {
+            cube_ext::spawn_blocking(move || -> Result<DataFrame, CubeError> {
                 Ok(load::<DataFrame>(local_file)?)
             })
             .await??,
@@ -383,7 +384,7 @@ impl ChunkDataStore for ChunkStore {
         self.remote_fs.download_file(&remote_path).await?;
         let local_file = self.remote_fs.local_file(&remote_path).await?;
         Ok(
-            tokio::task::spawn_blocking(move || -> Result<Rows, CubeError> {
+            cube_ext::spawn_blocking(move || -> Result<Rows, CubeError> {
                 let parquet = ParquetTableStore::new(index.get_row().clone(), 16384); // TODO config
                 Ok(parquet.read_rows(&local_file)?)
             })
@@ -629,7 +630,7 @@ impl ChunkStore {
 
         let mut remaining_rows: Vec<usize> = (0..rows.num_rows()).collect_vec();
         {
-            let (rows_again, remaining_rows_again) = tokio::task::spawn_blocking(move || {
+            let (rows_again, remaining_rows_again) = cube_ext::spawn_blocking(move || {
                 remaining_rows.sort_unstable_by(|&a, &b| {
                     cmp_row_key(sort_key_size, &rows.view()[a], &rows.view()[b])
                 });
@@ -694,7 +695,7 @@ impl ChunkStore {
         let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
         let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
         let local_file_copy = local_file.clone();
-        tokio::task::spawn_blocking(move || -> Result<(), CubeError> {
+        cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
             let parquet = ParquetTableStore::new(index.get_row().clone(), 16384); // TODO config
             parquet.merge_rows(
                 None,
@@ -707,7 +708,7 @@ impl ChunkStore {
         .await??;
 
         let fs = self.remote_fs.clone();
-        Ok(tokio::spawn(async move {
+        Ok(cube_ext::spawn(async move {
             fs.upload_file(&local_file, &remote_path).await?;
             Ok(chunk)
         }))
@@ -725,7 +726,7 @@ impl ChunkStore {
             let index_columns = index.get_row().columns();
             let index_columns_copy = index_columns.clone();
             let columns = columns.to_vec();
-            let (rows_again, remapped) = tokio::task::spawn_blocking(move || {
+            let (rows_again, remapped) = cube_ext::spawn_blocking(move || {
                 let remapped = remap_columns(&rows, &columns, &index_columns_copy);
                 (rows, remapped)
             })

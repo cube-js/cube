@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, Tabs, Input, Button, Space, Typography, Form } from 'antd';
 import { CheckOutlined, CopyOutlined, EditOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
+import jwtDecode from 'jwt-decode';
 
 import { useSecurityContext } from '../../hooks';
 import { copyToClipboard } from '../../utils';
@@ -10,11 +11,11 @@ const { TabPane } = Tabs;
 const { TextArea } = Input;
 const { Text, Link } = Typography;
 
-type TFlexBoxProps = {
+type FlexBoxProps = {
   editing: boolean;
 };
 
-const FlexBox = styled.div<TFlexBoxProps>`
+const FlexBox = styled.div<FlexBoxProps>`
   display: flex;
   gap: 8px;
 
@@ -30,13 +31,14 @@ export function SecurityContext() {
     isModalOpen,
     setIsModalOpen,
     saveToken,
-    getToken,
+    onTokenPayloadChange,
   } = useSecurityContext();
 
   const [form] = Form.useForm();
   const [editingToken, setEditingToken] = useState(false);
   const [isJsonValid, setIsJsonValid] = useState(true);
   const [tmpPayload, setPayload] = useState<string>(payload || '');
+  const [isSubmitting, setSubmitting] = useState<boolean>(false);
   const inputRef = useRef<any>(null);
 
   useEffect(() => {
@@ -54,10 +56,17 @@ export function SecurityContext() {
     });
   }, [form, token, payload]);
 
-  function handleTokenSave(values) {
-    saveToken(values?.token || null);
-    setEditingToken(false);
-    setIsModalOpen(false);
+  async function handleTokenSave(values) {
+    try {
+      setSubmitting(true);
+      saveToken(await onTokenPayloadChange(jwtDecode(values?.token), values?.token || null));
+    } catch (_) {
+      saveToken(values?.token || null);
+    } finally {
+      setEditingToken(false);
+      setIsModalOpen(false);
+      setSubmitting(false);
+    }
   }
 
   function handlePayloadChange(event) {
@@ -74,17 +83,21 @@ export function SecurityContext() {
 
   async function handlePayloadSave() {
     if (isJsonValid) {
-      if (typeof getToken !== 'function') {
+      if (typeof onTokenPayloadChange !== 'function') {
         throw new Error(
-          'Saving token requires the `getToken` function provided to the `SecurityContext`'
+          'Saving token requires the `onTokenPayloadChange` function provided to the `SecurityContext`'
         );
       }
 
+      setSubmitting(true);
+
       try {
-        saveToken(await getToken(tmpPayload || ''));
+        saveToken(await onTokenPayloadChange(JSON.parse(tmpPayload || '{}'), null));
       } catch (error) {
         console.error(error);
       }
+
+      setSubmitting(false);
     } else if (!tmpPayload) {
       saveToken(null);
     }
@@ -131,6 +144,7 @@ export function SecurityContext() {
                   data-testid="save-security-context-payload-btn"
                   type="primary"
                   disabled={Boolean(tmpPayload && !isJsonValid)}
+                  loading={isSubmitting}
                   onClick={handlePayloadSave}
                 >
                   Save
@@ -138,7 +152,11 @@ export function SecurityContext() {
               </Space>
             </TabPane>
 
-            <TabPane data-testid="security-modal-token-tab" tab="Token" key="token">
+            <TabPane
+              data-testid="security-modal-token-tab"
+              tab="Token"
+              key="token"
+            >
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <Text type="secondary">
                   Edit or copy the generated token from below
@@ -188,8 +206,9 @@ export function SecurityContext() {
                     ) : (
                       <Button
                         type="primary"
-                        icon={<CheckOutlined />}
                         htmlType="submit"
+                        loading={isSubmitting}
+                        icon={<CheckOutlined />}
                       />
                     )}
                   </FlexBox>

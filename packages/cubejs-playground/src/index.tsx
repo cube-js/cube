@@ -21,23 +21,31 @@ history.listen((location) => {
   page(props);
 });
 
-async function getToken(payload: string = '') {
+async function onTokenPayloadChange(payload: Record<string, any>, token) {
+  if (token != null) {
+    return token;
+  }
+
   const response = await fetch('/playground/token', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      payload: JSON.parse(payload),
+      payload,
     }),
   });
-  const { token } = await response.json();
-  return token;
+  const json = await response.json();
+  return json.token;
 }
 
 ReactDOM.render(
   <Router history={history}>
-    <AppContextProvider>
+    <AppContextProvider
+      playgroundContext={{
+        isCloud: false,
+      }}
+    >
       <App>
         <Route key="index" exact path="/" component={IndexPage} />
         <Route
@@ -45,7 +53,9 @@ ReactDOM.render(
           path="/build"
           component={(props) => {
             return (
-              <SecurityContextProvider getToken={getToken}>
+              <SecurityContextProvider
+                onTokenPayloadChange={onTokenPayloadChange}
+              >
                 <ExplorePage {...props} />
               </SecurityContextProvider>
             );

@@ -34,8 +34,8 @@ export class CubeStoreQuery extends BaseQuery {
     return `CAST(${value} as TIMESTAMP)`; // TODO
   }
 
-  public inDbTimeZone(date) {
-    return this.inIntegrationTimeZone(date).clone().utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  public timestampFormat() {
+    return moment.HTML5_FMT.DATETIME_LOCAL_MS;
   }
 
   public dateTimeCast(value) {
@@ -43,11 +43,11 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL ${interval})`;
+    return `DATE_SUB(${date}, INTERVAL '${interval}')`;
   }
 
   public addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL ${interval})`;
+    return `DATE_ADD(${date}, INTERVAL '${interval}')`;
   }
 
   public timeGroupedColumn(granularity, dimension) {

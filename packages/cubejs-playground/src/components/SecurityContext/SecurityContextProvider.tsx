@@ -1,44 +1,56 @@
-import { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useState, useEffect, ReactNode } from 'react';
 import jwtDecode from 'jwt-decode';
 
 import { SecurityContext } from './SecurityContext';
+import { useIsMounted, useLocalStorage } from '../../hooks';
 
-export type TSecurityContextContextProps = {
+export type SecurityContextProps = {
   payload: string;
   token: string | null;
-  isValid: boolean;
   isModalOpen: boolean;
   setIsModalOpen: any;
   saveToken: (token: string | null) => void;
-  getToken: (payload: string) => Promise<string>;
+  refreshToken: () => Promise<void>;
+  onTokenPayloadChange: (payload: Record<string, any>, token: string | null) => Promise<string>;
 };
 
-export const SecurityContextContext = createContext<TSecurityContextContextProps>(
-  {} as TSecurityContextContextProps
+export const SecurityContextContext = createContext<SecurityContextProps>(
+  {} as SecurityContextProps
 );
 
-type TSecurityContextProviderProps = {
+export type SecurityContextProviderProps = {
   children: ReactNode;
-  tokenKey?: string | null;
-} & Pick<TSecurityContextContextProps, 'getToken'>
+  tokenUpdater?: (token: string | null) => Promise<string | null>;
+} & Pick<SecurityContextProps, 'onTokenPayloadChange'>;
+
+let mutex = 0;
+let refreshingToken: string | null = null;
 
 export function SecurityContextProvider({
   children,
-  getToken,
-  tokenKey = null,
-}: TSecurityContextProviderProps) {
-  const [token, setToken] = useState<string | null>(null);
+  tokenUpdater,
+  onTokenPayloadChange,
+}: SecurityContextProviderProps) {
+  const isMounted = useIsMounted();
+  const [token, setToken, removeToken] = useLocalStorage<string | null>(
+    'cubejsToken',
+    null
+  );
   const [payload, setPayload] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const tokenName = tokenKey ? `cubejsToken:${tokenKey}` : 'cubejsToken';
+  async function refreshToken() {
+    if (token != null && tokenUpdater && refreshingToken !== token) {
+      refreshingToken = token;
+      const currentMutex = mutex;
+      const refreshedToken = await tokenUpdater(token);
 
-  useEffect(() => {
-    const token = localStorage.getItem(tokenName);
-    if (token) {
-      setToken(token);
+      if (isMounted && currentMutex === mutex) {
+        setToken(refreshedToken);
+        mutex++;
+      }
     }
-  }, [tokenName]);
+  }
 
   useEffect(() => {
     if (token) {
@@ -47,34 +59,29 @@ export function SecurityContextProvider({
         setPayload(JSON.stringify(payload, null, 2));
       } catch (error) {
         setPayload('');
-        console.error('Invalid JWT token');
+        console.error('Invalid JWT token', token);
       }
+    } else {
+      setPayload('');
     }
   }, [token]);
-
-  const saveToken = useCallback(
-    (token) => {
-      if (token) {
-        localStorage.setItem(tokenName, token);
-      } else {
-        localStorage.removeItem(tokenName);
-        setPayload('');
-      }
-      setToken(token || null);
-    },
-    [tokenName]
-  );
 
   return (
     <SecurityContextContext.Provider
       value={{
-        payload,
         token,
-        isValid: false,
+        payload,
         isModalOpen,
         setIsModalOpen,
-        saveToken,
-        getToken,
+        saveToken(token) {
+          if (!token) {
+            removeToken();
+          } else {
+            setToken(token);
+          }
+        },
+        refreshToken,
+        onTokenPayloadChange,
       }}
     >
       {children}

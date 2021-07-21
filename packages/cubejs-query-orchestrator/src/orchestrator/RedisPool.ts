@@ -13,7 +13,7 @@ function createRedisClient(url: string, opts: RedisOptions | IORedisOptions = {}
   return createNodeRedisClient(url, <RedisOptions>opts);
 }
 
-export type CreateRedisClientFn = () => PromiseLike<AsyncRedisClient>;
+export type CreateRedisClientFn = () => Promise<AsyncRedisClient>;
 
 export interface RedisPoolOptions {
   poolMin?: number;
@@ -21,7 +21,7 @@ export interface RedisPoolOptions {
   idleTimeoutSeconds?: number;
   softIdleTimeoutSeconds?: number;
   createClient?: CreateRedisClientFn;
-  destroyClient?: (client: AsyncRedisClient) => PromiseLike<void>;
+  destroyClient?: (client: AsyncRedisClient) => Promise<void>;
 }
 
 const MAX_ALLOWED_POOL_ERRORS = 100;

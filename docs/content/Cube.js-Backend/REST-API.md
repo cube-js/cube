@@ -6,19 +6,24 @@ menuOrder: 4
 ---
 
 ## Prerequisites
+
 ### Base path
 
-REST API is used to communicate with Cube.js backend.
-All requests are prefixed with **basePath** described in [Backend Server Core](@cubejs-backend-server-core). By default it's `/cubejs-api`.
+REST API is used to communicate with Cube.js backend. All requests are prefixed
+with **basePath** described in
+[Backend Server Core](@cubejs-backend-server-core). By default it's
+`/cubejs-api`.
 
 ### Authentication
 
 Cube.js uses API Token for requests' authorization and also for passing
-additional security context, which could be used in the [SECURITY_CONTEXT](cube#context-variables-security-context) object in the Data
-Schema.
+additional security context, which could be used in the
+[SECURITY_CONTEXT](/schema/reference/cube#context-variables-security-context)
+object in the Data Schema.
 
-The API Token is passed via the Authorization Header. The token itself is a [JSON
-Web Token](https://jwt.io), the [Security section](security) describes how to generate it.
+The API Token is passed via the Authorization Header. The token itself is a
+[JSON Web Token](https://jwt.io), the [Security section](security) describes how
+to generate it.
 
 In the development environment the token is not required for authorization, but
 you can still use it to pass a security context.
@@ -31,30 +36,37 @@ curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 
 ### Continue wait
 
-If the request takes too long to be processed, Cube.js Backend responds with ```{ "error": "Continue wait" }``` and 200 status code. To get the data requested, simply retry your request a bit later.
+If the request takes too long to be processed, Cube.js Backend responds with
+`{ "error": "Continue wait" }` and 200 status code. To get the data requested,
+simply retry your request a bit later.
 
 Possible reasons of **Continue wait**:
 
- * The query requested is heavy and it takes some time for the database to process it.
- * There are many queries requested and Cube.js backend queues them to save database from overloading.
+- The query requested is heavy and it takes some time for the database to
+  process it.
+- There are many queries requested and Cube.js backend queues them to save
+  database from overloading.
 
 ### Error Handling
 
 Cube.js REST API has basic errors and HTTP Error codes for all requests.
 
-| Status | Error response | Description |
-| --- | --- | --- |
-| 400 | Error message | General error. It may be a database error, timeout, or other issue. Check error message for details. |
-| 403 | Authorization header isn't set | You didn't provide an auth token. Provide a valid API Token or disable authorization. |
-| 403 | Invalid token | The auth token provided is not valid. It may be expired or have invalid signature. |
-| 500 | Error message | Cube.js internal server error. Check error message for details. |
+| Status | Error response                 | Description                                                                                          |
+| ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 400    | Error message                  | General error. It may be a database error, timeout, or other issue. Check error message for details. |
+| 403    | Authorization header isn't set | You didn't provide an auth token. Provide a valid API Token or disable authorization.                |
+| 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
+| 500    | Error message                  | Cube.js internal server error. Check error message for details.                                      |
 
 ### Request Span Annotation
 
-For monitoring tools such as Cube Cloud proper request span annotation should be provided in `x-request-id` header of a request.
-Each request id should consist of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as whole: `${spanId}-span-${requestSequenceId}`.
-Values of `x-request-id` header should be unique for each separate request.
-`spanId` should define user interaction span such us `Continue wait` retry cycle and it's value shouldn't change during one single interaction.
+For monitoring tools such as Cube Cloud proper request span annotation should be
+provided in `x-request-id` header of a request. Each request id should consist
+of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as
+whole: `${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header
+should be unique for each separate request. `spanId` should define user
+interaction span such us `Continue wait` retry cycle and it's value shouldn't
+change during one single interaction.
 
 ## API Reference
 
@@ -62,18 +74,19 @@ Values of `x-request-id` header should be unique for each separate request.
 
 Get the data for a query.
 
-| Parameter | Description |
-| --- | --- |
-| query | URL encoded Cube.js [Query](/query-format) |
+| Parameter | Description                                |
+| --------- | ------------------------------------------ |
+| query     | URL encoded Cube.js [Query](/query-format) |
 
 Response
 
-* `query` - The query passed via params. It can be an array of queries and in such case it will be treated as a [Data Blending](/data-blending) query.
-* `data` - Formatted dataset of query results.
-* `annotation` - Metadata for query. Contains descriptions for all query items.
-  * `title` - Human readable title from data schema.
-  * `shortTitle` - Short title for visualization usage (ex. chart overlay)
-  * `type` - Data type
+- `query` - The query passed via params. It can be an array of queries and in
+  such case it will be treated as a [Data Blending](/data-blending) query.
+- `data` - Formatted dataset of query results.
+- `annotation` - Metadata for query. Contains descriptions for all query items.
+  - `title` - Human readable title from data schema.
+  - `shortTitle` - Short title for visualization usage (ex. chart overlay)
+  - `type` - Data type
 
 Example request:
 
@@ -128,6 +141,7 @@ Example response:
   }
 }
 ```
+
 <!-- prettier-ignore-start -->
 [[warning | Note]]
 | Currently all fetched numericals are returned in the same format as driver returns it without any additional processing. Most of drivers return numerical values as strings instead of javascript integer or float to ensure there's no loss of significance. Client code should take care of parsing such numerical values.
@@ -137,17 +151,17 @@ Example response:
 
 Get the SQL Code generated by Cube.js to be executed in the database.
 
-| Parameter | Description |
-| --- | --- |
-| query | URLencoded Cube.js [Query](/query-format) |
+| Parameter | Description                               |
+| --------- | ----------------------------------------- |
+| query     | URLencoded Cube.js [Query](/query-format) |
 
 Response
 
-* `sql` - JSON Object with the following properties
-  * `sql` - Formatted SQL query with parameters
-  * `order` - Order fields and direction used in SQL query
-  * `cacheKeyQueries` - Key names and TTL of Cube.js data cache
-  * `preAggregations` - SQL queries used to build pre-aggregation tables
+- `sql` - JSON Object with the following properties
+  - `sql` - Formatted SQL query with parameters
+  - `order` - Order fields and direction used in SQL query
+  - `cacheKeyQueries` - Key names and TTL of Cube.js data cache
+  - `preAggregations` - SQL queries used to build pre-aggregation tables
 
 Example request:
 
@@ -158,7 +172,7 @@ curl \
  --data-urlencode 'query={"measures":["Users.count"],
  "timeDimensions":[{"dimension": "Users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
  http://localhost:4000/cubejs-api/v1/sql
-````
+```
 
 Example response:
 
@@ -200,13 +214,14 @@ Get meta-information for cubes defined in data schema
 
 Response
 
-* `cubes` - Array of cubes
-  * `name` - Codename of the cube
-  * `title` - Human-readable cube name
-  * `measures` - Array of measures defined within this cube
-  * `dimensions` - Array of dimensions defined within this cube
-  * `segments` - Array of segments defined within this cube
-  * `connectedComponent` - if it has the same value for two cubes, then there is at least one join path between them.
+- `cubes` - Array of cubes
+  - `name` - Codename of the cube
+  - `title` - Human-readable cube name
+  - `measures` - Array of measures defined within this cube
+  - `dimensions` - Array of dimensions defined within this cube
+  - `segments` - Array of segments defined within this cube
+  - `connectedComponent` - if it has the same value for two cubes, then there is
+    at least one join path between them.
 
 Example request:
 
@@ -215,59 +230,62 @@ curl \
  -H "Authorization: EXAMPLE-API-TOKEN" \
  -G \
  http://localhost:4000/cubejs-api/v1/meta
-````
+```
 
 Example response:
 
 ```javascript
 {
-  cubes:[
+  cubes: [
     {
-      name:"Users",
-      title:"Users",
-      connectedComponent:1,
-      measures:[
+      name: 'Users',
+      title: 'Users',
+      connectedComponent: 1,
+      measures: [
         {
-          name:"Users.count",
-          title:"Users Count",
-          shortTitle:"Count",
-          aliasName:"users.count",
-          type:"number",
-          aggType:"count",
-          drillMembers:[
-            "Users.id",
-            "Users.city",
-            "Users.createdAt"
-          ]
-        }
+          name: 'Users.count',
+          title: 'Users Count',
+          shortTitle: 'Count',
+          aliasName: 'users.count',
+          type: 'number',
+          aggType: 'count',
+          drillMembers: ['Users.id', 'Users.city', 'Users.createdAt'],
+        },
       ],
-      dimensions:[
+      dimensions: [
         {
-          name:"Users.city",
-          title:"Users City",
-          type:"string",
-          aliasName:"users.city",
-          shortTitle:"City",
-          suggestFilterValues:true
-        }
+          name: 'Users.city',
+          title: 'Users City',
+          type: 'string',
+          aliasName: 'users.city',
+          shortTitle: 'City',
+          suggestFilterValues: true,
+        },
       ],
-      segments:[]
-    }
-  ]
+      segments: [],
+    },
+  ];
 }
 ```
 
 ### /v1/run-scheduled-refresh
 
-Trigger scheduled refresh run to refresh pre-aggregations. Use it in serverless deployments.
+Trigger scheduled refresh run to refresh pre-aggregations. Use it in serverless
+deployments.
 
+<!-- prettier-ignore-start -->
 [[warning | Note]]
-| Single call to this API may be not enough to refresh everything is pending. This call just populates queue with refresh workload and it should be continously called until refresh jobs are done. Otherwise refresh jobs will be marked orphaned and they will be removed from queue.
+| Single call to this API may be not enough to refresh everything is pending.
+| This call just populates queue with refresh workload and should be
+| continuously called until refresh jobs have completed; otherwise refresh
+| jobs will be marked as orphaned, and they will be removed from the queue.
+<!-- prettier-ignore-end -->
 
-Learn more about [scheduled refresh here](caching#keeping-cache-up-to-date).
+Learn more about
+[scheduled refresh here](/caching/pre-aggregations/getting-started#keeping-pre-aggregations-up-to-date).
 
-| Parameter | Description |
-| --- | --- |
+| Parameter       | Description                                                                  |
+| --------------- | ---------------------------------------------------------------------------- |
 | queryingOptions | Optional URL encoded Cube.js [Query](/query-format) options such as timezone |
 
 Empty object response if scheduled successfully.
@@ -286,9 +304,11 @@ curl \
 
 Returns the ready state of the deployment.
 
-**Single-tenant:** Ensures the orchestration layer is operational and tests the connection to the default `dataSource`.
+**Single-tenant:** Ensures the orchestration layer is operational and tests the
+connection to the default `dataSource`.
 
-**Multi-tenant:** Tests connections per-tenant. If no connections exist, it will report as successful.
+**Multi-tenant:** Tests connections per-tenant. If no connections exist, it will
+report as successful.
 
 Example request:
 
@@ -297,6 +317,7 @@ curl -i http://localhost:4000/readyz
 ```
 
 Successful example response:
+
 ```bash
 HTTP/1.1 200 OK
 X-Powered-By: Express
@@ -312,6 +333,7 @@ Keep-Alive: timeout=5
 ```
 
 Failure example response:
+
 ```bash
 HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express
@@ -328,13 +350,16 @@ Keep-Alive: timeout=5
 
 ### /livez
 
-Returns the liveness state of the deployment. This is confirmed by testing any existing connections to `dataSource`. If no connections exist, it will report as successful.
+Returns the liveness state of the deployment. This is confirmed by testing any
+existing connections to `dataSource`. If no connections exist, it will report as
+successful.
 
 ```bash
 curl -i http://localhost:4000/livez
 ```
 
 Successful example response:
+
 ```bash
 HTTP/1.1 200 OK
 X-Powered-By: Express
@@ -350,6 +375,7 @@ Keep-Alive: timeout=5
 ```
 
 Failure example response:
+
 ```bash
 HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express

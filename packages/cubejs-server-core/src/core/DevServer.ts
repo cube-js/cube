@@ -1,5 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
+import { CubePreAggregationConverter, CubeSchemaConverter } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -8,13 +9,16 @@ import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
+import { executeCommand, getEnv, packageExists } from '@cubejs-backend/shared';
+import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import { ExternalDbTypeFn } from './types';
+import DriverDependencies from './DriverDependencies';
 
 const repo = {
   owner: 'cube-js',
@@ -22,8 +26,9 @@ const repo = {
 };
 
 type DevServerOptions = {
-  dockerVersion?: string,
-  externalDbTypeFn: ExternalDbTypeFn
+  externalDbTypeFn: ExternalDbTypeFn;
+  isReadyForQueryProcessing: () => boolean;
+  dockerVersion?: string;
 };
 
 export class DevServer {
@@ -35,7 +40,7 @@ export class DevServer {
 
   public constructor(
     protected readonly cubejsServer: CubejsServerCore,
-    protected readonly options?: DevServerOptions
+    protected readonly options: DevServerOptions
   ) {
   }
 
@@ -52,6 +57,19 @@ export class DevServer {
       console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
     }
     console.log(`🦅 Dev environment available at ${apiUrl}`);
+
+    if (
+      (
+        this.options.externalDbTypeFn({
+          authInfo: null,
+          securityContext: null,
+          requestId: '',
+        }) || ''
+      ).toLowerCase() !== 'cubestore'
+    ) {
+      console.log('⚠️  Your pre-aggregations will be on an external database. It is recommended to use Cube Store for optimal performance');
+    }
+
     this.cubejsServer.event('Dev Server Start');
     const serveStatic = require('serve-static');
 
@@ -67,24 +85,21 @@ export class DevServer {
 
     app.get('/playground/context', catchErrors((req, res) => {
       this.cubejsServer.event('Dev Server Env Open');
+
       res.json({
         cubejsToken,
-        apiUrl: process.env.CUBEJS_API_URL,
         basePath: options.basePath,
         anonymousId: this.cubejsServer.anonymousId,
         coreServerVersion: this.cubejsServer.coreServerVersion,
-        dockerVersion: this.options?.dockerVersion || null,
-        extDbType: this.options?.externalDbTypeFn({
-          authInfo: null,
-          securityContext: null,
-          requestId: getRequestIdFromRequest(req),
-        }) || null,
+        dockerVersion: this.options.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
-        shouldStartConnectionWizardFlow: !this.cubejsServer.configFileExists(),
+        dbType: options.dbType || null,
+        shouldStartConnectionWizardFlow: !this.options.isReadyForQueryProcessing(),
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
-        dbType: options.dbType
+        identifier: this.getIdentifier(options.apiSecret),
+        previewFeatures: getEnv('previewFeatures'),
       });
     }));
 
@@ -241,6 +256,62 @@ export class DevServer {
       });
     }));
 
+    let driverPromise: Promise<void> | null = null;
+    let driverError: Error | null = null;
+
+    app.get('/playground/driver', catchErrors(async (req: Request, res: Response) => {
+      const { driver } = req.query;
+
+      if (!driver || !DriverDependencies[driver]) {
+        return res.status(400).json('Wrong driver');
+      }
+
+      if (packageExists(DriverDependencies[driver])) {
+        return res.json({ status: 'installed' });
+      } else if (driverPromise) {
+        return res.json({ status: 'installing' });
+      } else if (driverError) {
+        return res.status(500).json({
+          status: 'error',
+          error: driverError.toString()
+        });
+      }
+
+      return res.json({ status: null });
+    }));
+
+    app.post('/playground/driver', catchErrors((req, res) => {
+      const { driver } = req.body;
+
+      if (!DriverDependencies[driver]) {
+        return res.status(400).json(`'${driver}' driver dependency not found`);
+      }
+
+      async function installDriver() {
+        driverError = null;
+
+        try {
+          await executeCommand(
+            'npm',
+            ['install', DriverDependencies[driver], '--save-dev'],
+            { cwd: path.resolve('.') }
+          );
+        } catch (error) {
+          driverError = error;
+        } finally {
+          driverPromise = null;
+        }
+      }
+
+      if (!driverPromise) {
+        driverPromise = installDriver();
+      }
+
+      return res.json({
+        dependency: DriverDependencies[driver]
+      });
+    }));
+
     app.post('/playground/apply-template-packages', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Download Template Packages');
 
@@ -253,7 +324,7 @@ export class DevServer {
         const manifestJson = await fetcher.manifestJSON();
         const response = await fetcher.downloadPackages();
 
-        let templatePackages = [];
+        let templatePackages: string[];
         if (typeof toApply === 'string') {
           const template = manifestJson.templates.find(({ name }) => name === toApply);
           templatePackages = template.templatePackages;
@@ -281,8 +352,7 @@ export class DevServer {
         await appContainer.ensureDependencies();
         this.cubejsServer.event('Dev Server Dashboard Npm Install Success');
 
-        // todo: uncomment
-        // fetcher.cleanup();
+        fetcher.cleanup();
       };
 
       if (this.applyTemplatePackagesPromise) {
@@ -297,7 +367,6 @@ export class DevServer {
           this.applyTemplatePackagesPromise = null;
         }
       }, (err) => {
-        console.log('err', err);
         lastApplyTemplatePackagesError = err;
         if (promise === this.applyTemplatePackagesPromise) {
           this.applyTemplatePackagesPromise = null;
@@ -348,7 +417,7 @@ export class DevServer {
     app.post('/playground/test-connection', catchErrors(async (req, res) => {
       const { variables = {} } = req.body || {};
 
-      let driver: BaseDriver|null = null;
+      let driver: BaseDriver | null = null;
 
       try {
         if (!variables.CUBEJS_DB_TYPE) {
@@ -397,6 +466,8 @@ export class DevServer {
 
       // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
+      variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+      variables.CUBEJS_DEV_MODE = 'true';
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
       const repositoryPath = path.join(process.cwd(), options.schemaPath);
@@ -422,5 +493,39 @@ export class DevServer {
 
       res.json({ token });
     }));
+
+    app.post('/playground/schema/pre-aggregation', catchErrors(async (req: Request, res: Response) => {
+      const { cubeName, preAggregationName, code } = req.body;
+
+      const schemaConverter = new CubeSchemaConverter(this.cubejsServer.repository, [
+        new CubePreAggregationConverter({
+          cubeName,
+          preAggregationName,
+          code
+        })
+      ]);
+
+      try {
+        await schemaConverter.generate();
+      } catch (error) {
+        res.status(400).json({ error: error.message || error });
+      }
+
+      schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
+        if (currentCubeName === cubeName) {
+          this.cubejsServer.repository.writeDataSchemaFile(fileName, source);
+        }
+      });
+
+      res.json('ok');
+    }));
+  }
+
+  protected getIdentifier(apiSecret: string): string {
+    return crypto.createHash('md5')
+      .update(apiSecret)
+      .digest('hex')
+      .replace(/[^\d]/g, '')
+      .substr(0, 10);
   }
 }

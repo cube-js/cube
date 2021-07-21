@@ -4,7 +4,7 @@ import cx from 'classnames';
 
 import ScrollLink from '../templates/ScrollSpyLink';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import { SectionWithoutNodes } from '../../types';
 import { layout } from '../../theme';
 

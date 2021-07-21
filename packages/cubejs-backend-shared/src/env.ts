@@ -84,16 +84,29 @@ const variables: Record<string, (...args: any) => any> = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
-  refreshTimer: () => {
+  rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
+    .default('false')
+    .asBoolStrict(),
+  refreshWorkerMode: () => {
+    const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
+    if (refreshWorkerMode !== undefined) {
+      return refreshWorkerMode;
+    }
+
+    // @deprecated Please use CUBEJS_REFRESH_WORKER
+    const scheduledRefresh = get('CUBEJS_SCHEDULED_REFRESH').asBool();
+    if (scheduledRefresh !== undefined) {
+      return scheduledRefresh;
+    }
+
+    // @deprecated Please use CUBEJS_REFRESH_WORKER
     if (process.env.CUBEJS_SCHEDULED_REFRESH_TIMER) {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
 
-    // Refresh timer is true by default for development
+    // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
-  scheduledRefresh: () => get('CUBEJS_SCHEDULED_REFRESH')
-    .asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
@@ -128,6 +141,19 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
     .asString(),
+  // Export bucket options for Integration based
+  dbExportIntegration: () => get('CUBEJS_DB_EXPORT_INTEGRATION')
+    .asString(),
+  // Export bucket options for GCS
+  dbExportGCSCredentials: () => {
+    const credentials = get('CUBEJS_DB_EXPORT_GCS_CREDENTIALS')
+      .asString();
+    if (credentials) {
+      return JSON.parse(Buffer.from(credentials, 'base64').toString('utf8'));
+    }
+
+    return undefined;
+  },
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
@@ -229,8 +255,6 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
-  jwkKey: () => get('CUBEJS_JWK_KEY')
-    .asUrlString(),
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
@@ -257,7 +281,16 @@ const variables: Record<string, (...args: any) => any> = {
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('false')
     .asBoolStrict(),
+  preAggregationsQueueEventsBus: () => get('CUBEJS_PRE_AGGREGATIONS_QUEUE_EVENTS_BUS')
+    .default('false')
+    .asBoolStrict(),
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
+    .default('false')
+    .asBoolStrict(),
+  scheduledRefreshDefault: () => get('CUBEJS_SCHEDULED_REFRESH_DEFAULT')
+    .default('false')
+    .asBoolStrict(),
+  previewFeatures: () => get('CUBEJS_PREVIEW_FEATURES')
     .default('false')
     .asBoolStrict(),
 };
@@ -266,7 +299,7 @@ type Vars = typeof variables;
 
 export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
   if (key in variables) {
-    return <any>variables[key](opts);
+    return variables[key](opts);
   }
 
   throw new Error(

@@ -17,7 +17,7 @@ const COLORS_SERIES = [palette.secondary.main, palette.primary.light, palette.se
 const TypeToChartComponent = {
   line: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
@@ -30,7 +30,7 @@ const TypeToChartComponent = {
   },
   bar: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => moment(c.category).format('DD/MM/YYYY')),
+      labels: resultSet.categories().map((c) => moment(c.x).format('DD/MM/YYYY')),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
@@ -42,7 +42,7 @@ const TypeToChartComponent = {
   },
   area: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
@@ -62,7 +62,7 @@ const TypeToChartComponent = {
   },
   pie: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s) => ({
         label: s.title,
         data: s.series.map((r) => r.value),

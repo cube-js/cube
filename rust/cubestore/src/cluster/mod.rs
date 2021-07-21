@@ -5,7 +5,7 @@ pub mod transport;
 pub mod worker_pool;
 
 #[cfg(not(target_os = "windows"))]
-use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
+use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
@@ -34,6 +34,7 @@ use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use chrono::Utc;
 use core::mem;
+use datafusion::cube_ext;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
 use flatbuffers::bitflags::_core::pin::Pin;
 use futures::future::join_all;
@@ -62,13 +63,20 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
-use tracing_futures::WithSubscriber;
 
 #[automock]
 #[async_trait]
 pub trait Cluster: DIService + Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
 
+    /// Send full select to a worker, which will act as the main node for the query.
+    async fn route_select(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>;
+
+    /// Runs select on a single worker node to get partial results from that worker.
     async fn run_select(
         &self,
         node_name: &str,
@@ -186,6 +194,14 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
     }
 }
 
+#[cfg(not(target_os = "windows"))]
+#[ctor::ctor]
+fn proc_handler() {
+    crate::util::respawn::register_handler(
+        worker_main::<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>), WorkerProcessor>,
+    );
+}
+
 struct JobRunner {
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
@@ -211,6 +227,20 @@ impl Cluster for ClusterImpl {
                 .await?;
         }
         Ok(())
+    }
+
+    async fn route_select(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
+        let response = self
+            .send_or_process_locally(&node_name, NetworkMessage::RouterSelect(plan))
+            .await?;
+        match response {
+            NetworkMessage::SelectResult(r) => r,
+            _ => panic!("unexpected response for route select"),
+        }
     }
 
     #[instrument(level = "trace", skip(self, plan_node))]
@@ -319,8 +349,19 @@ impl Cluster for ClusterImpl {
     #[instrument(level = "trace", skip(self, m))]
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
         match m {
+            NetworkMessage::RouterSelect(plan) => {
+                let res = self
+                    .query_executor
+                    .execute_router_plan(plan, self.this.upgrade().unwrap())
+                    .await
+                    .and_then(|(schema, records)| {
+                        let records = SerializedRecordBatchStream::write(&schema, records)?;
+                        Ok((schema, records))
+                    });
+                NetworkMessage::SelectResult(res)
+            }
             NetworkMessage::Select(plan) => {
-                let res = self.run_local_select_serialized(plan).await;
+                let res = self.run_local_select_worker(plan).await;
                 NetworkMessage::SelectResult(res)
             }
             NetworkMessage::WarmupDownload(remote_path) => {
@@ -466,7 +507,7 @@ impl JobRunner {
         let job_id = job.get_id();
         let (mut tx, rx) = oneshot::channel::<()>();
         let meta_store = self.meta_store.clone();
-        let heart_beat_timer = tokio::spawn(async move {
+        let heart_beat_timer = cube_ext::spawn(async move {
             loop {
                 tokio::select! {
                     _ = tx.closed() => {
@@ -518,7 +559,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::WALs, wal_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let wal_id = *wal_id;
-                    tokio::spawn(async move { chunk_store.partition(wal_id).await }).await??
+                    cube_ext::spawn(async move { chunk_store.partition(wal_id).await }).await??
                 } else {
                     Self::fail_job_row_key(job);
                 }
@@ -527,7 +568,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let partition_id = *partition_id;
-                    tokio::spawn(async move { chunk_store.repartition(partition_id).await })
+                    cube_ext::spawn(async move { chunk_store.repartition(partition_id).await })
                         .await??
                 } else {
                     Self::fail_job_row_key(job);
@@ -537,7 +578,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
-                    tokio::spawn(async move { compaction_service.compact(partition_id).await })
+                    cube_ext::spawn(async move { compaction_service.compact(partition_id).await })
                         .await??;
                 } else {
                     Self::fail_job_row_key(job);
@@ -547,7 +588,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
                     let import_service = self.import_service.clone();
                     let table_id = *table_id;
-                    tokio::spawn(async move { import_service.import_table(table_id).await })
+                    cube_ext::spawn(async move { import_service.import_table(table_id).await })
                         .await??
                 } else {
                     Self::fail_job_row_key(job);
@@ -638,7 +679,7 @@ impl ClusterImpl {
                 Duration::from_secs(self.config_obj.query_timeout()),
             ));
             *pool = Some(arc.clone());
-            futures.push(tokio::spawn(
+            futures.push(cube_ext::spawn(
                 async move { arc.wait_processing_loops().await },
             ));
         }
@@ -654,7 +695,7 @@ impl ClusterImpl {
                 notify: self.job_notify.clone(),
                 jobs_enabled: self.jobs_enabled.clone(),
             };
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
             }));
         }
@@ -804,7 +845,7 @@ impl ClusterImpl {
             let cluster_to_move = cluster.clone();
             let process_fn_to_move = process_fn.clone();
 
-            tokio::spawn(async move {
+            cube_ext::spawn(async move {
                 process_fn_to_move(cluster_to_move, socket).await;
             });
         }
@@ -846,7 +887,7 @@ impl ClusterImpl {
     }
 
     #[instrument(level = "trace", skip(self, plan_node))]
-    async fn run_local_select_serialized(
+    async fn run_local_select_worker(
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
@@ -863,7 +904,6 @@ impl ClusterImpl {
             .zip(
                 join_all(file_futures)
                     .instrument(tracing::span!(tracing::Level::TRACE, "warmup_download"))
-                    .with_current_subscriber()
                     .await
                     .into_iter()
                     .collect::<Result<Vec<_>, _>>()?
@@ -875,46 +915,36 @@ impl ClusterImpl {
             warn!("Warmup download for select ({:?})", warmup);
         }
 
-        #[cfg(target_os = "windows")]
+        let mut res = None;
+        #[cfg(not(target_os = "windows"))]
         {
+            if let Some(pool) = self.select_process_pool.read().await.clone() {
+                res = Some(
+                    pool.process(WorkerMessage::Select(
+                        plan_node.clone(),
+                        remote_to_local_names.clone(),
+                    ))
+                    .instrument(tracing::span!(
+                        tracing::Level::TRACE,
+                        "execute_worker_plan_on_pool"
+                    ))
+                    .await,
+                )
+            }
+        }
+
+        if res.is_none() {
             // TODO optimize for no double conversion
             let (schema, records) = self
                 .query_executor
                 .execute_worker_plan(plan_node.clone(), remote_to_local_names)
                 .await?;
             let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
-            info!("Running select completed ({:?})", start.elapsed()?);
-            Ok((schema, records?))
+            res = Some(Ok((schema, records?)))
         }
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            let pool_option = self.select_process_pool.read().await.clone();
-
-            let res = if let Some(pool) = pool_option {
-                let serialized_plan_node = plan_node.clone();
-                pool.process(WorkerMessage::Select(
-                    serialized_plan_node,
-                    remote_to_local_names,
-                ))
-                .instrument(tracing::span!(
-                    tracing::Level::TRACE,
-                    "execute_worker_plan_on_pool"
-                ))
-                .await
-            } else {
-                // TODO optimize for no double conversion
-                let (schema, records) = self
-                    .query_executor
-                    .execute_worker_plan(plan_node.clone(), remote_to_local_names)
-                    .await?;
-                let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
-                Ok((schema, records?))
-            };
-
-            info!("Running select completed ({:?})", start.elapsed()?);
-            res
-        }
+        info!("Running select completed ({:?})", start.elapsed()?);
+        res.unwrap()
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {
@@ -1041,7 +1071,7 @@ impl ClusterImpl {
     async fn start_stream_on_worker(self: Arc<Self>, m: NetworkMessage) -> Box<dyn MessageStream> {
         match m {
             NetworkMessage::SelectStart(p) => {
-                let (schema, results) = match self.run_local_select_serialized(p).await {
+                let (schema, results) = match self.run_local_select_worker(p).await {
                     Err(e) => return Box::new(QueryStream::new_error(e)),
                     Ok(x) => x,
                 };

@@ -16,6 +16,8 @@ use tests::sql_tests;
 
 #[cfg(not(target_os = "windows"))]
 pub mod multiproc;
+#[allow(unused_parens, non_snake_case)]
+mod rows;
 mod tests;
 
 #[async_trait]

@@ -14,15 +14,12 @@ const generateTestEnv = (apiSecret, dbType) => ({
 test('dotEnv should return default env vars for mysql DB type', () => {
   const dbType = 'mysql';
   const expectedDotEnvVars = `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
-CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_WEB_SOCKETS=true
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
-CUBEJS_EXTERNAL_DEFAULT=true`;
+CUBEJS_EXTERNAL_DEFAULT=true
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
+CUBEJS_WEB_SOCKETS=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
 });
@@ -30,15 +27,12 @@ CUBEJS_EXTERNAL_DEFAULT=true`;
 test('dotEnv should return default env vars for unsupported DB type', () => {
   const dbType = 'unsupported';
   const expectedDotEnvVars = `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
-CUBEJS_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_WEB_SOCKETS=true
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
-CUBEJS_EXTERNAL_DEFAULT=true`;
+CUBEJS_EXTERNAL_DEFAULT=true
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
+CUBEJS_WEB_SOCKETS=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
 });
@@ -55,7 +49,8 @@ CUBEJS_JDBC_DRIVER=athena
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
-CUBEJS_EXTERNAL_DEFAULT=true`;
+CUBEJS_EXTERNAL_DEFAULT=true
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
 });

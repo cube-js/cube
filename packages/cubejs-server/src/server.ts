@@ -5,6 +5,7 @@ import CubeCore, {
   CubejsServerCore,
   DatabaseType,
   DriverContext,
+  SystemOptions
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
 import express from 'express';
@@ -12,6 +13,7 @@ import http from 'http';
 import util from 'util';
 import bodyParser from 'body-parser';
 import cors, { CorsOptions } from 'cors';
+
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
@@ -55,7 +57,7 @@ export class CubejsServer {
 
   protected readonly status: ServerStatusHandler = new ServerStatusHandler();
 
-  public constructor(config: CreateOptions = {}) {
+  public constructor(config: CreateOptions = {}, systemOptions?: SystemOptions) {
     this.config = {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),
@@ -68,7 +70,7 @@ export class CubejsServer {
       },
     };
 
-    this.core = CubeCore.create(config);
+    this.core = CubeCore.create(config, systemOptions);
     this.server = null;
   }
 

@@ -8,6 +8,7 @@ use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use datafusion::cube_ext;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
@@ -173,7 +174,7 @@ impl RemoteFs for LocalDirRemoteFs {
             debug!("Downloading {}", remote_path);
             if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
                 let temp_path =
-                    tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dir))
+                    cube_ext::spawn_blocking(move || NamedTempFile::new_in(downloads_dir))
                         .await??
                         .into_temp_path();
                 fs::copy(remote_dir.as_path().join(remote_path), &temp_path)
@@ -185,7 +186,7 @@ impl RemoteFs for LocalDirRemoteFs {
                         ))
                     })?;
                 local_file =
-                    tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
+                    cube_ext::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
                         temp_path.persist(&local_file)?;
                         Ok(local_file)
                     })

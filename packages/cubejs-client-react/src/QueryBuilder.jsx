@@ -1,13 +1,14 @@
 import React from 'react';
-import { prop, uniqBy, equals, pick, clone, indexBy, uniq } from 'ramda';
+import { clone, equals, indexBy, pick, prop, uniq, uniqBy } from 'ramda';
 import {
-  ResultSet,
-  moveItemInArray,
+  defaultHeuristics,
   defaultOrder,
   flattenFilters,
   getQueryMembers,
+  isQueryPresent,
+  moveItemInArray,
   movePivotItem,
-  defaultHeuristics,
+  ResultSet
 } from '@cubejs-client/core';
 
 import QueryRenderer from './QueryRenderer.jsx';
@@ -26,6 +27,8 @@ const granularities = [
 ];
 
 export default class QueryBuilder extends React.Component {
+  static contextType = CubeContext;
+
   // This is an anti-pattern, only kept for backward compatibility
   // https://reactjs.org/blog/2018/06/07/you-probably-dont-need-derived-state.html#anti-pattern-unconditionally-copying-props-to-state
   static getDerivedStateFromProps(props, state) {
@@ -92,23 +95,30 @@ export default class QueryBuilder extends React.Component {
       chartType: props.defaultChartType,
       validatedQuery: props.query, // deprecated, validatedQuery should not be set until after dry-run for safety
       missingMembers: [],
-      isFetchingMeta: false,
+      // todo: rename to `isMetaReady`
+      isFetchingMeta: true,
       dryRunResponse: null,
       ...props.vizState, // deprecated
       ...props.initialVizState,
     };
 
     this.mutexObj = {};
-    this.reorderTriggered = false;
+    this.orderMembersOrderKeys = [];
   }
 
   async componentDidMount() {
+    this.prevContext = this.context;
     await this.fetchMeta();
   }
 
   async componentDidUpdate(prevProps) {
     const { schemaVersion, onSchemaChange } = this.props;
     const { meta } = this.state;
+
+    if (this.prevContext?.cubejsApi !== this.context?.cubejsApi) {
+      this.prevContext = this.context;
+      await this.fetchMeta();
+    }
 
     if (prevProps.schemaVersion !== schemaVersion) {
       try {
@@ -129,6 +139,10 @@ export default class QueryBuilder extends React.Component {
   }
 
   fetchMeta = async () => {
+    if (!this.cubejsApi()) {
+      return;
+    }
+
     let meta;
     let metaError = null;
 
@@ -276,59 +290,39 @@ export default class QueryBuilder extends React.Component {
       availableDimensions = meta.membersForQuery(query, 'dimensions');
       availableSegments = meta.membersForQuery(query, 'segments');
 
-      const indexedMeasures = indexBy(
-        prop('cubeName'),
-        availableMembers.measures
-      );
-      const indexedDimensions = indexBy(
-        prop('cubeName'),
-        availableMembers.dimensions
-      );
-      const cubeNames = uniq([
-        ...Object.keys(indexedMeasures),
-        ...Object.keys(indexedDimensions),
-      ]).sort();
+      const indexedMeasures = indexBy(prop('cubeName'), availableMembers.measures);
+      const indexedDimensions = indexBy(prop('cubeName'), availableMembers.dimensions);
+      const cubeNames = uniq([...Object.keys(indexedMeasures), ...Object.keys(indexedDimensions)]).sort();
 
       availableFilterMembers = cubeNames.map((name) => {
-        const cube = (indexedMeasures[name] || indexedDimensions[name]);
+        const cube = indexedMeasures[name] || indexedDimensions[name];
 
         return {
           ...cube,
           members: [
             ...indexedMeasures[name]?.members,
-            ...indexedDimensions[name]?.members,
-          ].sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1))
+            ...indexedDimensions[name]?.members
+          ].sort((a, b) => (a.shortTitle > b.shortTitle ? 1 : -1)),
         };
       });
     }
 
+    const activeOrder = Array.isArray(query.order) ? Object.fromEntries(query.order) : query.order;
+
     let orderMembers = uniqBy(prop('id'), [
-      ...(Array.isArray(query.order) ? query.order : Object.entries(query.order || {})).map(([id, order]) => ({
-        id,
-        order,
-        title: meta ? meta.resolveMember(id, ['measures', 'dimensions']).title : '',
-      })),
       // uniqBy prefers first, so these will only be added if not already in the query
-      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: 'none' })),
+      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: activeOrder?.[name] || 'none' })),
     ]);
 
-    // Preserve order until the members change or manually re-ordered
-    // This is needed so that when an order member becomes active, it doesn't jump to the top of the list
-    const orderMemberOrderKey = JSON.stringify(orderMembers.map(({ id }) => id).sort());
-
-    if (
-      this.orderMemberOrderKey
-      && this.orderMemberOrder
-      && orderMemberOrderKey === this.orderMemberOrderKey
-      && !this.reorderTriggered
-    ) {
-      orderMembers = this.orderMemberOrder.map((id) => orderMembers.find((member) => member.id === id));
-    } else {
-      this.orderMemberOrderKey = orderMemberOrderKey;
-      this.orderMemberOrder = orderMembers.map(({ id }) => id);
+    if (this.orderMembersOrderKeys.length !== orderMembers.length) {
+      this.orderMembersOrderKeys = orderMembers.map(({ id }) => id);
     }
 
-    this.reorderTriggered = false;
+    if (this.orderMembersOrderKeys.length) {
+      // Preserve order until the members change or manually re-ordered
+      // This is needed so that when an order member becomes active, it doesn't jump to the top of the list
+      orderMembers = (this.orderMembersOrderKeys || []).map((id) => orderMembers.find((member) => member.id === id));
+    }
 
     return {
       meta,
@@ -378,13 +372,11 @@ export default class QueryBuilder extends React.Component {
             return;
           }
 
-          this.reorderTriggered = true;
+          const nextArray = moveItemInArray(orderMembers, sourceIndex, destinationIndex);
+          this.orderMembersOrderKeys = nextArray.map(({ id }) => id);
 
           this.updateQuery({
-            order: moveItemInArray(orderMembers, sourceIndex, destinationIndex).reduce(
-              (acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc),
-              []
-            ),
+            order: nextArray.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []),
           });
         },
       },
@@ -485,7 +477,12 @@ export default class QueryBuilder extends React.Component {
 
     handleVizStateChange(finalState);
 
-    if (QueryRenderer.isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
+    const shouldFetchDryRun = !equals(
+      pick(['measures', 'dimensions', 'timeDimensions'], stateQuery),
+      pick(['measures', 'dimensions', 'timeDimensions'], finalState.query)
+    );
+
+    if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
       try {
         const response = await this.cubejsApi().dryRun(finalState.query, {
           mutexObj: this.mutexObj,
@@ -500,7 +497,7 @@ export default class QueryBuilder extends React.Component {
         finalState.dryRunResponse = response;
 
         // deprecated
-        if (QueryRenderer.isQueryPresent(stateQuery)) {
+        if (isQueryPresent(stateQuery)) {
           runSetters({
             ...this.state,
             ...finalState,
@@ -568,8 +565,6 @@ export default class QueryBuilder extends React.Component {
     }
   }
 }
-
-QueryBuilder.contextType = CubeContext;
 
 QueryBuilder.defaultProps = {
   cubejsApi: null,

@@ -27,6 +27,7 @@ const DbTypeToGenericType = {
   time: 'string',
   datetime: 'timestamp',
   date: 'date',
+  enum: 'text',
   'double precision': 'double',
   // PostgreSQL aliases, but maybe another databases support it
   int8: 'bigint',
@@ -208,8 +209,8 @@ export class BaseDriver {
     const types = fields.map(field => ({
       name: field,
       type: Object.keys(DbTypeValueMatcher).find(
-        type => !rows.filter(row => !!row[field]).find(row => !DbTypeValueMatcher[type](row[field])) &&
-          rows.find(row => !!row[field])
+        type => !rows.filter(row => field in row).find(row => !DbTypeValueMatcher[type](row[field])) &&
+          rows.find(row => field in row)
       ) || 'text'
     }));
 

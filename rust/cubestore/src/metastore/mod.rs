@@ -42,6 +42,7 @@ use chunks::ChunkRocksTable;
 use core::{fmt, mem};
 use cubehll::HllSketch;
 use cubezetasketch::HyperLogLogPlusPlus;
+use datafusion::cube_ext;
 use futures::future::join_all;
 use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
@@ -51,6 +52,7 @@ use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
+use rocksdb::backup::BackupEngineOptions;
 use rocksdb::checkpoint::Checkpoint;
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
@@ -692,7 +694,7 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Table>, CubeError>;
     async fn get_table_by_id(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
     async fn get_tables(&self) -> Result<Vec<IdRow<Table>>, CubeError>;
-    async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError>;
+    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError>;
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
 
     fn partition_table(&self) -> PartitionMetaStoreTable;
@@ -789,6 +791,8 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         table_name: Vec<(String, String)>,
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError>;
+
+    async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
 }
 
 /// Information required to produce partition name on remote fs.
@@ -960,6 +964,7 @@ pub struct RocksMetaStore {
     last_check_seq: Arc<RwLock<u64>>,
     upload_loop: Arc<WorkerLoop>,
     config: Arc<dyn ConfigObj>,
+    cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
 }
 
 trait BaseRocksSecondaryIndex<T>: Debug {
@@ -1533,7 +1538,7 @@ impl RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
-        opts.set_merge_operator("meta_store merge", meta_store_merge, None);
+        opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
 
         let db = DB::open(&opts, path).unwrap();
         let db_arc = Arc::new(db);
@@ -1550,6 +1555,7 @@ impl RocksMetaStore {
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             upload_loop: Arc::new(WorkerLoop::new("Meta Store Upload")),
             config,
+            cached_tables: Arc::new(Mutex::new(None)),
         };
         meta_store
     }
@@ -1668,7 +1674,7 @@ impl RocksMetaStore {
         };
         let db_to_send = db.clone();
         let (spawn_res, events) =
-            tokio::task::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
+            cube_ext::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
                 let snapshot = db_to_send.snapshot();
                 let res = f(
@@ -1683,6 +1689,7 @@ impl RocksMetaStore {
                 Ok((res, write_result))
             })
             .await??;
+        self.invalidate_caches();
 
         mem::drop(db);
         mem::drop(db_span);
@@ -1694,7 +1701,6 @@ impl RocksMetaStore {
                 listener.send(event.clone())?;
             }
         }
-
         Ok(spawn_res)
     }
 
@@ -1870,7 +1876,7 @@ impl RocksMetaStore {
         }
 
         let uploads_dir = remote_fs.uploads_dir().await?;
-        let (file, file_path) = tokio::task::spawn_blocking(move || {
+        let (file, file_path) = cube_ext::spawn_blocking(move || {
             tempfile::Builder::new()
                 .prefix("metastore-current")
                 .tempfile_in(uploads_dir)
@@ -1895,7 +1901,7 @@ impl RocksMetaStore {
         let remote_path = RocksMetaStore::meta_store_path(checkpoint_time);
         let checkpoint_path = db.path().join("..").join(remote_path.clone());
         let path_to_move = checkpoint_path.clone();
-        tokio::task::spawn_blocking(move || -> Result<(), CubeError> {
+        cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
             let checkpoint = Checkpoint::new(db.as_ref())?;
             checkpoint.create_checkpoint(path_to_move.as_path())?;
             Ok(())
@@ -1932,7 +1938,7 @@ impl RocksMetaStore {
             seq_store: self.seq_store.clone(),
         };
         let db_to_send = db.clone();
-        let res = tokio::task::spawn_blocking(move || {
+        let res = cube_ext::spawn_blocking(move || {
             let snapshot = db_to_send.snapshot();
             f(DbTableRef {
                 db: db_to_send.as_ref(),
@@ -2115,6 +2121,10 @@ impl RocksMetaStore {
             table.update_with_fn(*id, |row| row.set_uploaded(true), batch_pipe)?;
         }
         return Ok(activated_row_count);
+    }
+
+    fn invalidate_caches(&self) {
+        *self.cached_tables.lock().unwrap() = None;
     }
 }
 
@@ -2357,19 +2367,29 @@ impl MetaStore for RocksMetaStore {
             .await
     }
 
-    async fn get_tables_with_path(&self) -> Result<Vec<TablePath>, CubeError> {
-        self.read_operation(|db_ref| {
+    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError> {
+        let cache = self.cached_tables.clone();
+        self.read_operation(move |db_ref| {
+            let cached = cache.lock().unwrap().clone();
+            if let Some(t) = cached {
+                return Ok(t);
+            }
             let tables = TableRocksTable::new(db_ref.clone())
                 .all_rows()?
                 .into_iter()
                 .filter(|t| t.get_row().is_ready())
                 .collect::<Vec<_>>();
             let schemas = SchemaRocksTable::new(db_ref);
-            Ok(schemas.build_path_rows(
+            let tables = Arc::new(schemas.build_path_rows(
                 tables,
                 |t| t.get_row().get_schema_id(),
                 |table, schema| TablePath { table, schema },
-            )?)
+            )?);
+
+            let to_cache = tables.clone();
+            *cache.lock().unwrap() = Some(to_cache);
+
+            Ok(tables)
         })
         .await
     }
@@ -3082,6 +3102,15 @@ impl MetaStore for RocksMetaStore {
                 r.push((schema, table, indexes))
             }
             Ok(r)
+        })
+        .await
+    }
+
+    async fn debug_dump(&self, out_path: String) -> Result<(), CubeError> {
+        self.read_operation(|db| {
+            let mut e =
+                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), out_path)?;
+            Ok(e.create_new_backup_flush(db.db, true)?)
         })
         .await
     }

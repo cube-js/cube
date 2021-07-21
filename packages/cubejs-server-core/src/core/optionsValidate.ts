@@ -60,6 +60,7 @@ const schemaOptions = Joi.object().keys({
   externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
   //
+  cacheAndQueueDriver: Joi.string().valid('redis', 'memory'),
   contextToAppId: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),
@@ -68,6 +69,7 @@ const schemaOptions = Joi.object().keys({
   checkAuthMiddleware: Joi.func(),
   jwt: jwtOptions,
   queryTransformer: Joi.func(),
+  queryRewrite: Joi.func(),
   preAggregationsSchema: Joi.alternatives().try(
     Joi.string(),
     Joi.func()

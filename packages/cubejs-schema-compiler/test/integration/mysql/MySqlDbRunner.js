@@ -34,6 +34,10 @@ export class MySqlDbRunner extends BaseDbRunner {
     };
   }
 
+  tempTableSql(desc) {
+    return desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMPORARY TABLE');
+  }
+
   async prepareFixture(conn) {
     const query = conn.execute;
     await query('CREATE TEMPORARY TABLE visitors (id INT, amount INT, created_at datetime, updated_at datetime, status INT, source VARCHAR(255), latitude DECIMAL, longitude DECIMAL)');
@@ -78,7 +82,7 @@ export class MySqlDbRunner extends BaseDbRunner {
   async containerLazyInit() {
     const version = process.env.TEST_MYSQL_VERSION || '5.7';
 
-    return new GenericContainer('mysql', version)
+    return new GenericContainer(`mysql:${version}`)
       .withEnv('MYSQL_ROOT_PASSWORD', this.password())
       .withExposedPorts(this.port())
       // workaround for MySQL 8 unsupported auth

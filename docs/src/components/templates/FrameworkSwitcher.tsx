@@ -7,7 +7,7 @@ import {
   FRAMEWORKS,
 } from '../../stores/frameworkOfChoice';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 
 type Props = {
   value: string;

@@ -31,38 +31,38 @@ describe('getEnv', () => {
     );
   });
 
-  test('refreshTimer', () => {
+  test('refreshWorkerMode (from refreshTimer)', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
-    expect(getEnv('refreshTimer')).toBe(false);
+    expect(getEnv('refreshWorkerMode')).toBe(false);
 
     process.env.NODE_ENV = 'development';
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
-    expect(getEnv('refreshTimer')).toBe(true);
+    expect(getEnv('refreshWorkerMode')).toBe(true);
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '60';
-    expect(getEnv('refreshTimer')).toBe(60);
+    expect(getEnv('refreshWorkerMode')).toBe(60);
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '1m';
-    expect(getEnv('refreshTimer')).toBe(60);
+    expect(getEnv('refreshWorkerMode')).toBe(60);
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'true';
-    expect(getEnv('refreshTimer')).toBe(true);
+    expect(getEnv('refreshWorkerMode')).toBe(true);
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'false';
-    expect(getEnv('refreshTimer')).toBe(false);
+    expect(getEnv('refreshWorkerMode')).toBe(false);
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'True';
-    expect(getEnv('refreshTimer')).toBe(true);
+    expect(getEnv('refreshWorkerMode')).toBe(true);
 
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = 'False';
-    expect(getEnv('refreshTimer')).toBe(false);
+    expect(getEnv('refreshWorkerMode')).toBe(false);
   });
 
-  test('refreshTimer(exception)', () => {
+  test('refreshWorkerMode(exception)', () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '11fffffff';
 
-    expect(() => getEnv('refreshTimer')).toThrowError(
+    expect(() => getEnv('refreshWorkerMode')).toThrowError(
       'Value "11fffffff" is not valid for CUBEJS_SCHEDULED_REFRESH_TIMER. Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
     );
   });
@@ -83,7 +83,7 @@ describe('getEnv', () => {
 
   test('livePreview', () => {
     expect(getEnv('livePreview')).toBe(false);
-    
+
     process.env.CUBEJS_LIVE_PREVIEW = 'true';
     expect(getEnv('livePreview')).toBe(true);
 

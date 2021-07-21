@@ -1,61 +1,67 @@
-pub mod cache;
-pub(crate) mod parser;
-
-use log::trace;
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
-use sqlparser::ast::*;
-use sqlparser::dialect::Dialect;
-
-use crate::metastore::{
-    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
-    MetaStoreTable, RowKey, Schema, TableId,
-};
-use crate::table::{Row, TableValue, TimestampValue};
-use crate::CubeError;
-use crate::{
-    metastore::{Column, ColumnType, MetaStore},
-    store::DataFrame,
-};
-use std::sync::Arc;
-
-use crate::queryplanner::{QueryPlan, QueryPlanner};
-
-use crate::cluster::{Cluster, JobEvent};
-
-use crate::config::injection::DIService;
-use crate::import::limits::ConcurrencyLimits;
-use crate::import::Ingestion;
-use crate::metastore::job::JobType;
-use crate::queryplanner::query_executor::QueryExecutor;
-use crate::remotefs::RemoteFs;
-use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::CubeStoreParser;
-use crate::store::ChunkDataStore;
-use crate::table::data::{MutRows, Rows, TableValueR};
-use crate::util::decimal::Decimal;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
 use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
-use cubehll::HllSketch;
 use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
-use parser::Statement as CubeStoreStatement;
+use log::trace;
+use rand::distributions::Uniform;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::path::Path;
-use std::time::Duration;
+use sqlparser::ast::*;
+use sqlparser::dialect::Dialect;
 use tokio::time::timeout;
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
+
+use cubehll::HllSketch;
+use parser::Statement as CubeStoreStatement;
+
+use crate::cluster::{Cluster, JobEvent, JobResultListener};
+use crate::config::injection::DIService;
+use crate::import::limits::ConcurrencyLimits;
+use crate::import::Ingestion;
+use crate::metastore::job::JobType;
+use crate::metastore::{
+    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    MetaStoreTable, RowKey, Schema, TableId,
+};
+use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
+use crate::queryplanner::{QueryPlan, QueryPlanner};
+use crate::remotefs::RemoteFs;
+use crate::sql::cache::SqlResultCache;
+use crate::sql::parser::CubeStoreParser;
+use crate::store::ChunkDataStore;
+use crate::table::data::{MutRows, Rows, TableValueR};
+use crate::table::{Row, TableValue, TimestampValue};
+use crate::util::decimal::Decimal;
+use crate::util::strings::path_to_string;
+use crate::CubeError;
+use crate::{
+    app_metrics,
+    metastore::{Column, ColumnType, MetaStore},
+    store::DataFrame,
+};
+use datafusion::cube_ext;
+use tempfile::TempDir;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+
+pub mod cache;
+pub(crate) mod parser;
 
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
@@ -116,6 +122,7 @@ impl SqlServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
+        max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
@@ -127,7 +134,7 @@ impl SqlServiceImpl {
             rows_per_chunk,
             query_timeout,
             remote_fs,
-            cache: SqlResultCache::new(10000), // TODO config
+            cache: SqlResultCache::new(max_cached_queries),
         })
     }
 
@@ -170,60 +177,10 @@ impl SqlServiceImpl {
                 });
             }
         }
-        if external {
-            let listener = self.cluster.job_result_listener();
-            let table = self
+
+        if !external {
+            return self
                 .db
-                .create_table(
-                    schema_name,
-                    table_name,
-                    columns_to_set,
-                    locations,
-                    Some(ImportFormat::CSV),
-                    indexes_to_create,
-                    false,
-                )
-                .await?;
-            let wait_for = table
-                .get_row()
-                .locations()
-                .unwrap()
-                .iter()
-                .map(|&l| {
-                    (
-                        RowKey::Table(TableId::Tables, table.get_id()),
-                        JobType::TableImportCSV(l.clone()),
-                    )
-                })
-                .collect();
-            let imports = listener.wait_for_job_results(wait_for).await?;
-            for r in imports {
-                if let JobEvent::Error(_, _, e) = r {
-                    return Err(CubeError::user(format!("Create table failed: {}", e)));
-                }
-            }
-
-            let mut futures = Vec::new();
-            let indexes = self.db.get_table_indexes(table.get_id()).await?;
-            let partitions = self
-                .db
-                .get_active_partitions_and_chunks_by_index_id_for_select(
-                    indexes.iter().map(|i| i.get_id()).collect(),
-                )
-                .await?;
-            for (partition, chunks) in partitions.into_iter().flatten() {
-                futures.push(self.cluster.warmup_partition(partition, chunks));
-            }
-            join_all(futures)
-                .await
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()?;
-
-            self.db.table_ready(table.get_id(), true).await?;
-
-            Ok(table)
-        } else {
-            self.db
                 .create_table(
                     schema_name,
                     table_name,
@@ -233,8 +190,78 @@ impl SqlServiceImpl {
                     indexes_to_create,
                     true,
                 )
-                .await
+                .await;
         }
+
+        let listener = self.cluster.job_result_listener();
+        let table = self
+            .db
+            .create_table(
+                schema_name,
+                table_name,
+                columns_to_set,
+                locations,
+                Some(ImportFormat::CSV),
+                indexes_to_create,
+                false,
+            )
+            .await?;
+
+        if let Err(e) = self.finalize_external_table(&table, listener).await {
+            if let Err(inner) = self.db.drop_table(table.get_id()).await {
+                log::error!(
+                    "Drop table ({}) after error failed: {}",
+                    table.get_id(),
+                    inner
+                );
+            }
+            return Err(e);
+        }
+        Ok(table)
+    }
+
+    async fn finalize_external_table(
+        &self,
+        table: &IdRow<Table>,
+        listener: JobResultListener,
+    ) -> Result<(), CubeError> {
+        let wait_for = table
+            .get_row()
+            .locations()
+            .unwrap()
+            .iter()
+            .map(|&l| {
+                (
+                    RowKey::Table(TableId::Tables, table.get_id()),
+                    JobType::TableImportCSV(l.clone()),
+                )
+            })
+            .collect();
+        let imports = listener.wait_for_job_results(wait_for).await?;
+        for r in imports {
+            if let JobEvent::Error(_, _, e) = r {
+                return Err(CubeError::user(format!("Create table failed: {}", e)));
+            }
+        }
+
+        let mut futures = Vec::new();
+        let indexes = self.db.get_table_indexes(table.get_id()).await?;
+        let partitions = self
+            .db
+            .get_active_partitions_and_chunks_by_index_id_for_select(
+                indexes.iter().map(|i| i.get_id()).collect(),
+            )
+            .await?;
+        for (partition, chunks) in partitions.into_iter().flatten() {
+            futures.push(self.cluster.warmup_partition(partition, chunks));
+        }
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.db.table_ready(table.get_id(), true).await?;
+        Ok(())
     }
 
     async fn create_index(
@@ -298,6 +325,60 @@ impl SqlServiceImpl {
         }
         ingestion.wait_completion().await?;
         Ok(data.len() as u64)
+    }
+
+    async fn dump_select_inputs(
+        &self,
+        query: &str,
+        q: Box<Query>,
+    ) -> Result<Arc<DataFrame>, CubeError> {
+        // TODO: metastore snapshot must be consistent wrt the dumped data.
+        let logical_plan = self
+            .query_planner
+            .logical_plan(DFStatement::Statement(Statement::Query(q)))
+            .await?;
+
+        let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await);
+        dump_dir.push("dumps");
+        tokio::fs::create_dir_all(&dump_dir).await?;
+
+        let dump_dir = TempDir::new_in(&dump_dir)?.into_path();
+        let meta_dir = path_to_string(dump_dir.join("metastore-backup"))?;
+
+        log::debug!("Dumping metastore to {}", meta_dir);
+        self.db.debug_dump(meta_dir).await?;
+
+        match logical_plan {
+            QueryPlan::Select(p, _) => {
+                let data_dir = dump_dir.join("data");
+                tokio::fs::create_dir(&data_dir).await?;
+                log::debug!("Dumping data files to {:?}", data_dir);
+                // TODO: download in parallel.
+                for f in p.all_required_files() {
+                    let f = self.remote_fs.download_file(&f).await?;
+                    let name = Path::new(&f).file_name().ok_or_else(|| {
+                        CubeError::internal(format!("Could not get filename of '{}'", f))
+                    })?;
+                    tokio::fs::copy(&f, data_dir.join(&name)).await?;
+                }
+            }
+            QueryPlan::Meta(_) => {}
+        }
+
+        let query_file = dump_dir.join("query.sql");
+        File::create(query_file)
+            .await?
+            .write_all(query.as_bytes())
+            .await?;
+
+        log::debug!("Wrote debug dump to {:?}", dump_dir);
+
+        let dump_dir = path_to_string(dump_dir)?;
+        let columns = vec![Column::new("dump_path".to_string(), ColumnType::String, 0)];
+        Ok(Arc::new(DataFrame::new(
+            columns,
+            vec![Row::new(vec![TableValue::String(dump_dir)])],
+        )))
     }
 }
 
@@ -509,16 +590,39 @@ impl SqlService for SqlServiceImpl {
                 // TODO distribute and combine
                 let res = match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
+                        app_metrics::META_QUERIES.increment();
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
-                    QueryPlan::Select(serialized) => {
+                    QueryPlan::Select(serialized, partitions) => {
+                        app_metrics::DATA_QUERIES.increment();
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
                         timeout(
                             self.query_timeout,
                             self.cache
                                 .get(query, serialized, async move |plan| {
-                                    executor.execute_router_plan(plan, cluster).await
+                                    let records;
+                                    if partitions.len() == 0 {
+                                        records =
+                                            executor.execute_router_plan(plan, cluster).await?.1;
+                                    } else {
+                                        // Pick one of the workers to run as main for the request.
+                                        let i =
+                                            thread_rng().sample(Uniform::new(0, partitions.len()));
+                                        let node = cluster.node_name_by_partitions(&partitions[i]);
+                                        let rs = cluster.route_select(&node, plan).await?.1;
+                                        records = rs
+                                            .into_iter()
+                                            .map(|r| r.read())
+                                            .collect::<Result<Vec<_>, _>>()?;
+                                    }
+                                    Ok(cube_ext::spawn_blocking(
+                                        move || -> Result<DataFrame, CubeError> {
+                                            let df = batch_to_dataframe(&records)?;
+                                            Ok(df)
+                                        },
+                                    )
+                                    .await??)
                                 })
                                 .with_current_subscriber(),
                         )
@@ -527,6 +631,7 @@ impl SqlService for SqlServiceImpl {
                 };
                 Ok(res)
             }
+            CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
@@ -544,7 +649,7 @@ impl SqlService for SqlServiceImpl {
                     .logical_plan(DFStatement::Statement(Statement::Query(q)))
                     .await?;
                 match logical_plan {
-                    QueryPlan::Select(router_plan) => {
+                    QueryPlan::Select(router_plan, _) => {
                         // For tests, pretend we have all partitions on the same worker.
                         let worker_plan = router_plan.with_partition_id_to_execute(
                             router_plan
@@ -926,14 +1031,12 @@ fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::cluster::MockCluster;
-    use crate::config::{Config, FileStoreProvider};
-    use crate::metastore::RocksMetaStore;
-    use crate::queryplanner::query_executor::MockQueryExecutor;
-    use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-    use crate::store::{ChunkStore, WALStore};
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
+    use std::time::Duration;
+    use std::{env, fs};
+
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
@@ -941,13 +1044,18 @@ mod tests {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use rocksdb::{Options, DB};
-    use std::fs::File;
-    use std::io::Write;
-    use std::path::PathBuf;
-    use std::time::Duration;
-    use std::{env, fs};
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
+
+    use crate::cluster::MockCluster;
+    use crate::config::{Config, FileStoreProvider};
+    use crate::metastore::RocksMetaStore;
+    use crate::queryplanner::query_executor::MockQueryExecutor;
+    use crate::queryplanner::MockQueryPlanner;
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use crate::store::{ChunkStore, WALStore};
+
+    use super::*;
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -985,6 +1093,7 @@ mod tests {
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
+                10_000, // max_cached_queries
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -1035,6 +1144,7 @@ mod tests {
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
+                10_000, // max_cached_queries
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -1362,7 +1472,9 @@ mod tests {
 
     #[tokio::test]
     async fn high_frequency_inserts_gcs() {
-        if env::var("SERVICE_ACCOUNT_JSON").is_err() {
+        if env::var("SERVICE_ACCOUNT_JSON").is_err()
+            && env::var("CUBESTORE_GCP_SERVICE_ACCOUNT_JSON").is_err()
+        {
             return;
         }
         Config::test("high_frequency_inserts_gcs")

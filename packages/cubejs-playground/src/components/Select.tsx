@@ -11,7 +11,7 @@ const StyledSelect: any = styled(AntdSelect)`
 
       .ant-select-selector {
         color: var(--disabled-color);
-        
+
         &:hover,
         &:active,
         &:focus {

@@ -11,17 +11,30 @@ import { QueryStream } from './QueryStream';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
-  double: 'decimal'
+  double: 'decimal',
 };
 
-const DataTypeMapping: Record<string, any> = {};
+const NativeTypeToPostgresType: Record<string, string> = {};
 
-Object.entries(types.builtins).forEach(pair => {
-  const [key, value] = pair;
-  DataTypeMapping[value] = key;
+Object.entries(types.builtins).forEach(([key, value]) => {
+  NativeTypeToPostgresType[value] = key;
 });
 
-const timestampDataTypes = [1114, 1184];
+const PostgresToGenericType: Record<string, GenericDataBaseType> = {
+  // bpchar (“blank-padded char”, the internal name of the character data type)
+  bpchar: 'varchar',
+  // Numeric is an alias
+  numeric: 'decimal',
+};
+
+const timestampDataTypes = [
+  // @link TypeId.DATE
+  1082,
+  // @link TypeId.TIMESTAMP
+  1114,
+  // @link TypeId.TIMESTAMPTZ
+  1184
+];
 const timestampTypeParser = (val: any) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 
 export type PostgresDriverConfiguration = Partial<PoolConfig> & {
@@ -40,14 +53,14 @@ function getTypeParser(dataType: TypeId, format: TypeFormat|undefined) {
   return (val: any) => parser(val);
 }
 
-export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriverConfiguration>
+export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
   protected readonly pool: Pool;
 
-  protected readonly config: Partial<C>;
+  protected readonly config: Partial<Config>;
 
   public constructor(
-    config: Partial<C> = {}
+    config: Partial<Config> = {}
   ) {
     super();
 
@@ -73,11 +86,13 @@ export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriv
   }
 
   /**
-   * The easist way how to add additional configuration from env variables, because
+   * The easiest way how to add additional configuration from env variables, because
    * you cannot call method in RedshiftDriver.constructor before super.
    */
-  protected getInitialConfiguration(): Partial<C> {
-    return {};
+  protected getInitialConfiguration(): Partial<PostgresDriverConfiguration> {
+    return {
+      readOnly: true,
+    };
   }
 
   public async testConnection(): Promise<void> {
@@ -99,7 +114,7 @@ export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriv
     }
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
-    await conn.query(`set statement_timeout to ${options.executionTimeout}`);
+    await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
   }
 
   public async stream(
@@ -125,7 +140,7 @@ export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriv
         rowStream,
         types: meta.map((f: any) => ({
           name: f.name,
-          type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+          type: this.toGenericType(NativeTypeToPostgresType[f.dataTypeID].toLowerCase())
         })),
         release: async () => {
           await conn.release();
@@ -172,9 +187,17 @@ export class PostgresDriver<C extends PostgresDriverConfiguration = PostgresDriv
       rows: res.rows,
       types: res.fields.map(f => ({
         name: f.name,
-        type: this.toGenericType(DataTypeMapping[f.dataTypeID].toLowerCase())
+        type: this.toGenericType(NativeTypeToPostgresType[f.dataTypeID].toLowerCase())
       })),
     };
+  }
+
+  public toGenericType(columnType: string): GenericDataBaseType {
+    if (columnType in PostgresToGenericType) {
+      return PostgresToGenericType[columnType];
+    }
+
+    return super.toGenericType(columnType);
   }
 
   public readOnly() {

@@ -12,7 +12,7 @@ const colors = {
   light: '243, 243, 251',
   green: '65, 181, 111',
   yellow: '251, 188, 5',
-  gray: '246, 246, 248'
+  gray: '246, 246, 248',
 };
 
 function color(name, opacity = 1) {

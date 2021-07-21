@@ -472,11 +472,12 @@ span.group-header {
           color: $dark-01;
 
           .ant-menu-item {
+            padding: 0.25rem 0;
             margin-left: 20px;
             font-size: 15px;
-            line-height: 25px;
-            height: 29px;
-            min-height: 20px;
+            line-height: 1.5rem;
+            min-height: 1.25rem;
+            height: auto;
 
             &:first-child {
               margin-top: 6px !important;
@@ -969,8 +970,32 @@ section[type=h2] h2 {
     .gettingStartedItem {
       @include card-grid-item;
 
+      a {
+        border-bottom: none;
+      }
+
       &.gettingStartedItemAdjacent {
         @include card-grid-item-adjacent;
+      }
+
+      &.gettingStartedItemSlim {
+        .gettingStartedItemContent {
+          min-height: unset;
+          text-align: center;;
+
+          .gettingStartedItemImage {
+            margin-right: 1.25rem;
+
+            > img {
+              margin: unset;
+            }
+          }
+
+          .gettingStartedItemImage,
+          .gettingStartedItemLink {
+            display: inline-block;
+          }
+        }
       }
 
       .gettingStartedItemContent {

@@ -1,15 +1,6 @@
 import 'jest';
 import ResultSet from '../ResultSet';
 
-jest.mock('moment-range', () => {
-  const Moment = jest.requireActual('moment');
-  const MomentRange = jest.requireActual('moment-range');
-  const moment = MomentRange.extendMoment(Moment);
-  return {
-    extendMoment: () => moment,
-  };
-});
-
 describe('resultSet tablePivot and tableColumns', () => {
   describe('it works with one measure', () => {
     const resultSet = new ResultSet({

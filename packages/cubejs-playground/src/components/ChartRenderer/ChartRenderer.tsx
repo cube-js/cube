@@ -1,16 +1,16 @@
-import { RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Alert, Typography } from 'antd';
 import { PlaySquareOutlined } from '@ant-design/icons';
-import styled from 'styled-components';
+import type { ChartType, PivotConfig, Query } from '@cubejs-client/core';
 import { ResultSet } from '@cubejs-client/core';
+import { CubeContext } from '@cubejs-client/react';
+import { Alert, Typography } from 'antd';
+import { RefObject, useContext, useEffect, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import type { PivotConfig, Query, ChartType } from '@cubejs-client/core';
+import styled from 'styled-components';
 
 import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
-import { event } from '../../events';
-import { QueryStatus } from '../../PlaygroundQueryBuilder';
-import { useAppContext } from '../AppContext';
+import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
+import { useChartRendererState, useChartRendererStateMethods } from '../QueryTabs/ChartRendererStateProvider';
 
 const { Text } = Typography;
 
@@ -67,47 +67,50 @@ const Wrapper = styled.div`
   text-align: center;
 `;
 
-export type TQueryLoadResult = {
-  isLoading: boolean;
+export type QueryLoadResult = {
   resultSet?: ResultSet;
   error?: Error | null;
 } & Partial<QueryStatus>;
 
-type TChartRendererProps = {
+type ChartRendererProps = {
+  queryId: string;
   query: Query;
   queryError: Error | null;
-  isQueryLoading: boolean;
+  isFetchingMeta: boolean;
   areQueriesEqual: boolean;
-  isChartRendererReady: boolean;
   queryHasMissingMembers: boolean;
   chartType: ChartType;
   pivotConfig?: PivotConfig;
   iframeRef: RefObject<HTMLIFrameElement>;
   framework: UIFramework;
-  onQueryStatusChange: (result: TQueryLoadResult) => void;
-  onChartRendererReadyChange: (isReady: boolean) => void;
-  onRunButtonClick: () => void;
+  onRunButtonClick: () => Promise<void>;
 };
 
 export default function ChartRenderer({
+  queryId,
   areQueriesEqual,
-  queryError,
+  isFetchingMeta,
   iframeRef,
   framework,
-  isChartRendererReady,
   queryHasMissingMembers,
-  isQueryLoading,
-  onChartRendererReadyChange,
-  onQueryStatusChange,
   onRunButtonClick,
-}: TChartRendererProps) {
-  const runButtonRef = useRef<HTMLButtonElement>(null);
-  const [slowQuery, setSlowQuery] = useState(false);
-  const [resultSetExists, setResultSet] = useState(false);
-  const [slowQueryFromCache, setSlowQueryFromCache] = useState(false);
-  const [isPreAggregationBuildInProgress, setBuildInProgress] = useState(false);
+}: ChartRendererProps) {
+  const { cubejsApi } = useContext(CubeContext);
 
-  const { extDbType } = useAppContext();
+  const {
+    isChartRendererReady,
+    isQueryLoading,
+    resultSetExists,
+    queryError,
+    isBuildInProgress,
+    slowQuery,
+    slowQueryFromCache,
+  } = useChartRendererState(queryId);
+  const { setResultSetExists, setChartRendererReady, setQueryError } =
+    useChartRendererStateMethods();
+
+  const runButtonRef = useRef<HTMLButtonElement>(null);
+  // const [isTokenRefreshing, setTokenRefreshing] = useState<boolean>(false);
 
   // for you, ovr :)
   useHotkeys('cmd+enter', () => {
@@ -116,85 +119,27 @@ export default function ChartRenderer({
 
   useEffect(() => {
     return () => {
-      onChartRendererReadyChange(false);
+      setChartRendererReady(queryId, false);
     };
     // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
-    setResultSet(false);
+    if (!areQueriesEqual && queryError) {
+      setQueryError(queryId, null);
+    }
+  }, [queryId, areQueriesEqual, queryError]);
+
+  useEffect(() => {
+    setResultSetExists(queryId, false);
   }, [framework]);
 
-  useLayoutEffect(() => {
-    let queryStartTime: number;
-    window['__cubejsPlayground'] = {
-      ...window['__cubejsPlayground'],
-      onQueryStart: () => {
-        queryStartTime = Date.now();
-        onQueryStatusChange({ isLoading: true });
-      },
-      onQueryLoad: ({ resultSet, error }: TQueryLoadResult) => {
-        let isAggregated;
-        const timeElapsed = Date.now() - queryStartTime;
-
-        if (resultSet) {
-          const { loadResponse } = resultSet.serialize();
-          const { external, dbType } = loadResponse.results[0] || {};
-
-          setSlowQueryFromCache(Boolean(loadResponse.slowQuery));
-          Boolean(loadResponse.slowQuery) && setSlowQuery(false);
-          setResultSet(true);
-
-          isAggregated = external !== null;
-
-          event(
-            isAggregated
-              ? 'load_request_success_aggregated:frontend'
-              : 'load_request_success:frontend',
-            {
-              dbType,
-              ...(isAggregated ? { external } : null),
-              ...(external ? { extDbType } : null),
-            }
-          );
-        }
-
-        if (resultSet || error) {
-          onQueryStatusChange({
-            resultSet,
-            error,
-            isLoading: false,
-            timeElapsed,
-            isAggregated
-          });
-        }
-      },
-      onQueryProgress: (progress) => {
-        setBuildInProgress(
-          Boolean(progress?.stage?.stage.includes('pre-aggregation'))
-        );
-
-        const isQuerySlow =
-          progress?.stage?.stage.includes('Executing query') &&
-          (progress.stage.timeElapsed || 0) >= 5000;
-
-        setSlowQuery(isQuerySlow);
-        isQuerySlow && setSlowQueryFromCache(false);
-      },
-      onChartRendererReady() {
-        onChartRendererReadyChange(true);
-      },
-    };
-  }, [framework, onChartRendererReadyChange]);
-
   const loading: boolean =
-    queryHasMissingMembers ||
-    isQueryLoading ||
-    isPreAggregationBuildInProgress;
+    queryHasMissingMembers || isQueryLoading || isBuildInProgress || !cubejsApi;
 
   const invisible: boolean =
     !isChartRendererReady ||
-    isPreAggregationBuildInProgress ||
+    isBuildInProgress ||
     Boolean(queryError) ||
     queryHasMissingMembers ||
     loading ||
@@ -222,7 +167,7 @@ export default function ChartRenderer({
             <Wrapper>
               <CubeLoader full={false} />
 
-              {isPreAggregationBuildInProgress && (
+              {isBuildInProgress && (
                 <RequestMessage>
                   <Text strong style={{ fontSize: 18 }}>
                     Building pre-aggregations...
@@ -244,9 +189,13 @@ export default function ChartRenderer({
               ref={runButtonRef}
               size="large"
               type="primary"
-              loading={!isChartRendererReady}
+              loading={!isChartRendererReady || isFetchingMeta}
               icon={<PlaySquareOutlined />}
-              onClick={onRunButtonClick}
+              onClick={async () => {
+                // setTokenRefreshing(true);
+                await onRunButtonClick();
+                // setTokenRefreshing(false);
+              }}
             >
               Run
             </Button>
@@ -277,12 +226,15 @@ export default function ChartRenderer({
       {renderExtras()}
 
       <ChartContainer invisible={invisible}>
-        <iframe
-          data-testid="chart-renderer"
-          ref={iframeRef}
-          title="Chart renderer"
-          src={`/chart-renderers/${framework}/index.html`}
-        />
+        {cubejsApi ? (
+          <iframe
+            id={`iframe-${queryId}`}
+            data-testid="chart-renderer"
+            ref={iframeRef}
+            title="Chart renderer"
+            src={`/chart-renderers/${framework}/index.html#queryId=${queryId}`}
+          />
+        ) : null}
       </ChartContainer>
     </>
   );

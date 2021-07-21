@@ -338,10 +338,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         } else if let Some(cs) = a.downcast_ref::<ClusterSendExec>() {
             *out += &format!(
                 "ClusterSend, partitions: {:?}",
-                cs.partitions
-                    .iter()
-                    .map(|ps| ps.iter().map(|p| p.get_id()).collect_vec())
-                    .collect_vec()
+                cs.partitions.iter().map(|(_, ids)| ids).collect_vec()
             );
         } else if let Some(topk) = a.downcast_ref::<AggregateTopKExec>() {
             *out += &format!("AggregateTopK, limit: {:?}", topk.limit);

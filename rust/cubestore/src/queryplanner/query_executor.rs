@@ -7,14 +7,13 @@ use crate::queryplanner::planning::get_worker_plan;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use arrow::array::{
-    Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
-    Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
-    Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
-    TimestampNanosecondArray, UInt64Array,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array,
+    Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
+    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, MutableArrayData, StringArray,
+    TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
 };
-use arrow::compute::take;
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
 use arrow::ipc::writer::MemStreamWriter;
@@ -45,6 +44,7 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
+use std::iter::FromIterator;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
@@ -56,7 +56,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
-    ) -> Result<DataFrame, CubeError>;
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
     async fn execute_worker_plan(
         &self,
@@ -89,7 +89,7 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
-    ) -> Result<DataFrame, CubeError> {
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
@@ -99,36 +99,24 @@ impl QueryExecutor for QueryExecutorImpl {
         let execution_time = SystemTime::now();
 
         let results = collect(split_plan.clone()).instrument(collect_span).await;
-        debug!(
-            "Query data processing time: {:?}",
-            execution_time.elapsed()?
-        );
-        if execution_time.elapsed()?.as_millis() > 200 {
-            warn!(
-                "Slow Query ({:?}):\n{:#?}",
-                execution_time.elapsed()?,
-                logical_plan
-            );
+        let execution_time = execution_time.elapsed()?;
+        debug!("Query data processing time: {:?}", execution_time,);
+        app_metrics::DATA_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
+        if execution_time.as_millis() > 200 {
+            warn!("Slow Query ({:?}):\n{:#?}", execution_time, logical_plan);
             debug!(
                 "Slow Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &split_plan
+                execution_time, &split_plan
             );
         }
         if results.is_err() {
-            error!(
-                "Error Query ({:?}):\n{:#?}",
-                execution_time.elapsed()?,
-                logical_plan
-            );
+            error!("Error Query ({:?}):\n{:#?}", execution_time, logical_plan);
             error!(
                 "Error Query Physical Plan ({:?}): {:#?}",
-                execution_time.elapsed()?,
-                &split_plan
+                execution_time, &split_plan
             );
         }
-        let data_frame = tokio::task::spawn_blocking(|| batch_to_dataframe(&results?)).await??;
-        Ok(data_frame)
+        Ok((split_plan.schema().to_schema_ref(), results?))
     }
 
     #[instrument(level = "trace", skip(self, plan, remote_to_local_names))]
@@ -520,9 +508,9 @@ impl ExecutionPlan for CubeTableExec {
 
 pub struct ClusterSendExec {
     schema: DFSchemaRef,
+    pub partitions: Vec<(/*node*/ String, /*partition_id*/ Vec<u64>)>,
     /// Never executed, only stored to allow consistent optimization on router and worker.
     pub input_for_optimizations: Arc<dyn ExecutionPlan>,
-    pub partitions: Vec<Vec<IdRow<Partition>>>,
     pub cluster: Arc<dyn Cluster>,
     pub serialized_plan: Arc<SerializedPlan>,
     pub use_streaming: bool,
@@ -537,8 +525,21 @@ impl ClusterSendExec {
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
     ) -> Self {
-        let to_multiply = union_snapshots
-            .into_iter()
+        let partitions = Self::logical_partitions(&union_snapshots);
+        let partitions = Self::assign_nodes(cluster.as_ref(), partitions);
+        Self {
+            schema,
+            partitions,
+            cluster,
+            serialized_plan,
+            input_for_optimizations,
+            use_streaming,
+        }
+    }
+
+    pub fn logical_partitions(snapshots: &[Vec<IndexSnapshot>]) -> Vec<Vec<IdRow<Partition>>> {
+        let to_multiply = snapshots
+            .iter()
             .map(|union| {
                 union
                     .iter()
@@ -550,14 +551,24 @@ impl ClusterSendExec {
             .into_iter()
             .multi_cartesian_product()
             .collect::<Vec<Vec<_>>>();
-        Self {
-            schema,
-            partitions,
-            cluster,
-            serialized_plan,
-            input_for_optimizations,
-            use_streaming,
+        partitions
+    }
+
+    fn assign_nodes(
+        c: &dyn Cluster,
+        logical: Vec<Vec<IdRow<Partition>>>,
+    ) -> Vec<(String, Vec<u64>)> {
+        let mut m: HashMap<String, Vec<u64>> = HashMap::new();
+        for ps in &logical {
+            let ids = ps.iter().map(|p| p.get_id()).collect_vec();
+            m.entry(c.node_name_by_partitions(&ids))
+                .or_default()
+                .extend(ids)
         }
+
+        let mut r = m.into_iter().collect_vec();
+        r.sort_unstable_by(|l, r| l.0.cmp(&r.0));
+        r
     }
 
     pub fn with_changed_schema(
@@ -621,18 +632,10 @@ impl ExecutionPlan for ClusterSendExec {
         &self,
         partition: usize,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        let node_name = &self.cluster.node_name_by_partitions(
-            &self.partitions[partition]
-                .iter()
-                .map(|p| p.get_id())
-                .collect_vec(),
-        );
-        let plan = self.serialized_plan.with_partition_id_to_execute(
-            self.partitions[partition]
-                .iter()
-                .map(|p| p.get_id())
-                .collect(),
-        );
+        let (node_name, ids) = &self.partitions[partition];
+        let plan = self
+            .serialized_plan
+            .with_partition_id_to_execute(HashSet::from_iter(ids.iter().cloned()));
         if self.use_streaming {
             Ok(self.cluster.run_select_stream(node_name, plan).await?)
         } else {
@@ -965,7 +968,7 @@ fn regroup_batches(
                 b.columns()
                     .iter()
                     .map(|c| slice_copy(c.as_ref(), row, slice_len))
-                    .collect::<Result<Vec<_>, _>>()?,
+                    .collect(),
             )?);
             row += slice_len
         }
@@ -973,11 +976,9 @@ fn regroup_batches(
     Ok(r)
 }
 
-fn slice_copy(a: &dyn Array, start: usize, len: usize) -> Result<ArrayRef, CubeError> {
+fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
     // If we use [Array::slice], serialization will still copy the whole contents.
-    Ok(take(
-        a,
-        &UInt64Array::from_iter_values(start as u64..(start + len) as u64),
-        None,
-    )?)
+    let mut a = MutableArrayData::new(vec![a.data()], false, len);
+    a.extend(0, start, start + len);
+    make_array(a.freeze())
 }
