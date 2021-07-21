@@ -19,8 +19,9 @@ import {
 import {
   AppContextConsumer,
   PlaygroundContext,
-  useAppContext,
 } from './components/AppContext';
+import { useAppContext } from './hooks';
+
 import './index.less';
 
 const selectedTab = (pathname) => {

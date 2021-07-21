@@ -1,4 +1,4 @@
-import { useAppContext } from '../components/AppContext';
+import { useAppContext } from './app-context';
 
 export function useIdentifier(): string {
   const { identifier } = useAppContext();

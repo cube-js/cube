@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useHistory } from 'react-router';
 
-import { useSecurityContext } from '../../hooks';
+import { useAppContext, useSecurityContext } from '../../hooks';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
-import { useAppContext } from '../../components/AppContext';
 import DashboardSource from '../../DashboardSource';
 
 type LivePreviewContext = {
@@ -24,7 +23,7 @@ export function ExplorePage() {
 
   const dashboardSource = useMemo(() => new DashboardSource(), []);
 
-  const { playgroundContext } = useAppContext();
+  const { setContext, playgroundContext } = useAppContext();
   const { token } = useSecurityContext();
   const [livePreviewContext, setLivePreviewContext] =
     useState<LivePreviewContext | null>(null);
@@ -70,6 +69,10 @@ export function ExplorePage() {
 
   const currentToken =
     livePreviewContext?.token || token || playgroundContext?.cubejsToken;
+
+  useEffect(() => {
+    setContext({ token: currentToken });
+  }, [currentToken])
 
   return (
     <LivePreviewContextProvider

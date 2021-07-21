@@ -14,18 +14,23 @@ import {
   Tabs,
   Typography,
 } from 'antd';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 
 import { CodeSnippet } from '../../atoms';
 import { Box, Flex } from '../../grid';
-import { useDeepEffect, useIsMounted, useToggle } from '../../hooks';
+import {
+  useDeepEffect,
+  useIsCloud,
+  useIsMounted,
+  useToggle,
+  useToken,
+} from '../../hooks';
 import {
   getMembersByCube,
   getNameMemberPairs,
   request,
 } from '../../shared/helpers';
-import { useIsCloud } from '../AppContext';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
 import { TimeDimension } from './components/TimeDimension';
@@ -39,14 +44,9 @@ import {
 const { Paragraph, Link } = Typography;
 const { TabPane } = Tabs;
 
-const Wrapper = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-`;
-
 const MainWrapper = styled.div`
   flex-grow: 1;
+  min-width: 0;
 `;
 
 const RightSidePanel = styled.div`
@@ -68,11 +68,13 @@ export function RollupDesigner({
 }: RollupDesignerProps) {
   const isMounted = useIsMounted();
   const isCloud = useIsCloud();
+  const token = useToken();
 
   const canBeRolledUp =
     transformedQuery.leafMeasureAdditive &&
     !transformedQuery.hasMultipliedMeasures;
 
+  const canUseMutex = useRef<number>(0);
   const [matching, setMatching] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [preAggName, setPreAggName] = useState<string>('main');
@@ -103,6 +105,7 @@ export function RollupDesigner({
   }, [references]);
 
   useDeepEffect(() => {
+    let mutext = canUseMutex.current;
     const { measures, dimensions, timeDimensions } = references;
 
     async function load() {
@@ -110,22 +113,28 @@ export function RollupDesigner({
         `${apiUrl}/pre-aggregations/can-use`,
         'POST',
         {
-          transformedQuery,
-          references: {
-            measures,
-            dimensions,
-            timeDimensions,
+          token: token!,
+          body: {
+            transformedQuery,
+            references: {
+              measures,
+              dimensions,
+              timeDimensions,
+            },
           },
         }
       );
 
-      if (isMounted()) {
+      if (isMounted() && mutext === canUseMutex.current) {
         setMatching(json.canUsePreAggregationForTransformedQuery);
+        canUseMutex.current++;
       }
     }
 
-    load();
-  }, [isMounted, references]);
+    if (token != null) {
+      load();
+    }
+  }, [isMounted, references, token, canUseMutex]);
 
   const cubeName =
     transformedQuery &&
@@ -150,10 +159,14 @@ export function RollupDesigner({
       '/playground/schema/pre-aggregation',
       'POST',
       {
-        preAggregationName: preAggName,
-        cubeName,
-        code: getPreAggregationDefinitionFromReferences(references, preAggName)
-          .value,
+        body: {
+          preAggregationName: preAggName,
+          cubeName,
+          code: getPreAggregationDefinitionFromReferences(
+            references,
+            preAggName
+          ).value,
+        },
       }
     );
 
@@ -236,131 +249,127 @@ export function RollupDesigner({
   }
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
-      <Wrapper>
-        {!isRollupCodeVisible ? (
-          <div>
-            <Cubes
-              selectedKeys={selectedKeys}
-              membersByCube={getMembersByCube(availableMembers)}
-              onSelect={(memberType, key) => {
-                handleMemberToggle(memberType)(key);
-              }}
-            />
-          </div>
-        ) : null}
+    <Flex justifyContent="space-between" gap={2}>
+      {!isRollupCodeVisible ? (
+        <div>
+          <Cubes
+            selectedKeys={selectedKeys}
+            membersByCube={getMembersByCube(availableMembers)}
+            onSelect={(memberType, key) => {
+              handleMemberToggle(memberType)(key);
+            }}
+          />
+        </div>
+      ) : null}
 
-        <MainWrapper>
-          <Space direction="vertical" style={{ width: '100%' }}>
-            {!isRollupCodeVisible && (
-              <Flex justifyContent="flex-end">
-                <Button type="primary" onClick={toggleRollupCode}>
-                  Preview rollup definition
-                </Button>
-              </Flex>
-            )}
-
-            <Flex direction="column" gap={2}>
-              {isRollupCodeVisible ? (
-                <Input
-                  value={preAggName}
-                  onChange={(event) => setPreAggName(event.target.value)}
-                />
-              ) : null}
-
-              <Box>{rollupBody()}</Box>
+      <MainWrapper>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {!isRollupCodeVisible && (
+            <Flex justifyContent="flex-end">
+              <Button type="primary" onClick={toggleRollupCode}>
+                Preview rollup definition
+              </Button>
             </Flex>
+          )}
 
-            {!isRollupCodeVisible ? (
-              <Tabs>
-                <TabPane tab="Members" key="members">
-                  {!isRollupCodeVisible ? (
-                    <div>
-                      {references.measures?.length ? (
-                        <>
-                          <Members
-                            title="Measures"
-                            members={references.measures.map(
-                              (name) => indexedMembers[name]
-                            )}
-                            onRemove={handleMemberToggle('measures')}
-                          />
-
-                          <Divider />
-                        </>
-                      ) : null}
-
-                      {references.dimensions?.length ? (
-                        <>
-                          <Members
-                            title="Dimensions"
-                            members={references.dimensions.map(
-                              (name) => indexedMembers[name]
-                            )}
-                            onRemove={handleMemberToggle('dimensions')}
-                          />
-
-                          <Divider />
-                        </>
-                      ) : null}
-
-                      {references.timeDimensions.length ? (
-                        <TimeDimension
-                          member={
-                            indexedMembers[
-                              references.timeDimensions[0].dimension
-                            ]
-                          }
-                          granularity={references.timeDimensions[0].granularity}
-                          onGranularityChange={(granularity) => {
-                            setReferences({
-                              ...references,
-                              timeDimensions: [
-                                {
-                                  ...(references.timeDimensions[0] || {}),
-                                  ...(granularity ? { granularity } : null),
-                                } as TimeDimensionBase,
-                              ],
-                            });
-                          }}
-                          onRemove={handleMemberToggle('timeDimensions')}
-                        />
-                      ) : null}
-                    </div>
-                  ) : null}
-                </TabPane>
-
-                {/*<TabPane tab="Settings" key="settings">*/}
-                {/*  settings*/}
-                {/*</TabPane>*/}
-
-                {/*<TabPane tab="Queries" key="queries">*/}
-                {/*  queries*/}
-                {/*</TabPane>*/}
-              </Tabs>
-            ) : null}
-          </Space>
-        </MainWrapper>
-
-        <RightSidePanel>
           <Flex direction="column" gap={2}>
-            {canBeRolledUp &&
-              (matching ? (
-                <Alert message="This pre-aggregation will match and accelerate this query:" />
-              ) : (
-                <Alert
-                  type="warning"
-                  message="This pre-aggregation will not match this query:"
-                />
-              ))}
+            {isRollupCodeVisible ? (
+              <Input
+                value={preAggName}
+                onChange={(event) => setPreAggName(event.target.value)}
+              />
+            ) : null}
 
-            <CodeSnippet
-              style={{ marginBottom: 16 }}
-              code={JSON.stringify(matchedQuery, null, 2)}
-            />
+            <Box>{rollupBody()}</Box>
           </Flex>
-        </RightSidePanel>
-      </Wrapper>
-    </Space>
+
+          {!isRollupCodeVisible ? (
+            <Tabs>
+              <TabPane tab="Members" key="members">
+                {!isRollupCodeVisible ? (
+                  <div>
+                    {references.measures?.length ? (
+                      <>
+                        <Members
+                          title="Measures"
+                          members={references.measures.map(
+                            (name) => indexedMembers[name]
+                          )}
+                          onRemove={handleMemberToggle('measures')}
+                        />
+
+                        <Divider />
+                      </>
+                    ) : null}
+
+                    {references.dimensions?.length ? (
+                      <>
+                        <Members
+                          title="Dimensions"
+                          members={references.dimensions.map(
+                            (name) => indexedMembers[name]
+                          )}
+                          onRemove={handleMemberToggle('dimensions')}
+                        />
+
+                        <Divider />
+                      </>
+                    ) : null}
+
+                    {references.timeDimensions.length ? (
+                      <TimeDimension
+                        member={
+                          indexedMembers[references.timeDimensions[0].dimension]
+                        }
+                        granularity={references.timeDimensions[0].granularity}
+                        onGranularityChange={(granularity) => {
+                          setReferences({
+                            ...references,
+                            timeDimensions: [
+                              {
+                                ...(references.timeDimensions[0] || {}),
+                                ...(granularity ? { granularity } : null),
+                              } as TimeDimensionBase,
+                            ],
+                          });
+                        }}
+                        onRemove={handleMemberToggle('timeDimensions')}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </TabPane>
+
+              {/*<TabPane tab="Settings" key="settings">*/}
+              {/*  settings*/}
+              {/*</TabPane>*/}
+
+              {/*<TabPane tab="Queries" key="queries">*/}
+              {/*  queries*/}
+              {/*</TabPane>*/}
+            </Tabs>
+          ) : null}
+        </Space>
+      </MainWrapper>
+
+      <RightSidePanel>
+        <Flex direction="column" gap={2}>
+          {canBeRolledUp &&
+            (matching ? (
+              <Alert message="This pre-aggregation will match and accelerate this query:" />
+            ) : (
+              <Alert
+                type="warning"
+                message="This pre-aggregation will not match this query:"
+              />
+            ))}
+
+          <CodeSnippet
+            style={{ marginBottom: 16 }}
+            code={JSON.stringify(matchedQuery, null, 2)}
+          />
+        </Flex>
+      </RightSidePanel>
+    </Flex>
   );
 }

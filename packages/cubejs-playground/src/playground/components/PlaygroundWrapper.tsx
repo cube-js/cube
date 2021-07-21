@@ -26,6 +26,7 @@ type PlaygroundWrapperProps = {
   Pick<SecurityContextProviderProps, 'tokenUpdater'>;
 
 export function PlaygroundWrapper({
+  token,
   identifier,
   playgroundContext,
   children,
@@ -36,8 +37,9 @@ export function PlaygroundWrapper({
     <StyledWrapper>
       <BrowserRouter>
         <AppContextProvider
+          token={token}
           identifier={identifier}
-          playgroundContext={playgroundContext}
+          playgroundContext={playgroundContext || {}}
         >
           <SecurityContextProvider
             tokenUpdater={tokenUpdater}
