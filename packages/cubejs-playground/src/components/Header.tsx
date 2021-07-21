@@ -3,6 +3,7 @@ import Icon, {
   FileFilled,
   MenuOutlined,
   SlackOutlined,
+  CloudFilled,
 } from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';
 import styled from 'styled-components';
@@ -152,6 +153,15 @@ const Header = ({ selectedKeys }) => {
           >
             <FileFilled />
             Docs
+          </StyledMenuButton>
+
+          <StyledMenuButton
+            key="docs"
+            href="https://cube.dev/docs"
+            target="_blank"
+          >
+            <CloudFilled />
+            Run on Cube Cloud
           </StyledMenuButton>
         </StyledMenu>
       )}

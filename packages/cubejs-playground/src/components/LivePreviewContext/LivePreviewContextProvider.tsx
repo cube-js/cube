@@ -1,5 +1,7 @@
 import { createContext, useState, useEffect, useRef } from 'react';
 
+import { openWindow } from '../../shared/helpers';
+
 type LivePreviewStatus = {
   deploymentUrl: string | null;
   active: boolean;
@@ -98,13 +100,12 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
         const params: any =
           window.location.origin !== 'http://localhost:4000' &&
           new URLSearchParams({ callbackUrl }).toString();
-        const wn = window.open(
-          `https://cubecloud.dev/auth/live-preview${
+
+        const wn = openWindow({
+          url: `https://cubecloud.dev/auth/live-preview${
             params ? `?${params}` : ''
           }`,
-          '',
-          `width=640,height=720`
-        );
+        });
 
         if (!wn) {
           console.error('The popup was blocked by the browser');
