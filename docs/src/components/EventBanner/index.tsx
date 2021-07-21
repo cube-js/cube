@@ -17,7 +17,7 @@ const query = {
       values: [formatDate()],
     },
   ],
-  dimensions: ['Banner.text', 'Banner.link'],
+  dimensions: ['Banner.text', 'Banner.link', 'Banner.campaign'],
   limit: 1,
 };
 async function getBannerDataFromApi(set, setIsLoaded) {
@@ -58,7 +58,7 @@ const EventBanner = (props) => {
   }, []);
   return (
     <a
-      href={getLinkWithUTM(banner?.['Banner.link'], 'docs')}
+      href={getLinkWithUTM(banner?.['Banner.link'], 'docs', banner?.['Banner.campaign'])}
       target="_blank"
       style={{
         paddingBottom: isLoaded ? (isMobile ? '54px' : '40px') : "0",
@@ -111,12 +111,12 @@ function formatDate() {
   if (day.length < 2) day = '0' + day;
   return [year, month, day].join('-');
 }
-function getLinkWithUTM(link, source) {
+function getLinkWithUTM(link, source, compagin) {
   if (!link) {
     return null;
   }
   const lastSymbol = link.charAt(link.length - 1);
-  const utm = `?utm_campaign=${formatDate().replaceAll('-', '')}&utm_medium=purple&utm_source=${source}`;
+  const utm = `?utm_campaign=${compagin}&utm_medium=purple&utm_source=${source}`;
   if (lastSymbol !== '/') {
     return link + '/' + utm;
   }
