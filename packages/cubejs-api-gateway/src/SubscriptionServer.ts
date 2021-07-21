@@ -15,6 +15,10 @@ const methodParams: Record<string, string[]> = {
   'subscribe.queue.events': []
 };
 
+const methodWithPlaygroundSecret: Set<string> = new Set([
+  'subscribe.queue.events'
+]);
+
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
 export class SubscriptionServer {
@@ -75,6 +79,18 @@ export class SubscriptionServer {
 
       if (!methodParams[message.method]) {
         throw new UserError(`Unsupported method: ${message.method}`);
+      }
+
+      if (methodWithPlaygroundSecret.has(message.method) && !authContext.signedWithPlaygroundAuthSecret) {
+        await this.sendMessage(
+          connectionId,
+          {
+            messageId: message.messageId,
+            message: { error: 'Forbidden' },
+            status: 403
+          }
+        );
+        return;
       }
 
       const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
