@@ -12,13 +12,20 @@ export function IndexPage() {
 
   const [files, setFiles] = useState<any[] | null>(null);
 
+  const [debug, setDebug] = useState<any>({});
+
   useEffect(() => {
     async function loadFiles() {
+      setDebug({ loadFiles: true });
       const res = await fetch('/playground/files');
       const result = await res.json();
 
+      setDebug({ loaded: true, result, isMounted: isMounted() });
+
       if (isMounted()) {
         setFiles(result.files);
+      } else {
+        setDebug({ notMounted: true, files: result.files });
       }
     }
 
@@ -42,6 +49,8 @@ export function IndexPage() {
 
   return (
     <>
+      <div style={{ marginBottom: 100 }}>{JSON.stringify(debug)}</div>
+
       <div style={{ marginBottom: 100 }}>files: {JSON.stringify(files)}</div>
       <div style={{ marginBottom: 100 }}>
         context: {JSON.stringify(context)}
