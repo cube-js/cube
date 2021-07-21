@@ -530,7 +530,7 @@ cube(`Orders`, {
 ```
 
 [ref-caching-garbage-collection]:
-  /caching/using-pre-aggregations#caching-garbage-collection
+  /caching/using-pre-aggregations#garbage-collection
 [ref-caching-preaggs-target]:
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
 [ref-caching-readonly]: /caching/using-pre-aggregations#read-only-data-source
