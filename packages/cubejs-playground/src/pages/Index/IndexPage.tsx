@@ -40,5 +40,12 @@ export function IndexPage() {
     }
   }, [context, files]);
 
-  return null;
+  return (
+    <>
+      <div style={{ marginBottom: 100 }}>files: {JSON.stringify(files)}</div>
+      <div style={{ marginBottom: 100 }}>
+        context: {JSON.stringify(context)}
+      </div>
+    </>
+  );
 }
