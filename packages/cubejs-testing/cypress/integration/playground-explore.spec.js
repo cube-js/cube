@@ -55,7 +55,8 @@ context('Playground: Explore Page', () => {
     cy.visit('/');
     cy.wait(['@context', '@files']);
 
-    cy.getByTestId('cube-loader', { timeout: 10 * 1000 }).should('not.exist');
+    cy.wait(500);
+    cy.url().should('include', '/build');
 
     cy.addMeasure('Events.count');
     cy.wait(300);
@@ -115,7 +116,9 @@ context('Playground: Explore Page', () => {
 
       cy.visit('/');
       cy.wait('@context');
-      cy.getByTestId('cube-loader', { timeout: 10 * 1000 }).should('not.exist');
+
+      cy.wait(500);
+      cy.url().should('include', '/build');
 
       cy.getByTestId('security-context-btn').contains('Add').should('exist');
       cy.getLocalStorage('cubejsToken').should('be.null');
