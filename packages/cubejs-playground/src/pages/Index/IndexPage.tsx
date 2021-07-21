@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
-import { CubeLoader } from '../../atoms';
 import { usePlaygroundContext } from '../../components/AppContext';
 import { useIsMounted } from '../../hooks';
 
