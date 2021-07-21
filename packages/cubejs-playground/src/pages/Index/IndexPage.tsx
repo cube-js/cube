@@ -20,12 +20,12 @@ export function IndexPage() {
       const res = await fetch('/playground/files');
       const result = await res.json();
 
-      setDebug({ loaded: true, result, isMounted: isMounted() });
+      setDebug({ loaded: true, isMounted: isMounted() });
 
       if (isMounted()) {
         setFiles(result.files);
       } else {
-        setDebug({ notMounted: true, files: result.files });
+        setDebug({ notMounted: true });
       }
     }
 
@@ -48,13 +48,13 @@ export function IndexPage() {
   }, [context, files]);
 
   return (
-    <>
+    <div style={{ fontSize: 30 }}>
       <div style={{ marginBottom: 100 }}>{JSON.stringify(debug)}</div>
 
       <div style={{ marginBottom: 100 }}>files: {JSON.stringify(files)}</div>
       <div style={{ marginBottom: 100 }}>
         context: {JSON.stringify(context)}
       </div>
-    </>
+    </div>
   );
 }

@@ -55,6 +55,7 @@ context('Playground: Explore Page', () => {
     cy.visit('/');
     cy.wait(['@context', '@files']);
 
+    cy.wait(500);
     cy.url().should('include', '/build');
 
     cy.addMeasure('Events.count');
@@ -116,6 +117,7 @@ context('Playground: Explore Page', () => {
       cy.visit('/');
       cy.wait('@context');
 
+      cy.wait(500);
       cy.url().should('include', '/build');
 
       cy.getByTestId('security-context-btn').contains('Add').should('exist');
