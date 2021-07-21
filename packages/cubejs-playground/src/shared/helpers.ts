@@ -82,15 +82,30 @@ export function playgroundFetch(url, options: any = {}) {
     });
 }
 
+type RequestOptions = {
+  token?: string;
+  body?: Record<string, any>;
+  headers?: Record<string, string>;
+}
+
 export async function request(
   endpoint: string,
   method: string = 'GET',
-  body?: Record<string, any>
+  options: RequestOptions
 ) {
+  const { body, token } = options;
+
+  const headers: Record<string, string> = {};
+
+  if (token) {
+    headers.authorization = token;
+  }
+
   const response = await fetch(endpoint, {
     method,
     headers: {
       'Content-Type': 'application/json',
+      ...headers,
     },
     ...(body ? { body: JSON.stringify(body) } : null),
   });

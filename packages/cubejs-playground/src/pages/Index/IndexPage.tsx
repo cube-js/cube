@@ -2,8 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { useHistory } from 'react-router';
 import { fetch } from 'whatwg-fetch';
 
-import { usePlaygroundContext } from '../../components/AppContext';
-import { useIsMounted } from '../../hooks';
+import { useIsMounted, usePlaygroundContext } from '../../hooks';
 
 export function IndexPage() {
   const { push } = useHistory();

@@ -13,7 +13,7 @@ import { Query } from '@cubejs-client/core';
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { QueryStatus } from './PlaygroundQueryBuilder';
 import { RollupDesigner } from '../../RollupDesigner';
-import { useServerCoreVersionGt, useToggle } from '../../../hooks';
+import { useServerCoreVersionGte, useToggle } from '../../../hooks';
 
 const { Link } = Typography;
 
@@ -38,7 +38,7 @@ export function PreAggregationStatus({
   preAggregationType,
   ...props
 }: PreAggregationStatusProps) {
-  const isVersionGt = useServerCoreVersionGt('0.28.4');
+  const isVersionGte = useServerCoreVersionGte('0.28.4');
   const [isModalOpen, toggleModal] = useToggle();
 
   // hide it for the time being
@@ -66,7 +66,7 @@ export function PreAggregationStatus({
           <Typography.Text>
             Query was accelerated with pre-aggregation
           </Typography.Text>
-        ) : isVersionGt ? (
+        ) : isVersionGte ? (
           <Button type="link" onClick={toggleModal}>
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
