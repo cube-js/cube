@@ -339,6 +339,6 @@ If you want to run Cube.js in production without Redis, you can use
 [ref-deploy-cubecloud]: /deployment/platforms/cube-cloud
 [ref-deploy-docker]: /deployment/platforms/docker
 [ref-deploy-sls-aws]: /deployment/platforms/serverless/aws
-[ref-deploy-sls-gcp]: /deployment/platforms/serverless/gcp
+[ref-deploy-sls-gcp]: /deployment/platforms/serverless/google-cloud
 [ref-config-env]: /reference/environment-variables
 [ref-config-js]: /config
