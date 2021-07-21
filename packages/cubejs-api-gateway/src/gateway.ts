@@ -868,7 +868,14 @@ export class ApiGateway {
     }
   }
 
-  public subscribeQueueEvents({ context, connectionId, res }) {
+  public subscribeQueueEvents({ context, signedWithPlaygroundAuthSecret, connectionId, res }) {
+    if (this.enforceSecurityChecks && !signedWithPlaygroundAuthSecret) {
+      throw new CubejsHandlerError(
+        403,
+        'Forbidden',
+        'Only for signed with playground auth secret'
+      );
+    }
     return this.getAdapterApi(context).subscribeQueueEvents(connectionId, res);
   }
 
