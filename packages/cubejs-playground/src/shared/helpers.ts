@@ -91,7 +91,7 @@ type RequestOptions = {
 export async function request(
   endpoint: string,
   method: string = 'GET',
-  options: RequestOptions
+  options: RequestOptions = {}
 ) {
   const { body, token } = options;
 
