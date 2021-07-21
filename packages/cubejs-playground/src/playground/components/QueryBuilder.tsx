@@ -1,78 +1,52 @@
-import { useLayoutEffect } from 'react';
-import { CubeProvider } from '@cubejs-client/react';
+import equals from 'fast-deep-equal';
+import { memo } from 'react';
+import { PlaygroundContext } from '../../components/AppContext';
 
-import PlaygroundWrapper from '../PlaygroundWrapper';
-import PlaygroundQueryBuilder, {
-  TPlaygroundQueryBuilderProps,
-} from '../../PlaygroundQueryBuilder';
-import { TSecurityContextContextProps } from '../../components/SecurityContext/SecurityContextProvider';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
+import { PlaygroundWrapper } from './PlaygroundWrapper';
+import {
+  SecurityContextProps,
+  SecurityContextProviderProps,
+} from '../../components/SecurityContext/SecurityContextProvider';
+import { PlaygroundQueryBuilderProps } from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
+import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 
-type TQueryBuilderProps = {
-  apiUrl: string;
+type QueryBuilderProps = {
   token: string;
-  tokenKey?: string;
+  identifier?: string;
+  playgroundContext?: PlaygroundContext;
 } & Pick<
-  TPlaygroundQueryBuilderProps,
+  PlaygroundQueryBuilderProps,
+  | 'apiUrl'
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
   | 'onVizStateChanged'
   | 'onSchemaChange'
 > &
-  Pick<TSecurityContextContextProps, 'getToken'>;
+  Pick<SecurityContextProps, 'onTokenPayloadChange'> &
+  Pick<SecurityContextProviderProps, 'tokenUpdater'>;
 
-export function QueryBuilder({ apiUrl, token, ...props }: TQueryBuilderProps) {
+function QueryBuilderComponent({
+  token,
+  identifier,
+  ...props
+}: QueryBuilderProps) {
   return (
-    <PlaygroundWrapper tokenKey={props.tokenKey} getToken={props.getToken}>
-      <QueryBuilderContainer apiUrl={apiUrl} token={token} {...props} />
+    <PlaygroundWrapper
+      identifier={identifier}
+      token={token}
+      tokenUpdater={props.tokenUpdater}
+      playgroundContext={props.playgroundContext}
+      onTokenPayloadChange={props.onTokenPayloadChange}
+    >
+      <QueryBuilderContainer token={token} {...props} />
     </PlaygroundWrapper>
   );
 }
 
-type TQueryBuilderContainerProps = Omit<
-  TQueryBuilderProps,
-  'tokenKey' | 'getToken'
->;
-
-function QueryBuilderContainer({
-  apiUrl,
-  token,
-  ...props
-}: TQueryBuilderContainerProps) {
-  const { token: securityContextToken } = useSecurityContext();
-  const currentToken = securityContextToken || token;
-  const cubejsApi = useCubejsApi(apiUrl, currentToken);
-
-  useLayoutEffect(() => {
-    if (apiUrl && currentToken) {
-      // @ts-ignore
-      window.__cubejsPlayground = {
-        // @ts-ignore
-        ...window.__cubejsPlayground,
-        apiUrl,
-        token: currentToken,
-      };
-    }
-  }, [apiUrl, currentToken]);
-
-  if (!cubejsApi) {
-    return null;
+export const QueryBuilder = memo(
+  QueryBuilderComponent,
+  (prevProps, nextProps) => {
+    return equals(prevProps, nextProps);
   }
-
-  return (
-    <CubeProvider cubejsApi={cubejsApi}>
-      <PlaygroundQueryBuilder
-        apiUrl={apiUrl}
-        cubejsToken={currentToken}
-        initialVizState={{
-          query: props.defaultQuery,
-          ...props.initialVizState,
-        }}
-        schemaVersion={props.schemaVersion}
-        onVizStateChanged={props.onVizStateChanged}
-        onSchemaChange={props.onSchemaChange}
-      />
-    </CubeProvider>
-  );
-}
+);

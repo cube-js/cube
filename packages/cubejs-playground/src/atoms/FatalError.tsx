@@ -12,11 +12,11 @@ export const Code = styled.pre`
   margin: 0;
 `;
 
-type TFatalErrorProps = {
-  error: Error;
+type FatalErrorProps = {
+  error: Error | string;
 };
 
-export function FatalError({ error }: TFatalErrorProps) {
+export function FatalError({ error }: FatalErrorProps) {
   return (
     <Space direction="vertical">
       <Text strong style={{ fontSize: 18 }}>

@@ -25,10 +25,11 @@ type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concur
 };
 
 type PreAggregationsQueryingOptions = {
-  timezone: string,
+  timezones: string[],
   preAggregations: {
     id: string,
-    refreshRange?: [string, string]
+    refreshRange?: [string, string],
+    partitions?: string[]
   }[]
 };
 
@@ -194,6 +195,7 @@ export class RefreshScheduler {
   ) {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
+
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
@@ -235,6 +237,8 @@ export class RefreshScheduler {
     compilerApi: CompilerApi,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const preAggregationsLoadCacheByDataSource = {};
     const preAggregationsQueringOptions = queryingOptions.preAggregations.reduce((obj, p) => {
       obj[p.id] = p;
       return obj;
@@ -245,42 +249,51 @@ export class RefreshScheduler {
     });
 
     return Promise.all(preAggregations.map(async preAggregation => {
-      const { timezone } = queryingOptions;
-      const { refreshRange } = preAggregationsQueringOptions[preAggregation.id] || {};
-      const queriesForPreAggregation = preAggregation && await this.refreshQueriesForPreAggregation(
-        context,
-        compilerApi,
-        preAggregation,
-        // TODO: timezones, concurrency, workerIndices???
-        {
-          timezones: undefined,
-          concurrency: undefined,
-          workerIndices: undefined,
-          timezone,
-          refreshRange,
-          contextSymbols: {
-            securityContext: context.securityContext || {},
-          },
-        }
-      );
+      const { timezones } = queryingOptions;
+      const { refreshRange, partitions: partitionsFilter } = preAggregationsQueringOptions[preAggregation.id] || {};
+
+      const queriesForPreAggregation = preAggregation && (await Promise.all(
+        timezones.map(
+          timezone => this.refreshQueriesForPreAggregation(
+            context,
+            compilerApi,
+            preAggregation,
+            // TODO: timezones, concurrency, workerIndices???
+            {
+              timezones: undefined,
+              concurrency: undefined,
+              workerIndices: undefined,
+              timezone,
+              refreshRange,
+              contextSymbols: {
+                securityContext: context.securityContext || {},
+              },
+            }
+          )
+        )
+      )).reduce((target, source) => [...target, ...source], []);
 
       const partitions: any = queriesForPreAggregation && await Promise.all(
         queriesForPreAggregation.map(
-          query => compilerApi
-            .getSql(query)
-            .then(sql => (
-              {
-                ...query,
-                sql: sql.preAggregations[0]
-              }
-            ))
+          async query => {
+            const sql = await orchestratorApi.expandPartitionsInPreAggregations({
+              ...(await compilerApi.getSql(query)),
+              preAggregationsLoadCacheByDataSource
+            });
+            return {
+              ...query,
+              sql: sql.preAggregations.find(p => p.preAggregationId === preAggregation.id)
+            };
+          }
         )
       );
 
       return {
-        timezone,
+        timezones,
         preAggregation,
-        partitions
+        partitions: partitions.filter(p => !partitionsFilter ||
+          !partitionsFilter.length ||
+          partitionsFilter.includes(p.sql?.tableName))
       };
     }));
   }
@@ -418,5 +431,44 @@ export class RefreshScheduler {
           }
         }
       }));
+  }
+
+  public async buildPreAggregations(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    queryingOptions: PreAggregationsQueryingOptions
+  ) {
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const preAggregations = await this.preAggregationPartitions(context, compilerApi, queryingOptions);
+    const preAggregationsLoadCacheByDataSource = {};
+    
+    Promise.all(preAggregations.map(async (p: any) => {
+      const { partitions } = p;
+      return Promise.all(partitions.map(async query => {
+        const sqlQuery = await compilerApi.getSql(query);
+
+        await orchestratorApi.executeQuery({
+          ...sqlQuery,
+          continueWait: true,
+          renewQuery: true,
+          forceBuildPreAggregations: true,
+          orphanedTimeout: 60 * 60,
+          requestId: context.requestId,
+          timezone: query.timezone,
+          scheduledRefresh: false,
+          preAggregationsLoadCacheByDataSource
+        });
+      }));
+    })).catch(e => {
+      if (e.error !== 'Continue wait') {
+        this.serverCore.logger('Manual Build Pre-aggregations Error', {
+          error: e.error || e.stack || e.toString(),
+          securityContext: context.securityContext,
+          requestId: context.requestId
+        });
+      }
+    });
+
+    return true;
   }
 }

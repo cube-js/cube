@@ -139,6 +139,13 @@ declare module '@cubejs-client/core' {
     sortedTimeDimensions: [[string, string]];
   };
 
+  export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
+
+  type UsedPreAggregation = {
+    targetTableName: string;
+    type: PreAggregationType;
+  }
+
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
@@ -146,7 +153,8 @@ declare module '@cubejs-client/core' {
     data: T[];
     external: boolean | null;
     dbType: string;
-    usedPreAggregations?: Record<string, any>;
+    extDbType: string;
+    usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
   };
 
@@ -700,22 +708,26 @@ declare module '@cubejs-client/core' {
     annotation(): QueryAnnotations;
   }
 
-  export type Filter = BinaryFilter | UnaryFilter;
+  export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
+  type LogicalAndFilter = {
+    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[]
+  };
+
+  type LogicalOrFilter = {
+    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[]
+  };
+
   type BinaryFilter = {
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-    and?: BinaryFilter[];
-    or?: BinaryFilter[];
   };
   type UnaryFilter = {
     dimension?: string;
     member?: string;
     operator: UnaryOperator;
     values?: never;
-    and?: UnaryFilter[];
-    or?: UnaryFilter[];
   };
   type UnaryOperator = 'set' | 'notSet';
   type BinaryOperator =
@@ -773,13 +785,11 @@ declare module '@cubejs-client/core' {
     timeElapsed(): string;
   }
 
-  export type SqlQueryTuple = [string, boolean | string | number];
+  export type SqlQueryTuple = [string, any[], any];
 
   export type SqlData = {
     aliasNameToMember: Record<string, string>;
-    cacheKeyQueries: {
-      queries: SqlQueryTuple[];
-    };
+    cacheKeyQueries: SqlQueryTuple[];
     dataSource: boolean;
     external: boolean;
     sql: SqlQueryTuple;
@@ -802,14 +812,14 @@ declare module '@cubejs-client/core' {
 
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
-  type TCubeMember = {
+  export type TCubeMember = {
     type: TCubeMemberType;
     name: string;
     title: string;
     shortTitle: string;
   };
 
-  type TCubeMeasure = TCubeMember & {
+  export type TCubeMeasure = TCubeMember & {
     aggType: 'count' | 'number';
     cumulative: boolean;
     cumulativeTotal: boolean;
@@ -820,11 +830,11 @@ declare module '@cubejs-client/core' {
     };
   };
 
-  type TCubeDimension = TCubeMember & {
+  export type TCubeDimension = TCubeMember & {
     suggestFilterValues: boolean;
   };
 
-  type TCubeSegment = Pick<TCubeMember, 'name' | 'shortTitle' | 'title'>;
+  export type TCubeSegment = Pick<TCubeMember, 'name' | 'shortTitle' | 'title'>;
 
   type TCubeMemberByType<T> = T extends 'measures'
     ? TCubeMeasure
@@ -834,11 +844,12 @@ declare module '@cubejs-client/core' {
     ? TCubeSegment
     : never;
 
-  type TDryRunResponse = {
+  type DryRunResponse = {
     queryType: QueryType;
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
+    transformedQueries: TransformedQuery[]
   };
 
   export type Cube = {
@@ -981,11 +992,11 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 
-    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<TDryRunResponse>;
+    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<TDryRunResponse>): void;
+    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
   }
 
   /**

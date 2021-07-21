@@ -4,7 +4,7 @@ import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
 
-export default function useCubeQuery(query, options = {}) {
+export function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
   const isMounted = useRef(true);
   const [currentQuery, setCurrentQuery] = useState(null);

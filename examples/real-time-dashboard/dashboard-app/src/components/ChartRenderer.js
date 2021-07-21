@@ -10,7 +10,7 @@ const minutesAgo = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0"];
 const TypeToChartComponent = {
   line: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map(c => moment(c.category).format("mm:ss")),
+      labels: resultSet.categories().map(c => moment(c.x).format("mm:ss")),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map(r => r.value),
@@ -39,7 +39,7 @@ const TypeToChartComponent = {
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: minutesAgo.map((minute) => {
-          const value = s.series.find(i  => i.category === minute)
+          const value = s.series.find(i  => i.x === minute)
           return (value && value.value) || 0
         }),
         backgroundColor: COLORS_SERIES[index],
@@ -75,7 +75,7 @@ const TypeToChartComponent = {
   },
   area: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map(c => c.category),
+      labels: resultSet.categories().map(c => c.x),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map(r => r.value),
@@ -95,7 +95,7 @@ const TypeToChartComponent = {
   },
   pie: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map(c => c.category),
+      labels: resultSet.categories().map(c => c.x),
       datasets: resultSet.series().map(s => ({
         label: s.title,
         data: s.series.map(r => r.value),

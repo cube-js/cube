@@ -1,27 +1,11 @@
 import Moment from 'moment-timezone';
 import { extendMoment } from 'moment-range';
+import { timeSeries, FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 
 const moment = extendMoment(Moment);
-
-const TIME_SERIES = {
-  day: (range) => Array.from(range.snapTo('day').by('day'))
-    .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.format('YYYY-MM-DDT23:59:59.999')]),
-  month: (range) => Array.from(range.snapTo('month').by('month'))
-    .map(d => [d.format('YYYY-MM-01T00:00:00.000'), d.endOf('month').format('YYYY-MM-DDT23:59:59.999')]),
-  year: (range) => Array.from(range.snapTo('year').by('year'))
-    .map(d => [d.format('YYYY-01-01T00:00:00.000'), d.endOf('year').format('YYYY-MM-DDT23:59:59.999')]),
-  hour: (range) => Array.from(range.snapTo('hour').by('hour'))
-    .map(d => [d.format('YYYY-MM-DDTHH:00:00.000'), d.format('YYYY-MM-DDTHH:59:59.999')]),
-  minute: (range) => Array.from(range.snapTo('minute').by('minute'))
-    .map(d => [d.format('YYYY-MM-DDTHH:mm:00.000'), d.format('YYYY-MM-DDTHH:mm:59.999')]),
-  second: (range) => Array.from(range.snapTo('second').by('second'))
-    .map(d => [d.format('YYYY-MM-DDTHH:mm:ss.000'), d.format('YYYY-MM-DDTHH:mm:ss.999')]),
-  week: (range) => Array.from(range.snapTo('isoweek').by('week'))
-    .map(d => [d.startOf('isoweek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoweek').format('YYYY-MM-DDT23:59:59.999')])
-};
 
 export class BaseTimeDimension extends BaseFilter {
   constructor(query, timeDimension) {
@@ -33,6 +17,7 @@ export class BaseTimeDimension extends BaseFilter {
     this.query = query;
     this.dateRange = timeDimension.dateRange;
     this.granularity = timeDimension.granularity;
+    this.boundaryDateRange = timeDimension.boundaryDateRange;
   }
 
   selectColumns() {
@@ -184,12 +169,19 @@ export class BaseTimeDimension extends BaseFilter {
       ];
     }
 
-    if (!TIME_SERIES[this.granularity]) {
-      throw new UserError(`Unsupported time granularity: ${this.granularity}`);
-    }
+    return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()]);
+  }
 
-    const range = moment.range(this.dateFromFormatted(), this.dateToFormatted());
+  wildcardRange() {
+    return [FROM_PARTITION_RANGE, TO_PARTITION_RANGE];
+  }
 
-    return TIME_SERIES[this.granularity](range);
+  boundaryDateRangeFormatted() {
+    // TODO or here is due to boundaryDateRange can be defined in originalSql query used by rollup
+    // TODO and dateRange can be defined in rollup query
+    return this.boundaryDateRange && [
+      this.formatFromDate(this.boundaryDateRange[0]),
+      this.formatToDate(this.boundaryDateRange[1])
+    ] || [this.dateFromFormatted(), this.dateToFormatted()];
   }
 }

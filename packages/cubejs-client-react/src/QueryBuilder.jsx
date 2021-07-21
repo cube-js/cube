@@ -1,13 +1,14 @@
 import React from 'react';
-import { prop, uniqBy, equals, pick, clone, indexBy, uniq } from 'ramda';
+import { clone, equals, indexBy, pick, prop, uniq, uniqBy } from 'ramda';
 import {
-  ResultSet,
-  moveItemInArray,
+  defaultHeuristics,
   defaultOrder,
   flattenFilters,
   getQueryMembers,
+  isQueryPresent,
+  moveItemInArray,
   movePivotItem,
-  defaultHeuristics,
+  ResultSet
 } from '@cubejs-client/core';
 
 import QueryRenderer from './QueryRenderer.jsx';
@@ -26,6 +27,8 @@ const granularities = [
 ];
 
 export default class QueryBuilder extends React.Component {
+  static contextType = CubeContext;
+
   // This is an anti-pattern, only kept for backward compatibility
   // https://reactjs.org/blog/2018/06/07/you-probably-dont-need-derived-state.html#anti-pattern-unconditionally-copying-props-to-state
   static getDerivedStateFromProps(props, state) {
@@ -92,7 +95,8 @@ export default class QueryBuilder extends React.Component {
       chartType: props.defaultChartType,
       validatedQuery: props.query, // deprecated, validatedQuery should not be set until after dry-run for safety
       missingMembers: [],
-      isFetchingMeta: false,
+      // todo: rename to `isMetaReady`
+      isFetchingMeta: true,
       dryRunResponse: null,
       ...props.vizState, // deprecated
       ...props.initialVizState,
@@ -103,12 +107,18 @@ export default class QueryBuilder extends React.Component {
   }
 
   async componentDidMount() {
+    this.prevContext = this.context;
     await this.fetchMeta();
   }
 
   async componentDidUpdate(prevProps) {
     const { schemaVersion, onSchemaChange } = this.props;
     const { meta } = this.state;
+
+    if (this.prevContext?.cubejsApi !== this.context?.cubejsApi) {
+      this.prevContext = this.context;
+      await this.fetchMeta();
+    }
 
     if (prevProps.schemaVersion !== schemaVersion) {
       try {
@@ -129,6 +139,10 @@ export default class QueryBuilder extends React.Component {
   }
 
   fetchMeta = async () => {
+    if (!this.cubejsApi()) {
+      return;
+    }
+
     let meta;
     let metaError = null;
 
@@ -463,7 +477,12 @@ export default class QueryBuilder extends React.Component {
 
     handleVizStateChange(finalState);
 
-    if (QueryRenderer.isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
+    const shouldFetchDryRun = !equals(
+      pick(['measures', 'dimensions', 'timeDimensions'], stateQuery),
+      pick(['measures', 'dimensions', 'timeDimensions'], finalState.query)
+    );
+
+    if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
       try {
         const response = await this.cubejsApi().dryRun(finalState.query, {
           mutexObj: this.mutexObj,
@@ -478,7 +497,7 @@ export default class QueryBuilder extends React.Component {
         finalState.dryRunResponse = response;
 
         // deprecated
-        if (QueryRenderer.isQueryPresent(stateQuery)) {
+        if (isQueryPresent(stateQuery)) {
           runSetters({
             ...this.state,
             ...finalState,
@@ -546,8 +565,6 @@ export default class QueryBuilder extends React.Component {
     }
   }
 }
-
-QueryBuilder.contextType = CubeContext;
 
 QueryBuilder.defaultProps = {
   cubejsApi: null,

@@ -80,7 +80,7 @@ export const frameworks: FrameworkDescriptor[] = [
   },
 ];
 
-type TChartContainerProps = {
+type ChartContainerProps = {
   query: Query;
   hideActions: boolean;
   dashboardSource?: DashboardSource;
@@ -90,7 +90,7 @@ type TChartContainerProps = {
 };
 
 class ChartContainer extends Component<
-  TChartContainerProps & RouteComponentProps,
+  ChartContainerProps & RouteComponentProps,
   any
 > {
   static defaultProps = {
@@ -366,6 +366,7 @@ class ChartContainer extends Component<
               onClick={async () => {
                 this.setState({ addingToDashboard: true });
                 const canAddChart = await dashboardSource.canAddChart();
+
                 if (typeof canAddChart === 'boolean' && canAddChart) {
                   playgroundAction('Add to Dashboard');
                   await dashboardSource.addChart(codeExample);
@@ -435,7 +436,7 @@ class ChartContainer extends Component<
         );
       } else if (showCode === 'code') {
         if (error) {
-          return <FatalError error={error} />
+          return <FatalError error={error} />;
         }
 
         return <PrismCode code={codeExample} />;
@@ -448,7 +449,7 @@ class ChartContainer extends Component<
             query={query}
             render={({ sqlQuery, error }) => {
               if (error) {
-                return <FatalError error={error} />
+                return <FatalError error={error} />;
               }
 
               const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { AvailableCube } from '@cubejs-client/react';
-import { Input, Menu as AntdMenu } from 'antd';
+import { ButtonProps, Input, Menu as AntdMenu } from 'antd';
 import styled from 'styled-components';
 import FlexSearch from 'flexsearch';
+import { TCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
+import useDeepMemo from '../hooks/deep-memo';
+import { getNameMemberPairs } from '../shared/helpers';
 
 const Menu = styled(AntdMenu)`
   max-height: 320px;
@@ -40,18 +43,6 @@ const SearchMenuItem = styled(Menu.Item)`
   }
 `;
 
-function getKeyTitle(members) {
-  const items: [string, string][] = [];
-
-  members.forEach((cube) =>
-    cube.members.forEach(({ name, title }) => {
-      items.push([name, title]);
-    })
-  );
-
-  return items;
-}
-
 function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
   const cubeNames = keys.map((key) => key.split('.')[0]);
 
@@ -65,8 +56,18 @@ function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
     });
 }
 
-// Can't be a Pure Component due to Dropdown lookups overlay component type to set appropriate styles
-function memberMenu(onClick, availableMembers: AvailableCube[]) {
+type MemberDropdownProps = {
+  availableMembers: AvailableCube[];
+  showNoMembersPlaceholder?: boolean;
+  onClick: (member: TCubeMember) => void;
+} & ButtonProps;
+
+export default function MemberMenu({
+  availableMembers,
+  showNoMembersPlaceholder = true,
+  onClick,
+  ...buttonProps
+}: MemberDropdownProps) {
   const flexSearch = useRef(FlexSearch.create<string>({ encode: 'advanced' }));
   const [search, setSearch] = useState<string>('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
@@ -74,10 +75,12 @@ function memberMenu(onClick, availableMembers: AvailableCube[]) {
   const index = flexSearch.current;
   const hasMembers = availableMembers.some((cube) => cube.members.length > 0);
 
-  useEffect(() => {
-    getKeyTitle(availableMembers).forEach(([name, title]) =>
+  const indexedMembers = useDeepMemo(() => {
+    getNameMemberPairs(availableMembers).forEach(([name, { title }]) =>
       index.add(name as any, title)
     );
+
+    return Object.fromEntries(getNameMemberPairs(availableMembers));
   }, [availableMembers]);
 
   useEffect(() => {
@@ -102,67 +105,52 @@ function memberMenu(onClick, availableMembers: AvailableCube[]) {
     : availableMembers;
 
   return (
-    <Menu>
-      {hasMembers ? (
-        <>
-          <SearchMenuItem disabled>
-            <Input
-              placeholder="Search"
-              autoFocus
-              value={search}
-              allowClear
-              onKeyDown={(event) => {
-                if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
-                  event.preventDefault();
-                }
-              }}
-              onChange={(event) => {
-                setSearch(event.target.value);
-              }}
-            />
-          </SearchMenuItem>
+    <ButtonDropdown
+      {...buttonProps}
+      overlay={
+        <Menu
+          onClick={(event) => {
+            setSearch('');
+            setFilteredKeys([]);
+            onClick(indexedMembers[event.key]);
+          }}
+        >
+          {hasMembers ? (
+            <>
+              <SearchMenuItem disabled>
+                <Input
+                  placeholder="Search"
+                  autoFocus
+                  value={search}
+                  allowClear
+                  onKeyDown={(event) => {
+                    if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
+                      event.preventDefault();
+                    }
+                  }}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                  }}
+                />
+              </SearchMenuItem>
 
-          {members.map((cube) =>
-            cube.members.length > 0 ? (
-              <Menu.ItemGroup key={cube.cubeName} title={cube.cubeTitle}>
-                {cube.members.map((m) => (
-                  <Menu.Item
-                    key={m.name}
-                    data-testid={m.name}
-                    onClick={() => {
-                      setSearch('');
-                      setFilteredKeys([]);
-                      onClick(m);
-                    }}
-                  >
-                    {m.shortTitle}
-                  </Menu.Item>
-                ))}
-              </Menu.ItemGroup>
-            ) : null
-          )}
-        </>
-      ) : (
-        <Menu.Item disabled>No members found</Menu.Item>
-      )}
-    </Menu>
+              {members.map((cube) =>
+                cube.members.length > 0 ? (
+                  <Menu.ItemGroup key={cube.cubeName} title={cube.cubeTitle}>
+                    {cube.members.map((m) => (
+                      <Menu.Item key={m.name} data-testid={m.name}>
+                        {m.shortTitle}
+                      </Menu.Item>
+                    ))}
+                  </Menu.ItemGroup>
+                ) : null
+              )}
+            </>
+          ) : showNoMembersPlaceholder ? (
+            <Menu.Item disabled>No members found</Menu.Item>
+          ) : null}
+        </Menu>
+      }
+    />
   );
 }
-
-type MemberDropdownProps = {
-  availableMembers: AvailableCube[];
-  [key: string]: any;
-};
-
-const MemberDropdown = ({
-  availableMembers,
-  onClick,
-  ...buttonProps
-}: MemberDropdownProps) => (
-  <ButtonDropdown
-    overlay={memberMenu(onClick, availableMembers)}
-    {...buttonProps}
-  />
-);
-
-export default MemberDropdown;

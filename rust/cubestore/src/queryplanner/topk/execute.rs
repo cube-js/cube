@@ -5,6 +5,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::DFSchemaRef;
 use datafusion::physical_plan::aggregates::AggregateFunction;
@@ -152,7 +153,7 @@ impl ExecutionPlan for AggregateTopKExec {
         let mut tasks = Vec::with_capacity(nodes);
         for p in 0..nodes {
             let cluster = self.cluster.clone();
-            tasks.push(tokio::spawn(async move {
+            tasks.push(cube_ext::spawn(async move {
                 // fuse the streams to simplify further code.
                 cluster.execute(p).await.map(|s| (s.schema(), s.fuse()))
             }));
@@ -563,7 +564,7 @@ impl TopKState<'_> {
     fn update_group_estimates(&self, group: &mut Group) -> Result<(), DataFusionError> {
         for i in 0..group.estimates.len() {
             group.estimates[i].reset();
-            group.estimates[i].merge(&group.accumulators[i].state()?.to_vec())?;
+            group.estimates[i].merge(&group.accumulators[i].state()?)?;
             // Node estimate might contain a neutral value (e.g. '0' for sum), but we must avoid
             // giving invalid estimates for NULL values.
             let use_node_estimates =
@@ -575,8 +576,7 @@ impl TopKState<'_> {
                         continue;
                     }
                     if use_node_estimates {
-                        group.estimates[i]
-                            .merge(&self.node_estimates[node][i].state()?.to_vec())?;
+                        group.estimates[i].merge(&self.node_estimates[node][i].state()?)?;
                     }
                 }
             }

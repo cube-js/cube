@@ -9,14 +9,11 @@
     "checkJs": true,
     "jsx": "react-jsx",
     "allowSyntheticDefaultImports": true,
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": true,
     "esModuleInterop": true,
     "strict": true,
+    "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
@@ -25,14 +22,6 @@
     "noImplicitAny": false,
     "noEmit": true
   },
-  "exclude": [
-    "node_modules",
-    "build",
-    "lib",
-    "dist",
-    "charts-dist"
-  ],
-  "include": [
-    "src"
-  ]
+  "exclude": ["node_modules", "build", "lib", "dist", "charts-dist"],
+  "include": ["src"]
 }

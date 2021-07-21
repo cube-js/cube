@@ -1,5 +1,12 @@
-import { CheckAuthFn, CheckAuthMiddlewareFn, ExtendContextFn, QueryTransformerFn, JWTOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
-import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
+import {
+  CheckAuthFn,
+  CheckAuthMiddlewareFn,
+  ExtendContextFn,
+  JWTOptions,
+  UserBackgroundContext,
+  QueryRewriteFn,
+} from '@cubejs-backend/api-gateway';
+import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
 
@@ -69,6 +76,7 @@ export type DatabaseType =
   | 'sqlite';
 
 export type ContextToAppIdFn = (context: RequestContext) => string;
+export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
 
@@ -84,7 +92,7 @@ export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type LoggerFn = (msg: string, params: any) => void;
+export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
@@ -98,13 +106,16 @@ export interface CreateOptions {
   dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
-  contextToOrchestratorId?: (context: RequestContext) => string;
+  contextToOrchestratorId?: ContextToOrchestratorIdFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   jwt?: JWTOptions;
-  queryTransformer?: QueryTransformerFn;
+  // @deprecated Please use queryRewrite
+  queryTransformer?: QueryRewriteFn;
+  queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string;
   extendContext?: ExtendContextFn;
@@ -128,3 +139,7 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
 }
+
+export type SystemOptions = {
+  isCubeConfigEmpty: boolean;
+};

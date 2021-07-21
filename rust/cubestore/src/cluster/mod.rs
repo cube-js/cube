@@ -5,7 +5,7 @@ pub mod transport;
 pub mod worker_pool;
 
 #[cfg(not(target_os = "windows"))]
-use crate::cluster::worker_pool::{MessageProcessor, WorkerPool};
+use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
@@ -34,6 +34,7 @@ use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use chrono::Utc;
 use core::mem;
+use datafusion::cube_ext;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
 use flatbuffers::bitflags::_core::pin::Pin;
 use futures::future::join_all;
@@ -62,7 +63,6 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
-use tracing_futures::WithSubscriber;
 
 #[automock]
 #[async_trait]
@@ -192,6 +192,14 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
             }
         }
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+#[ctor::ctor]
+fn proc_handler() {
+    crate::util::respawn::register_handler(
+        worker_main::<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>), WorkerProcessor>,
+    );
 }
 
 struct JobRunner {
@@ -499,7 +507,7 @@ impl JobRunner {
         let job_id = job.get_id();
         let (mut tx, rx) = oneshot::channel::<()>();
         let meta_store = self.meta_store.clone();
-        let heart_beat_timer = tokio::spawn(async move {
+        let heart_beat_timer = cube_ext::spawn(async move {
             loop {
                 tokio::select! {
                     _ = tx.closed() => {
@@ -551,7 +559,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::WALs, wal_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let wal_id = *wal_id;
-                    tokio::spawn(async move { chunk_store.partition(wal_id).await }).await??
+                    cube_ext::spawn(async move { chunk_store.partition(wal_id).await }).await??
                 } else {
                     Self::fail_job_row_key(job);
                 }
@@ -560,7 +568,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let partition_id = *partition_id;
-                    tokio::spawn(async move { chunk_store.repartition(partition_id).await })
+                    cube_ext::spawn(async move { chunk_store.repartition(partition_id).await })
                         .await??
                 } else {
                     Self::fail_job_row_key(job);
@@ -570,7 +578,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
-                    tokio::spawn(async move { compaction_service.compact(partition_id).await })
+                    cube_ext::spawn(async move { compaction_service.compact(partition_id).await })
                         .await??;
                 } else {
                     Self::fail_job_row_key(job);
@@ -580,7 +588,7 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
                     let import_service = self.import_service.clone();
                     let table_id = *table_id;
-                    tokio::spawn(async move { import_service.import_table(table_id).await })
+                    cube_ext::spawn(async move { import_service.import_table(table_id).await })
                         .await??
                 } else {
                     Self::fail_job_row_key(job);
@@ -671,7 +679,7 @@ impl ClusterImpl {
                 Duration::from_secs(self.config_obj.query_timeout()),
             ));
             *pool = Some(arc.clone());
-            futures.push(tokio::spawn(
+            futures.push(cube_ext::spawn(
                 async move { arc.wait_processing_loops().await },
             ));
         }
@@ -687,7 +695,7 @@ impl ClusterImpl {
                 notify: self.job_notify.clone(),
                 jobs_enabled: self.jobs_enabled.clone(),
             };
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
             }));
         }
@@ -837,7 +845,7 @@ impl ClusterImpl {
             let cluster_to_move = cluster.clone();
             let process_fn_to_move = process_fn.clone();
 
-            tokio::spawn(async move {
+            cube_ext::spawn(async move {
                 process_fn_to_move(cluster_to_move, socket).await;
             });
         }
@@ -896,7 +904,6 @@ impl ClusterImpl {
             .zip(
                 join_all(file_futures)
                     .instrument(tracing::span!(tracing::Level::TRACE, "warmup_download"))
-                    .with_current_subscriber()
                     .await
                     .into_iter()
                     .collect::<Result<Vec<_>, _>>()?

@@ -7,6 +7,7 @@ import { StaticQuery, graphql } from 'gatsby';
 import FrameworkOfChoiceStore, {
   useFrameworkOfChoice,
 } from '../../stores/frameworkOfChoice';
+import EventBanner from '../EventBanner';
 import Search from '../Search';
 import Header from '../Header';
 import MobileFooter from './MobileFooter';
@@ -14,7 +15,7 @@ import MainMenu from './MainMenu';
 import ScrollMenu from './ScrollMenu';
 import FrameworkSwitcher from '../templates/FrameworkSwitcher';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import '../../../static/styles/prism.scss';
 import { renameCategory } from '../../rename-category';
 import {
@@ -213,6 +214,8 @@ class AppLayout extends React.Component<
         <StaticQuery
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
+            <>
+            <EventBanner />
             <Row>
               <Header
                 className={cx(styles.header, {
@@ -266,6 +269,7 @@ class AppLayout extends React.Component<
                 setMobileMode={this.setMobileMode}
               />
             </Row>
+            </>
           )}
         />
       </FrameworkOfChoiceStore>

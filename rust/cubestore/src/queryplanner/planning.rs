@@ -335,6 +335,7 @@ async fn pick_index(
         if let Some((index, _)) = indices
             .filter_map(|i| {
                 if let Some((join_on_columns, _)) = sort_on.as_ref() {
+                    // TODO: join_on_columns may be larger than sort_key_size of the index.
                     let join_columns_in_index = join_on_columns
                         .iter()
                         .map(|c| {
@@ -342,25 +343,19 @@ async fn pick_index(
                                 .get_columns()
                                 .iter()
                                 .find(|ic| ic.get_name().as_str() == c.as_str())
-                                .clone()
+                                .cloned()
                         })
-                        .collect::<Vec<_>>();
-                    if join_columns_in_index.iter().any(|c| c.is_none()) {
-                        return None;
-                    }
-                    let join_columns_indices = CubeTable::project_to_index_positions(
-                        &join_columns_in_index
-                            .into_iter()
-                            .map(|c| c.unwrap().clone())
-                            .collect(),
-                        &i,
-                    );
-                    if (0..join_columns_indices.len())
-                        .map(|i| Some(i))
-                        .collect::<HashSet<_>>()
-                        != join_columns_indices.into_iter().collect::<HashSet<_>>()
-                    {
-                        return None;
+                        .collect::<Option<Vec<_>>>();
+                    let join_columns_in_index = match join_columns_in_index {
+                        None => return None,
+                        Some(c) => c,
+                    };
+                    let join_columns_indices =
+                        CubeTable::project_to_index_positions(&join_columns_in_index, &i);
+                    for (i, col_i) in join_columns_indices.iter().enumerate() {
+                        if col_i != &Some(i) {
+                            return None;
+                        }
                     }
                 }
                 let projected_index_positions =

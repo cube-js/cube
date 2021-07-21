@@ -4,11 +4,15 @@ import { getEnv } from '@cubejs-backend/shared';
 import { QueryCache } from './QueryCache';
 import { PreAggregations } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
-import { DriverFactoryByDataSource } from './DriverFactory';
+import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { RedisQueueEventsBus } from './RedisQueueEventsBus';
+import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
-interface QueryOrchestratorOptions {
-  cacheAndQueueDriver?: 'redis' | 'memory';
-  externalDriverFactory?: any;
+export type CacheAndQueryDriverType = 'redis' | 'memory';
+
+export interface QueryOrchestratorOptions {
+  externalDriverFactory?: DriverFactory;
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
   redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: any;
   preAggregationsOptions?: any;
@@ -24,13 +28,15 @@ export class QueryOrchestrator {
 
   protected readonly redisPool: RedisPool|undefined;
 
-  protected readonly driverFactory: DriverFactoryByDataSource;
-
   protected readonly rollupOnlyMode: boolean;
+
+  private queueEventsBus: RedisQueueEventsBus|LocalQueueEventsBus;
+
+  private readonly cacheAndQueueDriver: string;
 
   public constructor(
     protected readonly redisPrefix: string,
-    driverFactory: DriverFactoryByDataSource,
+    protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
     options: QueryOrchestratorOptions = {}
   ) {
@@ -41,19 +47,19 @@ export class QueryOrchestrator {
         ? 'redis'
         : 'memory'
     );
+    this.cacheAndQueueDriver = cacheAndQueueDriver;
 
     if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
       throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
+    this.redisPool = redisPool;
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
-
-    this.driverFactory = driverFactory;
 
     this.queryCache = new QueryCache(
       this.redisPrefix,
-      this.driverFactory,
+      driverFactory,
       this.logger,
       {
         externalDriverFactory,
@@ -64,7 +70,6 @@ export class QueryOrchestrator {
         ...options.queryCacheOptions,
       }
     );
-
     this.preAggregations = new PreAggregations(
       this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
         externalDriverFactory,
@@ -72,9 +77,20 @@ export class QueryOrchestrator {
         redisPool,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
-        ...options.preAggregationsOptions
+        ...options.preAggregationsOptions,
+        getQueueEventsBus: getEnv('preAggregationsQueueEventsBus') && this.getQueueEventsBus.bind(this)
       }
     );
+  }
+
+  private getQueueEventsBus() {
+    if (!this.queueEventsBus) {
+      const isRedis = this.cacheAndQueueDriver === 'redis';
+      this.queueEventsBus = isRedis ?
+        new RedisQueueEventsBus({ redisPool: this.redisPool }) :
+        new LocalQueueEventsBus();
+    }
+    return this.queueEventsBus;
   }
 
   public async fetchQuery(queryBody: any): Promise<any> {
@@ -167,25 +183,15 @@ export class QueryOrchestrator {
     preAggregationsSchema: string,
     requestId: string,
   ) {
-    const preAggregationsByUniqueSource = preAggregations.reduce((obj, p) => {
-      const { dataSource, external } = p.preAggregation;
-      const key = JSON.stringify({ dataSource, external });
-      if (!obj.set.has(key)) {
-        obj.set.add(key);
-        obj.array.push(p.preAggregation);
-      }
-      return obj;
-    }, { set: new Set(), array: [] });
-
-    const versionEntries = await Promise.all(
-      preAggregationsByUniqueSource.array
-        .map(p => this.preAggregations.getPreAggregationVersionEntries(
-          {
-            ...p.preAggregation,
-            preAggregationsSchema
-          },
-          requestId
-        ))
+    const versionEntries = await this.preAggregations.getVersionEntries(
+      preAggregations.map(p => {
+        const { preAggregation } = p.preAggregation;
+        const partition = p.partitions[0];
+        preAggregation.dataSource = (partition && partition.dataSource) || 'default';
+        preAggregation.preAggregationsSchema = preAggregationsSchema;
+        return preAggregation;
+      }),
+      requestId
     );
 
     const flatFn = (arrResult: any[], arrItem: any[]) => ([...arrResult, ...arrItem]);
@@ -193,7 +199,7 @@ export class QueryOrchestrator {
       .map(p => p.partitions)
       .reduce(flatFn, [])
       .reduce((obj, partition) => {
-        obj[partition.sql.tableName] = partition;
+        if (partition && partition.sql) obj[partition.sql.tableName] = partition;
         return obj;
       }, {});
 
@@ -203,5 +209,40 @@ export class QueryOrchestrator {
         const partition = partitionsByTableName[versionEntry.table_name];
         return partition && versionEntry.structure_version === PreAggregations.structureVersion(partition.sql);
       });
+  }
+
+  public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {
+    if (!preAggregation.sql) return [];
+
+    const { previewSql, tableName, external, dataSource } = preAggregation.sql;
+    const targetTableName = PreAggregations.targetTableName(versionEntry);
+    const querySql = QueryCache.replacePreAggregationTableNames(previewSql, [[tableName, { targetTableName }]]);
+    const query = querySql && querySql[0];
+
+    const data = query && await this.fetchQuery({
+      continueWait: true,
+      external,
+      dataSource,
+      query,
+      requestId
+    });
+
+    return data || [];
+  }
+
+  public async expandPartitionsInPreAggregations(queryBody) {
+    return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
+  }
+
+  public async getPreAggregationQueueStates() {
+    return this.preAggregations.getQueueState();
+  }
+
+  public async subscribeQueueEvents(id, callback) {
+    return this.getQueueEventsBus().subscribe(id, callback);
+  }
+
+  public async unSubscribeQueueEvents(id) {
+    return this.getQueueEventsBus().unsubscribe(id);
   }
 }

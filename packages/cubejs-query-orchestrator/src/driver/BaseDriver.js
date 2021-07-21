@@ -209,8 +209,8 @@ export class BaseDriver {
     const types = fields.map(field => ({
       name: field,
       type: Object.keys(DbTypeValueMatcher).find(
-        type => !rows.filter(row => !!row[field]).find(row => !DbTypeValueMatcher[type](row[field])) &&
-          rows.find(row => !!row[field])
+        type => !rows.filter(row => field in row).find(row => !DbTypeValueMatcher[type](row[field])) &&
+          rows.find(row => field in row)
       ) || 'text'
     }));
 

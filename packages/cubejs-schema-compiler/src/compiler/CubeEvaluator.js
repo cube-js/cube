@@ -1,6 +1,5 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -17,7 +16,7 @@ export class CubeEvaluator extends CubeSymbols {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
 
-    Object.values(validCubes).map(this.prepareCube);
+    Object.values(validCubes).map((cube) => this.prepareCube(cube, errorReporter));
 
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
@@ -30,16 +29,58 @@ export class CubeEvaluator extends CubeSymbols {
     }));
   }
 
-  prepareCube(cube) {
+  /**
+   * @protected
+   */
+  prepareCube(cube, errorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
       for (const preAggregation of Object.values(cube.preAggregations)) {
-        if (preAggregation.scheduledRefresh === undefined) {
-          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+        if (preAggregation.timeDimension) {
+          preAggregation.timeDimensionReference = preAggregation.timeDimension;
+          delete preAggregation.timeDimension;
         }
 
-        if (preAggregation.external === undefined) {
-          preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
+        if (preAggregation.dimensions) {
+          preAggregation.dimensionReferences = preAggregation.dimensions;
+          delete preAggregation.dimensions;
+        }
+
+        if (preAggregation.measures) {
+          preAggregation.measureReferences = preAggregation.measures;
+          delete preAggregation.measures;
+        }
+
+        if (preAggregation.segments) {
+          preAggregation.segmentReferences = preAggregation.segments;
+          delete preAggregation.segments;
+        }
+
+        if (preAggregation.rollups) {
+          preAggregation.rollupReferences = preAggregation.rollups;
+          delete preAggregation.rollups;
+        }
+
+        if (preAggregation.buildRangeStart) {
+          if (preAggregation.refreshRangeStart) {
+            errorReporter.warning({
+              message: 'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+            });
+          }
+
+          preAggregation.refreshRangeStart = preAggregation.buildRangeStart;
+          delete preAggregation.buildRangeStart;
+        }
+
+        if (preAggregation.buildRangeEnd) {
+          if (preAggregation.refreshRangeEnd) {
+            errorReporter.warning({
+              message: 'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+            });
+          }
+
+          preAggregation.refreshRangeEnd = preAggregation.buildRangeEnd;
+          delete preAggregation.buildRangeEnd;
         }
       }
     }
@@ -175,19 +216,24 @@ export class CubeEvaluator extends CubeSymbols {
     if (!type) {
       throw new Error(`Type can't be undefined for '${path}'`);
     }
+
     if (!path) {
       throw new Error('Path can\'t be undefined');
     }
+
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
     if (!this.evaluatedCubes[cubeAndName[0]]) {
       throw new UserError(`Cube '${cubeAndName[0]}' not found for path '${path}'`);
     }
+
     if (!this.evaluatedCubes[cubeAndName[0]][type]) {
       throw new UserError(`${type} not defined for path '${path}'`);
     }
+
     if (!this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]]) {
       throw new UserError(`'${cubeAndName[1]}' not found for path '${path}'`);
     }
+
     return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 

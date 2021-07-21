@@ -8,7 +8,9 @@ let baseProps = {
   sentFrom: 'frontend',
 };
 let telemetry: boolean | undefined;
-let track: null | ((event: Record<string, any>, telemetry?: boolean) => Promise<any>) = null;
+let track:
+  | null
+  | ((event: Record<string, any>, telemetry?: boolean) => Promise<any>) = null;
 
 export const setTelemetry = (isAllowed) => (telemetry = isAllowed);
 

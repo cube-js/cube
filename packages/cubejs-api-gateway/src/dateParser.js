@@ -36,7 +36,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
     const span = match[2] === 'week' ? 'isoWeek' : match[2];
     momentRange = [
       moment.tz(timezone).startOf(span).add(-parseInt(match[1], 10), match[2]),
-      moment.tz(timezone).endOf(span).add(-1, match[2])
+      moment.tz(timezone).add(-1, match[2]).endOf(span)
     ];
   } else if (dateString.match(/today/)) {
     momentRange = [moment.tz(timezone).startOf('day'), moment.tz(timezone).endOf('day')];

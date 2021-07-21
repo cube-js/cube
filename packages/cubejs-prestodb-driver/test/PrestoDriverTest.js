@@ -1,8 +1,6 @@
 /* globals describe, before, after, it */
 const path = require('path');
 const { DockerComposeEnvironment, Wait } = require('testcontainers');
-// eslint-disable-next-line import/no-extraneous-dependencies
-const { Duration, TemporalUnit } = require('node-duration');
 
 const PrestoDriver = require('../driver/PrestoDriver');
 
@@ -39,14 +37,14 @@ describe('PrestoHouseDriver', () => {
     );
 
     env = await dc
-      .withStartupTimeout(new Duration(90, TemporalUnit.SECONDS))
+      .withStartupTimeout(90 * 1000)
       .withWaitStrategy('coordinator', Wait.forHealthCheck())
       .withWaitStrategy('worker0', Wait.forLogMessage('Added catalog postgresql'))
       .withWaitStrategy('postgres', Wait.forHealthCheck())
       .up();
 
     config = {
-      host: env.getContainer('coordinator').getContainerIpAddress(),
+      host: env.getContainer('coordinator').getHost(),
       port: env.getContainer('coordinator').getMappedPort(8080),
       catalog: 'postgresql',
       schema: 'default'

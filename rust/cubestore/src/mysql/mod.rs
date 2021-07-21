@@ -4,6 +4,7 @@ use crate::table::TableValue;
 use crate::util::time_span::warn_long;
 use crate::{metastore, CubeError};
 use async_trait::async_trait;
+use datafusion::cube_ext;
 use hex::ToHex;
 use log::{error, info, warn};
 use msql_srv::*;
@@ -64,7 +65,11 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             )
             .await;
         if let Err(e) = res {
-            error!("Error during processing {}: {}", query, e.message);
+            error!(
+                "Error during processing {}: {}",
+                query,
+                e.display_with_backtrace()
+            );
             results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
             return Ok(());
         }
@@ -183,7 +188,7 @@ impl ProcessingLoop for MySqlServer {
 
             let sql_service = self.sql_service.clone();
             let auth = self.auth.clone();
-            tokio::spawn(async move {
+            cube_ext::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Backend {
                         sql_service,

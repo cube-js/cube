@@ -38,3 +38,13 @@ p > code {
 	padding: 4px 6px;
 	white-space: nowrap;
 }
+
+:global(.mjx-chtml.MJXc-display) {
+  background: rgba(122, 119, 255, 0.05);
+  letter-spacing: 1px;
+  margin: 24px 0;
+  width: 100%;
+  padding: 24px 0;
+  border-radius: 3px;
+  font-size: 1.5rem;
+}

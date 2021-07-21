@@ -1,5 +1,5 @@
 import decompress from 'decompress';
-import fetch, { Headers, Request, Response } from 'node-fetch';
+import fetch, { Headers, Request, RequestInit, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
 import { SingleBar } from 'cli-progress';
@@ -12,7 +12,7 @@ import * as path from 'path';
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
 
-type ByteProgressCallback = (info: { progress: number, eta: number, speed: string }) => void;
+type ByteProgressCallback = (info: { progress: number; eta: number; speed: string }) => void;
 
 export async function streamWithProgress(
   response: Response,
@@ -63,14 +63,14 @@ export async function streamWithProgress(
 }
 
 type DownloadAndExtractFile = {
-  showProgress: boolean,
-  cwd: string,
+  showProgress: boolean;
+  cwd: string;
 };
 
 export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndExtractFile) {
   const request = new Request(url, {
     headers: new Headers({
-      'Content-Type': 'application/octet-stream'
+      'Content-Type': 'application/octet-stream',
     }),
     agent: await getHttpAgentForProxySettings(),
   });
@@ -94,7 +94,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   const savedFilePath = await streamWithProgress(response, ({ progress, speed, eta }) => {
     bar.update(progress, {
       speed,
-      eta
+      eta,
     });
   });
 

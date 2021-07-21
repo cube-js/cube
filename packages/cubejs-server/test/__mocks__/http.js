@@ -4,7 +4,7 @@
 const http = jest.requireActual('http');
 
 http.__mockServer = {
-  on: jest.fn((signal, cb) => {
+  on: jest.fn(() => {
     //
   }),
   listen: jest.fn((opts, cb) => cb && cb(null)),

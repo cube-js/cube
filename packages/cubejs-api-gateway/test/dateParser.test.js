@@ -1,4 +1,4 @@
-/* globals describe,test,expect */
+/* globals describe,test,expect,jest */
 
 import { dateParser } from '../src/dateParser';
 
@@ -67,5 +67,27 @@ describe('dateParser', () => {
     expect(() => dateParser('unexpected date', 'UTC')).toThrowError(
       'Can\'t parse date: \'unexpected date\'',
     );
+  });
+
+  test('last 6 months from month with less days than previous month', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 1, 15, 13, 0, 0, 0));
+
+    expect(dateParser('last 6 months', 'UTC', new Date(2021, 1, 15, 13, 0, 0, 0))).toStrictEqual([
+      '2020-08-01T00:00:00.000',
+      '2021-01-31T23:59:59.999',
+    ]);
+
+    Date.now.mockRestore();
+  });
+
+  test('last 6 months from month with more days than previous month', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 2, 15, 13, 0, 0, 0));
+
+    expect(dateParser('last 6 months', 'UTC', new Date(2021, 1, 15, 13, 0, 0, 0))).toStrictEqual([
+      '2020-09-01T00:00:00.000',
+      '2021-02-28T23:59:59.999',
+    ]);
+
+    Date.now.mockRestore();
   });
 });

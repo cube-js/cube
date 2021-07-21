@@ -85,8 +85,7 @@ cube(`Users`, {
 The Cube.js client provides set of methods to access Cube.js API and to work
 with query result. The client itself doesn't provide any visualizations and is
 designed to work with existing chart libraries. You can find more information
-about [the Cube.js client as well as our frontend integrations here]
-[ref-frontend-intro].
+about [the Cube.js client as well as our frontend integrations here][ref-frontend-intro].
 
 As a shortcut you can run your dev server first:
 
@@ -355,7 +354,7 @@ For more information on deploying with the Serverless Framework, consult the
 [link-serverless-framework]: https://www.serverless.com/
 [ref-dev-playground]: /dev-tools/dev-playground
 [ref-frontend-intro]: /frontend-introduction
-[ref-docker-deployment-guide]: /deployment#docker
-[ref-sls-aws-deployment-guide]: /deployment#aws-serverless-deploy
+[ref-docker-deployment-guide]: /deployment/platforms/docker
+[ref-sls-aws-deployment-guide]: /deployment/serverless/aws
 [ref-connecting-to-the-database]: /connecting-to-the-database
-[ref-cubejs-schema]: /getting-started-cubejs-schema
+[ref-cubejs-schema]: /schema/getting-started

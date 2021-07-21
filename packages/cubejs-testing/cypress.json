@@ -3,5 +3,6 @@
   "chromeWebSecurity": false,
   "viewportWidth": 1600,
   "viewportHeight": 1400,
-  "projectId": "zv1vfg"
+  "projectId": "zv1vfg",
+  "blockHosts": ["*.cube.dev"]
 }

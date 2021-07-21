@@ -24,6 +24,7 @@ use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
+use datafusion::cube_ext;
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -59,7 +60,7 @@ pub struct WorkerServices {
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
         let futures = self.spawn_processing_loops().await?;
-        tokio::spawn(async move {
+        cube_ext::spawn(async move {
             if let Err(e) = Self::wait_loops(futures).await {
                 error!("Error in processing loop: {}", e);
             }
@@ -82,22 +83,22 @@ impl CubeServices {
     async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
         let cluster = self.cluster.clone();
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
         let remote_fs = self.remote_fs.clone();
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
                 Ok(())
             }));
             let cluster = self.cluster.clone();
             let (started_tx, started_rx) = tokio::sync::oneshot::channel();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 ClusterImpl::listen_on_metastore_port(cluster, started_tx).await
             }));
             started_rx.await?;
@@ -107,29 +108,31 @@ impl CubeServices {
 
             if self.injector.has_service_typed::<MySqlServer>().await {
                 let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
-                futures.push(tokio::spawn(
-                    async move { mysql_server.processing_loop().await },
-                ));
+                futures.push(cube_ext::spawn(async move {
+                    mysql_server.processing_loop().await
+                }));
             }
             if self.injector.has_service_typed::<HttpServer>().await {
                 let http_server = self.injector.get_service_typed::<HttpServer>().await;
-                futures.push(tokio::spawn(async move { http_server.run_server().await }));
+                futures.push(cube_ext::spawn(
+                    async move { http_server.run_server().await },
+                ));
             }
         } else {
             let cluster = self.cluster.clone();
             let (started_tx, started_rx) = tokio::sync::oneshot::channel();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 ClusterImpl::listen_on_worker_port(cluster, started_tx).await
             }));
             started_rx.await?;
 
             let cluster = self.cluster.clone();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 cluster.warmup_select_worker().await;
                 Ok(())
             }))
         }
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             start_track_event_loop().await;
             Ok(())
         }));
@@ -236,6 +239,8 @@ pub trait ConfigObj: DIService {
     fn enable_startup_warmup(&self) -> bool;
 
     fn malloc_trim_every_secs(&self) -> u64;
+
+    fn max_cached_queries(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -266,6 +271,7 @@ pub struct ConfigObjImpl {
     pub enable_topk: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
+    pub max_cached_queries: usize,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -365,6 +371,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn malloc_trim_every_secs(&self) -> u64 {
         self.malloc_trim_every_secs
+    }
+    fn max_cached_queries(&self) -> usize {
+        self.max_cached_queries
     }
 }
 
@@ -468,8 +477,8 @@ impl Config {
                     .ok()
                     .map(|v| format!("0.0.0.0:{}", v)),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
-                upload_concurrency: 4,
-                download_concurrency: 8,
+                upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
+                download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env::var("CUBESTORE_MAX_DATA_FRAMES")
                     .ok()
                     .map(|v| v.parse::<usize>().unwrap())
@@ -490,6 +499,7 @@ impl Config {
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse::<u64>("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
+                max_cached_queries: env_parse::<usize>("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
             }),
         }
     }
@@ -532,6 +542,7 @@ impl Config {
                 enable_topk: true,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
+                max_cached_queries: 10_000,
             }),
         }
     }
@@ -856,6 +867,7 @@ impl Config {
 
         self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
+                let c = i.get_service_typed::<dyn ConfigObj>().await;
                 SqlServiceImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -867,9 +879,8 @@ impl Config {
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
-                    Duration::from_secs(
-                        i.get_service_typed::<dyn ConfigObj>().await.query_timeout(),
-                    ),
+                    Duration::from_secs(c.query_timeout()),
+                    c.max_cached_queries(),
                 )
             })
             .await;

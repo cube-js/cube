@@ -69,7 +69,10 @@ const BaseMeasure = {
 const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: Joi.alternatives().try(
     Joi.object().keys({
-      sql: Joi.func().required()
+      sql: Joi.func().required(),
+      // We dont support timezone for this, because it's useless
+      // We cannot support cron interval
+      every: Joi.alternatives().try(everyInterval),
     }),
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
@@ -82,12 +85,6 @@ const BasePreAggregationWithoutPartitionGranularity = {
   useOriginalSqlPreAggregations: Joi.boolean(),
   external: Joi.boolean(),
   scheduledRefresh: Joi.boolean(),
-  refreshRangeStart: {
-    sql: Joi.func().required()
-  },
-  refreshRangeEnd: {
-    sql: Joi.func().required()
-  },
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({
       sql: Joi.func().required()
@@ -96,6 +93,20 @@ const BasePreAggregationWithoutPartitionGranularity = {
       columns: Joi.func().required()
     })
   )),
+  // refreshRange was deprecated
+  refreshRangeStart: {
+    sql: Joi.func().required()
+  },
+  refreshRangeEnd: {
+    sql: Joi.func().required()
+  },
+  // new api
+  buildRangeStart: {
+    sql: Joi.func().required()
+  },
+  buildRangeEnd: {
+    sql: Joi.func().required()
+  },
 };
 
 const BasePreAggregation = {
@@ -108,7 +119,10 @@ const cubeSchema = Joi.object().keys({
   sql: Joi.func().required(),
   refreshKey: Joi.alternatives().try(
     Joi.object().keys({
-      sql: Joi.func().required()
+      sql: Joi.func().required(),
+      // We dont support timezone for this, because it's useless
+      // We cannot support cron interval
+      every: Joi.alternatives().try(everyInterval),
     }),
     Joi.object().keys({
       immutable: Joi.boolean().required()
@@ -198,15 +212,22 @@ const cubeSchema = Joi.object().keys({
       type: Joi.any().valid('autoRollup').required(),
       maxPreAggregations: Joi.number(),
     })),
+    // OriginalSQL partitioning with references
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
       timeDimensionReference: Joi.func().required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
     })),
+    // OriginalSQL partitioning without references
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
+      type: Joi.any().valid('originalSql').required(),
+      timeDimension: Joi.func().required(),
+      partitionGranularity: BasePreAggregation.partitionGranularity.required(),
+    })),
     Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
       type: Joi.any().valid('originalSql').required(),
     })),
-    // TODO duplicate
+    // RollupJoin with references
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
       measureReferences: Joi.func(),
@@ -214,7 +235,6 @@ const cubeSchema = Joi.object().keys({
       segmentReferences: Joi.func(),
       rollupReferences: Joi.func().required(),
     })),
-    // TODO duplicate
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
       measureReferences: Joi.func(),
@@ -226,6 +246,26 @@ const cubeSchema = Joi.object().keys({
       ).required(),
       rollupReferences: Joi.func().required(),
     })),
+    // RollupJoin without references
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
+      type: Joi.any().valid('rollupJoin').required(),
+      measures: Joi.func(),
+      dimensions: Joi.func(),
+      segments: Joi.func(),
+      rollups: Joi.func().required(),
+    })),
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
+      type: Joi.any().valid('rollupJoin').required(),
+      measures: Joi.func(),
+      dimensions: Joi.func(),
+      segments: Joi.func(),
+      timeDimension: Joi.func().required(),
+      granularity: Joi.any().valid(
+        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+      ).required(),
+      rollups: Joi.func().required(),
+    })),
+    // Rollup with references
     Joi.object().keys(Object.assign({}, BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
@@ -238,6 +278,23 @@ const cubeSchema = Joi.object().keys({
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
       timeDimensionReference: Joi.func().required(),
+      granularity: Joi.any().valid(
+        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+      ).required()
+    })),
+    // Rollup without References postfix
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
+      type: Joi.any().valid('rollup').required(),
+      measures: Joi.func(),
+      dimensions: Joi.func(),
+      segments: Joi.func()
+    })),
+    Joi.object().keys(Object.assign({}, BasePreAggregation, {
+      type: Joi.any().valid('rollup').required(),
+      measures: Joi.func(),
+      dimensions: Joi.func(),
+      segments: Joi.func(),
+      timeDimension: Joi.func().required(),
       granularity: Joi.any().valid(
         'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
       ).required()
