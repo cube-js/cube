@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.5](https://github.com/cube-js/cube.js/compare/v0.28.4...v0.28.5) (2021-07-21)
+
+
+### Bug Fixes
+
+* **cubestore:** only pick index with exact column order ([f873a0c](https://github.com/cube-js/cube.js/commit/f873a0c2ba31dbc2ca80d4cdb0d5151a39f9e912))
+
+
+
+
+
 ## [0.28.3](https://github.com/cube-js/cube.js/compare/v0.28.2...v0.28.3) (2021-07-20)
 
 
