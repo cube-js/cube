@@ -339,6 +339,8 @@ cube(`Orders`, {
       },
     },
   },
+});
+```
 
 Partition tables are refreshed as a whole. When a new partition table is
 available, it replaces the old one. Old partition tables are collected by
