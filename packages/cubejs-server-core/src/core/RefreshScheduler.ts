@@ -1,5 +1,5 @@
 import R from 'ramda';
-import { v4 as uuid } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { Required } from '@cubejs-backend/shared';
 
 import { CubejsServerCore } from './server';
@@ -141,7 +141,7 @@ export class RefreshScheduler {
       authInfo: null,
       securityContext: {},
       ...ctx,
-      requestId: `scheduler-${ctx && ctx.requestId || uuid()}`,
+      requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
     const queryingOptions: ScheduledRefreshQueryingOptions = {
