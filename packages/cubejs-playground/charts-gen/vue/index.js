@@ -8,8 +8,8 @@ const {
   AppContainer,
   DependencyTree,
   DevPackageFetcher,
-  executeCommand
 } = require('@cubejs-backend/templates');
+const { executeCommand } = require('@cubejs-backend/shared');
 
 const { REPOSITORY } = require('../env');
 const { generateCodeChunks } = require('./code-chunks-gen');

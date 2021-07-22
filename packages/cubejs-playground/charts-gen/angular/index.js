@@ -5,8 +5,8 @@ const {
   AppContainer,
   DependencyTree,
   DevPackageFetcher,
-  executeCommand
 } = require('@cubejs-backend/templates');
+const { executeCommand } = require('@cubejs-backend/shared');
 
 const path = require('path');
 const { generateCodeChunks } = require('./code-chunks-gen');

@@ -4,5 +4,9 @@
   "viewportWidth": 1600,
   "viewportHeight": 1400,
   "projectId": "zv1vfg",
-  "blockHosts": ["*.cube.dev"]
+  "blockHosts": ["*.cube.dev"],
+  "retries": {
+    "runMode": 2,
+    "openMode": 0
+  }
 }

@@ -17,15 +17,25 @@
 // import 'cypress-plugin-snapshots/commands';
 
 import 'cypress-localstorage-commands';
-import '@4tw/cypress-drag-drop'
+import '@4tw/cypress-drag-drop';
 import { addMatchImageSnapshotCommand } from 'cypress-image-snapshot/command';
 
-import './commands'
+import './commands';
 
 addMatchImageSnapshotCommand({
-  capture: 'viewport'
+  capture: 'viewport',
 });
 
 after(() => {
   cy.exec(`rm -rf cypress/screenshots/playground-explore.spec.js/tmp`);
-})
+});
+
+const resizeObserverLoopErrRe = /^ResizeObserver loop limit exceeded/;
+
+Cypress.on('uncaught:exception', (err) => {
+  if (resizeObserverLoopErrRe.test(err.message)) {
+    // returning false here prevents Cypress from
+    // failing the test
+    return false;
+  }
+});

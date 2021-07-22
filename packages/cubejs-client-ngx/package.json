@@ -56,10 +56,5 @@
   "fesm2015": "dist/fesm2015/cubejs-client-ngx.js",
   "typings": "dist/cubejs-client-ngx.d.ts",
   "metadata": "dist/cubejs-client-ngx.metadata.json",
-  "sideEffects": false,
-  "__processed_by_ivy_ngcc__": {
-    "es2015": "10.1.0",
-    "fesm2015": "10.1.0",
-    "typings": "10.1.0"
-  }
+  "sideEffects": false
 }
