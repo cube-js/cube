@@ -1,6 +1,6 @@
 import { fetch } from 'whatwg-fetch';
 import cookie from 'js-cookie';
-import uuidv4 from 'uuid/v4';
+import { v4 as uuid } from 'uuid';
 
 let flushPromise = null;
 let trackEvents: BaseEvent[] = [];
@@ -25,7 +25,7 @@ export const trackImpl = async (event) => {
 
   if (!clientAnonymousId) {
     clientAnonymousId = <string>(
-      (cookie.get('playground_anonymous') || uuidv4().toString())
+      (cookie.get('playground_anonymous') || uuid().toString())
     );
     localStorage.setItem('playground_anonymous', clientAnonymousId);
     cookie.remove('playground_anonymous');
@@ -34,7 +34,7 @@ export const trackImpl = async (event) => {
   trackEvents.push({
     ...baseProps,
     ...event,
-    id: uuidv4(),
+    id: uuid(),
     clientAnonymousId,
     clientTimestamp: new Date().toJSON(),
   });
