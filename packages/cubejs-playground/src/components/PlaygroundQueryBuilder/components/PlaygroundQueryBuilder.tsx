@@ -477,7 +477,7 @@ export function PlaygroundQueryBuilder({
                     isChartRendererReady={isChartRendererReady}
                     query={query}
                     error={error}
-                    chartType={chartType}
+                    chartType={chartType || 'line'}
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}

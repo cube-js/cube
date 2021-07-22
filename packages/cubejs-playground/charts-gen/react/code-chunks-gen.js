@@ -6,7 +6,13 @@ const generator = require('@babel/generator').default;
 function generateCodeChunks(chartRendererCode) {
   const ts = new TargetSource('ChartRenderer.js', chartRendererCode);
 
-  const imports = ts.imports.map(({ node }) => generator(node, {}).code);
+  const imports = ts.imports.map((path) => {
+    if (!path.get('source').node.value.startsWith('.')) {
+      return generator(path.node, {}).code;
+    }
+
+    return false;
+  }).filter(Boolean);
 
   const chartComponents = getChartComponents(ts).map(({ key, code }) => {
     return `

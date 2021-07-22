@@ -66,6 +66,10 @@ platformBrowserDynamic().bootstrapModule(AppModule)
   },
 };
 
+const peerDependencies = {
+  'react-chartjs-2': 'chart.js',
+};
+
 export function codeSandboxDefinition(template, files, dependencies = []) {
   return {
     files: {
@@ -79,7 +83,14 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
             ...bootstrapDefinition[template]?.dependencies,
             ...dependencies.reduce((memo, d) => {
               const [name, version] = Array.isArray(d) ? d : [d, 'latest'];
-              return { ...memo, [name]: version };
+
+              return {
+                ...memo,
+                [name]: version,
+                ...(peerDependencies[name]
+                  ? { [peerDependencies[name]]: 'latest' }
+                  : null),
+              };
             }, {}),
           },
         },

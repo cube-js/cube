@@ -9,7 +9,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@cubejs-backend/templates": "^0.27.30",
+    "@cubejs-backend/shared": "^0.28.2",
+    "@cubejs-backend/templates": "^0.28.2",
     "@cubejs-templates/core": "^0.0.7",
     "change-case": "^4.1.1",
     "fs-extra": "^9.0.1",
