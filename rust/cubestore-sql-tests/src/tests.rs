@@ -1,3 +1,4 @@
+use crate::rows::rows;
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -50,6 +51,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
         t("coalesce", coalesce),
+        t("count_distinct_crash", count_distinct_crash),
+        t(
+            "count_distinct_group_by_crash",
+            count_distinct_group_by_crash,
+        ),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -83,8 +89,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("rolling_window_join", rolling_window_join),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
+        t("date_add", date_add),
         t("now", now),
         t("dump", dump),
+        t("unsorted_merge_assertion", unsorted_merge_assertion),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -392,19 +400,34 @@ async fn join(service: Box<dyn SqlClient>) {
     let result = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON o.customer_id = c.id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
     assert_eq!(
-        result.get_rows()[0],
-        Row::new(vec![
-            TableValue::String("San Francisco".to_string()),
-            TableValue::Int(10)
-        ])
+        to_rows(&result),
+        vec![
+            vec![
+                TableValue::String("San Francisco".to_string()),
+                TableValue::Int(10)
+            ],
+            vec![
+                TableValue::String("New York".to_string()),
+                TableValue::Int(5)
+            ]
+        ]
     );
-    assert_eq!(
-        result.get_rows()[1],
-        Row::new(vec![
-            TableValue::String("New York".to_string()),
-            TableValue::Int(5)
-        ])
-    );
+
+    // Same query, reverse comparison order.
+    let result2 = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON c.id = o.customer_id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+    assert_eq!(result.get_rows(), result2.get_rows());
+
+    // Join on non-existing field.
+    assert!(service.exec_query("SELECT c.id, sum(o.amount) FROM foo.customers c JOIN foo.orders o ON c.id = o.not_found")
+        .await.is_err());
+    assert!(service.exec_query("SELECT c.id, sum(o.amount) FROM foo.customers c JOIN foo.orders o ON o.not_found = c.id")
+        .await.is_err());
+
+    // Join on ambiguous fields.
+    assert!(service
+        .exec_query("SELECT c.id, k.id FROM foo.customers c JOIN foo.customers k ON id = id")
+        .await
+        .is_err());
 }
 
 async fn three_tables_join(service: Box<dyn SqlClient>) {
@@ -1016,6 +1039,79 @@ async fn coalesce(service: Box<dyn SqlClient>) {
         .exec_query("SELECT n, coalesce() FROM s.Data ORDER BY 1")
         .await
         .unwrap_err();
+}
+
+async fn count_distinct_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data (n int)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+
+    service
+        .exec_query("INSERT INTO s.Data(n) VALUES (1), (2), (3), (3), (4), (4), (4)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data WHERE n > 4")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT CASE WHEN n > 4 THEN n END) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+}
+
+async fn count_distinct_group_by_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data (n string)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data (n) VALUES ('a'), ('b'), ('c'), ('b'), ('c')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT n, COUNT(DISTINCT CASE WHEN n <> 'a' THEN n END), COUNT(*) \
+             FROM s.Data \
+             GROUP BY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![
+                TableValue::String("a".to_string()),
+                TableValue::Int(0),
+                TableValue::Int(1)
+            ],
+            vec![
+                TableValue::String("b".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+            vec![
+                TableValue::String("c".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+        ]
+    );
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
@@ -2248,12 +2344,6 @@ async fn topk_query(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, i)| vec![TableValue::String(s.to_string()), TableValue::Int(*i)])
-            .collect_vec()
-    }
 }
 
 async fn topk_decimals(service: Box<dyn SqlClient>) {
@@ -2288,18 +2378,10 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("z", 100), ("y", 80), ("b", 52)]));
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, i)| {
-                vec![
-                    TableValue::String(s.to_string()),
-                    TableValue::Decimal(Decimal::new(*i * 100_000)),
-                ]
-            })
-            .collect_vec()
-    }
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
+    );
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -2350,12 +2432,6 @@ async fn offset(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["h", "g", "f"]));
-
-    fn rows(a: &[&str]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|s| vec![TableValue::String(s.to_string())])
-            .collect_vec()
-    }
 }
 
 async fn having(service: Box<dyn SqlClient>) {
@@ -2426,12 +2502,6 @@ async fn having(service: Box<dyn SqlClient>) {
         )
         .await;
     assert!(err.is_err());
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, n)| vec![TableValue::String(s.to_string()), TableValue::Int(*n)])
-            .collect_vec()
-    }
 }
 
 async fn rolling_window_join(service: Box<dyn SqlClient>) {
@@ -2536,18 +2606,6 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
             ])
         );
     }
-
-    fn rows(a: &[(TimestampValue, &str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(t, s, n)| {
-                vec![
-                    TableValue::Timestamp(*t),
-                    TableValue::String(s.to_string()),
-                    TableValue::Int(*n),
-                ]
-            })
-            .collect_vec()
-    }
 }
 
 async fn decimal_index(service: Box<dyn SqlClient>) {
@@ -2569,24 +2627,20 @@ async fn decimal_index(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * FROM s.Data ORDER BY x")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[(1, 2), (2, 3), (3, 4)]));
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(dec5(1), dec5(2)), (dec5(2), dec5(3)), (dec5(3), dec5(4))])
+    );
 
     let r = service
         .exec_query("SELECT * FROM s.Data ORDER BY y DESC")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[(3, 4), (2, 3), (1, 2)]));
-
-    fn rows(a: &[(i64, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(x, y)| {
-                vec![
-                    TableValue::Decimal(Decimal::new(x * 100000)),
-                    TableValue::Decimal(Decimal::new(y * 100000)),
-                ]
-            })
-            .collect_vec()
-    }
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(dec5(3), dec5(4)), (dec5(2), dec5(3)), (dec5(1), dec5(2))])
+    );
 }
 
 async fn float_index(service: Box<dyn SqlClient>) {
@@ -2615,17 +2669,94 @@ async fn float_index(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+}
 
-    fn rows(a: &[(f64, f64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(x, y)| {
-                vec![
-                    TableValue::Float((*x).into()),
-                    TableValue::Float((*y).into()),
-                ]
-            })
-            .collect_vec()
-    }
+async fn date_add(service: Box<dyn SqlClient>) {
+    let r = service
+        .exec_query(
+            "SELECT
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 second'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 minute'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 hour'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 day 1 hour 1 minute 1 second'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 year'),\
+            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '13 month'),\
+            DATE_ADD(CAST('2021-01-01T23:59:00Z' as TIMESTAMP), INTERVAL '1 minute'),\
+            DATE_ADD(CAST('2021-12-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2021-12-31T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2020-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2021-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
+            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 year'),\
+            DATE_ADD(CAST('2021-01-30T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2020-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
+            DATE_ADD(CAST('2021-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month')\
+        ",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![
+            // Simple tests for IntervalDayTime
+            TableValue::Timestamp(timestamp_from_string("2021-01-01T00:00:01Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-01T00:01:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-01T01:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-02T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-01-02T01:01:01Z").unwrap()),
+            // Simple tests for IntervalYearMonth
+            TableValue::Timestamp(timestamp_from_string("2021-02-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-02-01T00:00:00Z").unwrap()),
+            // Calculation logic
+            TableValue::Timestamp(timestamp_from_string("2021-01-02T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-03-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-03-01T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
+            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
+        ],]
+    );
+}
+
+async fn unsorted_merge_assertion(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(x int, y int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data1(x,y) VALUES (1, 4), (2, 3), (3, 2)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.Data2(x int, y int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(x,y) VALUES (1, 4), (2, 3), (3, 2)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT x, y, count(x) \
+             FROM (SELECT * FROM s.Data1 UNION ALL \
+                   SELECT * FROM s.Data2)\
+             GROUP BY y, x \
+             ORDER BY y, x",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3, 2, 2), (2, 3, 2), (1, 4, 2)]));
 }
 
 async fn now(service: Box<dyn SqlClient>) {
@@ -2703,4 +2834,8 @@ fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
         .iter()
         .map(|r| r.values().clone())
         .collect_vec();
+}
+
+fn dec5(i: i64) -> Decimal {
+    Decimal::new(i * 100_000)
 }

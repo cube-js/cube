@@ -1,10 +1,11 @@
 import {
   createContext,
   ReactNode,
-  useContext,
+  useCallback,
   useEffect,
-  useState,
+  useState
 } from 'react';
+import { useAppContext } from '../hooks';
 
 export type PlaygroundContext = {
   anonymousId: string;
@@ -16,6 +17,11 @@ export type PlaygroundContext = {
   shouldStartConnectionWizardFlow: boolean;
   dockerVersion: string | null;
   identifier: string;
+  previewFeatures: boolean;
+  serverCoreVersion: string;
+  // @deprecated
+  coreServerVersion: string;
+  isCloud: boolean;
   livePreview?: boolean;
 };
 
@@ -26,14 +32,16 @@ export type SystemContext = {
 };
 
 export type ContextProps = {
+  ready: boolean;
+  playgroundContext: Partial<PlaygroundContext>;
+  token?: string | null;
   identifier?: string | null;
-  playgroundContext?: PlaygroundContext;
   setContext: (context: Partial<ContextProps> | null) => void;
 };
 
 export type AppContextProps = {
   children: ReactNode;
-} & Omit<ContextProps, 'setContext'>;
+} & Omit<ContextProps, 'ready' | 'setContext'>;
 
 export const AppContext = createContext<ContextProps>({} as ContextProps);
 
@@ -41,20 +49,29 @@ export function AppContextProvider({
   children,
   ...contextProps
 }: AppContextProps) {
-  const [context, setContext] = useState<Partial<ContextProps> | null>(
+  const [context, setContextState] = useState<Partial<ContextProps> | null>(
     contextProps || null
   );
+
+  const setContext = useCallback<(context: Partial<ContextProps> | null) => any>((context) => {
+    setContextState((currentContext) => ({
+      ...currentContext,
+      ...context,
+      playgroundContext: {
+        ...currentContext?.playgroundContext,
+        ...context?.playgroundContext,
+      }
+    }));
+  }, []);
 
   return (
     <AppContext.Provider
       value={{
+        ready: false,
         ...context,
-        setContext(context: Partial<ContextProps> | null) {
-          setContext((currentContext) => ({
-            ...context,
-            ...currentContext,
-          }));
-        },
+        token: context?.token || null,
+        playgroundContext: context?.playgroundContext || {},
+        setContext
       }}
     >
       {children}
@@ -74,8 +91,4 @@ export function AppContextConsumer({ onReady }: AppContextConsumerProps) {
   }, [context]);
 
   return null;
-}
-
-export function useAppContext() {
-  return useContext(AppContext);
 }

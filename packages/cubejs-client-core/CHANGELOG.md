@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.1](https://github.com/cube-js/cube.js/compare/v0.28.0...v0.28.1) (2021-07-19)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+
+
+
+
+# [0.28.0](https://github.com/cube-js/cube.js/compare/v0.27.53...v0.28.0) (2021-07-17)
+
+
+### Features
+
+* Move partition range evaluation from Schema Compiler to Query Orchestrator to allow unbounded queries on partitioned pre-aggregations ([8ea654e](https://github.com/cube-js/cube.js/commit/8ea654e93b57014fb2409e070b3a4c381985a9fd))
+
+
+
+
+
+## [0.27.51](https://github.com/cube-js/cube.js/compare/v0.27.50...v0.27.51) (2021-07-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** incorrect types for logical and/or in query filters ([#3083](https://github.com/cube-js/cube.js/issues/3083)) ([d7014a2](https://github.com/cube-js/cube.js/commit/d7014a21add8d264d92987a3c840d98d09545457))
+
+
+
+
+
+## [0.27.48](https://github.com/cube-js/cube.js/compare/v0.27.47...v0.27.48) (2021-07-08)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Long Query 413 URL too large ([#3072](https://github.com/cube-js/cube.js/issues/3072)) ([67de4bc](https://github.com/cube-js/cube.js/commit/67de4bc3de69a4da86d4c8d241abe5d921d0e658))
+* **@cubejs-client/core:** week granularity ([#3076](https://github.com/cube-js/cube.js/issues/3076)) ([80812ea](https://github.com/cube-js/cube.js/commit/80812ea4027a929729187b096088f38829e9fa27))
+
+
+### Performance Improvements
+
+* **@cubejs-client/core:** speed up the pivot implementaion ([#3075](https://github.com/cube-js/cube.js/issues/3075)) ([d6d7a85](https://github.com/cube-js/cube.js/commit/d6d7a858ea8e3940b034cd12ed1630c53e55ea6d))
+
+
+
+
+
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+
+### Features
+
+* **@cubejs-client/playground:** rollup designer v2 ([#3018](https://github.com/cube-js/cube.js/issues/3018)) ([07e2427](https://github.com/cube-js/cube.js/commit/07e2427bb8050a74bae3a4d9206a7cfee6944022))
+
+
+
+
+
 ## [0.27.41](https://github.com/cube-js/cube.js/compare/v0.27.40...v0.27.41) (2021-06-25)
 
 **Note:** Version bump only for package @cubejs-client/core

@@ -4,6 +4,7 @@ use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use cloud_storage::Object;
+use datafusion::cube_ext;
 use futures::StreamExt;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
@@ -162,7 +163,7 @@ impl RemoteFs for GCSRemoteFs {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let (temp_file, temp_path) =
-                tokio::task::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
+                cube_ext::spawn_blocking(move || NamedTempFile::new_in(downloads_dirs))
                     .await??
                     .into_parts();
             let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
@@ -180,12 +181,11 @@ impl RemoteFs for GCSRemoteFs {
             }
             writer.flush().await?;
 
-            local_file =
-                tokio::task::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
-                    temp_path.persist(&local_file)?;
-                    Ok(local_file)
-                })
-                .await??;
+            local_file = cube_ext::spawn_blocking(move || -> Result<PathBuf, PathPersistError> {
+                temp_path.persist(&local_file)?;
+                Ok(local_file)
+            })
+            .await??;
 
             info!(
                 "Downloaded {} ({:?}) ({} bytes)",

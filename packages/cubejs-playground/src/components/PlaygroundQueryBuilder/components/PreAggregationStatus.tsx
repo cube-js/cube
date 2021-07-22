@@ -13,7 +13,7 @@ import { Query } from '@cubejs-client/core';
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { QueryStatus } from './PlaygroundQueryBuilder';
 import { RollupDesigner } from '../../RollupDesigner';
-import { useToggle } from '../../../hooks';
+import { useServerCoreVersionGte, useToggle } from '../../../hooks';
 
 const { Link } = Typography;
 
@@ -26,6 +26,7 @@ const Badge = styled.div`
 `;
 
 type PreAggregationStatusProps = QueryStatus & {
+  apiUrl: string;
   availableMembers: AvailableMembers;
   query: Query;
 };
@@ -37,7 +38,9 @@ export function PreAggregationStatus({
   preAggregationType,
   ...props
 }: PreAggregationStatusProps) {
+  const isVersionGte = useServerCoreVersionGte('0.28.4');
   const [isModalOpen, toggleModal] = useToggle();
+
   // hide it for the time being
   // const renderTime = () => (
   //   <Typography.Text strong style={{ color: 'rgba(20, 20, 70, 0.85)' }}>
@@ -63,11 +66,11 @@ export function PreAggregationStatus({
           <Typography.Text>
             Query was accelerated with pre-aggregation
           </Typography.Text>
-        ) : (
+        ) : isVersionGte ? (
           <Button type="link" onClick={toggleModal}>
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
-        )}
+        ) : null}
 
         {isAggregated && external && extDbType !== 'cubestore' ? (
           <Alert
@@ -110,9 +113,10 @@ export function PreAggregationStatus({
       >
         {props.transformedQuery ? (
           <RollupDesigner
+            apiUrl={props.apiUrl}
             defaultQuery={props.query}
             availableMembers={props.availableMembers}
-            defaultTransformedQuery={props.transformedQuery}
+            transformedQuery={props.transformedQuery}
           />
         ) : null}
       </Modal>

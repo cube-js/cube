@@ -29,13 +29,13 @@ pub fn try_switch_to_inplace_aggregates(
     // Try to cheaply rearrange the plan so that it produces sorted inputs.
     let new_input = try_regroup_columns(agg.input().clone())?;
 
-    if compute_aggregation_strategy(new_input.as_ref(), agg.group_expr())
-        != AggregateStrategy::InplaceSorted
-    {
+    let (strategy, order) = compute_aggregation_strategy(new_input.as_ref(), agg.group_expr());
+    if strategy != AggregateStrategy::InplaceSorted {
         return Ok(p);
     }
     Ok(Arc::new(HashAggregateExec::try_new(
         AggregateStrategy::InplaceSorted,
+        order,
         *agg.mode(),
         agg.group_expr().into(),
         agg.aggr_expr().into(),

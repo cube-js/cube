@@ -179,4 +179,21 @@ export class OrchestratorApi {
   public getPreAggregationPreview(context: RequestContext, preAggregation, versionEntry) {
     return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, versionEntry);
   }
+
+  public expandPartitionsInPreAggregations(queryBody) {
+    return this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+  }
+
+  public async getPreAggregationQueueStates() {
+    const result = await this.orchestrator.getPreAggregationQueueStates();
+    return result;
+  }
+
+  public async subscribeQueueEvents(id, callback) {
+    return this.orchestrator.subscribeQueueEvents(id, callback);
+  }
+
+  public async unSubscribeQueueEvents(id) {
+    return this.orchestrator.unSubscribeQueueEvents(id);
+  }
 }

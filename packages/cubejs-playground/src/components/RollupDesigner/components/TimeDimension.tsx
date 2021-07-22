@@ -3,7 +3,7 @@ import {
   TCubeMember,
   TimeDimensionGranularity,
 } from '@cubejs-client/core';
-import { Typography, Button, Menu } from 'antd';
+import { Typography, Menu } from 'antd';
 import styled from 'styled-components';
 import ButtonDropdown from '../../../QueryBuilder/ButtonDropdown';
 import MemberDropdown from '../../../QueryBuilder/MemberDropdown';

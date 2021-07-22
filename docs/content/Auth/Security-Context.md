@@ -168,7 +168,7 @@ build one from a JSON object.
 [link-multitenancy]: /multitenancy-setup
 [ref-config-sched-refresh]: /config#options-reference-scheduled-refresh-contexts
 [ref-config-sec-ctx]: /config#request-context-security-context
-[ref-schema-sec-ctx]: /cube#context-variables-security-context
+[ref-schema-sec-ctx]: /schema/reference/cube#context-variables-security-context
 [ref-cubes-compile-ctx]:
   https://cube.dev/docs/cube#context-variables-compile-context
 [ref-sec-ctx-vs-compile-ctx]:

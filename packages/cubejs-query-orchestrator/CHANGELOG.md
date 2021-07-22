@@ -3,6 +3,93 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.3](https://github.com/cube-js/cube.js/compare/v0.28.2...v0.28.3) (2021-07-20)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Wrong detection for 0 (zero integer) ([#3126](https://github.com/cube-js/cube.js/issues/3126)) ([39a6b1c](https://github.com/cube-js/cube.js/commit/39a6b1c2928995de4e91cb5242dd18a964e6d616))
+
+
+
+
+
+## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
+
+
+### Bug Fixes
+
+* Use experimental flag for pre-aggregations queue events bus, debug API ([#3130](https://github.com/cube-js/cube.js/issues/3130)) ([4f141d7](https://github.com/cube-js/cube.js/commit/4f141d789cd0058b2e7c07af6a16642d6c145834))
+
+
+
+
+
+## [0.28.1](https://github.com/cube-js/cube.js/compare/v0.28.0...v0.28.1) (2021-07-19)
+
+
+### Features
+
+* Subscribe to pre-aggregations queue events, debug API  ([#3116](https://github.com/cube-js/cube.js/issues/3116)) ([9f0e52e](https://github.com/cube-js/cube.js/commit/9f0e52e012bf94d2adb5a70a75b4b1fb151238ea))
+
+
+
+
+
+# [0.28.0](https://github.com/cube-js/cube.js/compare/v0.27.53...v0.28.0) (2021-07-17)
+
+
+### Features
+
+* Move partition range evaluation from Schema Compiler to Query Orchestrator to allow unbounded queries on partitioned pre-aggregations ([8ea654e](https://github.com/cube-js/cube.js/commit/8ea654e93b57014fb2409e070b3a4c381985a9fd))
+
+
+
+
+
+## [0.27.53](https://github.com/cube-js/cube.js/compare/v0.27.52...v0.27.53) (2021-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.27.51](https://github.com/cube-js/cube.js/compare/v0.27.50...v0.27.51) (2021-07-13)
+
+
+### Bug Fixes
+
+* Use orphaned timeout from query body, pre-aggregations queue, debug API ([#3088](https://github.com/cube-js/cube.js/issues/3088)) ([83e0a0a](https://github.com/cube-js/cube.js/commit/83e0a0a2d68fe94f193cfbb4fedb3f44d0b3cc27))
+
+
+### Features
+
+* Manual build pre-aggregations, getter for queue state, debug API   ([#3080](https://github.com/cube-js/cube.js/issues/3080)) ([692372e](https://github.com/cube-js/cube.js/commit/692372e1da6ffa7b7c1718d8332d80d1e2ce2b2d))
+
+
+
+
+
+## [0.27.49](https://github.com/cube-js/cube.js/compare/v0.27.48...v0.27.49) (2021-07-08)
+
+
+### Features
+
+* Execute refreshKeys in externalDb (only for every) ([#3061](https://github.com/cube-js/cube.js/issues/3061)) ([75167a0](https://github.com/cube-js/cube.js/commit/75167a0e92028dbdd6f24aca85331b84be8ec3c3))
+
+
+
+
+
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
 ## [0.27.46](https://github.com/cube-js/cube.js/compare/v0.27.45...v0.27.46) (2021-07-01)
 
 

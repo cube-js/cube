@@ -5,6 +5,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::DFSchemaRef;
 use datafusion::physical_plan::aggregates::AggregateFunction;
@@ -152,7 +153,7 @@ impl ExecutionPlan for AggregateTopKExec {
         let mut tasks = Vec::with_capacity(nodes);
         for p in 0..nodes {
             let cluster = self.cluster.clone();
-            tasks.push(tokio::spawn(async move {
+            tasks.push(cube_ext::spawn(async move {
                 // fuse the streams to simplify further code.
                 cluster.execute(p).await.map(|s| (s.schema(), s.fuse()))
             }));

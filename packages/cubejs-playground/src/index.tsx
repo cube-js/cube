@@ -21,23 +21,31 @@ history.listen((location) => {
   page(props);
 });
 
-async function onTokenPayloadChange(payload: Record<string, any>) {
+async function onTokenPayloadChange(payload: Record<string, any>, token) {
+  if (token != null) {
+    return token;
+  }
+
   const response = await fetch('/playground/token', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      payload
+      payload,
     }),
   });
-  const { token } = await response.json();
-  return token;
+  const json = await response.json();
+  return json.token;
 }
 
 ReactDOM.render(
   <Router history={history}>
-    <AppContextProvider>
+    <AppContextProvider
+      playgroundContext={{
+        isCloud: false,
+      }}
+    >
       <App>
         <Route key="index" exact path="/" component={IndexPage} />
         <Route

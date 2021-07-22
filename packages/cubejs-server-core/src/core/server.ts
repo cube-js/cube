@@ -57,7 +57,7 @@ export type ServerCoreInitializedOptions = Required<
   'scheduledRefreshContexts'
 >;
 
-function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
+function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   if (typeof possibleFn === 'function') {
     return <any>possibleFn;
   }
@@ -68,7 +68,7 @@ function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
 export class CubejsServerCore {
   public readonly repository: FileRepository;
 
-  protected devServer: DevServer|undefined;
+  protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
@@ -114,6 +114,8 @@ export class CubejsServerCore {
 
   public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
+
+    this.coreServerVersion = version;
 
     this.logger = opts.logger || (
       process.env.NODE_ENV !== 'production'
@@ -174,10 +176,6 @@ export class CubejsServerCore {
 
       if (!this.anonymousId) {
         this.anonymousId = getAnonymousId();
-      }
-
-      if (!this.coreServerVersion) {
-        this.coreServerVersion = version;
       }
 
       const internalExceptionsEnv = getEnv('internalExceptions');
@@ -250,9 +248,14 @@ export class CubejsServerCore {
   }
 
   protected isReadyForQueryProcessing(): boolean {
+    const hasDbCredentials =
+      Object.keys(process.env).filter(
+        (key) => (key.startsWith('CUBEJS_DB') && key !== 'CUBEJS_DB_TYPE') ||
+          key.startsWith('CUBEJS_AWS')
+      ).length > 0;
+
     return (
-      Boolean(process.env.CUBEJS_DB_HOST) ||
-      Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
+      hasDbCredentials ||
       this.systemOptions?.isCubeConfigEmpty === undefined ||
       !this.systemOptions?.isCubeConfigEmpty
     );
@@ -543,7 +546,7 @@ export class CubejsServerCore {
     } else {
       app.get('/', (req, res) => {
         res.status(200)
-          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment#production-mode">Learn more about production mode</a>.</body></html>');
+          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment/production-checklist">Learn more about production mode</a>.</body></html>');
       });
     }
   }
@@ -576,6 +579,7 @@ export class CubejsServerCore {
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
+        serverCoreVersion: this.coreServerVersion
       }
     );
   }
@@ -721,8 +725,7 @@ export class CubejsServerCore {
     return orchestratorApi;
   }
 
-  protected createCompilerApi(repository, options) {
-    options = options || {};
+  protected createCompilerApi(repository, options: Record<string, any> = {}) {
     return new CompilerApi(repository, options.dbType || this.options.dbType, {
       schemaVersion: options.schemaVersion || this.options.schemaVersion,
       devServer: this.options.devServer,

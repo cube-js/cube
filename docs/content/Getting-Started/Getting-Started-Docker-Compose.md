@@ -103,7 +103,7 @@ frameworks][ref-frontend-introduction].
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-config]: /config
 [ref-connecting-to-the-database]: /connecting-to-the-database
-[ref-cubejs-schema]: /getting-started-cubejs-schema
+[ref-cubejs-schema]: /schema/getting-started
 [ref-devtools-playground]: /dev-tools/dev-playground
 [ref-env-vars]: /reference/environment-variables
 [ref-frontend-introduction]: /frontend-introduction

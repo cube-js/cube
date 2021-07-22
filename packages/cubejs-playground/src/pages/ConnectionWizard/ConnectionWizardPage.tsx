@@ -1,6 +1,7 @@
 import { Alert, Col, Row, Space, Spin, Typography } from 'antd';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import styled from 'styled-components';
+import { usePlaygroundContext } from '../../hooks';
 
 import envVarsDatabaseMap from '../../shared/env-vars-db-map';
 import { fetchPoll, fetchWithTimeout } from '../../utils';
@@ -10,7 +11,6 @@ import DatabaseForm from './components/DatabaseForm';
 import { Button, FatalError } from '../../atoms';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
 import { event, playgroundAction } from '../../events';
-import { useAppContext } from '../../components/AppContext';
 
 const { Title, Paragraph } = Typography;
 
@@ -81,7 +81,7 @@ export type Database = {
 };
 
 export function ConnectionWizardPage({ history }) {
-  const { playgroundContext } = useAppContext();
+  const playgroundContext = usePlaygroundContext();
 
   const [hostname, setHostname] = useState<string>('');
   const [isLoading, setLoading] = useState(false);
@@ -251,17 +251,24 @@ export function ConnectionWizardPage({ history }) {
                 </Typography.Paragraph>
               )}
 
-              <Typography.Paragraph>
-                For advanced configuration, use the <code>cube.js</code>{' '}
-                configuration file inside mount volume or environment variables.
-                <br />
-                <Typography.Link
-                  href="https://cube.dev/docs/connecting-to-the-database"
-                  target="_blank"
-                >
-                  Learn more about connecting to databases in the documentation.
-                </Typography.Link>
-              </Typography.Paragraph>
+              <Alert
+                type="info"
+                message={
+                  <>
+                    For advanced configuration, use the <b>cube.js</b> or <b>.env</b>{' '}
+                    configuration file inside mount volume or environment
+                    variables.
+                    <br />
+                    <Typography.Link
+                      href="https://cube.dev/docs/connecting-to-the-database"
+                      target="_blank"
+                    >
+                      Learn more about connecting to databases in the
+                      documentation.
+                    </Typography.Link>
+                  </>
+                }
+              />
 
               {db.title === 'MongoDB' ? (
                 <Alert

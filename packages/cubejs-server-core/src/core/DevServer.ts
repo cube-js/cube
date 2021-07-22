@@ -1,5 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
+import { CubePreAggregationConverter, CubeSchemaConverter } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -10,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
-import { executeCommand, packageExists } from '@cubejs-backend/shared';
+import { executeCommand, getEnv, packageExists } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
@@ -97,7 +98,8 @@ export class DevServer {
         livePreview: options.livePreview,
         isDocker: isDocker(),
         telemetry: options.telemetry,
-        identifier: this.getIdentifier(options.apiSecret)
+        identifier: this.getIdentifier(options.apiSecret),
+        previewFeatures: getEnv('previewFeatures'),
       });
     }));
 
@@ -415,7 +417,7 @@ export class DevServer {
     app.post('/playground/test-connection', catchErrors(async (req, res) => {
       const { variables = {} } = req.body || {};
 
-      let driver: BaseDriver|null = null;
+      let driver: BaseDriver | null = null;
 
       try {
         if (!variables.CUBEJS_DB_TYPE) {
@@ -490,6 +492,32 @@ export class DevServer {
       const token = jwt.sign(payload, options.apiSecret, jwtOptions);
 
       res.json({ token });
+    }));
+
+    app.post('/playground/schema/pre-aggregation', catchErrors(async (req: Request, res: Response) => {
+      const { cubeName, preAggregationName, code } = req.body;
+
+      const schemaConverter = new CubeSchemaConverter(this.cubejsServer.repository, [
+        new CubePreAggregationConverter({
+          cubeName,
+          preAggregationName,
+          code
+        })
+      ]);
+
+      try {
+        await schemaConverter.generate();
+      } catch (error) {
+        res.status(400).json({ error: error.message || error });
+      }
+
+      schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
+        if (currentCubeName === cubeName) {
+          this.cubejsServer.repository.writeDataSchemaFile(fileName, source);
+        }
+      });
+
+      res.json('ok');
     }));
   }
 

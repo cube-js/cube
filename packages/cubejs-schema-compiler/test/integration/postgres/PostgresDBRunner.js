@@ -24,7 +24,9 @@ export class PostgresDBRunner extends BaseDbRunner {
         return db.tx(tx => tx.query('SET TIME ZONE \'UTC\'')
           .then(() => prepareDataSet(tx)
             .then(() => queries
-              .map(([query, params]) => () => tx.query(query, params)).reduce((a, b) => a.then(b), Promise.resolve()))
+              .map(([query, params]) => () => tx.query(query, params).catch(e => {
+                throw new Error(`Execution failed for '${query}', params: ${params}: ${e.stack || e}`);
+              })).reduce((a, b) => a.then(b), Promise.resolve()))
             .then(r => JSON.parse(JSON.stringify(r)))));
       },
       close() {

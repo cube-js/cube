@@ -3,6 +3,92 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.5](https://github.com/cube-js/cube.js/compare/v0.28.4...v0.28.5) (2021-07-21)
+
+
+### Bug Fixes
+
+* **cubestore:** only pick index with exact column order ([f873a0c](https://github.com/cube-js/cube.js/commit/f873a0c2ba31dbc2ca80d4cdb0d5151a39f9e912))
+
+
+
+
+
+## [0.28.3](https://github.com/cube-js/cube.js/compare/v0.28.2...v0.28.3) (2021-07-20)
+
+
+### Bug Fixes
+
+* **cubestore:** Installer (bad path) ([fe3458f](https://github.com/cube-js/cube.js/commit/fe3458ff492c1104c8719ec0b90a5c3b5e93a588))
+
+
+
+
+
+## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
+
+
+### Bug Fixes
+
+* **cubestore:** allow to specify join columns in any order, fix [#2987](https://github.com/cube-js/cube.js/issues/2987) ([b59aaab](https://github.com/cube-js/cube.js/commit/b59aaabc765c123dfa680e1866f79e6225219c76))
+* Close Cube Store process on process exit ([#3082](https://github.com/cube-js/cube.js/issues/3082)) ([f22f71a](https://github.com/cube-js/cube.js/commit/f22f71a4fe2240a9db58c035cb87d1b0d47e5b72))
+
+
+
+
+
+# [0.28.0](https://github.com/cube-js/cube.js/compare/v0.27.53...v0.28.0) (2021-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.27.52](https://github.com/cube-js/cube.js/compare/v0.27.51...v0.27.52) (2021-07-13)
+
+
+### Bug Fixes
+
+* **cubestore:** crash on count(distinct ...) ([516924d](https://github.com/cube-js/cube.js/commit/516924d2615ff201a7b92d88e723acb0527c0b94))
+
+
+
+
+
+## [0.27.50](https://github.com/cube-js/cube.js/compare/v0.27.49...v0.27.50) (2021-07-12)
+
+
+### Features
+
+* **cubestore:** Introduce support for DATE_ADD ([#3085](https://github.com/cube-js/cube.js/issues/3085)) ([071d7b4](https://github.com/cube-js/cube.js/commit/071d7b430566b0f42e2fc209b1888f9b4b9bb4e7))
+
+
+
+
+
+## [0.27.48](https://github.com/cube-js/cube.js/compare/v0.27.47...v0.27.48) (2021-07-08)
+
+
+### Bug Fixes
+
+* **cubestore:** fix panic 'Unexpected accumulator state List([NULL])' ([cfe8647](https://github.com/cube-js/cube.js/commit/cfe8647d9ffd03dfde3d0fc028249a3c43ecb527))
+
+
+
+
+
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+
+### Features
+
+* **cubestore:** add some configuration variables ([23e26fa](https://github.com/cube-js/cube.js/commit/23e26fae914f2dd20c82bc61ae3836b4a384b1cf))
+
+
+
+
+
 ## [0.27.46](https://github.com/cube-js/cube.js/compare/v0.27.45...v0.27.46) (2021-07-01)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

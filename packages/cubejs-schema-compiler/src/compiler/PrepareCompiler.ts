@@ -52,6 +52,7 @@ export const prepareCompiler = (repo, options) => {
     },
     compileContext: options.compileContext
   }, options));
+
   return {
     compiler,
     metaTransformer,

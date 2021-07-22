@@ -42,6 +42,7 @@ use chunks::ChunkRocksTable;
 use core::{fmt, mem};
 use cubehll::HllSketch;
 use cubezetasketch::HyperLogLogPlusPlus;
+use datafusion::cube_ext;
 use futures::future::join_all;
 use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
@@ -1673,7 +1674,7 @@ impl RocksMetaStore {
         };
         let db_to_send = db.clone();
         let (spawn_res, events) =
-            tokio::task::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
+            cube_ext::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
                 let snapshot = db_to_send.snapshot();
                 let res = f(
@@ -1875,7 +1876,7 @@ impl RocksMetaStore {
         }
 
         let uploads_dir = remote_fs.uploads_dir().await?;
-        let (file, file_path) = tokio::task::spawn_blocking(move || {
+        let (file, file_path) = cube_ext::spawn_blocking(move || {
             tempfile::Builder::new()
                 .prefix("metastore-current")
                 .tempfile_in(uploads_dir)
@@ -1900,7 +1901,7 @@ impl RocksMetaStore {
         let remote_path = RocksMetaStore::meta_store_path(checkpoint_time);
         let checkpoint_path = db.path().join("..").join(remote_path.clone());
         let path_to_move = checkpoint_path.clone();
-        tokio::task::spawn_blocking(move || -> Result<(), CubeError> {
+        cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
             let checkpoint = Checkpoint::new(db.as_ref())?;
             checkpoint.create_checkpoint(path_to_move.as_path())?;
             Ok(())
@@ -1937,7 +1938,7 @@ impl RocksMetaStore {
             seq_store: self.seq_store.clone(),
         };
         let db_to_send = db.clone();
-        let res = tokio::task::spawn_blocking(move || {
+        let res = cube_ext::spawn_blocking(move || {
             let snapshot = db_to_send.snapshot();
             f(DbTableRef {
                 db: db_to_send.as_ref(),

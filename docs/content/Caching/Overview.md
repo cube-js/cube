@@ -5,8 +5,6 @@ category: Caching
 menuOrder: 1
 ---
 
-[link-cube-cloud]: https://cube.dev/cloud
-
 Cube.js provides a two-level caching system. The first level is **in-memory**
 cache and is active by default. We recommend using [Redis](https://redis.io) for
 in-memory cache when
@@ -28,30 +26,36 @@ unless it is necessary. To speed up query performance, consider using
 
 ## Pre-Aggregations
 
-Pre-aggregations is a layer of the aggregated data built and refreshed by Cube.js. It can dramatically improve the query performance and provide a higher concurrency.
+Pre-aggregations is a layer of the aggregated data built and refreshed by
+Cube.js. It can dramatically improve the query performance and provide a higher
+concurrency.
 
 <!-- prettier-ignore-start -->
 [[info |]]
-| To start building pre-aggregations, Cube.js requires write access to the [pre-aggregations schema](/config#options-reference-pre-aggregations-schema) in the source database. Cube.js first builds pre-aggregations as tables in the source database and then exports them into the pre-aggregations storage. 
+| To start building pre-aggregations, Cube.js requires write access to the
+| [pre-aggregations schema](/config#options-reference-pre-aggregations-schema)
+| in the source database. Cube.js first builds pre-aggregations as tables in
+| the source database and then exports them into the pre-aggregations storage.
 <!-- prettier-ignore-end -->
 
-Pre-aggregations are defined in the data schema. You can learn more about defining pre-aggregations in [schema reference](/pre-aggregations).
-
+Pre-aggregations are defined in the data schema. You can learn more about
+defining pre-aggregations in
+[schema reference](/schema/reference/pre-aggregations).
 
 ```js
 cube(`Orders`, {
   measures: {
     totalAmount: {
       sql: `amount`,
-      type: `sum`
-    }
+      type: `sum`,
+    },
   },
 
   dimensions: {
     createdAt: {
       sql: `created_at`,
-      type: `time`
-    }
+      type: `time`,
+    },
   },
 
   preAggregations: {
@@ -157,8 +161,9 @@ guarantees are provided in this case.
 For situations like real-time analytics or responding to live user changes to
 underlying data, the `refreshKey` query cache can prevent fresh data from
 showing up immediately. For these situations, the cache can effectively be
-disabled by setting the [`refreshKey.every`](cube#parameters-refresh-key)
-parameter to something very low, like `1 second`.
+disabled by setting the
+[`refreshKey.every`](/schema/reference/cube#parameters-refresh-key) parameter to
+something very low, like `1 second`.
 
 ## Inspecting Queries
 

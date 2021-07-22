@@ -2,7 +2,7 @@ import cn from 'classnames';
 import GatsbyLink from 'gatsby-link';
 import React, { useEffect, useRef, useState } from 'react';
 
-import styles from './styles.module.scss';
+import * as styles from './styles.module.scss';
 import cubeJsLogo from './cube.js-logo.svg';
 import cubeCloudLogo from './cube-cloud-logo.svg';
 import cubeCloudLogoSmall from './cube-cloud-logo-sm.svg';

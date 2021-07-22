@@ -24,6 +24,7 @@ use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
+use datafusion::cube_ext;
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -59,7 +60,7 @@ pub struct WorkerServices {
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
         let futures = self.spawn_processing_loops().await?;
-        tokio::spawn(async move {
+        cube_ext::spawn(async move {
             if let Err(e) = Self::wait_loops(futures).await {
                 error!("Error in processing loop: {}", e);
             }
@@ -82,22 +83,22 @@ impl CubeServices {
     async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
         let cluster = self.cluster.clone();
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
         let remote_fs = self.remote_fs.clone();
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
                 Ok(())
             }));
             let cluster = self.cluster.clone();
             let (started_tx, started_rx) = tokio::sync::oneshot::channel();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 ClusterImpl::listen_on_metastore_port(cluster, started_tx).await
             }));
             started_rx.await?;
@@ -107,29 +108,31 @@ impl CubeServices {
 
             if self.injector.has_service_typed::<MySqlServer>().await {
                 let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
-                futures.push(tokio::spawn(
-                    async move { mysql_server.processing_loop().await },
-                ));
+                futures.push(cube_ext::spawn(async move {
+                    mysql_server.processing_loop().await
+                }));
             }
             if self.injector.has_service_typed::<HttpServer>().await {
                 let http_server = self.injector.get_service_typed::<HttpServer>().await;
-                futures.push(tokio::spawn(async move { http_server.run_server().await }));
+                futures.push(cube_ext::spawn(
+                    async move { http_server.run_server().await },
+                ));
             }
         } else {
             let cluster = self.cluster.clone();
             let (started_tx, started_rx) = tokio::sync::oneshot::channel();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 ClusterImpl::listen_on_worker_port(cluster, started_tx).await
             }));
             started_rx.await?;
 
             let cluster = self.cluster.clone();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 cluster.warmup_select_worker().await;
                 Ok(())
             }))
         }
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             start_track_event_loop().await;
             Ok(())
         }));

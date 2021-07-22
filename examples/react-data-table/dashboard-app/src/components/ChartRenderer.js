@@ -14,7 +14,7 @@ const COLORS_SERIES = ['#FF6492', '#141446', '#7A77FF'];
 const TypeToChartComponent = {
   line: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
@@ -27,7 +27,7 @@ const TypeToChartComponent = {
   },
   bar: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
@@ -48,7 +48,7 @@ const TypeToChartComponent = {
   },
   area: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map((r) => r.value),
@@ -68,7 +68,7 @@ const TypeToChartComponent = {
   },
   pie: ({ resultSet }) => {
     const data = {
-      labels: resultSet.categories().map((c) => c.category),
+      labels: resultSet.categories().map((c) => c.x),
       datasets: resultSet.series().map((s) => ({
         label: s.title,
         data: s.series.map((r) => r.value),

@@ -19,8 +19,9 @@ import {
 import {
   AppContextConsumer,
   PlaygroundContext,
-  useAppContext,
 } from './components/AppContext';
+import { useAppContext } from './hooks';
+
 import './index.less';
 
 const selectedTab = (pathname) => {
@@ -55,8 +56,6 @@ class App extends Component<RouteComponentProps, AppState> {
   };
 
   async componentDidMount() {
-    const { history } = this.props;
-
     setTimeout(() => this.setState({ showLoader: true }), 700);
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
@@ -80,11 +79,7 @@ class App extends Component<RouteComponentProps, AppState> {
       dockerVersion: context.dockerVersion,
     });
 
-    this.setState({ context }, () => {
-      if (context.shouldStartConnectionWizardFlow) {
-        history.push('/connection');
-      }
-    });
+    this.setState({ context });
   }
 
   componentDidCatch(error, info) {
@@ -101,14 +96,16 @@ class App extends Component<RouteComponentProps, AppState> {
     if (context != null && !isAppContextSet) {
       return (
         <>
-          {showLoader ? <CubeLoader /> : null}
-
           <ContextSetter context={context} />
           <AppContextConsumer
             onReady={() => this.setState({ isAppContextSet: true })}
           />
         </>
       );
+    }
+
+    if (context == null && !isAppContextSet) {
+      return showLoader ? <CubeLoader /> : null;
     }
 
     if (fatalError) {
@@ -147,7 +144,11 @@ function ContextSetter({ context }: ContextSetterProps) {
   useEffect(() => {
     if (context !== null) {
       setContext({
-        playgroundContext: context,
+        ready: true,
+        playgroundContext: {
+          ...context,
+          isCloud: false
+        },
         identifier: context.identifier,
       });
     }

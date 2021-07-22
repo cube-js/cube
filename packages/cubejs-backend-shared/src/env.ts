@@ -281,10 +281,16 @@ const variables: Record<string, (...args: any) => any> = {
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('false')
     .asBoolStrict(),
+  preAggregationsQueueEventsBus: () => get('CUBEJS_PRE_AGGREGATIONS_QUEUE_EVENTS_BUS')
+    .default('false')
+    .asBoolStrict(),
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('false')
     .asBoolStrict(),
   scheduledRefreshDefault: () => get('CUBEJS_SCHEDULED_REFRESH_DEFAULT')
+    .default('false')
+    .asBoolStrict(),
+  previewFeatures: () => get('CUBEJS_PREVIEW_FEATURES')
     .default('false')
     .asBoolStrict(),
 };

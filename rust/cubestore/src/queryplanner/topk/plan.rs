@@ -267,9 +267,10 @@ pub fn plan_topk(
             planner.create_aggregate_expr(e, &logical_input_schema, &physical_input_schema, ctx)
         })
         .collect::<Result<Vec<_>, DataFusionError>>()?;
-    let strategy = compute_aggregation_strategy(input.as_ref(), &group_expr);
+    let (strategy, order) = compute_aggregation_strategy(input.as_ref(), &group_expr);
     let aggregate = Arc::new(HashAggregateExec::try_new(
         strategy,
+        order,
         AggregateMode::Full,
         group_expr,
         initial_aggregate_expr.clone(),
