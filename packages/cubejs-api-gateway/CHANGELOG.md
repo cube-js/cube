@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
+
+
+### Bug Fixes
+
+* **api-gateway:** Debug API, allow subscribe to pre-aggregations queue events only by playground JWT ([#3144](https://github.com/cube-js/cube.js/issues/3144)) ([700080f](https://github.com/cube-js/cube.js/commit/700080f33c13fd149acc6f6bad26a11ea0528211))
+
+
+
+
+
 ## [0.28.4](https://github.com/cube-js/cube.js/compare/v0.28.3...v0.28.4) (2021-07-20)
 
 

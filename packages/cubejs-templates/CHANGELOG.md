@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** week granularity ([#3146](https://github.com/cube-js/cube.js/issues/3146)) ([9697a64](https://github.com/cube-js/cube.js/commit/9697a646e5e58edc54c4b08a810e0faecc4d0c69))
+
+
+
+
+
 ## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/templates
