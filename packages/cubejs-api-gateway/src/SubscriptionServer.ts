@@ -90,6 +90,7 @@ export class SubscriptionServer {
         ...params,
         connectionId,
         context,
+        signedWithPlaygroundAuthSecret: authContext.signedWithPlaygroundAuthSecret,
         isSubscription,
         res: this.resultFn(connectionId, message.messageId),
         subscriptionState: async () => {
