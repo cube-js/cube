@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { ResultSet } from '@cubejs-client/core';
@@ -49,19 +49,22 @@ export class ExploreComponent implements OnInit, OnDestroy {
   timeDimensionMembers: any[] = [];
 
   constructor(
-    public cubejsClient: CubejsClient,
+    @Inject(CubejsClient) public cubejsClient: CubejsClient,
     public queryBuilder: QueryBuilderService,
     public dialog: MatDialog,
     private route: ActivatedRoute
   ) {
-    queryBuilder.setCubejsClient(cubejsClient);
+    cubejsClient.ready$.subscribe(
+      (ready) => ready && queryBuilder.setCubejsClient(cubejsClient)
+    );
+
     this.chartTypeMap = this.chartTypeToIcon.reduce(
       (memo, { chartType, icon }) => ({ ...memo, [chartType]: icon }),
       {}
     );
   }
 
-  async ngOnInit() {
+  async ngOnInit(): Promise<void> {
     this.builderMeta = await this.queryBuilder.builderMeta;
     this.query = await this.queryBuilder.query;
 
@@ -84,7 +87,7 @@ export class ExploreComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy() {
+  ngOnDestroy(): void {
     this.queryBuilder.deserialize({
       query: {},
     });
@@ -104,7 +107,7 @@ export class ExploreComponent implements OnInit, OnDestroy {
     });
   }
 
-  openAddToDashboardDialog() {
+  openAddToDashboardDialog(): void {
     const dialogRef = this.dialog.open(AddToDashboardDialogComponent, {
       width: '500px',
       data: {

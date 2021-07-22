@@ -1,5 +1,5 @@
-import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { APP_INITIALIZER, NgModule } from '@angular/core';
+import { HttpClientModule } from '@angular/common/http';
+import { NgModule } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatGridListModule } from '@angular/material/grid-list';
@@ -18,7 +18,11 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { CubejsClientModule, QueryBuilderService } from '@cubejs-client/ngx';
+import {
+  CubejsClient,
+  CubejsConfig,
+  QueryBuilderService,
+} from '@cubejs-client/ngx';
 import { ChartsModule } from 'ng2-charts';
 import { HttpLink } from 'apollo-angular/http';
 import { APOLLO_OPTIONS } from 'apollo-angular';
@@ -32,28 +36,28 @@ import { OrderComponent } from './explore/order/order.component';
 import { PivotComponent } from './explore/pivot/pivot.component';
 import { SettingsDialogComponent } from './settings-dialog/settings-dialog.component';
 import {
-  FilterGroupComponent,
   FilterComponent,
+  FilterGroupComponent,
 } from './explore/filter-group/filter-group.component';
 import { AppRoutingModule } from './app-routing.module';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { AddToDashboardDialogComponent } from './explore/add-to-dashboard-dialog/add-to-dashboard-dialog.component';
 import { QueryRendererComponent } from './explore/query-renderer/query-renderer.component';
 import apolloClient from '../graphql/client';
+import { AuthService } from './auth.service';
 
-const cubejsOptions = {
-  token: 'environment.CUBEJS_API_TOKEN',
+export const cubejsConfig: CubejsConfig = {
+  token:
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MDY1OTA0NjEsImV4cCI6MTkyMjE2NjQ2MX0.DdY7GaiHsQWyTH_xkslHb17Cbc3yLFfMFwoEpx89JiA',
   options: {
-    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    apiUrl:
+      'https://aquamarine-galliform.aws-us-east-2.cubecloudapp.dev/cubejs-api/v1',
   },
 };
 
-export function cubejsClientFactory(http: HttpClient) {
-  return () =>
-    new Promise((resolve) => {
-      setTimeout(() => resolve({ token: '100500' }), 2000);
-    });
-}
+const cubejsClientFactory = (authService: AuthService) => {
+  return new CubejsClient(authService.config$);
+};
 
 @NgModule({
   declarations: [
@@ -74,7 +78,6 @@ export function cubejsClientFactory(http: HttpClient) {
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
-    CubejsClientModule.forRoot(cubejsOptions),
     MatButtonModule,
     MatSelectModule,
     MatGridListModule,
@@ -97,6 +100,7 @@ export function cubejsClientFactory(http: HttpClient) {
     GridsterModule,
   ],
   providers: [
+    AuthService,
     QueryBuilderService,
     {
       provide: APOLLO_OPTIONS,
@@ -104,10 +108,9 @@ export function cubejsClientFactory(http: HttpClient) {
       deps: [HttpLink],
     },
     {
-      provide: APP_INITIALIZER,
+      provide: CubejsClient,
       useFactory: cubejsClientFactory,
-      deps: [HttpClient],
-      multi: true,
+      deps: [AuthService],
     },
   ],
   bootstrap: [AppComponent],

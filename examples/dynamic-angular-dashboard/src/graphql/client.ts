@@ -7,12 +7,10 @@ import { makeExecutableSchema } from 'graphql-tools';
 const cache = new InMemoryCache();
 const defaultDashboardItems = [];
 
-const getDashboardItems = () =>
-  JSON.parse(window.localStorage.getItem('dashboardItems')) ||
+const getDashboardItems = () => JSON.parse(window.localStorage.getItem('dashboardItems')) ||
   defaultDashboardItems;
 
-const setDashboardItems = (items) =>
-  window.localStorage.setItem('dashboardItems', JSON.stringify(items));
+const setDashboardItems = (items) => window.localStorage.setItem('dashboardItems', JSON.stringify(items));
 
 const nextId = () => {
   const currentId =
@@ -69,7 +67,7 @@ const schema = makeExecutableSchema({
         item = { ...item, id: nextId(), layout: JSON.stringify({}) };
         dashboardItems.push(item);
         setDashboardItems(dashboardItems);
-        
+
         return toApolloItem(item);
       },
       updateDashboardItem: (_, { id, input: { ...item } }) => {
@@ -83,7 +81,7 @@ const schema = makeExecutableSchema({
         const index = dashboardItems.findIndex((i) => i.id.toString() === id);
         dashboardItems[index] = { ...dashboardItems[index], ...item };
         setDashboardItems(dashboardItems);
-        
+
         return toApolloItem(dashboardItems[index]);
       },
       deleteDashboardItem: (_, { id }) => {
@@ -91,7 +89,7 @@ const schema = makeExecutableSchema({
         const index = dashboardItems.findIndex((i) => i.id.toString() === id);
         const [removedItem] = dashboardItems.splice(index, 1);
         setDashboardItems(dashboardItems);
-        
+
         return toApolloItem(removedItem);
       },
     },
