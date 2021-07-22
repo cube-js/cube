@@ -2,7 +2,7 @@
 import ClickHouse from '@apla/clickhouse';
 import { GenericContainer } from 'testcontainers';
 import { format as formatSql } from 'sqlstring';
-import uuidv4 from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 
 process.env.TZ = 'GMT';
 

@@ -60,7 +60,7 @@
     "react-source-render": "4.0.0-1",
     "sql-formatter": "^4.0.2",
     "throttle-debounce": "^3.0.1",
-    "uuid": "^3.3.3",
+    "uuid": "^8.3.2",
     "whatwg-fetch": "^3.0.0"
   },
   "devDependencies": {
@@ -69,6 +69,7 @@
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
     "@types/jest": "^26.0.20",
     "@types/node": "^14.14.35",
+    "@types/uuid": "^8.3.1",
     "@types/react": "^17.0.3",
     "@types/react-beautiful-dnd": "^13.0.0",
     "@types/react-dom": "^17.0.2",

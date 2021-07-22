@@ -1,4 +1,4 @@
-import uuid from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
@@ -78,7 +78,7 @@ export class SubscriptionServer {
       }
 
       const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
-      const requestId = `${baseRequestId}-span-${uuid()}`;
+      const requestId = `${baseRequestId}-span-${uuidv4()}`;
       context = await this.apiGateway.contextByReq(message, authContext.securityContext, requestId);
 
       const allowedParams = methodParams[message.method];
