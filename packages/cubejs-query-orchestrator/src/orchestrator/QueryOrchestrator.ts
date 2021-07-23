@@ -234,7 +234,7 @@ export class QueryOrchestrator {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
   }
 
-  public async getPreAggregationQueueStates(dataSource) {
+  public async getPreAggregationQueueStates(dataSource = 'default') {
     return this.preAggregations.getQueueState(dataSource);
   }
 
