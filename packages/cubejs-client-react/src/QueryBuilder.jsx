@@ -250,13 +250,11 @@ export default class QueryBuilder extends React.Component {
       dryRunResponse,
     } = this.state;
 
-    const flatFilters = uniqBy(
-      prop('member'),
+    const flatFilters = uniqBy((filter) => `${prop('member', filter)}${prop('operator', filter)}`,
       flattenFilters((meta && query.filters) || []).map((filter) => ({
         ...filter,
         member: filter.member || filter.dimension,
-      }))
-    );
+      })));
 
     const filters = flatFilters.map((m, i) => ({
       ...m,
