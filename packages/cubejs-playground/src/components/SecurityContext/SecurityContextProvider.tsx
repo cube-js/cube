@@ -45,7 +45,7 @@ export function SecurityContextProvider({
       const currentMutex = mutex;
       const refreshedToken = await tokenUpdater(token);
 
-      if (isMounted && currentMutex === mutex) {
+      if (isMounted() && currentMutex === mutex) {
         setToken(refreshedToken);
         mutex++;
       }

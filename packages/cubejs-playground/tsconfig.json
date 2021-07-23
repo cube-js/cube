@@ -1,15 +1,16 @@
 {
   "compilerOptions": {
+    "tsBuildInfoFile": "lib/.tsbuildinfo",
     "module": "esnext",
-    "target": "ES5",
+    "lib": ["dom", "esnext"],
     "declaration": true,
+    "declarationDir": "./lib",
     "noEmitOnError": true,
     "sourceMap": true,
     "allowJs": true,
     "checkJs": true,
     "jsx": "react-jsx",
     "allowSyntheticDefaultImports": true,
-    "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": true,
     "esModuleInterop": true,
     "strict": true,
@@ -20,7 +21,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noImplicitAny": false,
-    "noEmit": true
+    "incremental" : true
   },
   "exclude": ["node_modules", "build", "lib", "dist", "charts-dist"],
   "include": ["src"]

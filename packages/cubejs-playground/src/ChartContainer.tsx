@@ -114,8 +114,6 @@ class ChartContainer extends Component<
         };
       }
 
-      console.log('>>', props.chartType)
-
       const codesandboxFiles = __cubejsPlayground.getCodesandboxFiles(
         props.chartingLibrary,
         {

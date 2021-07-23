@@ -1,9 +1,10 @@
 import commonjs from '@rollup/plugin-commonjs';
 import localResolve from 'rollup-plugin-local-resolve';
 import postcss from 'rollup-plugin-postcss';
-import typescript from 'rollup-plugin-typescript2';
+import typescript from '@rollup/plugin-typescript';
+import svg from 'rollup-plugin-svg';
 
-import { LESS_VARIABLES } from './src/variables-esm';
+import { LESS_VARIABLES } from './variables-esm';
 
 const bundle = (name, globalName, { globals = {}, ...baseConfig }) => {
   return [
@@ -26,14 +27,14 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }) => {
         }),
         commonjs(),
         typescript({
-          tsconfigOverride: {
-            include: ['src/playground/**/*'],
-          },
+          tsconfig: 'tsconfig.json',
         }),
         localResolve(),
+        svg()
       ],
       output: {
-        file: `./lib/${name}.esm.js`,
+        dir: './lib',
+        name: 'playground.esm',
         format: 'es',
         sourcemap: true,
         globals,
