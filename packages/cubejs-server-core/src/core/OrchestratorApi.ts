@@ -189,6 +189,11 @@ export class OrchestratorApi {
     return result;
   }
 
+  public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource: string) {
+    const result = await this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
+    return result;
+  }
+
   public async subscribeQueueEvents(id, callback) {
     return this.orchestrator.subscribeQueueEvents(id, callback);
   }

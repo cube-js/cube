@@ -53,6 +53,7 @@ export class RedisQueueDriverConnection {
       .zcard(this.toProcessRedisKey());
 
     if (this.getQueueEventsBus) {
+      console.log('addedToQueue', this.redisHash(queryKey));
       tx.publish(
         this.getQueueEventsBus().eventsChannel,
         JSON.stringify({
@@ -85,6 +86,24 @@ export class RedisQueueDriverConnection {
       .del(this.queryProcessingLockKey(queryKey))
       .execAsync();
     return [JSON.parse(query), ...restResult];
+  }
+
+  async cancelQuery(queryKey) {
+    const [query] = await this.getQueryAndRemove(queryKey);
+
+    if (this.getQueueEventsBus) {
+      await this.redisClient.publish(
+        this.getQueueEventsBus().eventsChannel,
+        JSON.stringify({
+          event: 'cancelQuery',
+          redisQueuePrefix: this.redisQueuePrefix,
+          queryKey: this.redisHash(queryKey),
+          payload: query
+        })
+      );
+    }
+
+    return true;
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {

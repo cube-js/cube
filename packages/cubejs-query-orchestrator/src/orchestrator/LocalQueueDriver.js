@@ -122,6 +122,24 @@ export class LocalQueueDriverConnection {
     return [query];
   }
 
+  async cancelQuery(queryKey) {
+    const query = await this.getQueryAndRemove(queryKey);
+
+    if (this.getQueueEventsBus) {
+      await this.redisClient.publish(
+        this.getQueueEventsBus().eventsChannel,
+        JSON.stringify({
+          event: 'cancelQuery',
+          redisQueuePrefix: this.redisQueuePrefix,
+          queryKey: this.redisHash(queryKey),
+          payload: query
+        })
+      );
+    }
+
+    return true;
+  }
+
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
     const key = this.redisHash(queryKey);
     if (this.processingLocks[key] !== processingId) {
