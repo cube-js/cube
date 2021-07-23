@@ -126,15 +126,12 @@ export class LocalQueueDriverConnection {
     const query = await this.getQueryAndRemove(queryKey);
 
     if (this.getQueueEventsBus) {
-      await this.redisClient.publish(
-        this.getQueueEventsBus().eventsChannel,
-        JSON.stringify({
-          event: 'cancelQuery',
-          redisQueuePrefix: this.redisQueuePrefix,
-          queryKey: this.redisHash(queryKey),
-          payload: query
-        })
-      );
+      this.getQueueEventsBus().emit({
+        event: 'cancelQuery',
+        redisQueuePrefix: this.redisQueuePrefix,
+        queryKey: this.redisHash(queryKey),
+        payload: query
+      });
     }
 
     return true;
