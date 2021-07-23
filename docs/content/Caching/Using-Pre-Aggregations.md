@@ -5,6 +5,15 @@ category: Caching
 menuOrder: 3
 ---
 
+<!-- prettier-ignore-start -->
+[[info |]]
+| The Cube.js pre-aggregations workshop is on August 18th at 9-11 am PST! If you
+| want to learn why/when you want to use pre-aggregations, how to get started,
+| tips & tricks, you will want to attend this event 😀 <br/> You can register
+| for the workshop at [the event
+| page](https://cube.dev/events/pre-aggregations/).
+<!-- prettier-ignore-end -->
+
 Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
 many configuration options to consider. Please make sure to also check [this
 Pre-Aggregations page in the data schema section][ref-preaggs].

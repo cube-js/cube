@@ -5,6 +5,15 @@ category: Caching
 menuOrder: 1
 ---
 
+<!-- prettier-ignore-start -->
+[[info |]]
+| The Cube.js pre-aggregations workshop is on August 18th at 9-11 am PST! If you
+| want to learn why/when you want to use pre-aggregations, how to get started,
+| tips & tricks, you will want to attend this event 😀 <br/> You can register
+| for the workshop at [the event
+| page](https://cube.dev/events/pre-aggregations/).
+<!-- prettier-ignore-end -->
+
 Cube.js provides a two-level caching system. The first level is **in-memory**
 cache and is active by default. We recommend using [Redis](https://redis.io) for
 in-memory cache when
