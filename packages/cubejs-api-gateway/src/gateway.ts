@@ -23,6 +23,7 @@ import {
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
+  normalizeQueryCancelPreAggregations,
   QUERY_TYPE
 } from './query';
 import {
@@ -405,6 +406,14 @@ export class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+
+      app.post('/cubejs-system/v1/pre-aggregations/cancel', jsonParser, systemMiddlewares, (async (req, res) => {
+        await this.cancelPreAggregationsFromQueue({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -594,6 +603,23 @@ export class ApiGateway {
       const orchestratorApi = this.getAdapterApi(context);
       res({
         result: await orchestratorApi.getPreAggregationQueueStates()
+      });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
+  public async cancelPreAggregationsFromQueue(
+    { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
+  ) {
+    const requestStarted = new Date();
+    try {
+      const { queryKeys, dataSource } = normalizeQueryCancelPreAggregations(this.parseQueryParam(query));
+      const orchestratorApi = this.getAdapterApi(context);
+      res({
+        result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
       });
     } catch (e) {
       this.handleError({

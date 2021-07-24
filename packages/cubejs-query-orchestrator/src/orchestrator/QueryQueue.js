@@ -205,6 +205,15 @@ export class QueryQueue {
     }
   }
 
+  async cancelQuery(queryKey) {
+    const redisClient = await this.queueDriver.createConnection();
+    try {
+      return redisClient.cancelQuery(queryKey);
+    } finally {
+      this.queueDriver.release(redisClient);
+    }
+  }
+
   async reconcileQueueImpl() {
     const redisClient = await this.queueDriver.createConnection();
     try {
