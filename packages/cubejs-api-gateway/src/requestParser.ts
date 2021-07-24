@@ -1,4 +1,4 @@
-import uuid from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 import type { Request, Response } from 'express';
 
 interface RequestParserResult {
@@ -12,7 +12,7 @@ interface RequestParserResult {
 }
 
 export function getRequestIdFromRequest(req: Request): string {
-  return req.get('x-request-id') || req.get('traceparent') || uuid();
+  return req.get('x-request-id') || req.get('traceparent') || uuidv4();
 }
 
 export function requestParser(req: Request, res: Response) {

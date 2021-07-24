@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.5",
+  "version": "0.28.6",
   "engines": {},
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
   "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.28.1",
-    "@cubejs-client/react": "^0.28.1",
+    "@cubejs-client/core": "^0.28.6",
+    "@cubejs-client/react": "^0.28.6",
     "camel-case": "^4.1.2",
     "codesandbox-import-utils": "^2.1.1",
     "customize-cra": "^1.0.0",
@@ -60,7 +60,7 @@
     "react-source-render": "4.0.0-1",
     "sql-formatter": "^4.0.2",
     "throttle-debounce": "^3.0.1",
-    "uuid": "^3.3.3",
+    "uuid": "^8.3.2",
     "whatwg-fetch": "^3.0.0"
   },
   "devDependencies": {
@@ -75,6 +75,7 @@
     "@types/react-router": "^5.1.12",
     "@types/react-router-dom": "^5.1.7",
     "@types/styled-components": "5.1.9",
+    "@types/uuid": "^8.3.1",
     "antd": "4.13.0",
     "eslint-config-airbnb": "^18.1.0",
     "eslint-plugin-jsx-a11y": "^6.2.1",

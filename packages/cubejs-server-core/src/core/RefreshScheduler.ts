@@ -1,5 +1,5 @@
 import R from 'ramda';
-import uuid from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 import { Required } from '@cubejs-backend/shared';
 
 import { CubejsServerCore } from './server';
@@ -141,7 +141,7 @@ export class RefreshScheduler {
       authInfo: null,
       securityContext: {},
       ...ctx,
-      requestId: `scheduler-${ctx && ctx.requestId || uuid()}`,
+      requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
     const queryingOptions: ScheduledRefreshQueryingOptions = {
@@ -441,7 +441,7 @@ export class RefreshScheduler {
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, compilerApi, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
-    
+
     Promise.all(preAggregations.map(async (p: any) => {
       const { partitions } = p;
       return Promise.all(partitions.map(async query => {

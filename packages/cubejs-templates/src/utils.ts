@@ -1,6 +1,5 @@
 import fs from 'fs-extra';
 import path from 'path';
-import spawn from 'cross-spawn';
 import fetch from 'node-fetch';
 import { getHttpAgentForProxySettings } from '@cubejs-backend/shared';
 
