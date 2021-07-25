@@ -53,7 +53,6 @@ export class RedisQueueDriverConnection {
       .zcard(this.toProcessRedisKey());
 
     if (this.getQueueEventsBus) {
-      console.log('addedToQueue', this.redisHash(queryKey));
       tx.publish(
         this.getQueueEventsBus().eventsChannel,
         JSON.stringify({
