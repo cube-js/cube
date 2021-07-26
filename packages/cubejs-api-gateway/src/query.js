@@ -257,3 +257,17 @@ export const normalizeQueryPreAggregationPreview = (query) => {
 
   return query;
 };
+
+const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
+  dataSource: Joi.string(),
+  queryKeys: Joi.array().items(Joi.string())
+});
+
+export const normalizeQueryCancelPreAggregations = query => {
+  const { error } = Joi.validate(query, queryCancelPreAggregationPreviewSchema);
+  if (error) {
+    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+  }
+
+  return query;
+};

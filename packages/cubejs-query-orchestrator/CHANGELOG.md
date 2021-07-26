@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.8](https://github.com/cube-js/cube.js/compare/v0.28.7...v0.28.8) (2021-07-25)
+
+
+### Bug Fixes
+
+* Hide debug logs, Debug API ([#3152](https://github.com/cube-js/cube.js/issues/3152)) ([601f65f](https://github.com/cube-js/cube.js/commit/601f65f3e390e738da4f03d313935a2506a77290))
+
+
+
+
+
+## [0.28.7](https://github.com/cube-js/cube.js/compare/v0.28.6...v0.28.7) (2021-07-25)
+
+
+### Features
+
+* Remove job from pre-aggregations queue, Debug API ([#3148](https://github.com/cube-js/cube.js/issues/3148)) ([2e244db](https://github.com/cube-js/cube.js/commit/2e244dbde868a002d5c5d4396bb5274679cf9168))
+
+
+
+
+
 ## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

@@ -1457,8 +1457,13 @@ export class PreAggregations {
     return data.filter(res => res);
   }
 
-  public async getQueueState(dataSource = undefined) {
+  public async getQueueState(dataSource: string) {
     const queries = await this.getQueue(dataSource).getQueries();
     return queries;
+  }
+
+  public async cancelQueriesFromQueue(queryKeys: string[], dataSource: string) {
+    const queue = this.getQueue(dataSource);
+    return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey)));
   }
 }

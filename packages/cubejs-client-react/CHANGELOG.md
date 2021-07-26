@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.7](https://github.com/cube-js/cube.js/compare/v0.28.6...v0.28.7) (2021-07-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** QueryBuilder incorrectly deduplicates filters based only on member instead of member+operator ([#2948](https://github.com/cube-js/cube.js/issues/2948)) ([#3147](https://github.com/cube-js/cube.js/issues/3147)) ([69d5baf](https://github.com/cube-js/cube.js/commit/69d5baf761bf6a55ec487cb179c61878bbfa6089))
+
+
+
+
+
 ## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
 
 **Note:** Version bump only for package @cubejs-client/react
