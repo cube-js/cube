@@ -30,7 +30,6 @@ practices of running and scaling Cube.js applications.
 ## Prerequisites
 
 - A Cube Cloud account
-- Node.js 12+
 
 ## Configuration
 
