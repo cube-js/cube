@@ -215,6 +215,7 @@ export const normalizeQuery = (query) => {
 };
 
 const queryPreAggregationsSchema = Joi.object().keys({
+  metadata: Joi.object(),
   timezone: Joi.string(),
   timezones: Joi.array().items(Joi.string()),
   preAggregations: Joi.array().items(Joi.object().keys({
