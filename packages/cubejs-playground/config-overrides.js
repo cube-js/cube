@@ -40,7 +40,6 @@ module.exports = function override(config, env) {
   config.stats = 'verbose';
   config.plugins = config.plugins.concat([
     new webpack.ProgressPlugin(),
-    // to fix No module factory available for dependency type: CssDependency
     new MiniCssExtractPlugin(),
   ]);
   if (env === 'production') {
