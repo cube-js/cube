@@ -620,6 +620,7 @@ export class PreAggregationLoader {
         requestId: this.requestId,
         invalidationKeys,
         forceBuild: this.forceBuild,
+        metadata: this.metadata,
         orphanedTimeout: this.orphanedTimeout
       },
       priority,
