@@ -1,5 +1,5 @@
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
-use crate::queryplanner::datetime::date_add;
+use crate::queryplanner::datetime::date_addsub;
 use crate::queryplanner::hll::Hll;
 use crate::CubeError;
 use arrow::array::{Array, BinaryArray, UInt64Builder};
@@ -23,6 +23,7 @@ pub enum CubeScalarUDFKind {
     Now,
     UnixTimestamp,
     DateAdd,
+    DateSub,
 }
 
 pub trait CubeScalarUDF {
@@ -37,7 +38,8 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Box<dyn CubeScalarUDF> {
         CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
         CubeScalarUDFKind::Now => Box::new(Now {}),
         CubeScalarUDFKind::UnixTimestamp => Box::new(UnixTimestamp {}),
-        CubeScalarUDFKind::DateAdd => Box::new(DateAdd {}),
+        CubeScalarUDFKind::DateAdd => Box::new(DateAddSub { is_add: true }),
+        CubeScalarUDFKind::DateSub => Box::new(DateAddSub { is_add: false }),
     }
 }
 
@@ -57,6 +59,9 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     }
     if n == "DATE_ADD" {
         return Some(CubeScalarUDFKind::DateAdd);
+    }
+    if n == "DATE_SUB" {
+        return Some(CubeScalarUDFKind::DateSub);
     }
     return None;
 }
@@ -187,8 +192,11 @@ impl CubeScalarUDF for UnixTimestamp {
     }
 }
 
-struct DateAdd {}
-impl DateAdd {
+struct DateAddSub {
+    is_add: bool,
+}
+
+impl DateAddSub {
     fn signature() -> Signature {
         Signature::OneOf(vec![
             Signature::Exact(vec![
@@ -202,23 +210,38 @@ impl DateAdd {
         ])
     }
 }
-impl CubeScalarUDF for DateAdd {
+
+impl DateAddSub {
+    fn name_static(&self) -> &'static str {
+        match self.is_add {
+            true => "DATE_ADD",
+            false => "DATE_SUB",
+        }
+    }
+}
+
+impl CubeScalarUDF for DateAddSub {
     fn kind(&self) -> CubeScalarUDFKind {
-        CubeScalarUDFKind::DateAdd
+        match self.is_add {
+            true => CubeScalarUDFKind::DateAdd,
+            false => CubeScalarUDFKind::DateSub,
+        }
     }
 
     fn name(&self) -> &str {
-        "DATE_ADD"
+        self.name_static()
     }
 
     fn descriptor(&self) -> ScalarUDF {
+        let name = self.name_static();
+        let is_add = self.is_add;
         return ScalarUDF {
             name: self.name().to_string(),
             signature: Self::signature(),
             return_type: Arc::new(|_| {
                 Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
             }),
-            fun: Arc::new(|inputs| {
+            fun: Arc::new(move |inputs| {
                 assert_eq!(inputs.len(), 2);
                 // TODO: support arrays as inputs.
                 let t = match &inputs[0] {
@@ -226,21 +249,23 @@ impl CubeScalarUDF for DateAdd {
                         Utc.timestamp_nanos(*t)
                     }
                     _ => {
-                        return Err(DataFusionError::Execution(
-                            "First argument of `DATE_ADD` must be a non-null timestamp".to_string(),
-                        ))
+                        return Err(DataFusionError::Execution(format!(
+                            "First argument of `{}` must be a non-null timestamp",
+                            name
+                        )))
                     }
                 };
                 let i = match &inputs[1] {
                     ColumnarValue::Scalar(i) => i,
                     _ => {
-                        return Err(DataFusionError::Execution(
-                            "Second argument of `DATE_ADD` must be a non-null interval".to_string(),
-                        ))
+                        return Err(DataFusionError::Execution(format!(
+                            "Second argument of `{}` must be a non-null interval",
+                            name
+                        )))
                     }
                 };
                 Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                    Some(date_add(t, i.clone())?.timestamp_nanos()),
+                    Some(date_addsub(t, i.clone(), is_add)?.timestamp_nanos()),
                 )))
             }),
         };

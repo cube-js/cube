@@ -2,50 +2,63 @@ use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
 use datafusion::error::DataFusionError;
 use datafusion::scalar::ScalarValue;
 
-pub fn date_add(t: DateTime<Utc>, i: ScalarValue) -> Result<DateTime<Utc>, DataFusionError> {
+pub fn date_addsub(
+    t: DateTime<Utc>,
+    i: ScalarValue,
+    is_add: bool,
+) -> Result<DateTime<Utc>, DataFusionError> {
     match i {
         ScalarValue::IntervalYearMonth(Some(v)) => {
-            if v < 0 {
-                return Err(DataFusionError::Plan(
-                    "Second argument of `DATE_ADD` must be a positive".to_string(),
-                ));
-            }
+            let v = match is_add {
+                true => v,
+                false => -v,
+            };
 
             let mut year = t.year();
-            let mut month = t.month();
+            // Note month is numbered 0..11 in this function.
+            let mut month = t.month() as i32 - 1;
 
             year += v / 12;
-            month += (v % 12) as u32;
-            if 12 < month {
-                year += 1;
-                month -= 12;
-            }
-            assert!(month <= 12);
+            month += v % 12;
 
-            match change_ym(t, year, month) {
+            if month < 0 {
+                year -= 1;
+                month += 12;
+            }
+            debug_assert!(0 <= month);
+            year += month / 12;
+            month = month % 12;
+
+            match change_ym(t, year, 1 + month as u32) {
                 Some(t) => return Ok(t),
                 None => {
                     return Err(DataFusionError::Execution(format!(
                         "Failed to set date to ({}-{})",
-                        year, month
+                        year,
+                        1 + month
                     )))
                 }
             };
         }
         ScalarValue::IntervalDayTime(Some(v)) => {
-            if v < 0 {
-                return Err(DataFusionError::Plan(
-                    "Second argument of `DATE_ADD` must be positive".to_string(),
-                ));
-            }
-            let days: i64 = v >> 32;
-            let millis: i64 = v & 0xFFFFFFFF;
+            let v = match is_add {
+                true => v,
+                false => -v,
+            };
+
+            let days: i64 = v.signum() * (v.abs() >> 32);
+            let millis: i64 = v.signum() * ((v.abs() << 32) >> 32);
             return Ok(t + Duration::days(days) + Duration::milliseconds(millis));
         }
         _ => {
-            return Err(DataFusionError::Plan(
-                "Second argument of `DATE_ADD` must be a non-null interval".to_string(),
-            ));
+            let name = match is_add {
+                true => "DATE_ADD",
+                false => "DATE_SUB",
+            };
+            return Err(DataFusionError::Plan(format!(
+                "Second argument of `{}` must be a non-null interval",
+                name
+            )));
         }
     }
 }

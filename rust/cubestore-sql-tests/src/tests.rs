@@ -2672,47 +2672,79 @@ async fn float_index(service: Box<dyn SqlClient>) {
 }
 
 async fn date_add(service: Box<dyn SqlClient>) {
-    let check_adds_to = |t, i, expected| {
+    let check_fun = |name, t, i, expected| {
         let expected = timestamp_from_string(expected).unwrap();
         let service = &service;
         async move {
             let actual = service
                 .exec_query(&format!(
-                    "SELECT DATE_ADD(CAST('{}' as TIMESTAMP), INTERVAL '{}')",
-                    t, i
+                    "SELECT {}(CAST('{}' as TIMESTAMP), INTERVAL '{}')",
+                    name, t, i
                 ))
                 .await
                 .unwrap();
             assert_eq!(to_rows(&actual), rows(&[expected]));
         }
     };
+    let check_adds_to = |t, i, expected| check_fun("DATE_ADD", t, i, expected);
+    let check_subs_to = |t, i, expected| check_fun("DATE_SUB", t, i, expected);
 
     check_adds_to("2021-01-01T00:00:00Z", "1 second", "2021-01-01T00:00:01Z").await;
     check_adds_to("2021-01-01T00:00:00Z", "1 minute", "2021-01-01T00:01:00Z").await;
     check_adds_to("2021-01-01T00:00:00Z", "1 hour", "2021-01-01T01:00:00Z").await;
     check_adds_to("2021-01-01T00:00:00Z", "1 day", "2021-01-02T00:00:00Z").await;
+
     check_adds_to(
         "2021-01-01T00:00:00Z",
         "1 day 1 hour 1 minute 1 second",
         "2021-01-02T01:01:01Z",
     )
     .await;
+    check_subs_to(
+        "2021-01-02T01:01:01Z",
+        "1 day 1 hour 1 minute 1 second",
+        "2021-01-01T00:00:00Z",
+    )
+    .await;
+
     check_adds_to("2021-01-01T00:00:00Z", "1 month", "2021-02-01T00:00:00Z").await;
+
     check_adds_to("2021-01-01T00:00:00Z", "1 year", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 year", "2021-01-01T00:00:00Z").await;
 
     check_adds_to("2021-01-01T00:00:00Z", "13 month", "2022-02-01T00:00:00Z").await;
+    check_subs_to("2022-02-01T00:00:00Z", "13 month", "2021-01-01T00:00:00Z").await;
+
     check_adds_to("2021-01-01T23:59:00Z", "1 minute", "2021-01-02T00:00:00Z").await;
+    check_subs_to("2021-01-02T00:00:00Z", "1 minute", "2021-01-01T23:59:00Z").await;
+
     check_adds_to("2021-12-01T00:00:00Z", "1 month", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 month", "2021-12-01T00:00:00Z").await;
+
     check_adds_to("2021-12-31T00:00:00Z", "1 day", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 day", "2021-12-31T00:00:00Z").await;
 
     // Feb 29 on leap and non-leap years.
     check_adds_to("2020-02-29T00:00:00Z", "1 day", "2020-03-01T00:00:00Z").await;
+    check_subs_to("2020-03-01T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
+
     check_adds_to("2020-02-28T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-02-29T00:00:00Z", "1 day", "2020-02-28T00:00:00Z").await;
+
     check_adds_to("2021-02-28T00:00:00Z", "1 day", "2021-03-01T00:00:00Z").await;
+    check_subs_to("2021-03-01T00:00:00Z", "1 day", "2021-02-28T00:00:00Z").await;
+
     check_adds_to("2020-02-29T00:00:00Z", "1 year", "2021-02-28T00:00:00Z").await;
+    check_subs_to("2020-02-29T00:00:00Z", "1 year", "2019-02-28T00:00:00Z").await;
+
     check_adds_to("2020-01-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-03-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+
     check_adds_to("2020-01-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-03-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+
     check_adds_to("2021-01-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
+    check_subs_to("2021-03-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
 
     // Invalid types passed to date_add.
     service
