@@ -13,8 +13,7 @@
   "scripts": {
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
-    "build": "yarn run build:playground && yarn run build:library",
-    "build:library": "rollup -c && rm -f lib/.tsbuildinfo",
+    "build": "yarn run build:playground && rollup -c",
     "build:playground": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },
   "browserslist": [
@@ -83,7 +82,7 @@
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
-    "less-loader": "^10.0.1",
+    "less-loader": "^8.1.1",
     "react": "^17.0.1",
     "react-app-rewire-yarn-workspaces": "^1.0.3",
     "react-app-rewired": "^2.1.0",
