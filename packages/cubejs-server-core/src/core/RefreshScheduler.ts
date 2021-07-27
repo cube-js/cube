@@ -273,13 +273,18 @@ export class RefreshScheduler {
 
           let result = [];
           if (queriesForPreAggregation && queriesForPreAggregation.length) {
-            const dates = queriesForPreAggregation.map(query => query?.timeDimensions[0]?.dateRange).flat();
+            const query = queriesForPreAggregation[0];
+            const lastQuery = queriesForPreAggregation[queriesForPreAggregation.length - 1];
 
-            const [query] = queriesForPreAggregation;
+            const dates = query?.timeDimensions[0]?.dateRange[0] && [
+              query?.timeDimensions[0]?.dateRange[0],
+              lastQuery?.timeDimensions[0]?.dateRange[1]
+            ];
+
             const getSqlResultFirst = await compilerApi.getSql(query);
             const expandPartitions = await orchestratorApi.expandPartitionsInPreAggregations({
               preAggregations: getSqlResultFirst.preAggregations.map(p => {
-                p.matchedTimeDimensionDateRange = refreshRange || (dates.length && [dates[0], dates[dates - 1]]);
+                p.matchedTimeDimensionDateRange = refreshRange || dates;
                 return p;
               }),
               preAggregationsLoadCacheByDataSource
