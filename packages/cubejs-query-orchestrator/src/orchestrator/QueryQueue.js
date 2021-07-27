@@ -209,14 +209,8 @@ export class QueryQueue {
     const redisClient = await this.queueDriver.createConnection();
     try {
       const [query] = await redisClient.cancelQuery(queryKey);
-      if (query) {
-        this.logger('Cancelling query', {
-          queryKey: query.queryKey,
-          queuePrefix: this.redisQueuePrefix,
-          requestId: query.requestId
-        });
-        await this.sendCancelMessageFn(query);
-      }
+      if (query) await this.sendCancelMessageFn(query);
+
       return true;
     } finally {
       this.queueDriver.release(redisClient);
