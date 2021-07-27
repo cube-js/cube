@@ -14,7 +14,7 @@
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
     "build": "yarn run build:playground && yarn run build:library",
-    "build:library": "rollup -c",
+    "build:library": "rollup -c && rm -f lib/.tsbuildinfo",
     "build:playground": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },
   "browserslist": [
@@ -44,7 +44,7 @@
     "history": "^4.9.0",
     "js-cookie": "^2.2.1",
     "jwt-decode": "^3.1.2",
-    "less": "^3.10.3",
+    "less": "^4.1.1",
     "mitt": "^2.1.0",
     "moment": "^2.24.0",
     "prettier": "^2.0.5",
@@ -84,16 +84,19 @@
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
-    "mini-css-extract-plugin": "^2.1.0",
+    "mini-css-extract-plugin": "^1.6.2",
     "react": "^17.0.1",
     "react-app-rewire-yarn-workspaces": "^1.0.3",
     "react-app-rewired": "^2.1.0",
     "react-dom": "^17.0.1",
     "recursive-readdir": "^2.2.2",
     "rollup": "^2.53.3",
+    "rollup-plugin-local-resolve": "^1.0.7",
     "rollup-plugin-postcss": "^4.0.0",
     "rollup-plugin-svg": "^2.0.0",
     "styled-components": "5.2.0",
+    "terser-webpack-plugin": "^5.1.4",
+    "tslib": "^2.3.0",
     "typescript": "^4.3.5"
   },
   "peerDependencies": {

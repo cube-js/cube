@@ -7,50 +7,39 @@ import svg from 'rollup-plugin-svg';
 import { LESS_VARIABLES } from './variables-esm';
 
 const bundle = (name, globalName, { globals = {}, ...baseConfig }) => {
-  return [
-    {
-      ...baseConfig,
-      plugins: [
-        postcss({
-          extensions: ['.less'],
-          use: [
-            [
-              'less',
-              {
-                javascriptEnabled: true,
-                modifyVars: LESS_VARIABLES,
-              },
-            ],
+  return {
+    ...baseConfig,
+    plugins: [
+      postcss({
+        extensions: ['.less', '.css'],
+        use: [
+          [
+            'less',
+            {
+              javascriptEnabled: true,
+              modifyVars: LESS_VARIABLES,
+            },
           ],
-          extract: 'antd.min.css',
-          minimize: true,
-        }),
-        commonjs(),
-        typescript({
-          tsconfig: 'tsconfig.json',
-        }),
-        localResolve(),
-        svg()
-      ],
-      output: {
-        dir: './lib',
-        name: 'playground.esm',
-        format: 'es',
-        sourcemap: true,
-        globals,
-      },
+        ],
+        extract: 'antd.min.css',
+        minimize: true,
+      }),
+      commonjs(),
+      typescript({
+        tsconfig: 'tsconfig.json',
+      }),
+      localResolve(),
+      svg(),
+    ],
+    output: {
+      dir: 'lib',
+      format: 'es',
+      sourcemap: true,
+      globals,
     },
-  ];
+  };
 };
 
 export default bundle('cubejs-playground', 'cubejsPlayground', {
-  input: './src/playground/index.ts',
-  external: [
-    'react',
-    'react-dom',
-    'react/jsx-runtime',
-    'react-router',
-    'prop-types',
-    'styled-components',
-  ],
+  input: './src/playground/index.ts'
 });
