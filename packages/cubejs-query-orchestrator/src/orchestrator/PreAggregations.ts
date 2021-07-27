@@ -97,6 +97,7 @@ type PreAggregationDescription = {
   timezone: string;
   indexesSql: IndexDescription[];
   invalidateKeyQueries: QueryWithParams[];
+  range: QueryDateRange,
   sql: QueryWithParams;
   loadSql: QueryWithParams;
   tableName: string;
@@ -1033,6 +1034,7 @@ export class PreAggregationPartitionRangeLoader {
     );
     return {
       ...this.preAggregation,
+      range,
       tableName: partitionTableName,
       loadSql: this.preAggregation.loadSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName),

@@ -252,9 +252,9 @@ export class RefreshScheduler {
       const { timezones } = queryingOptions;
       const { refreshRange, partitions: partitionsFilter } = preAggregationsQueringOptions[preAggregation.id] || {};
 
-      const queriesForPreAggregation = preAggregation && (await Promise.all(
-        timezones.map(
-          timezone => this.refreshQueriesForPreAggregation(
+      const partitions = (await Promise.all(
+        timezones.map(async timezone => {
+          const queriesForPreAggregation = await this.refreshQueriesForPreAggregation(
             context,
             compilerApi,
             preAggregation,
@@ -269,42 +269,41 @@ export class RefreshScheduler {
                 securityContext: context.securityContext || {},
               },
             }
-          )
-        )
-      )).reduce((target, source) => [...target, ...source], []);
+          );
 
-      let partitions = [];
-      if (queriesForPreAggregation && queriesForPreAggregation.length) {
-        const getSqlResult = await compilerApi.getSql(queriesForPreAggregation[0]);
-        
-        partitions = await Promise.all(
-          queriesForPreAggregation.map(
-            async query => {
-              const sql = await orchestratorApi.expandPartitionsInPreAggregations({
-                preAggregations: getSqlResult.preAggregations.map(p => {
-                  const clonePreAgg = JSON.parse(JSON.stringify(p));
-                  if (query?.timeDimensions?.length) {
-                    clonePreAgg.matchedTimeDimensionDateRange = query.timeDimensions[0].dateRange;
-                  }
-                  return clonePreAgg;
-                }),
-                preAggregationsLoadCacheByDataSource
-              });
-              return {
-                ...query,
-                sql: sql.preAggregations.find(p => p.preAggregationId === preAggregation.id)
-              };
-            }
-          )
-        );
-      }
+          let result = [];
+          if (queriesForPreAggregation && queriesForPreAggregation.length) {
+            const dates = queriesForPreAggregation.map(query => query?.timeDimensions[0]?.dateRange).flat();
+
+            const [query] = queriesForPreAggregation;
+            const getSqlResultFirst = await compilerApi.getSql(query);
+            const expandPartitions = await orchestratorApi.expandPartitionsInPreAggregations({
+              preAggregations: getSqlResultFirst.preAggregations.map(p => {
+                p.matchedTimeDimensionDateRange = refreshRange || (dates.length && [dates[0], dates[dates - 1]]);
+                return p;
+              }),
+              preAggregationsLoadCacheByDataSource
+            });
+
+            result = expandPartitions.preAggregations.map(sql => ({
+              ...query,
+              timeDimensions: query?.timeDimensions?.map(timeDimension => ({
+                ...timeDimension,
+                dateRange: sql.range
+              })),
+              sql
+            }));
+          }
+          return result;
+        })
+      ))
+        .reduce((target, source) => [...target, ...source], [])
+        .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p.sql?.tableName));
 
       return {
         timezones,
         preAggregation,
-        partitions: partitions.filter(p => !partitionsFilter ||
-          !partitionsFilter.length ||
-          partitionsFilter.includes(p.sql?.tableName))
+        partitions
       };
     }));
   }
