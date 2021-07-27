@@ -273,20 +273,31 @@ export class RefreshScheduler {
         )
       )).reduce((target, source) => [...target, ...source], []);
 
-      const partitions: any = queriesForPreAggregation && await Promise.all(
-        queriesForPreAggregation.map(
-          async query => {
-            const sql = await orchestratorApi.expandPartitionsInPreAggregations({
-              ...(await compilerApi.getSql(query)),
-              preAggregationsLoadCacheByDataSource
-            });
-            return {
-              ...query,
-              sql: sql.preAggregations.find(p => p.preAggregationId === preAggregation.id)
-            };
-          }
-        )
-      );
+      let partitions = [];
+      if (queriesForPreAggregation && queriesForPreAggregation.length) {
+        const getSqlResult = await compilerApi.getSql(queriesForPreAggregation[0]);
+        
+        partitions = await Promise.all(
+          queriesForPreAggregation.map(
+            async query => {
+              const sql = await orchestratorApi.expandPartitionsInPreAggregations({
+                preAggregations: getSqlResult.preAggregations.map(p => {
+                  const clonePreAgg = JSON.parse(JSON.stringify(p));
+                  if (query?.timeDimensions?.length) {
+                    clonePreAgg.matchedTimeDimensionDateRange = query.timeDimensions[0].dateRange;
+                  }
+                  return clonePreAgg;
+                }),
+                preAggregationsLoadCacheByDataSource
+              });
+              return {
+                ...query,
+                sql: sql.preAggregations.find(p => p.preAggregationId === preAggregation.id)
+              };
+            }
+          )
+        );
+      }
 
       return {
         timezones,
