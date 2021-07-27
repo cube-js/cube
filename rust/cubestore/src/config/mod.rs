@@ -403,13 +403,18 @@ where
     T: FromStr,
     T::Err: Display,
 {
-    env::var(name)
-        .ok()
-        .map(|x| match x.parse::<T>() {
-            Ok(v) => v,
-            Err(e) => panic!("could not parse value for '{}': {}", name, e),
-        })
-        .unwrap_or(default)
+    env_optparse(name).unwrap_or(default)
+}
+
+fn env_optparse<T>(name: &str) -> Option<T>
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    env::var(name).ok().map(|x| match x.parse::<T>() {
+        Ok(v) => v,
+        Err(e) => panic!("could not parse environment variable '{}': {}", name, e),
+    })
 }
 
 impl Config {
@@ -448,21 +453,14 @@ impl Config {
                         FileStoreProvider::Filesystem { remote_dir: None }
                     }
                 },
-                select_worker_pool_size: env::var("CUBESTORE_SELECT_WORKERS")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4),
-                bind_address: Some(env::var("CUBESTORE_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESTORE_PORT")
-                            .ok()
-                            .map(|v| v.parse::<u16>().unwrap())
-                            .unwrap_or(3306u16)),
-                )),
-                http_bind_address: Some(env::var("CUBESTORE_HTTP_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESTORE_HTTP_PORT")
+                select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
+                bind_address: Some(
+                    env::var("CUBESTORE_BIND_ADDR")
                         .ok()
-                        .map(|v| v.parse::<u16>().unwrap())
-                        .unwrap_or(3030u16)),
+                        .unwrap_or(format!("0.0.0.0:{}", env_parse("CUBESTORE_PORT", 3306))),
+                ),
+                http_bind_address: Some(env::var("CUBESTORE_HTTP_BIND_ADDR").ok().unwrap_or(
+                    format!("0.0.0.0:{}", env_parse("CUBESTORE_HTTP_PORT", 3030)),
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
@@ -470,27 +468,16 @@ impl Config {
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
                     .unwrap_or(Vec::new()),
-                worker_bind_address: env::var("CUBESTORE_WORKER_PORT")
-                    .ok()
+                worker_bind_address: env_optparse::<u16>("CUBESTORE_WORKER_PORT")
                     .map(|v| format!("0.0.0.0:{}", v)),
-                metastore_bind_address: env::var("CUBESTORE_META_PORT")
-                    .ok()
+                metastore_bind_address: env_optparse::<u16>("CUBESTORE_META_PORT")
                     .map(|v| format!("0.0.0.0:{}", v)),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
-                max_ingestion_data_frames: env::var("CUBESTORE_MAX_DATA_FRAMES")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4),
-                wal_split_threshold: env::var("CUBESTORE_WAL_SPLIT_THRESHOLD")
-                    .ok()
-                    .map(|v| v.parse::<u64>().unwrap())
-                    .unwrap_or(524288 / 2),
-                job_runners_count: env::var("CUBESTORE_JOB_RUNNERS")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4),
+                max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
+                wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 524288 / 2),
+                job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
@@ -498,8 +485,8 @@ impl Config {
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
-                malloc_trim_every_secs: env_parse::<u64>("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
-                max_cached_queries: env_parse::<usize>("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
+                max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
             }),
         }
     }
