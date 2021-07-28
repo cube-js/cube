@@ -14,7 +14,7 @@ import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
-import { Query, ResultSet } from '@cubejs-client/core';
+import { ChartType, Query, ResultSet } from '@cubejs-client/core';
 import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
@@ -83,6 +83,7 @@ export const frameworks: FrameworkDescriptor[] = [
 type ChartContainerProps = {
   query: Query;
   hideActions: boolean;
+  chartType: ChartType;
   dashboardSource?: DashboardSource;
   error?: Error;
   resultSet?: ResultSet;

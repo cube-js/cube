@@ -844,12 +844,22 @@ declare module '@cubejs-client/core' {
     ? TCubeSegment
     : never;
 
-  type DryRunResponse = {
+  /**
+   * @deprecated use DryRunResponse
+   */
+  type TDryRunResponse = {
     queryType: QueryType;
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
     transformedQueries: TransformedQuery[]
+  };
+
+  export type DryRunResponse = {
+    queryType: QueryType;
+    normalizedQueries: Query[];
+    pivotQuery: PivotQuery;
+    queryOrder: Array<{ [k: string]: QueryOrder }>;
   };
 
   export type Cube = {

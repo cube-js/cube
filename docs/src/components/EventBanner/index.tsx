@@ -9,7 +9,7 @@ const query = {
     {
       member: 'Banner.start',
       operator: 'beforeDate',
-      values: [formatDate()],
+      values: [formatDate(1)],
     },
     {
       member: 'Banner.end',
@@ -102,13 +102,20 @@ const EventBanner = (props) => {
   );
 };
 export default EventBanner;
-function formatDate() {
-  var d = new Date(),
-    month = '' + (d.getMonth() + 1),
-    day = '' + d.getDate(),
-    year = d.getFullYear();
+function formatDate(daysToAdd) {
+  let d = new Date();
+
+  if (daysToAdd) {
+    d.setDate(d.getDate() + daysToAdd);
+  }
+
+  let month = '' + (d.getMonth() + 1);
+  let day = '' + d.getDate();
+  let year = d.getFullYear();
+
   if (month.length < 2) month = '0' + month;
   if (day.length < 2) day = '0' + day;
+
   return [year, month, day].join('-');
 }
 function getLinkWithUTM(link, source, compagin) {

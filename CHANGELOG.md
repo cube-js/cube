@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.8](https://github.com/cube-js/cube.js/compare/v0.28.7...v0.28.8) (2021-07-25)
+
+
+### Bug Fixes
+
+* Hide debug logs, Debug API ([#3152](https://github.com/cube-js/cube.js/issues/3152)) ([601f65f](https://github.com/cube-js/cube.js/commit/601f65f3e390e738da4f03d313935a2506a77290))
+
+
+
+
+
+## [0.28.7](https://github.com/cube-js/cube.js/compare/v0.28.6...v0.28.7) (2021-07-25)
+
+
+### Bug Fixes
+
+* **@cubejs-client/react:** QueryBuilder incorrectly deduplicates filters based only on member instead of member+operator ([#2948](https://github.com/cube-js/cube.js/issues/2948)) ([#3147](https://github.com/cube-js/cube.js/issues/3147)) ([69d5baf](https://github.com/cube-js/cube.js/commit/69d5baf761bf6a55ec487cb179c61878bbfa6089))
+
+
+### Features
+
+* Remove job from pre-aggregations queue, Debug API ([#3148](https://github.com/cube-js/cube.js/issues/3148)) ([2e244db](https://github.com/cube-js/cube.js/commit/2e244dbde868a002d5c5d4396bb5274679cf9168))
+
+
+
+
+
+## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** week granularity ([#3146](https://github.com/cube-js/cube.js/issues/3146)) ([9697a64](https://github.com/cube-js/cube.js/commit/9697a646e5e58edc54c4b08a810e0faecc4d0c69))
+* **api-gateway:** Debug API, allow subscribe to pre-aggregations queue events only by playground JWT ([#3144](https://github.com/cube-js/cube.js/issues/3144)) ([700080f](https://github.com/cube-js/cube.js/commit/700080f33c13fd149acc6f6bad26a11ea0528211))
+
+
+### Features
+
+* **@cubejs-client/ngx:** async CubejsClient initialization ([#2876](https://github.com/cube-js/cube.js/issues/2876)) ([bba3a01](https://github.com/cube-js/cube.js/commit/bba3a01d2a072093509633f2d26e8df9677f940c))
+
+
+
+
+
+## [0.28.5](https://github.com/cube-js/cube.js/compare/v0.28.4...v0.28.5) (2021-07-21)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server-core:** is ready for query processing for AWS ([22761b5](https://github.com/cube-js/cube.js/commit/22761b50d1a436973937807332c2f8aa85c21c06))
+* **@cubejs-client/playground:** Rollup Designer can use pre-agg ([#3142](https://github.com/cube-js/cube.js/issues/3142)) ([3021132](https://github.com/cube-js/cube.js/commit/30211328ecbf47720a562584f40e6db4e0af1e89))
+* **cubestore:** only pick index with exact column order ([f873a0c](https://github.com/cube-js/cube.js/commit/f873a0c2ba31dbc2ca80d4cdb0d5151a39f9e912))
+
+
+
+
+
 ## [0.28.4](https://github.com/cube-js/cube.js/compare/v0.28.3...v0.28.4) (2021-07-20)
 
 

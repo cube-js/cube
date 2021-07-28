@@ -255,9 +255,10 @@ export function ConnectionWizardPage({ history }) {
                 type="info"
                 message={
                   <>
-                    For advanced configuration, use the <b>cube.js</b> or <b>.env</b>{' '}
-                    configuration file inside mount volume or environment
-                    variables.
+                    For advanced configuration, use the <b>cube.js</b> or{' '}
+                    <b>.env</b> configuration files in your cube.js project.
+                    Note these files are on the mount volume if you are running
+                    Docker.
                     <br />
                     <Typography.Link
                       href="https://cube.dev/docs/connecting-to-the-database"

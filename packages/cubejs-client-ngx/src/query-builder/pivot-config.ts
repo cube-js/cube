@@ -31,6 +31,6 @@ export class PivotConfig extends StateSubject<TPivotConfig> {
     this.subject.next({
       ...this.get(),
       fillMissingDates
-    })
+    });
   }
 }

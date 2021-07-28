@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.8](https://github.com/cube-js/cube.js/compare/v0.28.7...v0.28.8) (2021-07-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.28.7](https://github.com/cube-js/cube.js/compare/v0.28.6...v0.28.7) (2021-07-25)
+
+
+### Features
+
+* Remove job from pre-aggregations queue, Debug API ([#3148](https://github.com/cube-js/cube.js/issues/3148)) ([2e244db](https://github.com/cube-js/cube.js/commit/2e244dbde868a002d5c5d4396bb5274679cf9168))
+
+
+
+
+
+## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.28.5](https://github.com/cube-js/cube.js/compare/v0.28.4...v0.28.5) (2021-07-21)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/server-core:** is ready for query processing for AWS ([22761b5](https://github.com/cube-js/cube.js/commit/22761b50d1a436973937807332c2f8aa85c21c06))
+* **@cubejs-client/playground:** Rollup Designer can use pre-agg ([#3142](https://github.com/cube-js/cube.js/issues/3142)) ([3021132](https://github.com/cube-js/cube.js/commit/30211328ecbf47720a562584f40e6db4e0af1e89))
+
+
+
+
+
 ## [0.28.4](https://github.com/cube-js/cube.js/compare/v0.28.3...v0.28.4) (2021-07-20)
 
 

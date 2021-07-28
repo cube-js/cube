@@ -234,8 +234,12 @@ export class QueryOrchestrator {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
   }
 
-  public async getPreAggregationQueueStates() {
-    return this.preAggregations.getQueueState();
+  public async getPreAggregationQueueStates(dataSource = 'default') {
+    return this.preAggregations.getQueueState(dataSource);
+  }
+
+  public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource = 'default') {
+    return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
   }
 
   public async subscribeQueueEvents(id, callback) {
