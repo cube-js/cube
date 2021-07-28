@@ -1329,7 +1329,7 @@ export class PreAggregations {
           waitForRenew: queryBody.renewQuery,
           skipLoadRangeQuery: queryBody.skipLoadRangeQuery,
           requestId: queryBody.requestId,
-          externalRefresh: this.externalRefresh,
+          externalRefresh: this.externalRefresh
         }
       );
 

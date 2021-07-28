@@ -132,7 +132,7 @@ export class RefreshScheduler {
                 scheduledRefresh: true,
               }))
           );
-  
+
         const extractDate = ({ data }: any) => {
           // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
           data = JSON.parse(JSON.stringify(data));
@@ -149,7 +149,7 @@ export class RefreshScheduler {
         });
       }
     }
-    
+
     return dateRange;
   }
 
