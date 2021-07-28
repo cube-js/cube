@@ -1110,11 +1110,13 @@ export class PreAggregationPartitionRangeLoader {
         ),
       );
 
-      this.logger('PreAggregation Refresh Range', {
-        requestId: this.options.requestId,
-        preAggregationId: this.preAggregation.preAggregationId,
-        refreshRange: dateRange
-      });
+      if (startDate && endDate) {
+        this.logger('PreAggregation Refresh Range', {
+          requestId: this.options.requestId,
+          preAggregationId: this.preAggregation.preAggregationId,
+          refreshRange: [startDate, endDate]
+        });
+      }
 
       dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
         [startDate, endDate],

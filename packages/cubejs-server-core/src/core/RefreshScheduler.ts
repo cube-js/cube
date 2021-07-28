@@ -57,7 +57,8 @@ export class RefreshScheduler {
         matchedTimeDimensionDateRange: queryingOptions.refreshRange
       }],
       preAggregationsLoadCacheByDataSource,
-      skipLoadRangeQuery: !!queryingOptions.refreshRange
+      skipLoadRangeQuery: !!queryingOptions.refreshRange,
+      requestId: context.requestId
     });
     
     return partitions.preAggregations.map(partition => ({
