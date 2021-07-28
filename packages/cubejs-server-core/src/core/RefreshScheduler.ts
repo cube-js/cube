@@ -46,15 +46,9 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const baseQuery = await this.baseQueryForPreAggregation(compilerApi, preAggregation, queryingOptions);
-    const refreshRange = await this.fetchRefreshRangeForPreAggregation(
-      context,
-      compilerApi,
-      preAggregation,
-      queryingOptions
-    );
     const getSqlResult = await compilerApi.getSql(baseQuery);
     const preAggregationSql = getSqlResult.preAggregations.find(p => p.preAggregationId === preAggregation.id);
-    const partitions = await this.expandPartitionsInPreAggregation(context, preAggregationSql, refreshRange);
+    const partitions = await this.expandPartitionsInPreAggregation(context, preAggregationSql, queryingOptions);
     
     return partitions.preAggregations.map(partition => ({
       query: {
@@ -104,59 +98,10 @@ export class RefreshScheduler {
     }
   }
 
-  protected async fetchRefreshRangeForPreAggregation(
-    context,
-    compilerApi: CompilerApi,
-    preAggregation,
-    queryingOptions: ScheduledRefreshQueryingOptions
-  ) {
-    let dateRange = queryingOptions.refreshRange;
-    if (preAggregation.preAggregation.partitionGranularity) {
-      const compilers = await compilerApi.getCompilers();
-      const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
-      const dataSource = query.cubeDataSource(preAggregation.cube);
-  
-      const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-
-      if (!dateRange) {
-        const [startDate, endDate] =
-          await Promise.all(
-            compilerApi.createQueryByDataSource(compilers, queryingOptions, dataSource)
-              .preAggregationStartEndQueries(preAggregation.cube, preAggregation.preAggregation)
-              .map(sql => orchestratorApi.executeQuery({
-                query: sql[0],
-                values: sql[1],
-                continueWait: true,
-                cacheKeyQueries: [],
-                dataSource,
-                scheduledRefresh: true,
-              }))
-          );
-
-        const extractDate = ({ data }: any) => {
-          // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
-          data = JSON.parse(JSON.stringify(data));
-          return data[0] && data[0][Object.keys(data[0])[0]];
-        };
-        dateRange = [extractDate(startDate), extractDate(endDate)];
-  
-        this.serverCore.logger('PreAggregation Refresh Range', {
-          securityContext: context.securityContext,
-          requestId: context.requestId,
-          preAggregationId: preAggregation.id,
-          timezone: queryingOptions.timezone,
-          refreshRange: dateRange
-        });
-      }
-    }
-
-    return dateRange;
-  }
-
   protected async expandPartitionsInPreAggregation(
     context,
     preAggregation,
-    refreshRange
+    queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const preAggregationsLoadCacheByDataSource = {};
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
@@ -164,10 +109,10 @@ export class RefreshScheduler {
     const expandPartitions = await orchestratorApi.expandPartitionsInPreAggregations({
       preAggregations: [{
         ...preAggregation,
-        matchedTimeDimensionDateRange: refreshRange
+        matchedTimeDimensionDateRange: queryingOptions.refreshRange
       }],
       preAggregationsLoadCacheByDataSource,
-      skipLoadRangeQuery: !!refreshRange
+      skipLoadRangeQuery: !!queryingOptions.refreshRange
     });
 
     return expandPartitions;

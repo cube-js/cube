@@ -93,6 +93,7 @@ type IndexDescription = {
 };
 
 type PreAggregationDescription = {
+  preAggregationId: string;
   previewSql: QueryWithParams;
   timezone: string;
   indexesSql: IndexDescription[];
@@ -1102,16 +1103,24 @@ export class PreAggregationPartitionRangeLoader {
   private async partitionRanges() {
     const { preAggregationStartEndQueries } = this.preAggregation;
     let dateRange = this.preAggregation.matchedTimeDimensionDateRange;
-    if (!this.options.skipLoadRangeQuery) {
+    if (!this.options.skipLoadRangeQuery || !dateRange) {
       const [startDate, endDate] = await Promise.all(
         preAggregationStartEndQueries.map(
           async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
         ),
       );
+
+      this.logger('PreAggregation Refresh Range', {
+        requestId: this.options.requestId,
+        preAggregationId: this.preAggregation.preAggregationId,
+        refreshRange: dateRange
+      });
+
       dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
         [startDate, endDate],
         this.preAggregation.matchedTimeDimensionDateRange,
       );
+
       if (!dateRange) {
         // If there's no date range intersection between query data range and pre-aggregation build range
         // use last partition so outer query can receive expected table structure.
