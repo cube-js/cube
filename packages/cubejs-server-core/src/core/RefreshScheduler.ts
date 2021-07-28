@@ -46,9 +46,19 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const baseQuery = await this.baseQueryForPreAggregation(compilerApi, preAggregation, queryingOptions);
-    const getSqlResult = await compilerApi.getSql(baseQuery);
-    const preAggregationSql = getSqlResult.preAggregations.find(p => p.preAggregationId === preAggregation.id);
-    const partitions = await this.expandPartitionsInPreAggregation(context, preAggregationSql, queryingOptions);
+    const preAggregationDescriptionList = (await compilerApi.getSql(baseQuery)).preAggregations;
+    const preAggregationDescription = preAggregationDescriptionList.find(p => p.preAggregationId === preAggregation.id);
+
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const preAggregationsLoadCacheByDataSource = {};
+    const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
+      preAggregations: [{
+        ...preAggregationDescription,
+        matchedTimeDimensionDateRange: queryingOptions.refreshRange
+      }],
+      preAggregationsLoadCacheByDataSource,
+      skipLoadRangeQuery: !!queryingOptions.refreshRange
+    });
     
     return partitions.preAggregations.map(partition => ({
       query: {
@@ -96,26 +106,6 @@ export class RefreshScheduler {
         `Scheduled refresh is unsupported for ${preAggregation.preAggregation.type} of ${preAggregation.preAggregationName}`
       );
     }
-  }
-
-  protected async expandPartitionsInPreAggregation(
-    context,
-    preAggregation,
-    queryingOptions: ScheduledRefreshQueryingOptions
-  ) {
-    const preAggregationsLoadCacheByDataSource = {};
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-
-    const expandPartitions = await orchestratorApi.expandPartitionsInPreAggregations({
-      preAggregations: [{
-        ...preAggregation,
-        matchedTimeDimensionDateRange: queryingOptions.refreshRange
-      }],
-      preAggregationsLoadCacheByDataSource,
-      skipLoadRangeQuery: !!queryingOptions.refreshRange
-    });
-
-    return expandPartitions;
   }
 
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
