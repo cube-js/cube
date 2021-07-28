@@ -370,6 +370,8 @@ export class PreAggregationLoader {
 
   private requestId: string;
 
+  private metadata: any;
+
   private structureVersionPersistTime: any;
 
   private externalRefresh: boolean;
@@ -395,6 +397,7 @@ export class PreAggregationLoader {
     this.orphanedTimeout = options.orphanedTimeout;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
+    this.metadata = options.metadata;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
     this.externalRefresh = options.externalRefresh;
 
@@ -524,6 +527,7 @@ export class PreAggregationLoader {
       this.logger('Force build pre-aggregation', {
         preAggregation: this.preAggregation,
         requestId: this.requestId,
+        metadata: this.metadata,
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
@@ -616,6 +620,7 @@ export class PreAggregationLoader {
         requestId: this.requestId,
         invalidationKeys,
         forceBuild: this.forceBuild,
+        metadata: this.metadata,
         orphanedTimeout: this.orphanedTimeout
       },
       priority,
@@ -1273,6 +1278,7 @@ export class PreAggregations {
           waitForRenew: queryBody.renewQuery,
           forceBuild: queryBody.forceBuildPreAggregations,
           requestId: queryBody.requestId,
+          metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
           externalRefresh: this.externalRefresh
         }
