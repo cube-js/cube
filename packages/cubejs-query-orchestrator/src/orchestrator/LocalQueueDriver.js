@@ -123,7 +123,7 @@ export class LocalQueueDriverConnection {
   }
 
   async cancelQuery(queryKey) {
-    const query = await this.getQueryAndRemove(queryKey);
+    const [query] = await this.getQueryAndRemove(queryKey);
 
     if (this.getQueueEventsBus) {
       this.getQueueEventsBus().emit({
@@ -134,7 +134,7 @@ export class LocalQueueDriverConnection {
       });
     }
 
-    return true;
+    return query;
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {

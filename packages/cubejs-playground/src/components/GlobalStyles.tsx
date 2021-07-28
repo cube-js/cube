@@ -1,6 +1,6 @@
 import { createGlobalStyle } from 'styled-components';
 
-import { CSS_PROPERTIES } from '../variables-esm';
+import { CSS_PROPERTIES } from '../variables';
 
 const GlobalStyles = createGlobalStyle`
   body {

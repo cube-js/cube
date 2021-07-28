@@ -26,3 +26,4 @@ yarn-error.log*
 
 /charts-dist
 /lib
+/.rollup.cache/
