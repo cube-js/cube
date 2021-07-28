@@ -52,7 +52,6 @@ export class RefreshScheduler {
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
     const preAggregationsLoadCacheByDataSource = {};
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
-      ...queryingOptions,
       preAggregations: [{
         ...preAggregationDescription,
         matchedTimeDimensionDateRange: queryingOptions.refreshRange
