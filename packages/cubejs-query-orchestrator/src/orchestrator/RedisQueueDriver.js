@@ -102,7 +102,7 @@ export class RedisQueueDriverConnection {
       );
     }
 
-    return [query];
+    return query;
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {

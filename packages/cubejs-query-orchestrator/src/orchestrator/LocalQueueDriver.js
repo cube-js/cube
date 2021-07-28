@@ -134,7 +134,7 @@ export class LocalQueueDriverConnection {
       });
     }
 
-    return [query];
+    return query;
   }
 
   async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
