@@ -1101,20 +1101,24 @@ export class PreAggregationPartitionRangeLoader {
 
   private async partitionRanges() {
     const { preAggregationStartEndQueries } = this.preAggregation;
-    const [startDate, endDate] = await Promise.all(
-      preAggregationStartEndQueries.map(
-        async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
-      ),
-    );
-    let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
-      [startDate, endDate],
-      this.preAggregation.matchedTimeDimensionDateRange,
-    );
-    if (!dateRange) {
-      // If there's no date range intersection between query data range and pre-aggregation build range
-      // use last partition so outer query can receive expected table structure.
-      dateRange = [endDate, endDate];
+    let dateRange = this.preAggregation.matchedTimeDimensionDateRange;
+    if (!this.options.skipLoadRangeQuery) {
+      const [startDate, endDate] = await Promise.all(
+        preAggregationStartEndQueries.map(
+          async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
+        ),
+      );
+      dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
+        [startDate, endDate],
+        this.preAggregation.matchedTimeDimensionDateRange,
+      );
+      if (!dateRange) {
+        // If there's no date range intersection between query data range and pre-aggregation build range
+        // use last partition so outer query can receive expected table structure.
+        dateRange = [endDate, endDate];
+      }
     }
+
     return PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       dateRange,
@@ -1323,8 +1327,9 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource),
         {
           waitForRenew: queryBody.renewQuery,
+          skipLoadRangeQuery: queryBody.skipLoadRangeQuery,
           requestId: queryBody.requestId,
-          externalRefresh: this.externalRefresh
+          externalRefresh: this.externalRefresh,
         }
       );
 

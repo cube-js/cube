@@ -45,14 +45,79 @@ export class RefreshScheduler {
     preAggregation,
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
+    const baseQuery = await this.baseQueryForPreAggregation(compilerApi, preAggregation, queryingOptions);
+    const refreshRange = await this.fetchRefreshRangeForPreAggregation(
+      context,
+      compilerApi,
+      preAggregation,
+      queryingOptions
+    );
+    const getSqlResult = await compilerApi.getSql(baseQuery);
+    const preAggregationSql = getSqlResult.preAggregations.find(p => p.preAggregationId === preAggregation.id);
+    const partitions = await this.expandPartitionsInPreAggregation(context, preAggregationSql, refreshRange);
+    
+    return partitions.preAggregations.map(partition => ({
+      query: {
+        ...baseQuery,
+        timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
+          ...baseQuery.timeDimensions[0],
+          dateRange: partition.range
+        }]
+      },
+      partition
+    }));
+  }
+
+  protected async baseQueryForPreAggregation(
+    compilerApi: CompilerApi,
+    preAggregation,
+    queryingOptions: ScheduledRefreshQueryingOptions
+  ) {
     const compilers = await compilerApi.getCompilers();
     const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
-    if (preAggregation.preAggregation.partitionGranularity) {
-      const dataSource = query.cubeDataSource(preAggregation.cube);
+    if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
+      return { ...queryingOptions, ...preAggregation.references };
+    } else if (preAggregation.preAggregation.type === 'originalSql') {
+      const cubeFromPath = query.cubeEvaluator.cubeFromPath(preAggregation.cube);
+      const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
+      const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
+      if (measuresCount === 0 && dimensionsCount === 0) {
+        throw new Error(
+          `Can't refresh pre-aggregation without measures and dimensions: ${preAggregation.preAggregationName}`
+        );
+      }
+      return {
+        ...queryingOptions,
+        ...(
+          measuresCount &&
+            { measures: [`${preAggregation.cube}.${Object.keys(cubeFromPath.measures)[0]}`] }
+        ),
+        ...(
+          dimensionsCount &&
+            { dimensions: [`${preAggregation.cube}.${Object.keys(cubeFromPath.dimensions)[0]}`] }
+        )
+      };
+    } else {
+      throw new Error(
+        `Scheduled refresh is unsupported for ${preAggregation.preAggregation.type} of ${preAggregation.preAggregationName}`
+      );
+    }
+  }
 
+  protected async fetchRefreshRangeForPreAggregation(
+    context,
+    compilerApi: CompilerApi,
+    preAggregation,
+    queryingOptions: ScheduledRefreshQueryingOptions
+  ) {
+    let dateRange = queryingOptions.refreshRange;
+    if (preAggregation.preAggregation.partitionGranularity) {
+      const compilers = await compilerApi.getCompilers();
+      const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
+      const dataSource = query.cubeDataSource(preAggregation.cube);
+  
       const orchestratorApi = this.serverCore.getOrchestratorApi(context);
 
-      let dateRange = queryingOptions.refreshRange;
       if (!dateRange) {
         const [startDate, endDate] =
           await Promise.all(
@@ -67,14 +132,14 @@ export class RefreshScheduler {
                 scheduledRefresh: true,
               }))
           );
-
+  
         const extractDate = ({ data }: any) => {
           // TODO some backends return dates as objects here. Use ApiGateway data transformation ?
           data = JSON.parse(JSON.stringify(data));
           return data[0] && data[0][Object.keys(data[0])[0]];
         };
         dateRange = [extractDate(startDate), extractDate(endDate)];
-
+  
         this.serverCore.logger('PreAggregation Refresh Range', {
           securityContext: context.securityContext,
           requestId: context.requestId,
@@ -83,57 +148,29 @@ export class RefreshScheduler {
           refreshRange: dateRange
         });
       }
-
-      if (!dateRange[0] || !dateRange[1]) {
-        // Empty table. Nothing to refresh.
-        return [];
-      }
-
-      const baseQuery = {
-        ...queryingOptions,
-        ...preAggregation.references,
-        timeDimensions: [{
-          ...preAggregation.references.timeDimensions[0],
-          dateRange
-        }]
-      };
-      const partitionQuery = compilerApi.createQueryByDataSource(compilers, baseQuery);
-      const { partitionDimension } = partitionQuery.preAggregations.partitionDimension(preAggregation);
-
-      return partitionDimension.timeSeries().map(range => ({
-        ...baseQuery,
-        timeDimensions: [{
-          ...preAggregation.references.timeDimensions[0],
-          dateRange: range
-        }]
-      }));
-    } else if (preAggregation.preAggregation.type === 'rollup') {
-      return [{ ...queryingOptions, ...preAggregation.references }];
-    } else if (preAggregation.preAggregation.type === 'originalSql') {
-      const cubeFromPath = query.cubeEvaluator.cubeFromPath(preAggregation.cube);
-      const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
-      const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
-      if (measuresCount === 0 && dimensionsCount === 0) {
-        throw new Error(
-          `Can't refresh pre-aggregation without measures and dimensions: ${preAggregation.preAggregationName}`
-        );
-      }
-      return [{
-        ...queryingOptions,
-        ...(
-          measuresCount &&
-            { measures: [`${preAggregation.cube}.${Object.keys(cubeFromPath.measures)[0]}`] }
-        ),
-        ...(
-          dimensionsCount &&
-            { dimensions: [`${preAggregation.cube}.${Object.keys(cubeFromPath.dimensions)[0]}`] }
-        )
-      }];
-    } else {
-      throw new Error(
-        `Scheduled refresh is unsupported for ${preAggregation.preAggregation.type} of ${preAggregation.preAggregationName}`
-      );
     }
+    
+    return dateRange;
+  }
+
+  protected async expandPartitionsInPreAggregation(
+    context,
+    preAggregation,
+    refreshRange
+  ) {
+    const preAggregationsLoadCacheByDataSource = {};
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+
+    const expandPartitions = await orchestratorApi.expandPartitionsInPreAggregations({
+      preAggregations: [{
+        ...preAggregation,
+        matchedTimeDimensionDateRange: refreshRange
+      }],
+      preAggregationsLoadCacheByDataSource,
+      skipLoadRangeQuery: !!refreshRange
+    });
+
+    return expandPartitions;
   }
 
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
@@ -237,8 +274,6 @@ export class RefreshScheduler {
     compilerApi: CompilerApi,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-    const preAggregationsLoadCacheByDataSource = {};
     const preAggregationsQueringOptions = queryingOptions.preAggregations.reduce((obj, p) => {
       obj[p.id] = p;
       return obj;
@@ -267,39 +302,14 @@ export class RefreshScheduler {
               refreshRange,
               contextSymbols: {
                 securityContext: context.securityContext || {},
-              },
+              }
             }
           );
 
-          let result = [];
-          if (queriesForPreAggregation && queriesForPreAggregation.length) {
-            const query = queriesForPreAggregation[0];
-            const lastQuery = queriesForPreAggregation[queriesForPreAggregation.length - 1];
-
-            const dates = query?.timeDimensions[0]?.dateRange[0] && [
-              query?.timeDimensions[0]?.dateRange[0],
-              lastQuery?.timeDimensions[0]?.dateRange[1]
-            ];
-
-            const getSqlResultFirst = await compilerApi.getSql(query);
-            const expandPartitions = await orchestratorApi.expandPartitionsInPreAggregations({
-              preAggregations: getSqlResultFirst.preAggregations.map(p => {
-                p.matchedTimeDimensionDateRange = refreshRange || dates;
-                return p;
-              }),
-              preAggregationsLoadCacheByDataSource
-            });
-
-            result = expandPartitions.preAggregations.map(sql => ({
-              ...query,
-              timeDimensions: query?.timeDimensions?.map(timeDimension => ({
-                ...timeDimension,
-                dateRange: sql.range
-              })),
-              sql
-            }));
-          }
-          return result;
+          return queriesForPreAggregation.map(({ query, partition }) => ({
+            ...query,
+            sql: partition
+          }));
         })
       ))
         .reduce((target, source) => [...target, ...source], [])
@@ -394,7 +404,7 @@ export class RefreshScheduler {
         const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
         if (partitionCursor < queries.length) {
           const queryCursor = queries.length - 1 - partitionCursor;
-          const query = queries[queryCursor];
+          const { query } = queries[queryCursor];
           const sqlQuery = await compilerApi.getSql(query);
           return {
             ...sqlQuery,
