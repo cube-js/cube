@@ -5,6 +5,8 @@ import {
   pluck, mergeAll, flatten,
 } from 'ramda';
 
+import { aliasSeries } from './utils';
+
 dayjs.locale({
   ...en,
   weekStart: 1,
@@ -302,7 +304,7 @@ class ResultSet {
     return ResultSet.getNormalizedPivotConfig(this.loadResponse.pivotQuery, pivotConfig);
   }
 
-  timeSeries(timeDimension) {
+  timeSeries(timeDimension, resultIndex) {
     if (!timeDimension.granularity) {
       return null;
     }
@@ -314,7 +316,7 @@ class ResultSet {
       const dates = pipe(
         map(row => row[member] && dayjs(row[member])),
         filter(Boolean)
-      )(this.timeDimensionBackwardCompatibleData());
+      )(this.timeDimensionBackwardCompatibleData(resultIndex));
 
       dateRange = dates.length && [
         reduce(minBy(d => d.toDate()), dates[0], dates),
@@ -362,7 +364,7 @@ class ResultSet {
         ))
       ) {
         const series = this.loadResponses.map(
-          (loadResponse) => this.timeSeries(loadResponse.query.timeDimensions[0])
+          (loadResponse) => this.timeSeries(loadResponse.query.timeDimensions[0], resultIndex)
         );
 
         if (series[0]) {
@@ -470,22 +472,12 @@ class ResultSet {
       allMeasures.filter((e, i, a) => a.indexOf(e) !== i).forEach(m => duplicateMeasures.add(m));
     }
 
-    const aliasSeries = (yValues, i) => {
-      // manual alias
-      if (pivotConfig && pivotConfig.aliasSeries && pivotConfig.aliasSeries[i]) {
-        return [pivotConfig.aliasSeries[i], ...yValues];
-      } else if (duplicateMeasures.has(yValues[0])) {
-        return [i, ...yValues];
-      }
-      return [yValues];
-    };
-
     return this.pivot(pivotConfig).map(({ xValues, yValuesArray }) => {
       const yValuesMap = {};
 
       yValuesArray
         .forEach(([yValues, m], i) => {
-          yValuesMap[this.axisValuesString(aliasSeries(yValues, i), ',')] = m && validate(m);
+          yValuesMap[this.axisValuesString(aliasSeries(yValues, i, pivotConfig, duplicateMeasures), ',')] = m && validate(m);
         });
 
       return ({
@@ -655,17 +647,8 @@ class ResultSet {
       allMeasures.filter((e, i, a) => a.indexOf(e) !== i).forEach(m => duplicateMeasures.add(m));
     }
 
-    const aliasSeries = (yValues, i) => {
-      if (pivotConfig && pivotConfig.aliasSeries && pivotConfig.aliasSeries[i]) {
-        return [pivotConfig.aliasSeries[i], ...yValues];
-      } else if (duplicateMeasures.has(yValues[0])) {
-        return [i, ...yValues];
-      }
-      return yValues;
-    };
-
     return seriesNames.map((axisValues, i) => {
-      const aliasedAxis = aliasSeries(axisValues, i);
+      const aliasedAxis = aliasSeries(axisValues, i, pivotConfig, duplicateMeasures);
       return {
         title: this.axisValuesString(
           pivotConfig.y.find(d => d === 'measures') ?
@@ -710,7 +693,11 @@ class ResultSet {
     return this.loadResponses[0].annotation;
   }
 
-  timeDimensionBackwardCompatibleData(resultIndex = 0) {
+  timeDimensionBackwardCompatibleData(resultIndex) {
+    if (resultIndex === undefined) {
+      throw new Error('resultIndex is required');
+    }
+
     if (!this.backwardCompatibleData[resultIndex]) {
       const { data, query } = this.loadResponses[resultIndex];
       const timeDimensions = (query.timeDimensions || []).filter(td => Boolean(td.granularity));

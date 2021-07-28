@@ -48,7 +48,7 @@ const VARIABLES = {
   'heading-color': color('dark', 0.65),
   'link-color': color('purple'),
   'info-color': color('purple'),
-  'layout-body-background': '#f6f6f8',
+  'layout-body-background': '#f6f6f8;',
   'layout-header-background': '#eeeef5',
   'menu-highlight-color': color('dark-01'),
   'item-hover-bg': color('light'),
@@ -78,9 +78,14 @@ Object.keys(colors).forEach(
 );
 
 const LESS_VARIABLES = {};
-// Create LESS variable map.
+const CSS_PROPERTIES = {};
+
 Object.keys(VARIABLES).forEach((key) => {
   LESS_VARIABLES[`@${key}`] = VARIABLES[key];
 });
 
-module.exports = { VARIABLES, LESS_VARIABLES };
+Object.keys(VARIABLES).forEach((key) => {
+  CSS_PROPERTIES[`--${key}`] = VARIABLES[key];
+});
+
+export { VARIABLES, LESS_VARIABLES, CSS_PROPERTIES };
