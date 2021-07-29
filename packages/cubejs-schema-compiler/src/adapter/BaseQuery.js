@@ -399,7 +399,31 @@ export class BaseQuery {
     if (!this.options.preAggregationQuery && !this.ungrouped) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery) {
-        return this.preAggregations.rollupPreAggregation(preAggregationForQuery);
+        const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
+
+        if (!cumulativeMeasures.length) {
+          return this.preAggregations.rollupPreAggregation(preAggregationForQuery, this.measures, true);
+        }
+
+        const regularAndMultiplied = regularMeasures.concat(multipliedMeasures);
+        const toJoin =
+          (regularAndMultiplied.length ? [
+            this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false))
+          ] : []).concat(
+            R.map(
+              ([multiplied, measure]) => this.withCubeAliasPrefix(
+                `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
+                () => this.overTimeSeriesQuery(
+                  (measures, filters) => this.preAggregations.rollupPreAggregation(
+                    preAggregationForQuery, measures, false, filters
+                  ),
+                  measure,
+                  true
+                )
+              )
+            )(cumulativeMeasures)
+          );
+        return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
       }
     }
     return this.fullKeyQueryAggregate();
@@ -518,16 +542,18 @@ export class BaseQuery {
       return this.simpleQuery();
     }
 
-    const renderedReferenceContext = {
-      renderedReference: R.pipe(
-        R.map(m => [m.measure, m.aliasName()]),
-        R.fromPairs
-      )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure)))
-    };
+    let toJoin;
 
-    let toJoin =
-      (regularMeasures.length ? [
-        this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(regularMeasures))
+    if (this.options.preAggregationQuery) {
+      const allRegular = regularMeasures.concat(
+        cumulativeMeasures.map(([multiplied, measure]) => (multiplied ? null : measure)).filter(m => !!m)
+      );
+      const allMultiplied = multipliedMeasures.concat(
+        cumulativeMeasures.map(([multiplied, measure]) => (multiplied ? measure : null)).filter(m => !!m)
+      );
+
+      toJoin = (allRegular.length ? [
+        this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(allRegular))
       ] : [])
         .concat(
           R.pipe(
@@ -536,20 +562,36 @@ export class BaseQuery {
             R.map(
               ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
             )
-          )(multipliedMeasures)
-        ).concat(
-          R.map(
-            ([multiplied, measure]) => this.withCubeAliasPrefix(
-              `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
-              () => this.overTimeSeriesQuery(
-                multiplied ?
-                  (measures, filters) => this.aggregateSubQuery(measures[0].cube().name, measures, filters) :
-                  this.regularMeasuresSubQuery.bind(this),
-                measure
-              )
-            )
-          )(cumulativeMeasures)
+          )(allMultiplied)
         );
+    } else {
+      toJoin =
+        (regularMeasures.length ? [
+          this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(regularMeasures))
+        ] : [])
+          .concat(
+            R.pipe(
+              R.groupBy(m => m.cube().name),
+              R.toPairs,
+              R.map(
+                ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+              )
+            )(multipliedMeasures)
+          ).concat(
+            R.map(
+              ([multiplied, measure]) => this.withCubeAliasPrefix(
+                `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
+                () => this.overTimeSeriesQuery(
+                  multiplied ?
+                    (measures, filters) => this.aggregateSubQuery(measures[0].cube().name, measures, filters) :
+                    this.regularMeasuresSubQuery.bind(this),
+                  measure,
+                  false
+                )
+              )
+            )(cumulativeMeasures)
+          );
+    }
 
     // Move regular measures to multiplied ones if there're same cubes to calculate.
     // Most of the times it'll be much faster to calculate as there will be only single scan per cube
@@ -572,21 +614,38 @@ export class BaseQuery {
       }
     }
 
+    return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
+  }
+
+  joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin) {
+    const renderedReferenceContext = {
+      renderedReference: R.pipe(
+        R.map(m => [m.measure, m.aliasName()]),
+        R.fromPairs,
+      )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure))),
+    };
+
     const join = R.drop(1, toJoin)
       .map(
         (q, i) => (this.dimensionAliasNames().length ?
           `INNER JOIN (${q}) as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
-          `, (${q}) as q_${i + 1}`)
+          `, (${q}) as q_${i + 1}`),
       ).join('\n');
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
       () => this.dimensionColumns('q_0').concat(this.measures.map(m => m.selectColumns())).join(', '),
-      renderedReferenceContext
+      renderedReferenceContext,
     );
     const havingFilters = this.evaluateSymbolSqlWithContext(
       () => this.baseWhere(this.measureFilters),
-      renderedReferenceContext
+      renderedReferenceContext,
     );
+
+    // TODO all having filters should be pushed down
+    if (toJoin.length === 1 && this.measureFilters.length === 0) {
+      return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
+    }
+
     return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
@@ -680,7 +739,7 @@ export class BaseQuery {
     return aHierarchy[lastIndex - 1];
   }
 
-  overTimeSeriesQuery(baseQueryFn, cumulativeMeasure) {
+  overTimeSeriesQuery(baseQueryFn, cumulativeMeasure, fromRollup) {
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
     const cumulativeMeasures = [cumulativeMeasure];
     const dateFromStartToEndConditionSql =
@@ -697,7 +756,7 @@ export class BaseQuery {
               isFromStartToEnd ?
                 this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
                 `${this.timeStampInClientTz(d.dateToParam())}`,
-              `${d.convertedToTz()}`,
+              `${fromRollup ? this.dimensionSql(d) : d.convertedToTz()}`,
               `${this.timeStampInClientTz(d.dateFromParam())}`,
               `${this.timeStampInClientTz(d.dateToParam())}`,
               isFromStartToEnd
@@ -740,12 +799,17 @@ export class BaseQuery {
   }
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forSelect = this.dateSeriesSelect().concat(
-      this.dimensions.concat(cumulativeMeasures).map(s => s.cumulativeSelectColumns())
-    ).filter(c => !!c).join(', ');
+    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
       this.groupByClause();
+  }
+
+  overTimeSeriesForSelect(cumulativeMeasures) {
+    return this.dimensions.map(s => s.cumulativeSelectColumns()).concat(this.dateSeriesSelect()).concat(
+      cumulativeMeasures.map(s => s.cumulativeSelectColumns()),
+    ).filter(c => !!c)
+      .join(', ');
   }
 
   dateSeriesSelect() {

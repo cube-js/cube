@@ -99,10 +99,7 @@ export class MssqlQuery extends BaseQuery {
     const forGroupBy = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
     );
-    const forSelect = this.dateSeriesSelect()
-      .concat(this.dimensions.concat(cumulativeMeasures).map((s) => s.cumulativeSelectColumns()))
-      .filter((c) => !!c)
-      .join(', ');
+    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     return (
       `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +

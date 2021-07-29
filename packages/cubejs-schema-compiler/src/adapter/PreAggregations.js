@@ -111,16 +111,25 @@ export class PreAggregations {
     return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation));
   }
 
+  get hasCumulativeMeasures() {
+    if (!this.hasCumulativeMeasuresValue) {
+      this.hasCumulativeMeasuresValue = PreAggregations.hasCumulativeMeasures(this.query);
+    }
+    return this.hasCumulativeMeasuresValue;
+  }
+
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
 
-    const matchedTimeDimension = preAggregation.partitionGranularity && this.query.timeDimensions.find(
-      td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension &&
-        td.dateRange
-    );
+    const matchedTimeDimension =
+      preAggregation.partitionGranularity &&
+      !this.hasCumulativeMeasures &&
+      this.query.timeDimensions.find(
+        td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension && td.dateRange
+      );
     const filters = preAggregation.partitionGranularity && this.query.filters.filter(
       td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension &&
         td.isDateOperator() &&
@@ -222,7 +231,14 @@ export class PreAggregations {
       );
 
     const isAdditive = R.all(m => m.isAdditive(), query.measures);
-    const leafMeasureAdditive = R.all(path => query.newMeasure(path).isAdditive(), leafMeasurePaths);
+    const leafMeasures = leafMeasurePaths.map(path => query.newMeasure(path));
+    const leafMeasureAdditive = R.all(m => m.isAdditive(), leafMeasures);
+    const cumulativeMeasures = leafMeasures
+      .filter(m => m.isCumulative());
+    const hasCumulativeMeasures = cumulativeMeasures.length > 0;
+    const windowGranularity = cumulativeMeasures
+      .map(m => m.windowGranularity())
+      .reduce((a, b) => query.minGranularity(a, b), null);
     const granularityHierarchies = query.granularityHierarchies();
     const hasMultipliedMeasures = query.fullKeyQueryAggregateMeasures().multipliedMeasures.length > 0;
 
@@ -236,7 +252,9 @@ export class PreAggregations {
       allFiltersWithinSelectedDimensions,
       isAdditive,
       granularityHierarchies,
-      hasMultipliedMeasures
+      hasMultipliedMeasures,
+      hasCumulativeMeasures,
+      windowGranularity
     };
   }
 
@@ -281,15 +299,28 @@ export class PreAggregations {
         timeDimensions.map(d => [d.dimension, d.granularity || 'day']) // TODO granularity shouldn't be null?
       ) || [];
     }
+    const expandGranularity = (granularity) => transformedQuery.granularityHierarchies[granularity] || [granularity];
     // TimeDimension :: [Dimension, Granularity]
     // TimeDimension -> [TimeDimension]
     function expandTimeDimension(timeDimension) {
       const [dimension, granularity] = timeDimension;
       const makeTimeDimension = newGranularity => [dimension, newGranularity];
-      return (transformedQuery.granularityHierarchies[granularity] || [granularity]).map(makeTimeDimension);
+      return expandGranularity(granularity).map(makeTimeDimension);
     }
     // [[TimeDimension]]
     const queryTimeDimensionsList = transformedQuery.sortedTimeDimensions.map(expandTimeDimension);
+
+    const windowGranularityMatches = (references) => {
+      if (!transformedQuery.windowGranularity) {
+        return true;
+      }
+
+      const sortedTimeDimensions = references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions);
+      return expandGranularity(transformedQuery.windowGranularity).map(windowGranularity => R.all(
+        td => td[1] === windowGranularity,
+        sortedTimeDimensions,
+      )).filter(x => !!x).length > 0;
+    };
 
     const canUsePreAggregationNotAdditive = (references) => transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
       transformedQuery.allFiltersWithinSelectedDimensions &&
@@ -301,8 +332,9 @@ export class PreAggregations {
       R.equals(
         transformedQuery.sortedTimeDimensions,
         references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions)
-      );
+      ) && !transformedQuery.hasCumulativeMeasures;
 
+    // TODO revisit cumulative leaf measure matches
     const canUsePreAggregationLeafMeasureAdditive = (references) => R.all(
       d => (references.sortedDimensions || references.dimensions).indexOf(d) !== -1,
       transformedQuery.sortedDimensions
@@ -310,7 +342,8 @@ export class PreAggregations {
       R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures) &&
       R.allPass(
         queryTimeDimensionsList.map(tds => R.anyPass(tds.map(td => R.contains(td))))
-      )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
+      )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions)) &&
+      windowGranularityMatches(references);
 
     let canUseFn;
     if (transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures) {
@@ -374,10 +407,6 @@ export class PreAggregations {
 
   rollupMatchResults() {
     const { query } = this;
-
-    if (PreAggregations.hasCumulativeMeasures(query)) {
-      return [];
-    }
 
     const canUsePreAggregation = this.canUsePreAggregationFn(query);
 
@@ -635,7 +664,7 @@ export class PreAggregations {
     );
   }
 
-  rollupPreAggregation(preAggregationForQuery) {
+  rollupPreAggregation(preAggregationForQuery, measures, isFullSimpleQuery, filters) {
     let toJoin;
 
     const sqlAndAlias = (preAgg) => ({
@@ -683,15 +712,17 @@ export class PreAggregations {
     const segmentFilters = this.query.segments.map(
       s => this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })
     );
-    const filters =
-      segmentFilters
-        .concat(this.query.filters).concat(this.query.timeDimensions.map(dimension => dimension.dateRange && ({
-          filterToWhere: () => this.query.timeRangeFilter(
-            this.query.dimensionSql(dimension),
-            dimension.localDateTimeFromParam(),
-            dimension.localDateTimeToParam()
-          )
-        }))).filter(f => !!f);
+    const replacedFilters =
+      filters || segmentFilters
+        .concat(this.query.filters).concat(
+          this.query.timeDimensions.map(dimension => dimension.dateRange && ({
+            filterToWhere: () => this.query.timeRangeFilter(
+              this.query.dimensionSql(dimension),
+              dimension.localDateTimeFromParam(),
+              dimension.localDateTimeToParam(),
+            ),
+          }))
+        ).filter(f => !!f);
 
     const renderedReference = R.pipe(
       R.map(path => {
@@ -712,11 +743,14 @@ export class PreAggregations {
 
     return this.query.evaluateSymbolSqlWithContext(
       // eslint-disable-next-line prefer-template
-      () => `SELECT ${this.query.baseSelect()} FROM ${from} ${this.query.baseWhere(filters)}` +
+      () => `SELECT ${this.query.selectAllDimensionsAndMeasures(measures)} FROM ${from} ${this.query.baseWhere(replacedFilters)}` +
         this.query.groupByClause() +
-        this.query.baseHaving(this.query.measureFilters) +
-        this.query.orderBy() +
-        this.query.groupByDimensionLimit(),
+        (
+          isFullSimpleQuery ?
+            this.query.baseHaving(this.query.measureFilters) +
+            this.query.orderBy() +
+            this.query.groupByDimensionLimit() : ''
+        ),
       {
         renderedReference,
         rollupQuery: true,
