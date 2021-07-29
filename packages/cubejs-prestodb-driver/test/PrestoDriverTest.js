@@ -18,7 +18,7 @@ describe('PrestoHouseDriver', () => {
 
   // eslint-disable-next-line consistent-return,func-names
   before(async function () {
-    this.timeout(2 * 60 * 1000);
+    this.timeout(3 * 60 * 1000);
 
     if (process.env.TEST_PRESTO_HOST) {
       config = {
@@ -37,7 +37,7 @@ describe('PrestoHouseDriver', () => {
     );
 
     env = await dc
-      .withStartupTimeout(90 * 1000)
+      .withStartupTimeout(120 * 1000)
       .withWaitStrategy('coordinator', Wait.forHealthCheck())
       .withWaitStrategy('worker0', Wait.forLogMessage('Added catalog postgresql'))
       .withWaitStrategy('postgres', Wait.forHealthCheck())
