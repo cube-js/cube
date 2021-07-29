@@ -133,7 +133,8 @@ const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry
 
 type PreAggregationLoadCacheOptions = {
   requestId?: string,
-  dataSource: string
+  dataSource: string,
+  tablePrefixes?: string[],
 };
 
 type VersionEntriesObj = {
@@ -172,6 +173,8 @@ class PreAggregationLoadCache {
 
   private dataSource: string;
 
+  private tablePrefixes: string[] | null;
+
   public constructor(
     redisPrefix,
     clientFactory: DriverFactory,
@@ -188,6 +191,7 @@ class PreAggregationLoadCache {
     this.cacheDriver = preAggregations.cacheDriver;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
+    this.tablePrefixes = options.tablePrefixes;
     this.versionEntries = {};
     this.tables = {};
   }
@@ -226,6 +230,9 @@ class PreAggregationLoadCache {
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory();
+    if (this.tablePrefixes && client.getPrefixTablesQuery && this.preAggregations.options.skipExternalCacheAndQueue) {
+      return client.getPrefixTablesQuery(preAggregation.preAggregationsSchema, this.tablePrefixes);
+    }
     return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
@@ -1257,7 +1264,10 @@ export class PreAggregations {
         loadCacheByDataSource[dataSource] =
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
             requestId: queryBody.requestId,
-            dataSource
+            dataSource,
+            tablePrefixes: preAggregations
+              .filter(p => (p.dataSource || 'default') === dataSource)
+              .map(p => p.tableName.split('.')[1])
           });
       }
 
