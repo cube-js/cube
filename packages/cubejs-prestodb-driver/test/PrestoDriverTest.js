@@ -20,12 +20,20 @@ describe('PrestoHouseDriver', () => {
   before(async function () {
     this.timeout(6 * 60 * 1000);
 
+    const authOpts = {
+      basic_auth: {
+        user: 'presto',
+        password: ''
+      }
+    };
+
     if (process.env.TEST_PRESTO_HOST) {
       config = {
         host: process.env.TEST_PRESTO_HOST || 'localhost',
         port: process.env.TEST_PRESTO_PORT || '8080',
-        catalog: process.env.TEST_PRESTO_CATALOG || 'postgresql',
-        schema: 'presto',
+        catalog: process.env.TEST_PRESTO_CATALOG || 'tpch',
+        schema: 'sf1',
+        ...authOpts
       };
 
       return;
@@ -39,15 +47,14 @@ describe('PrestoHouseDriver', () => {
     env = await dc
       .withStartupTimeout(240 * 1000)
       .withWaitStrategy('coordinator', Wait.forHealthCheck())
-      .withWaitStrategy('worker0', Wait.forLogMessage('Added catalog postgresql'))
-      .withWaitStrategy('postgres', Wait.forHealthCheck())
       .up();
 
     config = {
       host: env.getContainer('coordinator').getHost(),
       port: env.getContainer('coordinator').getMappedPort(8080),
-      catalog: 'postgresql',
-      schema: 'default'
+      catalog: 'tpch',
+      schema: 'sf1',
+      ...authOpts
     };
   });
 

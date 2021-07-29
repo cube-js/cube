@@ -2,44 +2,12 @@ version: '2.2'
 
 services:
   coordinator:
-    image: lewuathe/presto-coordinator:341-SNAPSHOT
+    image: trinodb/trino
     ports:
       - "8080:8080"
     container_name: "coordinator"
-    depends_on:
-      - postgres
-    links:
-      - postgres
-    command: http://coordinator:8080 coordinator
-    volumes:
-      - ./config/catalog/:/usr/local/presto/etc/catalog/
     healthcheck:
-      test: "/usr/local/bin/presto-cli --execute 'SELECT 1' || exit 1"
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  worker0:
-    image: lewuathe/presto-worker:341-SNAPSHOT
-    container_name: "worker0"
-    depends_on:
-      - coordinator
-      - postgres
-    links:
-      - coordinator
-      - postgres
-    command: http://coordinator:8080 worker0
-    volumes:
-      - ./config/catalog/:/usr/local/presto/etc/catalog/
-
-  postgres:
-    image: postgres:12.4
-    environment:
-      POSTGRES_USER: 'presto'
-      POSTGRES_PASSWORD: '9bee2c3975024292eff5829526722ac2'
-      POSTGRES_DB: 'presto'
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U presto"]
+      test: "trino --execute 'SELECT 1' || exit 1"
       interval: 10s
       timeout: 5s
       retries: 5
