@@ -50,6 +50,7 @@ options][link-config].
 | `CUBEJS_EXT_DB_PASS`                 | The password used to connect to the external pre-aggregations database                                                                                                                           | A valid database password                                   |
 | `CUBEJS_EXT_DB_PORT`                 | The port for the external pre-aggregations database                                                                                                                                              | A valid port number                                         |
 | `CUBEJS_EXT_DB_USER`                 | The username used to connect to the external pre-aggregations database                                                                                                                           | A valid database username                                   |
+| `CUBEJS_TOPIC_NAME`                  | The name of the Amazon SNS or Google Cloud Pub/Sub topic (defaults to `<process.env.CUBEJS_APP>-process` if undefined, and finally `cubejs-process`)                                             | A valid topic name                                          |
 
 [gh-ioredis]: https://github.com/luin/ioredis
 [gh-node-redis]: https://github.com/NodeRedis/node-redis
