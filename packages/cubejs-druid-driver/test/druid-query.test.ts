@@ -1,8 +1,18 @@
+
+import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+
 import { DruidQuery } from '../src/DruidQuery';
-import { prepareCompiler } from './PrepareCompiler';
+
+export const testCompiler = (content, options) => originalPrepareCompiler({
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    { fileName: 'main.js', content }
+  ])
+}, { adapter: 'druid', ...options });
+
 
 describe('DruidQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = testCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -21,7 +31,7 @@ describe('DruidQuery', () => {
         }
       }
     })
-    `);
+    `,{});
 
   it('druid query like test',
     () => compiler.compile().then(() => {
