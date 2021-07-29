@@ -154,6 +154,7 @@ ORDER BY
 LIMIT
   5000
 ```
+
 </div>
 
 ## Funnel parameters
@@ -275,7 +276,7 @@ cube(`PurchaseFunnel`, {
 
   extends: Funnels.eventFunnel({
     // ...
-  })
+  }),
 });
 ```
 
@@ -313,7 +314,8 @@ in a non-linear way with the addition of steps. However, if the cardinality of
 the first event isn't too high, very simple optimization can be applied:
 [originalSql pre-aggregation](/schema/reference/pre-aggregations#original-sql).
 
-It is best to use [partitioned rollups][ref-partitioned-rollups] to cache the steps instead. Add one to the `PurchaseFunnel` cube as follows:
+It is best to use [partitioned rollups][ref-partitioned-rollups] to cache the
+steps instead. Add one to the `PurchaseFunnel` cube as follows:
 
 ```javascript
 cube(`PurchaseFunnel`, {
@@ -329,4 +331,5 @@ cube(`PurchaseFunnel`, {
 });
 ```
 
-[ref-partitioned-rollups]: /pre-aggregations#rollup-time-partitioning
+[ref-partitioned-rollups]:
+  /caching/using-pre-aggregations#partitioning-time-partitioning
