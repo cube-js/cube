@@ -36,6 +36,8 @@ jobs:
   unit:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
+    needs: latest-tag-sha
+    if: (needs['latest-tag-sha'].outputs.sha == github.sha)
 
     strategy:
       matrix:
