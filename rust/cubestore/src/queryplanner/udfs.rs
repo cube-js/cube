@@ -1,8 +1,8 @@
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
-use crate::queryplanner::datetime::date_addsub;
+use crate::queryplanner::datetime::{date_addsub_array, date_addsub_scalar};
 use crate::queryplanner::hll::Hll;
 use crate::CubeError;
-use arrow::array::{Array, BinaryArray, UInt64Builder};
+use arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
 use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use chrono::{TimeZone, Utc};
 use datafusion::error::DataFusionError;
@@ -243,10 +243,35 @@ impl CubeScalarUDF for DateAddSub {
             }),
             fun: Arc::new(move |inputs| {
                 assert_eq!(inputs.len(), 2);
-                // TODO: support arrays as inputs.
-                let t = match &inputs[0] {
+                let interval = match &inputs[1] {
+                    ColumnarValue::Scalar(i) => i.clone(),
+                    _ => {
+                        // We leave this case out for simplicity.
+                        // CubeStore does not allow intervals inside tables, so this is super rare.
+                        return Err(DataFusionError::Execution(format!(
+                            "Only scalar intervals are supported in `{}`",
+                            name
+                        )));
+                    }
+                };
+                match &inputs[0] {
+                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
+                        ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
+                    ),
                     ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
-                        Utc.timestamp_nanos(*t)
+                        let r = date_addsub_scalar(Utc.timestamp_nanos(*t), interval, is_add)?;
+                        Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                            Some(r.timestamp_nanos()),
+                        )))
+                    }
+                    ColumnarValue::Array(t) if t.as_any().is::<TimestampNanosecondArray>() => {
+                        let t = t
+                            .as_any()
+                            .downcast_ref::<TimestampNanosecondArray>()
+                            .unwrap();
+                        Ok(ColumnarValue::Array(Arc::new(date_addsub_array(
+                            &t, interval, is_add,
+                        )?)))
                     }
                     _ => {
                         return Err(DataFusionError::Execution(format!(
@@ -254,19 +279,7 @@ impl CubeScalarUDF for DateAddSub {
                             name
                         )))
                     }
-                };
-                let i = match &inputs[1] {
-                    ColumnarValue::Scalar(i) => i,
-                    _ => {
-                        return Err(DataFusionError::Execution(format!(
-                            "Second argument of `{}` must be a non-null interval",
-                            name
-                        )))
-                    }
-                };
-                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                    Some(date_addsub(t, i.clone(), is_add)?.timestamp_nanos()),
-                )))
+                }
             }),
         };
     }

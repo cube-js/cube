@@ -2,6 +2,8 @@
 use cubestore::table::{TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
 
+pub const NULL: () = ();
+
 pub fn rows(i: &[impl ToRow]) -> Vec<Vec<TableValue>> {
     i.iter().map(ToRow::to_row).collect()
 }
@@ -33,6 +35,15 @@ pub trait ToValue {
 impl ToValue for () {
     fn to_val(&self) -> TableValue {
         TableValue::Null
+    }
+}
+
+impl<T: ToValue> ToValue for Option<T> {
+    fn to_val(&self) -> TableValue {
+        match self {
+            None => TableValue::Null,
+            Some(v) => v.to_val(),
+        }
     }
 }
 

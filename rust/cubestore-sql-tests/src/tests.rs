@@ -1,4 +1,4 @@
-use crate::rows::rows;
+use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -2746,6 +2746,16 @@ async fn date_add(service: Box<dyn SqlClient>) {
     check_adds_to("2021-01-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
     check_subs_to("2021-03-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
 
+    // Nulls.
+    let r = service
+        .exec_query(
+            "SELECT date_add(CAST(NULL as timestamp), INTERVAL '1 month'), \
+                            date_sub(CAST(NULL as timestamp), INTERVAL '3 month')",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(NULL, NULL)]));
+
     // Invalid types passed to date_add.
     service
         .exec_query("SELECT date_add(1, 2)")
@@ -2766,6 +2776,43 @@ async fn date_add(service: Box<dyn SqlClient>) {
         .unwrap_err();
     // Too few arguments
     service.exec_query("SELECT date_add(1)").await.unwrap_err();
+
+    // Must work on columnar data.
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(t timestamp)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(t) VALUES ('2020-01-01T00:00:00Z'), ('2020-02-01T00:00:00Z'), (NULL)",
+        )
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT date_add(t, INTERVAL '1 year') FROM s.data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            None,
+            Some(timestamp_from_string("2021-01-01T00:00:00Z").unwrap()),
+            Some(timestamp_from_string("2021-02-01T00:00:00Z").unwrap())
+        ]),
+    );
+    let r = service
+        .exec_query("SELECT date_add(t, INTERVAL '1 hour') FROM s.data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            None,
+            Some(timestamp_from_string("2020-01-01T01:00:00Z").unwrap()),
+            Some(timestamp_from_string("2020-02-01T01:00:00Z").unwrap())
+        ]),
+    );
 }
 
 async fn unsorted_merge_assertion(service: Box<dyn SqlClient>) {
