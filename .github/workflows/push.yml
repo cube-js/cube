@@ -17,9 +17,6 @@ on:
       - 'yarn.lock'
     branches:
       - 'master'
-      # feature or legacy releases
-      - 'v*.*.*'
-      - 'v*.*'
   pull_request:
     paths:
       - '.github/workflows/push.yml'
@@ -87,6 +84,8 @@ jobs:
   lint:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
+    needs: latest-tag-sha
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     steps:
       - name: Checkout
@@ -119,6 +118,8 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
+    needs: latest-tag-sha
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     steps:
       - name: Checkout
@@ -151,9 +152,10 @@ jobs:
         run: yarn lerna run --concurrency 1 build
 
   integration-redis:
-    needs: [unit, lint]
+    needs: [unit, lint, latest-tag-sha]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     services:
       redis:
@@ -226,9 +228,10 @@ jobs:
           CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
 
   integration:
-    needs: [unit, lint]
+    needs: [unit, lint, latest-tag-sha]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     strategy:
       matrix:
@@ -267,7 +270,8 @@ jobs:
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
-    needs: [lint]
+    needs: [lint, latest-tag-sha]
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     runs-on: ubuntu-20.04
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
@@ -276,6 +280,18 @@ jobs:
         uses: actions/checkout@v2
       - id: get-tag
         run: echo "::set-output name=tag::$(git tag --contains $GITHUB_SHA)"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
+  latest-tag-sha:
+    runs-on: ubuntu-20.04
+    outputs:
+      tag_sha: ${{ steps.get-tag.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - id: get-tag
+        run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $GITHUB_SHA))"
         env:
           GITHUB_SHA: ${{ github.sha }}
 
@@ -355,7 +371,8 @@ jobs:
           yarn run birdbox:postgresql
 
   docker-dev:
-    needs: [build, unit, lint]
+    needs: [build, unit, lint, latest-tag-sha]
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-20.04
     timeout-minutes: 60
