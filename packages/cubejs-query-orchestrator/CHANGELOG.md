@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
+
+
+### Bug Fixes
+
+* Optimize timestamp formatting and table names loading for large partition range serving ([#3166](https://github.com/cube-js/cube.js/issues/3166)) ([e1f8dc5](https://github.com/cube-js/cube.js/commit/e1f8dc5aab469b060f0fe8c69467117171c070fd))
+* **query-orchestrator:** Improved manual cancellation for preaggregation request from queue, Debug API ([#3156](https://github.com/cube-js/cube.js/issues/3156)) ([11284ce](https://github.com/cube-js/cube.js/commit/11284ce8085673486fb50d49a20ba005a45f1647))
+
+
+
+
+
 ## [0.28.8](https://github.com/cube-js/cube.js/compare/v0.28.7...v0.28.8) (2021-07-25)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** data blending without date range ([#3161](https://github.com/cube-js/cube.js/issues/3161)) ([cc7c140](https://github.com/cube-js/cube.js/commit/cc7c1401b1d4e7d66fa4215997cfa4f19f8a5707))
+
+
+
+
+
 ## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
 
 

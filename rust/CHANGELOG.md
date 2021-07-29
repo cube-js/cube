@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
+
+
+### Features
+
+* **cubestore:** add `date_sub` function ([3bf2520](https://github.com/cube-js/cube.js/commit/3bf25203db8e0ebde00c224fd9462a3a2e54bee6))
+
+
+
+
+
 ## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

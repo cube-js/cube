@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
+
+
+### Bug Fixes
+
+* Optimize timestamp formatting and table names loading for large partition range serving ([#3166](https://github.com/cube-js/cube.js/issues/3166)) ([e1f8dc5](https://github.com/cube-js/cube.js/commit/e1f8dc5aab469b060f0fe8c69467117171c070fd))
+* **@cubejs-client/core:** data blending without date range ([#3161](https://github.com/cube-js/cube.js/issues/3161)) ([cc7c140](https://github.com/cube-js/cube.js/commit/cc7c1401b1d4e7d66fa4215997cfa4f19f8a5707))
+* **examples:** change invalid token ([dba8ae5](https://github.com/cube-js/cube.js/commit/dba8ae5bdf5bf8ee5b772cf294e1f56b4cc39eb4))
+* **query-orchestrator:** Improved manual cancellation for preaggregation request from queue, Debug API ([#3156](https://github.com/cube-js/cube.js/issues/3156)) ([11284ce](https://github.com/cube-js/cube.js/commit/11284ce8085673486fb50d49a20ba005a45f1647))
+
+
+### Features
+
+* add env var for SNS || Pub/Sub topic ([#3086](https://github.com/cube-js/cube.js/issues/3086)) Thanks to [@msambol](https://github.com/msambol)! ([bc9289c](https://github.com/cube-js/cube.js/commit/bc9289c91fc9bf1e9f067e84041151ff0c189acd)), closes [#1014](https://github.com/cube-js/cube.js/issues/1014)
+* **cubestore:** add `date_sub` function ([3bf2520](https://github.com/cube-js/cube.js/commit/3bf25203db8e0ebde00c224fd9462a3a2e54bee6))
+
+
+
+
+
 ## [0.28.8](https://github.com/cube-js/cube.js/compare/v0.28.7...v0.28.8) (2021-07-25)
 
 

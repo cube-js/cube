@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
+
+
+### Features
+
+* add env var for SNS || Pub/Sub topic ([#3086](https://github.com/cube-js/cube.js/issues/3086)) Thanks to [@msambol](https://github.com/msambol)! ([bc9289c](https://github.com/cube-js/cube.js/commit/bc9289c91fc9bf1e9f067e84041151ff0c189acd)), closes [#1014](https://github.com/cube-js/cube.js/issues/1014)
+
+
+
+
+
 ## [0.28.8](https://github.com/cube-js/cube.js/compare/v0.28.7...v0.28.8) (2021-07-25)
 
 **Note:** Version bump only for package @cubejs-backend/serverless-google
