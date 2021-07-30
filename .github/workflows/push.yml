@@ -295,11 +295,11 @@ jobs:
       - id: get-tag-test
         run: echo "$GITHUB_SHA $(git rev-list -n 1 $(git tag --contains $GITHUB_SHA))"
         env:
-          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SHA: edcbbb2aad9062ed5b965b18eb586ea99ec7d0bd
       - id: get-tag
         run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $GITHUB_SHA))"
         env:
-          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SHA: edcbbb2aad9062ed5b965b18eb586ea99ec7d0bd
 
   docker-image-latest:
     needs: docker-image-latest-set-tag
