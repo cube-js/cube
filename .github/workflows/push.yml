@@ -290,8 +290,9 @@ jobs:
     outputs:
       sha: ${{ github.sha }} #${{ steps.get-tag.outputs.sha }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - id: git-log
         run: git log HEAD~30..HEAD
       - id: get-tag-test
