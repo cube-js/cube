@@ -46,6 +46,10 @@ jobs:
       fail-fast: false
 
     steps:
+      - id: get-tag-out
+        run: echo "$OUT"
+        env:
+          OUT: ${{ needs['latest-tag-sha'].outputs.sha }}
       - name: Checkout
         uses: actions/checkout@v2
         with:
