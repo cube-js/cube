@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.10](https://github.com/cube-js/cube.js/compare/v0.28.9...v0.28.10) (2021-07-30)
+
+
+### Bug Fixes
+
+* **cubestore:** date_add and date_sub on columnar data ([418c017](https://github.com/cube-js/cube.js/commit/418c017461c88fec0e4e28e1f1a64d97a0765718))
+
+
+### Features
+
+* Rolling window rollup support ([#3151](https://github.com/cube-js/cube.js/issues/3151)) ([109ab5b](https://github.com/cube-js/cube.js/commit/109ab5bec32255244412a24bf75402abd1cbfe49))
+
+
+
+
+
 ## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
 
 
