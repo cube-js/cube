@@ -16,9 +16,30 @@ on:
     branches:
       - master
 jobs:
+  latest-tag-sha:
+    runs-on: ubuntu-20.04
+    outputs:
+      sha: ${{ steps.get-tag.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - id: git-log
+        run: git log HEAD~30..HEAD
+      - id: get-tag-test
+        run: echo "$SHA $(git rev-list -n 1 $(git tag --contains $SHA))"
+        env:
+          SHA: edcbbb2aad9062ed5b965b18eb586ea99ec7d0bd
+      - id: get-tag
+        run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $SHA))"
+        env:
+          SHA: edcbbb2aad9062ed5b965b18eb586ea99ec7d0bd
+
   docker-image-dev:
     name: Release :dev image
     runs-on: ubuntu-20.04
+    needs: latest-tag-sha
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2

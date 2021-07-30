@@ -288,7 +288,7 @@ jobs:
   latest-tag-sha:
     runs-on: ubuntu-20.04
     outputs:
-      sha: ${{ github.sha }} #${{ steps.get-tag.outputs.sha }}
+      sha: ${{ steps.get-tag.outputs.sha }}
     steps:
       - uses: actions/checkout@v2
         with:
