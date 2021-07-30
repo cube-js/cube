@@ -291,6 +291,9 @@ class PreAggregationLoadCache {
   }
 
   public async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
+    if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableName.split('.')[1].startsWith(p))) {
+      throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
+    }
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.versionEntries[redisKey]) {
       this.versionEntries[redisKey] = this.calculateVersionEntries(preAggregation).catch(e => {
@@ -525,7 +528,7 @@ export class PreAggregationLoader {
         await this.loadCache.getVersionEntries(this.preAggregation)
       );
       if (!lastVersion) {
-        throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created. It usually means database silently truncates table names due to max name length.`);
+        throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created`);
       }
       return this.targetTableName(lastVersion);
     };
@@ -1265,9 +1268,12 @@ export class PreAggregations {
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
             requestId: queryBody.requestId,
             dataSource,
-            tablePrefixes: preAggregations
-              .filter(p => (p.dataSource || 'default') === dataSource)
-              .map(p => p.tableName.split('.')[1])
+            tablePrefixes:
+              // Can't reuse tablePrefixes for shared refresh scheduler cache
+              !queryBody.preAggregationsLoadCacheByDataSource ?
+                preAggregations
+                  .filter(p => (p.dataSource || 'default') === dataSource)
+                  .map(p => p.tableName.split('.')[1]) : null
           });
       }
 
