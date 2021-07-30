@@ -59,12 +59,14 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
         uses: actions/cache@v2
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
-            ~/.npm
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/node_modules
             packages/*/node_modules
@@ -100,12 +102,14 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
         uses: actions/cache@v2
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
-            ~/.npm
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/node_modules
             packages/*/node_modules
@@ -134,12 +138,14 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
         uses: actions/cache@v2
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
-            ~/.npm
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/node_modules
             packages/*/node_modules
@@ -186,12 +192,14 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
         uses: actions/cache@v2
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
-            ~/.npm
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/node_modules
             packages/*/node_modules
@@ -252,12 +260,14 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
         uses: actions/cache@v2
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
-            ~/.npm
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/node_modules
             packages/*/node_modules
@@ -358,12 +368,14 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 15.x
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
         uses: actions/cache@v2
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
-            ~/.npm
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/node_modules
             packages/*/node_modules
@@ -433,12 +445,14 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 15.x
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
         uses: actions/cache@v2
         with:
-          # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
-            ~/.npm
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/node_modules
             packages/*/node_modules
