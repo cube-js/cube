@@ -288,10 +288,12 @@ jobs:
   latest-tag-sha:
     runs-on: ubuntu-20.04
     outputs:
-      sha: ${{ steps.get-tag.outputs.sha }}
+      sha: ${{ github.sha }} #${{ steps.get-tag.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - id: git-log
+        run: git log
       - id: get-tag-test
         run: echo "$SHA $(git rev-list -n 1 $(git tag --contains $SHA))"
         env:
