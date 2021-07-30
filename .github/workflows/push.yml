@@ -303,6 +303,10 @@ jobs:
         run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $SHA))"
         env:
           SHA: edcbbb2aad9062ed5b965b18eb586ea99ec7d0bd
+      - id: get-tag-out
+        run: echo "$OUT"
+        env:
+          OUT: ${{ steps.get-tag.outputs.sha }}
 
   docker-image-latest:
     needs: docker-image-latest-set-tag
