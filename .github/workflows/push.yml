@@ -414,14 +414,10 @@ jobs:
       matrix:
         dockerfile:
           - dev.Dockerfile
-          - dev-alpine.Dockerfile
         include:
           - dockerfile: dev.Dockerfile
             name: Debian
             tag: tmp-dev
-          - dockerfile: dev-alpine.Dockerfile
-            name: Alpine
-            tag: tmp-dev-alpine
       fail-fast: false
     steps:
       - name: Checkout
