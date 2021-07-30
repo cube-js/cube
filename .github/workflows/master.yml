@@ -19,7 +19,7 @@ jobs:
   latest-tag-sha:
     runs-on: ubuntu-20.04
     outputs:
-      sha: ${{ github.sha }}
+      sha: ${{ steps.get-tag.outputs.sha }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -29,11 +29,15 @@ jobs:
       - id: get-tag-test
         run: echo "$SHA $(git rev-list -n 1 $(git tag --contains $SHA))"
         env:
-          SHA: edcbbb2aad9062ed5b965b18eb586ea99ec7d0bd
+          SHA: ${{ github.sha }}
       - id: get-tag
         run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $SHA))"
         env:
-          SHA: edcbbb2aad9062ed5b965b18eb586ea99ec7d0bd
+          SHA: ${{ github.sha }}
+      - id: get-tag-out
+        run: echo "$OUT"
+        env:
+          OUT: ${{ steps.get-tag.outputs.sha }}
 
   docker-image-dev:
     name: Release :dev image
