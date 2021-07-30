@@ -293,7 +293,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - id: git-log
-        run: git log
+        run: git log -20
       - id: get-tag-test
         run: echo "$SHA $(git rev-list -n 1 $(git tag --contains $SHA))"
         env:
