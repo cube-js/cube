@@ -9,12 +9,12 @@ const query = {
     {
       member: 'Banner.start',
       operator: 'beforeDate',
-      values: [formatDate(1)],
+      values: [getISODate()],
     },
     {
       member: 'Banner.end',
       operator: 'afterDate',
-      values: [formatDate()],
+      values: [getISODate()],
     },
   ],
   dimensions: ['Banner.text', 'Banner.link', 'Banner.campaign'],
@@ -27,18 +27,18 @@ async function getBannerDataFromApi(set, setIsLoaded) {
     if (response) {
       set(response);
       setIsLoaded(true);
-      // set result to localStorage by date
-      if (window?.localStorage) {
-        window?.localStorage?.setItem(`website-banner-${formatDate()}`, JSON.stringify(response));
+      // set result to sessionStorage by date
+      if (window?.sessionStorage) {
+        window?.sessionStorage?.setItem(`website-banner-${formatDate()}`, JSON.stringify(response));
       }
     }
   }
   return resultSet;
 }
-function getBannerDataFromLocalStorage(set, setIsLoaded) {
-  let item = window?.localStorage?.getItem(`website-banner-${formatDate()}`);
+function getBannerDataFromSessionStorage(set, setIsLoaded) {
+  let item = window?.sessionStorage?.getItem(`website-banner-${formatDate()}`);
   set(JSON.parse(item));
-  setIsLoaded('localStorage');
+  setIsLoaded('sessionStorage');
 }
 const EventBanner = (props) => {
   const [banner, setBanner] = useState(null);
@@ -47,8 +47,8 @@ const EventBanner = (props) => {
   const [isMobile, setIsMobile] = useState(null);
 
   useEffect(() => {
-    if (window?.localStorage && window.localStorage.getItem(`website-banner-${formatDate()}`)) {
-      getBannerDataFromLocalStorage(setBanner, setIsLoaded);
+    if (window?.sessionStorage && window.sessionStorage.getItem(`website-banner-${formatDate()}`)) {
+      getBannerDataFromSessionStorage(setBanner, setIsLoaded);
     } else {
       getBannerDataFromApi(setBanner, setIsLoaded);
     }
@@ -68,7 +68,7 @@ const EventBanner = (props) => {
         fontWeight: '500',
         wordSpacing: '2px',
         display: isLoaded ? "block" : "auto",
-        transition:  isLoaded === 'localStorage'
+        transition:  isLoaded === 'sessionStorage'
               ? null : 'padding 1s ease-in-out',
       }}
       onMouseEnter={() => setDecoration('underline')}
@@ -90,7 +90,7 @@ const EventBanner = (props) => {
           justifyContent: 'center',
           lineHeight: 'normal',
           transition:
-            isLoaded === 'localStorage'
+            isLoaded === 'sessionStorage'
               ? null
               : 'max-height 1s ease-in-out, opacity 1s ease-in-out, padding 1s ease-in-out',
           padding: isLoaded ? '7px 16px' : "0 16px",
@@ -117,6 +117,11 @@ function formatDate(daysToAdd) {
   if (day.length < 2) day = '0' + day;
 
   return [year, month, day].join('-');
+}
+
+function getISODate() {
+  let d = new Date();
+  return d.toISOString();
 }
 function getLinkWithUTM(link, source, compagin) {
   if (!link) {
