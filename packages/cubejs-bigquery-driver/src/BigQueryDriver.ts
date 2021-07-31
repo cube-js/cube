@@ -143,11 +143,19 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return field;
   }
 
-  protected parseDataset(dataset: Dataset) {
-    return dataset.getTables().then(
-      (data) => Promise.all(data[0].map(this.parseTableData))
-        .then(tables => ({ id: dataset.id, data: this.addSuffixTables(tables.reduce(this.reduceSuffixTables, {})) }))
-    );
+  protected async parseDataset(dataset: Dataset) {
+    try {
+      return await dataset.getTables().then(
+        (data) => Promise.all(data[0].map(this.parseTableData))
+          .then(tables => ({ id: dataset.id, data: this.addSuffixTables(tables.reduce(this.reduceSuffixTables, {})) }))
+      );
+    } catch (e) {
+      if (e.message.includes('Permission bigquery.tables.get denied on table')) {
+        return {};
+      }
+
+      throw e;
+    }
   }
 
   protected parseTableData(table: Table) {
