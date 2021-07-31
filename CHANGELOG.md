@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.12](https://github.com/cube-js/cube.js/compare/v0.28.11...v0.28.12) (2021-07-31)
+
+
+### Bug Fixes
+
+* **bigquery-driver:** Ignore dataSets with wrong permissions ([6933807](https://github.com/cube-js/cube.js/commit/6933807234b50b4eccee143fbf0595760f367701))
+
+
+
+
+
 ## [0.28.11](https://github.com/cube-js/cube.js/compare/v0.28.10...v0.28.11) (2021-07-31)
 
 
