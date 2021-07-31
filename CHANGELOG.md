@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.11](https://github.com/cube-js/cube.js/compare/v0.28.10...v0.28.11) (2021-07-31)
+
+
+### Bug Fixes
+
+* **docs:** banner time range ([6eddf4a](https://github.com/cube-js/cube.js/commit/6eddf4a555cf1ef3f9e99c88f26dbe40d0f4a302))
+* Pre-aggregation table is not found for after it was successfully created in Refresh Worker ([334af1c](https://github.com/cube-js/cube.js/commit/334af1cc3c590e8b835958511d6ec0e17a77b0f3))
+
+
+### Reverts
+
+* Revert "chore: Do not test dev images" ([712b82a](https://github.com/cube-js/cube.js/commit/712b82ac0994e513962e41c0de4a9e67a9e1466a))
+
+
+
+
+
 ## [0.28.10](https://github.com/cube-js/cube.js/compare/v0.28.9...v0.28.10) (2021-07-30)
 
 
