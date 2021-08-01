@@ -28,7 +28,7 @@ CUBEJS_DEV_MODE=false
 ## Set up Refresh Worker
 
 To refresh in-memory cache and [pre-aggregations][ref-pre-aggregations] in the background, we recommend running
-a separate Cube.js refresh worker instance. This allows your Cube.js API
+a separate Cube.js Refresh Worker instance. This allows your Cube.js API
 Instance to continue to serve requests with high availability.
 
 ```bash
