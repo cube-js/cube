@@ -28,12 +28,27 @@ the Data Schema and as the [`securityContext`][ref-config-sec-ctx] property
 inside the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
 support [multi-tenant deployments][link-multitenancy].
 
-## Using SECURITY_CONTEXT
+## Using queryRewrite
 
-In the example below `user_id`, `sub` and `iat` will be injected into the
-security context and will be accessible from the
-[`SECURITY_CONTEXT`][ref-schema-sec-ctx] global variable in the Cube.js Data
-Schema.
+You can use [`queryRewrite`][ref-config-queryrewrite] to amend incoming queries
+with filters. For example, let's take the following query:
+
+```json
+{
+  "dimensions": ["Orders.status"],
+  "measures": ["Orders.count", "Orders.total"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt",
+      "dateRange": ["2015-01-01", "2015-12-31"],
+      "granularity": "month"
+    }
+  ]
+}
+```
+
+We'll also use the following as a JWT payload; `user_id`, `sub` and `iat` will
+be injected into the security context:
 
 ```json
 {
@@ -52,26 +67,27 @@ Schema.
 | ```
 <!-- prettier-ignore-end -->
 
-Consider the following example. We want to show orders only for customers who
-own these orders. The `orders` table has a `user_id` column, which we can use to
-filter the results.
+To ensure that users making this query only receive their own orders, define
+`queryRewrite` in the `cube.js` configuration file:
 
 ```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders WHERE ${SECURITY_CONTEXT.user_id.filter(
-    'user_id'
-  )}`,
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    // Ensure `securityContext` has an `id` property
+    if (!securityContext.user_id) {
+      throw new Error('No id found in Security Context!');
+    }
 
-  measures: {
-    count: {
-      type: `count`,
-    },
+    query.filters.push({
+      member: 'Orders.userId',
+      operator: 'equals',
+      values: [securityContext.user_id],
+    });
   },
-});
+};
 ```
 
-Now, we can generate an API Token with a security context including the user's
-ID:
+To test this, we can generate an API token as follows:
 
 ```javascript
 const jwt = require('jsonwebtoken');
@@ -93,7 +109,7 @@ curl \
  http://localhost:4000/cubejs-api/v1/load
 ```
 
-And Cube.js with generate the following SQL:
+And Cube.js will generate the following SQL:
 
 ```sql
 SELECT
@@ -150,11 +166,11 @@ cube(`Orders`, {
 });
 ```
 
-## Usage with Pre-Aggregations
+### Usage with Pre-Aggregations
 
-To generate pre-aggregations that are security context dependent, [configure
-`scheduledRefreshContexts` in your `cube.js` configuration
-file][ref-config-sched-refresh].
+To generate pre-aggregations that rely on `SECURITY_CONTEXT` and/or
+`COMPILE_CONTEXT`, [configure `scheduledRefreshContexts` in your `cube.js`
+configuration file][ref-config-sched-refresh].
 
 ## Testing during development
 
@@ -166,6 +182,7 @@ build one from a JSON object.
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
 [link-multitenancy]: /multitenancy-setup
+[ref-config-queryrewrite]: /config#options-reference-query-rewrite
 [ref-config-sched-refresh]: /config#options-reference-scheduled-refresh-contexts
 [ref-config-sec-ctx]: /config#request-context-security-context
 [ref-schema-sec-ctx]: /schema/reference/cube#context-variables-security-context

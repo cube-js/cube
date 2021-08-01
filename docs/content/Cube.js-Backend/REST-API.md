@@ -16,10 +16,13 @@ with **basePath** described in
 
 ### Authentication
 
-Cube.js uses API Token for requests' authorization and also for passing
-additional security context, which could be used in the
-[SECURITY_CONTEXT](/schema/reference/cube#context-variables-security-context)
-object in the Data Schema.
+Cube.js uses API tokens to authorize requests and also for passing
+additional security context, which can be used in the
+[`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
+configuration file][ref-config-js].
+
+[ref-config-queryrewrite]: /config#options-reference-query-rewrite
+[ref-config-js]: /config
 
 The API Token is passed via the Authorization Header. The token itself is a
 [JSON Web Token](https://jwt.io), the [Security section](security) describes how
