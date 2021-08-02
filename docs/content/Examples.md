@@ -15,22 +15,22 @@ Below you can find tutorials to help you get started with Cube.js.
 These tutorials are great to start learning Cube.js:
 
 * [Cube.js, the Open Source Dashboard Framework: Ultimate Guide](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide) —
-  you will launch an API with Cube.js and build a dashboard with React
+  launch an API with Cube.js and build a dashboard with React
 
 * [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js) -
-  you will learn how to use MongoDB Connector for BI to connect Cube.js to MongoDB
+  learn how to use MongoDB Connector for BI to connect Cube.js to MongoDB
 
 * [React Dashboard: an Ultimate Guide](https://react-dashboard.cube.dev) —
-  you will learn how to build a dynamic dashboard with React, GraphQL, and Cube.js
+  learn how to build a dynamic dashboard with React, GraphQL, and Cube.js
 
 * [React query builder](https://cube.dev/blog/react-query-builder-with-cubejs) and
   [Vue query builder](https://cube.dev/blog/vue-query-builder-with-cubejs/) —
-  you will learn how to use Query Builder components for React and Vue to build customizable query interfaces
+  learn how to use Query Builder components for React and Vue to build customizable query interfaces
 
 The following tutorials cover advanced concepts of Cube.js:
 
 * [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) -
-  you will learn about pre-aggregations, one of the most powerful Cube.js features that significantly speed up the performance of your applications such as dashboards and reports
+  learn about pre-aggregations, one of the most powerful Cube.js features that significantly speed up the performance of your applications such as dashboards and reports
 
 * *Building an Open Source Mixpanel Alternative* -
   a two-part series on building a production-ready application with Cube.js:
