@@ -1,5 +1,5 @@
 ---
-title: Examples & Tutorials
+title: Examples, Tutorials & Recipes
 permalink: /examples
 category: Examples & Tutorials
 redirect_from:
@@ -78,5 +78,9 @@ Have a look at some of demo applications you can build with Cube.js:
 | [Slack Vibe](https://slack-vibe-demo.cube.dev)       | [Slack Vibe, the Open Source Analytics for Slack](https://dev.to/cubejs/slack-vibe-the-open-source-analytics-for-slack-2khl)   |
 
 
-<!-- ## Recipes -->
-<!-- TODO: add recipes here -->
+
+## Recipes
+These recipes will show you the best practices of using Cube.js.
+
+### Analytics
+- [Daily, Weekly, Monthly active users](https://cube.dev/recipes/dau-wau-mau-active-users)
