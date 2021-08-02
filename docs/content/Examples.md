@@ -49,7 +49,7 @@ Learn more about prominent features of Cube.js:
 | [Data blending](https://cube.dev/docs/data-blending)                                     | [Introducing data blending API](https://cube.dev/blog/introducing-data-blending-api/)                                | [Demo](https://data-blending-demo.cube.dev)       |
 | [Real-time data fetch](https://cube.dev/docs/real-time-data-fetch)                       | [Real-time dashboard guide](https://real-time-dashboard.cube.dev)                                                    | [Demo](https://real-time-dashboard-demo.cube.dev) |
 | [Dynamic schema creation](https://cube.dev/docs/dynamic-schema-creation)                 | [Using asyncModule to generate schemas](https://github.com/cube-js/cube.js/tree/master/examples/async-module-simple) | —                                                 |
-| [JSON Web Ket Sets support](http://localhost:8000/security#using-json-web-key-sets-jwks) | [Auth0 integration](https://github.com/cube-js/cube.js/tree/master/examples/auth0)                                   | —                                                 |
+| [JSON Web Key Sets support](http://localhost:8000/security#using-json-web-key-sets-jwks) | [Auth0 integration](https://github.com/cube-js/cube.js/tree/master/examples/auth0)                                   | —                                                 |
 | [JSON Web Ket Sets support](http://localhost:8000/security#using-json-web-key-sets-jwks) | [AWS Cognito integration](https://github.com/cube-js/cube.js/tree/master/examples/cognito)                           | —                                                 |
 
 
