@@ -1,5 +1,5 @@
 ---
-title: Examples & Tutorials
+title: Examples, Tutorials & Recipes
 permalink: /examples
 category: Examples & Tutorials
 redirect_from:
@@ -89,3 +89,9 @@ These tutorials are a good place to start learning Cube.js.
 
 - [React Query Builder with Cube.js ](https://cube.dev/blog/react-query-builder-with-cubejs) -
   It shows you how to build a dynamic query builder with Cube.js React Component.
+
+## Recipes
+These recipes will show you the best practices of using Cube.js.
+
+### Analytics
+- [Daily, Weekly, Monthly active users](https://cube.dev/recipes/dau-wau-mau-active-users)
