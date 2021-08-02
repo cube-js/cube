@@ -91,7 +91,9 @@ These tutorials are a good place to start learning Cube.js.
   It shows you how to build a dynamic query builder with Cube.js React Component.
 
 ## Recipes
+
 These recipes will show you the best practices of using Cube.js.
 
 ### Analytics
+
 - [Daily, Weekly, Monthly active users](https://cube.dev/recipes/dau-wau-mau-active-users)
