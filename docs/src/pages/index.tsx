@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import Helmet from 'react-helmet';
 import { Row, Col } from 'antd';
+import GitHubCodeBlock from '../components/GitHubCodeBlock'
 
 import MainTab from '../components/templates/MainTab';
 
@@ -67,6 +68,12 @@ class IndexPage extends Component<Props> {
               right
             />
           </Row>
+          <GitHubCodeBlock
+            href="https://github.com/rchkv/cubejs-active-users-recipe/blob/main/schema/Users.js"
+            titleSuffixCount={2}
+            part="some-measure"
+            lang="js"
+          />
         </div>
       </div>
     );
