@@ -126,7 +126,7 @@ cube(`Orders`, {
 
 By default, Cube.js will check and invalidate the cache in the background when
 in [development mode][link-development-mode]. When development mode is disabled
-you can set `CUBEJS_SCHEDULED_REFRESH_TIMER=true` to enable this behavior.
+you can set `CUBEJS_REFRESH_WORKER=true` to enable this behavior.
 
 We recommend enabling background cache invalidation in a separate Cube.js worker
 for production deployments. Please consult the [Production

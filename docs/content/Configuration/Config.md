@@ -363,9 +363,8 @@ module.exports = {
 | refresh intervals for pre-aggregations.
 <!-- prettier-ignore-end -->
 
-Cube.js enables background refresh by default. You can specify an interval as a
-number in seconds or as a string format e.g. `30s`, `1m`. Can be also set using
-`CUBEJS_SCHEDULED_REFRESH_TIMER` env variable.
+Cube.js enables background refresh by default using the `CUBEJS_REFRESH_WORKER`
+environment variable.
 
 ```javascript
 module.exports = {

@@ -74,7 +74,7 @@ services:
       - CUBEJS_CUBESTORE_HOST=cubestore_router
       - CUBEJS_REDIS_URL=redis://redis:6379
       - CUBEJS_API_SECRET=secret
-      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+      - CUBEJS_REFRESH_WORKER=true
     volumes:
       - .:/cube/conf
 
