@@ -1,14 +1,16 @@
-import { Link } from 'react-router-dom';
 import Icon, {
   FileFilled,
   MenuOutlined,
   SlackOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';
-import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
+import { Link } from 'react-router-dom';
+import styled from 'styled-components';
 
-import { DiscourseIcon } from '../shared/icons/DiscourseIcon';
+import { usePlaygroundContext } from '../../hooks';
+import { DiscourseIcon } from '../../shared/icons/DiscourseIcon';
+import { RunOnCubeCloud } from './RunOnCubeCloud';
 
 const StyledHeader = styled(Layout.Header)`
   && {
@@ -94,7 +96,7 @@ const StyledMenuButton = styled.a<TStyledMenuButtonProps>`
   }
 `;
 
-const Header = ({ selectedKeys }) => {
+export default function Header({ selectedKeys }) {
   const isDesktopOrLaptop = useMediaQuery({
     query: '(min-device-width: 992px)',
   });
@@ -102,6 +104,8 @@ const Header = ({ selectedKeys }) => {
   const isMobileOrTable = useMediaQuery({
     query: '(max-device-width: 991px)',
   });
+
+  const { livePreview } = usePlaygroundContext();
 
   return (
     <StyledHeader>
@@ -112,6 +116,7 @@ const Header = ({ selectedKeys }) => {
           alt=""
         />
       </div>
+
       {isDesktopOrLaptop && (
         <StyledMenu theme="light" mode="horizontal" selectedKeys={selectedKeys}>
           <StyledMenuItem key="/build">
@@ -153,8 +158,11 @@ const Header = ({ selectedKeys }) => {
             <FileFilled />
             Docs
           </StyledMenuButton>
+
+          <RunOnCubeCloud />
         </StyledMenu>
       )}
+
       {isMobileOrTable && (
         <div style={{ float: 'right' }}>
           <Dropdown
@@ -178,6 +186,4 @@ const Header = ({ selectedKeys }) => {
       )}
     </StyledHeader>
   );
-};
-
-export default Header;
+}

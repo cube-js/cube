@@ -3,7 +3,7 @@ import { LoadingOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 import { useLivePreviewContext } from '../../hooks';
 
-const StatusIcon = ({ status, uploading }) => {
+export function StatusIcon({ status, uploading }) {
   const statusMap = {
     loading: <LoadingOutlined spin />,
     inProgress: <LoadingOutlined spin />,
@@ -11,7 +11,7 @@ const StatusIcon = ({ status, uploading }) => {
   };
 
   return uploading ? statusMap.loading : statusMap[status] || statusMap.loading;
-};
+}
 
 const LivePreviewBar = () => {
   const livePreviewContext = useLivePreviewContext();

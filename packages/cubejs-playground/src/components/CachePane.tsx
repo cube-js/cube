@@ -18,7 +18,6 @@ const CachePane = ({ query }) => (
       const rs: any = resultSet?.serialize() || {};
       const rawQuery = sqlQuery?.rawQuery();
       const loadResponse = rs.loadResponse?.results[0];
-      console.log('rawQuery', rawQuery);
 
       return (
         <Tabs
@@ -94,7 +93,6 @@ const CachePane = ({ query }) => (
                     let refreshKeyValues = loadResponse?.usedPreAggregations?.[
                       record.tableName
                       ]?.refreshKeyValues;
-                    console.log('usedPreAggregations', loadResponse);
                     if (Array.isArray(refreshKeyValues)) {
                       refreshKeyValues = refreshKeyValues.reduce((a, b) => a.concat(b), []);
                     }

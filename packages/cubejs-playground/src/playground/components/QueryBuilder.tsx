@@ -13,7 +13,7 @@ import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/Q
 type QueryBuilderProps = {
   token: string;
   identifier?: string;
-  playgroundContext?: PlaygroundContext;
+  playgroundContext?: Partial<PlaygroundContext>;
 } & Pick<
   PlaygroundQueryBuilderProps,
   | 'apiUrl'
