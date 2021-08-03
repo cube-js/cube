@@ -12,7 +12,7 @@ Below you can find tutorials to help you get started with Cube.js.
 
 ## Tutorials
 
-These tutorials are great to start learning Cube.js:
+These tutorials are great places to start learning Cube.js:
 
 * [Cube.js, the Open Source Dashboard Framework: Ultimate Guide](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide) —
   launch an API with Cube.js and build a dashboard with React
