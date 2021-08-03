@@ -1,5 +1,5 @@
 ---
-title: Examples, Tutorials & Recipes
+title: Overview
 permalink: /examples
 category: Examples & Tutorials
 redirect_from:
@@ -96,4 +96,4 @@ These recipes will show you the best practices of using Cube.js.
 
 ### Analytics
 
-- [Daily, Weekly, Monthly active users](https://cube.dev/recipes/dau-wau-mau-active-users)
+- [Daily, Weekly, Monthly active users](/recipes/dau-wau-mau-active-users)
