@@ -97,3 +97,7 @@ These recipes will show you the best practices of using Cube.js.
 ### Analytics
 
 - [Daily, Weekly, Monthly active users](/recipes/dau-wau-mau-active-users)
+
+### Queries
+
+- [Pagination](/recipes/pagination)
