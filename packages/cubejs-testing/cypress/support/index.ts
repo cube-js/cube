@@ -30,7 +30,7 @@ after(() => {
   cy.exec(`rm -rf cypress/screenshots/playground-explore.spec.js/tmp`);
 });
 
-const resizeObserverLoopErrRe = /^ResizeObserver loop limit exceeded/;
+const resizeObserverLoopErrRe = /ResizeObserver loop limit exceeded/;
 
 Cypress.on('uncaught:exception', (err) => {
   if (resizeObserverLoopErrRe.test(err.message)) {

@@ -5,6 +5,8 @@ use crate::CubeError;
 use chrono::{SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 
 pub mod data;
 pub(crate) mod parquet;
@@ -21,7 +23,7 @@ pub enum TableValue {
     Boolean(bool),
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TimestampValue {
     unix_nano: i64,
 }
@@ -33,6 +35,15 @@ impl TimestampValue {
 
     pub fn get_time_stamp(&self) -> i64 {
         self.unix_nano
+    }
+}
+
+impl Debug for TimestampValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimestampValue")
+            .field("unix_nano", &self.unix_nano)
+            .field("str", &self.to_string())
+            .finish()
     }
 }
 
