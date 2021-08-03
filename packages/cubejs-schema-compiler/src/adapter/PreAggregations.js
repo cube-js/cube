@@ -729,8 +729,11 @@ export class PreAggregations {
         const measure = this.query.newMeasure(path);
         return [
           path,
-          this.query.aggregateOnGroupedColumn(measure.measureDefinition(), measure.aliasName()) ||
-          `sum(${measure.aliasName()})`
+          this.query.aggregateOnGroupedColumn(
+            measure.measureDefinition(),
+            measure.aliasName(),
+            !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate
+          ) || `sum(${measure.aliasName()})`
         ];
       }),
       R.fromPairs
