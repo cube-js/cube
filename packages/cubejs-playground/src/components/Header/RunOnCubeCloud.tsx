@@ -1,10 +1,13 @@
 import { CaretDownOutlined, CloudFilled } from '@ant-design/icons';
-import { Button, Card, Dropdown, Input, Typography } from 'antd';
+import { Button, Card, Dropdown, Typography } from 'antd';
 import { useState } from 'react';
 
 import { Box, Flex } from '../../grid';
 import { useLivePreviewContext } from '../../hooks';
+import { copyToClipboard } from '../../utils';
+import { CopiableInput } from '../CopiableInput';
 import { StatusIcon } from '../LivePreviewContext/LivePreviewBar';
+import { LivePreviewStatus } from '../LivePreviewContext/LivePreviewContextProvider';
 
 export function RunOnCubeCloud() {
   const livePreviewContext = useLivePreviewContext();
@@ -45,6 +48,7 @@ export function RunOnCubeCloud() {
         <Dropdown
           overlay={
             <LivePreviewOverlay
+              livePreviewStatus={livePreviewContext.statusLivePreview}
               apiUrl={livePreviewContext.credentials?.apiUrl || ''}
               loading={loading}
               onStopClick={async () => {
@@ -66,16 +70,20 @@ export function RunOnCubeCloud() {
 }
 
 type LivePreviewOverlayProps = {
+  livePreviewStatus: LivePreviewStatus;
   apiUrl: string;
   loading: boolean;
   onStopClick: () => void;
 };
 
 function LivePreviewOverlay({
+  livePreviewStatus,
   apiUrl,
   loading,
   onStopClick,
 }: LivePreviewOverlayProps) {
+  const { url, deploymentId } = livePreviewStatus;
+
   return (
     <Card style={{ maxWidth: 600 }}>
       <Flex direction="column" gap={2}>
@@ -85,11 +93,17 @@ function LivePreviewOverlay({
           on developing and testing with Cube Cloud.
         </Typography.Paragraph>
 
-        <Input value={apiUrl} />
+        <CopiableInput value={apiUrl} onCopyClick={copyToClipboard} />
 
         <Box>
           <Flex justifyContent="space-between">
-            <Button>Inspect querires</Button>
+            <Button
+              type="primary"
+              target="_blank"
+              href={`${url}/deployments/${deploymentId}/history`}
+            >
+              Inspect querires
+            </Button>
 
             <Button
               type="primary"

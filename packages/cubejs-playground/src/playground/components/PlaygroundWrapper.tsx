@@ -21,7 +21,7 @@ const StyledWrapper = styled.div`
 type PlaygroundWrapperProps = {
   children: ReactNode;
   identifier?: string;
-  playgroundContext?: PlaygroundContext;
+  playgroundContext?: Partial<PlaygroundContext>;
 } & Pick<SecurityContextProps, 'token' | 'onTokenPayloadChange'> &
   Pick<SecurityContextProviderProps, 'tokenUpdater'>;
 

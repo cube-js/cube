@@ -1,15 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useHistory } from 'react-router';
 
-import {
-  useAppContext,
-  useDeepEffect,
-  useLivePreviewContext,
-  useSecurityContext,
-} from '../../hooks';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
-import { LivePreviewContextProvider } from '../../components/LivePreviewContext/LivePreviewContextProvider';
 import DashboardSource from '../../DashboardSource';
+import { useAppContext, useDeepEffect, useLivePreviewContext, useSecurityContext } from '../../hooks';
 
 export function buildApiUrl(
   apiUrl: string,

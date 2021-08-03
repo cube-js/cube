@@ -3,14 +3,16 @@ import { createContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { openWindow } from '../../shared/helpers';
 import { Credentials } from '../../types';
 
-type LivePreviewStatus = {
-  deploymentUrl: string | null;
-  active: boolean;
-  lastHash: string;
+export type LivePreviewStatus = {
   lastHashTarget: string;
-  loading: boolean;
-  status: 'loading' | 'inProgress' | 'running';
   uploading: boolean;
+  active: boolean;
+  deploymentUrl?: string | null;
+  lastHash?: string;
+  loading?: boolean;
+  status?: 'loading' | 'inProgress' | 'running';
+  deploymentId?: number;
+  url?: string;
 };
 
 export type LivePreviewContextProps = {
