@@ -43,7 +43,7 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    protected readonly options: {
+    public readonly options: {
       refreshKeyRenewalThreshold?: number;
       externalQueueOptions?: any;
       externalDriverFactory?: DriverFactory;
