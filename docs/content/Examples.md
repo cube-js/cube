@@ -6,86 +6,77 @@ redirect_from:
   - /tutorials/
 ---
 
-Below you can find examples and tutorials to help you get started with Cube.js.
+Below you can find tutorials to help you get started with Cube.js.
+<!-- Also, please review the [recipes](#recipes) for common use cases. -->
 
-<!-- prettier-ignore-start -->
-[[info | ]]
-| If you have any examples or tutorials that you'd like to contribute, we encourage you to create a new topic
-| in the [Cube.js community forum](https://forum.cube.dev/).
-<!-- prettier-ignore-end -->
-
-## Examples
-
-| Demo                                            |                      Code                       | Description                                                                               |
-| :---------------------------------------------- | :---------------------------------------------: | :---------------------------------------------------------------------------------------- |
-| [Web Analytics][link-web-analytics]             |       [web-analytics][code-web-analytics]       | Web Analytics with AWS Athena, Snowplow, Cube.js backed by Cube Store                     |
-| [Real-Time Dashboard][link-real-time-dashboard] | [real-time-dashboard][code-real-time-dashboard] | Real-Time Dashboard Demo using WebSockets transport                                       |
-| [React Dashboard][link-react-dashboard]         |     [react-dashboard][code-react-dashboard]     | Dynamic dashboard with React, GraphQL, and Cube.js                                        |
-| [D3 Dashboard][link-d3-dashboard]               |        [d3-dashboard][code-d3-dashboard]        | Dashboard with Cube.js, D3, and Material UI                                               |
-| [Stripe Dashboard][link-stripe-dashboard]       |    [stripe-dashboard][code-stripe-dashboard]    | Stripe Demo Dashboard built with Cube.js and Recharts                                     |
-| [Event Analytics][link-event-analytics]         |     [event-analytics][code-event-analytics]     | Mixpanel like Event Analytics App built with Cube.js and Snowplow                         |
-| [External Rollups][link-external-rollups]       |    [external-rollups][code-external-rollups]    | Compare performance of direct BigQuery querying vs MySQL cached version for the same data |
-| Simple Dynamic Schema Creation                  | [async-module-simple][code-simple-asyncmodule]  | A simple example of using `asyncModule` to generate schemas                               |
-| Auth0                                           |               [auth0][code-auth0]               | Cube.js deployment configured with Auth0 JWK/JWT integration                              |
-| Cognito                                         |             [cognito][code-cognito]             | Cube.js deployment configured with AWS Cognito JWK/JWT integration                        |
-
-[link-real-time-dashboard]: https://real-time-dashboard-demo.cube.dev/
-[code-real-time-dashboard]:
-  https://github.com/cube-js/cube.js/tree/master/examples/real-time-dashboard
-[link-react-dashboard]: https://react-dashboard-demo.cube.dev/
-[code-react-dashboard]:
-  https://github.com/cube-js/cube.js/tree/master/guides/react-dashboard/demo
-[link-d3-dashboard]: https://d3-dashboard-demo.cube.dev/
-[code-d3-dashboard]:
-  https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard
-[link-stripe-dashboard]:
-  http://cubejs-stripe-dashboard-example.s3-website-us-west-2.amazonaws.com/
-[code-stripe-dashboard]:
-  https://github.com/cube-js/cube.js/tree/master/examples/stripe-dashboard
-[link-event-analytics]: https://d1ygcqhosay4lt.cloudfront.net/
-[code-event-analytics]:
-  https://github.com/cube-js/cube.js/tree/master/examples/event-analytics
-[link-external-rollups]: https://external-rollups-demo.cube.dev/
-[code-external-rollups]:
-  https://github.com/cube-js/cube.js/tree/master/examples/external-rollups
-[link-web-analytics]: https://web-analytics-demo.cube.dev/
-[code-web-analytics]:
-  https://github.com/cube-js/cube.js/tree/master/examples/web-analytics
-[code-simple-asyncmodule]:
-  https://github.com/cube-js/cube.js/tree/master/examples/async-module-simple
-[code-auth0]: https://github.com/cube-js/cube.js/tree/master/examples/auth0
-[code-cognito]: https://github.com/cube-js/cube.js/tree/master/examples/cognito
 
 ## Tutorials
 
-### Getting Started Tutorials
+These tutorials are great places to start learning Cube.js:
 
-These tutorials are a good place to start learning Cube.js.
+* [Cube.js, the Open Source Dashboard Framework: Ultimate Guide](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide) —
+  launch an API with Cube.js and build a dashboard with React
 
-- [Cube.js, the Open Source Dashboard Framework: Ultimate Guide ](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide) -
-  It is "**Cube.js 101**" style tutorial, which walks through the building a
-  simple dashboard with React on the frontend.
+* [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js) -
+  learn how to use MongoDB Connector for BI to connect Cube.js to MongoDB
 
-- [Building MongoDB Dashboard using Node.js ](https://cube.dev/blog/building-mongodb-dashboard-using-node.js) -
-  It is a great place to start if you are planning to use Cube.js with MongoDB.
-  It covers the MongoDB Connector for BI and how to connect it to Cube.js.
+* [React Dashboard: an Ultimate Guide](https://react-dashboard.cube.dev) —
+  learn how to build a dynamic dashboard with React, GraphQL, and Cube.js
 
-- [Node Express Analytics Dashboard with Cube.js ](https://cube.dev/blog/node-express-analytics-dashboard-with-cubejs) -
-  This tutorials shows how Cube.js could be embedded into an existing Express.js
-  application.
+* [React query builder](https://cube.dev/blog/react-query-builder-with-cubejs) and
+  [Vue query builder](https://cube.dev/blog/vue-query-builder-with-cubejs/) —
+  learn how to use Query Builder components for React and Vue to build customizable query interfaces
 
-### Advanced
+The following tutorials cover advanced concepts of Cube.js:
 
-- [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) -
-  Pre-Aggregations is one of the most powerful Cube.js features. By using it you
-  can significantly speed up performance of your dashboards and reports. This
-  tutorial is a good first step to master pre-aggregations.
+* [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) -
+  learn about pre-aggregations, one of the most powerful Cube.js features that significantly speed up the performance of your applications such as dashboards and reports
 
-- Building an Open Source Mixpanel Alternative - It's a series of tutorials on
-  building a production ready application with Cube.js.
+* *Building an Open Source Mixpanel Alternative* -
+  a two-part series on building a production-ready application with Cube.js:
+  [Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1),
+  [Part 2: Conversion Funnels ](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
 
-  - [Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1)
-  - [Part 2: Conversion Funnels ](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
 
-- [React Query Builder with Cube.js ](https://cube.dev/blog/react-query-builder-with-cubejs) -
-  It shows you how to build a dynamic query builder with Cube.js React Component.
+### Features
+
+Learn more about prominent features of Cube.js:
+
+| Feature                                                                                  | Story                                                                                                                | Demo                                              |
+| :--------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------ |
+| [Drill downs](https://cube.dev/docs/drill-downs)                                         | [Introducing a drill down table API](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/)            | [Demo](https://drill-downs-demo.cube.dev)         |
+| [Compare date range](https://cube.dev/docs/query-format#time-dimensions-format)          | [Comparing data over different time periods](https://cube.dev/blog/comparing-data-over-different-time-periods/)      | [Demo](https://compare-date-range-demo.cube.dev)  |
+| [Data blending](https://cube.dev/docs/data-blending)                                     | [Introducing data blending API](https://cube.dev/blog/introducing-data-blending-api/)                                | [Demo](https://data-blending-demo.cube.dev)       |
+| [Real-time data fetch](https://cube.dev/docs/real-time-data-fetch)                       | [Real-time dashboard guide](https://real-time-dashboard.cube.dev)                                                    | [Demo](https://real-time-dashboard-demo.cube.dev) |
+| [Dynamic schema creation](https://cube.dev/docs/dynamic-schema-creation)                 | [Using asyncModule to generate schemas](https://github.com/cube-js/cube.js/tree/master/examples/async-module-simple) | —                                                 |
+| [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)            | [Auth0 integration](https://github.com/cube-js/cube.js/tree/master/examples/auth0)                                   | —                                                 |
+| [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)            | [AWS Cognito integration](https://github.com/cube-js/cube.js/tree/master/examples/cognito)                           | —                                                 |
+
+
+### Front-end integrations
+
+Explore how to integrate Cube.js with data visualization tools:
+
+| Tool                                                                   | Tutorial                                                                                                             | Demo                                                  |
+| :--------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------- |
+| 📈 [D3.js](https://awesome.cube.dev/tools/d3)                          | [D3 dashboard tutorial](https://d3-dashboard.cube.dev)                                                               | [Demo](https://d3-dashboard-demo.cube.dev)            |
+| 📈 [Highcharts](https://awesome.cube.dev/tools/highcharts)             | [React Highcharts example](https://cube.dev/blog/react-highcharts-example/)                                          | [Demo](https://highcharts-demo.cube.dev)              |
+| 📈 [Material UI](https://awesome.cube.dev/tools/material-ui-data-grid) | [Material UI Dashboard with React](https://material-ui-dashboard.cube.dev)                                           | [Demo](https://material-ui-dashboard-demo.cube.dev)   |
+| 📈 [Material UI](https://awesome.cube.dev/tools/material-ui-data-grid) | [React data table with Material UI](https://dev.to/cubejs/react-data-table-with-material-ui-and-a-spark-of-joy-50o1) | [Demo](https://react-data-table-demo.cube.dev)        |
+| 📈 [Material](https://material.io)                                     | [Angular dashboard with Material](https://angular-dashboard.cube.dev)                                                | [Demo](https://angular-dashboard-demo.cube.dev)       |
+| 📊 [AG Grid](https://awesome.cube.dev/tools/ag-grid)                   | [React Pivot Table with AG Grid](https://react-pivot-table.cube.dev)                                                 | [Demo](https://react-pivot-table-demo.cube.dev)       |
+| 🗺 [Mapbox](https://awesome.cube.dev/tools/mapbox-gl)                  | [Building map-based data visualizations with Mapbox](https://mapbox-guide.cube.dev)                                  | [Demo](https://mapbox-demo.cube.dev)                  |
+
+
+### Demo applications
+
+Have a look at some of demo applications you can build with Cube.js:
+
+| Application                                          | Story                                                                                                                          |
+| :--------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
+| [Hacktoberfest 2020](https://hacktoberfest.cube.dev) | [Hacktoberfest 2020 in insights and statistics](https://dev.to/igorlukanin/hacktoberfest-2020-in-insights-and-statistics-3m57) |
+| [Slack Vibe](https://slack-vibe-demo.cube.dev)       | [Slack Vibe, the Open Source Analytics for Slack](https://dev.to/cubejs/slack-vibe-the-open-source-analytics-for-slack-2khl)   |
+
+
+<!-- ## Recipes -->
+<!-- TODO: add recipes here -->
