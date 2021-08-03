@@ -93,6 +93,7 @@ type IndexDescription = {
 };
 
 type PreAggregationDescription = {
+  priority: number;
   previewSql: QueryWithParams;
   timezone: string;
   indexesSql: IndexDescription[];
@@ -991,6 +992,12 @@ export class PreAggregationLoader {
 }
 
 export class PreAggregationPartitionRangeLoader {
+  protected waitForRenew: boolean;
+
+  protected requestId: string;
+
+  protected dataSource: string;
+
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactory,
@@ -1003,10 +1010,50 @@ export class PreAggregationPartitionRangeLoader {
     private readonly loadCache: any,
     private readonly options: any = {}
   ) {
+    this.waitForRenew = options.waitForRenew;
+    this.requestId = options.requestId;
+    this.dataSource = options.dataSource;
   }
 
-  private async loadRangeQuery(rangeQuery) {
-    return this.loadCache.keyQueryResult(rangeQuery, false, 10, 60 * 60); // TODO 60 * 60
+  private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
+    const [query, values, queryOptions]: QueryTuple = rangeQuery;
+
+    return this.queryCache.cacheQueryResult(
+      query,
+      values,
+      [query, values],
+      24 * 60 * 60,
+      {
+        renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
+          || queryOptions?.renewalThreshold || 24 * 60 * 60,
+        waitForRenew: this.waitForRenew,
+        priority: this.priority(10),
+        requestId: this.requestId,
+        dataSource: this.dataSource,
+        useInMemory: true,
+        external: queryOptions?.external,
+        renewalKey: partitionRange ? await this.getInvalidationKeyValues(partitionRange) : null
+      }
+    );
+  }
+
+  protected getInvalidationKeyValues(range) {
+    const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
+      this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
+    );
+    return Promise.all(
+      (this.preAggregation.invalidateKeyQueries || []).map(
+        (sqlQuery) => (
+          this.loadCache.keyQueryResult(
+            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName), this.waitForRenew, this.priority(10)
+          )
+        )
+      )
+    );
+  }
+
+  protected priority(defaultValue) {
+    return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
   private replacePartitionSqlAndParams(
@@ -1128,10 +1175,39 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [endDate, endDate];
     }
-    return PreAggregationPartitionRangeLoader.timeSeries(
+    let timeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       dateRange,
     );
+    const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
+      this.preAggregation.partitionGranularity,
+      [startDate, endDate],
+    );
+    const [preciseStartDate, preciseEndDate] = await Promise.all(
+      preAggregationStartEndQueries.map(
+        async (rangeQuery, i) => PreAggregationPartitionRangeLoader.extractDate(
+          await this.loadRangeQuery(
+            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1]
+          )
+        ),
+      ),
+    );
+    if (preciseStartDate !== startDate || preciseEndDate !== endDate) {
+      dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
+        [preciseStartDate, preciseEndDate],
+        this.preAggregation.matchedTimeDimensionDateRange,
+      );
+      if (!dateRange) {
+        // If there's no date range intersection between query data range and pre-aggregation build range
+        // use last partition so outer query can receive expected table structure.
+        dateRange = [preciseEndDate, preciseEndDate];
+      }
+      timeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
+        this.preAggregation.partitionGranularity,
+        dateRange,
+      );
+    }
+    return timeSeriesRanges;
   }
 
   private static checkDataRangeType(range: QueryDateRange) {
