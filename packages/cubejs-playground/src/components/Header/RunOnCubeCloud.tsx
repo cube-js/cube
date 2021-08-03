@@ -27,6 +27,7 @@ export function RunOnCubeCloud() {
       }}
     >
       <Button
+        data-testid="live-preview-btn"
         ghost
         icon={
           active ? (
