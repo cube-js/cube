@@ -1,9 +1,12 @@
 ---
 title: Daily, Weekly, Monthly active users
-permalink: /recipes/dau-wau-mau-active-users
+permalink: /recipes/active-users
 # category: Examples & Tutorials
 subCategory: Analytics
 menuOrder: 1
+# Uncomment it when the original tutorial will be deleted
+# redirect_from:
+#   - /active-users
 ---
 
 ## Use case
