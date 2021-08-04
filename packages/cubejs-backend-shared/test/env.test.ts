@@ -82,7 +82,7 @@ describe('getEnv', () => {
   });
 
   test('livePreview', () => {
-    expect(getEnv('livePreview')).toBe(false);
+    expect(getEnv('livePreview')).toBe(true);
 
     process.env.CUBEJS_LIVE_PREVIEW = 'true';
     expect(getEnv('livePreview')).toBe(true);

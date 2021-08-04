@@ -1,4 +1,4 @@
-import { CaretDownOutlined, CloudFilled } from '@ant-design/icons';
+import { CloudFilled } from '@ant-design/icons';
 import { Button, Card, Dropdown, Typography } from 'antd';
 import { useState } from 'react';
 
@@ -8,6 +8,7 @@ import { copyToClipboard } from '../../utils';
 import { CopiableInput } from '../CopiableInput';
 import { StatusIcon } from '../LivePreviewContext/LivePreviewBar';
 import { LivePreviewStatus } from '../LivePreviewContext/LivePreviewContextProvider';
+import { StyledMenuButton } from './Menu';
 
 export function RunOnCubeCloud() {
   const livePreviewContext = useLivePreviewContext();
@@ -19,54 +20,47 @@ export function RunOnCubeCloud() {
 
   const { active, status, uploading } = livePreviewContext.statusLivePreview;
 
-  return (
-    <Button.Group
-      style={{
-        float: 'right',
-        margin: 8,
+  const button = (
+    <StyledMenuButton
+      data-testid="live-preview-btn"
+      onClick={() => {
+        console.log({ active });
+        if (!active) {
+          livePreviewContext.startLivePreview();
+        }
       }}
     >
-      <Button
-        data-testid="live-preview-btn"
-        ghost
-        icon={
-          active ? (
-            <StatusIcon status={status} uploading={uploading} />
-          ) : (
-            <CloudFilled />
-          )
-        }
-        onClick={() => {
-          if (!active) {
-            livePreviewContext.startLivePreview();
-          }
-        }}
-      >
-        {!active ? 'Run on Cube Cloud' : 'Live Preview'}
-      </Button>
+      {active ? (
+        <StatusIcon status={status} uploading={uploading} />
+      ) : (
+        <CloudFilled />
+      )}
+      {!active ? 'Run' : 'Running'} on Cube Cloud
+    </StyledMenuButton>
+  );
 
-      {livePreviewContext.statusLivePreview.active ? (
-        <Dropdown
-          overlay={
-            <LivePreviewOverlay
-              livePreviewStatus={livePreviewContext.statusLivePreview}
-              apiUrl={livePreviewContext.credentials?.apiUrl || ''}
-              loading={loading}
-              onStopClick={async () => {
-                setLoading(true);
-                await livePreviewContext.stopLivePreview();
-                setLoading(false);
-              }}
-            />
-          }
-          trigger={['click']}
-        >
-          <Button ghost>
-            <CaretDownOutlined />
-          </Button>
-        </Dropdown>
-      ) : null}
-    </Button.Group>
+  if (!active) {
+    return button;
+  }
+
+  return (
+    <Dropdown
+      overlay={
+        <LivePreviewOverlay
+          livePreviewStatus={livePreviewContext.statusLivePreview}
+          apiUrl={livePreviewContext.credentials?.apiUrl || ''}
+          loading={loading}
+          onStopClick={async () => {
+            setLoading(true);
+            await livePreviewContext.stopLivePreview();
+            setLoading(false);
+          }}
+        />
+      }
+      trigger={['click']}
+    >
+      {button}
+    </Dropdown>
   );
 }
 
@@ -89,8 +83,11 @@ function LivePreviewOverlay({
     <Card style={{ maxWidth: 600 }}>
       <Flex direction="column" gap={2}>
         <Typography.Paragraph>
-          Playground users the following API URL to execute queries on Cloud.
-          You can use this API to test queries in your application. Learn more
+          Playground uses the following API URL to execute queries on Cloud. You
+          can use this API to test queries in your application.{' '}
+          <Typography.Link href="https://cube.dev/docs/cloud" target="_blank">
+            Learn more
+          </Typography.Link>{' '}
           on developing and testing with Cube Cloud.
         </Typography.Paragraph>
 

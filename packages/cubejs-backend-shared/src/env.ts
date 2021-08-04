@@ -279,7 +279,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asBool(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   preAggregationsQueueEventsBus: () => get('CUBEJS_PRE_AGGREGATIONS_QUEUE_EVENTS_BUS')
     .default('false')
