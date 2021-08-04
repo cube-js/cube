@@ -312,7 +312,7 @@ In the following example, we use the `conversions` measure along with the
 Funnel joins are extremely heavy for most modern databases and complexity grows
 in a non-linear way with the addition of steps. However, if the cardinality of
 the first event isn't too high, very simple optimization can be applied:
-[originalSql pre-aggregation](/schema/reference/pre-aggregations#original-sql).
+[`originalSql` pre-aggregation][ref-schema-ref-preaggs-origsql].
 
 It is best to use [partitioned rollups][ref-partitioned-rollups] to cache the
 steps instead. Add one to the `PurchaseFunnel` cube as follows:
@@ -333,3 +333,5 @@ cube(`PurchaseFunnel`, {
 
 [ref-partitioned-rollups]:
   /caching/using-pre-aggregations#partitioning-time-partitioning
+[ref-schema-ref-preaggs-origsql]:
+  /schema/reference/pre-aggregations#parameters-type-originalsql

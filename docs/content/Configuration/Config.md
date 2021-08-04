@@ -127,7 +127,7 @@ usually used in [Multitenancy Setup][ref-multitenancy].
 If no option is passed, Cube.js will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve `dbType`.
 
-Called only once per [`appId`][ref-opts-ctx-to-appid].
+Called only once per [`appId`][self-opts-ctx-to-appid].
 
 ### schemaPath
 
@@ -163,7 +163,7 @@ Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
 [Multitenancy Applications][ref-multitenancy].
 
-Called once per [`dataSourceId`][ref-opts-ctx-to-datasourceid]. Can return a
+Called once per [`dataSourceId`][self-opts-ctx-to-datasourceid]. Can return a
 `Promise` which resolves to a driver.
 
 ```javascript
@@ -219,10 +219,10 @@ module.exports = {
 This option allows to customize the repository for Cube.js data schema files. It
 is a function, which accepts a context object and can dynamically select
 repositories with schema files based on
-[`SchemaFileRepository`][ref-schemafilerepo] contract. Learn more about it in
+[`SchemaFileRepository`][self-schemafilerepo] contract. Learn more about it in
 [Multitenancy guide][ref-multitenancy].
 
-Called only once per [`appId`][ref-opts-ctx-to-appid].
+Called only once per [`appId`][self-opts-ctx-to-appid].
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
@@ -254,7 +254,7 @@ header and sets payload to `req.securityContext` if it's verified. More
 information on how to generate these tokens is [here][ref-sec-ctx].
 
 You can set `req.securityContext = userContextObj` inside the middleware if you
-want to customize [`SECURITY_CONTEXT`][ref-cube-ctx-sec-ctx].
+want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
 
 Called on each request.
 
@@ -317,7 +317,7 @@ Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
 | production environments to avoid pre-aggregation tables clashes.
 <!-- prettier-ignore-end -->
 
-Called once per [`appId`][ref-opts-ctx-to-appid].
+Called once per [`appId`][self-opts-ctx-to-appid].
 
 ```javascript
 // Static usage
@@ -338,7 +338,7 @@ Schema version can be used to tell Cube.js schema should be recompiled in case
 schema code depends on dynamic definitions fetched from some external database
 or API. This method is called on each request however `RequestContext` parameter
 is reused per application ID as determined by
-[`contextToAppId`][ref-opts-ctx-to-appid]. If the returned string is different,
+[`contextToAppId`][self-opts-ctx-to-appid]. If the returned string is different,
 the schema will be recompiled. It can be used in both multi-tenant and single
 tenant environments.
 
@@ -379,8 +379,8 @@ instance. For Serverless deployments, [REST API][ref-rest-api-sched-refresh]
 should be used instead.
 
 You may also need to configure
-[`scheduledRefreshTimeZones`][ref-opts-sched-refresh-tz] and
-[`scheduledRefreshContexts`][ref-opts-sched-refresh-ctxs].
+[`scheduledRefreshTimeZones`][self-opts-sched-refresh-tz] and
+[`scheduledRefreshContexts`][self-opts-sched-refresh-ctxs].
 
 ### scheduledRefreshTimeZones
 
@@ -445,8 +445,8 @@ Option to extend the `RequestContext` with custom values. This method is called
 on each request. Can be async.
 
 The function should return an object which gets appended to the
-[`RequestContext`][ref-opts-req-ctx]. Make sure to register your value using
-[`contextToAppId`][ref-opts-ctx-to-appid] to use cache context for all possible
+[`RequestContext`][self-opts-req-ctx]. Make sure to register your value using
+[`contextToAppId`][self-opts-ctx-to-appid] to use cache context for all possible
 values that your extendContext object key can have.
 
 ```javascript
@@ -558,16 +558,17 @@ Should be used in conjunction with
 select a database type depending on the user's context. It is usually used in
 [Multitenancy Setup][ref-multitenancy].
 
-Called only once per [`appId`][ref-opts-ctx-to-appid].
+Called only once per [`appId`][self-opts-ctx-to-appid].
 
 ### externalDriverFactory
 
-Set database driver for external rollup database. Please refer to [External
-Rollup][ref-preagg-ext-rollup] documentation for more guidance. The function
-accepts a context object as an argument to allow dynamically loading database
-drivers, which is usually used for [Multitenant deployments][ref-multitenancy].
+Set database driver for external rollup database. Please refer to the [`rollup`
+reference][ref-schema-ref-preaggs-rollup] documentation for more guidance. The
+function accepts a context object as an argument to allow dynamically loading
+database drivers, which is usually used for [Multitenant
+deployments][ref-multitenancy].
 
-Called once per [`appId`][ref-opts-ctx-to-appid]. Can return a `Promise` that
+Called once per [`appId`][self-opts-ctx-to-appid]. Can return a `Promise` that
 resolves to a driver.
 
 ```javascript
@@ -600,17 +601,17 @@ The cache and queue driver to use for the Cube.js deployment. Defaults to
 
 You can pass this object to set advanced options for Cube.js Query Orchestrator.
 
-| Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                               | Default Value           |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| redisPrefix                                  | Prefix to be set an all Redis keys                                                                                                                                                                                                                                                                                                                                                                                        | `STANDALONE`            |
-| rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                                          | `false`                 |
-| queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                                        | `{}`                    |
-| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey][ref-cube-refresh-key] check                                                                                                                                                                                                                                                                                                                                           | `defined by DB dialect` |
-| queryCacheOptions.backgroundRenew            | Controls whether to wait in foreground for refreshed query data if `refreshKey` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [refreshKey][ref-cube-refresh-key] check to renew in foreground. Default value before 0.15.0 was `true` | `false`                 |
-| queryCacheOptions.queueOptions               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                                                        | `{}`                    |
-| preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                  | `{}`                    |
-| preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                  | `{}`                    |
-| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube.js to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                                                | `false`                 |
+| Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                                          | Default Value           |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| redisPrefix                                  | Prefix to be set an all Redis keys                                                                                                                                                                                                                                                                                                                                                                                                   | `STANDALONE`            |
+| rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                                                     | `false`                 |
+| queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                                                   | `{}`                    |
+| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [refreshKey][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                                                           | `defined by DB dialect` |
+| queryCacheOptions.backgroundRenew            | Controls whether to wait in foreground for refreshed query data if `refreshKey` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [refreshKey][ref-schema-cube-ref-refresh-key] check to renew in foreground. Default value before 0.15.0 was `true` | `false`                 |
+| queryCacheOptions.queueOptions               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                                                                   | `{}`                    |
+| preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                             | `{}`                    |
+| preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                                                             | `{}`                    |
+| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube.js to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                                                           | `false`                 |
 
 To set options for `queryCache` and `preAggregations`, set an object with key
 queueOptions. `queryCacheOptions` are used while querying database tables, while
@@ -652,18 +653,18 @@ Timeout and interval options' values are in seconds.
 ### securityContext
 
 Defined as `req.securityContext` which should be set by
-[`checkAuth`][ref-opts-checkauth]. Default implementation of
-[`checkAuth`][ref-opts-checkauth] uses [JWT Security Token][ref-sec] payload and
-sets it to `req.securityContext`.
+[`checkAuth`][self-opts-checkauth]. Default implementation of
+[`checkAuth`][self-opts-checkauth] uses [JWT Security Token][ref-sec] payload
+and sets it to `req.securityContext`.
 
 ## SchemaFileRepository
 
 The `SchemaFileRepository` contract defines an async `dataSchemaFiles` function
 which returns the files to compile for a schema. Returned by
-[repositoryFactory][ref-repofactory].
+[repositoryFactory][self-repofactory].
 `@cubejs-backend/server-core/core/FileRepository` is the default implementation
 of the `SchemaFileRepository` contract which accepts
-[schemaPath][ref-schemapath] in the constructor.
+[schemaPath][self-schemapath] in the constructor.
 
 ```javascript
 class ApiFileRepository {
@@ -694,25 +695,25 @@ the additional transpiler for check duplicates.
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_databas
 [ref-caching-up-to-date]: /caching#keeping-cache-up-to-date
-[ref-cube-refresh-key]: /schema/reference/cube#parameters-refresh-key
-[ref-cube-ctx-sec-ctx]:
-  /schema/reference/cube#context-variables-security-context
+[ref-development-mode]: /overview#development-mode
 [ref-multitenancy]: /multitenancy-setup
-[ref-ext-driverfactory]: #external-driver-factory
-[ref-opts-req-ctx]: #request-context
-[ref-opts-checkauth]: #options-reference-check-auth
-[ref-opts-ctx-to-appid]: #options-reference-context-to-app-id
-[ref-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
-[ref-opts-sched-refresh-ctxs]: #options-reference-scheduled-refresh-contexts
-[ref-opts-sched-refresh-tz]: #options-reference-scheduled-refresh-time-zones
-[ref-preagg-ext-rollup]: /schema/reference/pre-aggregations#external-rollup
-[ref-repofactory]: #repositoryFactory
-[ref-schemafilerepo]: #SchemaFileRepository
-[ref-schemapath]: #schemaPath
-[ref-sec]: /security
-[ref-sec-ctx]: /security/context
 [ref-rest-api]: /rest-api
 [ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
-[ref-development-mode]: /overview#development-mode
 [ref-pre-aggregations-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
+[ref-schema-cube-ref-refresh-key]: /schema/reference/cube#parameters-refresh-key
+[ref-schema-cube-ref-ctx-sec-ctx]:
+  /schema/reference/cube#context-variables-security-context
+[ref-schema-ref-preaggs-rollup]:
+  /schema/reference/pre-aggregations#parameters-type-rollup
+[ref-sec]: /security
+[ref-sec-ctx]: /security/context
+[self-opts-req-ctx]: #request-context
+[self-opts-checkauth]: #options-reference-check-auth
+[self-opts-ctx-to-appid]: #options-reference-context-to-app-id
+[self-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
+[self-opts-sched-refresh-ctxs]: #options-reference-scheduled-refresh-contexts
+[self-opts-sched-refresh-tz]: #options-reference-scheduled-refresh-time-zones
+[self-repofactory]: #repositoryFactory
+[self-schemafilerepo]: #SchemaFileRepository
+[self-schemapath]: #schemaPath

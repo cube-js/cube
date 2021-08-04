@@ -42,7 +42,7 @@ same condensed dataset if any matching attributes are found.
 [Pre-aggregations are defined within each cube's data
 schema][ref-schema-preaggs], and cubes can have as many pre-aggregations as they
 require. The pre-aggregated data [can be stored either alongside the source data
-in the same database, in an external database][ref-schema-preaggs-extvsint] that
+in the same database, in an external database][ref-caching-preaggs-storage] that
 is supported by Cube.js, [or in Cube Store, a dedicated pre-aggregation storage
 layer][ref-caching-preaggs-cubestore].
 
@@ -145,8 +145,8 @@ cube(`Orders`, {
 ```
 
 Note that we have added a `granularity` property with a value of `month` to this
-definition. [This allows Cube.js to aggregate the dataset to a single entry for
-each month][ref-schema-preaggs-examples].
+definition. This allows Cube.js to aggregate the dataset to a single entry for
+each month.
 
 The next time the API receives the same JSON query, Cube.js will build (if it
 doesn't already exist) the pre-aggregated dataset, store it in the source
@@ -181,7 +181,7 @@ it receives via the API. The process for selection is summarized below:
    - The pre-aggregation contains all dimensions, filter dimensions and leaf
      measures from the query
    - The measures aren't multiplied ([via a `hasMany`
-     relation][ref-joins-hasmany])
+     relation][ref-schema-joins-hasmany])
 
 3. If no, then check if
 
@@ -492,20 +492,21 @@ Some extra considerations for pre-aggregation selection:
   if you have both `originalSql` and `rollup` defined, Cube.js will try to match
   `rollup` pre-aggregations before trying to match `originalSql`. You can
   instruct Cube.js to use the original SQL pre-aggregations by using
-  [`useOriginalSqlPreAggregations`][ref-orig-sql].
+  [`useOriginalSqlPreAggregations`][ref-schema-preaggs-origsql].
 
-[ref-joins-hasmany]: /joins#parameters-relationship
-[ref-orig-sql]: /pre-aggregations#original-sql
-[ref-schema-preaggs-examples]: /pre-aggregations#rollup-rollup-examples
-[ref-schema-joins]: /joins
-[ref-caching-preaggs-cubestore]:
-  /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-caching-preaggs-bk-refresh]:
   /caching/using-pre-aggregations#background-refresh
+[ref-caching-preaggs-cubestore]:
+  /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-caching-preaggs-refresh]: /caching/using-pre-aggregations#refresh-strategy
-[ref-schema-preaggs]: /pre-aggregations
-[ref-schema-preaggs-extvsint]: /pre-aggregations#external-vs-internal
+[ref-caching-preaggs-storage]:
+  /caching/using-pre-aggregations#pre-aggregations-storage
+[ref-schema-dims]: /schema/reference/dimensions
+[ref-schema-joins]: /schema/reference/joins
+[ref-schema-joins-hasmany]: /schema/reference/joins#parameters-relationship
+[ref-schema-preaggs]: /schema/reference/pre-aggregations
+[ref-schema-preaggs-origsql]:
+  /schema/reference/pre-aggregations#parameters-type-originalsql
 [self-select-pre-agg]:
   #ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
-[ref-schema-dims]: /dimensions
 [wiki-gcd]: https://en.wikipedia.org/wiki/Greatest_common_divisor
