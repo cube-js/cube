@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.13](https://github.com/cube-js/cube.js/compare/v0.28.12...v0.28.13) (2021-08-04)
+
+
+### Bug Fixes
+
+* Support rolling `countDistinctApprox` rollups ([#3185](https://github.com/cube-js/cube.js/issues/3185)) ([e731992](https://github.com/cube-js/cube.js/commit/e731992b351f68f1ee249c9412f679b1903a6f28))
+
+
+
+
+
 ## [0.28.11](https://github.com/cube-js/cube.js/compare/v0.28.10...v0.28.11) (2021-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

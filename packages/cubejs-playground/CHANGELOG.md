@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.13](https://github.com/cube-js/cube.js/compare/v0.28.12...v0.28.13) (2021-08-04)
+
+
+### Reverts
+
+* Revert "misc: rollup dependencies fix" ([c08f93c](https://github.com/cube-js/cube.js/commit/c08f93cce990b5851287e89ad51980f78bbdef55))
+
+
+
+
+
 ## [0.28.10](https://github.com/cube-js/cube.js/compare/v0.28.9...v0.28.10) (2021-07-30)
 
 **Note:** Version bump only for package @cubejs-client/playground

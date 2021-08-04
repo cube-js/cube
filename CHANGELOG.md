@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.13](https://github.com/cube-js/cube.js/compare/v0.28.12...v0.28.13) (2021-08-04)
+
+
+### Bug Fixes
+
+* Support rolling `countDistinctApprox` rollups ([#3185](https://github.com/cube-js/cube.js/issues/3185)) ([e731992](https://github.com/cube-js/cube.js/commit/e731992b351f68f1ee249c9412f679b1903a6f28))
+* **cubestore:** improve errors for env var parse failures ([dbedd4e](https://github.com/cube-js/cube.js/commit/dbedd4e9103b4ce3d22c86ede4d1dc8b56f64f24))
+* Load build range query only on refresh key changes ([#3184](https://github.com/cube-js/cube.js/issues/3184)) ([40c6ee0](https://github.com/cube-js/cube.js/commit/40c6ee036de73144c12072c71df10081801d4e6b))
+
+
+### Reverts
+
+* Revert "misc: rollup dependencies fix" ([c08f93c](https://github.com/cube-js/cube.js/commit/c08f93cce990b5851287e89ad51980f78bbdef55))
+
+
+
+
+
 ## [0.28.12](https://github.com/cube-js/cube.js/compare/v0.28.11...v0.28.12) (2021-07-31)
 
 
