@@ -32,7 +32,7 @@ export default {
   ],
   output: {
     dir: 'lib',
-    format: 'es',
+    format: 'esm',
     sourcemap: true,
   },
 };
