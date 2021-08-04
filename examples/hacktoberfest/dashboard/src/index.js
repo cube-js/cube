@@ -8,7 +8,7 @@ import App from './App';
 
 const API_URL =
   process.env.NODE_ENV === 'production'
-    ? 'https://serious-tobias.gcp-us-central1.cubecloudapp.dev'
+    ? 'https://nervous-itmann.gcp-us-central1.cubecloudapp.dev'
     : 'http://localhost:4000';
 
 const CUBEJS_TOKEN =

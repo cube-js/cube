@@ -13,7 +13,7 @@ import Header from './components/Header';
 const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MDY1OTA0NjEsImV4cCI6MTkyMjE2NjQ2MX0.DdY7GaiHsQWyTH_xkslHb17Cbc3yLFfMFwoEpx89JiA'
 
 const cubejsApi = cubejs(token, {
-  apiUrl: 'https://aquamarine-galliform.aws-us-east-2.cubecloudapp.dev/cubejs-api/v1'
+  apiUrl: 'https://harsh-eel.aws-us-east-2.cubecloudapp.dev/cubejs-api/v1'
 });
 
 // Amplify.configure(aws_exports);
