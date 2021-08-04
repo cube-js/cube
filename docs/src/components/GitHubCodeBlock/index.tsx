@@ -2,25 +2,28 @@ import React, { useEffect, useState } from 'react';
 
 const GitHubCodeBlock = (props: propsType) => {
   const { href, titleSuffixCount, part, lang } = props;
-  const [file, setFile] = useState("");
-  const [title, setTitle] = useState("");
+  const [code, setCode] = useState('');
+  const [title, setTitle] = useState('');
 
   useEffect(() => {
-    const { user, repo, branch, filePath, title } = parseHref(href, titleSuffixCount);
-    
+    const { user, repo, branch, filePath, title } = parseHref(
+      href,
+      titleSuffixCount
+    );
+
     setTitle(title);
     fetchCodeFromGitHub(
-      `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${filePath}`, setFile, part
+      `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${filePath}`,
+      setCode,
+      part
     );
   }, []);
 
   return (
     <div>
-      <h3>{title}</h3>
+      <h4>{title}</h4>
       <pre>
-        <code className={`language-${lang}`}>
-          { file }
-        </code>
+        <code className={`language-${lang}`}>{code}</code>
       </pre>
     </div>
   );
@@ -34,29 +37,71 @@ function parseHref(href: string, titleSuffixCount: number): parseHref {
   const user = arrayOfStringData?.[0] || null;
   const repo = arrayOfStringData?.[1] || null;
   const branch = arrayOfStringData?.[3] || null;
-  const title = [...arrayOfStringData]?.reverse()?.splice(0, titleSuffixCount)?.reverse()?.join('/') || "";
+  const title =
+    [...arrayOfStringData]
+      ?.reverse()
+      ?.splice(0, titleSuffixCount)
+      ?.reverse()
+      ?.join('/') || '';
   const filePath = arrayOfStringData?.splice(4)?.join('/') || null;
 
   return { user, repo, branch, filePath, title };
 }
 
-async function fetchCodeFromGitHub(url: string, setFile: (text: string) => void, part: string | null) {
-  const response = await fetch(url);
-  if (response.ok) {
-    let text = await response.text();
+async function fetchCodeFromGitHub(
+  url: string,
+  setCode: (text: string) => void,
+  part: string | null
+) {
+  try {
+    const response = await fetch(url);
+    if (response.ok) {
+      let code = await response.text();
 
-    if (!part) {
-      setFile(text);
-    } else {
-      // @todo splice text
-      setFile(text);  
+      if (!part) {
+        setCode(code);
+      } else {
+        setCode(spliceCodeByPart(code, part));
+      }
     }
+    highlightCode();
+  } catch (e) {
+    console.log(e);
   }
-  highlightCode();
 }
 
 function highlightCode(): void {
   window.Prism && window.Prism.highlightAll();
+}
+
+function spliceCodeByPart(code: string, value: string): string {
+  if (!value) {
+    return code;
+  }
+  const start = [
+    `<!-- start part: ${value} -->`,
+    `// start part: ${value}`,
+    `# start part: ${value}`,
+  ];
+  const end = [
+    `<!-- end part: ${value} -->`,
+    `// end part: ${value}`,
+    `# end part: ${value}`,
+  ];
+
+  start.forEach((startLine) => {
+    const startIndex = code.indexOf(startLine);
+    if (startIndex !== -1) {
+      end.forEach((endLine) => {
+        const endIndex = code.indexOf(endLine);
+        if (endIndex !== -1) {
+          code = code?.slice(startIndex + startLine.length, endIndex)?.trim()
+        }
+      });
+    }
+  });
+
+  return code;
 }
 
 interface propsType {
@@ -66,6 +111,6 @@ interface propsType {
   lang: string;
 }
 interface parseHref {
-  [key: string]: string | null,
-  title: string
+  [key: string]: string | null;
+  title: string;
 }

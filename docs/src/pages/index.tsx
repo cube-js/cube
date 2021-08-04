@@ -69,9 +69,9 @@ class IndexPage extends Component<Props> {
             />
           </Row>
           <GitHubCodeBlock
-            href="https://github.com/rchkv/cubejs-active-users-recipe/blob/main/schema/Users.js"
+            href="https://github.com/YakovlevCoded/test/blob/master/test.js"
             titleSuffixCount={2}
-            part="some-measure"
+            part={"test-value"}
             lang="js"
           />
         </div>
