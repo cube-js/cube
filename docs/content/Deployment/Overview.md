@@ -89,7 +89,7 @@ services:
 
       - CUBEJS_API_SECRET=secret
 
-      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+      - CUBEJS_REFRESH_WORKER=true
     volumes:
       - .:/cube/conf
 
@@ -154,9 +154,8 @@ has access to the data schema files.
 Refresh Worker updates the pre-aggregations and in-memory cache in the
 background.
 
-[Cube.js docker image][dh-cubejs] is used for Refresh Worker too. To make
-service act as a Refresh Worker `CUBEJS_SCHEDULED_REFRESH_TIMER=true` should be
-set.
+[Cube.js Docker image][dh-cubejs] is used for Refresh Worker too. To make
+service act as a Refresh Worker `CUBEJS_REFRESH_WORKER=true` should be set.
 
 ## Cube Store
 
