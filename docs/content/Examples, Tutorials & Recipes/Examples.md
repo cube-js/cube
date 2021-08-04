@@ -84,13 +84,9 @@ Have a look at some of demo applications you can build with Cube.js:
 These recipes will show you the best practices of using Cube.js.
 
 ### Analytics
-<<<<<<< HEAD:docs/content/Examples.md
-- [Daily, Weekly, Monthly active users](https://cube.dev/recipes/dau-wau-mau-active-users)
-=======
 
 - [Daily, Weekly, Monthly active users](/recipes/dau-wau-mau-active-users)
 
 ### Queries
 
 - [Pagination](/recipes/pagination)
->>>>>>> 0aed46d6e (docs(recipes): Active users & pagination recipes (#3177)):docs/content/Examples, Tutorials & Recipes/Examples.md
