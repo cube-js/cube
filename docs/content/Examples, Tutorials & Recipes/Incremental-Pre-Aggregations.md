@@ -1,10 +1,9 @@
 ---
 title: Incremental Pre-aggregations
 permalink: /incremental-pre-aggregations
-scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 25
+category: Examples & Tutorials
+subCategory: Query acceleration
+menuOrder: 7
 ---
 
 When you use partitioned rollups on immutable data there's an opportunity to

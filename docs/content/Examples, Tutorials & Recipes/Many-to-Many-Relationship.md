@@ -1,10 +1,9 @@
 ---
 title: Many-to-Many Relationship
 permalink: /many-to-many-relationship
-scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 17
+category: Examples & Tutorials
+subCategory: Data schema
+menuOrder: 4
 ---
 <div class="block attention-block">
   This is an advanced topic that assumes good, pre-existing knowledge of SQL and Cube.js.

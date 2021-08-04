@@ -1,9 +1,9 @@
 ---
 title: Event Analytics
 permalink: /event-analytics
-category: Reference
-subCategory: Tutorials
-menuOrder: 12
+category: Examples & Tutorials
+subCategory: Analytics
+menuOrder: 2
 ---
 
 [comment]: # 'DOCUMENT IS PROOFREADED, MAKE CHANGES WITH CONFIDENCE'

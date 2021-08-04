@@ -78,15 +78,24 @@ Have a look at some of demo applications you can build with Cube.js:
 | [Slack Vibe](https://slack-vibe-demo.cube.dev)       | [Slack Vibe, the Open Source Analytics for Slack](https://dev.to/cubejs/slack-vibe-the-open-source-analytics-for-slack-2khl)   |
 
 
-
 ## Recipes
 
 These recipes will show you the best practices of using Cube.js.
 
 ### Analytics
+- [Funnel Analysis](/funnels)
+- [Retention Analysis](/cohort-retention)
+- [Event Analytics](/event-analytics)
 
-- [Daily, Weekly, Monthly active users](/recipes/dau-wau-mau-active-users)
+### Data schema
+- [Many-to-Many Relationship](/many-to-many-relationship)
+- [Dynamically Union Tables](/dynamically-union-tables)
+- [Data Blending](/data-blending)
 
 ### Queries
 
 - [Pagination](/recipes/pagination)
+
+### Query acceleration
+
+- [Incremental Pre-aggregations](/incremental-pre-aggregations)

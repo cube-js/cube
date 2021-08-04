@@ -1,10 +1,9 @@
 ---
 title: Dynamically Union Tables
 permalink: /dynamically-union-tables
-scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 23
+category: Examples & Tutorials
+subCategory: Data schema
+menuOrder: 5
 ---
 
 [comment]: # (PROOFREAD: DONE)

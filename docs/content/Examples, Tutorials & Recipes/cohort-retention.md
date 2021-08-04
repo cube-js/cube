@@ -1,9 +1,9 @@
 ---
 title: Cohort Retention
 permalink: /cohort-retention
-category: Reference
-subCategory: Tutorials
-menuOrder: 15
+category: Examples & Tutorials
+subCategory: Analytics
+menuOrder: 3
 ---
 [comment]: # (DOCUMENT IS PROOFREADED, MAKE CHANGES WITH CONFIDENCE)
 

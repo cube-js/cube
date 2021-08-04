@@ -1,8 +1,8 @@
 ---
 title: Pagination
 permalink: /recipes/pagination
-category: Examples & Tutorials
-subCategory: Recipes / Queries
+# category: Examples & Tutorials
+subCategory: Queries
 menuOrder: 1
 ---
 

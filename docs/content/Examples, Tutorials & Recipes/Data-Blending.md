@@ -1,10 +1,9 @@
 ---
 title: Data Blending
 permalink: /data-blending
-scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 24
+category: Examples & Tutorials
+subCategory: Data schema
+menuOrder: 6
 ---
 
 <!-- prettier-ignore-start -->

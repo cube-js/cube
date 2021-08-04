@@ -1,8 +1,8 @@
 ---
 title: Daily, Weekly, Monthly active users
 permalink: /recipes/dau-wau-mau-active-users
-category: Examples & Tutorials
-subCategory: Recipes / Analytics
+# category: Examples & Tutorials
+subCategory: Analytics
 menuOrder: 1
 ---
 

@@ -1,9 +1,9 @@
 ---
 title: Funnels
 permalink: /funnels
-category: Reference
-subCategory: Tutorials
-menuOrder: 13
+category: Examples & Tutorials
+subCategory: Analytics
+menuOrder: 3
 ---
 
 <!-- prettier-ignore-start -->
