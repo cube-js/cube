@@ -83,6 +83,7 @@ Have a look at some of demo applications you can build with Cube.js:
 These recipes will show you the best practices of using Cube.js.
 
 ### Analytics
+- [Daily, Weekly, Monthly Active Users](/active-users)
 - [Funnel Analysis](/funnels)
 - [Retention Analysis](/cohort-retention)
 - [Event Analytics](/event-analytics)
