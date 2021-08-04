@@ -132,7 +132,7 @@ As the name suggests, it persists the results of the `sql` property of the cube.
 Pre-aggregations of type `originalSql` should **only** be used when the cube's
 `sql` is a complex query (i.e. nested, window functions and/or multiple joins).
 We **strongly** recommend only persisting results of `originalSql` back to the
-source database i.e. [set `internal: true`][ref-caching-using-preaggs-internal].
+source database.
 They often do not provide much in the way of performance directly, but there are
 two specific applications:
 
@@ -153,8 +153,7 @@ cube(`CompletedOrders`, {
 
   preAggregations: {
     main: {
-      type: `originalSql`,
-      internal: true,
+      type: `originalSql`
     },
   },
 });
