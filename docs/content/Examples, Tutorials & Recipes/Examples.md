@@ -89,7 +89,6 @@ These recipes will show you the best practices of using Cube.js.
 - [Event Analytics](/event-analytics)
 
 ### Data schema
-- [Many-to-Many Relationship](/many-to-many-relationship)
 - [Dynamically Union Tables](/dynamically-union-tables)
 - [Data Blending](/data-blending)
 
