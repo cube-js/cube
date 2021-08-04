@@ -39,13 +39,6 @@ Pre-aggregations must have, at minimum, a name and a type. This name, along with
 the name of the cube will be used as a prefix for pre-aggregation tables created
 in the database.
 
-<!-- prettier-ignore-start -->
-[[warning | ]]
-| Some databases have trouble with long table names. You can work around this
-| by specifying the [`sqlAlias`][ref-sqlalias] property on the cube and on
-| the pre-aggregation definition.
-<!-- prettier-ignore-end -->
-
 Pre-aggregation names should:
 
 - Be unique within a cube
@@ -60,7 +53,6 @@ cube(`Orders`, {
 
   preAggregations: {
     ordersByStatus: {
-      sqlAlias: `order_status`,
       dimensions: [CUBE.status],
       measures: [CUBE.count],
     },
