@@ -3,7 +3,7 @@ import { Button, Card, Dropdown, Typography } from 'antd';
 import { useState } from 'react';
 
 import { Box, Flex } from '../../grid';
-import { useLivePreviewContext, useToggle } from '../../hooks';
+import { useLivePreviewContext } from '../../hooks';
 import { copyToClipboard } from '../../utils';
 import { CopiableInput } from '../CopiableInput';
 import { StatusIcon } from '../LivePreviewContext/LivePreviewBar';
