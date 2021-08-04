@@ -27,7 +27,7 @@ one or multiple API instances, a Refresh Worker, Redis and a Cube Store cluster.
 >
   <img
   alt="Deployment Overview"
-  src="deployment-overview.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Deployment/deployment-overview.png"
   style="border: none"
   width="100%"
   />
