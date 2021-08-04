@@ -1618,7 +1618,7 @@ export class BaseQuery {
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath];
-      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql);
+      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql, true);
       if (onGroupedColumn) {
         return onGroupedColumn;
       }
@@ -1643,11 +1643,11 @@ export class BaseQuery {
     return `${symbol.type}(${evaluateSql})`;
   }
 
-  aggregateOnGroupedColumn(symbol, evaluateSql) {
+  aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge) {
     if (symbol.type === 'count' || symbol.type === 'sum') {
       return `sum(${evaluateSql})`;
     } else if (symbol.type === 'countDistinctApprox') {
-      return this.hllMerge(evaluateSql);
+      return topLevelMerge ? this.hllCardinalityMerge(evaluateSql) : this.hllMergeOnly(evaluateSql);
     } else if (symbol.type === 'min' || symbol.type === 'max') {
       return `${symbol.type}(${evaluateSql})`;
     }
@@ -1660,6 +1660,14 @@ export class BaseQuery {
 
   hllMerge(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
+  }
+
+  hllMergeOnly(sql) {
+    return this.hllMerge(sql);
+  }
+
+  hllCardinalityMerge(sql) {
+    return this.hllMerge(sql);
   }
 
   countDistinctApprox(sql) {
