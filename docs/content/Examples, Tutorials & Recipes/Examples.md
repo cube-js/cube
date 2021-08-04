@@ -99,3 +99,10 @@ These recipes will show you the best practices of using Cube.js.
 ### Query acceleration
 
 - [Incremental Pre-aggregations](/incremental-pre-aggregations)
+
+### Code reusability
+
+- [Export and Import](/export-import)
+- [Extending Cubes](/extending-cubes)
+- [Schema Generation](/schema-generation)
+- [Polymorphic Cubes](/polymorphic-cubes)

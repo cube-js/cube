@@ -1,10 +1,9 @@
 ---
 title: Polymorphic Cubes
 permalink: /polymorphic-cubes
-scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 26
+category: Examples & Tutorials
+subCategory: Code reusability
+menuOrder: 11
 ---
 
 [comment]: # 'PROOFREAD: DONE'
