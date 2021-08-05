@@ -73,6 +73,8 @@ Cube.js supports three types of pre-aggregations:
 - [`originalSql`][self-originalsql]
 - [`rollupJoin`][self-rollupjoin]
 
+Default type is `rollup`.
+
 <h4 id="parameters-type-rollup">
 rollup
 </h4>
