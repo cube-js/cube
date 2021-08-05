@@ -5,7 +5,7 @@ category: Examples & Tutorials
 subCategory: Code reusability
 menuOrder: 11
 redirect_from:
-  - /polymorphic-cubes 
+  - /polymorphic-cubes
 ---
 
 [comment]: # 'PROOFREAD: DONE'

@@ -84,7 +84,7 @@ Get the data for a query.
 Response
 
 - `query` - The query passed via params. It can be an array of queries and in
-  such case it will be treated as a [Data Blending](/data-blending) query.
+  such case it will be treated as a [Data Blending](/recipes/data-blending) query.
 - `data` - Formatted dataset of query results.
 - `annotation` - Metadata for query. Contains descriptions for all query items.
   - `title` - Human readable title from data schema.

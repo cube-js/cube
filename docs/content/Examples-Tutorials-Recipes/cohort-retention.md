@@ -11,7 +11,7 @@ redirect_from:
 
 <!-- prettier-ignore-start -->
 [[info | ]]
-| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
+| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/).
 | We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/cohort-retention).
 <!-- prettier-ignore-end -->
 
@@ -31,7 +31,7 @@ It’s usually visualized as a cohort grid or retention curves.
   style="text-align: center"
 >
   <img
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/cohort-retention1.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/cohort-retention.png"
   style="border: none"
   width="100%"
   />

@@ -143,7 +143,7 @@ two specific applications:
    rollup pre-aggregations.
 
 2. Situations where it is not possible to use a `rollup` pre-aggregations, such
-   as [funnels][ref-schema-funnels].
+   as [funnels][ref-recipe-funnels].
 
 For example, to pre-aggregate all completed orders, you could do the following:
 
@@ -760,8 +760,8 @@ cube(`Orders`, {
 [ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
+[ref-recipe-funnels]: /recipes/funnels
 [ref-sqlalias]: /schema/reference/cube#parameters-sql-alias
-[ref-schema-funnels]: /funnels
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments
