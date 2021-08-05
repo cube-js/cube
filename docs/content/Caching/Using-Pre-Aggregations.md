@@ -15,13 +15,14 @@ menuOrder: 3
 <!-- prettier-ignore-end -->
 
 Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
-many configuration options to consider. Please make sure to also check [this
-Pre-Aggregations page in the data schema section][ref-preaggs].
+many configuration options to consider. Please make sure to also check [the
+Pre-Aggregations reference in the data schema section][ref-schema-ref-preaggs].
 
 ## Refresh Strategy
 
 Refresh strategy can be customized by setting the
-[refreshKey][ref-preaggs-refresh-key] property for the pre-aggregation.
+[refreshKey][ref-schema-ref-preaggs-refresh-key] property for the
+pre-aggregation.
 
 The default value of `refreshKey` is `every: '1 hour'`. It can be redefined
 either by providing SQL:
@@ -68,11 +69,11 @@ cube(`Orders`, {
 
 You can refresh pre-aggregations in the background by setting
 `scheduledRefresh: true`. You can find more information about this setting in
-the [Pre-Aggregation Reference][ref-preagg-sched-refresh].
+the [Pre-Aggregation Reference][ref-schema-ref-preaggs-sched-refresh].
 
 In development mode, Cube.js enables background refresh by default and will
 refresh all pre-aggregations marked with the
-[`scheduledRefresh`](/pre-aggregations#scheduled-refresh) parameter.
+[`scheduledRefresh`][ref-schema-ref-preaggs-sched-refresh] parameter.
 
 Please consult the [Production Checklist][ref-prod-list-refresh] for best
 practices on running background refresh in production environments.
@@ -160,14 +161,14 @@ this attribute, and **only** valid partitions required to satisfy it are
 selected. This results in faster refresh times due to unnecessary data not being
 scanned and processed, and possibly even reduced cost, depending on your
 database solution. Cube.js supports partitioning data using the `timeDimension`
-property in [a pre-aggregation definition][ref-preaggs].
+property in [a pre-aggregation definition][ref-schema-ref-preaggs].
 
 ### Time partitioning
 
 Time-based partitioning is especially helpful for incremental refreshes; when
 configured, Cube.js will only refresh partitions as necessary. Without
 incremental refreshing, Cube.js will re-calculate the entire pre-aggregation
-whenever [the refresh key][ref-preaggs-refresh-key] changes.
+whenever [the refresh key][ref-schema-ref-preaggs-refresh-key] changes.
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -386,10 +387,12 @@ When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube.js does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
-[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
 [ref-config-connect-db]: /connecting-to-the-database
+[ref-config-driverfactory]: /config#options-reference-driver-factory
 [ref-config-env]: /reference/environment-variables#cube-store
 [ref-config-env-general]: /config#general
+[ref-config-extdbtype]: /config#options-reference-external-db-type
+[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
 [ref-connect-db-athena]: /connecting-to-the-database#notes-aws-athena
 [ref-connect-db-redshift]: /connecting-to-the-database#notes-aws-redshift
 [ref-connect-db-bigquery]: /connecting-to-the-database#notes-google-big-query
@@ -397,11 +400,11 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-connect-db-postgres]: /connecting-to-the-database#notes-aws-rds-postgres
 [ref-connect-db-snowflake]: /connecting-to-the-database#notes-snowflake
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
-[ref-preaggs]: /pre-aggregations
-[ref-preagg-sched-refresh]: /pre-aggregations#scheduled-refresh
-[ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
+[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
+[ref-schema-ref-preaggs-refresh-key]:
+  /schema/reference/pre-aggregations#parameters-refresh-key
 [ref-deploy-refresh-wrkr]: /deployment/overview#refresh-worker
+[ref-schema-ref-preaggs-sched-refresh]:
+  /schema/reference/pre-aggregations#parameters-scheduled-refresh
 [ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
-[ref-config-extdbtype]: /config#options-reference-external-db-type
-[ref-config-driverfactory]: /config#options-reference-driver-factory
-[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
+[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)

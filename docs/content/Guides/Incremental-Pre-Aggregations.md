@@ -15,7 +15,7 @@ to significant performance boost.
 <!-- prettier-ignore-start -->
 [[warning | Note]]
 | Since 0.15.0 `incremental` flag is a built-in [pre-aggregations `refreshKey`
-| ](/schema/reference/pre-aggregations#refresh-key) parameter.
+| ](/schema/reference/pre-aggregations#parameters-refresh-key) parameter.
 <!-- prettier-ignore-end -->
 
 As usually there're multiple cubes that require incremental partitions building
