@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import { renderToString } from 'react-dom/server'
 import { graphql } from 'gatsby';
 import { MDXRenderer } from 'gatsby-plugin-mdx';
 import { MDXProvider } from '@mdx-js/react'
@@ -108,10 +109,13 @@ class DocTemplate extends Component<Props, State> {
       this.props.setScrollSectionsAndGithubUrl([], '');
       return;
     }
-
+    const element = <MDXProvider components={components}>
+      <MDXRenderer>{this.props.data.mdx.body}</MDXRenderer>
+    </MDXProvider>
+    const stringElement = renderToString(element)
     // the code below transforms html from markdown to section-based html
     // for normal scrollspy
-    const rawNodes = ReactHtmlParser(html);
+    const rawNodes = ReactHtmlParser(stringElement);
     const sectionTags: Section[] = [
       {
         id: 'top',
