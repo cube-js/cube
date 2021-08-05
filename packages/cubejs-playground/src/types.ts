@@ -7,4 +7,4 @@ export type QueryMemberKey = 'measures' | 'dimensions' | 'timeDimensions';
 export type Credentials = {
   apiUrl: string;
   token: string;
-}
+};
