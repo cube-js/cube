@@ -71,8 +71,8 @@ cube(`Orders`, {
     amountByCreated: {
       type: `rollup`,
       external: true,
-      measureReferences: [totalAmount],
-      timeDimensionReference: createdAt,
+      measures: [totalAmount],
+      timeDimension: createdAt,
       granularity: `month`,
     },
   },

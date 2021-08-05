@@ -34,8 +34,8 @@ cube(`Orders`, {
   preAggregations: {
     amountByCreated: {
       type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
+      measures: [amount],
+      timeDimension: createdAt,
       granularity: `month`,
       refreshKey: {
         sql: `SELECT MAX(created_at) FROM orders`,
@@ -54,8 +54,8 @@ cube(`Orders`, {
   preAggregations: {
     amountByCreated: {
       type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
+      measures: [amount],
+      timeDimension: createdAt,
       granularity: `month`,
       refreshKey: {
         every: `12 hour`,
@@ -85,8 +85,8 @@ cube(`Orders`, {
   preAggregations: {
     amountByCreated: {
       type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
+      measures: [amount],
+      timeDimension: createdAt,
       granularity: `month`,
       scheduledRefresh: true,
     },

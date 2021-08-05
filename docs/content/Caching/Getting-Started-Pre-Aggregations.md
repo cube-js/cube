@@ -108,7 +108,7 @@ cube(`Orders`, {
   preAggregations: {
     orderStatuses: {
       type: `rollup`,
-      dimensionReferences: [status],
+      dimensions: [status],
     },
   },
 });
@@ -136,8 +136,8 @@ cube(`Orders`, {
   preAggregations: {
     ordersByCompletedAt: {
       type: `rollup`,
-      measureReferences: [count],
-      timeDimensionReference: completedAt,
+      measures: [count],
+      timeDimension: completedAt,
       granularity: `month`,
     },
   },
@@ -425,7 +425,7 @@ cube(`LineItems`, {
   preAggregations: {
     myRollup: {
       ...,
-      measureReferences: [ CUBE.countDistinctProducts ],
+      measures: [ CUBE.countDistinctProducts ],
     }
   },
   ...,
