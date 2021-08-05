@@ -134,16 +134,15 @@ As the name suggests, it persists the results of the `sql` property of the cube.
 Pre-aggregations of type `originalSql` should **only** be used when the cube's
 `sql` is a complex query (i.e. nested, window functions and/or multiple joins).
 We **strongly** recommend only persisting results of `originalSql` back to the
-source database.
-They often do not provide much in the way of performance directly, but there are
-two specific applications:
+source database. They often do not provide much in the way of performance
+directly, but there are two specific applications:
 
 1. They can be used in tandem with the
    [`useOriginalSqlPreAggregations`][self-origsql-preaggs] option in other
    rollup pre-aggregations.
 
 2. Situations where it is not possible to use a `rollup` pre-aggregations, such
-   as [funnels][ref-schema-funnels].
+   as [funnels][ref-recipe-funnels].
 
 For example, to pre-aggregate all completed orders, you could do the following:
 
@@ -432,7 +431,6 @@ The value can be one of `hour`, `day`, `week`, `month`, `year`. A
 [`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
-
 
 ### refreshKey
 
@@ -760,8 +758,8 @@ cube(`Orders`, {
 [ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
+[ref-recipe-funnels]: /recipes/funnels
 [ref-sqlalias]: /schema/reference/cube#parameters-sql-alias
-[ref-schema-funnels]: /funnels
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments

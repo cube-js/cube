@@ -30,7 +30,7 @@ Cube.js supports importing JavaScript logic from other files in a schema, so it
 is useful to declare utility functions for handling the above differences in a
 separate file:
 
-[ref-import-export]: /export-import
+[ref-import-export]: /recipes/export-import
 
 ```javascript
 // schema/utils.js
