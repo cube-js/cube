@@ -19,8 +19,8 @@ $ cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
 
 | Parameter                 | Description                                     | Values                                                                                                                  |
 | ------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| -d, --db-type <db-type>   | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto`, `druid` |
-| -t, --template <template> | Framework running Cube.js backend.              | `docker` (default), `express`, `serverless`, `serverless-aws`                                                           |
+| `-d, --db-type <db-type>`   | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto`, `druid` |
+| `-t, --template <template>` | Framework running Cube.js backend.              | `docker` (default), `express`, `serverless`, `serverless-aws`                                                           |
 
 ### Example
 
@@ -88,7 +88,7 @@ $ cubejs generate -t TABLE-NAMES
 
 | Parameter             | Description                                            | Values                      |
 | --------------------- | ------------------------------------------------------ | --------------------------- |
-| -t, --tables <tables> | Comma delimited list of tables to generate schema for. | `TABLE-NAME-1,TABLE-NAME-2` |
+| `-t, --tables <tables>` | Comma delimited list of tables to generate schema for. | `TABLE-NAME-1,TABLE-NAME-2` |
 
 ### Example
 
@@ -104,7 +104,7 @@ The `token` command generates a JWT Cube.js token. It either uses the value of
 the `CUBEJS_API_SECRET` environment variable or provided value with `-s` flag.
 You can only run `token` command from the Cube.js app directory.
 
-_Use these manually generated tokens in production with caution._ <br> _Please
+_Use these manually generated tokens in production with caution._ <br/> _Please
 refer to the [Security Guide](https://cube.dev/docs/security) for production
 security best practices._
 

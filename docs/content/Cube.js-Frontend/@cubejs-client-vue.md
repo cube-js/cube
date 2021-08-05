@@ -64,6 +64,7 @@ API from Cube.js Backend.
 
 ### Example
 <a href="https://codesandbox.io/s/vuejs-query-builder-with-vuejs-forked-5fn8z" target="_blank">Open in CodeSandbox</a>
+
 ```html
 <template>
   <query-builder :cubejs-api="cubejsApi" :query="query">

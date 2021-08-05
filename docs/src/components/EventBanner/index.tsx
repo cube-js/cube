@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import cubejs from '@cubejs-client/core';
 const cubejsApi = cubejs(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjUyNDczNzZ9.fSV2XCFB40j0Jvg1men1syKPFrbKWq8SC-7xqiB_G5I',
-  { apiUrl: 'https://managing-aiea.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1' }
+  { apiUrl: 'https://asleep-raven.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1' }
 );
 const query = {
   filters: [
@@ -68,8 +68,8 @@ const EventBanner = (props) => {
         fontWeight: '500',
         wordSpacing: '2px',
         display: isLoaded ? "block" : "auto",
-        transition:  isLoaded === 'sessionStorage'
-              ? null : 'padding 1s ease-in-out',
+        transition: isLoaded === 'sessionStorage'
+          ? null : 'padding 1s ease-in-out',
       }}
       onMouseEnter={() => setDecoration('underline')}
       onMouseLeave={() => setDecoration('none')}
