@@ -4,7 +4,7 @@ import moment from 'moment';
 import url from 'url';
 
 const cubejsApiUrl = process.env.NODE_ENV === 'production'
-  ? `${window.location.origin}/cubejs-api/v1`
+  ? `https://slack.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1`
   : process.env.REACT_APP_CUBEJS_API;
 
 function getServerUrl(uri) {
