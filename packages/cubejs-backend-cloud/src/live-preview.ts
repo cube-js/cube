@@ -42,7 +42,10 @@ export class LivePreviewWatcher {
   }
 
   public startWatch(): void {
-    if (!this.auth) throw new Error('Auth isn\'t set');
+    if (!this.auth) {
+      throw new Error('Auth isn\'t set');
+    }
+
     if (!this.watcher) {
       this.log('Start with Cube Cloud');
       this.watcher = chokidar.watch(
@@ -84,7 +87,7 @@ export class LivePreviewWatcher {
     let result = {
       lastHashTarget: this.lastHash,
       uploading: this.uploading,
-      active: !!this.watcher,
+      active: Boolean(this.watcher),
     };
 
     if (auth) {
@@ -93,7 +96,9 @@ export class LivePreviewWatcher {
         ...(await this.cubeCloudClient.getStatusDevMode({
           auth,
           lastHash: this.lastHash
-        }))
+        })),
+        deploymentId: auth.deploymentId,
+        url: auth.url
       };
     }
 

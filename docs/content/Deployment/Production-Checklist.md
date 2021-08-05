@@ -11,9 +11,10 @@ deployment.
 ## Disable Development Mode
 
 When running Cube.js in production environments, make sure development mode is
-disabled both on API Instances and Refresh Worker. Running Cube.js in development mode in a production environment can
-lead to security vulnerabilities. You can read more on the differences between
-[production and development mode here][link-cubejs-dev-vs-prod].
+disabled both on API Instances and Refresh Worker. Running Cube.js in
+development mode in a production environment can lead to security
+vulnerabilities. You can read more on the differences between [production and
+development mode here][link-cubejs-dev-vs-prod].
 
 <!-- prettier-ignore-start -->
 [[info | Note]]
@@ -27,9 +28,10 @@ CUBEJS_DEV_MODE=false
 
 ## Set up Refresh Worker
 
-To refresh in-memory cache and [pre-aggregations][ref-pre-aggregations] in the background, we recommend running
-a separate Cube.js Refresh Worker instance. This allows your Cube.js API
-Instance to continue to serve requests with high availability.
+To refresh in-memory cache and [pre-aggregations][ref-schema-ref-preaggs] in the
+background, we recommend running a separate Cube.js Refresh Worker instance.
+This allows your Cube.js API Instance to continue to serve requests with high
+availability.
 
 ```bash
 # Set to true so a Cube.js instance acts as a refresh worker
@@ -38,15 +40,15 @@ CUBEJS_REFRESH_WORKER=true
 
 ## Set up Cube Store
 
-Cube Store is the purpose-built pre-aggregations storage for Cube.js.
-Follow the [instructions here][ref-caching-cubestore] to set it up.
+Cube Store is the purpose-built pre-aggregations storage for Cube.js. Follow the
+[instructions here][ref-caching-cubestore] to set it up.
 
 Depending on your database, Cube.js may need to "stage" pre-aggregations inside
-your database first before ingesting them into Cube Store. In this case, Cube.js will
-require write access to the `prod_pre_aggregations` schema inside your database. The schema name can be modified by the
+your database first before ingesting them into Cube Store. In this case, Cube.js
+will require write access to the `prod_pre_aggregations` schema inside your
+database. The schema name can be modified by the
 `CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable; see the [Environment
 Variables][ref-env-vars-general] page for more details.
-
 
 <!-- prettier-ignore-start -->
 [[info | Note]]
@@ -54,7 +56,6 @@ Variables][ref-env-vars-general] page for more details.
 | a much faster manner. It is currently suppored for BigQuery, Redshift and Snowflake. Check [the relevant documentation for your
 | configured database][ref-config-connect-db-notes] to set it up.
 <!-- prettier-ignore-end -->
-
 
 ## Set up Redis
 
@@ -114,8 +115,6 @@ If you want to run Cube.js in production without Redis, you can use
 | to manage the query queue.
 <!-- prettier-ignore-end -->
 
-
-
 ## Secure the deployment
 
 If you're using JWTs, you can configure Cube.js to correctly decode them and
@@ -145,9 +144,8 @@ deployment's health and be alerted to any issues.
 [link-redis-sentinel]: https://redis.io/topics/sentinel
 [ref-config-connect-db-notes]: /connecting-to-the-database#notes
 [ref-caching-cubestore]: /caching/running-in-production
-[ref-pre-aggregations]: /pre-aggregations#external-pre-aggregations
 [ref-env-vars-general]: /reference/environment-variables#general
-[ref-pre-aggregations]: /pre-aggregations
+[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
 [ref-api-scheduled-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
 [ref-sec-ctx]: /security/context
 [ref-config-jwt]: /config#options-reference-jwt

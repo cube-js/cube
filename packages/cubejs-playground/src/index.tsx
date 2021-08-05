@@ -39,6 +39,13 @@ async function onTokenPayloadChange(payload: Record<string, any>, token) {
   return json.token;
 }
 
+if (
+  window.location.port === '3080' &&
+  window.location.pathname.includes('/playground/live-preview/start')
+) {
+  fetch(window.location.pathname).then(() => window.close());
+}
+
 ReactDOM.render(
   <Router history={history}>
     <AppContextProvider

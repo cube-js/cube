@@ -11,7 +11,7 @@ export type AuthObject = {
 export class CubeCloudClient {
   public constructor(
     protected readonly auth?: AuthObject,
-    protected readonly livePreview?: Boolean
+    protected readonly livePreview?: boolean
   ) {
   }
 

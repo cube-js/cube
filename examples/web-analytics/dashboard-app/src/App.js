@@ -12,7 +12,7 @@ import client from "./graphql/client";
 import Header from "./components/Header";
 import SidePanel from "./components/SidePanel";
 
-const API_URL = process.env.NODE_ENV === 'production' ? 'https://violet-ant.gcp-us-central1.cubecloudapp.dev' : "http://localhost:4000";
+const API_URL = process.env.NODE_ENV === 'production' ? 'https://salmon-fox.gcp-us-central1.cubecloudapp.dev' : "http://localhost:4000";
 const CUBEJS_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1ODE0NzY4MjZ9.31_4J0M0oqqkwtur2_gaX7fhL6vOOLjKk_HvFEZjeq0";
 const cubejsApi = cubejs(CUBEJS_TOKEN, {

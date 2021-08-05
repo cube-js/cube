@@ -141,7 +141,7 @@ The simplest way to do that would be to add the following configuration option t
 `.env` file:
 
 ```
-CUBEJS_SCHEDULED_REFRESH_TIMER=true
+CUBEJS_REFRESH_WORKER=true
 ```
 
 That is the basics we need to know to start configuring pre-aggregations for our example. You

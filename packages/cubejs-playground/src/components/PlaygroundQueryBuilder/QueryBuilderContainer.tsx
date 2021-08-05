@@ -1,4 +1,4 @@
-import { CloudOutlined, LockOutlined } from '@ant-design/icons';
+import { LockOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
@@ -6,18 +6,10 @@ import { useHistory } from 'react-router';
 import styled from 'styled-components';
 
 import { Button } from '../../atoms';
-import {
-  useCubejsApi,
-  useLivePreviewContext,
-  useSecurityContext,
-} from '../../hooks';
-import LivePreviewBar from '../LivePreviewContext/LivePreviewBar';
+import { useCubejsApi, useLivePreviewContext, useSecurityContext } from '../../hooks';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs } from '../QueryTabs/QueryTabs';
-import {
-  PlaygroundQueryBuilder,
-  PlaygroundQueryBuilderProps,
-} from './components/PlaygroundQueryBuilder';
+import { PlaygroundQueryBuilder, PlaygroundQueryBuilderProps } from './components/PlaygroundQueryBuilder';
 
 const StyledCard = styled(Card)`
   border-radius: 0;
@@ -31,8 +23,8 @@ const StyledCard = styled(Card)`
 `;
 
 type QueryBuilderContainerProps = {
-  apiUrl?: string;
-  token?: string;
+  apiUrl: string | null;
+  token: string | null;
 } & Pick<
   PlaygroundQueryBuilderProps,
   | 'defaultQuery'
@@ -79,49 +71,21 @@ export function QueryBuilderContainer({
             query={query}
             sidebar={
               <Space direction="horizontal">
-                <Button.Group>
-                  <Button
-                    data-testid="security-context-btn"
-                    icon={<LockOutlined />}
-                    size="small"
-                    type={securityContextToken ? 'primary' : 'default'}
-                    onClick={() => setIsModalOpen(true)}
-                  >
-                    {securityContextToken ? 'Edit' : 'Add'} Security Context
-                  </Button>
-
-                  {livePreviewContext &&
-                    !livePreviewContext.livePreviewDisabled && (
-                      <Button
-                        data-testid="live-preview-btn"
-                        icon={<CloudOutlined />}
-                        size="small"
-                        type={
-                          livePreviewContext.statusLivePreview.active
-                            ? 'primary'
-                            : 'default'
-                        }
-                        onClick={() =>
-                          livePreviewContext.statusLivePreview.active
-                            ? livePreviewContext.stopLivePreview()
-                            : livePreviewContext.startLivePreview()
-                        }
-                      >
-                        {livePreviewContext.statusLivePreview.active
-                          ? 'Stop'
-                          : 'Start'}{' '}
-                        Live Preview
-                      </Button>
-                    )}
-                </Button.Group>
-
-                {livePreviewContext?.statusLivePreview.active && (
-                  <LivePreviewBar />
-                )}
+                <Button
+                  data-testid="security-context-btn"
+                  icon={<LockOutlined />}
+                  size="small"
+                  type={securityContextToken ? 'primary' : 'default'}
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  {securityContextToken ? 'Edit' : 'Add'} Security Context
+                </Button>
               </Space>
             }
             onTabChange={({ query }) => {
-              push({ search: `?query=${JSON.stringify(query)}` });
+              if (window.location.hash.includes('/build')) {
+                push({ search: `?query=${JSON.stringify(query)}` });
+              }
             }}
           >
             {({ id, query, chartType }, saveTab) => (
