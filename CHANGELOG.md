@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** live preview styles ([#3191](https://github.com/cube-js/cube.js/issues/3191)) ([862ee27](https://github.com/cube-js/cube.js/commit/862ee2761e0e41a2598b16c13d4d8b0e68b8bb29))
+* **cubestore:** proper support for nulls in group by ([922138d](https://github.com/cube-js/cube.js/commit/922138d0c0e294f67aef133b42aeee85070e7a9a))
+* **docs:** change top banner api url & catch network error ([0d600e5](https://github.com/cube-js/cube.js/commit/0d600e5fa8c30cf172704694c4f14f1e91d7074b))
+* **docs:** fix broken image link ([5179071](https://github.com/cube-js/cube.js/commit/5179071c806745a65eaa335dc4a2bef10dd6bb05))
+* **examples:** change invalid api url ([#3194](https://github.com/cube-js/cube.js/issues/3194)) ([d792631](https://github.com/cube-js/cube.js/commit/d79263149ba2bc2127fd8adb041e98c5d7593c05))
+
+
+
+
+
 ## [0.28.13](https://github.com/cube-js/cube.js/compare/v0.28.12...v0.28.13) (2021-08-04)
 
 

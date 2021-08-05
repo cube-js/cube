@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** live preview styles ([#3191](https://github.com/cube-js/cube.js/issues/3191)) ([862ee27](https://github.com/cube-js/cube.js/commit/862ee2761e0e41a2598b16c13d4d8b0e68b8bb29))
+
+
+
+
+
 ## [0.28.13](https://github.com/cube-js/cube.js/compare/v0.28.12...v0.28.13) (2021-08-04)
 
 

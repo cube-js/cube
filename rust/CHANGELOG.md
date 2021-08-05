@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
+
+
+### Bug Fixes
+
+* **cubestore:** proper support for nulls in group by ([922138d](https://github.com/cube-js/cube.js/commit/922138d0c0e294f67aef133b42aeee85070e7a9a))
+
+
+
+
+
 ## [0.28.13](https://github.com/cube-js/cube.js/compare/v0.28.12...v0.28.13) (2021-08-04)
 
 
