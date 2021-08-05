@@ -69,8 +69,6 @@ class Meta {
 
           if (key === 'timeDimensions') {
             members = cube.dimensions.filter((m) => m.type === 'time');
-          } else if (key === 'dimensions') {
-            members = cube.dimensions.filter((m) => m.type !== 'time');
           }
 
           memo[key] = [
