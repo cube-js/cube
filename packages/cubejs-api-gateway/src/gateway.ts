@@ -510,7 +510,6 @@ export class ApiGateway {
           compilerApi.preAggregationsSchema
         );
 
-      console.log({ versionEntriesResult });
       const mergePartitionsAndVersionEntries = () => ({ preAggregation, partitions, ...props }) => ({
         ...props,
         preAggregation,
