@@ -503,29 +503,22 @@ export class ApiGateway {
           query
         );
 
-      const preAggregationVersionEntries = preAggregationPartitions &&
+      const { versionEntriesByTableName, structureVersionsByTableName } = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
           preAggregationPartitions,
           compilerApi.preAggregationsSchema
         );
 
-      const mergePartitionsAndVersionEntries = () => {
-        const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntry) => {
-          if (!obj[versionEntry.table_name]) obj[versionEntry.table_name] = [];
-          obj[versionEntry.table_name].push(versionEntry);
-          return obj;
-        }, {});
-
-        return ({ preAggregation, partitions, ...props }) => ({
-          ...props,
-          preAggregation,
-          partitions: partitions.map(partition => {
-            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql?.tableName] || [];
-            return partition;
-          }),
-        });
-      };
+      const mergePartitionsAndVersionEntries = () => ({ preAggregation, partitions, ...props }) => ({
+        ...props,
+        preAggregation,
+        partitions: partitions.map(partition => {
+          partition.versionEntries = versionEntriesByTableName[partition.sql?.tableName] || [];
+          partition.structureVersion = structureVersionsByTableName[partition.sql?.tableName];
+          return partition;
+        }),
+      });
 
       res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
