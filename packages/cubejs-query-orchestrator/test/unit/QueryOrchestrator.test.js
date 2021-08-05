@@ -733,7 +733,10 @@ describe('QueryOrchestrator', () => {
       requestId: 'save structure versions'
     });
 
-    const versionEntries = await queryOrchestrator.getPreAggregationVersionEntries(
+    const {
+      versionEntriesByTableName,
+      structureVersionsByTableName
+    } = await queryOrchestrator.getPreAggregationVersionEntries(
       [
         {
           preAggregation: {
@@ -757,12 +760,19 @@ describe('QueryOrchestrator', () => {
       'request-id'
     );
 
-    expect(versionEntries.length).toBe(1);
-    expect(versionEntries[0]).toMatchObject({
-      table_name: 'stb_pre_aggregations.orders',
-      content_version: 'mjooke4',
-      structure_version: 'ezlvkhjl',
-      naming_version: 2
+    expect(Object.keys(versionEntriesByTableName).length).toBe(1);
+    expect(versionEntriesByTableName).toMatchObject({
+      'stb_pre_aggregations.orders': [{
+        table_name: 'stb_pre_aggregations.orders',
+        content_version: 'mjooke4',
+        structure_version: 'ezlvkhjl',
+        naming_version: 2
+      }]
+    });
+
+    expect(Object.keys(structureVersionsByTableName).length).toBe(1);
+    expect(structureVersionsByTableName).toMatchObject({
+      'stb_pre_aggregations.orders': 'ezlvkhjl'
     });
   });
 
