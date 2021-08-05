@@ -502,20 +502,21 @@ export class ApiGateway {
           compilerApi,
           query
         );
-
-      const { versionEntriesByTableName, structureVersionsByTableName } = preAggregationPartitions &&
+        
+      const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
           preAggregationPartitions,
           compilerApi.preAggregationsSchema
         );
 
+      console.log({ versionEntriesResult });
       const mergePartitionsAndVersionEntries = () => ({ preAggregation, partitions, ...props }) => ({
         ...props,
         preAggregation,
         partitions: partitions.map(partition => {
-          partition.versionEntries = versionEntriesByTableName[partition.sql?.tableName] || [];
-          partition.structureVersion = structureVersionsByTableName[partition.sql?.tableName];
+          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition.sql?.tableName] || [];
+          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition.sql?.tableName];
           return partition;
         }),
       });
