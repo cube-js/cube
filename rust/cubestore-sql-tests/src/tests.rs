@@ -32,6 +32,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
+        t("group_by_nulls", group_by_nulls),
         t("float_decimal_scale", float_decimal_scale),
         t("float_merge", float_merge),
         t("join", join),
@@ -311,6 +312,31 @@ async fn group_by_decimal(service: Box<dyn SqlClient>) {
                 TableValue::Int(2)
             ])
         ]
+    );
+}
+
+async fn group_by_nulls(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE s.data (id int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.data (id, n) VALUES (NULL, 1), (NULL, 2), (NULL, 3), (1, 1), (2, 2)",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT id, sum(n) from s.data group by 1 order by 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        rows(&[(None, 6), (Some(1), 1), (Some(2), 2)])
     );
 }
 
