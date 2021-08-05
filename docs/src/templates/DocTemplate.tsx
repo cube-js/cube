@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { graphql } from 'gatsby';
 import { MDXRenderer } from 'gatsby-plugin-mdx';
+import { MDXProvider } from '@mdx-js/react'
 import Helmet from 'react-helmet';
 import ReactHtmlParser from 'react-html-parser';
 import { scroller } from 'react-scroll';
@@ -19,6 +20,10 @@ import ScrollLink, {
 
 import * as styles from '../../static/styles/index.module.scss';
 import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
+
+// define components to using in MDX
+import GitHubCodeBlock from "../components/GitHubCodeBlock"
+const components = { GitHubCodeBlock }
 
 const mdContentCallback = () => {
   const accordionTriggers = document.getElementsByClassName(
@@ -66,6 +71,7 @@ class DocTemplate extends Component<Props, State> {
   componentWillMount() {
     const { mdx = {} } = this.props.data;
     const { body, frontmatter } = mdx;
+
     this.props.changePage({
       scope: frontmatter.scope,
       category: renameCategory(frontmatter.category),
@@ -246,12 +252,16 @@ class DocTemplate extends Component<Props, State> {
     const { mdx = {} } = this.props.data;
     const { frontmatter } = mdx;
 
+
     return (
       <div>
         <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
-            <MDXRenderer>{this.props.data.mdx.body}</MDXRenderer>
+            <h1>{frontmatter.title}</h1>
+            <MDXProvider components={components}>
+              <MDXRenderer>{this.props.data.mdx.body}</MDXRenderer>
+            </MDXProvider>
           </div>
         </div>
       </div>
