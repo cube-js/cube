@@ -1,9 +1,11 @@
 ---
 title: Daily, Weekly, Monthly Active Users
-permalink: /active-users
+permalink: /recipes/active-users
 category: Examples & Tutorials
 subCategory: Analytics
-menuOrder: 1    
+menuOrder: 1
+redirect_from:
+  - /active-users
 ---
 
 <!-- prettier-ignore-start -->

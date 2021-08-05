@@ -83,26 +83,22 @@ Have a look at some of demo applications you can build with Cube.js:
 These recipes will show you the best practices of using Cube.js.
 
 ### Analytics
-- [Daily, Weekly, Monthly Active Users](/active-users)
-- [Funnel Analysis](/funnels)
-- [Retention Analysis](/cohort-retention)
-- [Event Analytics](/event-analytics)
+- [Daily, Weekly, Monthly Active Users](/recipes/active-users)
+- [Event Analytics](/recipes/event-analytics)
+- [Funnel Analysis](/recipes/funnels)
+- [Retention Analysis](/recipes/cohort-retention)
 
 ### Data schema
-- [Dynamically Union Tables](/dynamically-union-tables)
-- [Data Blending](/data-blending)
-
-### Queries
-
-- [Pagination](/recipes/pagination)
+- [Dynamically Union Tables](/recipes/dynamically-union-tables)
+- [Data Blending](/recipes/data-blending)
 
 ### Query acceleration
 
-- [Incremental Pre-aggregations](/incremental-pre-aggregations)
+- [Incremental Pre-aggregations](/recipes/incremental-pre-aggregations)
 
 ### Code reusability
 
-- [Export and Import](/export-import)
-- [Extending Cubes](/extending-cubes)
-- [Schema Generation](/schema-generation)
-- [Polymorphic Cubes](/polymorphic-cubes)
+- [Export and Import](/recipes/export-import)
+- [Extending Cubes](/recipes/extending-cubes)
+- [Schema Generation](/recipes/schema-generation)
+- [Polymorphic Cubes](/recipes/polymorphic-cubes)

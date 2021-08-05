@@ -1,9 +1,11 @@
 ---
 title: Dynamically Union Tables
-permalink: /dynamically-union-tables
+permalink: /recipes/dynamically-union-tables
 category: Examples & Tutorials
 subCategory: Data schema
 menuOrder: 5
+redirect_from:
+  - /dynamically-union-tables
 ---
 
 [comment]: # (PROOFREAD: DONE)

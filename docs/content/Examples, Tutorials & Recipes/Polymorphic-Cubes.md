@@ -1,9 +1,11 @@
 ---
 title: Polymorphic Cubes
-permalink: /polymorphic-cubes
+permalink: /recipes/polymorphic-cubes
 category: Examples & Tutorials
 subCategory: Code reusability
 menuOrder: 11
+redirect_from:
+  - /polymorphic-cubes 
 ---
 
 [comment]: # 'PROOFREAD: DONE'

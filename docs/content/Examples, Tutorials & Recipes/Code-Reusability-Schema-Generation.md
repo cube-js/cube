@@ -1,9 +1,11 @@
 ---
 title: 'Code Reusability: Schema Generation'
-permalink: /schema-generation
+permalink: /recipes/schema-generation
 category: Examples & Tutorials
 subCategory: Code reusability
 menuOrder: 10
+redirect_from:
+  - /schema-generation
 ---
 
 Cube.js Schema is Javascript code, which means the full power of this language

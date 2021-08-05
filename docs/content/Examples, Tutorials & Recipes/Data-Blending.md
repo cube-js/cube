@@ -1,9 +1,11 @@
 ---
 title: Data Blending
-permalink: /data-blending
+permalink: /recipes/data-blending
 category: Examples & Tutorials
 subCategory: Data schema
 menuOrder: 6
+redirect_from:
+  - /data-blending
 ---
 
 <!-- prettier-ignore-start -->

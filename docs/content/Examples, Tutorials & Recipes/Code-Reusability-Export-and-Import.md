@@ -1,9 +1,11 @@
 ---
 title: 'Code Reusability: Export and Import'
-permalink: /export-import
+permalink: /recipes/export-import
 category: Examples & Tutorials
 subCategory: Code reusability
 menuOrder: 8
+redirect_from:
+  - /export-import
 ---
 
 [comment]: # (PROOFREAD: DONE)

@@ -1,9 +1,11 @@
 ---
 title: Cohort Retention
-permalink: /cohort-retention
+permalink: /recipes/cohort-retention
 category: Examples & Tutorials
 subCategory: Analytics
 menuOrder: 3
+redirect_from:
+  - /cohort-retention
 ---
 [comment]: # (DOCUMENT IS PROOFREADED, MAKE CHANGES WITH CONFIDENCE)
 

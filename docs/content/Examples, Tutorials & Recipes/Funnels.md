@@ -1,9 +1,11 @@
 ---
 title: Funnels
-permalink: /funnels
+permalink: /recipes/funnels
 category: Examples & Tutorials
 subCategory: Analytics
 menuOrder: 3
+redirect_from:
+  - /funnels
 ---
 
 <!-- prettier-ignore-start -->
