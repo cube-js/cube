@@ -373,34 +373,6 @@ cube('Orders', {
 The value can be one of `hour`, `day`, `week`, `month`, `year`. This property is
 required when using [`timeDimension`][self-timedimension].
 
-### partitionGranularity
-
-The `partitionGranularity` defines the granularity for each
-[partition][ref-caching-partitioning] of the pre-aggregation:
-
-```javascript
-cube('Orders', {
-  sql: `select * from orders`,
-
-  ...,
-
-  preAggregations: {
-    usersRollup: {
-      measures: [CUBE.count],
-      dimensions: [CUBE.status],
-      timeDimension: CUBE.createdAt,
-      granularity: `day`,
-      partitionGranularity: `month`,
-    },
-  },
-});
-```
-
-The value can be one of `hour`, `day`, `week`, `month`, `year`. A
-[`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
-**must** also be included in the pre-aggregation definition. This property is
-required when using [partitioned pre-aggregations][ref-caching-partitioning].
-
 ### segments
 
 The `segments` property is an array of [segments from the
@@ -432,6 +404,35 @@ cube(`Orders`, {
   },
 });
 ```
+
+### partitionGranularity
+
+The `partitionGranularity` defines the granularity for each
+[partition][ref-caching-partitioning] of the pre-aggregation:
+
+```javascript
+cube('Orders', {
+  sql: `select * from orders`,
+
+  ...,
+
+  preAggregations: {
+    usersRollup: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.status],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+    },
+  },
+});
+```
+
+The value can be one of `hour`, `day`, `week`, `month`, `year`. A
+[`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
+**must** also be included in the pre-aggregation definition. This property is
+required when using [partitioned pre-aggregations][ref-caching-partitioning].
+
 
 ### refreshKey
 
