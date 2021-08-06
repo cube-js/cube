@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.15](https://github.com/cube-js/cube.js/compare/v0.28.14...v0.28.15) (2021-08-06)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** do not filter out time dimensions ([#3201](https://github.com/cube-js/cube.js/issues/3201)) ([0300093](https://github.com/cube-js/cube.js/commit/0300093e0af29b87e7a9018dc8159c1299e3cd85))
+* **athena-driver:** Typings for driver (wrong import) ([fe6d429](https://github.com/cube-js/cube.js/commit/fe6d429c8ddf04702401c424143c113e92da0650))
+* **docs:** change invalid api url ([#3205](https://github.com/cube-js/cube.js/issues/3205)) ([0c4aded](https://github.com/cube-js/cube.js/commit/0c4aded2579438d0ed31109cbfe3201805c5ea60))
+* **examples:** change api url ([96d5c04](https://github.com/cube-js/cube.js/commit/96d5c045e8a2431879a7633b9ae5437c6951c340))
+
+
+### Features
+
+* **athena-driver:** Use getWorkGroup instead of SELECT 1 for testConnection ([a99a6e4](https://github.com/cube-js/cube.js/commit/a99a6e4bb5b5dad5558a74683f8618696c1786c0))
+
+
+
+
+
 ## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
 
 
