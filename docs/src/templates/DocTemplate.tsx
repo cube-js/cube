@@ -87,6 +87,7 @@ class DocTemplate extends Component<Props, State> {
 
   componentDidMount() {
     window.Prism && window.Prism.highlightAll();
+    this.setNamesToHeaders();
     this.scrollToHash();
     mdContentCallback();
   }
@@ -104,13 +105,32 @@ class DocTemplate extends Component<Props, State> {
     }, 100);
   };
 
+  setNamesToHeaders() {
+    // hack to work side navigation
+    const h1 = document.body.getElementsByTagName('h1');
+    const h2 = document.body.getElementsByTagName('h2');
+    const h3 = document.body.getElementsByTagName('h3');
+    const headers = [h2, h3];
+
+    console.log(document.body);
+
+    h1?.[0]?.setAttribute('name', 'top');
+
+    headers.forEach((tag, index) => {
+      tag.forEach(header => {
+        console.log(header, index);
+        header.setAttribute('name', kebabCase(header.innerHTML));
+      })
+    })
+  }
+
   createAnchors = (html: string, title: string, githubUrl: string) => {
     if (!html) {
       this.props.setScrollSectionsAndGithubUrl([], '');
       return;
     }
     const element = <MDXProvider components={components}>
-      <MDXRenderer>{this.props.data.mdx.body}</MDXRenderer>
+      <MDXRenderer>{this?.props?.data?.mdx?.body}</MDXRenderer>
     </MDXProvider>
     const stringElement = renderToString(element)
     // the code below transforms html from markdown to section-based html
@@ -229,19 +249,6 @@ class DocTemplate extends Component<Props, State> {
       last(sectionTags)?.nodes?.push(linkedHTag || item);
     });
 
-    const nodes = sectionTags.map((item) => {
-      return React.createElement(
-        'section',
-        {
-          key: item.id,
-          id: item.id,
-          type: item.type,
-          className: item.className,
-        },
-        item.nodes
-      );
-    });
-
     const sections = sectionTags.map((item) => ({
       id: item.id,
       title: item.title,
@@ -249,7 +256,6 @@ class DocTemplate extends Component<Props, State> {
     }));
 
     this.props.setScrollSectionsAndGithubUrl(sections, githubUrl);
-    this.setState({ nodes });
   };
 
   render() {
