@@ -48,14 +48,10 @@ export class RefreshScheduler {
     const baseQuerySql = await compilerApi.getSql(baseQuery);
     const preAggregationDescriptionList = baseQuerySql.preAggregations;
     const preAggregationDescription = preAggregationDescriptionList.find(p => p.preAggregationId === preAggregation.id);
-
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
     const preAggregationsLoadCacheByDataSource = {};
 
-    const preAggregations = [{
-      ...preAggregationDescription,
-      matchedTimeDimensionDateRange: undefined
-    }];
+    const preAggregations = [{ ...preAggregationDescription }];
 
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
       preAggregations,
@@ -99,7 +95,7 @@ export class RefreshScheduler {
         ...preAggregation.references,
         timeDimensions: [{
           ...preAggregation.references.timeDimensions[0],
-          dateRange: []
+          dateRange: null
         }]
       };
     } else if (preAggregation.preAggregation.type === 'rollup') {
