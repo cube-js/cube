@@ -9,27 +9,32 @@ redirect_from:
   - /recipes/extending-cubes
 ---
 
-Cube.js supports the
-[extends feature](/schema/reference/cube#parameters-extends), which allows you
-to reuse all declared members of a cube. This is a foundation for building
-reusable data schemas.
+Cube.js supports the [`extends` feature][ref-schema-ref-cube-extends], which
+allows you to reuse all declared members of a cube. This is a foundation for
+building reusable data schemas.
 
-Cubes in Cube.js are represented as
-[Javascript objects](https://www.w3schools.com/js/js_objects.asp) with such
-properties as measures, dimensions, and segments. Extending in Cube.js works
-similarly to JavaScript’s prototype inheritance. Measures, dimensions, and
-segments are merged as separate objects. So if the base cube defines measure A
-and the extending cube defines measure B, the resulting cube will have both
-measures A and B.
+[Cubes][self-schema-concepts-cubes] are represented as [JavaScript
+objects][mdn-js-objects] with such properties as measures, dimensions, and
+segments. Extending in Cube.js works similarly to JavaScript’s prototype
+inheritance. Measures, dimensions, and segments are merged as separate objects.
+So if the base cube defines measure `A` and the extending cube defines measure
+`B`, the resulting cube will have both measures `A` and `B`.
+
+[self-schema-concepts-cubes]: /schema/fundamentals/concepts#cubes
 
 The usual pattern is to **extract common measures, dimensions, and joins into
 the base cube** and then **extend from the base cube**. This helps to prevent
-code duplication and makes code easier to maintain and refactor. The base cube
-is usually placed into a separate file and excluded from the [context](context)
-for end users.
+code duplication and makes code easier to maintain and refactor.
 
 In the example below, the `BaseEvents` cube defines the common events measures,
-dimensions, and a join to the `Users` cube.
+dimensions, and a join to the `Users` cube:
+
+<!-- prettier-ignore-start -->
+[[info |]]
+| It’s important to use the `${CUBE}` reference instead of the `${BaseEvents}`
+| reference when referencing the extending cube. `${BaseEvents}` would not work
+| in this case, when the cube will be extended.
+<!-- prettier-ignore-end -->
 
 ```javascript
 cube(`BaseEvents`, {
@@ -56,14 +61,6 @@ cube(`BaseEvents`, {
   },
 });
 ```
-
-<div class="block attention-block">
-
-It’s important to use the `${CUBE}` reference instead of the `${BaseEvents}`
-reference when referencing the current cube, which is going to be extended.
-`${BaseEvents}` would not work in this case, when the cube will be extended.
-
-</div>
 
 The `ProductPurchases` and `PageViews` cubes are extended from `BaseEvents` and
 define only the specific dimensions – `productName` for product purchases and
@@ -94,3 +91,7 @@ cube(`PageViews`, {
   },
 });
 ```
+
+[mdn-js-objects]:
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
+[ref-schema-ref-cube-extends]: /schema/reference/cube#parameters-extends

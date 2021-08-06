@@ -9,10 +9,10 @@ redirect_from:
   - /recipes/polymorphic-cubes
 ---
 
-In programming languages, polymorphism usually means **the use of a single
-symbol to represent multiple different types**. It can be quite common for a
-database and application to be designed in such a way that leverages one single
-database table for entities of different types but sharing common traits.
+In programming languages, polymorphism usually means the use of a single symbol
+to represent multiple different types. It can be quite common for a database and
+application to be designed in such a way that leverages a single database table
+for entities of different types that share common traits.
 
 For example, you are working on an online education platform, where teachers
 assign lessons to students. The database can contain only two tables: one for
@@ -35,21 +35,17 @@ has both `teacher_id` and `student_id`, which are actually references to the
 | 101    | 31             | 2              | Division as an Unknown Factor Problem         |
 
 The best way to design such a schema is by using what we call **Polymorphic
-Cubes**. It relies on the [extends](/schema/reference/cube#parameters-extends)
-feature and prevents you from duplicating code, while preserving the correct
-domain logic.
-
-<div class="block help-block">
-<a href="extending-cubes">Learn more about using the extends feature.</a>
-</div>
+Cubes**. It relies on the [`extends`][ref-schema-ref-cubes-extends] feature and
+prevents you from duplicating code, while preserving the correct domain logic.
+Learn more about using [`extends` here][ref-schema-advanced-extend].
 
 The first step is to create a `User` cube, which will act as a base cube for our
 `Teachers` and `Students` cubes and will contain all common measures and
-dimensions.
+dimensions:
 
 ```javascript
 cube(`Users`, {
-  sql: `select * from users`,
+  sql: `SELECT * FROM USERS`,
 
   measures: {
     count: {
@@ -71,25 +67,25 @@ cube(`Users`, {
 });
 ```
 
-Then you can extend the `Teachers` and `Students` cubes from `Users`.
+Then you can extend the `Teachers` and `Students` cubes from `Users`:
 
 ```javascript
 cube(`Teachers`, {
   extends: Users,
-  sql: `select * from ${Users.sql()} where type = 'teacher'`,
+  sql: `SELECT * FROM ${Users.sql()} WHERE type = 'teacher'`,
 });
 
 cube(`Students`, {
   extends: Users,
-  sql: `select * from ${Users.sql()} where type = 'student'`,
+  sql: `SELECT * FROM ${Users.sql()} WHERE type = 'student'`,
 });
 ```
 
-Once we have those cubes, we can define correct joins from the `Lessons` cube.
+Once we have those cubes, we can define correct joins from the `Lessons` cube:
 
 ```javascript
 cube(`Lessons`, {
-  sql: `select * from lessons`,
+  sql: `SELECT * FROM LESSONS`,
 
   joins: {
     Students: {
@@ -103,3 +99,6 @@ cube(`Lessons`, {
   },
 });
 ```
+
+[ref-schema-advanced-extend]: /schema/advanced/extending-cubes
+[ref-schema-ref-cubes-extends]: /schema/reference/cube#parameters-extends
