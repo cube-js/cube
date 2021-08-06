@@ -488,11 +488,7 @@ describe('API Gateway', () => {
             timezones: ['UTC'],
             preAggregations: [
               {
-                id: 'cube.preAggregationName',
-                refreshRange: [
-                  '2020-01-01T00:00:00.000',
-                  '2020-01-01T23:59:59.999'
-                ]
+                id: 'cube.preAggregationName'
               }
             ]
           }
