@@ -45,20 +45,36 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const baseQuery = await this.baseQueryForPreAggregation(compilerApi, preAggregation, queryingOptions);
-    const preAggregationDescriptionList = (await compilerApi.getSql(baseQuery)).preAggregations;
+    const baseQuerySql = await compilerApi.getSql(baseQuery);
+    const preAggregationDescriptionList = baseQuerySql.preAggregations;
     const preAggregationDescription = preAggregationDescriptionList.find(p => p.preAggregationId === preAggregation.id);
 
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
     const preAggregationsLoadCacheByDataSource = {};
+
+    const preAggregations = [{
+      ...preAggregationDescription,
+      matchedTimeDimensionDateRange: undefined
+    }];
+
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
-      preAggregations: [{
-        ...preAggregationDescription,
-      }],
+      preAggregations,
       preAggregationsLoadCacheByDataSource,
       requestId: context.requestId
     });
-    
+
     return partitions.preAggregations.map(partition => ({
+      querySql: {
+        ...baseQuerySql,
+        sql: [
+          baseQuerySql.sql[0],
+          partition.range || []
+        ],
+        preAggregations: [{
+          ...preAggregationDescription,
+          matchedTimeDimensionDateRange: partition.range
+        }]
+      },
       query: {
         ...baseQuery,
         timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
@@ -66,7 +82,7 @@ export class RefreshScheduler {
           dateRange: partition.range
         }]
       },
-      partition
+      sql: partition
     }));
   }
 
@@ -77,7 +93,16 @@ export class RefreshScheduler {
   ) {
     const compilers = await compilerApi.getCompilers();
     const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
-    if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
+    if (preAggregation.preAggregation.partitionGranularity) {
+      return {
+        ...queryingOptions,
+        ...preAggregation.references,
+        timeDimensions: [{
+          ...preAggregation.references.timeDimensions[0],
+          dateRange: []
+        }]
+      };
+    } else if (preAggregation.preAggregation.type === 'rollup') {
       return { ...queryingOptions, ...preAggregation.references };
     } else if (preAggregation.preAggregation.type === 'originalSql') {
       const cubeFromPath = query.cubeEvaluator.cubeFromPath(preAggregation.cube);
@@ -238,15 +263,12 @@ export class RefreshScheduler {
             }
           );
 
-          return queriesForPreAggregation.map(({ query, partition }) => ({
-            ...query,
-            sql: partition
-          }));
+          return queriesForPreAggregation;
         })
       ))
         .reduce((target, source) => [...target, ...source], [])
         .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p.sql?.tableName));
-
+      
       return {
         timezones,
         preAggregation,
@@ -336,11 +358,10 @@ export class RefreshScheduler {
         const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
         if (partitionCursor < queries.length) {
           const queryCursor = queries.length - 1 - partitionCursor;
-          const { query } = queries[queryCursor];
-          const sqlQuery = await compilerApi.getSql(query);
+          const { querySql } = queries[queryCursor];
           return {
-            ...sqlQuery,
-            preAggregations: sqlQuery.preAggregations.map(
+            ...querySql,
+            preAggregations: querySql.preAggregations.map(
               (p) => ({ ...p, priority: preAggregationsWarmup ? 1 : queryCursor - queries.length })
             ),
             continueWait: true,
@@ -401,11 +422,9 @@ export class RefreshScheduler {
 
     Promise.all(preAggregations.map(async (p: any) => {
       const { partitions } = p;
-      return Promise.all(partitions.map(async query => {
-        const sqlQuery = await compilerApi.getSql(query);
-
+      return Promise.all(partitions.map(async ({ querySql, query }) => {
         await orchestratorApi.executeQuery({
-          ...sqlQuery,
+          ...querySql,
           continueWait: true,
           renewQuery: true,
           forceBuildPreAggregations: true,

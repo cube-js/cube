@@ -484,6 +484,14 @@ export class ApiGateway {
     }
   }
 
+  private formatPartitions(partitions) {
+    return partitions.map(({ query, querySql, partition }) => ({
+      ...query,
+      querySql,
+      sql: partition
+    }));
+  }
+
   public async getPreAggregationPartitions(
     { query, context, res }: { query: any, context: RequestContext, res: ResponseResultFn }
   ) {
