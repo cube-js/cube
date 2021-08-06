@@ -93,10 +93,6 @@ These recipes will show you the best practices of using Cube.js.
 - [Dynamically Union Tables](/recipes/dynamically-union-tables)
 - [Data Blending](/recipes/data-blending)
 
-### Query acceleration
-
-- [Incremental Pre-aggregations](/recipes/incremental-pre-aggregations)
-
 ### Code reusability
 
 - [Export and Import](/recipes/export-import)
