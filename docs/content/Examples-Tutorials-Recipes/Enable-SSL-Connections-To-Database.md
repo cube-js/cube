@@ -52,9 +52,9 @@ KmZIuh7+XpXzJ1MN0SBZXgXH
 For a complete list of SSL-related environment variables, consult the [Database
 Connections section of the Environment Variables Reference][ref-env-var].
 
-[ref-config-db-clickhouse]: /connecting-to-the-database#notes-click-house
-[ref-config-db-mongodb]: /connecting-to-the-database#notes-mongo-db
-[ref-config-db-mssql]: /connecting-to-the-database#notes-mssql
-[ref-config-db-mysql]: /connecting-to-the-database#notes-my-sql
-[ref-config-db-postgres]: /connecting-to-the-database#notes-aws-rds-postgres
+[ref-config-db-clickhouse]: /config/databases/clickhouse
+[ref-config-db-mongodb]: /config/databases/mongodb
+[ref-config-db-mssql]: /config/databases/mssql
+[ref-config-db-mysql]: /config/databases/mysql
+[ref-config-db-postgres]: /config/databases/postgres
 [ref-env-var]: /reference/environment-variables#database-connection

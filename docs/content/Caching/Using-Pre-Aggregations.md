@@ -393,12 +393,12 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-config-env-general]: /config#general
 [ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
-[ref-connect-db-athena]: /connecting-to-the-database#notes-aws-athena
-[ref-connect-db-redshift]: /connecting-to-the-database#notes-aws-redshift
-[ref-connect-db-bigquery]: /connecting-to-the-database#notes-google-big-query
-[ref-connect-db-mysql]: /connecting-to-the-database#notes-my-sql
-[ref-connect-db-postgres]: /connecting-to-the-database#notes-aws-rds-postgres
-[ref-connect-db-snowflake]: /connecting-to-the-database#notes-snowflake
+[ref-connect-db-athena]: /config/databases/aws-athena
+[ref-connect-db-redshift]: /config/databases/aws-redshift
+[ref-connect-db-bigquery]: /config/databases/google-bigquery
+[ref-connect-db-mysql]: /config/databases/mysql
+[ref-connect-db-postgres]: /config/databases/postgres
+[ref-connect-db-snowflake]: /config/databases/snowflake
 [ref-schema-timedimension]: /types-and-formats#dimensions-types-time
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-ref-preaggs-refresh-key]:
