@@ -1422,7 +1422,6 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource),
         {
           waitForRenew: queryBody.renewQuery,
-          skipLoadRangeQuery: queryBody.skipLoadRangeQuery,
           requestId: queryBody.requestId,
           externalRefresh: this.externalRefresh
         }

@@ -20,8 +20,7 @@ type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concur
   contextSymbols: {
     securityContext: object,
   };
-  timezones: string[],
-  refreshRange?: [string, string]
+  timezones: string[]
 };
 
 type PreAggregationsQueryingOptions = {
@@ -29,7 +28,6 @@ type PreAggregationsQueryingOptions = {
   timezones: string[],
   preAggregations: {
     id: string,
-    refreshRange?: [string, string],
     partitions?: string[]
   }[]
 };
@@ -55,10 +53,8 @@ export class RefreshScheduler {
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
       preAggregations: [{
         ...preAggregationDescription,
-        matchedTimeDimensionDateRange: queryingOptions.refreshRange
       }],
       preAggregationsLoadCacheByDataSource,
-      skipLoadRangeQuery: !!queryingOptions.refreshRange,
       requestId: context.requestId
     });
     
@@ -222,7 +218,7 @@ export class RefreshScheduler {
 
     return Promise.all(preAggregations.map(async preAggregation => {
       const { timezones } = queryingOptions;
-      const { refreshRange, partitions: partitionsFilter } = preAggregationsQueringOptions[preAggregation.id] || {};
+      const { partitions: partitionsFilter } = preAggregationsQueringOptions[preAggregation.id] || {};
 
       const partitions = (await Promise.all(
         timezones.map(async timezone => {
@@ -236,7 +232,6 @@ export class RefreshScheduler {
               concurrency: undefined,
               workerIndices: undefined,
               timezone,
-              refreshRange,
               contextSymbols: {
                 securityContext: context.securityContext || {},
               }
