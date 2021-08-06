@@ -88,6 +88,10 @@ These recipes will show you the best practices of using Cube.js.
 - [Funnel Analysis](/recipes/funnels)
 - [Retention Analysis](/recipes/cohort-retention)
 
+### Security
+
+- [Enable SSL Connections to the Database](/recipes/enable-ssl-connections-to-database)
+
 ### Data schema
 
 - [Dynamically Union Tables](/recipes/dynamically-union-tables)
