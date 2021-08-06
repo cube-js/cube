@@ -1,14 +1,13 @@
 ---
 title: 'Code Reusability: Export and Import'
-permalink: /recipes/export-import
-category: Examples & Tutorials
-subCategory: Code reusability
-menuOrder: 8
+permalink: /schema/advanced/export-import
+category: Data Schema
+subCategory: Advanced
+menuOrder: 1
 redirect_from:
   - /export-import
+  - /recipes/export-import
 ---
-
-[comment]: # 'PROOFREAD: DONE'
 
 In Cube.js your data schema is a code, and the code is much easier to manage
 when it is in small chunks. It is best practice to **keep files small and
@@ -42,16 +41,20 @@ Later, you can `import` into the cube, wherever needed:
 import { TEST_USER_IDS } from './constants';
 
 cube(`Users`, {
- sql: `...`,
- measures: { /* ... */ },
+  sql: `...`,
+  measures: {
+    /* ... */
+  },
 
- dimensions: { /* ... */ },
+  dimensions: {
+    /* ... */
+  },
 
- segments: {
-   excludeTestUsers: {
-     sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`
-   }
- }
+  segments: {
+    excludeTestUsers: {
+      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(', ')})`,
+    },
+  },
 });
 ```
 

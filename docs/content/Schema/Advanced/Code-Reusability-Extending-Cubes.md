@@ -1,14 +1,13 @@
 ---
 title: 'Code Reusability: Extending Cubes'
-permalink: /recipes/extending-cubes
-category: Examples & Tutorials
-subCategory: Code reusability
-menuOrder: 9
+permalink: /schema/advanced/extending-cubes
+category: Data Schema
+subCategory: Advanced
+menuOrder: 2
 redirect_from:
   - /extending-cubes
+  - /recipes/extending-cubes
 ---
-
-[comment]: # 'PROOFREAD: DONE'
 
 Cube.js supports the
 [extends feature](/schema/reference/cube#parameters-extends), which allows you

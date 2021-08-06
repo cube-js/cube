@@ -1,14 +1,13 @@
 ---
 title: Polymorphic Cubes
-permalink: /recipes/polymorphic-cubes
-category: Examples & Tutorials
-subCategory: Code reusability
-menuOrder: 11
+permalink: /schema/advanced/polymorphic-cubes
+category: Data Schema
+subCategory: Advanced
+menuOrder: 5
 redirect_from:
   - /polymorphic-cubes
+  - /recipes/polymorphic-cubes
 ---
-
-[comment]: # 'PROOFREAD: DONE'
 
 In programming languages, polymorphism usually means **the use of a single
 symbol to represent multiple different types**. It can be quite common for a

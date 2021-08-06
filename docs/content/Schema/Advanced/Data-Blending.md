@@ -1,18 +1,13 @@
 ---
 title: Data Blending
-permalink: /recipes/data-blending
-category: Examples & Tutorials
-subCategory: Data schema
-menuOrder: 6
+permalink: /schema/advanced/data-blending
+category: Data Schema
+subCategory: Advanced
+menuOrder: 3
 redirect_from:
   - /data-blending
+  - /recipes/data-blending
 ---
-
-<!-- prettier-ignore-start -->
-[[info | ]]
-| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/). 
-| We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/data-blending-cube/).
-<!-- prettier-ignore-end -->
 
 In case you want to plot two measures from different cubes on one chart or
 create a calculated measure based on it you need to create a join between these
