@@ -29,7 +29,9 @@ class AthenaDriver extends BaseDriver {
   }
 
   async testConnection() {
-    return this.query('SELECT 1', []);
+    await this.athena.getWorkGroup({
+      WorkGroup: 'primary'
+    });
   }
 
   async awaitForJobStatus(QueryExecutionId, query, options) {
