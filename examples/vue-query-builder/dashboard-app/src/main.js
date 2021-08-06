@@ -17,7 +17,7 @@ const apolloProvider = new VueApollo({
   defaultClient: apolloClient
 });
 
-const API_URL = 'https://ecom.cubecloudapp.dev';
+const API_URL = 'https://awesome-ecom.gcp-us-central1.cubecloudapp.dev';
 const CUBEJS_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjY4OTR9.0fdi5cuDZ2t3OSrPOMoc3B1_pwhnWj4ZmM3FHEX7Aus';
 const cubejsApi = cubejs(CUBEJS_TOKEN, {

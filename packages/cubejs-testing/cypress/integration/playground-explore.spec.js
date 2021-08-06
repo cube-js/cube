@@ -81,7 +81,7 @@ context('Playground: Explore Page', () => {
       cy.getByTestId('live-preview-btn').should('exist');
     });
 
-    it('does now show Live Preview button when livePreview is disabled', () => {
+    it('does now show the Live Preview button when livePreview is disabled', () => {
       cy.intercept('get', '/playground/context', (req) => {
         delete req.headers['if-none-match'];
 

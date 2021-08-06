@@ -1,10 +1,11 @@
 ---
 title: Incremental Pre-aggregations
-permalink: /incremental-pre-aggregations
-scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 25
+permalink: /recipes/incremental-pre-aggregations
+category: Examples & Tutorials
+subCategory: Query acceleration
+menuOrder: 7
+redirect_from:
+  - /incremental-pre-aggregations
 ---
 
 When you use partitioned rollups on immutable data there's an opportunity to
@@ -15,7 +16,7 @@ to significant performance boost.
 <!-- prettier-ignore-start -->
 [[warning | Note]]
 | Since 0.15.0 `incremental` flag is a built-in [pre-aggregations `refreshKey`
-| ](/schema/reference/pre-aggregations#refresh-key) parameter.
+| ](/schema/reference/pre-aggregations#parameters-refresh-key) parameter.
 <!-- prettier-ignore-end -->
 
 As usually there're multiple cubes that require incremental partitions building

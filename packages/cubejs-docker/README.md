@@ -2,7 +2,7 @@
 
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) •
 [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) •
-[Twitter](https://twitter.com/thecubejs)
+[Discourse](https://forum.cube.dev/) • [Twitter](https://twitter.com/thecubejs)
 
 # Supported tags and respective `Dockerfile` links
 

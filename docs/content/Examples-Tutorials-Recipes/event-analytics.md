@@ -1,9 +1,11 @@
 ---
 title: Event Analytics
-permalink: /event-analytics
-category: Reference
-subCategory: Tutorials
-menuOrder: 12
+permalink: /recipes/event-analytics
+category: Examples & Tutorials
+subCategory: Analytics
+menuOrder: 2
+redirect_from:
+  - /event-analytics
 ---
 
 [comment]: # 'DOCUMENT IS PROOFREADED, MAKE CHANGES WITH CONFIDENCE'

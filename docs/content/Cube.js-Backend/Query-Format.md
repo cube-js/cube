@@ -19,7 +19,7 @@ ex: `Stories.time.month`.
 Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`.
 
 The Cube.js client also accepts an array of queries. By default it will be
-treated as a [Data Blending](/data-blending) query.
+treated as a [Data Blending](/recipes/data-blending) query.
 
 ## Query Properties
 

@@ -1,16 +1,22 @@
-import { createContext, useState, useEffect, useRef } from 'react';
+import { createContext, useState, useEffect, useRef, ReactNode } from 'react';
 
-type LivePreviewStatus = {
-  deploymentUrl: string | null;
-  active: boolean;
-  lastHash: string;
+import { openWindow } from '../../shared/helpers';
+import { Credentials } from '../../types';
+
+export type LivePreviewStatus = {
   lastHashTarget: string;
-  loading: boolean;
-  status: 'loading' | 'inProgress' | 'running';
   uploading: boolean;
+  active: boolean;
+  deploymentUrl?: string | null;
+  lastHash?: string;
+  loading?: boolean;
+  status?: 'loading' | 'inProgress' | 'running';
+  deploymentId?: number;
+  url?: string;
 };
 
-export type TLivePreviewContextProps = {
+export type LivePreviewContextProps = {
+  credentials: Credentials | null;
   livePreviewDisabled: Boolean;
   statusLivePreview: LivePreviewStatus;
   createTokenWithPayload: (payload) => Promise<any>;
@@ -19,10 +25,11 @@ export type TLivePreviewContextProps = {
 };
 
 export const LivePreviewContextContext =
-  createContext<TLivePreviewContextProps | null>(null);
+  createContext<LivePreviewContextProps | null>(null);
 
-const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
+const useLivePreview = (disabled = false) => {
   const activeRef = useRef<boolean>(false);
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [status, setStatus] = useState<any>({
     loading: true,
     active: false,
@@ -37,11 +44,17 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
     const statusPoolingInterval = setInterval(() => {
       fetchStatus();
     }, 5000);
+
     fetchStatus();
+
     return () => {
       clearInterval(statusPoolingInterval);
     };
   }, []);
+
+  // useEffect(() => {
+  //   handleChange();
+  // }, []);
 
   useEffect(() => {
     if (!status.loading && activeRef.current !== status.active) {
@@ -49,6 +62,12 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
     }
     activeRef.current = status.active;
   }, [activeRef, status.active, status.loading]);
+
+  // useEffect(() => {
+  //   if (!status.loading && status.active) {
+  //     handleChange();
+  //   }
+  // }, [status]);
 
   const fetchStatus = () => {
     return fetch('/playground/live-preview/status')
@@ -75,16 +94,17 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
   const handleChange = async () => {
     if (status?.active) {
       const { token } = await createTokenWithPayload({});
-      onChange({
-        token: token?.token,
-        apiUrl: status?.deploymentUrl,
+      setCredentials({
+        token: token?.token || null,
+        apiUrl: status?.deploymentUrl || null,
       });
     } else {
-      onChange({});
+      setCredentials(null);
     }
   };
 
   return {
+    credentials,
     statusLivePreview: status,
     createTokenWithPayload,
     stopLivePreview: async (): Promise<Boolean> => {
@@ -98,13 +118,12 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
         const params: any =
           window.location.origin !== 'http://localhost:4000' &&
           new URLSearchParams({ callbackUrl }).toString();
-        const wn = window.open(
-          `https://cubecloud.dev/auth/live-preview${
+
+        const wn = openWindow({
+          url: `https://cubecloud.dev/auth/live-preview${
             params ? `?${params}` : ''
           }`,
-          '',
-          `width=640,height=720`
-        );
+        });
 
         if (!wn) {
           console.error('The popup was blocked by the browser');
@@ -124,12 +143,16 @@ const useLivePreview = (disabled = false, onChange = ({}) => {}) => {
   };
 };
 
+type LivePreviewContextProviderProps = {
+  disabled: boolean;
+  children: ReactNode;
+};
+
 export function LivePreviewContextProvider({
   disabled = false,
-  onChange,
   children,
-}) {
-  const devModeHooks = useLivePreview(disabled, onChange);
+}: LivePreviewContextProviderProps) {
+  const devModeHooks = useLivePreview(disabled);
 
   return (
     <LivePreviewContextContext.Provider

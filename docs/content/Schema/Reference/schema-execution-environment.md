@@ -121,12 +121,11 @@ cubes and cube members. There are reserved property names inside `cube`
 definition that undergo reference resolve transpiling process:
 
 - `sql`
-- `measureReferences`
-- `dimensionReferences`
-- `segmentReferences`
-- `timeDimensionReference`
+- `measures`
+- `dimensions`
+- `segments`
+- `timeDimension`
 - `drillMembers`
-- `drillMemberReferences`
 - `contextMembers`
 
 Each of these properties inside `cube` and `context` definitions are transpiled

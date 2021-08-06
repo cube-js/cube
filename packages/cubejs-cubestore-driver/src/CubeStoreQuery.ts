@@ -78,6 +78,10 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public hllMerge(sql) {
+    return `merge(${sql})`;
+  }
+
+  public hllCardinalityMerge(sql) {
     return `cardinality(merge(${sql}))`;
   }
 

@@ -78,8 +78,8 @@ cube(`SalesManagers`, {
 });
 ```
 
-Sub query requires you to reference at least one measure in the definition.
-Generally speaking all measures involved in defining particular sub query dimension should be defined as measures first and then referenced from a sub query dimension.
+A subquery requires referencing at least one measure in the definition.
+Generally speaking all measures involved in defining particular subquery dimension should be defined as measures first and then referenced from a subquery dimension.
 For example the following schema **will not work**:
 
 ```javascript
@@ -130,9 +130,10 @@ cube(`SalesManagers`, {
 
 ## Under the hood
 
-Based on sub query dimension definition, Cube.js will create a query that will include primary key dimension of main cube and all measures and dimensions included in sql definition of sub query dimension.
+Based on the subquery dimension definition, Cube.js will create a query that will include the primary key dimension of the main cube and all measures and dimensions included in the SQL definition of the subquery dimension.
+
 This query will be joined as a left join to the main SQL query.
-For example for `SalesManagers.dealsAmount` sub query dimension following query will be generated:
+For example, when using the `SalesManagers.dealsAmount` subquery dimension, the following query will be generated:
 
 ```javascript
 {

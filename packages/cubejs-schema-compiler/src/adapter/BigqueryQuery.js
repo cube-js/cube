@@ -64,9 +64,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forSelect = this.dateSeriesSelect().concat(
-      this.dimensions.concat(cumulativeMeasures).map(s => s.cumulativeSelectColumns())
-    ).filter(c => !!c).join(', ');
+    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     const outerSeriesAlias = this.cubeAlias('outer_series');
     const outerBase = this.cubeAlias('outer_base');
     const timeDimensionAlias = this.timeDimensions.map(d => d.aliasName()).filter(d => !!d)[0];

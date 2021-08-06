@@ -8,6 +8,7 @@ pub mod serialized_plan;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
+mod datetime;
 mod now;
 pub mod udfs;
 
@@ -244,6 +245,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
             "now" | "NOW" => CubeScalarUDFKind::Now,
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
+            "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));

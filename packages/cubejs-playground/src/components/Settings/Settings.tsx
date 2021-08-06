@@ -19,7 +19,8 @@ export default function Settings({
   isQueryPresent,
 }) {
   const [limit, setLimit] = useState<number>(initialLimit);
-  const [isLimitPopoverVisible, setIsLimitPopoverVisible] = useState<boolean>(false);
+  const [isLimitPopoverVisible, setIsLimitPopoverVisible] =
+    useState<boolean>(false);
 
   return (
     <>
@@ -52,7 +53,12 @@ export default function Settings({
 
       <Popover
         content={
-          <div style={{ padding: '8px' }}>
+          <div
+            style={{
+              padding: '8px',
+              paddingBottom: 1,
+            }}
+          >
             <OrderGroup
               orderMembers={orderMembers}
               onReorder={onReorder}

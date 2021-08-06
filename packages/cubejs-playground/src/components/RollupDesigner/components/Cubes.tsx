@@ -13,11 +13,7 @@ type CubesProps = {
 
 const MEMBER_TYPES = ['measures', 'dimensions', 'timeDimensions'];
 
-export function Cubes({
-  selectedKeys,
-  membersByCube,
-  onSelect,
-}: CubesProps) {
+export function Cubes({ selectedKeys, membersByCube, onSelect }: CubesProps) {
   const defaultOpenKeys = selectedKeys.map((key) => key.split('.')[0]);
 
   return (
@@ -39,13 +35,22 @@ export function Cubes({
             {MEMBER_TYPES.map((memberType) => {
               return (
                 <Menu.ItemGroup key={memberType} title={ucfirst(memberType)}>
-                  {cube[memberType].map((member) => {
-                    return (
-                      <Menu.Item key={member.name} data-membertype={memberType}>
-                        {member.title}
-                      </Menu.Item>
-                    );
-                  })}
+                  {cube[memberType]
+                    .filter((member) => {
+                      return !(
+                        memberType === 'dimensions' && member.type === 'time'
+                      );
+                    })
+                    .map((member) => {
+                      return (
+                        <Menu.Item
+                          key={member.name}
+                          data-membertype={memberType}
+                        >
+                          {member.title}
+                        </Menu.Item>
+                      );
+                    })}
                 </Menu.ItemGroup>
               );
             })}

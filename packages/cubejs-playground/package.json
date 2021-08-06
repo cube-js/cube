@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.7",
+  "version": "0.28.14",
   "engines": {},
   "repository": {
     "type": "git",
@@ -11,6 +11,7 @@
   "module": "lib/index.js",
   "types": "lib/playground/index.d.ts",
   "scripts": {
+    "dev": "kill-port 3080 && yarn start",
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
     "build": "yarn run build:playground && rollup -c",
@@ -32,8 +33,8 @@
   "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.28.6",
-    "@cubejs-client/react": "^0.28.7",
+    "@cubejs-client/core": "^0.28.10",
+    "@cubejs-client/react": "^0.28.10",
     "camel-case": "^4.1.2",
     "codesandbox-import-utils": "^2.1.1",
     "customize-cra": "^1.0.0",
@@ -67,7 +68,8 @@
     "@ant-design/compatible": "^1.0.2",
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
-    "@rollup/plugin-typescript": "^8.2.3",
+    "@rollup/plugin-commonjs": "^20.0.0",
+    "@rollup/plugin-typescript": "^8.2.5",
     "@types/jest": "^26.0.20",
     "@types/node": "^14.14.35",
     "@types/react": "^17.0.3",
@@ -93,7 +95,8 @@
     "rollup-plugin-postcss": "^4.0.0",
     "rollup-plugin-svg": "^2.0.0",
     "styled-components": "5.2.0",
-    "terser-webpack-plugin": "^4.1.0"
+    "tslib": "^2.3.0",
+    "typescript": "^4.3.5"
   },
   "peerDependencies": {
     "antd": ">=4.13.0",
