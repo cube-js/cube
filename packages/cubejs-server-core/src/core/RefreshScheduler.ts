@@ -59,13 +59,8 @@ export class RefreshScheduler {
       requestId: context.requestId
     });
 
-    return partitions.preAggregations.map(partition => ({
+    return Promise.all(partitions.preAggregations.map(async partition => ({
       querySql: {
-        ...baseQuerySql,
-        sql: [
-          baseQuerySql.sql[0],
-          partition.range || []
-        ],
         preAggregations: [{
           ...preAggregationDescription,
           matchedTimeDimensionDateRange: partition.range
@@ -79,7 +74,7 @@ export class RefreshScheduler {
         }]
       },
       sql: partition
-    }));
+    })));
   }
 
   protected async baseQueryForPreAggregation(
