@@ -61,6 +61,7 @@ export class RefreshScheduler {
 
     return Promise.all(partitions.preAggregations.map(async partition => ({
       querySql: {
+        ...baseQuerySql,
         preAggregations: [{
           ...preAggregationDescription,
           matchedTimeDimensionDateRange: partition.range
