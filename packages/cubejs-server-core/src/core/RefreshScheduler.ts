@@ -84,16 +84,7 @@ export class RefreshScheduler {
   ) {
     const compilers = await compilerApi.getCompilers();
     const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
-    if (preAggregation.preAggregation.partitionGranularity) {
-      return {
-        ...queryingOptions,
-        ...preAggregation.references,
-        timeDimensions: [{
-          ...preAggregation.references.timeDimensions[0],
-          dateRange: null
-        }]
-      };
-    } else if (preAggregation.preAggregation.type === 'rollup') {
+    if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
       return { ...queryingOptions, ...preAggregation.references };
     } else if (preAggregation.preAggregation.type === 'originalSql') {
       const cubeFromPath = query.cubeEvaluator.cubeFromPath(preAggregation.cube);
