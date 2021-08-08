@@ -36,6 +36,22 @@ describe('PreAggregations', () => {
           type: 'sum'
         },
         
+        checkinsRollingTotal: {
+          sql: \`\${checkinsCount}\`,
+          type: 'sum',
+          rollingWindow: {
+            trailing: 'unbounded'
+          }
+        },
+        
+        checkinsRolling2day: {
+          sql: \`\${checkinsCount}\`,
+          type: 'sum',
+          rollingWindow: {
+            trailing: '2 day'
+          }
+        },
+        
         uniqueSourceCount: {
           sql: 'source',
           type: 'countDistinct'
@@ -167,6 +183,14 @@ describe('PreAggregations', () => {
           timeDimensionReference: createdAt,
           granularity: 'hour',
           partitionGranularity: 'hour'
+        },
+        partitionedRolling: {
+          type: 'rollup',
+          measureReferences: [checkinsRollingTotal, checkinsRolling2day],
+          dimensionReferences: [source],
+          timeDimensionReference: createdAt,
+          granularity: 'hour',
+          partitionGranularity: 'month'
         },
       }
     })
@@ -1027,6 +1051,141 @@ describe('PreAggregations', () => {
             visitors__created_at_hour: '2017-01-05T00:00:00.000Z',
             visitors__checkins_total: '2'
           }
+        ]
+      );
+    });
+  }));
+
+  it('partitioned rolling', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.checkinsRollingTotal',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'UTC',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-02', '2017-01-05']
+      }],
+      order: [{
+        id: 'visitors.createdAt'
+      }, {
+        id: 'visitors.source'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            visitors__source: null,
+            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors__checkins_rolling_total: '0'
+          },
+          {
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+            visitors__checkins_rolling_total: '3'
+          },
+          {
+            visitors__source: null,
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+            visitors__checkins_rolling_total: '0'
+          },
+          {
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors__checkins_rolling_total: '3'
+          },
+          {
+            visitors__source: null,
+            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors__checkins_rolling_total: '0'
+          },
+          {
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__checkins_rolling_total: '5'
+          },
+          {
+            visitors__source: null,
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__checkins_rolling_total: '0'
+          },
+        ]
+      );
+    });
+  }));
+
+  it('partitioned rolling 2 day', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.checkinsRolling2day',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'UTC',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-02', '2017-01-05']
+      }],
+      order: [{
+        id: 'visitors.createdAt'
+      }, {
+        id: 'visitors.source'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            visitors__source: null,
+            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors__checkins_rolling2day: null
+          },
+          {
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+            visitors__checkins_rolling2day: '3'
+          },
+          {
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors__checkins_rolling2day: '3'
+          },
+          {
+            visitors__source: 'some',
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__checkins_rolling2day: '2'
+          },
         ]
       );
     });

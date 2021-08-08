@@ -1,10 +1,11 @@
 ---
 title: 'Code Reusability: Extending Cubes'
-permalink: /extending-cubes
-scope: cubejs
-category: Guides
-subCategory: Tutorials
-menuOrder: 21
+permalink: /recipes/extending-cubes
+category: Examples & Tutorials
+subCategory: Code reusability
+menuOrder: 9
+redirect_from:
+  - /extending-cubes
 ---
 
 [comment]: # 'PROOFREAD: DONE'

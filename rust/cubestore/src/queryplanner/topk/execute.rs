@@ -543,6 +543,7 @@ impl TopKState<'_> {
                 AggregateMode::Final,
                 &g.group_key,
                 &g.accumulators,
+                &schema.fields()[..self.key_len],
                 &mut key_columns,
                 &mut value_columns,
             )?

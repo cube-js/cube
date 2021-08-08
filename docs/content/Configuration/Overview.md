@@ -10,9 +10,6 @@ ways you can set configuration options; via [a configuration file][link-config],
 commonly known as the `cube.js` file, and [environment
 variables][link-env-vars].
 
-[link-config]: /config
-[link-env-vars]: /reference/environment-variables
-
 <!-- prettier-ignore-start -->
 [[info |]]
 | When using Docker, ensure that the `cube.js` configuration file and your
@@ -40,9 +37,6 @@ mode does the following:
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors
 
-[link-scheduled-refresh]: /schema/reference/pre-aggregations#scheduled-refresh
-[link-dev-playground]: /dev-tools/dev-playground
-
 ## Configuring CORS
 
 The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API
@@ -62,8 +56,6 @@ module.exports = {
 Please consult the Configuration Reference [for more
 options][link-config-cors-opts].
 
-[link-config-cors-opts]: /config#options-reference-http
-
 ## Migrating from Express to Docker
 
 Since [`v0.23`][link-v-023-release], Cube.js CLI uses the `docker` template
@@ -71,8 +63,6 @@ instead of `express` as a default for project creation, and it is the
 recommended route for production. To migrate you should move all Cube.js
 dependencies in `package.json` to `devDependencies` and leave dependencies that
 you use to configure Cube.js in `dependencies`.
-
-[link-v-023-release]: https://github.com/cube-js/cube.js/releases/tag/v0.23.0
 
 For example, your existing `package.json` might look something like:
 
@@ -170,3 +160,11 @@ module.exports = {
     `pre_aggregations_${securityContext.userId}`,
 };
 ```
+
+[link-config]: /config
+[link-config-cors-opts]: /config#options-reference-http
+[link-dev-playground]: /dev-tools/dev-playground
+[link-env-vars]: /reference/environment-variables
+[link-scheduled-refresh]:
+  /schema/reference/pre-aggregations#parameters-scheduled-refresh
+[link-v-023-release]: https://github.com/cube-js/cube.js/releases/tag/v0.23.0

@@ -1,14 +1,16 @@
-import { Link } from 'react-router-dom';
 import Icon, {
   FileFilled,
   MenuOutlined,
   SlackOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Layout, Menu } from 'antd';
-import styled from 'styled-components';
 import { useMediaQuery } from 'react-responsive';
+import { Link } from 'react-router-dom';
+import styled from 'styled-components';
 
-import { DiscourseIcon } from '../shared/icons/DiscourseIcon';
+import { DiscourseIcon } from '../../shared/icons/DiscourseIcon';
+import { StyledMenu, StyledMenuButton, StyledMenuItem } from './Menu';
+import { RunOnCubeCloud } from './RunOnCubeCloud';
 
 const StyledHeader = styled(Layout.Header)`
   && {
@@ -20,81 +22,7 @@ const StyledHeader = styled(Layout.Header)`
   }
 `;
 
-const StyledMenu = styled(Menu)`
-  && {
-    background: transparent;
-    border-bottom: 0;
-  }
-`;
-
-const StyledMenuItem = styled(Menu.Item)`
-  &&& {
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 48px;
-    height: 49px;
-    & > a {
-      &,
-      &:hover {
-        opacity: 0.6;
-        color: white;
-      }
-    }
-    &.ant-menu-item-selected,
-    &.ant-menu-item-active {
-      color: white;
-      border-bottom: 2px solid white;
-
-      &:hover {
-        border-bottom: 2px solid white;
-      }
-
-      a {
-        opacity: 1;
-        color: white;
-      }
-    }
-
-    &:not(.ant-menu-item-selected) {
-      &.ant-menu-item-active,
-      &:hover {
-        color: white;
-        border-bottom: 2px solid white;
-      }
-    }
-  }
-`;
-
-type TStyledMenuButtonProps = {
-  noMargin?: boolean;
-};
-
-const StyledMenuButton = styled.a<TStyledMenuButtonProps>`
-  &&& {
-    float: right;
-    height: 32px;
-    margin: 8px ${(props) => (props.noMargin ? '0' : '8px')};
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    color: white;
-    transition: all 0.25s ease;
-    padding: 0 10px;
-
-    span {
-      font-size: 14px;
-      margin-right: 10px;
-    }
-
-    &:hover {
-      border-color: white;
-      color: white;
-    }
-  }
-`;
-
-const Header = ({ selectedKeys }) => {
+export default function Header({ selectedKeys }) {
   const isDesktopOrLaptop = useMediaQuery({
     query: '(min-device-width: 992px)',
   });
@@ -112,6 +40,7 @@ const Header = ({ selectedKeys }) => {
           alt=""
         />
       </div>
+
       {isDesktopOrLaptop && (
         <StyledMenu theme="light" mode="horizontal" selectedKeys={selectedKeys}>
           <StyledMenuItem key="/build">
@@ -153,8 +82,11 @@ const Header = ({ selectedKeys }) => {
             <FileFilled />
             Docs
           </StyledMenuButton>
+
+          <RunOnCubeCloud />
         </StyledMenu>
       )}
+
       {isMobileOrTable && (
         <div style={{ float: 'right' }}>
           <Dropdown
@@ -178,6 +110,4 @@ const Header = ({ selectedKeys }) => {
       )}
     </StyledHeader>
   );
-};
-
-export default Header;
+}

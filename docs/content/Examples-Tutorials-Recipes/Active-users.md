@@ -1,9 +1,11 @@
 ---
 title: Daily, Weekly, Monthly Active Users
-permalink: /active-users
-category: Reference
-subCategory: Tutorials
-menuOrder: 14
+permalink: /recipes/active-users
+category: Examples & Tutorials
+subCategory: Analytics
+menuOrder: 1
+redirect_from:
+  - /active-users
 ---
 
 <!-- prettier-ignore-start -->
@@ -39,7 +41,6 @@ The example below should work in Redshift and BigQuery. The exact interval liter
 ```javascript
 cube(`ActiveUsers`, {
   sql: `select id, user_id, timestamp from events`,
-
   measures: {
     monthlyActiveUsers: {
       sql: `user_id`,
@@ -49,7 +50,6 @@ cube(`ActiveUsers`, {
         offset: `start`,
       },
     },
-
     weeklyActiveUsers: {
       sql: `user_id`,
       type: `countDistinct`,
@@ -58,7 +58,6 @@ cube(`ActiveUsers`, {
         offset: `start`,
       },
     },
-
     dailyActiveUsers: {
       sql: `user_id`,
       type: `countDistinct`,
@@ -68,7 +67,6 @@ cube(`ActiveUsers`, {
       },
     },
   },
-
   dimensions: {
     timestamp: {
       sql: `timestamp`,

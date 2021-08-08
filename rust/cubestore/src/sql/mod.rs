@@ -1322,7 +1322,7 @@ mod tests {
                             join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String(uuid), TableValue::Int(i)]))
                         }
                     } else {
-                        join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String("".to_string()), TableValue::Int(i)]))
+                        join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::Null, TableValue::Int(i)]))
                     }
                 }
 

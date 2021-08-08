@@ -1,4 +1,4 @@
-use crate::rows::rows;
+use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -32,6 +32,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
+        t("group_by_nulls", group_by_nulls),
         t("float_decimal_scale", float_decimal_scale),
         t("float_merge", float_merge),
         t("join", join),
@@ -311,6 +312,31 @@ async fn group_by_decimal(service: Box<dyn SqlClient>) {
                 TableValue::Int(2)
             ])
         ]
+    );
+}
+
+async fn group_by_nulls(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE s.data (id int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.data (id, n) VALUES (NULL, 1), (NULL, 2), (NULL, 3), (1, 1), (2, 2)",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT id, sum(n) from s.data group by 1 order by 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        rows(&[(None, 6), (Some(1), 1), (Some(2), 2)])
     );
 }
 
@@ -2672,57 +2698,146 @@ async fn float_index(service: Box<dyn SqlClient>) {
 }
 
 async fn date_add(service: Box<dyn SqlClient>) {
+    let check_fun = |name, t, i, expected| {
+        let expected = timestamp_from_string(expected).unwrap();
+        let service = &service;
+        async move {
+            let actual = service
+                .exec_query(&format!(
+                    "SELECT {}(CAST('{}' as TIMESTAMP), INTERVAL '{}')",
+                    name, t, i
+                ))
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&actual), rows(&[expected]));
+        }
+    };
+    let check_adds_to = |t, i, expected| check_fun("DATE_ADD", t, i, expected);
+    let check_subs_to = |t, i, expected| check_fun("DATE_SUB", t, i, expected);
+
+    check_adds_to("2021-01-01T00:00:00Z", "1 second", "2021-01-01T00:00:01Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 minute", "2021-01-01T00:01:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 hour", "2021-01-01T01:00:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 day", "2021-01-02T00:00:00Z").await;
+
+    check_adds_to(
+        "2021-01-01T00:00:00Z",
+        "1 day 1 hour 1 minute 1 second",
+        "2021-01-02T01:01:01Z",
+    )
+    .await;
+    check_subs_to(
+        "2021-01-02T01:01:01Z",
+        "1 day 1 hour 1 minute 1 second",
+        "2021-01-01T00:00:00Z",
+    )
+    .await;
+
+    check_adds_to("2021-01-01T00:00:00Z", "1 month", "2021-02-01T00:00:00Z").await;
+
+    check_adds_to("2021-01-01T00:00:00Z", "1 year", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 year", "2021-01-01T00:00:00Z").await;
+
+    check_adds_to("2021-01-01T00:00:00Z", "13 month", "2022-02-01T00:00:00Z").await;
+    check_subs_to("2022-02-01T00:00:00Z", "13 month", "2021-01-01T00:00:00Z").await;
+
+    check_adds_to("2021-01-01T23:59:00Z", "1 minute", "2021-01-02T00:00:00Z").await;
+    check_subs_to("2021-01-02T00:00:00Z", "1 minute", "2021-01-01T23:59:00Z").await;
+
+    check_adds_to("2021-12-01T00:00:00Z", "1 month", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 month", "2021-12-01T00:00:00Z").await;
+
+    check_adds_to("2021-12-31T00:00:00Z", "1 day", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 day", "2021-12-31T00:00:00Z").await;
+
+    // Feb 29 on leap and non-leap years.
+    check_adds_to("2020-02-29T00:00:00Z", "1 day", "2020-03-01T00:00:00Z").await;
+    check_subs_to("2020-03-01T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
+
+    check_adds_to("2020-02-28T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-02-29T00:00:00Z", "1 day", "2020-02-28T00:00:00Z").await;
+
+    check_adds_to("2021-02-28T00:00:00Z", "1 day", "2021-03-01T00:00:00Z").await;
+    check_subs_to("2021-03-01T00:00:00Z", "1 day", "2021-02-28T00:00:00Z").await;
+
+    check_adds_to("2020-02-29T00:00:00Z", "1 year", "2021-02-28T00:00:00Z").await;
+    check_subs_to("2020-02-29T00:00:00Z", "1 year", "2019-02-28T00:00:00Z").await;
+
+    check_adds_to("2020-01-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-03-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+
+    check_adds_to("2020-01-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-03-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+
+    check_adds_to("2021-01-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
+    check_subs_to("2021-03-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
+
+    // Nulls.
     let r = service
         .exec_query(
-            "SELECT
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 second'),\
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 minute'),\
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 hour'),\
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 day 1 hour 1 minute 1 second'),\
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 year'),\
-            DATE_ADD(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), INTERVAL '13 month'),\
-            DATE_ADD(CAST('2021-01-01T23:59:00Z' as TIMESTAMP), INTERVAL '1 minute'),\
-            DATE_ADD(CAST('2021-12-01T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
-            DATE_ADD(CAST('2021-12-31T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
-            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
-            DATE_ADD(CAST('2020-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
-            DATE_ADD(CAST('2021-02-28T00:00:00Z' as TIMESTAMP), INTERVAL '1 day'),\
-            DATE_ADD(CAST('2020-02-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 year'),\
-            DATE_ADD(CAST('2021-01-30T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
-            DATE_ADD(CAST('2020-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month'),\
-            DATE_ADD(CAST('2021-01-29T00:00:00Z' as TIMESTAMP), INTERVAL '1 month')\
-        ",
+            "SELECT date_add(CAST(NULL as timestamp), INTERVAL '1 month'), \
+                            date_sub(CAST(NULL as timestamp), INTERVAL '3 month')",
         )
         .await
         .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(NULL, NULL)]));
 
+    // Invalid types passed to date_add.
+    service
+        .exec_query("SELECT date_add(1, 2)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT date_add(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), 2)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT date_add(1, INTERVAL '1 second')")
+        .await
+        .unwrap_err();
+    // Too many arguments.
+    service
+        .exec_query("SELECT date_add(1, 2, 3)")
+        .await
+        .unwrap_err();
+    // Too few arguments
+    service.exec_query("SELECT date_add(1)").await.unwrap_err();
+
+    // Must work on columnar data.
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(t timestamp)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(t) VALUES ('2020-01-01T00:00:00Z'), ('2020-02-01T00:00:00Z'), (NULL)",
+        )
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT date_add(t, INTERVAL '1 year') FROM s.data ORDER BY 1")
+        .await
+        .unwrap();
     assert_eq!(
         to_rows(&r),
-        vec![vec![
-            // Simple tests for IntervalDayTime
-            TableValue::Timestamp(timestamp_from_string("2021-01-01T00:00:01Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-01-01T00:01:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-01-01T01:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-01-02T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-01-02T01:01:01Z").unwrap()),
-            // Simple tests for IntervalYearMonth
-            TableValue::Timestamp(timestamp_from_string("2021-02-01T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2022-02-01T00:00:00Z").unwrap()),
-            // Calculation logic
-            TableValue::Timestamp(timestamp_from_string("2021-01-02T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2022-01-01T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2020-03-01T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-03-01T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2020-02-29T00:00:00Z").unwrap()),
-            TableValue::Timestamp(timestamp_from_string("2021-02-28T00:00:00Z").unwrap()),
-        ],]
+        rows(&[
+            None,
+            Some(timestamp_from_string("2021-01-01T00:00:00Z").unwrap()),
+            Some(timestamp_from_string("2021-02-01T00:00:00Z").unwrap())
+        ]),
+    );
+    let r = service
+        .exec_query("SELECT date_add(t, INTERVAL '1 hour') FROM s.data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            None,
+            Some(timestamp_from_string("2020-01-01T01:00:00Z").unwrap()),
+            Some(timestamp_from_string("2020-02-01T01:00:00Z").unwrap())
+        ]),
     );
 }
 

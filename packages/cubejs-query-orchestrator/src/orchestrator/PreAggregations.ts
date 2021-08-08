@@ -93,6 +93,7 @@ type IndexDescription = {
 };
 
 type PreAggregationDescription = {
+  priority: number;
   previewSql: QueryWithParams;
   timezone: string;
   indexesSql: IndexDescription[];
@@ -133,7 +134,8 @@ const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry
 
 type PreAggregationLoadCacheOptions = {
   requestId?: string,
-  dataSource: string
+  dataSource: string,
+  tablePrefixes?: string[],
 };
 
 type VersionEntriesObj = {
@@ -172,6 +174,8 @@ class PreAggregationLoadCache {
 
   private dataSource: string;
 
+  private tablePrefixes: string[] | null;
+
   public constructor(
     redisPrefix,
     clientFactory: DriverFactory,
@@ -188,6 +192,7 @@ class PreAggregationLoadCache {
     this.cacheDriver = preAggregations.cacheDriver;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
+    this.tablePrefixes = options.tablePrefixes;
     this.versionEntries = {};
     this.tables = {};
   }
@@ -226,6 +231,9 @@ class PreAggregationLoadCache {
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory();
+    if (this.tablePrefixes && client.getPrefixTablesQuery && this.preAggregations.options.skipExternalCacheAndQueue) {
+      return client.getPrefixTablesQuery(preAggregation.preAggregationsSchema, this.tablePrefixes);
+    }
     return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
@@ -284,6 +292,9 @@ class PreAggregationLoadCache {
   }
 
   public async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
+    if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableName.split('.')[1].startsWith(p))) {
+      throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
+    }
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.versionEntries[redisKey]) {
       this.versionEntries[redisKey] = this.calculateVersionEntries(preAggregation).catch(e => {
@@ -370,6 +381,8 @@ export class PreAggregationLoader {
 
   private requestId: string;
 
+  private metadata: any;
+
   private structureVersionPersistTime: any;
 
   private externalRefresh: boolean;
@@ -395,6 +408,7 @@ export class PreAggregationLoader {
     this.orphanedTimeout = options.orphanedTimeout;
     this.externalDriverFactory = preAggregations.externalDriverFactory;
     this.requestId = options.requestId;
+    this.metadata = options.metadata;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
     this.externalRefresh = options.externalRefresh;
 
@@ -515,7 +529,7 @@ export class PreAggregationLoader {
         await this.loadCache.getVersionEntries(this.preAggregation)
       );
       if (!lastVersion) {
-        throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created. It usually means database silently truncates table names due to max name length.`);
+        throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created`);
       }
       return this.targetTableName(lastVersion);
     };
@@ -524,6 +538,7 @@ export class PreAggregationLoader {
       this.logger('Force build pre-aggregation', {
         preAggregation: this.preAggregation,
         requestId: this.requestId,
+        metadata: this.metadata,
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
@@ -616,6 +631,7 @@ export class PreAggregationLoader {
         requestId: this.requestId,
         invalidationKeys,
         forceBuild: this.forceBuild,
+        metadata: this.metadata,
         orphanedTimeout: this.orphanedTimeout
       },
       priority,
@@ -976,6 +992,12 @@ export class PreAggregationLoader {
 }
 
 export class PreAggregationPartitionRangeLoader {
+  protected waitForRenew: boolean;
+
+  protected requestId: string;
+
+  protected dataSource: string;
+
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactory,
@@ -988,10 +1010,50 @@ export class PreAggregationPartitionRangeLoader {
     private readonly loadCache: any,
     private readonly options: any = {}
   ) {
+    this.waitForRenew = options.waitForRenew;
+    this.requestId = options.requestId;
+    this.dataSource = options.dataSource;
   }
 
-  private async loadRangeQuery(rangeQuery) {
-    return this.loadCache.keyQueryResult(rangeQuery, false, 10, 60 * 60); // TODO 60 * 60
+  private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
+    const [query, values, queryOptions]: QueryTuple = rangeQuery;
+
+    return this.queryCache.cacheQueryResult(
+      query,
+      values,
+      [query, values],
+      24 * 60 * 60,
+      {
+        renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
+          || queryOptions?.renewalThreshold || 24 * 60 * 60,
+        waitForRenew: this.waitForRenew,
+        priority: this.priority(10),
+        requestId: this.requestId,
+        dataSource: this.dataSource,
+        useInMemory: true,
+        external: queryOptions?.external,
+        renewalKey: partitionRange ? await this.getInvalidationKeyValues(partitionRange) : null
+      }
+    );
+  }
+
+  protected getInvalidationKeyValues(range) {
+    const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
+      this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
+    );
+    return Promise.all(
+      (this.preAggregation.invalidateKeyQueries || []).map(
+        (sqlQuery) => (
+          this.loadCache.keyQueryResult(
+            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName), this.waitForRenew, this.priority(10)
+          )
+        )
+      )
+    );
+  }
+
+  protected priority(defaultValue) {
+    return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
   private replacePartitionSqlAndParams(
@@ -1113,10 +1175,39 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [endDate, endDate];
     }
-    return PreAggregationPartitionRangeLoader.timeSeries(
+    let timeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       dateRange,
     );
+    const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
+      this.preAggregation.partitionGranularity,
+      [startDate, endDate],
+    );
+    const [preciseStartDate, preciseEndDate] = await Promise.all(
+      preAggregationStartEndQueries.map(
+        async (rangeQuery, i) => PreAggregationPartitionRangeLoader.extractDate(
+          await this.loadRangeQuery(
+            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1]
+          )
+        ),
+      ),
+    );
+    if (preciseStartDate !== startDate || preciseEndDate !== endDate) {
+      dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
+        [preciseStartDate, preciseEndDate],
+        this.preAggregation.matchedTimeDimensionDateRange,
+      );
+      if (!dateRange) {
+        // If there's no date range intersection between query data range and pre-aggregation build range
+        // use last partition so outer query can receive expected table structure.
+        dateRange = [preciseEndDate, preciseEndDate];
+      }
+      timeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
+        this.preAggregation.partitionGranularity,
+        dateRange,
+      );
+    }
+    return timeSeriesRanges;
   }
 
   private static checkDataRangeType(range: QueryDateRange) {
@@ -1252,7 +1343,13 @@ export class PreAggregations {
         loadCacheByDataSource[dataSource] =
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
             requestId: queryBody.requestId,
-            dataSource
+            dataSource,
+            tablePrefixes:
+              // Can't reuse tablePrefixes for shared refresh scheduler cache
+              !queryBody.preAggregationsLoadCacheByDataSource ?
+                preAggregations
+                  .filter(p => (p.dataSource || 'default') === dataSource)
+                  .map(p => p.tableName.split('.')[1]) : null
           });
       }
 
@@ -1273,6 +1370,7 @@ export class PreAggregations {
           waitForRenew: queryBody.renewQuery,
           forceBuild: queryBody.forceBuildPreAggregations,
           requestId: queryBody.requestId,
+          metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
           externalRefresh: this.externalRefresh
         }

@@ -380,12 +380,12 @@ export class DevServer {
       res.json(await fetcher.manifestJSON());
     }));
 
-    app.get('/playground/live-preview/start/:token', catchErrors(async (req, res) => {
+    app.get('/playground/live-preview/start/:token', catchErrors(async (req: Request, res: Response) => {
       this.livePreviewWatcher.setAuth(req.params.token);
       this.livePreviewWatcher.startWatch();
 
       res.setHeader('Content-Type', 'text/html');
-      res.write('<html><head><script>window.close();</script></body></html>');
+      res.write('<html><body><script>window.close();</script></body></html>');
       res.end();
     }));
 

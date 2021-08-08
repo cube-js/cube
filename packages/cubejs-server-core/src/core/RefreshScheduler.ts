@@ -25,6 +25,7 @@ type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concur
 };
 
 type PreAggregationsQueryingOptions = {
+  metadata?: any,
   timezones: string[],
   preAggregations: {
     id: string,
@@ -456,7 +457,8 @@ export class RefreshScheduler {
           requestId: context.requestId,
           timezone: query.timezone,
           scheduledRefresh: false,
-          preAggregationsLoadCacheByDataSource
+          preAggregationsLoadCacheByDataSource,
+          metadata: queryingOptions.metadata
         });
       }));
     })).catch(e => {

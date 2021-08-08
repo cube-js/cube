@@ -143,4 +143,4 @@ cube(`Users`, {
 ```
 
 [ref-backend-query]: /query-format
-[ref-schema-gen]: /schema-generation
+[ref-schema-gen]: /recipes/schema-generation

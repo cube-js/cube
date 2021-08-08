@@ -4,7 +4,7 @@
 
 export const environment = {
   production: false,
-  apiUrl: 'https://angular-dashboard.cubecloudapp.dev'
+  apiUrl: 'https://flaky-sheep.gcp-us-central1.cubecloudapp.dev'
 };
 
 /*

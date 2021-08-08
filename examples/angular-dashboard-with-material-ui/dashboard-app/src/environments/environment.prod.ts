@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://angular-dashboard.cubecloudapp.dev'
+  apiUrl: 'https://flaky-sheep.gcp-us-central1.cubecloudapp.dev'
 };

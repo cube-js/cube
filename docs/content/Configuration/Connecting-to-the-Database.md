@@ -72,48 +72,6 @@ to [Multitenancy Guide][link-multitenancy] to learn more.
 
 [link-multitenancy]: /multitenancy-setup
 
-## Enabling SSL
-
-Cube.js supports SSL-encrypted connections for **ClickHouse**, **Postgres**,
-**MongoDB**, **MS SQL**, and **MySQL**. To enable it, set the `CUBEJS_DB_SSL`
-environment variable to `true`. Cube.js can also be configured to use custom
-connection settings. For example, to use a custom CA and certificates, you could
-do the following:
-
-```dotenv
-CUBEJS_DB_SSL_CA=/ssl/ca.pem
-CUBEJS_DB_SSL_CERT=/ssl/cert.pem
-CUBEJS_DB_SSL_KEY=/ssl/key.pem
-```
-
-You can also set the above environment variables to the contents of the PEM
-files; for example:
-
-```dotenv
-CUBEJS_DB_SSL_CA="-----BEGIN CERTIFICATE-----
-MIIDDjCCAfYCCQCN/HhSZ3ofTDANBgkqhkiG9w0BAQsFADBJMQswCQYDVQQGEwJV
-SzEMMAoGA1UECgwDSUJNMQ0wCwYDVQQLDARBSU9TMR0wGwYDVQQDDBRhaW9zLW9y
-Y2gtZGV2LWVudi1DQTAeFw0yMTAyMTUyMzIyMTZaFw0yMzEyMDYyMzIyMTZaMEkx
-CzAJBgNVBAYTAlVLMQwwCgYDVQQKDANJQk0xDTALBgNVBAsMBEFJT1MxHTAbBgNV
-BAMMFGFpb3Mtb3JjaC1kZXYtZW52LUNBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
-MIIBCgKCAQEAyhYY9+4TduTsNRh/6MaRtE59j8HkAkoQYvNYZN7D1j1oV6yhzitn
-oN4bD+HiQWe4J3mwAaJOAAJRCkIVyUXxwZUCPxGN/KVha/pcB8hN6LHfI6vInixp
-U9kHNYWWBn428nMeMqts7yqly/HwG1/qO+j4178c8lZNS7Uwh76y+lAEaIkeBipq
-i4WuCOiChFc/sIV7g4DcLKKbqzDWtRDjbsg7JRfsALO5gM360GrNYkhV4C5lm8Eh
-ozNuaPhS65zO93PMj/3UTyuctXKa7WpaHJHoKZRXAuOwSamvqvFgIQ0SSnW+qcud
-fL3GAPJn7d065gh7JvgcT86v7WWBiUNs0QIDAQABMA0GCSqGSIb3DQEBCwUAA4IB
-AQCzw00d8e0e5AYZtzIk9hjczta7JHy2/cwTMv0opzBk6C26G6YZww+9brHW2w5U
-mY/HKBnGnMadjMWOZmm9Vu0B0kalYY0lJdE8alO1aiv5B9Ms/XIt7FzzGtfv9gYJ
-cw5/nzGBBMJNICC1kVLnzzlllLferhCIrczDyPcu16o1Flc7q1p8AbwQpC+A2I/L
-8nWlFeHZ+watLtQ1lF3qDzzCumPHrJqAGmlp0265owCM8Q5zv8AL5DStIZvtexrI
-JqbwLdbA8smyOFRwCckOWcWjnrEDjO2e3NLWINbB7Z4ZRviZSEH5UZlDLVu+ahGV
-KmZIuh7+XpXzJ1MN0SBZXgXH
------END CERTIFICATE-----"
-```
-
-For a complete list of SSL-related environment variables, consult the [Database
-Connections section of the Environment Variables Reference][ref-env-var].
-
 ## Notes
 
 Below you can find useful tips for configuring the connection to specific
@@ -135,9 +93,9 @@ SSL-related environment variables can be left unset.
 Use `CUBEJS_DB_SSL=true` to enable SSL if you have SSL enabled for your RDS
 cluster. Download the new certificate [here][link-aws-rds-pem], and provide the
 contents of the downloaded file to `CUBEJS_DB_SSL_CA`. All other SSL-related
-environment variables can be left unset. See [Enabling SSL][ref-enabling-ssl]
-for more details. More info on AWS RDS SSL can be found
-[here][link-aws-rds-docs].
+environment variables can be left unset. See [Enabling
+SSL][ref-recipes-enable-ssl] for more details. More info on AWS RDS SSL can be
+found [here][link-aws-rds-docs].
 
 ### Google Cloud SQL Postgres
 
@@ -249,19 +207,19 @@ To connect to a local MySQL database using a UNIX socket use
 
 You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
 `true`. All other SSL-related environment variables can be left unset. See
-[Enabling SSL][ref-enabling-ssl] for more details.
+[Enabling SSL][ref-recipes-enable-ssl] for more details.
 
 ### Druid
 
 You can connect to an HTTPS-enabled Druid database by setting `CUBEJS_DB_SSL` to
 `true`. All other SSL-related environment variables can be left unset. See
-[Enabling SSL][ref-enabling-ssl] for more details.
+[Enabling SSL][ref-recipes-enable-ssl] for more details.
 
 ### ClickHouse
 
 You can connect to an HTTPS-enabled ClickHouse database by setting
 `CUBEJS_DB_SSL` to `true`. All other SSL-related environment variables can be
-left unset. See [Enabling SSL][ref-enabling-ssl] for more details.
+left unset. See [Enabling SSL][ref-recipes-enable-ssl] for more details.
 
 You can connect to a ClickHouse database when your user's permissions are
 [restricted][link-clickhouse-readonly] to read-only, by setting
@@ -381,6 +339,5 @@ CUBEJS_DB_EXPORT_INTEGRATION=gcs_int
 [link-bigquery-regional-locations]:
   https://cloud.google.com/bigquery/docs/locations#regional-locations
 [ref-cubejs-cli]: /using-the-cubejs-cli
-[ref-enabling-ssl]: #enabling-ssl
-[ref-env-var]: /reference/environment-variables#database-connection
+[ref-recipes-enable-ssl]: /recipes/enable-ssl-connections-to-database
 [ref-caching-large-preaggs]: /using-pre-aggregations#large-pre-aggregations

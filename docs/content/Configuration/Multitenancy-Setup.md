@@ -162,7 +162,7 @@ enforcing row level security by means of join logic defined in your cubes
 instead of embedding [`SECURITY_CONTEXT`][ref-cube-security-ctx] filtering
 boilerplate into each cube. Together with
 [`contextToOrchestratorId`][ref-config-ctx-to-orch-id], this allows defining
-both row-level security filtering as well as reusing the same pre-aggregation
+both row-level security filtering **and** reusing the same pre-aggregation
 set for each tenant.
 
 ## Same DB Instance with per Tenant Row Level Security

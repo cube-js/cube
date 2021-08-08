@@ -3,6 +3,122 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.15](https://github.com/cube-js/cube.js/compare/v0.28.14...v0.28.15) (2021-08-06)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** do not filter out time dimensions ([#3201](https://github.com/cube-js/cube.js/issues/3201)) ([0300093](https://github.com/cube-js/cube.js/commit/0300093e0af29b87e7a9018dc8159c1299e3cd85))
+* **athena-driver:** Typings for driver (wrong import) ([fe6d429](https://github.com/cube-js/cube.js/commit/fe6d429c8ddf04702401c424143c113e92da0650))
+* **docs:** change invalid api url ([#3205](https://github.com/cube-js/cube.js/issues/3205)) ([0c4aded](https://github.com/cube-js/cube.js/commit/0c4aded2579438d0ed31109cbfe3201805c5ea60))
+* **examples:** change api url ([96d5c04](https://github.com/cube-js/cube.js/commit/96d5c045e8a2431879a7633b9ae5437c6951c340))
+
+
+### Features
+
+* **athena-driver:** Use getWorkGroup instead of SELECT 1 for testConnection ([a99a6e4](https://github.com/cube-js/cube.js/commit/a99a6e4bb5b5dad5558a74683f8618696c1786c0))
+
+
+
+
+
+## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** live preview styles ([#3191](https://github.com/cube-js/cube.js/issues/3191)) ([862ee27](https://github.com/cube-js/cube.js/commit/862ee2761e0e41a2598b16c13d4d8b0e68b8bb29))
+* **cubestore:** proper support for nulls in group by ([922138d](https://github.com/cube-js/cube.js/commit/922138d0c0e294f67aef133b42aeee85070e7a9a))
+* **docs:** change top banner api url & catch network error ([0d600e5](https://github.com/cube-js/cube.js/commit/0d600e5fa8c30cf172704694c4f14f1e91d7074b))
+* **docs:** fix broken image link ([5179071](https://github.com/cube-js/cube.js/commit/5179071c806745a65eaa335dc4a2bef10dd6bb05))
+* **examples:** change invalid api url ([#3194](https://github.com/cube-js/cube.js/issues/3194)) ([d792631](https://github.com/cube-js/cube.js/commit/d79263149ba2bc2127fd8adb041e98c5d7593c05))
+
+
+
+
+
+## [0.28.13](https://github.com/cube-js/cube.js/compare/v0.28.12...v0.28.13) (2021-08-04)
+
+
+### Bug Fixes
+
+* Support rolling `countDistinctApprox` rollups ([#3185](https://github.com/cube-js/cube.js/issues/3185)) ([e731992](https://github.com/cube-js/cube.js/commit/e731992b351f68f1ee249c9412f679b1903a6f28))
+* **cubestore:** improve errors for env var parse failures ([dbedd4e](https://github.com/cube-js/cube.js/commit/dbedd4e9103b4ce3d22c86ede4d1dc8b56f64f24))
+* Load build range query only on refresh key changes ([#3184](https://github.com/cube-js/cube.js/issues/3184)) ([40c6ee0](https://github.com/cube-js/cube.js/commit/40c6ee036de73144c12072c71df10081801d4e6b))
+
+
+### Reverts
+
+* Revert "misc: rollup dependencies fix" ([c08f93c](https://github.com/cube-js/cube.js/commit/c08f93cce990b5851287e89ad51980f78bbdef55))
+
+
+
+
+
+## [0.28.12](https://github.com/cube-js/cube.js/compare/v0.28.11...v0.28.12) (2021-07-31)
+
+
+### Bug Fixes
+
+* **bigquery-driver:** Ignore dataSets with wrong permissions ([6933807](https://github.com/cube-js/cube.js/commit/6933807234b50b4eccee143fbf0595760f367701))
+
+
+
+
+
+## [0.28.11](https://github.com/cube-js/cube.js/compare/v0.28.10...v0.28.11) (2021-07-31)
+
+
+### Bug Fixes
+
+* **docs:** banner time range ([6eddf4a](https://github.com/cube-js/cube.js/commit/6eddf4a555cf1ef3f9e99c88f26dbe40d0f4a302))
+* Pre-aggregation table is not found for after it was successfully created in Refresh Worker ([334af1c](https://github.com/cube-js/cube.js/commit/334af1cc3c590e8b835958511d6ec0e17a77b0f3))
+
+
+### Reverts
+
+* Revert "chore: Do not test dev images" ([712b82a](https://github.com/cube-js/cube.js/commit/712b82ac0994e513962e41c0de4a9e67a9e1466a))
+
+
+
+
+
+## [0.28.10](https://github.com/cube-js/cube.js/compare/v0.28.9...v0.28.10) (2021-07-30)
+
+
+### Bug Fixes
+
+* **cubestore:** date_add and date_sub on columnar data ([418c017](https://github.com/cube-js/cube.js/commit/418c017461c88fec0e4e28e1f1a64d97a0765718))
+
+
+### Features
+
+* Rolling window rollup support ([#3151](https://github.com/cube-js/cube.js/issues/3151)) ([109ab5b](https://github.com/cube-js/cube.js/commit/109ab5bec32255244412a24bf75402abd1cbfe49))
+
+
+
+
+
+## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
+
+
+### Bug Fixes
+
+* Optimize timestamp formatting and table names loading for large partition range serving ([#3166](https://github.com/cube-js/cube.js/issues/3166)) ([e1f8dc5](https://github.com/cube-js/cube.js/commit/e1f8dc5aab469b060f0fe8c69467117171c070fd))
+* **@cubejs-client/core:** data blending without date range ([#3161](https://github.com/cube-js/cube.js/issues/3161)) ([cc7c140](https://github.com/cube-js/cube.js/commit/cc7c1401b1d4e7d66fa4215997cfa4f19f8a5707))
+* **examples:** change invalid token ([dba8ae5](https://github.com/cube-js/cube.js/commit/dba8ae5bdf5bf8ee5b772cf294e1f56b4cc39eb4))
+* **query-orchestrator:** Improved manual cancellation for preaggregation request from queue, Debug API ([#3156](https://github.com/cube-js/cube.js/issues/3156)) ([11284ce](https://github.com/cube-js/cube.js/commit/11284ce8085673486fb50d49a20ba005a45f1647))
+
+
+### Features
+
+* add env var for SNS || Pub/Sub topic ([#3086](https://github.com/cube-js/cube.js/issues/3086)) Thanks to [@msambol](https://github.com/msambol)! ([bc9289c](https://github.com/cube-js/cube.js/commit/bc9289c91fc9bf1e9f067e84041151ff0c189acd)), closes [#1014](https://github.com/cube-js/cube.js/issues/1014)
+* **cubestore:** add `date_sub` function ([3bf2520](https://github.com/cube-js/cube.js/commit/3bf25203db8e0ebde00c224fd9462a3a2e54bee6))
+
+
+
+
+
 ## [0.28.8](https://github.com/cube-js/cube.js/compare/v0.28.7...v0.28.8) (2021-07-25)
 
 

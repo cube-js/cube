@@ -1,9 +1,11 @@
 ---
 title: Funnels
-permalink: /funnels
-category: Reference
-subCategory: Tutorials
-menuOrder: 13
+permalink: /recipes/funnels
+category: Examples & Tutorials
+subCategory: Analytics
+menuOrder: 3
+redirect_from:
+  - /funnels
 ---
 
 <!-- prettier-ignore-start -->
@@ -154,6 +156,7 @@ ORDER BY
 LIMIT
   5000
 ```
+
 </div>
 
 ## Funnel parameters
@@ -275,7 +278,7 @@ cube(`PurchaseFunnel`, {
 
   extends: Funnels.eventFunnel({
     // ...
-  })
+  }),
 });
 ```
 
@@ -311,9 +314,10 @@ In the following example, we use the `conversions` measure along with the
 Funnel joins are extremely heavy for most modern databases and complexity grows
 in a non-linear way with the addition of steps. However, if the cardinality of
 the first event isn't too high, very simple optimization can be applied:
-[originalSql pre-aggregation](/schema/reference/pre-aggregations#original-sql).
+[`originalSql` pre-aggregation][ref-schema-ref-preaggs-origsql].
 
-It is best to use [partitioned rollups][ref-partitioned-rollups] to cache the steps instead. Add one to the `PurchaseFunnel` cube as follows:
+It is best to use [partitioned rollups][ref-partitioned-rollups] to cache the
+steps instead. Add one to the `PurchaseFunnel` cube as follows:
 
 ```javascript
 cube(`PurchaseFunnel`, {
@@ -329,4 +333,7 @@ cube(`PurchaseFunnel`, {
 });
 ```
 
-[ref-partitioned-rollups]: /pre-aggregations#rollup-time-partitioning
+[ref-partitioned-rollups]:
+  /caching/using-pre-aggregations#partitioning-time-partitioning
+[ref-schema-ref-preaggs-origsql]:
+  /schema/reference/pre-aggregations#parameters-type-originalsql

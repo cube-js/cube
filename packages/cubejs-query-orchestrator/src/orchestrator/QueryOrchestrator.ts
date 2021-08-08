@@ -195,20 +195,30 @@ export class QueryOrchestrator {
     );
 
     const flatFn = (arrResult: any[], arrItem: any[]) => ([...arrResult, ...arrItem]);
-    const partitionsByTableName = preAggregations
+    const structureVersionsByTableName = preAggregations
       .map(p => p.partitions)
       .reduce(flatFn, [])
       .reduce((obj, partition) => {
-        if (partition && partition.sql) obj[partition.sql.tableName] = partition;
+        if (partition && partition.sql) {
+          obj[partition.sql.tableName] = PreAggregations.structureVersion(partition.sql);
+        }
         return obj;
       }, {});
 
-    return versionEntries
-      .reduce(flatFn, [])
-      .filter((versionEntry) => {
-        const partition = partitionsByTableName[versionEntry.table_name];
-        return partition && versionEntry.structure_version === PreAggregations.structureVersion(partition.sql);
-      });
+    return {
+      structureVersionsByTableName,
+      versionEntriesByTableName: versionEntries
+        .reduce(flatFn, [])
+        .filter((versionEntry) => {
+          const structureVersion = structureVersionsByTableName[versionEntry.table_name];
+          return structureVersion && versionEntry.structure_version === structureVersion;
+        })
+        .reduce((obj, versionEntry) => {
+          if (!obj[versionEntry.table_name]) obj[versionEntry.table_name] = [];
+          obj[versionEntry.table_name].push(versionEntry);
+          return obj;
+        }, {})
+    };
   }
 
   public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {

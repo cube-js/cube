@@ -66,6 +66,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
   }
 
+  public getPrefixTablesQuery(schemaName, tablePrefixes) {
+    const prefixWhere = tablePrefixes.map(p => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
+    return this.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
+      [schemaName].concat(tablePrefixes)
+    );
+  }
+
   public quoteIdentifier(identifier: string): string {
     return `\`${identifier}\``;
   }
