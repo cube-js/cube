@@ -108,15 +108,15 @@ data needs to be refreshed.
 cube(`Orders`, {
   // This refreshKey tells Cube.js to refresh data every 5 minutes
   refreshKey: {
-    every: `5 minute`
-  }
+    every: `5 minute`,
+  },
 
   // With this refreshKey Cube.js will only refresh the data if
   // the value of previous MAX(created_at) changed
   // By default Cube.js will check this refreshKey every 10 seconds
   refreshKey: {
-    sql: `SELECT MAX(created_at) FROM orders`
-  }
+    sql: `SELECT MAX(created_at) FROM orders`,
+  },
 });
 ```
 

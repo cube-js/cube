@@ -21,37 +21,21 @@ Pre-Aggregations reference in the data schema section][ref-schema-ref-preaggs].
 ## Refresh Strategy
 
 Refresh strategy can be customized by setting the
-[refreshKey][ref-schema-ref-preaggs-refresh-key] property for the
+[`refreshKey`][ref-schema-ref-preaggs-refresh-key] property for the
 pre-aggregation.
 
-The default value of `refreshKey` is `every: '1 hour'`. It can be redefined
-either by providing SQL:
+The default value of [`refreshKey`][ref-schema-ref-preaggs-refresh-key] is
+`every: '1 hour'`. It can be redefined either by overriding the default value of
+the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
 
 ```javascript
 cube(`Orders`, {
-  // ...
+
+  ...,
 
   preAggregations: {
     amountByCreated: {
-      measures: [amount],
-      timeDimension: createdAt,
-      granularity: `month`,
-      refreshKey: {
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
-```
-
-Or by providing a refresh time interval:
-
-```javascript
-cube(`Orders`, {
-  // ...
-
-  preAggregations: {
-    amountByCreated: {
+      type: `rollup`,
       measures: [amount],
       timeDimension: createdAt,
       granularity: `month`,
@@ -62,6 +46,53 @@ cube(`Orders`, {
   },
 });
 ```
+
+Or by providing a [`sql` property][ref-schema-ref-preaggs-refresh-key-sql]
+instead, and leaving `every` unchanged from its' default value:
+
+```javascript
+cube(`Orders`, {
+
+  ...,
+
+  preAggregations: {
+    amountByCreated: {
+      measures: [amount],
+      timeDimension: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        // every will default to `10 seconds` here
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+Or both `every` and `sql` can be defined together:
+
+```javascript
+cube(`Orders`, {
+
+  ...,
+
+  preAggregations: {
+    amountByCreated: {
+      measures: [amount],
+      timeDimension: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        every: `12 hour`,
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+When `every` and `sql` are used together, Cube.js will run the query from the
+`sql` property on an interval defined by the `every` property. If the query
+returns new results, then the pre-aggregation will be refreshed.
 
 ## Background Refresh
 
@@ -79,7 +110,8 @@ practices on running background refresh in production environments.
 
 ```js
 cube(`Orders`, {
-  // ...
+
+  ...,
 
   preAggregations: {
     amountByCreated: {
@@ -384,6 +416,8 @@ When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube.js does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
+[ref-caching-in-mem-default-refresh-key]:
+  /caching#in-memory-cache-default-refresh-keys
 [ref-config-connect-db]: /connecting-to-the-database
 [ref-config-driverfactory]: /config#options-reference-driver-factory
 [ref-config-env]: /reference/environment-variables#cube-store
@@ -400,6 +434,10 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-ref-preaggs-refresh-key]:
   /schema/reference/pre-aggregations#parameters-refresh-key
+[ref-schema-ref-preaggs-refresh-key-every]:
+  /schema/reference/pre-aggregations#parameters-refresh-key-every
+[ref-schema-ref-preaggs-refresh-key-sql]:
+  /schema/reference/pre-aggregations#parameters-refresh-key-sql
 [ref-deploy-refresh-wrkr]: /deployment/overview#refresh-worker
 [ref-schema-ref-preaggs-sched-refresh]:
   /schema/reference/pre-aggregations#parameters-scheduled-refresh

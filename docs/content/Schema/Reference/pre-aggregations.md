@@ -47,7 +47,7 @@ Pre-aggregation names should:
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -113,7 +113,7 @@ with Pre-Aggregations][ref-caching-preaggs-target].
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -148,7 +148,7 @@ For example, to pre-aggregate all completed orders, you could do the following:
 
 ```javascript
 cube(`CompletedOrders`, {
-  sql: `select * from orders where completed = true`,
+  sql: `SELECT * FROM orders WHERE completed = true`,
 
   ...,
 
@@ -209,7 +209,7 @@ cube(`Users`, {
 // `schema/Orders.js` - a schema representing all orders, retrieved from Postgres
 cube('Orders', {
   dataSource: 'postgres',
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
   joins: {
     Users: {
       relationship: `belongsTo`,
@@ -264,7 +264,7 @@ cube][ref-schema-measures] that should be included in the pre-aggregation:
 
 ```javascript
 cube('Orders', {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   measures: {
     count: {
@@ -287,7 +287,7 @@ cube][ref-schema-dimensions] that should be included in the pre-aggregation:
 
 ```javascript
 cube('Orders', {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   dimensions: {
     status: {
@@ -313,7 +313,7 @@ improving performance with massive datasets.
 
 ```javascript
 cube('Orders', {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   measures: {
     count: {
@@ -354,7 +354,7 @@ the data by week and persist it to Cube Store.
 
 ```javascript
 cube('Orders', {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -411,7 +411,7 @@ The `partitionGranularity` defines the granularity for each
 
 ```javascript
 cube('Orders', {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -458,26 +458,23 @@ cube(`Orders`, {
 });
 ```
 
+In the above example, the refresh key SQL will be executed every 10 seconds, as
+[`every`][self-refreshkey-every] is not defined. If the results of the
+SQL refresh key differ from the last execution, then the pre-aggregation will be
+refreshed.
+
 <h4 id="parameters-refresh-key-every">
 every
 </h4>
 
 The `refreshKey` can define an `every` property which can be used to refresh
-pre-aggregations based on a time interval.
-
-<!-- prettier-ignore-start -->
-[[warning | ]]
-| The `every` parameter **does not** force Cube.js to fetch `refreshKey` based
-| on an interval. It instead generates a SQL query whose result should change
-| at least once per defined interval and adjusts `refreshKeyRenewalThreshold`
-| accordingly. [Learn more][ref-cube-refreshkey].
-<!-- prettier-ignore-end -->
-
-For example:
+pre-aggregations based on a time interval. By default, it is set to `1 hour`
+unless the [`sql` property][self-refreshkey-sql] is also defined, in which case
+it is set to `10 seconds`. For example:
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   preAggregations: {
     main: {
@@ -492,6 +489,28 @@ cube(`Orders`, {
 
 For possible `every` parameter values please refer to
 [`refreshKey`][ref-cube-refreshkey] documentation.
+
+You can also use `every` with `sql`:
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM orders`,
+
+  preAggregations: {
+    main: {
+      measures: [CUBE.count],
+      refreshKey: {
+        every: `1 hour`,
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+In the above example, the refresh key SQL will be executed every hour. If the
+results of the SQL refresh key differ from the last execution, then the
+pre-aggregation will be refreshed.
 
 <h4 id="parameters-refresh-key-incremental">
 incremental
@@ -510,7 +529,7 @@ You can incrementally refresh partitioned rollups by setting
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -542,7 +561,7 @@ SQL is changed.
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -585,11 +604,11 @@ underlying SQL calculations every time it builds new rollup tables.
 ```javascript
 cube(`Orders`, {
   sql: `
-    select * from orders1
+    SELECT * FROM orders1
     UNION ALL
-    select * from orders2
+    SELECT * FROM orders2
     UNION ALL
-    select * from orders3
+    SELECT * FROM orders3
     `,
 
   ...,
@@ -637,7 +656,7 @@ practices on running background refresh in production environments.
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   // ...
 
@@ -671,7 +690,7 @@ The refresh range for partitioned pre-aggregations can be controlled using
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -700,7 +719,7 @@ follows:
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -725,7 +744,7 @@ used:
 
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   ...,
 
@@ -751,7 +770,6 @@ cube(`Orders`, {
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-config-driverfactory]: /config/#options-reference-driver-factory
-[ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
 [ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
@@ -767,6 +785,8 @@ cube(`Orders`, {
 [self-origsql-preaggs]: #use-original-sql-pre-aggregations
 [self-originalsql]: #parameters-type-originalsql
 [self-refreshkey]: #parameters-refresh-key
+[self-refreshkey-every]: #parameters-refresh-key-every
+[self-refreshkey-sql]: #parameters-refresh-key-sql
 [self-rollup]: #parameters-type-rollup
 [self-rollupjoin]: #parameters-type-rollupjoin
 [self-timedimension]: #parameters-time-dimension
