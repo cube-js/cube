@@ -11,7 +11,6 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
-use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
@@ -55,6 +54,7 @@ use crate::{
     metastore::{Column, ColumnType, MetaStore},
     store::DataFrame,
 };
+use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use datafusion::cube_ext;
 use tempfile::TempDir;
 use tokio::fs::File;

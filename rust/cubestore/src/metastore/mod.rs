@@ -907,7 +907,6 @@ macro_rules! enum_from_primitive_impl {
     };
 }
 
-#[macro_use(enum_from_primitive_impl)]
 macro_rules! enum_from_primitive {
     (
         $( #[$enum_attr:meta] )*

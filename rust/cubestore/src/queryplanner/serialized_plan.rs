@@ -11,10 +11,11 @@ use crate::queryplanner::udfs::{
 use crate::CubeError;
 use arrow::datatypes::DataType;
 use datafusion::cube_ext::alias::LogicalAlias;
-use datafusion::cube_ext::join::CrossJoin;
+use datafusion::cube_ext::join::SkewedLeftCrossJoin;
 use datafusion::cube_ext::joinagg::CrossJoinAgg;
 use datafusion::logical_plan::{
-    DFSchemaRef, Expr, JoinType, LogicalPlan, Operator, Partitioning, PlanVisitor,
+    Column, DFSchemaRef, Expr, JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
+    PlanVisitor,
 };
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
@@ -110,8 +111,9 @@ pub enum SerializedLogicalPlan {
     Join {
         left: Arc<SerializedLogicalPlan>,
         right: Arc<SerializedLogicalPlan>,
-        on: Vec<(String, String)>,
+        on: Vec<(Column, Column)>,
         join_type: JoinType,
+        join_constraint: JoinConstraint,
         schema: DFSchemaRef,
     },
     TableScan {
@@ -236,7 +238,7 @@ impl SerializedLogicalPlan {
                 projection,
                 projected_schema,
                 filters,
-                alias,
+                alias: _,
                 limit,
             } => LogicalPlan::TableScan {
                 table_name: table_name.clone(),
@@ -249,7 +251,6 @@ impl SerializedLogicalPlan {
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
                 filters: filters.iter().map(|e| e.expr()).collect(),
-                alias: alias.clone(),
                 limit: limit.clone(),
             },
             SerializedLogicalPlan::EmptyRelation {
@@ -272,12 +273,14 @@ impl SerializedLogicalPlan {
                 right,
                 on,
                 join_type,
+                join_constraint,
                 schema,
             } => LogicalPlan::Join {
                 left: Arc::new(left.logical_plan(remote_to_local_names, worker_partition_ids)?),
                 right: Arc::new(right.logical_plan(remote_to_local_names, worker_partition_ids)?),
                 on: on.clone(),
                 join_type: join_type.clone(),
+                join_constraint: *join_constraint,
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Repartition {
@@ -332,7 +335,7 @@ impl SerializedLogicalPlan {
                 on,
                 join_schema,
             } => LogicalPlan::Extension {
-                node: Arc::new(CrossJoin {
+                node: Arc::new(SkewedLeftCrossJoin {
                     left: left.logical_plan(remote_to_local_names, worker_partition_ids)?,
                     right: right.logical_plan(remote_to_local_names, worker_partition_ids)?,
                     on: on.expr(),
@@ -349,7 +352,7 @@ impl SerializedLogicalPlan {
                 schema,
             } => LogicalPlan::Extension {
                 node: Arc::new(CrossJoinAgg {
-                    join: CrossJoin {
+                    join: SkewedLeftCrossJoin {
                         left: left.logical_plan(remote_to_local_names, worker_partition_ids)?,
                         right: right.logical_plan(remote_to_local_names, worker_partition_ids)?,
                         on: on.expr(),
@@ -435,7 +438,10 @@ impl SerializedExpr {
     fn expr(&self) -> Expr {
         match self {
             SerializedExpr::Alias(e, a) => Expr::Alias(Box::new(e.expr()), a.to_string()),
-            SerializedExpr::Column(c, a) => Expr::Column(c.clone(), a.clone()),
+            SerializedExpr::Column(c, a) => Expr::Column(Column {
+                name: c.clone(),
+                relation: a.clone(),
+            }),
             SerializedExpr::ScalarVariable(v) => Expr::ScalarVariable(v.clone()),
             SerializedExpr::Literal(v) => Expr::Literal(v.clone()),
             SerializedExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
@@ -638,7 +644,6 @@ impl SerializedPlan {
             LogicalPlan::TableScan {
                 table_name,
                 source,
-                alias,
                 projected_schema,
                 projection,
                 filters,
@@ -650,7 +655,7 @@ impl SerializedPlan {
                 } else {
                     panic!("Unexpected table source");
                 },
-                alias: alias.clone(),
+                alias: None,
                 projected_schema: projected_schema.clone(),
                 projection: projection.clone(),
                 filters: filters.iter().map(|e| Self::serialized_expr(e)).collect(),
@@ -731,7 +736,7 @@ impl SerializedPlan {
                         agg_expr: Self::exprs(&j.agg_expr),
                         schema: j.schema.clone(),
                     }
-                } else if let Some(join) = node.as_any().downcast_ref::<CrossJoin>() {
+                } else if let Some(join) = node.as_any().downcast_ref::<SkewedLeftCrossJoin>() {
                     SerializedLogicalPlan::CrossJoin {
                         left: Arc::new(Self::serialized_logical_plan(&join.left)),
                         right: Arc::new(Self::serialized_logical_plan(&join.right)),
@@ -765,12 +770,14 @@ impl SerializedPlan {
                 right,
                 on,
                 join_type,
+                join_constraint,
                 schema,
             } => SerializedLogicalPlan::Join {
                 left: Arc::new(Self::serialized_logical_plan(&left)),
                 right: Arc::new(Self::serialized_logical_plan(&right)),
                 on: on.clone(),
                 join_type: join_type.clone(),
+                join_constraint: *join_constraint,
                 schema: schema.clone(),
             },
             LogicalPlan::Repartition {
@@ -786,6 +793,9 @@ impl SerializedPlan {
                     ),
                 },
             },
+            LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
+                panic!("unsupported plan node")
+            }
         }
     }
 
@@ -798,7 +808,7 @@ impl SerializedPlan {
             Expr::Alias(expr, alias) => {
                 SerializedExpr::Alias(Box::new(Self::serialized_expr(expr)), alias.to_string())
             }
-            Expr::Column(c, a) => SerializedExpr::Column(c.to_string(), a.clone()),
+            Expr::Column(c) => SerializedExpr::Column(c.name.clone(), c.relation.clone()),
             Expr::ScalarVariable(v) => SerializedExpr::ScalarVariable(v.clone()),
             Expr::Literal(v) => SerializedExpr::Literal(v.clone()),
             Expr::BinaryExpr { left, op, right } => SerializedExpr::BinaryExpr {
@@ -890,6 +900,7 @@ impl SerializedPlan {
                 list: list.iter().map(|e| Self::serialized_expr(&e)).collect(),
                 negated: *negated,
             },
+            Expr::WindowFunction { .. } => panic!("window functions are not supported"),
         }
     }
 }

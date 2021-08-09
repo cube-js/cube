@@ -1,3 +1,4 @@
+#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.
 pub mod injection;
 pub mod processing_loop;
 

@@ -77,7 +77,7 @@ impl Row {
     }
 
     pub fn push(&mut self, val: TableValue) {
-        &self.values.push(val);
+        self.values.push(val);
     }
 
     pub fn len(&self) -> usize {

@@ -193,7 +193,10 @@ impl<
                                 res_rx = r;
                             }
                             Err(e) => {
-                                error!("Error during worker message processing: {}", e);
+                                error!(
+                                    "Error during worker message processing: {}",
+                                    e.display_with_backtrace()
+                                );
                                 if sender.send(Err(e.clone())).is_err() {
                                     error!("Error during worker message processing: Send Error");
                                 }
@@ -269,22 +272,24 @@ where
 {
     let (rx, tx) = (a.args, a.results);
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-    loop {
-        let res = rx.recv();
-        match res {
-            Ok(args) => {
-                let send_res = tx.send(runtime.block_on(P::process(args)));
-                if let Err(e) = send_res {
-                    error!("Worker message send error: {:?}", e);
+    runtime.block_on(async move {
+        loop {
+            let res = rx.recv();
+            match res {
+                Ok(args) => {
+                    let send_res = tx.send(P::process(args).await);
+                    if let Err(e) = send_res {
+                        error!("Worker message send error: {:?}", e);
+                        return 0;
+                    }
+                }
+                Err(e) => {
+                    error!("Worker message receive error: {:?}", e);
                     return 0;
                 }
             }
-            Err(e) => {
-                error!("Worker message receive error: {:?}", e);
-                return 0;
-            }
         }
-    }
+    })
 }
 
 #[cfg(test)]
