@@ -26,6 +26,7 @@ import {
   useToggle,
   useToken,
 } from '../../hooks';
+import { useCloud } from '../../playground/cloud';
 import {
   getMembersByCube,
   getNameMemberPairs,
@@ -67,8 +68,8 @@ export function RollupDesigner({
   transformedQuery,
 }: RollupDesignerProps) {
   const isMounted = useIsMounted();
-  const isCloud = useIsCloud();
   const token = useToken();
+  const { isCloud, ...cloud } = useCloud();
 
   const canBeRolledUp =
     transformedQuery.leafMeasureAdditive &&
@@ -153,35 +154,44 @@ export function RollupDesigner({
   );
 
   async function handleAddToSchemaClick() {
-    setSaving(true);
+    const definition = {
+      preAggregationName: preAggName,
+      cubeName,
+      code: getPreAggregationDefinitionFromReferences(references, preAggName)
+        .value,
+    };
 
-    const response = await request(
-      '/playground/schema/pre-aggregation',
-      'POST',
-      {
-        body: {
-          preAggregationName: preAggName,
-          cubeName,
-          code: getPreAggregationDefinitionFromReferences(
-            references,
-            preAggName
-          ).value,
-        },
-      }
-    );
-
-    setSaving(false);
-
-    if (response.ok) {
+    function showSuccessMessage() {
       notification.success({
         message: `Pre-aggregation has been added to the ${cubeName} cube`,
       });
-    } else {
-      const { error } = response.json;
-      notification.error({
-        message: error,
-      });
     }
+
+    setSaving(true);
+
+    if (!isCloud) {
+      const response = await request(
+        '/playground/schema/pre-aggregation',
+        'POST',
+        {
+          body: definition,
+        }
+      );
+
+      if (response.ok) {
+        showSuccessMessage();
+      } else {
+        const { error } = response.json;
+        notification.error({
+          message: error,
+        });
+      }
+    } else {
+      await cloud.addPreAggregationToSchema?.(definition);
+      showSuccessMessage();
+    }
+
+    setSaving(false);
   }
 
   function handleMemberToggle(memberType) {
@@ -231,15 +241,13 @@ export function RollupDesigner({
           <Flex justifyContent="flex-end" gap={2}>
             <Button onClick={toggleRollupCode}>Back to editing</Button>
 
-            {!isCloud ? (
-              <Button
-                type="primary"
-                loading={saving}
-                onClick={handleAddToSchemaClick}
-              >
-                Add to the Data Schema
-              </Button>
-            ) : null}
+            <Button
+              type="primary"
+              loading={saving}
+              onClick={handleAddToSchemaClick}
+            >
+              Add to the Data Schema
+            </Button>
           </Flex>
         </div>
       );
