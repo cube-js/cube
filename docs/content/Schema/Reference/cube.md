@@ -124,7 +124,7 @@ LEFT JOIN contacts "contacts" ON "users".contact_id = "contacts".id
 Abstract cubes can be defined by simply omitting the first parameter to the
 `cube()` function. Cubes defined in this way can still be extended, but will be
 "hidden" from the [Developer Playground][ref-dev-playground] and calls to the
-[`/meta` API endpoint][ref-rest-api-meta].
+[`/meta` API endpoint][ref-restapi-meta].
 
 ```javascript
 const Users = cube({
@@ -514,8 +514,8 @@ cube(`Events`, {
 ### Security Context
 
 `SECURITY_CONTEXT` is a user security object that is passed by the Cube.js
-Client. Please see [Security Context section](security#security-context) on how
-to set `SECURITY_CONTEXT` value.
+Client. Please read the [Security Context page][ref-sec-ctx] for more
+information on how to set `SECURITY_CONTEXT`.
 
 <!-- prettier-ignore-start -->
 [[info | ]]
@@ -523,8 +523,6 @@ to set `SECURITY_CONTEXT` value.
 | [`queryRewrite`][ref-config-queryrewrite] instead of `SECURITY_CONTEXT`
 | wherever possible.
 <!-- prettier-ignore-end -->
-
-[ref-config-queryrewrite]: /config#options-reference-query-rewrite
 
 Security context is suitable for the row level security implementation. For
 example, if you have an `orders` table that contains an `email` field you can
@@ -627,10 +625,10 @@ cube(`visitors`, {
 
 ### Compile context
 
-There's global `COMPILE_CONTEXT` that captured as
-[RequestContext][ref-config-req-ctx] at the time of schema compilation. It
+There's a global `COMPILE_CONTEXT` that captured as
+[`RequestContext`][ref-config-req-ctx] at the time of schema compilation. It
 contains `securityContext` and any other variables provided by
-[extendContext][ref-config-ext-ctx].
+[`extendContext`][ref-config-ext-ctx].
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -652,11 +650,13 @@ cube(`Users`, {
 });
 ```
 
-[ref-restapi-sql]: /rest-api#api-reference-v-1-sql
-[ref-dev-playground]: /dev-tools/dev-playground
-[ref-rest-api-meta]: /rest-api#api-reference-v-1-meta
 [ref-config-dbtype]: /config#options-reference-db-type
 [ref-config-driverfactory]: /config#options-reference-driver-factory
-[ref-config-req-ctx]: /config#request-context
 [ref-config-ext-ctx]: /config#options-reference-extend-context
+[ref-config-queryrewrite]: /config#options-reference-query-rewrite
+[ref-config-req-ctx]: /config#request-context
+[ref-dev-playground]: /dev-tools/dev-playground
+[ref-restapi-meta]: /rest-api#api-reference-v-1-meta
+[ref-restapi-sql]: /rest-api#api-reference-v-1-sql
+[ref-sec-ctx]: /security/context
 [wiki-camelcase]: https://en.wikipedia.org/wiki/Camel_case
