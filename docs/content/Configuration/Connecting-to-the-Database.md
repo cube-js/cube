@@ -145,7 +145,7 @@ Choose a database to get started with below:
       <div class="connectingToDatabaseItemContent">
         <a href="databases/elasticsearch">
           <div class="connectingToDatabaseItemImage">
-            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/elasticsearch.svg" alt="Elasticsearch" />
+            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/elasticsearch.svg" alt="Elasticsearch" width="56" height="56" />
           </div>
           <div class="connectingToDatabaseItemLink">Elasticsearch</div>
         </a>
@@ -155,7 +155,7 @@ Choose a database to get started with below:
       <div class="connectingToDatabaseItemContent">
         <a href="databases/sqlite">
           <div class="connectingToDatabaseItemImage">
-            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/sqlite.svg" alt="SQLite" />
+            <img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/sqlite.svg" alt="SQLite" width="56" height="56" />
           </div>
           <div class="connectingToDatabaseItemLink">SQLite</div>
         </a>
