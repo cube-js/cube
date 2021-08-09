@@ -1,6 +1,6 @@
 use crate::table::{cmp_same_types, TableValue};
 use arrow::datatypes::{DataType, Schema};
-use datafusion::logical_plan::{Expr, Operator};
+use datafusion::logical_plan::{Column, Expr, Operator};
 use datafusion::scalar::ScalarValue;
 use std::cmp::Ordering;
 
@@ -125,11 +125,11 @@ impl Builder<'_> {
     fn extract_filter(&self, e: &Expr, mut r: Vec<MinMaxCondition>) -> Vec<MinMaxCondition> {
         match e {
             Expr::BinaryExpr {
-                left: box Expr::Column(name, alias),
+                left: box Expr::Column(c),
                 op,
                 right,
             } if Self::is_comparison(*op) => {
-                if let Some(cc) = self.extract_column_compare(&name, alias.as_deref(), *op, right) {
+                if let Some(cc) = self.extract_column_compare(c, *op, right) {
                     self.apply_stat(&cc, &mut r);
                 }
                 return r;
@@ -137,29 +137,23 @@ impl Builder<'_> {
             Expr::BinaryExpr {
                 left,
                 op,
-                right: box Expr::Column(name, alias),
+                right: box Expr::Column(c),
             } if Self::is_comparison(*op) => {
-                if let Some(cc) = self.extract_column_compare(
-                    &name,
-                    alias.as_deref(),
-                    Self::invert_comparison(*op),
-                    left,
-                ) {
+                if let Some(cc) = self.extract_column_compare(c, Self::invert_comparison(*op), left)
+                {
                     self.apply_stat(&cc, &mut r);
                 }
                 return r;
             }
             Expr::InList {
-                expr: box Expr::Column(name, alias),
+                expr: box Expr::Column(c),
                 list,
                 negated: false,
             } => {
                 // equivalent to <name> = <list_1> OR ... OR <name> = <list_n>.
                 let elems = list.iter().map(|v| {
                     let mut r = r.clone();
-                    if let Some(cc) =
-                        self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, v)
-                    {
+                    if let Some(cc) = self.extract_column_compare(c, Operator::Eq, v) {
                         self.apply_stat(&cc, &mut r);
                         return r;
                     }
@@ -168,15 +162,13 @@ impl Builder<'_> {
                 return self.handle_or(elems);
             }
             Expr::InList {
-                expr: box Expr::Column(name, alias),
+                expr: box Expr::Column(c),
                 list,
                 negated: true,
             } => {
                 // equivalent to <name> != <list_1> AND ... AND <name> != <list_n>.
                 for v in list {
-                    if let Some(cc) =
-                        self.extract_column_compare(&name, alias.as_deref(), Operator::NotEq, v)
-                    {
+                    if let Some(cc) = self.extract_column_compare(c, Operator::NotEq, v) {
                         self.apply_stat(&cc, &mut r);
                     }
                 }
@@ -201,22 +193,18 @@ impl Builder<'_> {
                         .map(|e| self.extract_filter(e, r.clone())),
                 );
             }
-            Expr::Column(name, alias) => {
+            Expr::Column(c) => {
                 let true_expr = Expr::Literal(ScalarValue::Boolean(Some(true)));
-                if let Some(cc) =
-                    self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, &true_expr)
-                {
+                if let Some(cc) = self.extract_column_compare(c, Operator::Eq, &true_expr) {
                     self.apply_stat(&cc, &mut r);
                     return r;
                 }
                 r
             }
             // TODO: generic Not support with other expressions as children.
-            Expr::Not(box Expr::Column(name, alias)) => {
+            Expr::Not(box Expr::Column(c)) => {
                 let true_expr = Expr::Literal(ScalarValue::Boolean(Some(false)));
-                if let Some(cc) =
-                    self.extract_column_compare(&name, alias.as_deref(), Operator::Eq, &true_expr)
-                {
+                if let Some(cc) = self.extract_column_compare(c, Operator::Eq, &true_expr) {
                     self.apply_stat(&cc, &mut r);
                     return r;
                 }
@@ -292,8 +280,7 @@ impl Builder<'_> {
 
     fn extract_column_compare(
         &self,
-        col_name: &str,
-        col_alias: Option<&str>,
+        col: &Column,
         op: Operator,
         value: &Expr,
     ) -> Option<ColumnStat> {
@@ -305,12 +292,7 @@ impl Builder<'_> {
             return None;
         }
 
-        let field = datafusion::physical_plan::expressions::Column::new_with_alias(
-            col_name,
-            col_alias.map(|x| x.to_string()),
-        )
-        .lookup_field(self.schema)
-        .ok()?;
+        let field = self.schema.field_with_name(&col.name).ok()?;
 
         // TODO: all the other types. For now assume strings and numbers.
         let limit_val;

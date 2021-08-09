@@ -7,7 +7,7 @@ use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::DFSchemaRef;
+
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::group_scalar::GroupByScalar;
 use datafusion::physical_plan::hash_aggregate::{
@@ -39,7 +39,7 @@ pub struct AggregateTopKExec {
     pub order_by: Vec<SortColumn>,
     /// Always an instance of ClusterSendExec or WorkerExec.
     pub cluster: Arc<dyn ExecutionPlan>,
-    pub schema: DFSchemaRef,
+    pub schema: SchemaRef,
 }
 
 /// Third item is the neutral value for the corresponding aggregate function.
@@ -53,7 +53,7 @@ impl AggregateTopKExec {
         agg_fun: &[AggregateFunction],
         order_by: Vec<SortColumn>,
         cluster: Arc<dyn ExecutionPlan>,
-        schema: DFSchemaRef,
+        schema: SchemaRef,
     ) -> AggregateTopKExec {
         assert_eq!(schema.fields().len(), agg_expr.len() + key_len);
         assert_eq!(agg_fun.len(), agg_expr.len());
@@ -110,7 +110,7 @@ impl ExecutionPlan for AggregateTopKExec {
         self
     }
 
-    fn schema(&self) -> DFSchemaRef {
+    fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 
@@ -200,7 +200,7 @@ impl ExecutionPlan for AggregateTopKExec {
             batches.clear();
         }
 
-        let batch = state.finish(self.schema.to_schema_ref())?;
+        let batch = state.finish(self.schema())?;
         let schema = batch.schema();
         // TODO: don't clone batch.
         MemoryExec::try_new(&vec![vec![batch]], schema, None)?
@@ -771,8 +771,8 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use datafusion::catalog::catalog::MemoryCatalogList;
     use datafusion::error::DataFusionError;
-    use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
-    use datafusion::logical_plan::{DFField, DFSchema, Expr};
+    use datafusion::execution::context::{ExecutionConfig, ExecutionContextState, ExecutionProps};
+    use datafusion::logical_plan::{Column, DFField, DFSchema, Expr};
     use datafusion::physical_plan::aggregates::AggregateFunction;
     use datafusion::physical_plan::empty::EmptyExec;
     use datafusion::physical_plan::memory::MemoryExec;
@@ -780,7 +780,7 @@ mod tests {
     use datafusion::physical_plan::ExecutionPlan;
     use futures::StreamExt;
     use itertools::Itertools;
-    use std::convert::TryFrom;
+
     use std::iter::FromIterator;
     use std::sync::Arc;
 
@@ -798,7 +798,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let bs = proto.cluster.schema().to_schema_ref();
+        let bs = proto.cluster.schema();
 
         let r = run_topk(
             &proto,
@@ -901,7 +901,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let bs = proto.cluster.schema().to_schema_ref();
+        let bs = proto.cluster.schema();
 
         // negative numbers must not confuse the estimates.
         let r = run_topk(
@@ -972,7 +972,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let bs = proto.cluster.schema().to_schema_ref();
+        let bs = proto.cluster.schema();
 
         // Ascending.
         let r = run_topk(
@@ -1067,7 +1067,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let bs = proto.cluster.schema().to_schema_ref();
+        let bs = proto.cluster.schema();
 
         let r = run_topk(
             &proto,
@@ -1139,13 +1139,14 @@ mod tests {
             var_provider: Default::default(),
             aggregate_functions: Default::default(),
             config: ExecutionConfig::new(),
+            execution_props: ExecutionProps::new(),
         };
         let agg_exprs = aggs
             .iter()
             .enumerate()
             .map(|(i, f)| Expr::AggregateFunction {
                 fun: f.clone(),
-                args: vec![Expr::Column(format!("agg{}", i + 1), None)],
+                args: vec![Expr::Column(Column::from_name(format!("agg{}", i + 1)))],
                 distinct: false,
             });
         let physical_agg_exprs = agg_exprs
@@ -1153,7 +1154,7 @@ mod tests {
                 Ok(DefaultPhysicalPlanner::default().create_aggregate_expr(
                     &e,
                     &input_schema,
-                    &input_schema,
+                    &input_schema.to_schema_ref(),
                     &ctx,
                 )?)
             })
@@ -1163,13 +1164,13 @@ mod tests {
             .iter()
             .map(|agg| agg.field())
             .collect::<Result<Vec<_>, DataFusionError>>()?;
-        let output_schema = Arc::new(DFSchema::try_from(Schema::new(
+        let output_schema = Arc::new(Schema::new(
             key_fields
                 .into_iter()
                 .map(|k| Field::new(k.name().as_ref(), k.data_type().clone(), k.is_nullable()))
                 .chain(output_agg_fields)
                 .collect(),
-        ))?);
+        ));
 
         Ok(AggregateTopKExec::new(
             limit,
@@ -1186,11 +1187,7 @@ mod tests {
         proto: &AggregateTopKExec,
         inputs: Vec<Vec<RecordBatch>>,
     ) -> Result<RecordBatch, DataFusionError> {
-        let input = Arc::new(MemoryExec::try_new(
-            &inputs,
-            proto.cluster.schema().to_schema_ref(),
-            None,
-        )?);
+        let input = Arc::new(MemoryExec::try_new(&inputs, proto.cluster.schema(), None)?);
         let results = proto
             .with_new_children(vec![input])?
             .execute(0)

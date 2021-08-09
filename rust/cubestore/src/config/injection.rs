@@ -187,6 +187,7 @@ impl dyn DIService {
 #[macro_export]
 macro_rules! di_service (
     ( $ty: ident, [ $( $trait_ty: ident ),* ]) => {
+        #[allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.
         impl $crate::config::injection::DIService for $ty {
             fn downcast_ref(
                 &self,

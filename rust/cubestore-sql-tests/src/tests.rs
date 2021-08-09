@@ -450,10 +450,13 @@ async fn join(service: Box<dyn SqlClient>) {
         .await.is_err());
 
     // Join on ambiguous fields.
-    assert!(service
-        .exec_query("SELECT c.id, k.id FROM foo.customers c JOIN foo.customers k ON id = id")
+    let result = service
+        .exec_query(
+            "SELECT c.id, k.id FROM foo.customers c JOIN foo.customers k ON id = id ORDER BY 1",
+        )
         .await
-        .is_err());
+        .unwrap();
+    assert_eq!(to_rows(&result), rows(&[("a", "a"), ("b", "b")]));
 }
 
 async fn three_tables_join(service: Box<dyn SqlClient>) {
@@ -1677,17 +1680,19 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalInplaceAggregate\
-          \n  ClusterSend, partitions: [[1]]"
+        "Projection, [url, SUM(s.Data.hits)@1:SUM(hits)]\
+       \n  FinalInplaceAggregate\
+       \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalInplaceAggregate\
-           \n  Worker\
-           \n    PartialInplaceAggregate\
-           \n      MergeSort\
-           \n        Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
-           \n          Empty"
+        "Projection, [url, SUM(s.Data.hits)@1:SUM(hits)]\
+      \n  FinalInplaceAggregate\
+      \n    Worker\
+      \n      PartialInplaceAggregate\
+      \n        MergeSort\
+      \n          Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+      \n            Empty"
     );
 
     // When there is no index, we fallback to inplace aggregates.
@@ -1697,17 +1702,19 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalHashAggregate\
-          \n  ClusterSend, partitions: [[1]]"
+        "Projection, [day, SUM(s.Data.hits)@1:SUM(hits)]\
+       \n  FinalHashAggregate\
+       \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalHashAggregate\
-           \n  Worker\
-           \n    PartialHashAggregate\
-           \n      Merge\
-           \n        Scan, index: default:1:[1], fields: [day, hits]\
-           \n          Empty"
+        "Projection, [day, SUM(s.Data.hits)@1:SUM(hits)]\
+       \n  FinalHashAggregate\
+       \n    Worker\
+       \n      PartialHashAggregate\
+       \n        Merge\
+       \n          Scan, index: default:1:[1], fields: [day, hits]\
+       \n            Empty"
     );
 }
 
@@ -1856,31 +1863,28 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
     verbose.show_sort_by = true;
     assert_eq!(
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
-        "Projection, [url, SUM(hits):hits]\
+        "Projection, [url, SUM(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
            \n    ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
-            pp_phys_plan_ext(p.worker.as_ref(), &verbose),
-            "Projection, [url, SUM(hits):hits]\
+        pp_phys_plan_ext(p.worker.as_ref(), &verbose),
+        "Projection, [url, SUM(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
            \n    Worker\
-           \n      Sort, by: [SUM(hits) desc]\
+           \n      Sort, by: [SUM(hits)@1 desc]\
            \n        FullInplaceAggregate, sort_order: [0]\
-           \n          Alias, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n            MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n              Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                  Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                    MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                      Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                        Empty\
-           \n                Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                  Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                    MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                      Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                        Empty"
-        );
+           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
+           \n                  Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                    Empty\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
+           \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                    Empty"
+    );
 }
 
 async fn topk_large_inputs(service: Box<dyn SqlClient>) {
@@ -2046,17 +2050,19 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalInplaceAggregate\
-           \n  ClusterSend, partitions: [[1]]"
+        "Projection, [id, SUM(s.Orders.amount)@1:SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalInplaceAggregate\
-           \n  Worker\
-           \n    PartialInplaceAggregate\
-           \n      MergeSort\
-           \n        Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-           \n          Empty"
+        "Projection, [id, SUM(s.Orders.amount)@1:SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    Worker\
+       \n      PartialInplaceAggregate\
+       \n        MergeSort\
+       \n          Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+       \n            Empty"
     );
 
     let p = service
@@ -2072,24 +2078,24 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     // TODO: test MergeSort node is present if ClusterSend has multiple partitions.
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalInplaceAggregate\
-           \n  ClusterSend, partitions: [[1, 1]]"
+        "Projection, [id, SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    ClusterSend, partitions: [[1, 1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalInplaceAggregate\
-           \n  Worker\
-           \n    PartialInplaceAggregate\
-           \n      MergeSort\
-           \n        Union\
-           \n          Projection, [id, amount]\
-           \n            MergeSort\
-           \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-           \n                Empty\
-           \n          Projection, [id, amount]\
-           \n            MergeSort\
-           \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-           \n                Empty"
+        "Projection, [id, SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    Worker\
+       \n      PartialInplaceAggregate\
+       \n        MergeSort\
+       \n          Union\
+       \n            MergeSort\
+       \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+       \n                Empty\
+       \n            MergeSort\
+       \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+       \n                Empty"
     );
 }
 
@@ -2123,16 +2129,14 @@ async fn planning_joins(service: Box<dyn SqlClient>) {
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
             "Worker\
-                  \n  Projection, [order_id, customer_name]\
-                  \n    MergeJoin, on: [o.customer_id = c.customer_id]\
-                  \n      Alias\
-                  \n        MergeSort\
-                  \n          Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id]\
-                  \n            Empty\
-                  \n      Alias\
-                  \n        MergeSort\
-                  \n          Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-                  \n            Empty"
+           \n  Projection, [order_id, customer_name]\
+           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n      MergeSort\
+           \n        Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id]\
+           \n          Empty\
+           \n      MergeSort\
+           \n        Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n          Empty"
         );
 
     let p = service
@@ -2148,24 +2152,24 @@ async fn planning_joins(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "Sort\
-                  \n  FinalHashAggregate\
-                  \n    ClusterSend, partitions: [[2, 3]]"
+       \n  Projection, [order_id, customer_name, SUM(o.amount)@2:SUM(amount)]\
+       \n    FinalHashAggregate\
+       \n      ClusterSend, partitions: [[2, 3]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Sort\
-                  \n  FinalHashAggregate\
-                  \n    Worker\
-                  \n      PartialHashAggregate\
-                  \n        MergeJoin, on: [o.customer_id = c.customer_id]\
-                  \n          Alias\
-                  \n            MergeSort\
-                  \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: *\
-                  \n                Empty\
-                  \n          Alias\
-                  \n            MergeSort\
-                  \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-                  \n                Empty"
+       \n  Projection, [order_id, customer_name, SUM(o.amount)@2:SUM(amount)]\
+       \n    FinalHashAggregate\
+       \n      Worker\
+       \n        PartialHashAggregate\
+       \n          MergeJoin, on: [customer_id@1 = customer_id@0]\
+       \n            MergeSort\
+       \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: *\
+       \n                Empty\
+       \n            MergeSort\
+       \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+       \n                Empty"
     );
 }
 
@@ -2207,21 +2211,18 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             pp_phys_plan(p.worker.as_ref()),
             "Worker\
            \n  Projection, [order_id, customer_name, product_name]\
-           \n    MergeJoin, on: [o.product_id = p.product_id]\
+           \n    MergeJoin, on: [product_id@2 = product_id@0]\
            \n      MergeResort\
-           \n        MergeJoin, on: [o.customer_id = c.customer_id]\
-           \n          Alias\
-           \n            MergeSort\
-           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id, product_id]\
-           \n                Empty\
-           \n          Alias\
-           \n            MergeSort\
-           \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-           \n                Empty\
-           \n      Alias\
-           \n        MergeSort\
-           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *\
-           \n            Empty",
+           \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n          MergeSort\
+           \n            Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
+           \n              Empty\
+           \n          MergeSort\
+           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n              Empty\
+           \n      MergeSort\
+           \n        Scan, index: default:4:[4]:sort_on[product_id], fields: *\
+           \n          Empty",
         );
 
     let p = service
@@ -2242,23 +2243,20 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             pp_phys_plan_ext(p.worker.as_ref(), &show_filters),
             "Worker\
            \n  Projection, [order_id, customer_name, product_name]\
-           \n    MergeJoin, on: [o.product_id = p.product_id]\
+           \n    MergeJoin, on: [product_id@2 = product_id@0]\
            \n      MergeResort\
-           \n        MergeJoin, on: [o.customer_id = c.customer_id]\
-           \n          Filter, predicate: product_id = 125\
-           \n            Alias\
-           \n              MergeSort\
-           \n                Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id, product_id], predicate: #product_id Eq Int64(125)\
-           \n                  Empty\
-           \n          Alias\
+           \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n          Filter, predicate: product_id@2 = 125\
            \n            MergeSort\
-           \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
            \n                Empty\
-           \n      Filter, predicate: product_id = 125\
-           \n        Alias\
            \n          MergeSort\
-           \n            Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
-           \n              Empty",
+           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n              Empty\
+           \n      Filter, predicate: product_id@0 = 125\
+           \n        MergeSort\
+           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
+           \n            Empty",
         );
 }
 
@@ -2565,16 +2563,15 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(plan.as_ref()),
         "Sort\
-      \n  Projection, [date_to, name, SUM(n):n]\
-      \n    CrossJoinAgg, on: day <= date_to\
-      \n      Alias\
-      \n        Projection, [day, name, SUM(n):n]\
-      \n          FinalHashAggregate\
-      \n            Worker\
-      \n              PartialHashAggregate\
-      \n                Merge\
-      \n                  Scan, index: default:1:[1], fields: *\
-      \n                    Empty"
+      \n  Projection, [date_to, name, SUM(Table.n)@2:n]\
+      \n    CrossJoinAgg, on: day@1 <= date_to@0\
+      \n      Projection, [datetrunc(Utf8(\"day\"),converttz(s.Data.day,Utf8(\"+00:00\")))@0:day, name, SUM(s.Data.n)@2:n]\
+      \n        FinalHashAggregate\
+      \n          Worker\
+      \n            PartialHashAggregate\
+      \n              Merge\
+      \n                Scan, index: default:1:[1], fields: *\
+      \n                  Empty"
     );
 
     let plan = service
@@ -2586,17 +2583,15 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
         pp_phys_plan(plan.as_ref()),
         "Sort\
         \n  Projection, [date_to, name, n]\
-        \n    Alias\
-        \n      Projection, [date_to, name, SUM(n):n]\
-        \n        CrossJoinAgg, on: day <= date_to\
-        \n          Alias\
-        \n            Projection, [day, name, SUM(n):n]\
-        \n              FinalHashAggregate\
-        \n                Worker\
-        \n                  PartialHashAggregate\
-        \n                    Merge\
-        \n                      Scan, index: default:1:[1], fields: *\
-        \n                        Empty"
+        \n    Projection, [date_to, name, SUM(Table.n)@2:n]\
+        \n      CrossJoinAgg, on: day@1 <= date_to@0\
+        \n        Projection, [datetrunc(Utf8(\"day\"),converttz(s.Data.day,Utf8(\"+00:00\")))@0:day, name, SUM(s.Data.n)@2:n]\
+        \n          FinalHashAggregate\
+        \n            Worker\
+        \n              PartialHashAggregate\
+        \n                Merge\
+        \n                  Scan, index: default:1:[1], fields: *\
+        \n                    Empty"
     );
 
     service

@@ -22,8 +22,8 @@ use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
 use datafusion::cube_ext::join::CrossJoinExec;
 use datafusion::cube_ext::joinagg::CrossJoinAggExec;
-use datafusion::physical_plan::alias::AliasedSchemaExec;
 use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::union::UnionExec;
@@ -140,7 +140,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             projected_schema
                                 .fields()
                                 .iter()
-                                .map(|f| f.qualified_name())
+                                .map(|f| f.name())
                                 .join(", ")
                         );
                     } else {
@@ -180,6 +180,9 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                     } else {
                         panic!("unknown extension node");
                     }
+                }
+                LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
+                    panic!("unsupported logical plan node")
                 }
             }
 
@@ -263,11 +266,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             } else {
                 *out += &format!(
                     ", fields: [{}]",
-                    t.schema()
-                        .fields()
-                        .iter()
-                        .map(|f| f.qualified_name())
-                        .join(", ")
+                    t.schema().fields().iter().map(|f| f.name()).join(", ")
                 );
             }
             if o.show_filters && t.filter.is_some() {
@@ -281,12 +280,12 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 p.expr()
                     .iter()
                     .map(|(e, out_name)| {
-                        let in_name = e.to_string();
-                        if &in_name == out_name {
-                            in_name
-                        } else {
-                            format!("{}:{}", in_name, out_name)
+                        if let Some(c) = e.as_any().downcast_ref::<Column>() {
+                            if c.name() == out_name {
+                                return c.name().to_string();
+                            }
                         }
+                        format!("{}:{}", e.to_string(), out_name)
                     })
                     .join(", ")
             );
@@ -298,6 +297,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             let mode = match agg.mode() {
                 AggregateMode::Partial => "Partial",
                 AggregateMode::Final => "Final",
+                AggregateMode::FinalPartitioned => "FinalPartitioned",
                 AggregateMode::Full => "Full",
             };
             *out += &format!("{}{}Aggregate", mode, strat);
@@ -376,8 +376,6 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
         } else if let Some(_) = a.downcast_ref::<UnionExec>() {
             *out += "Union";
-        } else if let Some(_) = a.downcast_ref::<AliasedSchemaExec>() {
-            *out += "Alias";
         } else {
             panic!("unhandled ExecutionPlan: {:?}", p);
         }

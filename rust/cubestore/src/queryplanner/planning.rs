@@ -20,7 +20,7 @@ use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use arrow::datatypes::Field;
+use arrow::datatypes::{Field, SchemaRef};
 use async_trait::async_trait;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
@@ -28,7 +28,7 @@ use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogica
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::planner::ExtensionPlanner;
 use datafusion::physical_plan::{
-    ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+    ExecutionPlan, OptimizerHints, Partitioning, PhysicalPlanner, SendableRecordBatchStream,
 };
 use flatbuffers::bitflags::_core::any::Any;
 use flatbuffers::bitflags::_core::fmt::Formatter;
@@ -69,10 +69,10 @@ pub async fn choose_index_ext(
                 .constraints
                 .iter()
                 .map(|c| {
-                    let mut parts = c.table_name.splitn(2, ".");
-                    let schema = parts.next().unwrap();
-                    let table = parts.next().unwrap();
-                    (schema.to_string(), table.to_string())
+                    // TODO: use ids.
+                    let schema = c.table.schema.get_row().get_name().clone();
+                    let table = c.table.table.get_row().get_table_name().clone();
+                    (schema, table)
                 })
                 .collect_vec(),
         )
@@ -145,7 +145,7 @@ struct SortColumns {
 
 struct IndexConstraints {
     sort_on: Option<SortColumns>,
-    table_name: String,
+    table: TablePath,
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
 }
@@ -165,16 +165,15 @@ impl PlanRewriter for CollectConstraints {
     ) -> Result<LogicalPlan, DataFusionError> {
         match &n {
             LogicalPlan::TableScan {
-                table_name,
                 projection,
                 filters,
                 source,
                 ..
             } => {
-                assert!(source.as_any().is::<CubeTableLogical>());
+                let table = source.as_any().downcast_ref::<CubeTableLogical>().unwrap();
                 self.constraints.push(IndexConstraints {
                     sort_on: c.clone(),
-                    table_name: table_name.clone(),
+                    table: table.table.clone(),
                     projection: projection.clone(),
                     filters: filters.clone(),
                 })
@@ -192,7 +191,7 @@ impl PlanRewriter for CollectConstraints {
         fn column_name(expr: &Expr) -> Option<String> {
             match expr {
                 Expr::Alias(e, _) => column_name(e),
-                Expr::Column(col, _) => Some(col.to_string()), // TODO use alias
+                Expr::Column(col) => Some(col.name.clone()), // TODO use alias
                 _ => None,
             }
         }
@@ -224,10 +223,7 @@ impl PlanRewriter for CollectConstraints {
             panic!("expected join node");
         }
         Some(Some(SortColumns {
-            sort_on: join_on
-                .iter()
-                .map(|(l, _)| l.split(".").last().unwrap().to_string())
-                .collect(),
+            sort_on: join_on.iter().map(|(l, _)| l.name.clone()).collect(),
             required: true,
         }))
     }
@@ -244,10 +240,7 @@ impl PlanRewriter for CollectConstraints {
             panic!("expected join node");
         }
         Some(Some(SortColumns {
-            sort_on: join_on
-                .iter()
-                .map(|(_, r)| r.split(".").last().unwrap().to_string())
-                .collect(),
+            sort_on: join_on.iter().map(|(_, r)| r.name.clone()).collect(),
             required: true,
         }))
     }
@@ -286,27 +279,31 @@ fn try_extract_cluster_send(p: &LogicalPlan) -> Option<&ClusterSendNode> {
 impl ChooseIndex<'_> {
     fn choose_table_index(&mut self, mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
         match &mut p {
-            LogicalPlan::TableScan {
-                table_name, source, ..
-            } => {
+            LogicalPlan::TableScan { source, .. } => {
                 assert!(
                     self.next_index < self.chosen_indices.len(),
                     "inconsistent state"
                 );
-                assert_eq!(
-                    table_name,
-                    &self.chosen_indices[self.next_index].table_name()
-                );
+                let table = &source
+                    .as_any()
+                    .downcast_ref::<CubeTableLogical>()
+                    .unwrap()
+                    .table;
+                assert_eq!(table, &self.chosen_indices[self.next_index].table_path);
 
                 let snapshot = self.chosen_indices[self.next_index].clone();
                 self.next_index += 1;
 
+                let table_schema = source.schema();
                 *source = Arc::new(CubeTable::try_new(
                     snapshot.clone(),
                     // Filled by workers
                     HashMap::new(),
                     HashSet::new(),
                 )?);
+
+                let index_schema = source.schema();
+                assert_eq!(table_schema, index_schema);
 
                 return Ok(ClusterSendNode {
                     input: Arc::new(p),
@@ -370,13 +367,14 @@ async fn pick_index(
             (index, sort_on)
         } else {
             if let Some((join_on_columns, true)) = sort_on.as_ref() {
+                let table_name = c.table.table_name();
                 return Err(DataFusionError::Plan(format!(
                     "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
-                    c.table_name,
+                    table_name,
                     join_on_columns.join(", "),
                     table.get_row().get_table_name(),
                     join_on_columns.join("_"),
-                    c.table_name,
+                    table_name,
                     join_on_columns.join(", ")
                 )));
             }
@@ -386,7 +384,7 @@ async fn pick_index(
         if let Some((join_on_columns, _)) = sort_on {
             return Err(DataFusionError::Plan(format!(
                 "Can't find index to join table {} on {} and projection push down optimization has been disabled. Invalid state.",
-                c.table_name,
+                c.table.table_name(),
                 join_on_columns.join(", ")
             )));
         }
@@ -582,6 +580,11 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             *left = lsend.input.clone();
             *right = rsend.input.clone();
         }
+        LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
+            return Err(DataFusionError::Internal(
+                "unsupported operation".to_string(),
+            ))
+        }
     }
 
     Ok(ClusterSendNode {
@@ -599,24 +602,27 @@ pub struct CubeExtensionPlanner {
 impl ExtensionPlanner for CubeExtensionPlanner {
     fn plan_extension(
         &self,
+        planner: &dyn PhysicalPlanner,
         node: &dyn UserDefinedLogicalNode,
-        inputs: &[Arc<dyn ExecutionPlan>],
+        _logical_inputs: &[&LogicalPlan],
+        physical_inputs: &[Arc<dyn ExecutionPlan>],
         state: &ExecutionContextState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
+        let inputs = physical_inputs;
         if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
             Ok(Some(self.plan_cluster_send(
                 input.clone(),
                 &cs.snapshots,
-                cs.schema().clone(),
+                input.schema(),
                 false,
                 usize::MAX,
             )?))
         } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
-            Ok(Some(plan_topk(self, topk, input.clone(), state)?))
+            Ok(Some(plan_topk(planner, self, topk, input.clone(), state)?))
         } else {
             Ok(None)
         }
@@ -628,12 +634,12 @@ impl CubeExtensionPlanner {
         &self,
         input: Arc<dyn ExecutionPlan>,
         snapshots: &Vec<Vec<IndexSnapshot>>,
-        schema: DFSchemaRef,
+        schema: SchemaRef,
         use_streaming: bool,
         max_batch_rows: usize,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if snapshots.is_empty() {
-            return Ok(Arc::new(EmptyExec::new(false, schema.to_schema_ref())));
+            return Ok(Arc::new(EmptyExec::new(false, schema)));
         }
         // Note that MergeExecs are added automatically when needed.
         if let Some(c) = self.cluster.as_ref() {
@@ -662,7 +668,7 @@ pub struct WorkerExec {
     pub input: Arc<dyn ExecutionPlan>,
     // TODO: remove and use `self.input.schema()`
     //       This is a hacky workaround for wrong schema of joins after projection pushdown.
-    pub schema: DFSchemaRef,
+    pub schema: SchemaRef,
     pub max_batch_rows: usize,
 }
 
@@ -672,7 +678,7 @@ impl ExecutionPlan for WorkerExec {
         self
     }
 
-    fn schema(&self) -> DFSchemaRef {
+    fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 
@@ -756,16 +762,18 @@ pub mod tests {
         let plan = initial_plan("SELECT * FROM s.Customers WHERE customer_id = 1", &indices);
         assert_eq!(
             pretty_printers::pp_plan(&plan),
-            "Filter\
-           \n  Scan s.Customers, source: CubeTableLogical, fields: *"
+            "Projection, [s.Customers.customer_id, s.Customers.customer_name, s.Customers.customer_city, s.Customers.customer_registered_date]\
+           \n  Filter\
+           \n    Scan s.Customers, source: CubeTableLogical, fields: *"
         );
 
         let plan = choose_index(&plan, &indices).await.unwrap().0;
         assert_eq!(
             pretty_printers::pp_plan(&plan),
             "ClusterSend, indices: [[0]]\
-           \n  Filter\
-           \n    Scan s.Customers, source: CubeTable(index: default:0:[]), fields: *"
+           \n  Projection, [s.Customers.customer_id, s.Customers.customer_name, s.Customers.customer_city, s.Customers.customer_registered_date]\
+           \n    Filter\
+           \n      Scan s.Customers, source: CubeTable(index: default:0:[]), fields: *"
         );
 
         // Should prefer a non-default index for joins.
@@ -777,8 +785,8 @@ pub mod tests {
         );
         let plan = choose_index(&plan, &indices).await.unwrap().0;
         assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0]]\
-                                  \n  Projection, [order_id, order_amount, customer_name]\
-                                  \n    Join on: [order_customer = customer_id]\
+                                  \n  Projection, [s.Orders.order_id, s.Orders.order_amount, s.Customers.customer_name]\
+                                  \n    Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
                                   \n      Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_amount]\
                                   \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]");
 
@@ -791,9 +799,9 @@ pub mod tests {
         );
         let plan = choose_index(&plan, &indices).await.unwrap().0;
         assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0], [5]]\
-        \n  Projection, [order_id, customer_name, product_name]\
-        \n    Join on: [order_product = product_id]\
-        \n      Join on: [order_customer = customer_id]\
+        \n  Projection, [s.Orders.order_id, s.Customers.customer_name, s.Products.product_name]\
+        \n    Join on: [#s.Orders.order_product = #s.Products.product_id]\
+        \n      Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
         \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_product]\
         \n        Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
         \n      Scan s.Products, source: CubeTable(index: default:5:[]:sort_on[product_id]), fields: *");
@@ -808,13 +816,13 @@ pub mod tests {
         );
         let plan = choose_index(&plan, &indices).await.unwrap().0;
         assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0], [1]]\
-                                  \n  Projection, [customer_name]\
-                                  \n    Join on: [order_city = c2.customer_city]\
-                                  \n      Join on: [order_customer = c1.customer_id]\
+                                  \n  Projection, [c2.customer_name]\
+                                  \n    Join on: [#s.Orders.order_city = #c2.customer_city]\
+                                  \n      Join on: [#s.Orders.order_customer = #c1.customer_id]\
                                   \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
                                   \n        Filter\
-                                  \n          Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [c1.customer_id, c1.customer_name]\
-                                  \n      Scan s.Customers, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [c2.customer_name, c2.customer_city]");
+                                  \n          Scan c1, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
+                                  \n      Scan c2, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [customer_name, customer_city]");
     }
 
     #[tokio::test]
@@ -828,8 +836,9 @@ pub mod tests {
         let plan = choose_index(&plan, &indices).await.unwrap().0;
         assert_eq!(
             pretty_printers::pp_plan(&plan),
-            "ClusterAggregateTopK, limit: 10\
-           \n  Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+            "Projection, [s.Orders.order_customer, SUM(s.Orders.order_amount)]\
+           \n  ClusterAggregateTopK, limit: 10\
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Projections should be handled properly.
@@ -889,7 +898,7 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &verbose),
             "Projection, [customer, amount, min_amount, max_amount]\
-           \n  ClusterAggregateTopK, limit: 10, aggs: [SUM(#order_amount), MIN(#order_amount), MAX(#order_amount)], sortBy: [3 desc, 2]\
+           \n  ClusterAggregateTopK, limit: 10, aggs: [SUM(#s.Orders.order_amount), MIN(#s.Orders.order_amount), MAX(#s.Orders.order_amount)], sortBy: [3 desc, 2]\
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
