@@ -310,7 +310,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-02-17
+          toolchain: nightly-2021-07-04
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
