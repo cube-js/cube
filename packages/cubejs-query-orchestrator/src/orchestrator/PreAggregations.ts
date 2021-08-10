@@ -108,6 +108,8 @@ type PreAggregationDescription = {
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
 };
 
+type PartitionDescription = Omit<PreAggregationDescription, 'preAggregationStartEndQueries'>;
+
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
   table => -table.last_updated_at,
   tables.map(table => {
@@ -1091,12 +1093,16 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private partitionPreAggregationDescription(range: QueryDateRange): PreAggregationDescription {
+  private partitionPreAggregationDescription(range: QueryDateRange): PartitionDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { preAggregationStartEndQueries, ...preAggregation } = this.preAggregation;
+
     return {
-      ...this.preAggregation,
+      ...preAggregation,
       range,
       tableName: partitionTableName,
       loadSql: this.preAggregation.loadSql &&
@@ -1153,7 +1159,7 @@ export class PreAggregationPartitionRangeLoader {
     }
   }
 
-  public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
+  public async partitionPreAggregations(): Promise<PartitionDescription[]> {
     if (this.preAggregation.preAggregationStartEndQueries) {
       const partitionRanges = await this.partitionRanges();
       return partitionRanges.map(range => this.partitionPreAggregationDescription(range));
@@ -1410,7 +1416,7 @@ export class PreAggregations {
       return loadCacheByDataSource[dataSource];
     };
 
-    const expandedPreAggregations: PreAggregationDescription[][] = await Promise.all(preAggregations.map(p => {
+    const expandedPreAggregations: PartitionDescription[][] = await Promise.all(preAggregations.map(p => {
       const loader = new PreAggregationPartitionRangeLoader(
         this.redisPrefix,
         () => this.driverFactory(p.dataSource || 'default'),

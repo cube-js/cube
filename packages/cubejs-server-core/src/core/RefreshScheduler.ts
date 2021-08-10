@@ -59,23 +59,19 @@ export class RefreshScheduler {
       requestId: context.requestId
     });
 
-    return Promise.all(partitions.preAggregations.map(async partition => ({
-      querySql: {
-        ...baseQuerySql,
-        preAggregations: [{
-          ...preAggregationDescription,
-          matchedTimeDimensionDateRange: partition.range
-        }]
-      },
-      query: {
-        ...baseQuery,
-        timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
-          ...baseQuery.timeDimensions[0],
-          dateRange: partition.range
-        }]
-      },
-      sql: partition
-    })));
+    return Promise.all(partitions.preAggregations.map(async partition => {
+      delete partition.preAggregationStartEndQueries;
+      return {
+        query: {
+          ...baseQuery,
+          timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
+            ...baseQuery.timeDimensions[0],
+            dateRange: partition.range
+          }]
+        },
+        sql: partition
+      };
+    }));
   }
 
   protected async baseQueryForPreAggregation(
@@ -341,12 +337,9 @@ export class RefreshScheduler {
         const queries = await queriesForPreAggregation(preAggregationCursor, timezones[timezoneCursor]);
         if (partitionCursor < queries.length) {
           const queryCursor = queries.length - 1 - partitionCursor;
-          const { querySql } = queries[queryCursor];
+          const { sql } = queries[queryCursor];
           return {
-            ...querySql,
-            preAggregations: querySql.preAggregations.map(
-              (p) => ({ ...p, priority: preAggregationsWarmup ? 1 : queryCursor - queries.length })
-            ),
+            preAggregations: [sql],
             continueWait: true,
             renewQuery: true,
             requestId: context.requestId,
@@ -405,9 +398,9 @@ export class RefreshScheduler {
 
     Promise.all(preAggregations.map(async (p: any) => {
       const { partitions } = p;
-      return Promise.all(partitions.map(async ({ querySql, query }) => {
+      return Promise.all(partitions.map(async ({ query, sql }) => {
         await orchestratorApi.executeQuery({
-          ...querySql,
+          preAggregations: [{ sql }],
           continueWait: true,
           renewQuery: true,
           forceBuildPreAggregations: true,
