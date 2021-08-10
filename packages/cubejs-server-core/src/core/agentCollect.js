@@ -50,6 +50,10 @@ const createWsTransport = (endpointUrl, logger) => {
   return {
     ready: () => wsClient && wsClient.readyState === WebSocket.OPEN,
     async send(data) {
+      if (!this.ready()) {
+        await new Promise(resolve => setTimeout(() => resolve(), 1000));
+        throw new Error('WebSocket Agent not ready');
+      }
       const result = await new Promise((resolve, reject) => {
         const callbackId = crypto.randomBytes(16).toString('hex');
         wsClient.send(JSON.stringify({
@@ -104,21 +108,19 @@ export default async (event, endpointUrl, logger) => {
   }
 
   const flush = async (toFlush, retries) => {
-    if (transport && transport.ready()) {
-      if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
-      if (!toFlush.length) return false;
-      if (retries == null) retries = 3;
+    if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
+    if (!toFlush.length) return false;
+    if (retries == null) retries = 3;
 
-      try {
-        const sentAt = new Date().toJSON();
-        const result = await transport.send(toFlush.map(r => ({ ...r, sentAt })));
-        if (!result && retries > 0) return flush(toFlush, retries - 1);
-    
-        return true;
-      } catch (e) {
-        if (retries > 0) return flush(toFlush, retries - 1);
-        logger('Agent Error', { error: (e.stack || e).toString() });
-      }
+    try {
+      const sentAt = new Date().toJSON();
+      const result = await transport.send(toFlush.map(r => ({ ...r, sentAt })));
+      if (!result && retries > 0) return flush(toFlush, retries - 1);
+  
+      return true;
+    } catch (e) {
+      if (retries > 0) return flush(toFlush, retries - 1);
+      logger('Agent Error', { error: (e.stack || e).toString() });
     }
 
     return true;
