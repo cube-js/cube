@@ -104,13 +104,13 @@ export default async (event, endpointUrl, logger) => {
   lastEvent = new Date();
 
   if (!transport) {
-    transport = endpointUrl.includes('http') ?
+    transport = /^http/.test(endpointUrl) ?
       createHttpTransport(endpointUrl, logger) :
       createWsTransport(endpointUrl, logger);
   }
 
   const flush = async (toFlush, retries) => {
-    if (transport.ready()) {
+    if (transport && transport.ready()) {
       if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
       if (!toFlush.length) return false;
       if (retries == null) retries = 3;
