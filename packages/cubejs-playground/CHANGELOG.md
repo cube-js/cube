@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.15](https://github.com/cube-js/cube.js/compare/v0.28.14...v0.28.15) (2021-08-06)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** do not filter out time dimensions ([#3201](https://github.com/cube-js/cube.js/issues/3201)) ([0300093](https://github.com/cube-js/cube.js/commit/0300093e0af29b87e7a9018dc8159c1299e3cd85))
+
+
+
+
+
 ## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
 
 

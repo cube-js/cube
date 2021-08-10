@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.15](https://github.com/cube-js/cube.js/compare/v0.28.14...v0.28.15) (2021-08-06)
+
+
+### Bug Fixes
+
+* **athena-driver:** Typings for driver (wrong import) ([fe6d429](https://github.com/cube-js/cube.js/commit/fe6d429c8ddf04702401c424143c113e92da0650))
+
+
+### Features
+
+* **athena-driver:** Use getWorkGroup instead of SELECT 1 for testConnection ([a99a6e4](https://github.com/cube-js/cube.js/commit/a99a6e4bb5b5dad5558a74683f8618696c1786c0))
+
+
+
+
+
 ## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

@@ -751,8 +751,6 @@ cube(`Orders`, {
 [ref-caching-readonly]: /caching/using-pre-aggregations#read-only-data-source
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
-[ref-connect-db-ext]:
-  /connecting-to-the-database#external-pre-aggregations-database
 [ref-config-driverfactory]: /config/#options-reference-driver-factory
 [ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
 [ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
