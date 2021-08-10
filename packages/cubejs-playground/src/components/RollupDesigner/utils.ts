@@ -17,62 +17,10 @@ export type PreAggregationReferences = {
 };
 
 export type PreAggregationDefinition = {
-  value: string;
-  code: string;
-  references: PreAggregationReferences;
+  preAggregationName: string;
+  cubeName: string;
+  code: Object;
 };
-
-export function getPreAggregationDefinition(
-  transformedQuery,
-  preAggregationName = 'main'
-): PreAggregationDefinition {
-  const references: PreAggregationReferences = {
-    measures: [],
-    dimensions: [],
-    timeDimensions: [],
-  };
-  let lines: string[] = [];
-
-  if (transformedQuery?.leafMeasures.length) {
-    references.measures = [...transformedQuery.leafMeasures];
-    lines.push(`measures: [${transformedQuery.leafMeasures.join(', ')}]`);
-  }
-
-  if (transformedQuery?.sortedDimensions.length) {
-    references.dimensions = [...transformedQuery.sortedDimensions];
-    lines.push(`dimensions: [${transformedQuery.sortedDimensions.join(', ')}]`);
-  }
-
-  if (
-    transformedQuery?.sortedTimeDimensions.length &&
-    transformedQuery.sortedTimeDimensions[0]?.[1] != null
-  ) {
-    references.timeDimension = transformedQuery.sortedTimeDimensions[0][0];
-    references.granularity = transformedQuery.sortedTimeDimensions[0][1];
-
-    if (references.timeDimension) {
-      references.timeDimensions = [
-        {
-          dimension: references.timeDimension,
-          granularity: references.granularity,
-        },
-      ];
-    }
-
-    lines.push(`timeDimension: ${transformedQuery.sortedTimeDimensions[0][0]}`);
-    lines.push(
-      `granularity: \`${transformedQuery.sortedTimeDimensions[0][1]}\``
-    );
-  }
-
-  const value = `{\n${lines.map((l) => `  ${l}`).join(',\n')}\n}`;
-
-  return {
-    code: `${camelCase(preAggregationName)}: ${value}`,
-    value,
-    references,
-  };
-}
 
 export function getPreAggregationReferences(
   transformedQuery: TransformedQuery | null
