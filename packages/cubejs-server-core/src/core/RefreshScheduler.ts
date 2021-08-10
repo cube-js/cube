@@ -337,7 +337,10 @@ export class RefreshScheduler {
           const queryCursor = queries.length - 1 - partitionCursor;
           const { sql } = queries[queryCursor];
           return {
-            preAggregations: [sql],
+            preAggregations: [{
+              ...sql,
+              priority: preAggregationsWarmup ? 1 : queryCursor - queries.length
+            }],
             continueWait: true,
             renewQuery: true,
             requestId: context.requestId,
