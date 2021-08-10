@@ -105,6 +105,7 @@ const config = {
         ]
       }
     },
+    'cubejs-remark-nested-header-ids-plugin',
     'gatsby-redirect-from',
     'gatsby-plugin-meta-redirect',
     'gatsby-plugin-percy',
