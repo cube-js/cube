@@ -400,7 +400,7 @@ export class RefreshScheduler {
       const { partitions } = p;
       return Promise.all(partitions.map(async ({ query, sql }) => {
         await orchestratorApi.executeQuery({
-          preAggregations: [{ sql }],
+          preAggregations: [sql],
           continueWait: true,
           renewQuery: true,
           forceBuildPreAggregations: true,
