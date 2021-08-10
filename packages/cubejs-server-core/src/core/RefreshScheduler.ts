@@ -64,7 +64,7 @@ export class RefreshScheduler {
           ...baseQuery,
           timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
             ...baseQuery.timeDimensions[0],
-            dateRange: partition.range
+            dateRange: partition.loadSql[1]
           }]
         },
         sql: partition
