@@ -274,6 +274,11 @@ const variables: Record<string, (...args: any) => any> = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  agentEndpointUrl: () => get('CUBEJS_AGENT_ENDPOINT_URL')
+    .asString(),
+  agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
+    .default(1000)
+    .asInt(),
   telemetry: () => get('CUBEJS_TELEMETRY')
     .default('true')
     .asBool(),

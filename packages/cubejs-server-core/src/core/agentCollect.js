@@ -1,7 +1,7 @@
 import { getEnv } from '@cubejs-backend/shared';
 
-const crypto = require('crypto');
 const fetch = require('node-fetch');
+const crypto = require('crypto');
 const WebSocket = require('ws');
 
 const trackEvents = [];
@@ -48,10 +48,7 @@ const createWsTransport = (endpointUrl, logger) => {
   }
   
   return {
-    agentInterval: 100,
-    ready() {
-      return wsClient && wsClient.readyState === WebSocket.OPEN;
-    },
+    ready: () => wsClient && wsClient.readyState === WebSocket.OPEN,
     async send(data) {
       const result = await new Promise((resolve, reject) => {
         const callbackId = crypto.randomBytes(16).toString('hex');
@@ -81,10 +78,7 @@ const createWsTransport = (endpointUrl, logger) => {
 };
 
 const createHttpTransport = (endpointUrl) => ({
-  agentInterval: 1000,
-  ready() {
-    return true;
-  },
+  ready: () => true,
   async send(data) {
     const result = await fetch(endpointUrl, {
       method: 'post',
@@ -138,6 +132,6 @@ export default async (event, endpointUrl, logger) => {
         clearInterval(agentInterval);
         agentInterval = null;
       }
-    }, transport && transport.agentInterval || 1000);
+    }, getEnv('agentFlushInterval'));
   }
 };
