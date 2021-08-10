@@ -2,11 +2,15 @@ import { createContext, ReactNode, useContext, useState } from 'react';
 
 import { PreAggregationDefinition } from '../../components/RollupDesigner/utils';
 
+type AddPreAggregationToSchemaResult = {
+  error?: string;
+}
+
 type CloudProviderContext = {
   isCloud: boolean;
   addPreAggregationToSchema?: (
     preAggregationDefinition: PreAggregationDefinition
-  ) => Promise<void>;
+  ) => Promise<AddPreAggregationToSchemaResult>;
   setContext: (
     partialContext: Partial<Omit<CloudProviderContext, 'setContext'>>
   ) => void;

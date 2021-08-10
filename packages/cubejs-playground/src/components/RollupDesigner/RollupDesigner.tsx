@@ -187,8 +187,18 @@ export function RollupDesigner({
         });
       }
     } else {
-      await cloud.addPreAggregationToSchema?.(definition);
-      showSuccessMessage();
+      if (cloud.addPreAggregationToSchema == null) {
+        throw new Error('cloud.addPreAggregationToSchema is not defined');
+      }
+
+      const { error } = await cloud.addPreAggregationToSchema(definition);
+      if (!error) {
+        showSuccessMessage();
+      } else {
+        notification.error({
+          message: error,
+        });
+      }
     }
 
     setSaving(false);
@@ -294,58 +304,56 @@ export function RollupDesigner({
           {!isRollupCodeVisible ? (
             <Tabs>
               <TabPane tab="Members" key="members">
-                {!isRollupCodeVisible ? (
-                  <div>
-                    {references.measures?.length ? (
-                      <>
-                        <Members
-                          title="Measures"
-                          members={references.measures.map(
-                            (name) => indexedMembers[name]
-                          )}
-                          onRemove={handleMemberToggle('measures')}
-                        />
-
-                        <Divider />
-                      </>
-                    ) : null}
-
-                    {references.dimensions?.length ? (
-                      <>
-                        <Members
-                          title="Dimensions"
-                          members={references.dimensions.map(
-                            (name) => indexedMembers[name]
-                          )}
-                          onRemove={handleMemberToggle('dimensions')}
-                        />
-
-                        <Divider />
-                      </>
-                    ) : null}
-
-                    {references.timeDimensions.length ? (
-                      <TimeDimension
-                        member={
-                          indexedMembers[references.timeDimensions[0].dimension]
-                        }
-                        granularity={references.timeDimensions[0].granularity}
-                        onGranularityChange={(granularity) => {
-                          setReferences({
-                            ...references,
-                            timeDimensions: [
-                              {
-                                ...(references.timeDimensions[0] || {}),
-                                ...(granularity ? { granularity } : null),
-                              } as TimeDimensionBase,
-                            ],
-                          });
-                        }}
-                        onRemove={handleMemberToggle('timeDimensions')}
+                <div>
+                  {references.measures?.length ? (
+                    <>
+                      <Members
+                        title="Measures"
+                        members={references.measures.map(
+                          (name) => indexedMembers[name]
+                        )}
+                        onRemove={handleMemberToggle('measures')}
                       />
-                    ) : null}
-                  </div>
-                ) : null}
+
+                      <Divider />
+                    </>
+                  ) : null}
+
+                  {references.dimensions?.length ? (
+                    <>
+                      <Members
+                        title="Dimensions"
+                        members={references.dimensions.map(
+                          (name) => indexedMembers[name]
+                        )}
+                        onRemove={handleMemberToggle('dimensions')}
+                      />
+
+                      <Divider />
+                    </>
+                  ) : null}
+
+                  {references.timeDimensions.length ? (
+                    <TimeDimension
+                      member={
+                        indexedMembers[references.timeDimensions[0].dimension]
+                      }
+                      granularity={references.timeDimensions[0].granularity}
+                      onGranularityChange={(granularity) => {
+                        setReferences({
+                          ...references,
+                          timeDimensions: [
+                            {
+                              ...(references.timeDimensions[0] || {}),
+                              ...(granularity ? { granularity } : null),
+                            } as TimeDimensionBase,
+                          ],
+                        });
+                      }}
+                      onRemove={handleMemberToggle('timeDimensions')}
+                    />
+                  ) : null}
+                </div>
               </TabPane>
 
               {/*<TabPane tab="Settings" key="settings">*/}
