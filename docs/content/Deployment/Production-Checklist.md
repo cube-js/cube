@@ -52,9 +52,10 @@ Variables][ref-env-vars-general] page for more details.
 
 <!-- prettier-ignore-start -->
 [[info | Note]]
-| You may consider enabling an export bucket which allows Cube.js to build large pre-aggregations in
-| a much faster manner. It is currently suppored for BigQuery, Redshift and Snowflake. Check [the relevant documentation for your
-| configured database][ref-config-connect-db-notes] to set it up.
+| You may consider enabling an export bucket which allows Cube.js to build
+| large pre-aggregations in a much faster manner. It is currently supported for
+| BigQuery, Redshift and Snowflake. Check [the relevant documentation for your
+| configured database][ref-config-connect-db] to set it up.
 <!-- prettier-ignore-end -->
 
 ## Set up Redis
@@ -142,7 +143,7 @@ deployment's health and be alerted to any issues.
 [link-nginx]: https://www.nginx.com/
 [link-nginx-docs]: https://nginx.org/en/docs/http/configuring_https_servers.html
 [link-redis-sentinel]: https://redis.io/topics/sentinel
-[ref-config-connect-db-notes]: /connecting-to-the-database#notes
+[ref-config-connect-db]: /connecting-to-the-database
 [ref-caching-cubestore]: /caching/running-in-production
 [ref-env-vars-general]: /reference/environment-variables#general
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
