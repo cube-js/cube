@@ -51,10 +51,8 @@ export class RefreshScheduler {
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
     const preAggregationsLoadCacheByDataSource = {};
 
-    const preAggregations = [{ ...preAggregationDescription }];
-
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
-      preAggregations,
+      preAggregations: [preAggregationDescription],
       preAggregationsLoadCacheByDataSource,
       requestId: context.requestId
     });
