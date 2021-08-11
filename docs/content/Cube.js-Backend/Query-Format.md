@@ -412,8 +412,8 @@ provides a convenient shortcut to pass a dimension and a filter as a
   padded to the start and end of the day if used in start and end of date range
   interval accordingly. If only one date is specified it's equivalent to passing
   two of the same dates as a date range. You can also pass a string instead of
-  array with relative date range, for example: `last quarter` or
-  `last 360 days`.
+  array with relative date range, for example: `last quarter`, `last 360 days`,
+  or `next 2 months`.
 - `compareDateRange`: An array of date ranges to compare a measure change over
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
@@ -452,8 +452,8 @@ const resultSet = cubejsApi.load({
 // ...
 ```
 
-You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `last year`,
-or `last 6 months`.
+You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `tomorrow`, `last year`,
+`next month`, or `last 6 months`.
 
 ```js
 {
@@ -466,8 +466,8 @@ or `last 6 months`.
 }
 ```
 
-Be aware that e.g. `Last 7 days` does not include the current date. If you need
-the current date also you can use `from N days ago to now`.
+Be aware that e.g. `Last 7 days` or `Next 2 weeks` do not include the current
+date. If you need the current date also you can use `from N days ago to now` or `from now to N days from now`.
 
 ```js
 {
