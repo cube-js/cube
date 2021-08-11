@@ -36,13 +36,8 @@ module.exports = {
     'no-plusplus': 0,
     'no-await-in-loop': 0,
     'operator-linebreak': 0,
-    'max-len': ['error', 120, 2, {
-      ignoreUrls: true,
-      ignoreComments: false,
-      ignoreRegExpLiterals: true,
-      ignoreStrings: true,
-      ignoreTemplateLiterals: true,
-    }],
+    // linter can't fix this itself and, in some cases, conflicts with `arrow-body-style`
+    'max-len': 0,
     'no-trailing-spaces': ['warn', { skipBlankLines: true }],
     'object-curly-newline': 0,
     // TypeScript Recommended

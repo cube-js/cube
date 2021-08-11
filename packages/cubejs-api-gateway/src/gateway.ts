@@ -246,6 +246,8 @@ export class ApiGateway {
     protected readonly logger: any,
     protected readonly options: ApiGatewayOptions,
   ) {
+    console.log('SLDJFLSJLDFJSLDFLSJLFJSLDFJSLDFJ >>>');
+    
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
     this.scheduledRefreshContexts = options.scheduledRefreshContexts;
@@ -948,8 +950,7 @@ export class ApiGateway {
   }
 
   protected resToResultFn(res: Response) {
-    // @ts-ignore
-    return (message, { status } = {}) => (status ? res.status(status).json(message) : res.json(message));
+    return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
   }
 
   protected parseQueryParam(query) {
