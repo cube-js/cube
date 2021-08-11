@@ -93,6 +93,7 @@ type IndexDescription = {
 };
 
 type PreAggregationDescription = {
+  preAggregationId: string;
   priority: number;
   previewSql: QueryWithParams;
   timezone: string;
@@ -103,7 +104,7 @@ type PreAggregationDescription = {
   tableName: string;
   matchedTimeDimensionDateRange: QueryDateRange;
   partitionGranularity: string;
-  preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
+  preAggregationStartEndQueries?: [QueryWithParams, QueryWithParams];
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -1093,6 +1094,7 @@ export class PreAggregationPartitionRangeLoader {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
+
     return {
       ...this.preAggregation,
       tableName: partitionTableName,
@@ -1105,7 +1107,8 @@ export class PreAggregationPartitionRangeLoader {
       indexesSql: (this.preAggregation.indexesSql || [])
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName)
+        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
+      preAggregationStartEndQueries: undefined
     };
   }
 

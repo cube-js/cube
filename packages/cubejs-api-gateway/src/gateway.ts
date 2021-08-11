@@ -536,7 +536,7 @@ export class ApiGateway {
     const requestStarted = new Date();
     try {
       query = normalizeQueryPreAggregationPreview(this.parseQueryParam(query));
-      const { preAggregationId, refreshRange, versionEntry, timezone } = query;
+      const { preAggregationId, versionEntry, timezone } = query;
 
       const orchestratorApi = this.getAdapterApi(context);
       const compilerApi = this.getCompilerApi(context);
@@ -547,7 +547,7 @@ export class ApiGateway {
           compilerApi,
           {
             timezones: [timezone],
-            preAggregations: [{ id: preAggregationId, refreshRange }]
+            preAggregations: [{ id: preAggregationId }]
           }
         );
       const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
