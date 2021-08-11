@@ -62,7 +62,7 @@ jobs:
         with:
           script: |
             const repo = await github.repos.get(context.repo)
-            return repo.data
+            return repo.data.replace(/\p{Emoji_Basic}/ug, "")
       - name: Prepare
         id: prep
         run: |
@@ -126,7 +126,7 @@ jobs:
         with:
           script: |
             const repo = await github.repos.get(context.repo)
-            return repo.data
+            return repo.data.replace(/\p{Emoji_Basic}/ug, "")
       - name: Prepare
         id: prep
         run: |
@@ -191,7 +191,7 @@ jobs:
         with:
           script: |
             const repo = await github.repos.get(context.repo)
-            return repo.data
+            return repo.data.replace(/\p{Emoji_Basic}/ug, "")
       - name: Prepare
         id: prep
         env:
