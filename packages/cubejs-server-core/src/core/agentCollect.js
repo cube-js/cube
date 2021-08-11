@@ -7,53 +7,62 @@ const WebSocket = require('ws');
 const trackEvents = [];
 let agentInterval = null;
 let lastEvent;
-
 let transport = null;
 
 const createWsTransport = (endpointUrl, logger) => {
   const callbacks = {};
-  let wsClient = null;
 
-  if (!wsClient) {
-    const heartbeat = function heartbeat() {
-      clearTimeout(this.pingTimeout);
-      this.pingTimeout = setTimeout(() => {
-        this.terminate();
-      }, 30000 + 1000);
-    };
+  let connectionPromiseResolve;
+  let connectionPromiseReject;
+  const connectionPromise = new Promise((resolve, reject) => {
+    connectionPromiseResolve = resolve;
+    connectionPromiseReject = reject;
+  });
 
-    wsClient = new WebSocket(endpointUrl);
-    
-    wsClient.on('open', heartbeat);
-    wsClient.on('ping', heartbeat);
-    wsClient.on('close', function clear() {
-      clearTimeout(this.pingTimeout);
-      transport = null;
-    });
+  const clearTransport = () => {
+    clearInterval(agentInterval);
+    transport = null;
+    agentInterval = null;
+  };
 
-    wsClient.on('error', e => {
-      logger('Agent Error', { error: (e.stack || e).toString() });
-    });
-
-    wsClient.on('message', data => {
-      try {
-        const { method, params } = JSON.parse(data);
-        if (method === 'callback' && callbacks[params.callbackId]) {
-          callbacks[params.callbackId](params.result);
-        }
-      } catch (e) {
-        logger('Agent Error', { error: (e.stack || e).toString() });
-      }
-    });
-  }
+  const pingInterval = 30 * 1000;
+  const heartbeat = function heartbeat() {
+    connectionPromiseResolve();
+    clearTimeout(this.pingTimeout);
+    this.pingTimeout = setTimeout(() => {
+      this.terminate();
+    }, pingInterval + 1000); // +1000 - a conservative assumption of the latency
+  };
   
+  const wsClient = new WebSocket(endpointUrl);
+  
+  wsClient.on('open', heartbeat);
+  wsClient.on('ping', heartbeat);
+  wsClient.on('close', function clear() {
+    clearTimeout(this.pingTimeout);
+    clearTransport();
+  });
+
+  wsClient.on('error', e => {
+    connectionPromiseReject(e);
+    logger('Agent Error', { error: (e.stack || e).toString() });
+  });
+
+  wsClient.on('message', data => {
+    try {
+      const { method, params } = JSON.parse(data);
+      if (method === 'callback' && callbacks[params.callbackId]) {
+        callbacks[params.callbackId](params.result);
+      }
+    } catch (e) {
+      logger('Agent Error', { error: (e.stack || e).toString() });
+    }
+  });
+
   return {
     ready: () => wsClient && wsClient.readyState === WebSocket.OPEN,
     async send(data) {
-      if (!this.ready()) {
-        await new Promise(resolve => setTimeout(() => resolve(), 1000));
-        throw new Error('WebSocket Agent not ready');
-      }
+      await connectionPromise;
       const result = await new Promise((resolve, reject) => {
         const callbackId = crypto.randomBytes(16).toString('hex');
         wsClient.send(JSON.stringify({
