@@ -3,6 +3,11 @@ import { getEnv } from '@cubejs-backend/shared';
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 const WebSocket = require('ws');
+const zlib = require('zlib');
+const { promisify } = require('util');
+
+const deflate = promisify(zlib.deflate);
+console.log(deflate);
 
 const trackEvents = [];
 let agentInterval = null;
@@ -63,15 +68,18 @@ const createWsTransport = (endpointUrl, logger) => {
     ready: () => wsClient && wsClient.readyState === WebSocket.OPEN,
     async send(data) {
       await connectionPromise;
+
+      const callbackId = crypto.randomBytes(16).toString('hex');
+      const message = await deflate(JSON.stringify({
+        method: 'agent',
+        params: {
+          data
+        },
+        callbackId
+      }));
+
       const result = await new Promise((resolve, reject) => {
-        const callbackId = crypto.randomBytes(16).toString('hex');
-        wsClient.send(JSON.stringify({
-          method: 'agent',
-          params: {
-            data
-          },
-          callbackId
-        }));
+        wsClient.send(message);
 
         const timeout = setTimeout(() => {
           delete callbacks[callbackId];
