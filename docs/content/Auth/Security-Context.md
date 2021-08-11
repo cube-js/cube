@@ -83,6 +83,8 @@ module.exports = {
       operator: 'equals',
       values: [securityContext.user_id],
     });
+
+    return query;
   },
 };
 ```
