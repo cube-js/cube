@@ -109,11 +109,12 @@ class CubejsApi {
       }
 
       let body = {};
-
+      let text = '';
       try {
-        body = await response.clone().json();
+        text = await response.text();
+        body = JSON.parse(text);
       } catch (_) {
-        body.error = await response.text();
+        body.error = text;
       }
 
       if (body.error === 'Continue wait') {
