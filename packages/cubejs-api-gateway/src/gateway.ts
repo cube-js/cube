@@ -246,8 +246,6 @@ export class ApiGateway {
     protected readonly logger: any,
     protected readonly options: ApiGatewayOptions,
   ) {
-    console.log('SLDJFLSJLDFJSLDFLSJLFJSLDFJSLDFJ >>>');
-    
     this.dataSourceStorage = options.dataSourceStorage;
     this.refreshScheduler = options.refreshScheduler;
     this.scheduledRefreshContexts = options.scheduledRefreshContexts;
