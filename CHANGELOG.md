@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** client hangs when loading big responses (node) ([#3216](https://github.com/cube-js/cube.js/issues/3216)) ([33a16f9](https://github.com/cube-js/cube.js/commit/33a16f983f5bbbb88e62f737ee2dc0670f3710c7))
+
+
+
+
+
 ## [0.28.16](https://github.com/cube-js/cube.js/compare/v0.28.15...v0.28.16) (2021-08-10)
 
 **Note:** Version bump only for package cubejs
