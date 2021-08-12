@@ -9,6 +9,7 @@ import {
 } from '../../components/SecurityContext/SecurityContextProvider';
 import { PlaygroundQueryBuilderProps } from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
+import { QueryTabsProps } from '../../components/QueryTabs/QueryTabs';
 
 type QueryBuilderProps = {
   token: string;
@@ -24,7 +25,8 @@ type QueryBuilderProps = {
   | 'onSchemaChange'
 > &
   Pick<SecurityContextProps, 'onTokenPayloadChange'> &
-  Pick<SecurityContextProviderProps, 'tokenUpdater'>;
+  Pick<SecurityContextProviderProps, 'tokenUpdater'> &
+  Pick<QueryTabsProps, 'onTabChange'>;
 
 function QueryBuilderComponent({
   token,

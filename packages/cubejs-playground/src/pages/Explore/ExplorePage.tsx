@@ -3,7 +3,12 @@ import { useHistory } from 'react-router';
 
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import DashboardSource from '../../DashboardSource';
-import { useAppContext, useDeepEffect, useLivePreviewContext, useSecurityContext } from '../../hooks';
+import {
+  useAppContext,
+  useDeepEffect,
+  useLivePreviewContext,
+  useSecurityContext,
+} from '../../hooks';
 
 export function buildApiUrl(
   apiUrl: string,
@@ -48,15 +53,20 @@ export function ExplorePage() {
     }
   }, [basePath, livePreviewContext, cubejsToken, securityContextToken]);
 
+  function setQueryParam({ query }: { query?: Object}) {
+    if (query) {
+      push({ search: `?query=${JSON.stringify(query)}` });
+    }
+  }
+
   return (
     <QueryBuilderContainer
       apiUrl={apiUrl}
       token={token}
       schemaVersion={schemaVersion}
       dashboardSource={dashboardSource}
-      onVizStateChanged={({ query }) => {
-        push(`/build?query=${JSON.stringify(query)}`);
-      }}
+      onVizStateChanged={setQueryParam}
+      onTabChange={setQueryParam}
     />
   );
 }

@@ -34,7 +34,7 @@ type QueryTabs = {
   tabs: QueryTab[];
 };
 
-type QueryTabsProps = {
+export type QueryTabsProps = {
   query: Query | null;
   children: (
     tab: QueryTab,
