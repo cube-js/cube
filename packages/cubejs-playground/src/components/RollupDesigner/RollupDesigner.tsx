@@ -41,7 +41,7 @@ const { TabPane } = Tabs;
 
 const RightPanelContainer = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 300px 300px;
   grid-template-rows: max-content 1fr;
   gap: 32px 8px;
   grid-auto-flow: row;
@@ -120,7 +120,7 @@ export function RollupDesigner({
           },
         }
       );
-
+      
       if (isMounted() && mutext === canUseMutex.current) {
         setMatching(json.canUsePreAggregationForTransformedQuery);
         canUseMutex.current++;
@@ -229,7 +229,7 @@ export function RollupDesigner({
     }
 
     return (
-      <div>
+      <div style={{ minWidth: 200 }}>
         <CodeSnippet
           style={{ marginBottom: 16 }}
           code={
@@ -319,15 +319,19 @@ export function RollupDesigner({
             </Flex>
           </TabPane>
 
-          <TabPane tab="Settings" key="settings">
+          {/* <TabPane tab="Settings" key="settings">
             settings
-          </TabPane>
+          </TabPane> */}
         </Tabs>
       </Box>
 
       <RightPanelContainer>
         <Flex direction="column" gap={2}>
           <Text strong>Rollup Definition</Text>
+
+          <Paragraph>
+            Add the following pre-aggregation to the <b>{cubeName}</b> cube.
+          </Paragraph>
 
           <Input
             value={preAggName}
@@ -344,7 +348,7 @@ export function RollupDesigner({
             ) : (
               <Alert
                 type="warning"
-                message="This rollup will NOT match the following query:"
+                message={<Text>This rollup will <b>NOT</b> match the following query:</Text>}
               />
             ))}
         </Flex>
