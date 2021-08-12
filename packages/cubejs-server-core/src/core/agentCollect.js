@@ -7,7 +7,6 @@ const zlib = require('zlib');
 const { promisify } = require('util');
 
 const deflate = promisify(zlib.deflate);
-console.log(deflate);
 
 const trackEvents = [];
 let agentInterval = null;
