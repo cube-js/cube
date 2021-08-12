@@ -35,7 +35,8 @@
     "rollup-plugin-dts": "^1.1.8",
     "whatwg-fetch": "^3.0.0",
     "lerna": "^3.13.1",
-    "patch-package": "^6.4.7"
+    "patch-package": "^6.4.7",
+    "cubejs-cli": "^0.28.17"
   },
   "files": [
     "src",
