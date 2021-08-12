@@ -1,19 +1,13 @@
-import styled from 'styled-components';
-import { Alert, Button, Modal, Space, Typography } from 'antd';
 import Icon from '@ant-design/icons';
-// @ts-ignore
-import {
-  useCubeSql,
-  AvailableMembers,
-  useDryRun,
-  useLazyDryRun,
-} from '@cubejs-client/react';
 import { Query } from '@cubejs-client/core';
+import { AvailableMembers } from '@cubejs-client/react';
+import { Alert, Button, Modal, Space, Typography } from 'antd';
+import styled from 'styled-components';
 
-import { LightningIcon } from '../../../shared/icons/LightningIcon';
-import { QueryStatus } from './PlaygroundQueryBuilder';
-import { RollupDesigner } from '../../RollupDesigner';
 import { useServerCoreVersionGte, useToggle } from '../../../hooks';
+import { LightningIcon } from '../../../shared/icons/LightningIcon';
+import { RollupDesigner } from '../../RollupDesigner';
+import { QueryStatus } from './PlaygroundQueryBuilder';
 
 const { Link } = Typography;
 
@@ -39,7 +33,7 @@ export function PreAggregationStatus({
   ...props
 }: PreAggregationStatusProps) {
   const isVersionGte = useServerCoreVersionGte('0.28.4');
-  const [isModalOpen, toggleModal] = useToggle();
+  const [isModalOpen, toggleModal] = useToggle(true);
 
   // hide it for the time being
   // const renderTime = () => (
@@ -108,7 +102,7 @@ export function PreAggregationStatus({
         bodyStyle={{
           padding: 16,
         }}
-        width={1024}
+        width="90%"
         onCancel={toggleModal}
       >
         {props.transformedQuery ? (

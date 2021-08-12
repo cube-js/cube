@@ -10,6 +10,7 @@ type CodeSnippetProps = {
   code: string;
   language?: string;
   style?: CSSProperties;
+  copyMessage?: string;
 };
 
 const StyledCodeSnippet = styled.div`
@@ -53,7 +54,7 @@ const ButtonWrapper = styled.div`
   }
 `;
 
-export function CodeSnippet({ code, language, style }: CodeSnippetProps) {
+export function CodeSnippet({ code, language, style, copyMessage }: CodeSnippetProps) {
   return (
     <StyledCodeSnippet style={style}>
       <PrismCode code={code} language={language} style={{ flexGrow: 1 }} />
@@ -62,7 +63,7 @@ export function CodeSnippet({ code, language, style }: CodeSnippetProps) {
         <Button
           icon={<CopyOutlined />}
           onClick={() =>
-            copyToClipboard(code, 'Pre-aggregation code is copied')
+            copyToClipboard(code, copyMessage || 'Copied')
           }
         />
       </ButtonWrapper>
