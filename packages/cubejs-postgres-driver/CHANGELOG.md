@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.18](https://github.com/cube-js/cube.js/compare/v0.28.17...v0.28.18) (2021-08-12)
+
+
+### Features
+
+* **postgres-driver:** Load ud-types from pg_types for type detection ([b88d30c](https://github.com/cube-js/cube.js/commit/b88d30cfceb66682fbd0508352d441ba930f9e7c))
+
+
+
+
+
 ## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver

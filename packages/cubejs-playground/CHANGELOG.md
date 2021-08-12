@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.18](https://github.com/cube-js/cube.js/compare/v0.28.17...v0.28.18) (2021-08-12)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** query param change on tab change ([#3240](https://github.com/cube-js/cube.js/issues/3240)) ([128711a](https://github.com/cube-js/cube.js/commit/128711a947b629e6a7241fe9150d57c8a23c7f99))
+
+
+
+
+
 ## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
 
 **Note:** Version bump only for package @cubejs-client/playground

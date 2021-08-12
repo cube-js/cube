@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.18](https://github.com/cube-js/cube.js/compare/v0.28.17...v0.28.18) (2021-08-12)
+
+
+### Bug Fixes
+
+* **cubestore:** update datafusion to a new version ([ee80b3a](https://github.com/cube-js/cube.js/commit/ee80b3a2d16138768200e72cb7431fb067398ee8))
+
+
+
+
+
 ## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
