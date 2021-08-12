@@ -349,6 +349,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Repo metadata
+        id: repo
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const repo = await github.repos.get(context.repo)
+            const dataJSON = JSON.stringify(repo.data)
+            const replacedDataJSON = dataJSON.replace(/\p{Emoji_Basic}/ug, "")
+            console.log(replacedDataJSON)
+            const data = JSON.parse(replacedDataJSON)
+            console.log(data)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
