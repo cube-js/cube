@@ -1,23 +1,33 @@
 import { getEnv } from '@cubejs-backend/shared';
+import fetch from 'node-fetch';
+import crypto from 'crypto';
+import WebSocket from 'ws';
+import zlib from 'zlib';
+import { promisify } from 'util';
 
-const fetch = require('node-fetch');
-const crypto = require('crypto');
-const WebSocket = require('ws');
-const zlib = require('zlib');
-const { promisify } = require('util');
+interface WebSocketExtended extends WebSocket {
+  pingTimeout: NodeJS.Timeout
+}
+
+interface AgentTransport {
+  ready: () => Boolean,
+  send: (data: any[]) => Promise<Boolean>
+}
+
+type AgentTransportFactory = (endpointUrl: string, logger?: any) => AgentTransport;
 
 const deflate = promisify(zlib.deflate);
 
 const trackEvents = [];
-let agentInterval = null;
-let lastEvent;
-let transport = null;
+let agentInterval: NodeJS.Timeout = null;
+let lastEvent: Date;
+let transport: AgentTransport = null;
 
-const createWsTransport = (endpointUrl, logger) => {
+const createWsTransport: AgentTransportFactory = (endpointUrl, logger) => {
   const callbacks = {};
 
-  let connectionPromiseResolve;
-  let connectionPromiseReject;
+  let connectionPromiseResolve: Function;
+  let connectionPromiseReject: Function;
   const connectionPromise = new Promise((resolve, reject) => {
     connectionPromiseResolve = resolve;
     connectionPromiseReject = reject;
@@ -30,7 +40,7 @@ const createWsTransport = (endpointUrl, logger) => {
   };
 
   const pingInterval = 30 * 1000;
-  const heartbeat = function heartbeat() {
+  const heartbeat = function heartbeat(this: WebSocketExtended) {
     connectionPromiseResolve();
     clearTimeout(this.pingTimeout);
     this.pingTimeout = setTimeout(() => {
@@ -42,7 +52,7 @@ const createWsTransport = (endpointUrl, logger) => {
   
   wsClient.on('open', heartbeat);
   wsClient.on('ping', heartbeat);
-  wsClient.on('close', function clear() {
+  wsClient.on('close', function clear(this: WebSocketExtended) {
     clearTimeout(this.pingTimeout);
     clearTransport();
   });
@@ -52,9 +62,9 @@ const createWsTransport = (endpointUrl, logger) => {
     logger('Agent Error', { error: (e.stack || e).toString() });
   });
 
-  wsClient.on('message', data => {
+  wsClient.on('message', (data: WebSocket.Data) => {
     try {
-      const { method, params } = JSON.parse(data);
+      const { method, params } = JSON.parse(data.toString());
       if (method === 'callback' && callbacks[params.callbackId]) {
         callbacks[params.callbackId](params.result);
       }
@@ -64,8 +74,8 @@ const createWsTransport = (endpointUrl, logger) => {
   });
 
   return {
-    ready: () => wsClient && wsClient.readyState === WebSocket.OPEN,
-    async send(data) {
+    ready: () => wsClient?.readyState === WebSocket.OPEN,
+    async send(data: any[]): Promise<Boolean> {
       await connectionPromise;
 
       const callbackId = crypto.randomBytes(16).toString('hex');
@@ -85,21 +95,21 @@ const createWsTransport = (endpointUrl, logger) => {
           reject(new Error('Timeout agent'));
         }, 30 * 1000);
 
-        callbacks[callbackId] = res => {
+        callbacks[callbackId] = () => {
           clearTimeout(timeout);
-          resolve(res);
+          resolve(true);
           delete callbacks[callbackId];
         };
       });
 
-      return result;
+      return !!result;
     }
   };
 };
 
-const createHttpTransport = (endpointUrl) => ({
+const createHttpTransport: AgentTransportFactory = (endpointUrl) => ({
   ready: () => true,
-  async send(data) {
+  async send(data: any[]) {
     const result = await fetch(endpointUrl, {
       method: 'post',
       body: JSON.stringify(data),
@@ -109,7 +119,7 @@ const createHttpTransport = (endpointUrl) => ({
   }
 });
 
-export default async (event, endpointUrl, logger) => {
+export default async (event: Record<string, any>, endpointUrl: string, logger: any) => {
   trackEvents.push({
     ...event,
     id: crypto.randomBytes(16).toString('hex'),
@@ -119,11 +129,11 @@ export default async (event, endpointUrl, logger) => {
 
   if (!transport) {
     transport = /^http/.test(endpointUrl) ?
-      createHttpTransport(endpointUrl, logger) :
+      createHttpTransport(endpointUrl) :
       createWsTransport(endpointUrl, logger);
   }
 
-  const flush = async (toFlush, retries) => {
+  const flush = async (toFlush?: any[], retries?: number) => {
     if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
     if (!toFlush.length) return false;
     if (retries == null) retries = 3;
@@ -141,7 +151,6 @@ export default async (event, endpointUrl, logger) => {
 
     return true;
   };
-
   if (!agentInterval) {
     agentInterval = setInterval(async () => {
       if (trackEvents.length) {
