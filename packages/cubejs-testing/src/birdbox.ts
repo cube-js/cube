@@ -48,6 +48,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   const env = await dc
     .withStartupTimeout(30 * 1000)
     .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
+    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'latest')
     .up();
 
   const host = '127.0.0.1';
