@@ -356,11 +356,10 @@ jobs:
           script: |
             const repo = await github.repos.get(context.repo)
             const dataJSON = JSON.stringify(repo.data)
-            const reg = new RegExp('📊', 'ug');
+            const reg = new RegExp('📊 ', 'ug');
             const replacedDataJSON = dataJSON.replace(reg, "")
-            console.log(replacedDataJSON)
             const data = JSON.parse(replacedDataJSON)
-            console.log(data)
+            console.log(data.description)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
