@@ -57,6 +57,7 @@ const operators = [
   'lt',
   'lte',
   'set',
+  'tsQuery',
   'notSet',
   'inDateRange',
   'notInDateRange',
