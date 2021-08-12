@@ -6,10 +6,13 @@ import { useHistory } from 'react-router';
 import styled from 'styled-components';
 
 import { Button } from '../../atoms';
-import { useCubejsApi, useLivePreviewContext, useSecurityContext } from '../../hooks';
+import { useCubejsApi, useSecurityContext } from '../../hooks';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
-import { QueryTabs } from '../QueryTabs/QueryTabs';
-import { PlaygroundQueryBuilder, PlaygroundQueryBuilderProps } from './components/PlaygroundQueryBuilder';
+import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
+import {
+  PlaygroundQueryBuilder,
+  PlaygroundQueryBuilderProps,
+} from './components/PlaygroundQueryBuilder';
 
 const StyledCard = styled(Card)`
   border-radius: 0;
@@ -33,7 +36,8 @@ type QueryBuilderContainerProps = {
   | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
->;
+> &
+  Pick<QueryTabsProps, 'onTabChange'>;
 
 export function QueryBuilderContainer({
   apiUrl,
@@ -47,7 +51,6 @@ export function QueryBuilderContainer({
   const query = JSON.parse(params.get('query') || 'null');
 
   const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
-  const livePreviewContext = useLivePreviewContext();
 
   const currentToken = securityContextToken || token;
 
@@ -82,10 +85,8 @@ export function QueryBuilderContainer({
                 </Button>
               </Space>
             }
-            onTabChange={({ query }) => {
-              if (window.location.hash.includes('/build')) {
-                push({ search: `?query=${JSON.stringify(query)}` });
-              }
+            onTabChange={(tab) => {
+              props.onTabChange?.(tab);
             }}
           >
             {({ id, query, chartType }, saveTab) => (

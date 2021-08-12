@@ -30,7 +30,6 @@ export function CloudProvider({ children }: CloudProviderProps) {
       value={{
         ...context,
         setContext(partialContext) {
-          console.log('will set', partialContext);
           set({
             ...context,
             ...partialContext,
