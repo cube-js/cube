@@ -44,6 +44,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("three_tables_join_with_union", three_tables_join_with_union),
         t("in_list", in_list),
         t("numeric_cast", numeric_cast),
+        t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
         t("column_escaping", column_escaping),
@@ -736,6 +737,55 @@ async fn numeric_cast(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+}
+
+async fn numbers_to_bool(service: Box<dyn SqlClient>) {
+    let r = service
+        .exec_query("SELECT 1 = TRUE, FALSE = 0, -1 = TRUE, 123 = TRUE")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(true, true, true, true)]));
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.bools (b boolean, i int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.bools(b, i) VALUES (true, 0), (false, 0), (true, 123), (false, 123)",
+        )
+        .await
+        .unwrap();
+
+    // Compare array with constant.
+    let r = service
+        .exec_query("SELECT b, b = 1, b = 0, b = 123 FROM s.bools GROUP BY 1, 2, 3 ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(false, false, true, false), (true, true, false, true)])
+    );
+
+    // Compare array with array.
+    let r = service
+        .exec_query("SELECT b, i, b = i FROM s.bools ORDER BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (false, 0, true),
+            (false, 123, false),
+            (true, 0, false),
+            (true, 123, true)
+        ])
+    );
+
+    // Other types work fine.
+    let r = service.exec_query("SELECT 1 = 1, '1' = 1, 'foo' = 'foo'").await.unwrap();
+    assert_eq!(to_rows(&r), rows(&[(true, true, true)]))
 }
 
 async fn union(service: Box<dyn SqlClient>) {
