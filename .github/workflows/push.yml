@@ -356,7 +356,8 @@ jobs:
           script: |
             const repo = await github.repos.get(context.repo)
             const dataJSON = JSON.stringify(repo.data)
-            const replacedDataJSON = dataJSON.replace(/\p{Emoji_Basic}/ug, "")
+            const reg = new RegExp('\p{Emoji_Basic}', 'u');
+            const replacedDataJSON = dataJSON.replace(reg, "")
             console.log(replacedDataJSON)
             const data = JSON.parse(replacedDataJSON)
             console.log(data)
