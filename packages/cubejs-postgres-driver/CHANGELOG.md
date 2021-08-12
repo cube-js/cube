@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
 ## [0.28.15](https://github.com/cube-js/cube.js/compare/v0.28.14...v0.28.15) (2021-08-06)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
