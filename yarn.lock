@@ -5031,13 +5031,6 @@
   dependencies:
     "@types/estree" "*"
 
-"@types/archiver@^5.1.1":
-  version "5.1.1"
-  resolved "https://registry.yarnpkg.com/@types/archiver/-/archiver-5.1.1.tgz#d6d7610de4386b293abd5c1cb1875e0a4f4e1c30"
-  integrity sha512-heuaCk0YH5m274NOLSi66H1zX6GtZoMsdE6TYFcpFFjBjg0FoU4i4/M/a/kNlgNg26Xk3g364mNOYe1JaiEPOQ==
-  dependencies:
-    "@types/glob" "*"
-
 "@types/babel__code-frame@^7.0.2":
   version "7.0.3"
   resolved "https://registry.yarnpkg.com/@types/babel__code-frame/-/babel__code-frame-7.0.3.tgz#eda94e1b7c9326700a4b69c485ebbc9498a0b63f"
@@ -5168,7 +5161,7 @@
     "@types/node" "*"
     "@types/ssh2" "*"
 
-"@types/dockerode@^3.2.5":
+"@types/dockerode@^3.2.1":
   version "3.2.7"
   resolved "https://registry.yarnpkg.com/@types/dockerode/-/dockerode-3.2.7.tgz#0bc1f583b0e1edc4ca0c6179ef251382df35dcb3"
   integrity sha512-Y8hMRQTwsOjz4qm6yilZKKjB/Y7+2EOiY3RPN1Xtu63wEUEDVv+3Ou+sgiisPE9+pVe3bmwhnF+E1Iwj/o4J6w==
@@ -5244,7 +5237,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/glob@*", "@types/glob@^7.1.1":
+"@types/glob@^7.1.1":
   version "7.1.4"
   resolved "https://registry.yarnpkg.com/@types/glob/-/glob-7.1.4.tgz#ea59e21d2ee5c517914cb4bc8e4153b99e566672"
   integrity sha512-w+LsMxKyYQm347Otw+IfBXOv9UWVjpHpCDdbBMt8Kz/xbvCYNjP+0qPh91Km3iKfSRLBB0P7fAMf0KHrPu+MyA==
@@ -7008,7 +7001,7 @@ archiver-utils@^2.1.0:
     normalize-path "^3.0.0"
     readable-stream "^2.0.0"
 
-archiver@^5.3.0:
+archiver@^5.2.0:
   version "5.3.0"
   resolved "https://registry.yarnpkg.com/archiver/-/archiver-5.3.0.tgz#dd3e097624481741df626267564f7dd8640a45ba"
   integrity sha512-iUw+oDwK0fgNpvveEsdQ0Ase6IIKztBJU2U0E9MzszMfmVVUyv1QJhS2ITW9ZCqx8dktAxVAjWWkKehuZE8OPg==
@@ -10837,7 +10830,7 @@ dns-txt@^2.0.2:
   dependencies:
     buffer-indexof "^1.0.0"
 
-docker-compose@^0.23.12:
+docker-compose@^0.23.5:
   version "0.23.13"
   resolved "https://registry.yarnpkg.com/docker-compose/-/docker-compose-0.23.13.tgz#77d37bd05b6a966345f631e6d05e961c79514f06"
   integrity sha512-/9fYC4g3AO+qsqxIZhmbVnFvJJPcYEV2yJbAPPXH+6AytU3urIY8lUAXOlvY8sl4u25pdKu1JrOfAmWC7lJDJg==
@@ -10854,7 +10847,7 @@ docker-modem@^3.0.0:
     split-ca "^1.0.1"
     ssh2 "^0.8.7"
 
-dockerode@^3.3.0:
+dockerode@^3.2.1:
   version "3.3.0"
   resolved "https://registry.yarnpkg.com/dockerode/-/dockerode-3.3.0.tgz#bedaf48ef9fa9124275a54a9881a92374c51008e"
   integrity sha512-St08lfOjpYCOXEM8XA0VLu3B3hRjtddODphNW5GFoA0AS3JHgoPQKOz0Qmdzg3P+hUPxhb02g1o1Cu1G+U3lRg==
@@ -13096,7 +13089,7 @@ glob@7.1.6:
     once "^1.3.0"
     path-is-absolute "^1.0.0"
 
-glob@^7.0.0, glob@^7.0.3, glob@^7.1.1, glob@^7.1.2, glob@^7.1.3, glob@^7.1.4, glob@^7.1.6, glob@^7.1.7:
+glob@^7.0.0, glob@^7.0.3, glob@^7.1.1, glob@^7.1.2, glob@^7.1.3, glob@^7.1.4, glob@^7.1.6:
   version "7.1.7"
   resolved "https://registry.yarnpkg.com/glob/-/glob-7.1.7.tgz#3b193e9233f01d42d0b3f78294bbeeb418f94a90"
   integrity sha512-OvD9ENzPLbegENnYP5UUfJIirTg4+XwMWGaQfQTY0JenxNvvIKP3U3/tAQSPIu/lHxXYSZmpXlUHeqAIdKzBLQ==
@@ -24563,22 +24556,22 @@ test-exclude@^6.0.0:
     glob "^7.1.4"
     minimatch "^3.0.4"
 
-testcontainers@^7.11.1, testcontainers@^7.5.0, testcontainers@^7.6.2, testcontainers@^7.9.0:
-  version "7.18.2"
-  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-7.18.2.tgz#bb61260135d08f8cbf95447f7c086486264da717"
-  integrity sha512-80OIvYQvOul/euZVK710XbgBo5VajV1mJQHyaRuaEyI7GuZykrDqod5waZsTfqkznF35vnItAVeEnH9XmqsuNw==
+testcontainers@7.5.0, testcontainers@^7.11.1, testcontainers@^7.5.0, testcontainers@^7.6.2, testcontainers@^7.9.0:
+  version "7.5.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-7.5.0.tgz#2f570ddad89dbd8ea81585562136f7e8fb4b0c7d"
+  integrity sha512-cSP17iaXcy0U/wFTptjphgrd42kBRQYdizpt3bvjUe/c0MSbwEH6kXKZMXv5ZQ8LQB4OAwmlrUXxHqAi0uNmQA==
   dependencies:
-    "@types/archiver" "^5.1.1"
-    "@types/dockerode" "^3.2.5"
-    archiver "^5.3.0"
+    "@types/dockerode" "^3.2.1"
+    archiver "^5.2.0"
     byline "^5.0.0"
-    debug "^4.3.2"
-    docker-compose "^0.23.12"
-    dockerode "^3.3.0"
+    debug "^4.3.1"
+    docker-compose "^0.23.5"
+    dockerode "^3.2.1"
     get-port "^5.1.1"
-    glob "^7.1.7"
+    glob "^7.1.6"
     slash "^3.0.0"
     ssh-remote-port-forward "^1.0.3"
+    stream-to-array "^2.3.0"
     tar-fs "^2.1.1"
 
 text-extensions@^1.0.0:
