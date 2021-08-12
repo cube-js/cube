@@ -22,6 +22,7 @@ export const TIME_SERIES: { [key: string]: (range: DateRange) => QueryDateRange[
     .map(d => [d.format('YYYY-MM-DDTHH:mm:ss.000'), d.format('YYYY-MM-DDTHH:mm:ss.999')]),
   week: (range: DateRange) => Array.from(range.snapTo(<unitOfTime.Diff>'isoWeek').by('week'))
     .map(d => [d.startOf('isoWeek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoWeek').format('YYYY-MM-DDT23:59:59.999')])
+    //TODO add Quarter and it's function
 };
 
 export const timeSeries = (granularity: string, dateRange: QueryDateRange): QueryDateRange[] => {

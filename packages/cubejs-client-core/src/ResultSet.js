@@ -20,6 +20,7 @@ export const TIME_SERIES = {
   minute: (range) => range.by('m').map(d => d.format('YYYY-MM-DDTHH:mm:00.000')),
   second: (range) => range.by('s').map(d => d.format('YYYY-MM-DDTHH:mm:ss.000')),
   week: (range) => range.snapTo('week').by('w').map(d => d.startOf('week').format('YYYY-MM-DDT00:00:00.000'))
+    //TODO add quarter to the resultSet
 };
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
