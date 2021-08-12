@@ -79,7 +79,8 @@
   "resolutions": {
     "@types/ramda": "0.27.40",
     "rc-tree": "4.1.5",
-    "@azure/core-auth": "1.2.0"
+    "@azure/core-auth": "1.2.0",
+    "testcontainers": "7.12.1"
   },
   "license": "MIT"
 }
