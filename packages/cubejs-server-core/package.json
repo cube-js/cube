@@ -51,7 +51,8 @@
     "semver": "^6.3.0",
     "serve-static": "^1.13.2",
     "sqlstring": "^2.3.1",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "ws": "^7.5.3"
   },
   "devDependencies": {
     "@cubejs-backend/cubestore-driver": "^0.28.18",

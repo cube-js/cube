@@ -506,7 +506,8 @@ export class CubejsServerCore {
   }
 
   protected initAgent() {
-    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+    const agentEndpointUrl = getEnv('agentEndpointUrl');
+    if (agentEndpointUrl) {
       const oldLogger = this.logger;
       this.preAgentLogger = oldLogger;
       this.logger = (msg, params) => {
@@ -516,7 +517,7 @@ export class CubejsServerCore {
             msg,
             ...params
           },
-          process.env.CUBEJS_AGENT_ENDPOINT_URL,
+          agentEndpointUrl,
           oldLogger
         );
       };
@@ -524,10 +525,11 @@ export class CubejsServerCore {
   }
 
   protected async flushAgent() {
-    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+    const agentEndpointUrl = getEnv('agentEndpointUrl');
+    if (agentEndpointUrl) {
       await agentCollect(
         { msg: 'Flush Agent' },
-        process.env.CUBEJS_AGENT_ENDPOINT_URL,
+        agentEndpointUrl,
         this.preAgentLogger
       );
     }
