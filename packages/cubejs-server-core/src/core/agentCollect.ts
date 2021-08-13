@@ -5,119 +5,123 @@ import WebSocket from 'ws';
 import zlib from 'zlib';
 import { promisify } from 'util';
 
-interface WebSocketExtended extends WebSocket {
-  pingTimeout: NodeJS.Timeout
-}
-
+const deflate = promisify(zlib.deflate);
 interface AgentTransport {
   ready: () => Boolean,
   send: (data: any[]) => Promise<Boolean>
 }
+class WebSocketTransport implements AgentTransport {
+  private pingTimeout: NodeJS.Timeout;
 
-type AgentTransportFactory = (endpointUrl: string, logger?: any) => AgentTransport;
+  public readonly connectionPromise: Promise<Boolean>;
 
-const deflate = promisify(zlib.deflate);
+  private readonly wsClient: WebSocket;
 
-const trackEvents = [];
-let agentInterval: NodeJS.Timeout = null;
-let lastEvent: Date;
-let transport: AgentTransport = null;
+  private readonly callbacks = {};
 
-const createWsTransport: AgentTransportFactory = (endpointUrl, logger) => {
-  const callbacks = {};
+  public constructor(
+    private endpointUrl: string,
+    private logger
+  ) {
+    let connectionPromiseResolve: Function;
+    let connectionPromiseReject: Function;
+    this.connectionPromise = new Promise((resolve, reject) => {
+      connectionPromiseResolve = resolve;
+      connectionPromiseReject = reject;
+    });
 
-  let connectionPromiseResolve: Function;
-  let connectionPromiseReject: Function;
-  const connectionPromise = new Promise((resolve, reject) => {
-    connectionPromiseResolve = resolve;
-    connectionPromiseReject = reject;
-  });
+    this.wsClient = new WebSocket(this.endpointUrl);
 
-  const clearTransport = () => {
-    clearInterval(agentInterval);
-    transport = null;
-    agentInterval = null;
-  };
+    const pingInterval = 30 * 1000;
+    const heartbeat = () => {
+      connectionPromiseResolve();
+      clearTimeout(this.pingTimeout);
+      this.pingTimeout = setTimeout(() => {
+        this.wsClient.terminate();
+      }, pingInterval + 1000); // +1000 - a conservative assumption of the latency
+    };
 
-  const pingInterval = 30 * 1000;
-  const heartbeat = function heartbeat(this: WebSocketExtended) {
-    connectionPromiseResolve();
-    clearTimeout(this.pingTimeout);
-    this.pingTimeout = setTimeout(() => {
-      this.terminate();
-    }, pingInterval + 1000); // +1000 - a conservative assumption of the latency
-  };
+    this.wsClient.on('open', heartbeat);
+    this.wsClient.on('ping', heartbeat);
+    this.wsClient.on('close', () => {
+      clearTimeout(this.pingTimeout);
+    });
   
-  const wsClient = new WebSocket(endpointUrl);
+    this.wsClient.on('error', e => {
+      connectionPromiseReject(e);
+      this.logger('Agent Error', { error: (e.stack || e).toString() });
+    });
   
-  wsClient.on('open', heartbeat);
-  wsClient.on('ping', heartbeat);
-  wsClient.on('close', function clear(this: WebSocketExtended) {
-    clearTimeout(this.pingTimeout);
-    clearTransport();
-  });
-
-  wsClient.on('error', e => {
-    connectionPromiseReject(e);
-    logger('Agent Error', { error: (e.stack || e).toString() });
-  });
-
-  wsClient.on('message', (data: WebSocket.Data) => {
-    try {
-      const { method, params } = JSON.parse(data.toString());
-      if (method === 'callback' && callbacks[params.callbackId]) {
-        callbacks[params.callbackId](params.result);
+    this.wsClient.on('message', (data: WebSocket.Data) => {
+      try {
+        const { method, params } = JSON.parse(data.toString());
+        if (method === 'callback' && this.callbacks[params.callbackId]) {
+          this.callbacks[params.callbackId](params.result);
+        }
+      } catch (e) {
+        this.logger('Agent Error', { error: (e.stack || e).toString() });
       }
-    } catch (e) {
-      logger('Agent Error', { error: (e.stack || e).toString() });
-    }
-  });
+    });
+  }
 
-  return {
-    ready: () => wsClient?.readyState === WebSocket.OPEN,
-    async send(data: any[]): Promise<Boolean> {
-      await connectionPromise;
+  public ready() {
+    return this?.wsClient?.readyState === WebSocket.OPEN;
+  }
 
-      const callbackId = crypto.randomBytes(16).toString('hex');
-      const message = await deflate(JSON.stringify({
-        method: 'agent',
-        params: {
-          data
-        },
-        callbackId
-      }));
+  public async send(data) {
+    await this.connectionPromise;
 
-      const result = await new Promise((resolve, reject) => {
-        wsClient.send(message);
+    const callbackId = crypto.randomBytes(16).toString('hex');
+    const message = await deflate(JSON.stringify({
+      method: 'agent',
+      params: {
+        data
+      },
+      callbackId
+    }));
 
-        const timeout = setTimeout(() => {
-          delete callbacks[callbackId];
-          reject(new Error('Timeout agent'));
-        }, 30 * 1000);
+    const result = await new Promise((resolve, reject) => {
+      this.wsClient.send(message);
 
-        callbacks[callbackId] = () => {
-          clearTimeout(timeout);
-          resolve(true);
-          delete callbacks[callbackId];
-        };
-      });
+      const timeout = setTimeout(() => {
+        delete this.callbacks[callbackId];
+        reject(new Error('Timeout agent'));
+      }, 30 * 1000);
 
-      return !!result;
-    }
-  };
-};
+      this.callbacks[callbackId] = () => {
+        clearTimeout(timeout);
+        resolve(true);
+        delete this.callbacks[callbackId];
+      };
+    });
 
-const createHttpTransport: AgentTransportFactory = (endpointUrl) => ({
-  ready: () => true,
-  async send(data: any[]) {
-    const result = await fetch(endpointUrl, {
+    return !!result;
+  }
+}
+
+class HttpTransport implements AgentTransport {
+  public constructor(
+    private endpointUrl: string
+  ) {}
+
+  public ready() {
+    return true;
+  }
+
+  public async send(data: any[]) {
+    const result = await fetch(this.endpointUrl, {
       method: 'post',
       body: JSON.stringify(data),
       headers: { 'Content-Type': 'application/json' },
     });
     return result.status === 200;
   }
-});
+}
+
+const trackEvents = [];
+let agentInterval: NodeJS.Timeout = null;
+let lastEvent: Date;
+let transport: AgentTransport = null;
 
 export default async (event: Record<string, any>, endpointUrl: string, logger: any) => {
   trackEvents.push({
@@ -129,8 +133,8 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
 
   if (!transport) {
     transport = /^http/.test(endpointUrl) ?
-      createHttpTransport(endpointUrl) :
-      createWsTransport(endpointUrl, logger);
+      new HttpTransport(endpointUrl) :
+      new WebSocketTransport(endpointUrl, logger);
   }
 
   const flush = async (toFlush?: any[], retries?: number) => {
