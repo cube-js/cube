@@ -16,6 +16,7 @@ class AthenaDriver extends BaseDriver {
       },
       region: process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
+      workGroup: process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
@@ -30,7 +31,7 @@ class AthenaDriver extends BaseDriver {
 
   async testConnection() {
     await this.athena.getWorkGroup({
-      WorkGroup: 'primary'
+      WorkGroup: this.config.workGroup
     });
   }
 
@@ -92,6 +93,7 @@ class AthenaDriver extends BaseDriver {
 
     const { QueryExecutionId } = await this.athena.startQueryExecution({
       QueryString: queryString,
+      WorkGroup: this.config.workGroup,
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       }
