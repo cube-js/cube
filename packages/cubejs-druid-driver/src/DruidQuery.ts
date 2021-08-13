@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: date => `DATE_TRUNC('day', ${date})`,
@@ -11,7 +11,17 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   year: date => `DATE_TRUNC('year', ${date})`
 };
 
+class DruidFilter extends BaseFilter {
+  public likeIgnoreCase(column, not, param) {
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  }
+}
+
 export class DruidQuery extends BaseQuery {
+  public newFilter(filter) {
+    return new DruidFilter(this, filter);
+  }
+  
   public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
