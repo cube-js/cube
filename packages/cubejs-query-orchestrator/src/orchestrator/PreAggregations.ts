@@ -104,7 +104,7 @@ type PreAggregationDescription = {
   tableName: string;
   matchedTimeDimensionDateRange: QueryDateRange;
   partitionGranularity: string;
-  preAggregationStartEndQueries?: [QueryWithParams, QueryWithParams];
+  preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -1107,8 +1107,7 @@ export class PreAggregationPartitionRangeLoader {
       indexesSql: (this.preAggregation.indexesSql || [])
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
-      preAggregationStartEndQueries: undefined
+        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName)
     };
   }
 
@@ -1432,7 +1431,12 @@ export class PreAggregations {
 
     return {
       ...queryBody,
-      preAggregations: expandedPreAggregations.reduce((a, b) => a.concat(b), [])
+      preAggregations: expandedPreAggregations
+        .reduce((a, b) => a.concat(b), [])
+        .map(p => {
+          p.preAggregationStartEndQueries = undefined;
+          return p;
+        })
     };
   }
 
