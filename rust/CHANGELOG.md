@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
+
+
+### Bug Fixes
+
+* **cubestore:** add equality comparison between bool and int, fix [#3154](https://github.com/cube-js/cube.js/issues/3154) ([b3dc224](https://github.com/cube-js/cube.js/commit/b3dc2249af8fe397371213f933aab77fa12828e9))
+
+
+
+
+
 ## [0.28.18](https://github.com/cube-js/cube.js/compare/v0.28.17...v0.28.18) (2021-08-12)
 
 
