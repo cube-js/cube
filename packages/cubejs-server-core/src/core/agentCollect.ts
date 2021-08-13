@@ -15,13 +15,14 @@ class WebSocketTransport implements AgentTransport {
 
   public readonly connectionPromise: Promise<Boolean>;
 
-  private readonly wsClient: WebSocket;
+  public readonly wsClient: WebSocket;
 
   private readonly callbacks = {};
 
   public constructor(
     private endpointUrl: string,
-    private logger
+    private logger,
+    private onClose: Function
   ) {
     let connectionPromiseResolve: Function;
     let connectionPromiseReject: Function;
@@ -45,6 +46,7 @@ class WebSocketTransport implements AgentTransport {
     this.wsClient.on('ping', heartbeat);
     this.wsClient.on('close', () => {
       clearTimeout(this.pingTimeout);
+      this.onClose();
     });
   
     this.wsClient.on('error', e => {
@@ -123,6 +125,12 @@ let agentInterval: NodeJS.Timeout = null;
 let lastEvent: Date;
 let transport: AgentTransport = null;
 
+const clearTransport = () => {
+  clearInterval(agentInterval);
+  transport = null;
+  agentInterval = null;
+};
+
 export default async (event: Record<string, any>, endpointUrl: string, logger: any) => {
   trackEvents.push({
     ...event,
@@ -134,7 +142,7 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
   if (!transport) {
     transport = /^http/.test(endpointUrl) ?
       new HttpTransport(endpointUrl) :
-      new WebSocketTransport(endpointUrl, logger);
+      new WebSocketTransport(endpointUrl, logger, clearTransport);
   }
 
   const flush = async (toFlush?: any[], retries?: number) => {
