@@ -61,8 +61,10 @@ jobs:
         uses: actions/github-script@v3
         with:
           script: |
-            const repo = await github.repos.get(context.repo)
-            return repo.data
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
       - name: Prepare
         id: prep
         run: |
@@ -125,8 +127,10 @@ jobs:
         uses: actions/github-script@v3
         with:
           script: |
-            const repo = await github.repos.get(context.repo)
-            return repo.data
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
       - name: Prepare
         id: prep
         run: |
@@ -190,8 +194,10 @@ jobs:
         uses: actions/github-script@v3
         with:
           script: |
-            const repo = await github.repos.get(context.repo)
-            return repo.data
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
       - name: Prepare
         id: prep
         env:
