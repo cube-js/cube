@@ -63,19 +63,16 @@ export class RefreshScheduler {
       requestId: context.requestId
     });
 
-    return Promise.all(partitions.preAggregations.map(async partition => {
-      delete partition.preAggregationStartEndQueries;
-      return {
-        query: {
-          ...baseQuery,
-          timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
-            ...baseQuery.timeDimensions[0],
-            dateRange: partition.loadSql[1]
-          }]
-        },
-        sql: partition
-      };
-    }));
+    return Promise.all(partitions.preAggregations.map(async partition => ({
+      query: {
+        ...baseQuery,
+        timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
+          ...baseQuery.timeDimensions[0],
+          dateRange: partition.loadSql[1]
+        }]
+      },
+      sql: partition
+    })));
   }
 
   protected async baseQueryForPreAggregation(
