@@ -98,6 +98,6 @@ export class OracleQuery extends BaseQuery {
     if (name.length > 128) {
       throw new UserError(`Oracle can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
     }
-    return name;
+    return `${name} as `;
   }
 }
