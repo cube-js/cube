@@ -127,15 +127,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
-  protected async prepareConnection(
-    conn: PoolClient,
-    options: { executionTimeout: number } = {
-      executionTimeout: this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000
-    }
-  ) {
-    await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
-    await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
-
+  protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
     if (!this.userDefinedTypes) {
       const customTypes = await conn.query(
         "SELECT oid, typname FROM pg_type WHERE typcategory = 'U'",
@@ -147,6 +139,18 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         {}
       );
     }
+  }
+
+  protected async prepareConnection(
+    conn: PoolClient,
+    options: { executionTimeout: number } = {
+      executionTimeout: this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000
+    }
+  ) {
+    await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
+    await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
+
+    await this.loadUserDefinedTypes(conn);
   }
 
   public async stream(
