@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.20](https://github.com/cube-js/cube.js/compare/v0.28.19...v0.28.20) (2021-08-15)
+
+
+### Bug Fixes
+
+* **druid-driver:** Support contains (LIKE), fix [#3109](https://github.com/cube-js/cube.js/issues/3109) ([#3121](https://github.com/cube-js/cube.js/issues/3121)) ([9340a4c](https://github.com/cube-js/cube.js/commit/9340a4c247bb2e4148e2e89f56e69f632f35e3ef))
+
+
+
+
+
 ## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver

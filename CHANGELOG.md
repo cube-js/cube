@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.20](https://github.com/cube-js/cube.js/compare/v0.28.19...v0.28.20) (2021-08-15)
+
+
+### Bug Fixes
+
+* **druid-driver:** Support contains (LIKE), fix [#3109](https://github.com/cube-js/cube.js/issues/3109) ([#3121](https://github.com/cube-js/cube.js/issues/3121)) ([9340a4c](https://github.com/cube-js/cube.js/commit/9340a4c247bb2e4148e2e89f56e69f632f35e3ef))
+* **redshift-driver:** Dont load user defined types ([bd25e7d](https://github.com/cube-js/cube.js/commit/bd25e7d7b84d7a057a8d4b6543f305584c74a624))
+* **server-core:** Skip expand partitions for unused pre-aggregations ([#3255](https://github.com/cube-js/cube.js/issues/3255)) ([044ba8e](https://github.com/cube-js/cube.js/commit/044ba8e0c96bbcd1dc43c5aff114f458d9689204))
+
+
+
+
+
 ## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
 
 
