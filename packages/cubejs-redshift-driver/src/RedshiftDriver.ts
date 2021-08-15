@@ -64,6 +64,10 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     return undefined;
   }
 
+  public async loadUserDefinedTypes(): Promise<void> {
+    // @todo Implement for Redshift, column \"typcategory\" does not exist in pg_type
+  }
+
   public async isUnloadSupported() {
     if (this.config.exportBucket) {
       return true;
