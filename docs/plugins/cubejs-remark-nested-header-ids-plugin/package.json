@@ -1,0 +1,38 @@
+{
+  "name": "@cubejs-docs/cubejs-remark-nested-header-ids-plugin",
+  "description": "Gatsby page menus plugin",
+  "version": "0.0.4",
+  "license": "MIT",
+  "main": "index.js",
+  "author": "Cube Dev Inc",
+  "keywords": [
+    "gatsby",
+    "gatsby-plugin",
+    "menus"
+  ],
+  "scripts": {
+    "test": "jest"
+  },
+  "files": [
+    "gatsby-node.js",
+    "index.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "docs/plugins/cubejs-remark-nested-header-ids-plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/cube-js/cube.js/issues"
+  },
+  "homepage": "https://github.com/cube-js/cube.js#readme",
+  "dependencies": {
+    "lodash.kebabcase": "^4.1.1",
+    "mdast-util-from-markdown": "^0.8.4",
+    "remark-parse": "^9.0.0",
+    "unist-util-visit": "^2.0.3"
+  },
+  "devDependencies": {
+    "gatsby": "^2.29.1"
+  }
+}

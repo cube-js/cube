@@ -112,6 +112,7 @@ const config = {
         query: 'allMdx'
       },
     },
+    'cubejs-remark-nested-header-ids-plugin',
     'gatsby-plugin-meta-redirect',
     'gatsby-plugin-percy',
   ],
