@@ -100,7 +100,7 @@ function LivePreviewOverlay({
               target="_blank"
               href={`${url}/deployments/${deploymentId}/history`}
             >
-              Inspect querires
+              Inspect queries
             </Button>
 
             <Button
