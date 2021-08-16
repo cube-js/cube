@@ -383,39 +383,6 @@ describe('SQL Generation', () => {
         `
       })
     );
-
-    it('refreshKey from cube immutable (external)', async () => {
-      await compiler.compile();
-
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'cards.count'
-        ],
-        timeDimensions: [{
-          dimension: 'cards.createdAt',
-          granularity: 'day',
-          dateRange: ['2016-12-30', '2017-01-05']
-        }],
-        filters: [],
-        timezone: 'America/Los_Angeles',
-        externalQueryClass: MssqlQuery
-      });
-
-      const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-      expect(preAggregations.length).toEqual(1);
-      expect(preAggregations[0].invalidateKeyQueries).toEqual([
-        [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST($1 AS DATETIME2) THEN (SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 10) as refresh_key) END as refresh_key',
-          [
-            '__TO_PARTITION_RANGE'
-          ],
-          {
-            external: true,
-            renewalThreshold: 10,
-          }
-        ]
-      ]);
-    });
   });
 
   describe('refreshKey only cube (every)', () => {
