@@ -12,6 +12,14 @@ menuOrder: 1
   lang="js"
 />
 
+<CubeQueryResultSet
+  api="https://irish-idalia.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
+  token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjkxMjkxODR9.G4xg8Ah219GvWTPVRn45_950lZJ4uZw7GygaEotYz5k"
+  query={{ 
+    measures: ['Events.count']
+  }}
+/>
+
 In Cube.js, authorization (or access control) is based on the **security
 context**. The diagram below shows how it works during the request processing in
 Cube.js:

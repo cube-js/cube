@@ -24,7 +24,8 @@ import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
 
 // define components to using in MDX
 import GitHubCodeBlock from "../components/GitHubCodeBlock"
-const components = { GitHubCodeBlock }
+import CubeQueryResultSet from "../components/CubeQueryResultSet"
+const components = { GitHubCodeBlock, CubeQueryResultSet }
 
 const mdContentCallback = () => {
   const accordionTriggers = document.getElementsByClassName(
