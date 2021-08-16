@@ -33,7 +33,7 @@ export function PreAggregationStatus({
   ...props
 }: PreAggregationStatusProps) {
   const isVersionGte = useServerCoreVersionGte('0.28.4');
-  const [isModalOpen, toggleModal] = useToggle();
+  const [isModalOpen, toggleModal] = useToggle(true);
 
   // hide it for the time being
   // const renderTime = () => (
