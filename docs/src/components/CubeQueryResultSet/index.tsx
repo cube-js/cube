@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import cubejs from '@cubejs-client/core';
+import cubejs, {CubejsApi} from '@cubejs-client/core';
 
 const CubeQueryResultSet = (props: propsType) => {
   const { api, token, query } = props;
@@ -27,7 +27,7 @@ const CubeQueryResultSet = (props: propsType) => {
 export default CubeQueryResultSet;
 
 async function fetchDataFromCube(
-  cubejsApi: object,
+  cubejsApi: CubejsApi,
   query: object,
   setCode: (text: string) => void,
 ) {
