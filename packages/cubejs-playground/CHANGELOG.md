@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.21](https://github.com/cube-js/cube.js/compare/v0.28.20...v0.28.21) (2021-08-16)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** display segments in the Rollup Designer ([73d6778](https://github.com/cube-js/cube.js/commit/73d677882441cf848c6ab39eab229cb54fc1c02f))
+
+
+
+
+
 ## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
 
 **Note:** Version bump only for package @cubejs-client/playground

@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.21](https://github.com/cube-js/cube.js/compare/v0.28.20...v0.28.21) (2021-08-16)
+
+
+### Bug Fixes
+
+* Pre-aggregations should have default refreshKey of every 1 hour if it doesn't set for Cube ([#3259](https://github.com/cube-js/cube.js/issues/3259)) ([bc472aa](https://github.com/cube-js/cube.js/commit/bc472aac1a666c84ed9e7e00b2d4e9018a6b5719))
+* **@cubejs-client/playground:** display segments in the Rollup Designer ([73d6778](https://github.com/cube-js/cube.js/commit/73d677882441cf848c6ab39eab229cb54fc1c02f))
+
+
+
+
+
 ## [0.28.20](https://github.com/cube-js/cube.js/compare/v0.28.19...v0.28.20) (2021-08-15)
 
 
