@@ -89,6 +89,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
+        t("rolling_window_query", rolling_window_query),
+        t("rolling_window_exprs", rolling_window_exprs),
+        t(
+            "rolling_window_query_timestamps",
+            rolling_window_query_timestamps,
+        ),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
         t("date_add", date_add),
@@ -2680,6 +2686,410 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
             ])
         );
     }
+}
+
+async fn rolling_window_query(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 17), (3, 23), (4, 23), (5, 5)])
+    );
+
+    // Same, without preceding, i.e. with missing nodes.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 0 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, Some(17)),
+            (2, None),
+            (3, Some(23)),
+            (4, None),
+            (5, Some(5))
+        ])
+    );
+
+    // Unbounded windows.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 17), (3, 40), (4, 40), (5, 45)]),
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 45), (2, 28), (3, 28), (4, 5), (5, 5)])
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 45), (2, 45), (3, 45), (4, 45), (5, 45)])
+    );
+    // Combined windows.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 40), (3, 23), (4, 28), (5, 5)])
+    );
+    // Both bounds are either PRECEDING or FOLLOWING.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 FOLLOWING and 2 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, Some(23)),
+            (2, Some(23)),
+            (3, Some(5)),
+            (4, Some(5)),
+            (5, None)
+        ])
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 2 PRECEDING and 1 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, None),
+            (2, Some(17)),
+            (3, Some(17)),
+            (4, Some(23)),
+            (5, Some(23))
+        ])
+    );
+    // Empty inputs.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 0 PRECEDING) \
+             FROM (SELECT day, n FROM s.Data WHERE day = 123123123) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![] as Vec<Vec<_>>);
+
+    // Broader range step than input data.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 2 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 4 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 40), (5, 5)]));
+
+    // Dimension values not in the input data.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 2 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM -10 TO 10 EVERY 5 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (-10, None),
+            (-5, None),
+            (0, Some(17)),
+            (5, Some(5)),
+            (10, None)
+        ])
+    );
+
+    // Partition by clause.
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 2 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.Data GROUP BY 1, 2) \
+             ROLLING_WINDOW DIMENSION day \
+             PARTITION BY name \
+             FROM 1 TO 5 EVERY 2 \
+             ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, "john", 10),
+            (1, "sara", 7),
+            (3, "john", 30),
+            (3, "sara", 10),
+            (5, "john", 20),
+            (5, "sara", 3),
+            (5, "timmy", 5)
+        ])
+    );
+
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.Data GROUP BY 1, 2) \
+             ROLLING_WINDOW DIMENSION day \
+             PARTITION BY name \
+             FROM 1 TO 5 EVERY 2 \
+             ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, "john", 10),
+            (1, "sara", 7),
+            (3, "john", 20),
+            (3, "sara", 3),
+            (5, "timmy", 5)
+        ])
+    );
+
+    // Missing dates must be filled.
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE CURRENT ROW) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.Data GROUP BY 1, 2) \
+             ROLLING_WINDOW DIMENSION day \
+             PARTITION BY name \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, Some("john"), Some(10)),
+            (1, Some("sara"), Some(7)),
+            (2, None, None),
+            (3, Some("john"), Some(20)),
+            (3, Some("sara"), Some(3)),
+            (4, None, None),
+            (5, Some("timmy"), Some(5))
+        ])
+    );
+
+    // Check for errors.
+    // GROUP BY not allowed with ROLLING.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data GROUP BY 1 ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // Rolling aggregate without ROLLING_WINDOW.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data")
+        .await
+        .unwrap_err();
+    // ROLLING_WINDOW without rolling aggregate.
+    service
+        .exec_query("SELECT day, n FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // No RANGE in rolling aggregate.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n)) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // No DIMENSION.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // Invalid DIMENSION.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION unknown FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // Invalid types in FROM, TO, EVERY.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 'a' to 10 EVERY 1")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 'a' EVERY 1")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 'a'")
+        .await
+        .unwrap_err();
+    // Invalid values for FROM, TO, EVERY
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 0")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY -10")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 10 to 0 EVERY 10")
+        .await
+        .unwrap_err();
+}
+
+async fn rolling_window_exprs(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.data(day, n) VALUES(1, 10), (2, 20), (3, 30)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT ROLLING(SUM(n) RANGE 1 PRECEDING) / ROLLING(COUNT(n) RANGE 1 PRECEDING),\
+                    ROLLING(AVG(n) RANGE 1 PRECEDING) \
+             FROM (SELECT * FROM s.data) \
+             ROLLING_WINDOW DIMENSION day FROM 1 to 3 EVERY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(10, 10.), (15, 15.), (25, 25.)]))
+}
+
+async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=5)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE INTERVAL '1 day' PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+               FROM to_timestamp('2021-01-01T00:00:00Z') \
+               TO to_timestamp('2021-01-05T00:00:00Z') \
+               EVERY INTERVAL '1 day' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], 17),
+            (jan[2], 17),
+            (jan[3], 23),
+            (jan[4], 23),
+            (jan[5], 5)
+        ])
+    );
 }
 
 async fn decimal_index(service: Box<dyn SqlClient>) {
