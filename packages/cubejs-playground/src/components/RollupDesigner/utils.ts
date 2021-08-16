@@ -11,6 +11,7 @@ import { QueryMemberKey } from '../../types';
 export type PreAggregationReferences = {
   measures: string[];
   dimensions: string[];
+  segments: string[];
   timeDimensions: TimeDimensionBase[];
   timeDimension?: string;
   granularity?: TimeDimensionGranularity;
@@ -23,11 +24,13 @@ export type PreAggregationDefinition = {
 };
 
 export function getPreAggregationReferences(
-  transformedQuery: TransformedQuery | null
+  transformedQuery: TransformedQuery | null,
+  segments: Set<string>
 ): PreAggregationReferences {
   const references: PreAggregationReferences = {
     measures: [],
     dimensions: [],
+    segments: [],
     timeDimensions: [],
   };
 
@@ -36,7 +39,14 @@ export function getPreAggregationReferences(
   }
 
   if (transformedQuery?.sortedDimensions.length) {
-    references.dimensions = [...transformedQuery.sortedDimensions];
+    references.dimensions = [
+      ...transformedQuery.sortedDimensions.filter(
+        (name) => !segments.has(name)
+      ),
+    ];
+    references.segments = [
+      ...transformedQuery.sortedDimensions.filter((name) => segments.has(name)),
+    ];
   }
 
   if (
@@ -75,6 +85,12 @@ export function getPreAggregationDefinitionFromReferences(
       `  dimensions: [${references.dimensions.map((m) => m).join(', ')}]`
     );
   }
+  
+  if (references.segments.length) {
+    lines.push(
+      `  segments: [${references.segments.map((m) => m).join(', ')}]`
+    );
+  }
 
   if (references.timeDimensions.length) {
     const { dimension, granularity } = references.timeDimensions[0];
@@ -107,7 +123,7 @@ export function updateQuery(
     } else {
       updatedQuery.timeDimensions = [
         {
-          // defafult granularity
+          // default granularity
           granularity: 'day',
           ...updatedQuery.timeDimensions?.[0],
           dimension: key,

@@ -11,7 +11,7 @@ type CubesProps = {
   onSelect: (memberType: QueryMemberKey, key: string) => void;
 };
 
-const MEMBER_TYPES = ['measures', 'dimensions', 'timeDimensions'];
+const MEMBER_TYPES = ['measures', 'dimensions', 'segments', 'timeDimensions'];
 
 export function Cubes({ selectedKeys, membersByCube, onSelect }: CubesProps) {
   const defaultOpenKeys = selectedKeys.map((key) => key.split('.')[0]);

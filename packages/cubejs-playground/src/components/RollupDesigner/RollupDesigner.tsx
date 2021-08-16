@@ -78,14 +78,19 @@ export function RollupDesigner({
 
   const { order, limit, filters, ...matchedQuery } = defaultQuery;
 
+  const segments = new Set<string>();
+  availableMembers.segments.forEach(({ members }) => {
+    members.forEach(({ name }) => segments.add(name));
+  })
+  
   const [references, setReferences] = useState<PreAggregationReferences>(
-    getPreAggregationReferences(transformedQuery)
+    getPreAggregationReferences(transformedQuery, segments)
   );
 
   const selectedKeys = useMemo(() => {
     const keys: string[] = [];
 
-    ['measures', 'dimensions', 'timeDimensions'].map((memberKey) => {
+    ['measures', 'dimensions', 'timeDimensions', 'segments'].map((memberKey) => {
       if (memberKey === 'timeDimensions') {
         const { dimension } = references[memberKey]?.[0] || {};
 
@@ -102,7 +107,7 @@ export function RollupDesigner({
 
   useDeepEffect(() => {
     let mutext = canUseMutex.current;
-    const { measures, dimensions, timeDimensions } = references;
+    const { measures, segments, dimensions, timeDimensions } = references;
 
     async function load() {
       const { json } = await request(
@@ -114,7 +119,7 @@ export function RollupDesigner({
             transformedQuery,
             references: {
               measures,
-              dimensions,
+              dimensions: dimensions.concat(segments),
               timeDimensions,
             },
           },
@@ -145,9 +150,10 @@ export function RollupDesigner({
       ...availableMembers.measures,
       ...availableMembers.dimensions,
       ...availableMembers.timeDimensions,
+      ...availableMembers.segments,
     ])
   );
-
+  
   async function handleAddToSchemaClick() {
     const definition = {
       preAggregationName: preAggName,
@@ -289,6 +295,20 @@ export function RollupDesigner({
                         (name) => indexedMembers[name]
                       )}
                       onRemove={handleMemberToggle('dimensions')}
+                    />
+
+                    <Divider />
+                  </>
+                ) : null}
+                
+                {references.segments.length ? (
+                  <>
+                    <Members
+                      title="Segments"
+                      members={references.segments.map(
+                        (name) => indexedMembers[name]
+                      )}
+                      onRemove={handleMemberToggle('segments')}
                     />
 
                     <Divider />
