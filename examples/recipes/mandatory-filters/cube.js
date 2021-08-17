@@ -4,11 +4,11 @@ module.exports = {
             return Object.keys(obj).length === 0;
         }
 
-        let arr = Array.from(query.dimensions, element => element.split('.')[0])
+        const dimensions = Array.from(query.dimensions, element => element.split('.')[0]);
+        const measures =  Array.from(query.measures, element => element.split('.')[0]);
+        const filterItems = dimensions.concat(measures);
 
-        // let cube = !isEmpty(query.dimensions) ? query.dimensions[0].split('.')[0] : ''
-
-        const reducerFn = (elem) => {
+        const createFilter = (elem) => {
             return {
                 member: `${elem}.createdAt`,
                 operator: 'afterDate',
@@ -17,7 +17,7 @@ module.exports = {
             };
 
         query.filters.push(
-            arr.reduce(reducerFn)
+            filterItems.reduce(createFilter)
         );
 
         return query;
