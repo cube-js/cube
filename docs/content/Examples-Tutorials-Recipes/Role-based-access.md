@@ -8,19 +8,19 @@ menuOrder: 1
 
 ## Use case
 
-We might want to manage access to different data depending on the user's role.
-In the recipe below, a user with the `operator` role can view only processing
-orders from a shop, and a `manager` can view only shipped and completed orders.
+We want to manage user access to different data depending on their role.
+In the recipe below, a user with the `operator` role can only view processing
+orders from a shop and a `manager` can only view shipped and completed orders.
 
 ## Data schema
 
-To implement the role-based access, we will use
+To implement role-based access, we will use a
 [JSON Web Token](https://cube.dev/docs/security) with role information in the
 payload, and the
 [queryRewrite](https://cube.dev/docs/security/context#using-query-rewrite) to
 manage data access.
 
-Let's add the role verify in the cube.js file.
+Let's add the role verification in the cube.js file.
 
 ```javascript
 module.exports = {
@@ -52,7 +52,7 @@ module.exports = {
 
 ## Query
 
-To get the number of orders as manager and operator, we will send two identical
+To get the number of orders as a manager or operator, we will send two identical
 requests with different authorization tokens.
 
 ```javascript
@@ -100,5 +100,5 @@ We have received different data depending on the user's role.
 ## Source
 
 Please check out the full source code [here](https://github.com/cube-js/cube.js/tree/master/recipes/role-based-access). It is
-self-contained code, so if you execute `docker-compose up` command in the folder
-with the source code, you'll see the query execution result's console log.
+self-contained code, so if you execute the `docker-compose up` command in the folder
+with the source code, you'll see the result from the query execution in the console.
