@@ -97,8 +97,8 @@ We have received different data depending on the user's role.
 ];
 ```
 
-## Source
+## Source code
 
-Please check out the full source code [here](https://github.com/cube-js/cube.js/tree/master/recipes/role-based-access). It is
-self-contained code, so if you execute the `docker-compose up` command in the folder
-with the source code, you'll see the result from the query execution in the console.
+Please feel free to check out the [full source code](https://github.com/cube-js/cube.js/tree/master/recipes/role-based-access)
+or run it with the `docker-compose up` command.
+You'll see the result, including queried data, in the console.
