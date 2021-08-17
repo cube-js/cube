@@ -1,4 +1,4 @@
-import { GRANULARITIES } from '@cubejs-client/core';
+import { GRANULARITIES, TimeDimensionGranularity } from '@cubejs-client/core';
 import {
   Card,
   Checkbox,
@@ -31,7 +31,9 @@ const StyledRadioGroup = styled(Radio.Group)`
   display: block;
 `;
 
-const partionGranularities = GRANULARITIES.map((granularity) => {
+const partionGranularities = GRANULARITIES.filter(
+  ({ name }) => !['second', 'minute'].includes(name || '')
+).map((granularity) => {
   if (!granularity.name) {
     return {
       ...granularity,
@@ -208,7 +210,10 @@ export function Settings({ members, onChange }: SettingsProps) {
                   <Input type="number" min={0} style={{ maxWidth: 80 }} />
                 </Form.Item>
 
-                <GranularitySelect name="updateWindow.granularity" />
+                <GranularitySelect
+                  name="updateWindow.granularity"
+                  excludedGranularities={['second']}
+                />
               </Space>
 
               {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
@@ -285,20 +290,26 @@ function BuildRange({ time }: BuildRangeProps) {
   );
 }
 
+type GranularitySelectProps = {
+  excludedGranularities?: TimeDimensionGranularity[];
+  disabled?: boolean;
+};
+
 function GranularitySelect({
   disabled,
+  excludedGranularities = [],
   ...props
-}: FormItemProps & { disabled?: boolean }) {
+}: FormItemProps & GranularitySelectProps) {
   return (
     <Form.Item {...props}>
       <Select disabled={disabled} showSearch style={{ minWidth: 100 }}>
-        {GRANULARITIES.filter(({ name }) => Boolean(name)).map(
-          ({ name, title }) => (
-            <Select.Option key={name} value={name as string}>
-              {title}
-            </Select.Option>
-          )
-        )}
+        {GRANULARITIES.filter(
+          ({ name }) => name != null && !excludedGranularities.includes(name)
+        ).map(({ name, title }) => (
+          <Select.Option key={name} value={name as string}>
+            {title}
+          </Select.Option>
+        ))}
       </Select>
     </Form.Item>
   );
