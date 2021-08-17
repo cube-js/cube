@@ -17,5 +17,5 @@ curl ${apiUrl} -H "Authorization: ${operatorToken}" -G -s --data-urlencode "quer
 echo "Manager's data:"
 jq ".data" managerResponse.json
 
-echo "There's operator data"
+echo "Operator's data:"
 jq ".data" operatorResponse.json
