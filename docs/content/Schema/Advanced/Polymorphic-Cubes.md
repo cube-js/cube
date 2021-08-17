@@ -3,7 +3,7 @@ title: Polymorphic Cubes
 permalink: /schema/advanced/polymorphic-cubes
 category: Data Schema
 subCategory: Advanced
-menuOrder: 5
+menuOrder: 7
 redirect_from:
   - /polymorphic-cubes
   - /recipes/polymorphic-cubes

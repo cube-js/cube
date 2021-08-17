@@ -2,9 +2,9 @@
 title: Execution Environment
 permalink: /schema/reference/execution-environment
 scope: cubejs
-category: Reference
-menuOrder: 9
+category: Data Schema
 subCategory: Reference
+menuOrder: 15
 redirect_from:
   - /schema-execution-environment
 ---

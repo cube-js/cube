@@ -2,9 +2,9 @@
 title: Pre-aggregations
 permalink: /schema/reference/pre-aggregations
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 8
+menuOrder: 14
 redirect_from:
   - /pre-aggregations
 ---

@@ -2,8 +2,8 @@
 title: Data Schema Concepts
 permalink: /schema/fundamentals/concepts
 category: Data Schema
-menuOrder: 1
 subCategory: Fundamentals
+menuOrder: 2
 ---
 
 Cube.js borrows a lot of terminology from data science and [OLAP

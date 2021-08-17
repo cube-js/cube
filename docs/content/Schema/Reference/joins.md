@@ -2,9 +2,9 @@
 title: Joins
 permalink: /schema/reference/joins
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 5
+menuOrder: 11
 proofread: 06/18/2019
 redirect_from:
   - /joins

@@ -3,7 +3,7 @@ title: 'Code Reusability: Extending Cubes'
 permalink: /schema/advanced/extending-cubes
 category: Data Schema
 subCategory: Advanced
-menuOrder: 2
+menuOrder: 4
 redirect_from:
   - /extending-cubes
   - /recipes/extending-cubes

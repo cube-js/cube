@@ -3,7 +3,7 @@ title: Dynamic Schema Creation
 permalink: /schema/advanced/dynamic-schema-creation
 category: Data Schema
 subCategory: Advanced
-menuOrder: 4
+menuOrder: 6
 redirect_from:
   - /schema/dynamic-schema-creation
 ---

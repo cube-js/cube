@@ -2,9 +2,9 @@
 title: Dimensions
 permalink: /schema/reference/dimensions
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 4
+menuOrder: 10
 proofread: 06/18/2019
 redirect_from:
   - /dimensions

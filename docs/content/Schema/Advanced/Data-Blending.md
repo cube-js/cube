@@ -3,7 +3,7 @@ title: Data Blending
 permalink: /schema/advanced/data-blending
 category: Data Schema
 subCategory: Advanced
-menuOrder: 3
+menuOrder: 5
 redirect_from:
   - /data-blending
   - /recipes/data-blending

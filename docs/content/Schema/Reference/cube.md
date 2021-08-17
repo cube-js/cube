@@ -2,8 +2,8 @@
 title: Cubes
 permalink: /schema/reference/cube
 scope: cubejs
-category: Reference
-menuOrder: 2
+category: Data Schema
+menuOrder: 8
 subCategory: Reference
 proofread: 06/18/2019
 redirect_from:

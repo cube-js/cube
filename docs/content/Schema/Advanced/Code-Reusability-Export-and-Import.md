@@ -3,7 +3,7 @@ title: 'Code Reusability: Export and Import'
 permalink: /schema/advanced/export-import
 category: Data Schema
 subCategory: Advanced
-menuOrder: 1
+menuOrder: 3
 redirect_from:
   - /export-import
   - /recipes/export-import
