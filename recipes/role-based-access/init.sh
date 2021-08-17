@@ -14,7 +14,7 @@ sleep 15
 curl ${apiUrl} -H "Authorization: ${managerToken}" -G -s --data-urlencode "query=${query}" -o managerResponse.json
 curl ${apiUrl} -H "Authorization: ${operatorToken}" -G -s --data-urlencode "query=${query}"  -o operatorResponse.json
 
-echo "There's manager data"
+echo "Manager's data:"
 jq ".data" managerResponse.json
 
 echo "There's operator data"
