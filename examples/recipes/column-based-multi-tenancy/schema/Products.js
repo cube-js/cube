@@ -1,12 +1,5 @@
 cube(`Products`, {
-  sql: `SELECT * FROM public.products WHERE ${CUBE}.supplier_id = ${Suppliers}.id`,
-  
-  joins: {
-    Suppliers: {
-      sql: `${CUBE}.supplier_id = ${Suppliers}.id`,
-      relationship: `belongsTo`
-    }
-  },
+  sql: `SELECT * FROM public.products`,
   
   measures: {
     count: {

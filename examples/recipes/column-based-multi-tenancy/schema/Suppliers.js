@@ -1,6 +1,14 @@
 cube(`Suppliers`, {
-  sql: `SELECT * FROM public.suppliers WHERE email='${SECURITY_CONTEXT.email.unsafeValue()}'`,
+  sql: `SELECT * FROM public.suppliers`,
   
+
+  joins: {
+    Products: {
+      sql: `${CUBE}.id = ${Products}.supplier_id`,
+      relationship: `hasMany`
+    }
+  },
+
   measures: {
     count: {
       type: `count`,
