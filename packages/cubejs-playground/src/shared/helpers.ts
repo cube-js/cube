@@ -2,6 +2,10 @@ import { AvailableCube, AvailableMembers } from '@cubejs-client/react';
 import { MemberType, TCubeMember } from '@cubejs-client/core';
 import { fetch } from 'whatwg-fetch';
 
+export function notEmpty<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
+
 export function ucfirst(s: string): string {
   return s[0].toUpperCase() + s.slice(1);
 }

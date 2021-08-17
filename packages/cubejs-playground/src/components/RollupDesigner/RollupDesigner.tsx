@@ -15,11 +15,10 @@ import {
   Typography,
 } from 'antd';
 import { useMemo, useRef, useState } from 'react';
-import styled from 'styled-components';
 
 import { CodeSnippet } from '../../atoms';
 import { Box, Flex } from '../../grid';
-import { useDeepEffect, useIsMounted, useToggle, useToken } from '../../hooks';
+import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
 import { useCloud } from '../../playground/cloud';
 import {
   getMembersByCube,
@@ -28,6 +27,7 @@ import {
 } from '../../shared/helpers';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
+import { RollupSettings, Settings } from './components/Settings';
 import { TimeDimension } from './components/TimeDimension';
 import {
   getPreAggregationDefinitionFromReferences,
@@ -38,17 +38,6 @@ import {
 
 const { Paragraph, Link, Text } = Typography;
 const { TabPane } = Tabs;
-
-const RightPanelContainer = styled.div`
-  display: grid;
-  grid-template-columns: 300px 300px;
-  grid-template-rows: max-content 1fr;
-  gap: 32px 8px;
-  grid-auto-flow: row;
-  grid-template-areas:
-    '. .'
-    '. .';
-`;
 
 type RollupDesignerProps = {
   apiUrl: string;
@@ -66,6 +55,9 @@ export function RollupDesigner({
   const isMounted = useIsMounted();
   const token = useToken();
   const { isCloud, ...cloud } = useCloud();
+
+  const [activeTab, setActiveTab] = useState<string>('members');
+  const [settings, setSettings] = useState<RollupSettings>({});
 
   const canBeRolledUp =
     transformedQuery.leafMeasureAdditive &&
@@ -125,7 +117,7 @@ export function RollupDesigner({
           },
         }
       );
-      
+
       if (isMounted() && mutext === canUseMutex.current) {
         setMatching(json.canUsePreAggregationForTransformedQuery);
         canUseMutex.current++;
@@ -158,8 +150,11 @@ export function RollupDesigner({
     const definition = {
       preAggregationName: preAggName,
       cubeName,
-      code: getPreAggregationDefinitionFromReferences(references, preAggName)
-        .value,
+      code: getPreAggregationDefinitionFromReferences(
+        references,
+        preAggName,
+        settings
+      ).value,
     };
 
     function showSuccessMessage() {
@@ -205,6 +200,54 @@ export function RollupDesigner({
     setSaving(false);
   }
 
+  function handleSettingsChange(values) {
+    const nextSettings: RollupSettings = {};
+
+    if (values['refreshKey.option'] === 'every') {
+      nextSettings.refreshKey = {
+        every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
+      };
+    } else if (
+      values['refreshKey.option'] === 'sql' &&
+      values['refreshKey.sql']
+    ) {
+      nextSettings.refreshKey = {
+        sql: `\`${values['refreshKey.sql']}\``,
+      };
+    }
+
+    if (values.partitionGranularity) {
+      nextSettings.partitionGranularity = `\`${values.partitionGranularity}\``;
+
+      if (values['updateWindow.value']) {
+        const value = [
+          values['updateWindow.value'],
+          values['updateWindow.granularity'],
+        ].join(' ');
+
+        nextSettings.refreshKey = {
+          ...nextSettings.refreshKey,
+          updateWindow: `\`${value}\``,
+        };
+      }
+
+      nextSettings.refreshKey = {
+        ...nextSettings.refreshKey,
+        incremental: values['incrementalRefresh'],
+      };
+    }
+
+    if (Array.isArray(values.indexes) && values.indexes.length > 0) {
+      nextSettings.indexes = {
+        indexName: {
+          columns: values.indexes,
+        },
+      };
+    }
+
+    setSettings(nextSettings);
+  }
+
   function handleMemberToggle(memberType) {
     return (key) => {
       setReferences(updateQuery(references, memberType, key) as any);
@@ -239,21 +282,23 @@ export function RollupDesigner({
         <CodeSnippet
           style={{ marginBottom: 16 }}
           code={
-            getPreAggregationDefinitionFromReferences(references, preAggName)
-              .code
+            getPreAggregationDefinitionFromReferences(
+              references,
+              preAggName,
+              settings
+            ).code
           }
           copyMessage="Rollup definition is copied"
         />
 
-        <Flex justifyContent="flex-end" gap={2}>
-          <Button
-            type="primary"
-            loading={saving}
-            onClick={handleAddToSchemaClick}
-          >
-            Add to the Data Schema
-          </Button>
-        </Flex>
+        <Button
+          type="primary"
+          loading={saving}
+          style={{ width: '100%' }}
+          onClick={handleAddToSchemaClick}
+        >
+          Add to the Data Schema
+        </Button>
       </div>
     );
   }
@@ -261,7 +306,7 @@ export function RollupDesigner({
   return (
     <Flex justifyContent="space-between" gap={4}>
       <Box grow={1}>
-        <Tabs>
+        <Tabs onChange={setActiveTab}>
           <TabPane tab="Members" key="members">
             <Flex gap={2}>
               <Cubes
@@ -339,48 +384,72 @@ export function RollupDesigner({
             </Flex>
           </TabPane>
 
-          {/* <TabPane tab="Settings" key="settings">
-            settings
-          </TabPane> */}
+          <TabPane tab="Settings" key="settings">
+            <Settings
+              members={references.measures
+                .concat(references.dimensions)
+                .concat(references.timeDimensions.map((td) => td.dimension))}
+              onChange={handleSettingsChange}
+            />
+          </TabPane>
         </Tabs>
       </Box>
 
-      <RightPanelContainer>
-        <Flex direction="column" gap={2}>
-          <Text strong>Rollup Definition</Text>
+      <Flex gap={3}>
+        <Flex
+          direction="column"
+          justifyContent="flex-start"
+          style={{ minWidth: 300 }}
+        >
+          <Box style={{ flexBasis: 120 }}>
+            <Paragraph strong>Rollup Definition</Paragraph>
 
-          <Paragraph>
-            Add the following pre-aggregation to the <b>{cubeName}</b> cube.
-          </Paragraph>
+            <Paragraph>
+              Add the following pre-aggregation to the <b>{cubeName}</b> cube.
+            </Paragraph>
 
-          <Input
-            value={preAggName}
-            onChange={(event) => setPreAggName(event.target.value)}
-          />
+            <Input
+              value={preAggName}
+              onChange={(event) => setPreAggName(event.target.value)}
+            />
+          </Box>
+
+          <Box>{rollupBody()}</Box>
         </Flex>
 
-        <Flex direction="column" gap={2}>
-          <Text strong>Query Compatibility</Text>
+        {activeTab === 'members' ? (
+          <Flex
+            direction="column"
+            justifyContent="flex-start"
+            style={{ minWidth: 300 }}
+          >
+            <Box style={{ flexBasis: 120 }}>
+              <Paragraph strong>Query Compatibility</Paragraph>
 
-          {canBeRolledUp &&
-            (matching ? (
-              <Alert message="This rollup will match the following query:" />
-            ) : (
-              <Alert
-                type="warning"
-                message={<Text>This rollup will <b>NOT</b> match the following query:</Text>}
+              {canBeRolledUp && matching ? (
+                <Alert message="This rollup will match the following query:" />
+              ) : (
+                <Alert
+                  type="warning"
+                  message={
+                    <Text>
+                      This rollup will <b>NOT</b> match the following query:
+                    </Text>
+                  }
+                />
+              )}
+            </Box>
+
+            <Box>
+              <CodeSnippet
+                style={{ minWidth: 200 }}
+                code={JSON.stringify(matchedQuery, null, 2)}
+                copyMessage="Query is copied"
               />
-            ))}
-        </Flex>
-
-        {rollupBody()}
-
-        <CodeSnippet
-          style={{ minWidth: 200 }}
-          code={JSON.stringify(matchedQuery, null, 2)}
-          copyMessage="Query is copied"
-        />
-      </RightPanelContainer>
+            </Box>
+          </Flex>
+        ) : null}
+      </Flex>
     </Flex>
   );
 }
