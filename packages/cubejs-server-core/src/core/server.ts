@@ -96,21 +96,21 @@ export class CubejsServerCore {
 
   protected readonly standalone: boolean = true;
 
-  protected maxCompilerCacheKeep: NodeJS.Timeout|null = null;
+  protected maxCompilerCacheKeep: NodeJS.Timeout | null = null;
 
-  protected scheduledRefreshTimerInterval: CancelableInterval|null = null;
+  protected scheduledRefreshTimerInterval: CancelableInterval | null = null;
 
-  protected driver: BaseDriver|null = null;
+  protected driver: BaseDriver | null = null;
 
-  protected apiGatewayInstance: ApiGateway|null = null;
+  protected apiGatewayInstance: ApiGateway | null = null;
 
   public readonly event: (name: string, props?: object) => Promise<void>;
 
-  public projectFingerprint: string|null = null;
+  public projectFingerprint: string | null = null;
 
-  public anonymousId: string|null = null;
+  public anonymousId: string | null = null;
 
-  public coreServerVersion: string|null = null;
+  public coreServerVersion: string | null = null;
 
   public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
@@ -632,7 +632,7 @@ export class CubejsServerCore {
     }
 
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
-    let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
+    let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
     const externalDbType = this.contextToExternalDbType(context);
     // orchestrator options can be empty, if user didnt define it
@@ -684,7 +684,7 @@ export class CubejsServerCore {
 
           // eslint-disable-next-line no-return-assign
           return externalPreAggregationsDriverPromise = (async () => {
-            let driver: BaseDriver|null = null;
+            let driver: BaseDriver | null = null;
 
             try {
               driver = await this.options.externalDriverFactory(context);
@@ -783,7 +783,7 @@ export class CubejsServerCore {
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public async runScheduledRefresh(context: UserBackgroundContext|null, queryingOptions?: ScheduledRefreshOptions) {
+  public async runScheduledRefresh(context: UserBackgroundContext | null, queryingOptions?: ScheduledRefreshOptions) {
     return this.getRefreshScheduler().runScheduledRefresh(
       this.migrateBackgroundContext(context),
       queryingOptions
@@ -792,7 +792,7 @@ export class CubejsServerCore {
 
   protected warningBackgroundContextShow: boolean = false;
 
-  protected migrateBackgroundContext(ctx: UserBackgroundContext | null): RequestContext|null {
+  protected migrateBackgroundContext(ctx: UserBackgroundContext | null): RequestContext | null {
     let result: any = null;
 
     // We renamed authInfo to securityContext, but users can continue to use both ways
@@ -884,7 +884,7 @@ export class CubejsServerCore {
     }
   }
 
-  protected causeErrorPromise: Promise<any>|null = null;
+  protected causeErrorPromise: Promise<any> | null = null;
 
   protected onUncaughtException = async (e: Error) => {
     console.error(e.stack || e);

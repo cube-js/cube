@@ -23,7 +23,7 @@ import {
 import { CreateOptions, CubejsServer } from '../server';
 import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
-function safetyParseSemver(version: string|null) {
+function safetyParseSemver(version: string | null) {
   if (version) {
     return semverParse(version);
   }
@@ -355,7 +355,7 @@ export class ServerContainer {
     let instance = await makeInstance(false);
 
     if (!embedded) {
-      let shutdownHandler: Promise<0|1>|null = null;
+      let shutdownHandler: Promise<0 | 1> | null = null;
       let killSignalCount = 0;
 
       const signalToShutdown = [
@@ -402,7 +402,7 @@ export class ServerContainer {
         });
       }
 
-      let restartHandler: Promise<0|1>|null = null;
+      let restartHandler: Promise<0 | 1> | null = null;
 
       process.addListener('SIGUSR1', async (signal) => {
         console.log(`Received ${signal} signal, reloading in ${instance.configuration.gracefulShutdown}s`);

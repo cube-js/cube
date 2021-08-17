@@ -357,7 +357,7 @@ describe('index.test', () => {
     { setRefreshWorker, setScheduledRefresh, setScheduledRefreshTimer, testName, options }: {
       setRefreshWorker?: boolean,
       setScheduledRefresh?: boolean,
-      setScheduledRefreshTimer?: boolean|number,
+      setScheduledRefreshTimer?: boolean | number,
       testName?: string,
       options?: CreateOptions
     },

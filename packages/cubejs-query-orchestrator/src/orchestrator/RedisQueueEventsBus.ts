@@ -2,7 +2,7 @@ import { RedisPool } from './RedisPool';
 import { BaseQueueEventsBus } from './BaseQueueEventsBus';
 
 export class RedisQueueEventsBus extends BaseQueueEventsBus {
-  protected readonly redisPool: RedisPool|undefined;
+  protected readonly redisPool: RedisPool | undefined;
 
   protected readonly subscribers: Record<string, any>;
 

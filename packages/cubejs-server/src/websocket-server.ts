@@ -12,9 +12,9 @@ export interface WebSocketServerOptions {
 }
 
 export class WebSocketServer {
-  protected subscriptionsTimer: CancelableInterval|null = null;
+  protected subscriptionsTimer: CancelableInterval | null = null;
 
-  protected wsServer: WebSocket.Server|null = null;
+  protected wsServer: WebSocket.Server | null = null;
 
   protected subscriptionServer: any = null;
 

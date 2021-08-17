@@ -4,7 +4,7 @@ import { Socket } from 'net';
 import { TLSSocket } from 'tls';
 
 export type GracefulHttpServer = (https.Server | http.Server) & {
-  stop: (timeout?: number) => Promise<[boolean, Error|undefined]>;
+  stop: (timeout?: number) => Promise<[boolean, Error | undefined]>;
 };
 
 export function gracefulHttp(server: http.Server | https.Server): GracefulHttpServer {

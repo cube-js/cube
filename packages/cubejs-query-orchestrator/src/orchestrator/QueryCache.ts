@@ -35,7 +35,7 @@ export class QueryCache {
 
   protected queue: { [dataSource: string]: QueryQueue } = {};
 
-  protected externalQueue: QueryQueue|null = null;
+  protected externalQueue: QueryQueue | null = null;
 
   protected memoryCache: LRUCache<string, CacheEntry>;
 
