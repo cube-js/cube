@@ -1,5 +1,5 @@
 ---
-title: Role Based Access
+title: Role-Based Access
 permalink: /recipes/role-based-access
 category: Examples & Tutorials
 subCategory: Access control
