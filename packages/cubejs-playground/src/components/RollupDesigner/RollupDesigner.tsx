@@ -212,7 +212,7 @@ export function RollupDesigner({
       values['refreshKey.sql']
     ) {
       nextSettings.refreshKey = {
-        sql: values['refreshKey.sql'],
+        sql: `\`${values['refreshKey.sql']}\``,
       };
     }
 

@@ -80,7 +80,7 @@ export function Settings({ members, onChange }: SettingsProps) {
     },
     partitionGranularity: '',
     updateWindow: {
-      value: 1,
+      value: 7,
       granularity: 'day',
     },
     incrementalRefresh: true,
