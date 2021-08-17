@@ -99,6 +99,6 @@ We have received different data depending on the user's role.
 
 ## Source
 
-Please check out the full source code [here](https://github.com/rchkv/cubejs-rbac-recipe). It is
+Please check out the full source code [here](https://github.com/cube-js/cube.js/tree/master/recipes/role-based-access). It is
 self-contained code, so if you execute `docker-compose up` command in the folder
 with the source code, you'll see the query execution result's console log.
