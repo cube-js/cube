@@ -77,7 +77,16 @@ export function getPreAggregationDefinitionFromReferences(
   settings: RollupSettings
 ): PreAggregationDefinitionResult {
   const { timeDimensions, ...otherReferences } = references;
-  const code: Record<string, any> = { ...otherReferences, ...settings };
+  const code: Record<string, any> = {
+    ...Object.entries(otherReferences).reduce(
+      (memo, [key, value]) => ({
+        ...memo,
+        ...(Array.isArray(value) && value.length ? { [key]: value } : null),
+      }),
+      {}
+    ),
+    ...settings,
+  };
 
   if (timeDimensions.length) {
     const { dimension, granularity } = references.timeDimensions[0];
@@ -156,7 +165,7 @@ export function flatten(target: Object, opts: FlattenOptions = {}) {
   const transformKey = opts.transformKey || keyIdentity;
   const output = {};
 
-  function step(object, prev = null, currentDepth = 1) {
+  function step(object, prev = null, keyDepth = 1) {
     Object.keys(object).forEach(function (key) {
       const value = object[key];
       const isArray = opts.safe && Array.isArray(value);
@@ -173,9 +182,9 @@ export function flatten(target: Object, opts: FlattenOptions = {}) {
         !isbuffer &&
         isobject &&
         Object.keys(value).length &&
-        (!opts.maxDepth || currentDepth < maxDepth)
+        (!opts.maxDepth || keyDepth < maxDepth)
       ) {
-        return step(value, newKey, currentDepth + 1);
+        return step(value, newKey, keyDepth + 1);
       }
 
       output[newKey] = value;
