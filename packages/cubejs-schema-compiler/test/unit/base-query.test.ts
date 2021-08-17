@@ -523,7 +523,7 @@ describe('SQL Generation', () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
       createCubeSchema({
         name: 'cards',
-        refreshKey: ``,
+        refreshKey: '',
         preAggregations: `
           countCreatedAt: {
               type: 'rollup',

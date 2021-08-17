@@ -1127,7 +1127,7 @@ export class ApiGateway {
   }
 
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
-    type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
+    type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
@@ -1157,7 +1157,7 @@ export class ApiGateway {
       }
 
       checkAuthFn = async (auth) => {
-        const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
+        const decoded = <Record<string, any> | null>jwt.decode(auth, { complete: true });
         if (!decoded) {
           throw new CubejsHandlerError(
             403,

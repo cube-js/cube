@@ -220,10 +220,10 @@ export class SqlParser {
     return result;
   }
 
-  public extractTableFrom(): string|null {
+  public extractTableFrom(): string | null {
     this.throwErrorsIfAny();
 
-    let result: string|null = null;
+    let result: string | null = null;
 
     this.ast.accept(nodeVisitor({
       visitNode(ctx) {

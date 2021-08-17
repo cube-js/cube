@@ -4,16 +4,13 @@ module.exports = {
   env: {
     node: true,
   },
-  plugins: [
-    'import',
-    '@typescript-eslint/eslint-plugin',
-  ],
+  plugins: ['import', '@typescript-eslint/eslint-plugin'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     sourceType: 'module',
     ecmaVersion: 2020,
     ecmaFeatures: {
-      legacyDecorators: true
+      legacyDecorators: true,
     },
   },
   rules: {
@@ -54,6 +51,7 @@ module.exports = {
     '@typescript-eslint/prefer-namespace-keyword': 'error',
     '@typescript-eslint/triple-slash-reference': 'error',
     '@typescript-eslint/type-annotation-spacing': 'error',
+    '@typescript-eslint/space-infix-ops': 'error',
   },
   overrides: [
     {

@@ -43,7 +43,7 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   readOnly?: boolean,
 };
 
-function getTypeParser(dataType: TypeId, format: TypeFormat|undefined) {
+function getTypeParser(dataType: TypeId, format: TypeFormat | undefined) {
   const isTimestamp = timestampDataTypes.includes(dataType);
   if (isTimestamp) {
     return timestampTypeParser;
@@ -99,7 +99,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    * It's not possible to detect user defined types via constant oids
    * For example HLL extensions is using CREATE TYPE HLL which will generate a new pg_type with different oids
    */
-  protected userDefinedTypes: Record<string, string>|null = null;
+  protected userDefinedTypes: Record<string, string> | null = null;
 
   protected getPostgresTypeForField(field: FieldDef) {
     if (field.dataTypeID in NativeTypeToPostgresType) {
@@ -130,7 +130,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
     if (!this.userDefinedTypes) {
       const customTypes = await conn.query(
-        "SELECT oid, typname FROM pg_type WHERE typcategory = 'U'",
+        'SELECT oid, typname FROM pg_type WHERE typcategory = \'U\'',
         []
       );
 

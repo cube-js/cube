@@ -12,7 +12,7 @@ export interface CompilerErrorInterface {
 
 export interface SyntaxErrorInterface {
   message: string;
-  loc: SourceLocation|null,
+  loc: SourceLocation | null,
 }
 
 interface File {
@@ -29,10 +29,10 @@ export class ErrorReporter {
 
   protected errors: CompilerErrorInterface[] = [];
 
-  protected file: File|null = null;
+  protected file: File | null = null;
 
   public constructor(
-    protected readonly parent: ErrorReporter|null = null,
+    protected readonly parent: ErrorReporter | null = null,
     protected readonly context: any[] = [],
     protected readonly options: ErrorReporterOptions = {
       logger: (msg) => console.log(msg),
