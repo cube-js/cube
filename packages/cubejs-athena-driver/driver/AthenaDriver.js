@@ -8,19 +8,20 @@ const applyParams = (query, params) => SqlString.format(query, params);
 class AthenaDriver extends BaseDriver {
   constructor(config = {}) {
     super();
-
     this.config = {
-      credentials: {
-        accessKeyId: config.accessKeyId || process.env.CUBEJS_AWS_KEY,
-        secretAccessKey: config.secretAccessKey || process.env.CUBEJS_AWS_SECRET,
-      },
       region: process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
+      WorkGroup: config.WorkGroup || 'primary',
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
-
+    if (!process.env.AWS_SDK_LOAD_CONFIG) {
+      this.config.credentials = {
+        accessKeyId: config.accessKeyId || process.env.CUBEJS_AWS_KEY,
+        secretAccessKey: config.secretAccessKey || process.env.CUBEJS_AWS_SECRET,
+      };
+    }
     this.athena = new AWS.Athena(this.config);
   }
 
@@ -94,7 +95,8 @@ class AthenaDriver extends BaseDriver {
       QueryString: queryString,
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
-      }
+      },
+      WorkGroup: this.config.WorkGroup,
     });
 
     const startedTime = Date.now();
@@ -118,7 +120,6 @@ class AthenaDriver extends BaseDriver {
   async tablesSchema() {
     const tablesSchema = await super.tablesSchema();
     const viewsSchema = await this.viewsSchema(tablesSchema);
-
     return this.mergeSchemas([tablesSchema, viewsSchema]);
   }
 
@@ -143,7 +144,6 @@ class AthenaDriver extends BaseDriver {
       FROM information_schema.tables
       WHERE tables.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
     `);
-
     return data;
   }
 
