@@ -10,6 +10,7 @@ import {
   Radio,
   Row,
   Select,
+  SelectProps,
   Space,
   Typography,
 } from 'antd';
@@ -49,14 +50,20 @@ type RollupIndexColumns = {
   columns: string[];
 };
 
+type RefreshKey = {
+  every?: string;
+  incremental?: boolean;
+  updateWindow?: string;
+  sql?: string;
+};
+
 export type RollupSettings = {
-  refreshKey?: any;
+  refreshKey?: RefreshKey;
   partitionGranularity?: any;
   buildRangeStart?: BuildRange;
   buildRangeEnd?: BuildRange;
   indexes?: Record<string, RollupIndexColumns>;
 };
-
 
 type SettingsProps = {
   members: string[];
@@ -76,6 +83,7 @@ export function Settings({ members, onChange }: SettingsProps) {
       value: 1,
       granularity: 'day',
     },
+    incrementalRefresh: true,
     buildRange: {
       since: {
         option: 'relative',
@@ -96,11 +104,14 @@ export function Settings({ members, onChange }: SettingsProps) {
   };
 
   const flattenedValues = useMemo(() => {
-    return flatten(initialValues);
+    const values = flatten(initialValues);
+
+    onChange(values);
+
+    return values;
   }, []);
 
   const [values, setValues] = useState<Record<string, string>>(flattenedValues);
-  // const [form] = Form.useForm<Partial<typeof initialValues>>();
 
   return (
     <Form
@@ -120,40 +131,51 @@ export function Settings({ members, onChange }: SettingsProps) {
           <Form.Item name="refreshKey.option" noStyle>
             <StyledRadioGroup>
               <Row gutter={8}>
-                <Col flex="80px">
+                <Col flex="85px">
                   <Radio value="every">Every</Radio>
                 </Col>
 
                 <Col flex="auto">
                   <Space>
                     <Form.Item name="refreshKey.value">
-                      <Input type="number" min={0} style={{ maxWidth: 80 }} />
+                      <Input
+                        disabled={values['refreshKey.option'] !== 'every'}
+                        type="number"
+                        min={0}
+                        style={{ maxWidth: 80 }}
+                      />
                     </Form.Item>
 
-                    <GranularitySelect name="refreshKey.granularity" />
+                    <GranularitySelect
+                      disabled={values['refreshKey.option'] !== 'every'}
+                      name="refreshKey.granularity"
+                    />
                   </Space>
                 </Col>
               </Row>
 
               <Row gutter={8}>
-                <Col flex="80px">
+                <Col flex="85px">
                   <Radio value="sql">SQL</Radio>
                 </Col>
 
                 <Col flex="auto">
                   <Form.Item name="refreshKey.sql">
-                    <Input.TextArea placeholder="SELECT MAX(createdAt) FROM orders" />
+                    <Input.TextArea
+                      disabled={values['refreshKey.option'] !== 'sql'}
+                      placeholder="SELECT MAX(createdAt) FROM orders"
+                    />
                   </Form.Item>
                 </Col>
               </Row>
 
-              <Form.Item
+              {/* <Form.Item
                 name="automatedRefresh"
                 valuePropName="checked"
                 noStyle
               >
                 <Checkbox>Automated Refresh</Checkbox>
-              </Form.Item>
+              </Form.Item> */}
             </StyledRadioGroup>
           </Form.Item>
         </Card>
@@ -173,23 +195,31 @@ export function Settings({ members, onChange }: SettingsProps) {
             </Select>
           </Form.Item>
 
-          <Typography.Paragraph strong>Update Window</Typography.Paragraph>
+          {values.partitionGranularity ? (
+            <>
+              <Form.Item name="incrementalRefresh" valuePropName="checked">
+                <Checkbox>Incremental Refresh</Checkbox>
+              </Form.Item>
 
-          <Space>
-            <Form.Item name="updateWindow.value">
-              <Input type="number" min={0} style={{ maxWidth: 80 }} />
-            </Form.Item>
+              <Typography.Paragraph strong>Update Window</Typography.Paragraph>
 
-            <GranularitySelect name="updateWindow.granularity" />
-          </Space>
+              <Space>
+                <Form.Item name="updateWindow.value">
+                  <Input type="number" min={0} style={{ maxWidth: 80 }} />
+                </Form.Item>
 
-          <Typography.Paragraph strong>Build Range</Typography.Paragraph>
+                <GranularitySelect name="updateWindow.granularity" />
+              </Space>
 
-          <Flex direction="column" gap={4}>
-            <BuildRange time="since" />
+              {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
 
-            <BuildRange time="until" />
-          </Flex>
+              {/* <Flex direction="column" gap={4}>
+  <BuildRange time="since" />
+
+  <BuildRange time="until" />
+</Flex> */}
+            </>
+          ) : null}
 
           <Typography.Paragraph strong>Indexes</Typography.Paragraph>
 
@@ -255,10 +285,13 @@ function BuildRange({ time }: BuildRangeProps) {
   );
 }
 
-function GranularitySelect(props: FormItemProps) {
+function GranularitySelect({
+  disabled,
+  ...props
+}: FormItemProps & { disabled?: boolean }) {
   return (
     <Form.Item {...props}>
-      <Select showSearch style={{ minWidth: 100 }}>
+      <Select disabled={disabled} showSearch style={{ minWidth: 100 }}>
         {GRANULARITIES.filter(({ name }) => Boolean(name)).map(
           ({ name, title }) => (
             <Select.Option key={name} value={name as string}>

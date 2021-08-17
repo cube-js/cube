@@ -207,7 +207,10 @@ export function RollupDesigner({
       nextSettings.refreshKey = {
         every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
       };
-    } else if (values['refreshKey.option'] === 'sql') {
+    } else if (
+      values['refreshKey.option'] === 'sql' &&
+      values['refreshKey.sql']
+    ) {
       nextSettings.refreshKey = {
         sql: values['refreshKey.sql'],
       };
@@ -215,6 +218,23 @@ export function RollupDesigner({
 
     if (values.partitionGranularity) {
       nextSettings.partitionGranularity = `\`${values.partitionGranularity}\``;
+
+      if (values['updateWindow.value']) {
+        const value = [
+          values['updateWindow.value'],
+          values['updateWindow.granularity'],
+        ].join(' ');
+
+        nextSettings.refreshKey = {
+          ...nextSettings.refreshKey,
+          updateWindow: `\`${value}\``,
+        };
+      }
+
+      nextSettings.refreshKey = {
+        ...nextSettings.refreshKey,
+        incremental: values['incrementalRefresh'],
+      };
     }
 
     if (Array.isArray(values.indexes) && values.indexes.length > 0) {
