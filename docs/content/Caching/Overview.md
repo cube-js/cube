@@ -15,9 +15,8 @@ menuOrder: 1
 <!-- prettier-ignore-end -->
 
 Cube.js provides a two-level caching system. The first level is **in-memory**
-cache and is active by default. We recommend using [Redis](https://redis.io) for
-in-memory cache when
-[running Cube.js in production](/deployment/production-checklist).
+cache and is active by default. We recommend using [Redis][link-redis] for
+in-memory cache when [running Cube.js in production][ref-production-checklist].
 
 Cube.js [in-memory cache](#in-memory-cache) acts as a buffer for your database
 when there's a burst of requests hitting the same data from multiple concurrent
@@ -42,14 +41,13 @@ concurrency.
 <!-- prettier-ignore-start -->
 [[info |]]
 | To start building pre-aggregations, Cube.js requires write access to the
-| [pre-aggregations schema](/config#options-reference-pre-aggregations-schema)
-| in the source database. Cube.js first builds pre-aggregations as tables in
-| the source database and then exports them into the pre-aggregations storage.
+| [pre-aggregations schema][ref-config-preagg-schema] in the source database.
+| Cube.js first builds pre-aggregations as tables in the source database and
+| then exports them into the pre-aggregations storage.
 <!-- prettier-ignore-end -->
 
 Pre-aggregations are defined in the data schema. You can learn more about
-defining pre-aggregations in
-[schema reference](/schema/reference/pre-aggregations).
+defining pre-aggregations in [schema reference][ref-schema-ref-preaggs].
 
 ```js
 cube(`Orders`, {
@@ -69,8 +67,6 @@ cube(`Orders`, {
 
   preAggregations: {
     amountByCreated: {
-      type: `rollup`,
-      external: true,
       measures: [totalAmount],
       timeDimension: createdAt,
       granularity: `month`,
@@ -90,8 +86,8 @@ key. If nothing is found in the cache, the query is executed in the database and
 the result set is returned as well as updating the cache.
 
 If an existing value is present in the cache and the `refreshKey` value for the
-query hasn't changed, the cached value will be returned. Otherwise, a SQL query
-will be executed either against the pre-aggregations storage or the source
+query hasn't changed, the cached value will be returned. Otherwise, an SQL query
+will be executed against either the pre-aggregations storage or the source
 database to populate the cache with the results and return them.
 
 ### Refresh Keys
@@ -104,9 +100,9 @@ different, the cached result is valid and can be returned skipping an expensive
 query, but if there is a difference, the query needs to be re-run and its result
 cached.
 
-To aid with this, Cube.js defines a `refreshKey` for each cube.
-[Refresh keys](/cube#parameters-refresh-key) are evaluated by Cube.js to assess
-if the data needs to be refreshed.
+To aid with this, Cube.js defines a `refreshKey` for each cube. [Refresh
+keys][ref-schema-ref-cube-refresh-key] are evaluated by Cube.js to assess if the
+data needs to be refreshed.
 
 ```js
 cube(`Orders`, {
@@ -125,18 +121,13 @@ cube(`Orders`, {
 ```
 
 By default, Cube.js will check and invalidate the cache in the background when
-in [development mode][link-development-mode]. In production environments, we
+in [development mode][ref-development-mode]. In production environments, we
 recommend [running a Refresh Worker as a separate
-instance][link-production-checklist-refresh].
+instance][ref-production-checklist-refresh].
 
 We recommend enabling background cache invalidation in a separate Cube.js worker
 for production deployments. Please consult the [Production
-Checklist][link-production-checklist] for more information.
-
-[link-production-checklist]: /deployment/production-checklist
-[link-development-mode]: /configuration/overview#development-mode
-[link-production-checklist-refresh]:
-  /deployment/production-checklist#set-up-refresh-worker
+Checklist][ref-production-checklist] for more information.
 
 If background refresh is disabled, Cube.js will refresh the cache during query
 execution. Since this could lead to delays in responding to end-users, we
@@ -150,7 +141,7 @@ The default values for `refreshKey` are
 - `every: '10 second'` for all other databases.
 
 +You can use a custom SQL query to check if a refresh is required by changing
-the [`refreshKey`](/cube#parameters-refresh-key) property in a cube's Data
+the [`refreshKey`][ref-schema-ref-cube-refresh-key] property in a cube's Data
 Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option,
 or examining a metadata table for whatever system is managing the data to see
 when it last ran.
@@ -171,9 +162,8 @@ guarantees are provided in this case.
 For situations like real-time analytics or responding to live user changes to
 underlying data, the `refreshKey` query cache can prevent fresh data from
 showing up immediately. For these situations, the cache can effectively be
-disabled by setting the
-[`refreshKey.every`](/schema/reference/cube#parameters-refresh-key) parameter to
-something very low, like `1 second`.
+disabled by setting the [`refreshKey.every`][ref-schema-ref-cube-refresh-key]
+parameter to something very low, like `1 second`.
 
 ## Inspecting Queries
 
@@ -181,7 +171,7 @@ To inspect whether the query hits in-memory cache, pre-aggregation, or the
 underlying data source, you can use the Playground or [Cube
 Cloud][link-cube-cloud].
 
-[Developer Playground][link-dev-playground] can be used to inspect a single
+[Developer Playground][ref-dev-playground] can be used to inspect a single
 query. To do that, click the "cache" button after executing the query. It will
 show you the information about the `refreshKey` for the query and whether the
 query uses any pre-aggregations. To inspect multiple queries or list existing
@@ -192,8 +182,6 @@ pre-aggregations, you can use Cube Cloud.
 | [Cube Cloud][link-cube-cloud] currently is in early access. If you don't have
 | an account yet, you can [sign up to the waitlist here][link-cube-cloud].
 <!-- prettier-ignore-end -->
-
-[link-cube-cloud]: https://cube.dev/cloud
 
 To inspect queries in the Cube Cloud, navigate to the "History" page. You can
 filter queries by multiple parameters on this page, including whether they hit
@@ -209,4 +197,13 @@ timestamp, and the time spent to build the pre-aggregation. You can also inspect
 every pre-aggregation's details: the list of queries it serves and all its
 versions.
 
-[link-dev-playground]: /dev-tools/dev-playground
+[link-cube-cloud]: https://cube.dev/cloud
+[link-redis]: https://redis.io
+[ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
+[ref-dev-playground]: /dev-tools/dev-playground
+[ref-development-mode]: /configuration/overview#development-mode
+[ref-production-checklist]: /deployment/production-checklist
+[ref-production-checklist-refresh]:
+  /deployment/production-checklist#set-up-refresh-worker
+[ref-schema-ref-cube-refresh-key]: /schema/reference/cube#parameters-refresh-key
+[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations

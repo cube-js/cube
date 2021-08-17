@@ -132,7 +132,6 @@ asyncModule(async () => {
       measures,
       preAggregations: {
         main: {
-          type: `rollup`,
           ...
         },
       },
@@ -208,7 +207,6 @@ asyncModule(async () => {
       measures,
       preAggregations: {
         main: {
-          type: `rollup`,
           ...
         },
       },
@@ -257,7 +255,6 @@ asyncModule(async () => {
       measures,
       preAggregations: {
         main: {
-          type: `rollup`,
           ...
         },
       },

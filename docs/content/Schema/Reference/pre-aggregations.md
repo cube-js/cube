@@ -648,7 +648,6 @@ cube(`Orders`, {
       timeDimension: CUBE.createdAt,
       granularity: `day`,
       partitionGranularity: `month`,
-      scheduledRefresh: true,
     },
   },
 });

@@ -107,7 +107,6 @@ cube(`Orders`, {
   // Same content as before, but including the following:
   preAggregations: {
     orderStatuses: {
-      type: `rollup`,
       dimensions: [status],
     },
   },
@@ -135,7 +134,6 @@ cube(`Orders`, {
   // Same content as before, but including the following:
   preAggregations: {
     ordersByCompletedAt: {
-      type: `rollup`,
       measures: [count],
       timeDimension: completedAt,
       granularity: `month`,
