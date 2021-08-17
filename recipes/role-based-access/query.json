@@ -1,0 +1,13 @@
+{
+    "dimensions": [
+        "Orders.status"
+    ],
+    "timeDimensions": [],
+    "order": {
+        "Orders.count": "desc"
+    },
+    "measures": [
+        "Orders.count"
+    ],
+    "filters": []
+}
