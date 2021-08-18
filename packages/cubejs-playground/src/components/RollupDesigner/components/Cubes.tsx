@@ -18,10 +18,7 @@ export function Cubes({ selectedKeys, membersByCube, onSelect }: CubesProps) {
 
   return (
     <Menu
-      style={{
-        width: 256,
-        marginLeft: -24,
-      }}
+      style={{ maxWidth: 256 }}
       selectedKeys={selectedKeys}
       defaultOpenKeys={defaultOpenKeys}
       mode="inline"

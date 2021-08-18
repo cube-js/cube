@@ -10,12 +10,12 @@ import {
   Radio,
   Row,
   Select,
-  SelectProps,
   Space,
   Typography,
 } from 'antd';
 import { useMemo, useState } from 'react';
 import styled from 'styled-components';
+
 import { Flex } from '../../../grid';
 import { ucfirst } from '../../../shared/helpers';
 import { flatten } from '../utils';
@@ -68,11 +68,16 @@ export type RollupSettings = {
 };
 
 type SettingsProps = {
+  hasTimeDimension: boolean;
   members: string[];
   onChange: (values: Record<string, string>) => void;
 };
 
-export function Settings({ members, onChange }: SettingsProps) {
+export function Settings({
+  members,
+  hasTimeDimension,
+  onChange,
+}: SettingsProps) {
   const initialValues = {
     refreshKey: {
       option: 'every',
@@ -138,7 +143,7 @@ export function Settings({ members, onChange }: SettingsProps) {
                 </Col>
 
                 <Col flex="auto">
-                  <Space>
+                  <Space align="start">
                     <Form.Item name="refreshKey.value">
                       <Input
                         disabled={values['refreshKey.option'] !== 'every'}
@@ -183,49 +188,54 @@ export function Settings({ members, onChange }: SettingsProps) {
         </Card>
 
         <Card>
-          <Typography.Paragraph strong>
-            Partion Granularity
-          </Typography.Paragraph>
-
-          <Form.Item name="partitionGranularity">
-            <Select showSearch style={{ maxWidth: 150 }}>
-              {partionGranularities.map(({ name, title }) => (
-                <Select.Option key={name} value={name || ''}>
-                  {title}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          {values.partitionGranularity ? (
+          {hasTimeDimension ? (
             <>
-              <Form.Item name="incrementalRefresh" valuePropName="checked">
-                <Checkbox>Incremental Refresh</Checkbox>
+              <Typography.Paragraph strong>
+                Partion Granularity
+              </Typography.Paragraph>
+
+              <Form.Item name="partitionGranularity">
+                <Select showSearch style={{ maxWidth: 150 }}>
+                  {partionGranularities.map(({ name, title }) => (
+                    <Select.Option key={name} value={name || ''}>
+                      {title}
+                    </Select.Option>
+                  ))}
+                </Select>
               </Form.Item>
 
-              <Typography.Paragraph strong>Update Window</Typography.Paragraph>
+              {values.partitionGranularity ? (
+                <>
+                  <Form.Item name="incrementalRefresh" valuePropName="checked">
+                    <Checkbox>Incremental Refresh</Checkbox>
+                  </Form.Item>
 
-              <Space>
-                <Form.Item name="updateWindow.value">
-                  <Input type="number" min={0} style={{ maxWidth: 80 }} />
-                </Form.Item>
+                  <Typography.Paragraph strong>
+                    Update Window
+                  </Typography.Paragraph>
 
-                <GranularitySelect
-                  name="updateWindow.granularity"
-                  excludedGranularities={['second']}
-                />
-              </Space>
+                  <Space align="start">
+                    <Form.Item name="updateWindow.value">
+                      <Input type="number" min={0} style={{ maxWidth: 80 }} />
+                    </Form.Item>
 
-              {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
+                    <GranularitySelect
+                      name="updateWindow.granularity"
+                      excludedGranularities={['second']}
+                    />
+                  </Space>
 
-              {/* <Flex direction="column" gap={4}>
+                  {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
+
+                  {/* <Flex direction="column" gap={4}>
   <BuildRange time="since" />
 
   <BuildRange time="until" />
 </Flex> */}
+                </>
+              ) : null}
             </>
           ) : null}
-
           <Typography.Paragraph strong>Indexes</Typography.Paragraph>
 
           <Form.Item name="indexes" noStyle>

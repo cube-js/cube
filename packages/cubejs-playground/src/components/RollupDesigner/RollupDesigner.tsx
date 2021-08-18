@@ -15,6 +15,7 @@ import {
   Typography,
 } from 'antd';
 import { useMemo, useRef, useState } from 'react';
+import styled from 'styled-components';
 
 import { CodeSnippet } from '../../atoms';
 import { Box, Flex } from '../../grid';
@@ -38,6 +39,32 @@ import {
 
 const { Paragraph, Link, Text } = Typography;
 const { TabPane } = Tabs;
+
+const Layout = styled.div`
+  display: flex;
+  gap: 16px;
+
+  & > div {
+    max-width: 280px;
+
+    & > div {
+      flex-basis: 140px;
+    }
+  }
+
+  @media (max-width: 1280px) {
+    flex-direction: column;
+    gap: 32px;
+
+    & > div {
+      max-width: 280px;
+
+      & > div {
+        flex-basis: 0;
+      }
+    }
+  }
+`;
 
 type RollupDesignerProps = {
   apiUrl: string;
@@ -73,8 +100,8 @@ export function RollupDesigner({
   const segments = new Set<string>();
   availableMembers.segments.forEach(({ members }) => {
     members.forEach(({ name }) => segments.add(name));
-  })
-  
+  });
+
   const [references, setReferences] = useState<PreAggregationReferences>(
     getPreAggregationReferences(transformedQuery, segments)
   );
@@ -82,17 +109,19 @@ export function RollupDesigner({
   const selectedKeys = useMemo(() => {
     const keys: string[] = [];
 
-    ['measures', 'dimensions', 'timeDimensions', 'segments'].map((memberKey) => {
-      if (memberKey === 'timeDimensions') {
-        const { dimension } = references[memberKey]?.[0] || {};
+    ['measures', 'dimensions', 'timeDimensions', 'segments'].map(
+      (memberKey) => {
+        if (memberKey === 'timeDimensions') {
+          const { dimension } = references[memberKey]?.[0] || {};
 
-        if (dimension) {
-          keys.push(dimension);
+          if (dimension) {
+            keys.push(dimension);
+          }
+        } else {
+          references[memberKey]?.map((key) => keys.push(key));
         }
-      } else {
-        references[memberKey]?.map((key) => keys.push(key));
       }
-    });
+    );
 
     return keys;
   }, [references]);
@@ -145,7 +174,7 @@ export function RollupDesigner({
       ...availableMembers.segments,
     ])
   );
-  
+
   async function handleAddToSchemaClick() {
     const definition = {
       preAggregationName: preAggName,
@@ -345,7 +374,7 @@ export function RollupDesigner({
                     <Divider />
                   </>
                 ) : null}
-                
+
                 {references.segments.length ? (
                   <>
                     <Members
@@ -386,6 +415,7 @@ export function RollupDesigner({
 
           <TabPane tab="Settings" key="settings">
             <Settings
+              hasTimeDimension={references.timeDimensions.length > 0}
               members={references.measures
                 .concat(references.dimensions)
                 .concat(references.timeDimensions.map((td) => td.dimension))}
@@ -395,13 +425,9 @@ export function RollupDesigner({
         </Tabs>
       </Box>
 
-      <Flex gap={3}>
-        <Flex
-          direction="column"
-          justifyContent="flex-start"
-          style={{ minWidth: 300 }}
-        >
-          <Box style={{ flexBasis: 120 }}>
+      <Layout>
+        <Flex direction="column" justifyContent="flex-start" gap={2}>
+          <Box>
             <Paragraph strong>Rollup Definition</Paragraph>
 
             <Paragraph>
@@ -418,12 +444,8 @@ export function RollupDesigner({
         </Flex>
 
         {activeTab === 'members' ? (
-          <Flex
-            direction="column"
-            justifyContent="flex-start"
-            style={{ minWidth: 300 }}
-          >
-            <Box style={{ flexBasis: 120 }}>
+          <Flex direction="column" justifyContent="flex-start" gap={2}>
+            <Box>
               <Paragraph strong>Query Compatibility</Paragraph>
 
               {canBeRolledUp && matching ? (
@@ -449,7 +471,7 @@ export function RollupDesigner({
             </Box>
           </Flex>
         ) : null}
-      </Flex>
+      </Layout>
     </Flex>
   );
 }

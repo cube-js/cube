@@ -5,6 +5,7 @@ export const STEP = 8;
 
 type FlexProps = {
   direction?: CSSProperties['flexDirection'];
+  wrap?: boolean;
   justifyContent?: CSSProperties['justifyContent'];
   alignItems?: CSSProperties['alignItems'];
   gap?: number;
@@ -14,7 +15,8 @@ type FlexProps = {
 export const Flex = styled.div<FlexProps>`
   display: flex;
   flex-direction: ${(props) => props.direction || 'row'};
-  justify-content: ${(props) => props.justifyContent || 'space-between'};
+  flex-wrap: ${(props) => props.wrap ? 'wrap' : null};
+  justify-content: ${(props) => props.justifyContent};
   align-items: ${(props) => props.alignItems};
   gap: ${(props) => (props.gap ? `${props.gap * STEP}px` : null)};
   margin: ${margin};
