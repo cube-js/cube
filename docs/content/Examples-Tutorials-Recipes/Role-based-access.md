@@ -17,10 +17,10 @@ from a shop and a `manager` can only view shipped and completed orders.
 To implement role-based access, we will use a
 [JSON Web Token](https://cube.dev/docs/security) with role information in the
 payload, and the
-[queryRewrite](https://cube.dev/docs/security/context#using-query-rewrite)
+[`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
 extension point to manage data access.
 
-Let's add the role verification in the cube.js file.
+Let's add the role verification in the `cube.js` file.
 
 ```javascript
 module.exports = {
@@ -53,7 +53,7 @@ module.exports = {
 ## Query
 
 To get the number of orders as a manager or operator, we will send two identical
-requests with different authorization tokens.
+requests with different JWTs:
 
 ```javascript
 // manager
