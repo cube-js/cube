@@ -298,7 +298,7 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-schema-measure-types]:
   /docs/schema/reference/types-and-formats#measures-types
 [ref-schema-ref-joins-types]: /schema/reference/joins#parameters-relationship
-[ref-schema-ref-sql]: /docs/schema/reference/cube#parameters-sql
+[ref-schema-ref-sql]: /schema/reference/cube#parameters-sql
 [ref-tutorial-incremental-preagg]: /incremental-pre-aggregations
 [self-dimensions]: #dimensions
 [self-measures]: #measures
