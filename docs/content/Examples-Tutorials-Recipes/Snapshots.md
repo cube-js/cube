@@ -3,7 +3,7 @@ title: Snapshots
 permalink: /recipes/snapshots
 category: Examples & Tutorials
 subCategory: Data schema
-menuOrder: 1
+menuOrder: 3
 ---
 
 ## Use case
@@ -16,16 +16,16 @@ In the recipe below we'll learn, for a cube with `Product Id`, `Status`, and
 <!-- prettier-ignore-start -->
 [[info | ]]
 | We can consider the status property to be a
-[slowly chnaging dimension](https://en.wikipedia.org/wiki/Slowly_changing_dimension)
-(SCD) of type 2. Modeling data schemas that contain SCDs is an essential part of the
-data engineering skillset.
+| [slowly chnaging dimension](https://en.wikipedia.org/wiki/Slowly_changing_dimension)
+| (SCD) of type 2. Modeling data schemas that contain SCDs is an essential part of the
+| data engineering skillset.
 <!-- prettier-ignore-end -->
 
 ## Data schema
 
 Let's explore the `Statuses` cube that contains data like this:
 
-```json
+```javascript
 [
   {
     "Statuses.orderId": 1,
@@ -108,12 +108,15 @@ Please note that it makes sense to make the `StatusSnapshots` cube to
 the original `Statuses` cube in order to reuse the dimension definitions. We only need
 to add a new dimension that indicates the `date` of a snapshot.
 
+We're also referencing the definition of the `Statuses` cube with the
+[`sql()` function](https://cube.dev/docs/schema/reference/cube#parameters-sql).
+
 ## Query
 
 To count orders that remained in the `shipped` status at a particular date, we will
 send a query that selects a snapshot by this date and also filters by the status:
 
-```json
+```javascript
 {
   "measures": [
     "StatusSnapshots.count"
@@ -137,20 +140,20 @@ send a query that selects a snapshot by this date and also filters by the status
 
 If we execute a couple of such queries for distinct dates, we'll spot the change:
 
-```json
+```javascript
 // Shipped as of April 1, 2019:
 [
   {
-    "StatusSnapshots.count": "16"
+    "StatusSnapshots.count": 16
   }
 ]
 ```
 
-```json
+```javascript
 // Shipped as of May 1, 2019:
 [
   {
-    "StatusSnapshots.count": "25"
+    "StatusSnapshots.count": 25
   }
 ]
 ```
