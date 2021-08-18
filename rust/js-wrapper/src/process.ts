@@ -7,7 +7,7 @@ import { downloadBinaryFromRelease, getBinaryPath } from './download';
 export interface CubeStoreHandlerOptions {
   stdout: (data: Buffer) => void;
   stderr: (data: Buffer) => void;
-  onRestart: (exitCode: number|null) => void;
+  onRestart: (exitCode: number | null) => void;
 }
 
 interface StartProcessOptions extends CubeStoreHandlerOptions {
@@ -139,7 +139,7 @@ export class CubeStoreHandler {
       return this.cubeStoreStarting;
     }
 
-    const onExit = (code: number|null) => {
+    const onExit = (code: number | null) => {
       if (this.releaseRequested) {
         return;
       }

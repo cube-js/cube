@@ -3,6 +3,43 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.22](https://github.com/cube-js/cube.js/compare/v0.28.21...v0.28.22) (2021-08-17)
+
+
+### Features
+
+* **@cubejs-client/playground:** rollup designer settings ([#3261](https://github.com/cube-js/cube.js/issues/3261)) ([67aa26e](https://github.com/cube-js/cube.js/commit/67aa26eb39eb1f64d0576bc832bd0fd1be02e55b))
+* **cubejs-api-gateway:** Addition of `next` keyword for relative date ranges ([#3234](https://github.com/cube-js/cube.js/issues/3234)) Thanks to @JoshMentzer! ([f05922a](https://github.com/cube-js/cube.js/commit/f05922a49c0eca4a6e13f22e602066d2b4dbd8eb)), closes [#2866](https://github.com/cube-js/cube.js/issues/2866)
+
+
+
+
+
+## [0.28.21](https://github.com/cube-js/cube.js/compare/v0.28.20...v0.28.21) (2021-08-16)
+
+
+### Bug Fixes
+
+* Pre-aggregations should have default refreshKey of every 1 hour if it doesn't set for Cube ([#3259](https://github.com/cube-js/cube.js/issues/3259)) ([bc472aa](https://github.com/cube-js/cube.js/commit/bc472aac1a666c84ed9e7e00b2d4e9018a6b5719))
+* **@cubejs-client/playground:** display segments in the Rollup Designer ([73d6778](https://github.com/cube-js/cube.js/commit/73d677882441cf848c6ab39eab229cb54fc1c02f))
+
+
+
+
+
+## [0.28.20](https://github.com/cube-js/cube.js/compare/v0.28.19...v0.28.20) (2021-08-15)
+
+
+### Bug Fixes
+
+* **druid-driver:** Support contains (LIKE), fix [#3109](https://github.com/cube-js/cube.js/issues/3109) ([#3121](https://github.com/cube-js/cube.js/issues/3121)) ([9340a4c](https://github.com/cube-js/cube.js/commit/9340a4c247bb2e4148e2e89f56e69f632f35e3ef))
+* **redshift-driver:** Dont load user defined types ([bd25e7d](https://github.com/cube-js/cube.js/commit/bd25e7d7b84d7a057a8d4b6543f305584c74a624))
+* **server-core:** Skip expand partitions for unused pre-aggregations ([#3255](https://github.com/cube-js/cube.js/issues/3255)) ([044ba8e](https://github.com/cube-js/cube.js/commit/044ba8e0c96bbcd1dc43c5aff114f458d9689204))
+
+
+
+
+
 ## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
 
 

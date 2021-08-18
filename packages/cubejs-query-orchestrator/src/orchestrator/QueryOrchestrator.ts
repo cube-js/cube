@@ -26,11 +26,11 @@ export class QueryOrchestrator {
 
   protected readonly preAggregations: PreAggregations;
 
-  protected readonly redisPool: RedisPool|undefined;
+  protected readonly redisPool: RedisPool | undefined;
 
   protected readonly rollupOnlyMode: boolean;
 
-  private queueEventsBus: RedisQueueEventsBus|LocalQueueEventsBus;
+  private queueEventsBus: RedisQueueEventsBus | LocalQueueEventsBus;
 
   private readonly cacheAndQueueDriver: string;
 

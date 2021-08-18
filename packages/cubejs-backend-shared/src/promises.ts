@@ -31,7 +31,7 @@ export function pausePromise(ms: number): CancelablePromise<void> {
 }
 
 class CancelToken {
-  protected readonly deferred: (() => Promise<void>|void)[] = [];
+  protected readonly deferred: (() => Promise<void> | void)[] = [];
 
   protected readonly withQueue: CancelablePromiseCancel[] = [];
 
@@ -55,7 +55,7 @@ class CancelToken {
     }
   }
 
-  public defer(fn: () => Promise<void>|void): void {
+  public defer(fn: () => Promise<void> | void): void {
     this.deferred.push(fn);
   }
 
@@ -110,8 +110,8 @@ export function createCancelableInterval<T>(
   fn: (token: CancelToken) => Promise<T>,
   options: CancelableIntervalOptions,
 ): CancelableInterval {
-  let execution: CancelablePromise<T>|null = null;
-  let startTime: number|null = null;
+  let execution: CancelablePromise<T> | null = null;
+  let startTime: number | null = null;
   let intervalId: number = 0;
   let duplicatedExecutionTracked: boolean = false;
 
@@ -195,7 +195,7 @@ export const withTimeoutRace = <T>(
   fn: CancelablePromise<T>,
   timeout: number,
 ): Promise<T> => {
-  let timer: NodeJS.Timeout|null = null;
+  let timer: NodeJS.Timeout | null = null;
 
   return Promise.race<any>([
     fn,
@@ -227,7 +227,7 @@ export const retryWithTimeout = <T>(
   fn: (token: CancelToken) => Promise<T>,
   { timeout, intervalPause }: RetryWithTimeoutOptions,
 ) => withTimeoutRace(
-    createCancelablePromise<T|null>(async (token) => {
+    createCancelablePromise<T | null>(async (token) => {
       let i = 0;
 
       while (!token.isCanceled()) {

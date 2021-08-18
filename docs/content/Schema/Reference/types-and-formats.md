@@ -2,9 +2,9 @@
 title: Types and Formats
 permalink: /schema/reference/types-and-formats
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 7
+menuOrder: 13
 redirect_from:
   - /types-and-formats
 ---

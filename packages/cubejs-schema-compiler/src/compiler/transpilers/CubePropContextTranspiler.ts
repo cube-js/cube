@@ -76,7 +76,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     };
   }
 
-  protected knownIdentifiersInjectVisitor(field: RegExp|string, resolveSymbol: (name: string) => void): TraverseObject {
+  protected knownIdentifiersInjectVisitor(field: RegExp | string, resolveSymbol: (name: string) => void): TraverseObject {
     return {
       ObjectProperty: (path) => {
         if (path.node.key.type === 'Identifier' && path.node.key.name.match(field)) {

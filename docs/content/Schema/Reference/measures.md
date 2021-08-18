@@ -2,9 +2,9 @@
 title: Measures
 permalink: /schema/reference/measures
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 3
+menuOrder: 9
 proofread: 06/18/2019
 redirect_from:
   - /measures

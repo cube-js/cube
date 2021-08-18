@@ -17,7 +17,7 @@ import { getEnv } from '@cubejs-backend/shared';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 type HydrationConfiguration = {
-  types: string[], toValue: (column: Column) => ((value: any) => any)|null
+  types: string[], toValue: (column: Column) => ((value: any) => any) | null
 };
 type UnloadResponse = {
   // eslint-disable-next-line camelcase
@@ -119,7 +119,7 @@ interface SnowflakeDriverOptions {
  * Similar to data in response, column_name will be COLUMN_NAME
  */
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
-  protected connection: Promise<Connection>|null = null;
+  protected connection: Promise<Connection> | null = null;
 
   protected readonly config: SnowflakeDriverOptions;
 
@@ -171,7 +171,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * @todo Move to BaseDriver in the future?
    */
-  protected getExportBucket(): SnowflakeDriverExportBucket|undefined {
+  protected getExportBucket(): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
       supported: ['s3', 'gcs']
     });
@@ -405,7 +405,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     const stmt = await new Promise<Statement>((resolve, reject) => connection.execute({
       sqlText: query,
-      binds: <string[]|undefined>values,
+      binds: <string[] | undefined>values,
       fetchAsString: [
         // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube.js
         'Number',
@@ -469,7 +469,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   ): Promise<R> {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
-      binds: <string[]|undefined>values,
+      binds: <string[] | undefined>values,
       fetchAsString: ['Number'],
       complete: (err, stmt, rows) => {
         if (err) {

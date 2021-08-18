@@ -33,7 +33,6 @@ cube(`Orders`, {
 
   preAggregations: {
     amountByCreated: {
-      type: `rollup`,
       measures: [amount],
       timeDimension: createdAt,
       granularity: `month`,
@@ -53,7 +52,6 @@ cube(`Orders`, {
 
   preAggregations: {
     amountByCreated: {
-      type: `rollup`,
       measures: [amount],
       timeDimension: createdAt,
       granularity: `month`,
@@ -67,9 +65,10 @@ cube(`Orders`, {
 
 ## Background Refresh
 
-You can refresh pre-aggregations in the background by setting
-`scheduledRefresh: true`. You can find more information about this setting in
-the [Pre-Aggregation Reference][ref-schema-ref-preaggs-sched-refresh].
+Background refreshes are enabled by default for all Cube.js deployments, but
+this behaviour can be modified by setting `scheduledRefresh: false`. You can
+find more information about this setting in the [Pre-Aggregation
+Reference][ref-schema-ref-preaggs-sched-refresh].
 
 In development mode, Cube.js enables background refresh by default and will
 refresh all pre-aggregations marked with the
@@ -84,11 +83,9 @@ cube(`Orders`, {
 
   preAggregations: {
     amountByCreated: {
-      type: `rollup`,
       measures: [amount],
       timeDimension: createdAt,
       granularity: `month`,
-      scheduledRefresh: true,
     },
   },
 });

@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.22](https://github.com/cube-js/cube.js/compare/v0.28.21...v0.28.22) (2021-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/redshift-driver
+
+
+
+
+
+## [0.28.21](https://github.com/cube-js/cube.js/compare/v0.28.20...v0.28.21) (2021-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/redshift-driver
+
+
+
+
+
+## [0.28.20](https://github.com/cube-js/cube.js/compare/v0.28.19...v0.28.20) (2021-08-15)
+
+
+### Bug Fixes
+
+* **redshift-driver:** Dont load user defined types ([bd25e7d](https://github.com/cube-js/cube.js/commit/bd25e7d7b84d7a057a8d4b6543f305584c74a624))
+
+
+
+
+
 ## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
 
 **Note:** Version bump only for package @cubejs-backend/redshift-driver
