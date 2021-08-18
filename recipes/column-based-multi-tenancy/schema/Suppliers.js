@@ -1,13 +1,5 @@
 cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
-  
-
-  joins: {
-    Products: {
-      sql: `${CUBE}.id = ${Products}.supplier_id`,
-      relationship: `hasMany`
-    }
-  },
 
   measures: {
     count: {
