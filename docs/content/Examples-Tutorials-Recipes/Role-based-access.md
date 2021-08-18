@@ -88,7 +88,7 @@ We have received different data depending on the user's role.
 ```
 
 ```javascript
-// operator
+// Operator
 [
   {
     'Orders.status': 'processing',
