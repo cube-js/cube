@@ -74,7 +74,7 @@ curl cube:4000/cubejs-api/v1/load \
 We have received different data depending on the user's role.
 
 ```javascript
-// manager
+// Manager
 [
   {
     'Orders.status': 'completed',
