@@ -44,15 +44,15 @@ The following tutorials cover advanced concepts of Cube.js:
 
 Learn more about prominent features of Cube.js:
 
-| Feature                                                                         | Story                                                                                                                | Demo                                              |
-| :------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------ |
-| [Drill downs](https://cube.dev/docs/drill-downs)                                | [Introducing a drill down table API](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/)            | [Demo](https://drill-downs-demo.cube.dev)         |
-| [Compare date range](https://cube.dev/docs/query-format#time-dimensions-format) | [Comparing data over different time periods](https://cube.dev/blog/comparing-data-over-different-time-periods/)      | [Demo](https://compare-date-range-demo.cube.dev)  |
-| [Data blending](https://cube.dev/docs/recipes/data-blending)                    | [Introducing data blending API](https://cube.dev/blog/introducing-data-blending-api/)                                | [Demo](https://data-blending-demo.cube.dev)       |
-| [Real-time data fetch](https://cube.dev/docs/real-time-data-fetch)              | [Real-time dashboard guide](https://real-time-dashboard.cube.dev)                                                    | [Demo](https://real-time-dashboard-demo.cube.dev) |
-| [Dynamic schema creation](https://cube.dev/docs/dynamic-schema-creation)        | [Using asyncModule to generate schemas](https://github.com/cube-js/cube.js/tree/master/examples/async-module-simple) | —                                                 |
-| [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)   | [Auth0 integration](https://github.com/cube-js/cube.js/tree/master/examples/auth0)                                   | —                                                 |
-| [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)   | [AWS Cognito integration](https://github.com/cube-js/cube.js/tree/master/examples/cognito)                           | —                                                 |
+| Feature                                                                                 | Story                                                                                                                | Demo                                              |
+| :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------ |
+| [Drill downs](https://cube.dev/docs/schema/fundamentals/additional-concepts#drilldowns) | [Introducing a drill down table API](https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/)            | [Demo](https://drill-downs-demo.cube.dev)         |
+| [Compare date range](https://cube.dev/docs/query-format#time-dimensions-format)         | [Comparing data over different time periods](https://cube.dev/blog/comparing-data-over-different-time-periods/)      | [Demo](https://compare-date-range-demo.cube.dev)  |
+| [Data blending](https://cube.dev/docs/recipes/data-blending)                            | [Introducing data blending API](https://cube.dev/blog/introducing-data-blending-api/)                                | [Demo](https://data-blending-demo.cube.dev)       |
+| [Real-time data fetch](https://cube.dev/docs/real-time-data-fetch)                      | [Real-time dashboard guide](https://real-time-dashboard.cube.dev)                                                    | [Demo](https://real-time-dashboard-demo.cube.dev) |
+| [Dynamic schema creation](https://cube.dev/docs/dynamic-schema-creation)                | [Using asyncModule to generate schemas](https://github.com/cube-js/cube.js/tree/master/examples/async-module-simple) | —                                                 |
+| [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)           | [Auth0 integration](https://github.com/cube-js/cube.js/tree/master/examples/auth0)                                   | —                                                 |
+| [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)           | [AWS Cognito integration](https://github.com/cube-js/cube.js/tree/master/examples/cognito)                           | —                                                 |
 
 ### Front-end integrations
 

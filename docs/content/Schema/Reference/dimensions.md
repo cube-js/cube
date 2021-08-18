@@ -237,5 +237,5 @@ cube('Products', {
 ```
 
 [ref-schema-ref-joins]: /schema/reference/joins
-[ref-subquery]: /subquery
+[ref-subquery]: /schema/fundamentals/additional-concepts#subquery
 [self-subquery]: #parameters-sub-query

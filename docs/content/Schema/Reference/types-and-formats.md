@@ -455,8 +455,9 @@ cube('Orders', {
 });
 ```
 
-[ref-string-time-dims]: /working-with-string-time-dimensions
+[ref-string-time-dims]:
+  /schema/fundamentals/additional-concepts#string-time-dimensions
 [ref-schema-ref-preaggs-rollup]:
   /schema/reference/pre-aggregations#parameters-type-rollup
 [ref-schema-ref-calc-measures]: /schema/reference/measures#calculated-measures
-[ref-drilldowns]: /drill-downs
+[ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns

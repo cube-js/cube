@@ -278,4 +278,4 @@ join will be created automatically.
   /schema/reference/types-and-formats#measures-types
 [ref-schema-ref-types-formats-measures-formats]:
   /schema/reference/types-and-formats#measures-formats
-[ref-drilldowns]: /drill-downs
+[ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns

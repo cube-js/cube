@@ -92,4 +92,5 @@ cube(`Events`, {
   https://developer.mozilla.org/en-US/docs/web/javascript/reference/statements/export
 [mdn-js-es6-import]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import
-[ref-schema-string-time-dims]: /working-with-string-time-dimensions
+[ref-schema-string-time-dims]:
+  /schema/fundamentals/additional-concepts#string-time-dimensions
