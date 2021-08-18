@@ -15,7 +15,7 @@ until curl -s "$host":"$port"/"$readyzUrl"  > /dev/null; do
   sleep 1
 done
 
-# send the query
+# Send the query
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${managerToken}" -G -s --data-urlencode "query=${query}" -o managerResponse.json
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${operatorToken}" -G -s --data-urlencode "query=${query}"  -o operatorResponse.json
 
