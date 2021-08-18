@@ -1,0 +1,104 @@
+{{- if gt (.Values.workers.workersCount | int) 0 }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ printf "%s-workers" (include "cubestore.fullname" .) }}
+  labels:
+    {{- include "cubestore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.workers.workersCount }}
+  serviceName: {{ printf "%s-headless" (include "cubestore.fullname" .) }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: workers
+      {{- include "cubestore.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: workers
+        {{- include "cubestore.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: cubestore
+          image: "cubejs/cubestore:v{{ .Chart.AppVersion }}"
+          ports:
+            - name: worker
+              containerPort: {{ .Values.workers.port }}
+              protocol: TCP
+          env:
+            {{- include "cubestore.common-env" . | nindent 12 }}
+            {{- $fullName := include "cubestore.fullname" . }}
+            {{- $headlessServiceName := printf "%s-%s" $fullName "headless" }}
+            {{- $workerPort := .Values.workers.port | int }}
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CUBESTORE_SERVER_NAME
+              value: {{ printf "$(MY_POD_NAME).%s:%d" $headlessServiceName $workerPort}}
+            - name: CUBESTORE_WORKER_PORT
+              value: {{ .Values.workers.port | quote }}
+            {{- $workers := list }}
+            {{- range $e, $i := until ($.Values.workers.workersCount | int) }}
+            {{- $workers = append $workers (printf "%s-workers-%d.%s:%d" $fullName $i $headlessServiceName $workerPort) }}
+            {{- end }}
+            - name: CUBESTORE_WORKERS
+              value: {{ join "," $workers | quote }}
+            - name: CUBESTORE_META_ADDR
+              value: {{ printf "%s-router:%d" (include "cubestore.fullname" .) (.Values.router.metaPort | int) }}
+            - name: CUBESTORE_DATA_DIR
+              value: /cube/.cubestore/data
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            - name: CUBESTORE_REMOTE_DIR
+              value: /cube/data
+            {{- end}}
+          {{- if .Values.workers.resources }}
+          resources:
+            {{- toYaml .Values.workers.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts: 
+            - name: datadir
+              mountPath: /cube/.cubestore/data
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            - name: remotedir
+              mountPath: /cube/data
+            {{- end }}
+      volumes:
+      {{- if not .Values.workers.persistence.enabled }}
+        - name: datadir
+          emptyDir: {}
+      {{- end }}
+      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+        - name: remotedir
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-remote-storage" (include "cubestore.fullname" .) }}
+      {{- end }}
+      {{- if .Values.workers.affinity }}
+      affinity:
+        {{- toYaml .Values.workers.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.workers.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+  
+  {{- if .Values.workers.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir
+        labels:
+          app.kubernetes.io/component: cubestore-router
+          {{- include "cubestore.selectorLabels" . | nindent 10 }}
+        {{- if .Values.workers.persistence.annotations }}
+        annotations: {{- toYaml .Values.workers.persistence.annotations | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+        {{- range .Values.workers.persistence.accessModes }}
+          - {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.workers.persistence.size | quote }}
+  {{- end}}
+{{- end}}

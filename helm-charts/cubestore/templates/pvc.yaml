@@ -1,0 +1,22 @@
+{{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ printf "%s-remote-storage" (include "cubestore.fullname" .) }}
+  {{- if eq .Values.remoteDir.persistence.resourcePolicy "keep" }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+  labels: 
+    app.kubernetes.io/component: remote-storage
+    {{- include "cubestore.selectorLabels" . | nindent 4 }}
+  {{- if .Values.remoteDir.persistence.annotations }}
+  annotations: {{- toYaml .Values.remoteDir.persistence.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.remoteDir.persistence.size }}
+{{- end }}
