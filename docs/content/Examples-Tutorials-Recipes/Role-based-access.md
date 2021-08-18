@@ -63,7 +63,7 @@ curl cube:4000/cubejs-api/v1/load \
 ```
 
 ```javascript
-//operator
+// Operator
 curl cube:4000/cubejs-api/v1/load \
 -H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
 -G -s --data-urlencode "query={"dimensions": ["Orders.status"], "timeDimensions": [], "order": {"Orders.count": "desc"}, "measures": ["Orders.count"],"filters": []}"
