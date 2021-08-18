@@ -17,7 +17,7 @@ done
 
 # Send the query
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${managerToken}" -G -s --data-urlencode "query=${query}" -o managerResponse.json
-curl "$host":"$port"/"$loadUrl" -H "Authorization: ${operatorToken}" -G -s --data-urlencode "query=${query}"  -o operatorResponse.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${operatorToken}" -G -s --data-urlencode "query=${query}" -o operatorResponse.json
 
 echo "Manager's data:"
 jq ".data" managerResponse.json
