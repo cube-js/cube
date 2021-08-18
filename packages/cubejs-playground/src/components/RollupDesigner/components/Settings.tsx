@@ -10,7 +10,6 @@ import {
   Radio,
   Row,
   Select,
-  SelectProps,
   Space,
   Typography,
 } from 'antd';
@@ -138,7 +137,7 @@ export function Settings({ members, onChange }: SettingsProps) {
                 </Col>
 
                 <Col flex="auto">
-                  <Space>
+                  <Space align="start">
                     <Form.Item name="refreshKey.value">
                       <Input
                         disabled={values['refreshKey.option'] !== 'every'}
@@ -205,7 +204,7 @@ export function Settings({ members, onChange }: SettingsProps) {
 
               <Typography.Paragraph strong>Update Window</Typography.Paragraph>
 
-              <Space>
+              <Space align="start">
                 <Form.Item name="updateWindow.value">
                   <Input type="number" min={0} style={{ maxWidth: 80 }} />
                 </Form.Item>
