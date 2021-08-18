@@ -103,6 +103,15 @@ cube(`StatusSnapshots`, {
 });
 ```
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| To generate a range of dates, here we use the
+| [`GENERATE_SERIES` function](https://www.postgresql.org/docs/9.1/functions-srf.html)
+| which is Postgres-specific. Other databases have similar functions, e.g.,
+| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array)
+| in BigQuery.
+<!-- prettier-ignore-end -->
+
 Please note that it makes sense to make the `StatusSnapshots` cube to
 [extend](https://cube.dev/docs/schema/reference/cube#parameters-extends)
 the original `Statuses` cube in order to reuse the dimension definitions. We only need
