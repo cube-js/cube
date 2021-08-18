@@ -16,4 +16,4 @@ services:
       - cube
     volumes:
       - .:/curl
-    entrypoint: ["sh", "curl/init.sh"]
+    entrypoint: ["sh", "curl/query.sh"]
