@@ -94,7 +94,7 @@ We have received different data depending on the user's role.
     'Orders.status': 'processing',
     'Orders.count': '3354',
   },
-];
+]
 ```
 
 ## Source code
