@@ -84,12 +84,12 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
-export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
+export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver> | BaseDriver;
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
-export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
+export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;

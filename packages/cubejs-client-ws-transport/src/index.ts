@@ -209,7 +209,7 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
     };
 
     const pendingResults: WebSocketTransportResult[] = [];
-    let nextMessage: ((value: any) => void)|null = null;
+    let nextMessage: ((value: any) => void) | null = null;
 
     const runNextMessage = () => {
       if (nextMessage) {

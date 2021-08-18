@@ -247,7 +247,8 @@ joins: {
 ```
 
 To determine the end of the session, we’re going to use the
-[subQuery feature](/subquery) in Cube.js.
+[`subQuery` feature](/schema/fundamentals/additional-concepts#subquery) in
+Cube.js.
 
 ```javascript
 // Add the lastEventTimestamp measure to the measures block in the Events cube

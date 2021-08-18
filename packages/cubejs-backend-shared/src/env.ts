@@ -44,7 +44,7 @@ export function asPortNumber(input: number, envName: string) {
   return input;
 }
 
-function asPortOrSocket(input: string, envName: string): number|string {
+function asPortOrSocket(input: string, envName: string): number | string {
   if (/^-?\d+$/.test(input)) {
     return asPortNumber(parseInt(input, 10), envName);
   }
@@ -53,7 +53,7 @@ function asPortOrSocket(input: string, envName: string): number|string {
   return input;
 }
 
-function asBoolOrTime(input: string, envName: string): number|boolean {
+function asBoolOrTime(input: string, envName: string): number | boolean {
   if (input.toLowerCase() === 'true') {
     return true;
   }

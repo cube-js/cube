@@ -233,7 +233,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
           }
         };
 
-        const originalStream = conn.query(formattedQuery, options, (err: Error|null, result: any) => {
+        const originalStream = conn.query(formattedQuery, options, (err: Error | null, result: any) => {
           if (err) {
             reject(err);
           } else {

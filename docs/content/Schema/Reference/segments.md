@@ -2,9 +2,9 @@
 title: Segments
 permalink: /schema/reference/segments
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 6
+menuOrder: 12
 proofread: 06/18/2019
 redirect_from:
   - /segments

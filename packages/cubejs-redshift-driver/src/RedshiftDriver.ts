@@ -30,7 +30,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     };
   }
 
-  protected getExportBucket(): RedshiftDriverExportAWS|undefined {
+  protected getExportBucket(): RedshiftDriverExportAWS | undefined {
     const exportBucket: Partial<RedshiftDriverExportAWS> = {
       bucketType: getEnv('dbExportBucketType', {
         supported: ['s3']
@@ -103,7 +103,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         executionTimeout: 600000,
       });
 
-      let unloadTotalRows: number|null = null;
+      let unloadTotalRows: number | null = null;
 
       /**
        * @link https://github.com/brianc/node-postgres/blob/pg%408.6.0/packages/pg-protocol/src/messages.ts#L211

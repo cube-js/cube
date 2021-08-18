@@ -30,9 +30,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected readonly bigquery: BigQuery;
 
-  protected readonly storage: Storage|null = null;
+  protected readonly storage: Storage | null = null;
 
-  protected readonly bucket: Bucket|null = null;
+  protected readonly bucket: Bucket | null = null;
 
   public constructor(config: BigQueryDriverOptions = {}) {
     super();
