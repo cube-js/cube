@@ -415,6 +415,7 @@ export function RollupDesigner({
 
           <TabPane tab="Settings" key="settings">
             <Settings
+              hasTimeDimension={references.timeDimensions.length > 0}
               members={references.measures
                 .concat(references.dimensions)
                 .concat(references.timeDimensions.map((td) => td.dimension))}
