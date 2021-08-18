@@ -1,0 +1,163 @@
+---
+title: Snapshots
+permalink: /recipes/snapshots
+category: Examples & Tutorials
+subCategory: Data schema
+menuOrder: 1
+---
+
+## Use case
+
+For a dataset that contains a sequence of changes to a property over time,
+we want to be able to get the most recent state of said property at any given date.
+In the recipe below we'll learn, for a cube with `Product Id`, `Status`, and
+`Changed At` dimensions, how to calculate the snapshots of statuses at any given date.
+
+<!-- prettier-ignore-start -->
+[[info | ]]
+| We can consider the status property to be a
+[slowly chnaging dimension](https://en.wikipedia.org/wiki/Slowly_changing_dimension)
+(SCD) of type 2. Modeling data schemas that contain SCDs is an essential part of the
+data engineering skillset.
+<!-- prettier-ignore-end -->
+
+## Data schema
+
+Let's explore the `Statuses` cube that contains data like this:
+
+```json
+[
+  {
+    "Statuses.orderId": 1,
+    "Statuses.status": "shipped",
+    "Statuses.changedAt": "2019-01-19T00:00:00.000"
+  },
+  {
+    "Statuses.orderId": 1,
+    "Statuses.status": "processing",
+    "Statuses.changedAt": "2019-03-14T00:00:00.000"
+  },
+  {
+    "Statuses.orderId": 1,
+    "Statuses.status": "completed",
+    "Statuses.changedAt": "2019-01-25T00:00:00.000"
+  },
+  {
+    "Statuses.orderId": 2,
+    "Statuses.status": "processing",
+    "Statuses.changedAt": "2019-08-21T00:00:00.000"
+  },
+  {
+    "Statuses.orderId": 2,
+    "Statuses.status": "completed",
+    "Statuses.changedAt": "2019-04-13T00:00:00.000"
+  },
+  {
+    "Statuses.orderId": 2,
+    "Statuses.status": "shipped",
+    "Statuses.changedAt": "2019-03-18T00:00:00.000"
+  }
+]
+```
+
+We can see that statuses change occasionally. How do we count orders that remained
+in the `shipped` status at a particular date?
+
+First, we need to generate a range with all dates of interest, from the earliest to
+the latest. Second, we need to join the dates with the statuses and leave only the
+most recent statuses to date. 
+
+```javascript
+cube(`StatusSnapshots`, {
+  extends: Statuses,
+
+  sql: `
+    -- Create a range from the earlist date to the latest date
+    WITH range AS (
+      SELECT date
+      FROM GENERATE_SERIES(
+        (SELECT MIN(changed_at) FROM ${Statuses.sql()} AS statuses),
+        (SELECT MAX(changed_at) FROM ${Statuses.sql()} AS statuses),
+        INTERVAL '1 DAY'
+      ) AS date
+    )
+    
+    -- Calculate snapshots for every date in the range
+    SELECT range.date, statuses.*
+    FROM range
+    LEFT JOIN ${Statuses.sql()} AS statuses
+      ON range.date >= statuses.changed_at
+      AND statuses.changed_at = (
+        SELECT MAX(changed_at)
+        FROM ${Statuses.sql()} AS sub_statuses
+        WHERE sub_statuses.order_id = statuses.order_id
+      )
+  `,
+  
+  dimensions: {
+    date: {
+      sql: `date`,
+      type: `time`,
+    },
+  }
+});
+```
+
+Please note that it makes sense to make the `StatusSnapshots` cube to
+[extend](https://cube.dev/docs/schema/reference/cube#parameters-extends)
+the original `Statuses` cube in order to reuse the dimension definitions. We only need
+to add a new dimension that indicates the `date` of a snapshot.
+
+## Query
+
+To count orders that remained in the `shipped` status at a particular date, we will
+send a query that selects a snapshot by this date and also filters by the status:
+
+```json
+{
+  "measures": [
+    "StatusSnapshots.count"
+  ],
+  "filters": [
+    {
+      "member": "StatusSnapshots.date",
+      "operator": "equals",
+      "values": [ "2019-04-01" ]
+    },
+    {
+      "member": "StatusSnapshots.status",
+      "operator": "equals",
+      "values": [ "shipped" ]
+    }
+  ]
+}
+```
+
+## Result
+
+If we execute a couple of such queries for distinct dates, we'll spot the change:
+
+```json
+// Shipped as of April 1, 2019:
+[
+  {
+    "StatusSnapshots.count": "16"
+  }
+]
+```
+
+```json
+// Shipped as of May 1, 2019:
+[
+  {
+    "StatusSnapshots.count": "25"
+  }
+]
+```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/snapshots)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.
