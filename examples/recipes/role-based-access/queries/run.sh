@@ -11,7 +11,7 @@ managerToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoibWFuYWdlciIsImlhdC
 query=$(cat query/queries/query.json)
 
 # Wait for the Cube API to become ready
-until curl -s "$host":"$port"/"$readyzUrl"  > /dev/null; do
+until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
   sleep 1
 done
 
