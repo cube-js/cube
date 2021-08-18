@@ -16,7 +16,7 @@ In the recipe below we'll learn, for a cube with `Product Id`, `Status`, and
 <!-- prettier-ignore-start -->
 [[info | ]]
 | We can consider the status property to be a
-| [slowly chnaging dimension](https://en.wikipedia.org/wiki/Slowly_changing_dimension)
+| [slowly changing dimension](https://en.wikipedia.org/wiki/Slowly_changing_dimension)
 | (SCD) of type 2. Modeling data schemas that contain SCDs is an essential part of the
 | data engineering skillset.
 <!-- prettier-ignore-end -->
