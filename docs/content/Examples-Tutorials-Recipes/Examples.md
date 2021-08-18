@@ -88,7 +88,11 @@ These recipes will show you the best practices of using Cube.js.
 - [Funnel Analysis](/recipes/funnels)
 - [Retention Analysis](/recipes/cohort-retention)
 
-### Data Sources
+### Access control
+
+- [Role-Based Access](/recipes/role-based-access)
+
+### Data sources
 
 - [Enable SSL Connections to the Database](/recipes/enable-ssl-connections-to-database)
 
