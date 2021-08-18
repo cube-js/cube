@@ -1,9 +1,9 @@
 ---
 title: Data Blending
-permalink: /schema/advanced/data-blending
-category: Data Schema
-subCategory: Advanced
-menuOrder: 5
+permalink: /recipes/data-blending
+category: Examples & Tutorials
+subCategory: Data schema
+menuOrder: 1
 redirect_from:
   - /data-blending
   - /recipes/data-blending

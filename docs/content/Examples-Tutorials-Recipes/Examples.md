@@ -98,8 +98,8 @@ These recipes will show you the best practices of using Cube.js.
 
 ### Data schema
 
-- [Dynamically Union Tables](/recipes/dynamically-union-tables)
 - [Data Blending](/recipes/data-blending)
+- [Dynamically Union Tables](/recipes/dynamically-union-tables)
 - [Snapshots](/recipes/snapshots)
 
 ### Code reusability
