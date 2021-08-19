@@ -8,7 +8,7 @@ readyzUrl=readyz
 firstEmailToken=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJwdXJ1cy5hY2N1bXNhbkBQcm9pbi5vcmcifQ.vA_pzTOBYS10D2mhno0COJux7hhchfNmx-eh52SwSko
 secondEmailToken=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJncmF2aWRhLnNpdC5hbWV0QHJpc3VzLm5ldCJ9.ZOkiky821CZwoNi3VTcTsiiULl5tBkjmgX-1uW0UEjA
 
-query=$(cat curl/query.json)
+query=$(cat query/queries/query.json)
 
 # wait for the Cube API ready
 until curl -s "$host":"$port"/"$readyzUrl"  > /dev/null; do
