@@ -10,12 +10,12 @@ secondEmailToken=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2Mj
 
 query=$(cat query/queries/query.json)
 
-# wait for the Cube API ready
+# Wait for the Cube API to become ready
 until curl -s "$host":"$port"/"$readyzUrl"  > /dev/null; do
   sleep 1
 done
 
-# send the query
+# Send the query
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${firstEmailToken}" -G -s --data-urlencode "query=${query}" -o firstEmailResponse.json
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${secondEmailToken}" -G -s --data-urlencode "query=${query}"  -o secondEmailResponse.json
 

@@ -25,12 +25,37 @@ products to suppliers:
 ```javascript
 // schema/Products.js
 
-joins: {
+cube(`Products`, {
+  sql: `SELECT * FROM public.products`,
+
+  joins: {
     Suppliers: {
-        sql: `${Suppliers}.id = ${CUBE}.supplier_id`,
-        relationship: `hasOne`
+      sql: `${Suppliers}.id = ${CUBE}.supplier_id`,
+      relationship: `hasOne`
     }
-}
+  },
+  
+  dimensions: {
+    name: {
+      sql: `name`,
+      type: `string`
+    }
+  }
+});
+```
+```javascript
+// schema/Suppliers.js
+
+cube(`Suppliers`, {
+  sql: `SELECT * FROM public.suppliers`,
+
+  dimensions: {
+    email: {
+      sql: `email`,
+      type: `string`
+    }
+  }
+});
 ```
 
 ## Configuration
