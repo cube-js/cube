@@ -8,21 +8,21 @@ menuOrder: 1
 
 ## Use case
 
-Let's imagine that on New Year's Eve, December 30, 2019, we renamed our store,
+Let's imagine that on New Year's Eve, December 30th, 2019, we renamed our store,
 changed the design, and started selling completely different products. At the
-same time, the database was preserved from the previous store. We want to show
-only orders and users created after December 30, 2019. In the recipe below,
+same time, we preserve the database from the previous store. Our goal is to only show
+orders and users created after December 30th, 2019. In the recipe below,
 we'll learn how to add mandatory filters to all queries.
 
 ## Configuration
 
-To enforcing mandatory filters we will use
+To enforce mandatory filters we'll use the
 [`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
 extension.
 
-First, to make the solution universal, we need to receive all measures and
-dimensions from a query. Next, we add filters that include the previously
-obtained measures and dimensions.
+To solve this, first we need to get all measures and
+dimensions from a query. Next, we add filters for the
+measures and dimensions. This will make sure we only show users and orders created after December 30th, 2019.
 
 ```javascript
 module.exports = {
@@ -70,7 +70,7 @@ curl cube:4000/cubejs-api/v1/load \
 
 ## Result
 
-We have received users and orders created after December 30, 2019:
+We have received users and orders created after December 30th, 2019:
 
 ```javascript
 // Manager
