@@ -139,13 +139,13 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
   });
   lastEvent = new Date();
 
-  if (!transport) {
-    transport = /^http/.test(endpointUrl) ?
-      new HttpTransport(endpointUrl) :
-      new WebSocketTransport(endpointUrl, logger, clearTransport);
-  }
-
   const flush = async (toFlush?: any[], retries?: number) => {
+    if (!transport) {
+      transport = /^http/.test(endpointUrl) ?
+        new HttpTransport(endpointUrl) :
+        new WebSocketTransport(endpointUrl, logger, clearTransport);
+    }
+
     if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
     if (!toFlush.length) return false;
     if (retries == null) retries = 3;
