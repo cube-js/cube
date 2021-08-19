@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** gaps in Safari 13 ([2336a94](https://github.com/cube-js/cube.js/commit/2336a94c065a1ee59dadaa385ddca4709fb9a197))
+* **server-core:** Recreate agent transport after rejected WS connection, on retries ([#3280](https://github.com/cube-js/cube.js/issues/3280)) ([48c4e88](https://github.com/cube-js/cube.js/commit/48c4e88bd1a641bf016fc9fa78d5d150a08e0239))
+
+
+### Features
+
+* Added Quarter to the timeDimensions of ([3f62b2c](https://github.com/cube-js/cube.js/commit/3f62b2c125b2b7b752e370b65be4c89a0c65a623))
+* Support quarter granularity ([4ad1356](https://github.com/cube-js/cube.js/commit/4ad1356ac2d2c4d479c25e60519b0f7b4c1605bb))
+* **oracle-driver:** Allow to specify port via env variable, fix [#3210](https://github.com/cube-js/cube.js/issues/3210) ([#3274](https://github.com/cube-js/cube.js/issues/3274)) ([95230c9](https://github.com/cube-js/cube.js/commit/95230c9ffc59819c297d4d3e393a4a1665ec4e23))
+
+
+
+
+
 ## [0.28.23](https://github.com/cube-js/cube.js/compare/v0.28.22...v0.28.23) (2021-08-18)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
+
+
+### Bug Fixes
+
+* **server-core:** Recreate agent transport after rejected WS connection, on retries ([#3280](https://github.com/cube-js/cube.js/issues/3280)) ([48c4e88](https://github.com/cube-js/cube.js/commit/48c4e88bd1a641bf016fc9fa78d5d150a08e0239))
+
+
+
+
+
 ## [0.28.23](https://github.com/cube-js/cube.js/compare/v0.28.22...v0.28.23) (2021-08-18)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

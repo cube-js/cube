@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** gaps in Safari 13 ([2336a94](https://github.com/cube-js/cube.js/commit/2336a94c065a1ee59dadaa385ddca4709fb9a197))
+
+
+
+
+
 ## [0.28.23](https://github.com/cube-js/cube.js/compare/v0.28.22...v0.28.23) (2021-08-18)
 
 
