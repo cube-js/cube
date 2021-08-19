@@ -112,7 +112,7 @@ cube(`StatusSnapshots`, {
 | in BigQuery.
 <!-- prettier-ignore-end -->
 
-Please note that it makes sense to make the `StatusSnapshots` cube to
+Please note that it makes sense to make the `StatusSnapshots` cube
 [extend](https://cube.dev/docs/schema/reference/cube#parameters-extends)
 the original `Statuses` cube in order to reuse the dimension definitions. We only need
 to add a new dimension that indicates the `date` of a snapshot. We're also referencing
