@@ -1,0 +1,13 @@
+{
+    "measures": [],
+    "order": [
+      [
+        "Orders.createdAt",
+        "asc"
+      ]
+    ],
+    "dimensions": [
+      "Orders.status",
+      "Orders.createdAt"
+    ]
+  }
