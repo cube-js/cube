@@ -33,3 +33,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Extending Cubes](https://cube.dev/docs/recipes/extending-cubes)
 - [Schema Generation](https://cube.dev/docs/recipes/schema-generation)
 - [Polymorphic Cubes](https://cube.dev/docs/recipes/polymorphic-cubes)
+
+### Queries
+
+- [Enforcing Mandatory Filters in a Query](https://cube.dev/docs/recipes/enforcing-mandatory-filters)
