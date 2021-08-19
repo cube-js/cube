@@ -33,6 +33,8 @@ joins: {
 }
 ```
 
+## Configuration
+
 Let's add the supplier email filter if a query includes any dimension from the `Products` cube:
 
 ```javascript
@@ -61,14 +63,14 @@ module.exports = {
 To get the supplier's products, we will send two identical requests with
 different emails inside the JWT.
 
-```javascript
+```bash
 // purus.accumsan@Proin.org
 curl cube:4000/cubejs-api/v1/load \
 -H "Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJwdXJ1cy5hY2N1bXNhbkBQcm9pbi5vcmcifQ.vA_pzTOBYS10D2mhno0COJux7hhchfNmx-eh52SwSko" \
 -G -s --data-urlencode "query={"order": {"Suppliers.email": "asc"}, "dimensions": ["Products.name"]}"
 ```
 
-```javascript
+```bash
 // gravida.sit.amet@risus.net
 curl cube:4000/cubejs-api/v1/load \
 -H "Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJncmF2aWRhLnNpdC5hbWV0QHJpc3VzLm5ldCJ9.ZOkiky821CZwoNi3VTcTsiiULl5tBkjmgX-1uW0UEjA" \
@@ -103,6 +105,6 @@ We have received different data depending on the supplier's email.
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/recipes/column-based-access)
+[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/column-based-access)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.

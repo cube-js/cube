@@ -91,8 +91,9 @@ These recipes will show you the best practices of using Cube.js.
 ### Access control
 
 - [Role-Based Access](/recipes/role-based-access)
+- [Column-Based Access](/recipes/column-based-access)
 
-### Data sources
+### Data Sources
 
 - [Enable SSL Connections to the Database](/recipes/enable-ssl-connections-to-database)
 
