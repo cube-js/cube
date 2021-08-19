@@ -1,4 +1,6 @@
 import dayjs from 'dayjs';
+import quarterOfYear from 'dayjs/plugin/quarterOfYear';
+
 import en from 'dayjs/locale/en';
 import {
   groupBy, pipe, fromPairs, uniq, filter, map, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
@@ -11,6 +13,7 @@ dayjs.locale({
   ...en,
   weekStart: 1,
 });
+dayjs.extend(quarterOfYear);
 
 export const TIME_SERIES = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
@@ -19,8 +22,8 @@ export const TIME_SERIES = {
   hour: (range) => range.by('h').map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
   minute: (range) => range.by('m').map(d => d.format('YYYY-MM-DDTHH:mm:00.000')),
   second: (range) => range.by('s').map(d => d.format('YYYY-MM-DDTHH:mm:ss.000')),
-  week: (range) => range.snapTo('week').by('w').map(d => d.startOf('week').format('YYYY-MM-DDT00:00:00.000'))
-    //TODO add quarter to the resultSet
+  week: (range) => range.snapTo('week').by('w').map(d => d.startOf('week').format('YYYY-MM-DDT00:00:00.000')),
+  quarter: (range) => range.snapTo('quarter').by('quarter').map(d => d.startOf('quarter').format('YYYY-MM-DDT00:00:00.000')),
 };
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;

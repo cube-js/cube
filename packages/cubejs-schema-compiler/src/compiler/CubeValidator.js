@@ -111,7 +111,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
 
 const BasePreAggregation = {
   ...BasePreAggregationWithoutPartitionGranularity,
-  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'year'),
+  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter', 'year'),
 };
 
 const cubeSchema = Joi.object().keys({
