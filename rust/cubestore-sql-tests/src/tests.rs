@@ -784,7 +784,10 @@ async fn numbers_to_bool(service: Box<dyn SqlClient>) {
     );
 
     // Other types work fine.
-    let r = service.exec_query("SELECT 1 = 1, '1' = 1, 'foo' = 'foo'").await.unwrap();
+    let r = service
+        .exec_query("SELECT 1 = 1, '1' = 1, 'foo' = 'foo'")
+        .await
+        .unwrap();
     assert_eq!(to_rows(&r), rows(&[(true, true, true)]))
 }
 
