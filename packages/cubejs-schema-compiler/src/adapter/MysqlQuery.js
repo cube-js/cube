@@ -11,6 +11,7 @@ const GRANULARITY_TO_INTERVAL = {
   minute: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:00.000')`,
   second: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:%S.000')`,
   month: (date) => `DATE_FORMAT(${date}, '%Y-%m-01T00:00:00.000')`,
+  quarter: (date) => `DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(QUARTER, '1900-01-01', ${date}) QUARTER)`,
   year: (date) => `DATE_FORMAT(${date}, '%Y-01-01T00:00:00.000')`
 };
 
