@@ -5,14 +5,8 @@ services:
   cube:
     image: cubejs/cube:v0.26.16
     ports:
-      # It's better to use random port binding for 4000/3000 ports
-      # without it you will not able to start multiple projects inside docker
-      # - 4000
-      # - 3000
-      # 4000 is a port for Cube.js API
-      - 4000:4000
-      # 3000 is a port for Playground web-server
-      - 3000:3000
+      - 4000:4000  # Cube.js API and Developer Playground
+      - 3000:3000  # Dashboard app, if created
     env_file: .env
     volumes:
       - .:/cube/conf
