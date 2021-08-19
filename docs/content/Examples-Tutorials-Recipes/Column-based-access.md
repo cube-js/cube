@@ -15,8 +15,8 @@ products. A supplier can't see other supplier's products.
 ## Data schema
 
 To implement column-based access, we will use supplier's email from
-[JSON Web Token](https://cube.dev/docs/security), and the
-[queryRewrite](https://cube.dev/docs/security/context#using-query-rewrite)
+a [JSON Web Token](https://cube.dev/docs/security), and the
+[`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
 extension point to manage data access.
 
 We have `Products` and `Suppliers` tables with `hasOne` relationship from
@@ -33,7 +33,7 @@ joins: {
 }
 ```
 
-Let's add the supplier email filter if a query exists `Products` dimension:
+Let's add the supplier email filter if a query includes any dimension from the `Products` cube:
 
 ```javascript
 module.exports = {
@@ -59,7 +59,7 @@ module.exports = {
 ## Query
 
 To get the supplier's products, we will send two identical requests with
-different emails at authorization token.
+different emails inside the JWT.
 
 ```javascript
 // purus.accumsan@Proin.org
