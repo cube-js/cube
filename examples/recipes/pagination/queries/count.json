@@ -1,0 +1,10 @@
+{
+    "measures": [
+        "Orders.count"
+    ],
+    "timeDimensions": [
+        {
+            "dimension": "Orders.createdAt"
+        }
+    ]
+}
