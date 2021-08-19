@@ -1,12 +1,6 @@
 cube(`Users`, {
   sql: `SELECT * FROM public.users`,
   
-  measures: {
-    count: {
-      type: `count`
-    }
-  },
-  
   dimensions: {
     firstName: {
       sql: `first_name`,
