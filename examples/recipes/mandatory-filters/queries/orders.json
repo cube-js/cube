@@ -9,5 +9,6 @@
     "dimensions": [
       "Orders.status",
       "Orders.createdAt"
-    ]
+    ],
+    "limit": 5
   }
