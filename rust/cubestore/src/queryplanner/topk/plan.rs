@@ -4,12 +4,13 @@ use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn, MIN_TOPK_STREA
 use arrow::datatypes::DataType;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
-use datafusion::logical_plan::{DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan};
+use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
-use datafusion::physical_plan::planner::{compute_aggregation_strategy, DefaultPhysicalPlanner};
+use datafusion::physical_plan::planner::{compute_aggregation_strategy, physical_name};
 use datafusion::physical_plan::sort::{SortExec, SortOptions};
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
 use itertools::Itertools;
 use std::cmp::max;
 use std::sync::Arc;
@@ -83,7 +84,8 @@ pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> 
                                         let in_field = in_schema.field(p.input_columns[out_i]);
                                         let out_name = out_schema.field(out_i).name();
 
-                                        let mut e = field_reference(in_field);
+                                        let f = in_field;
+                                        let mut e = Expr::Column(f.qualified_column());
                                         if out_name != in_field.name() {
                                             e = Expr::Alias(Box::new(e), out_name.clone())
                                         }
@@ -182,8 +184,8 @@ fn extract_column_projection(p: &LogicalPlan) -> Option<ColumnProjection> {
             let mut input_columns = Vec::with_capacity(expr.len());
             for e in expr {
                 match e {
-                    Expr::Alias(box Expr::Column(n, q), _) | Expr::Column(n, q) => {
-                        input_columns.push(field_index(in_schema, q.as_deref(), n)?)
+                    Expr::Alias(box Expr::Column(c), _) | Expr::Column(c) => {
+                        input_columns.push(field_index(in_schema, c.relation.as_deref(), &c.name)?)
                     }
                     _ => return None,
                 }
@@ -208,11 +210,11 @@ fn extract_sort_columns(
     for e in sort_expr {
         match e {
             Expr::Sort {
-                expr: box Expr::Column(n, q),
+                expr: box Expr::Column(c),
                 asc,
                 nulls_first,
             } => {
-                let mut index = field_index(schema, q.as_deref(), n)?;
+                let mut index = field_index(schema, c.relation.as_deref(), &c.name)?;
                 if let Some(p) = projection {
                     index = p[index];
                 }
@@ -239,13 +241,12 @@ fn field_index(schema: &DFSchema, qualifier: Option<&str>, name: &str) -> Option
 }
 
 pub fn plan_topk(
+    planner: &dyn PhysicalPlanner,
     ext_planner: &CubeExtensionPlanner,
     node: &ClusterAggregateTopK,
     input: Arc<dyn ExecutionPlan>,
     ctx: &ExecutionContextState,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    let planner = DefaultPhysicalPlanner::default();
-
     // Partial aggregate on workers. Mimics corresponding planning code from DataFusion.
     let physical_input_schema = input.schema();
     let logical_input_schema = node.input.schema();
@@ -254,8 +255,13 @@ pub fn plan_topk(
         .iter()
         .map(|e| {
             Ok((
-                planner.create_physical_expr(e, &physical_input_schema, ctx)?,
-                e.name(&logical_input_schema)?,
+                planner.create_physical_expr(
+                    e,
+                    &logical_input_schema,
+                    &physical_input_schema,
+                    ctx,
+                )?,
+                physical_name(e, &logical_input_schema)?,
             ))
         })
         .collect::<Result<Vec<_>, DataFusionError>>()?;
@@ -285,17 +291,16 @@ pub fn plan_topk(
         .order_by
         .iter()
         .map(|c| {
-            planner.create_physical_sort_expr(
-                &field_reference(aggregate_schema.field(group_expr_len + c.agg_index)),
-                &aggregate_schema,
-                SortOptions {
+            let i = group_expr_len + c.agg_index;
+            PhysicalSortExpr {
+                expr: Arc::new(Column::new(aggregate_schema.field(i).name(), i)),
+                options: SortOptions {
                     descending: !c.asc,
                     nulls_first: c.nulls_first,
                 },
-                ctx,
-            )
+            }
         })
-        .collect::<Result<Vec<_>, DataFusionError>>()?;
+        .collect_vec();
     let sort = Arc::new(SortExec::try_new(sort_expr, aggregate)?);
     let sort_schema = sort.schema();
 
@@ -322,8 +327,4 @@ pub fn plan_topk(
         cluster,
         schema,
     )))
-}
-
-fn field_reference(f: &DFField) -> Expr {
-    Expr::Column(f.name().clone(), f.qualifier().cloned())
 }

@@ -15,46 +15,29 @@ menuOrder: 3
 <!-- prettier-ignore-end -->
 
 Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
-many configuration options to consider. Please make sure to also check [this
-Pre-Aggregations page in the data schema section][ref-preaggs].
+many configuration options to consider. Please make sure to also check [the
+Pre-Aggregations reference in the data schema section][ref-schema-ref-preaggs].
 
 ## Refresh Strategy
 
 Refresh strategy can be customized by setting the
-[refreshKey][ref-preaggs-refresh-key] property for the pre-aggregation.
+[`refreshKey`][ref-schema-ref-preaggs-refresh-key] property for the
+pre-aggregation.
 
-The default value of `refreshKey` is `every: '1 hour'`. It can be redefined
-either by providing SQL:
+The default value of [`refreshKey`][ref-schema-ref-preaggs-refresh-key] is
+`every: '1 hour'`. It can be redefined either by overriding the default value of
+the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
 
 ```javascript
 cube(`Orders`, {
-  // ...
+
+  ...,
 
   preAggregations: {
     amountByCreated: {
       type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
-      granularity: `month`,
-      refreshKey: {
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
-```
-
-Or by providing a refresh time interval:
-
-```javascript
-cube(`Orders`, {
-  // ...
-
-  preAggregations: {
-    amountByCreated: {
-      type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
+      measures: [amount],
+      timeDimension: createdAt,
       granularity: `month`,
       refreshKey: {
         every: `12 hour`,
@@ -64,34 +47,99 @@ cube(`Orders`, {
 });
 ```
 
+Or by providing a [`sql` property][ref-schema-ref-preaggs-refresh-key-sql]
+instead, and leaving `every` unchanged from its' default value:
+
+```javascript
+cube(`Orders`, {
+
+  ...,
+
+  preAggregations: {
+    amountByCreated: {
+      measures: [amount],
+      timeDimension: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        // every will default to `10 seconds` here
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+Or both `every` and `sql` can be defined together:
+
+```javascript
+cube(`Orders`, {
+
+  ...,
+
+  preAggregations: {
+    amountByCreated: {
+      measures: [amount],
+      timeDimension: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        every: `12 hour`,
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+When `every` and `sql` are used together, Cube.js will run the query from the
+`sql` property on an interval defined by the `every` property. If the query
+returns new results, then the pre-aggregation will be refreshed.
+
 ## Background Refresh
 
-You can refresh pre-aggregations in the background by setting
-`scheduledRefresh: true`. You can find more information about this setting in
-the [Pre-Aggregation Reference][ref-preagg-sched-refresh].
+Background refreshes are enabled by default for all Cube.js deployments, but
+this behaviour can be modified by setting `scheduledRefresh: false`. You can
+find more information about this setting in the [Pre-Aggregation
+Reference][ref-schema-ref-preaggs-sched-refresh].
 
 In development mode, Cube.js enables background refresh by default and will
 refresh all pre-aggregations marked with the
-[`scheduledRefresh`](/pre-aggregations#scheduled-refresh) parameter.
+[`scheduledRefresh`][ref-schema-ref-preaggs-sched-refresh] parameter.
 
 Please consult the [Production Checklist][ref-prod-list-refresh] for best
 practices on running background refresh in production environments.
 
 ```js
 cube(`Orders`, {
-  // ...
+
+  ...,
 
   preAggregations: {
     amountByCreated: {
-      type: `rollup`,
-      measureReferences: [amount],
-      timeDimensionReference: createdAt,
+      measures: [amount],
+      timeDimension: createdAt,
       granularity: `month`,
-      scheduledRefresh: true,
     },
   },
 });
 ```
+
+## Rollup Only Mode
+
+To make Cube.js _only_ serve requests from pre-aggregations, the
+[`CUBEJS_ROLLUP_ONLY` environment variable][ref-config-env-general] can be set
+to `true` on an API instance. This will prevent it from checking the freshness
+of the pre-aggregations; a separate [Refresh Worker][ref-deploy-refresh-wrkr]
+must be configured to keep the pre-aggregations up-to-date.
+
+<!-- prettier-ignore-start -->
+[[warning |]]
+| In a single node deployment (where the API instance and [Refresh Worker
+| ][ref-deploy-refresh-wrkr] are configured on the same host), requests made to
+| the API that cannot be satisfied by a rollup throw an error. Scheduled
+| refreshes will continue to work in the background; if a pre-aggregation is
+| being built at the time of a request, then the request will wait until the
+| build is complete before returning results.
+<!-- prettier-ignore-end -->
 
 ## Read Only Data Source
 
@@ -142,14 +190,14 @@ this attribute, and **only** valid partitions required to satisfy it are
 selected. This results in faster refresh times due to unnecessary data not being
 scanned and processed, and possibly even reduced cost, depending on your
 database solution. Cube.js supports partitioning data using the `timeDimension`
-property in [a pre-aggregation definition][ref-preaggs].
+property in [a pre-aggregation definition][ref-schema-ref-preaggs].
 
 ### Time partitioning
 
 Time-based partitioning is especially helpful for incremental refreshes; when
 configured, Cube.js will only refresh partitions as necessary. Without
 incremental refreshing, Cube.js will re-calculate the entire pre-aggregation
-whenever [the refresh key][ref-preaggs-refresh-key] changes.
+whenever [the refresh key][ref-schema-ref-preaggs-refresh-key] changes.
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -368,20 +416,30 @@ When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube.js does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
-[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
+[ref-caching-in-mem-default-refresh-key]:
+  /caching#in-memory-cache-default-refresh-keys
 [ref-config-connect-db]: /connecting-to-the-database
-[ref-config-env]: /reference/environment-variables#cube-store
-[ref-connect-db-athena]: /connecting-to-the-database#notes-aws-athena
-[ref-connect-db-redshift]: /connecting-to-the-database#notes-aws-redshift
-[ref-connect-db-bigquery]: /connecting-to-the-database#notes-google-big-query
-[ref-connect-db-mysql]: /connecting-to-the-database#notes-my-sql
-[ref-connect-db-postgres]: /connecting-to-the-database#notes-aws-rds-postgres
-[ref-connect-db-snowflake]: /connecting-to-the-database#notes-snowflake
-[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
-[ref-preaggs]: /pre-aggregations
-[ref-preagg-sched-refresh]: /pre-aggregations#scheduled-refresh
-[ref-preaggs-refresh-key]: /pre-aggregations#refresh-key
-[ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
-[ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-driverfactory]: /config#options-reference-driver-factory
+[ref-config-env]: /reference/environment-variables#cube-store
+[ref-config-env-general]: /config#general
+[ref-config-extdbtype]: /config#options-reference-external-db-type
 [ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
+[ref-connect-db-athena]: /config/databases/aws-athena
+[ref-connect-db-redshift]: /config/databases/aws-redshift
+[ref-connect-db-bigquery]: /config/databases/google-bigquery
+[ref-connect-db-mysql]: /config/databases/mysql
+[ref-connect-db-postgres]: /config/databases/postgres
+[ref-connect-db-snowflake]: /config/databases/snowflake
+[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
+[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
+[ref-schema-ref-preaggs-refresh-key]:
+  /schema/reference/pre-aggregations#parameters-refresh-key
+[ref-schema-ref-preaggs-refresh-key-every]:
+  /schema/reference/pre-aggregations#parameters-refresh-key-every
+[ref-schema-ref-preaggs-refresh-key-sql]:
+  /schema/reference/pre-aggregations#parameters-refresh-key-sql
+[ref-deploy-refresh-wrkr]: /deployment/overview#refresh-worker
+[ref-schema-ref-preaggs-sched-refresh]:
+  /schema/reference/pre-aggregations#parameters-scheduled-refresh
+[ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
+[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)

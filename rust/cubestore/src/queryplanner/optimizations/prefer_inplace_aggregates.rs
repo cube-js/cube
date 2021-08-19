@@ -1,7 +1,7 @@
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use datafusion::error::DataFusionError;
-use datafusion::physical_plan::alias::AliasedSchemaExec;
+use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::{AggregateStrategy, HashAggregateExec};
 use datafusion::physical_plan::merge::MergeExec;
@@ -53,7 +53,6 @@ fn try_regroup_columns(
     }
     if p.as_any().is::<UnionExec>()
         || p.as_any().is::<ProjectionExec>()
-        || p.as_any().is::<AliasedSchemaExec>()
         || p.as_any().is::<FilterExec>()
         || p.as_any().is::<WorkerExec>()
         || p.as_any().is::<ClusterSendExec>()
@@ -85,9 +84,11 @@ fn try_regroup_columns(
     if sort_order.is_empty() {
         return Ok(p);
     }
+
+    let schema = input.schema();
     let sort_columns = sort_order
         .into_iter()
-        .map(|i| input.schema().field(i).qualified_name())
+        .map(|i| Column::new(schema.field(i).name(), i))
         .collect();
     Ok(Arc::new(MergeSortExec::try_new(input, sort_columns)?))
 }

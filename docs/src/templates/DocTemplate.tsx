@@ -1,31 +1,23 @@
 import React, { Component } from 'react';
-import { renderToString } from 'react-dom/server'
 import { graphql } from 'gatsby';
 import { MDXRenderer } from 'gatsby-plugin-mdx';
 import { MDXProvider } from '@mdx-js/react'
 import Helmet from 'react-helmet';
-import ReactHtmlParser from 'react-html-parser';
 import { scroller } from 'react-scroll';
-import { Icon } from 'antd';
-import cx from 'classnames';
-import kebabCase from 'lodash/kebabCase';
 import get from 'lodash/get';
-import last from 'lodash/last';
 import { renameCategory } from '../rename-category';
 
 import "gatsby-remark-mathjax-ssr/mathjax.css";
 
-import ScrollLink, {
-  SCROLL_OFFSET,
-} from '../components/templates/ScrollSpyLink';
-
 import * as styles from '../../static/styles/index.module.scss';
-import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
+import { Page, SetScrollSectionsAndGithubUrlFunction } from '../types';
 
 // define components to using in MDX
 import GitHubCodeBlock from "../components/GitHubCodeBlock"
 import CubeQueryResultSet from "../components/CubeQueryResultSet"
-const components = { GitHubCodeBlock, CubeQueryResultSet }
+import GitHubFolderLink from "../components/GitHubFolderLink"
+
+const components = { GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink }
 
 const mdContentCallback = () => {
   const accordionTriggers = document.getElementsByClassName(

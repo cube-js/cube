@@ -41,6 +41,8 @@ pub fn run_sql_tests(
                     ignore: false,
                     should_panic: ShouldPanic::No,
                     allow_fail: false,
+                    compile_fail: false,
+                    no_run: false,
                     test_type: TestType::IntegrationTest,
                 },
                 testfn: DynTestFn(Box::new(move || runner(name, test_fn))),

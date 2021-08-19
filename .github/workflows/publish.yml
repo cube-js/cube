@@ -61,8 +61,10 @@ jobs:
         uses: actions/github-script@v3
         with:
           script: |
-            const repo = await github.repos.get(context.repo)
-            return repo.data
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
       - name: Prepare
         id: prep
         run: |
@@ -125,8 +127,10 @@ jobs:
         uses: actions/github-script@v3
         with:
           script: |
-            const repo = await github.repos.get(context.repo)
-            return repo.data
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
       - name: Prepare
         id: prep
         run: |
@@ -190,8 +194,10 @@ jobs:
         uses: actions/github-script@v3
         with:
           script: |
-            const repo = await github.repos.get(context.repo)
-            return repo.data
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
       - name: Prepare
         id: prep
         env:
@@ -310,7 +316,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-02-17
+          toolchain: nightly-2021-07-04
           target: ${{ matrix.target }}
           override: true
           components: rustfmt

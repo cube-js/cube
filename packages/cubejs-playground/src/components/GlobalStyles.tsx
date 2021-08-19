@@ -253,6 +253,10 @@ const GlobalStyles = createGlobalStyle`
   a.ant-typography {
     text-decoration: underline;
   }
+  
+  .ant-notification {
+    z-index: 9999;
+  }
 `;
 
 export default GlobalStyles;

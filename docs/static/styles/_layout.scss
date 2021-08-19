@@ -974,6 +974,10 @@ section[type=h2] h2 {
         border-bottom: none;
       }
 
+      &.originalWidth {
+        width: calc(100% / 3);
+      }
+
       &.gettingStartedItemAdjacent {
         @include card-grid-item-adjacent;
       }
@@ -1022,6 +1026,51 @@ section[type=h2] h2 {
         }
 
         .gettingStartedItemText {
+          @include card-grid-item-text;
+        }
+      }
+    }
+  }
+
+  .connectingToDatabaseGrid {
+    @include card-grid;
+
+    > .ant-row {
+      display: flex;
+      flex-flow: row wrap;
+    }
+
+    .connectingToDatabaseItem {
+      @include card-grid-item-without-width;
+
+      a {
+        border-bottom: none;
+      }
+
+      .connectingToDatabaseItemContent {
+        @include card-grid-item-content;
+        margin: 1.5rem;
+
+        .connectingToDatabaseItemImage {
+          @include card-grid-item-image;
+          position: unset;
+          display: flex;
+          justify-content: center;
+
+          > img {
+            box-shadow: none !important;
+            border: none;
+            max-height: 160px;
+          }
+        }
+
+        .connectingToDatabaseItemLink {
+          @include card-grid-item-link;
+          margin-top: 0.5rem;
+          text-align: center;
+        }
+
+        .connectingToDatabaseItemText {
           @include card-grid-item-text;
         }
       }

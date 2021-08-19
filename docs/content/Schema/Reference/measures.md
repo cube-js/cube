@@ -2,9 +2,9 @@
 title: Measures
 permalink: /schema/reference/measures
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 3
+menuOrder: 9
 proofread: 06/18/2019
 redirect_from:
   - /measures
@@ -278,4 +278,4 @@ join will be created automatically.
   /schema/reference/types-and-formats#measures-types
 [ref-schema-ref-types-formats-measures-formats]:
   /schema/reference/types-and-formats#measures-formats
-[ref-drilldowns]: /drill-downs
+[ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns

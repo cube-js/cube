@@ -1,4 +1,4 @@
-version: "3"
+version: "2.2"
 
 services:
   cube:
@@ -21,7 +21,7 @@ services:
       - ./postgresql/single/cube.js:/cube/conf/cube.js
       - ./postgresql/schema:/cube/conf/schema
     ports:
-      - 4000
+      - "4000"
     restart: always
 
   db:
@@ -32,7 +32,7 @@ services:
       - POSTGRES_USER=test
       - POSTGRES_DB=test
     ports:
-      - 5432
+      - "5432"
     restart: always
     volumes:
       - ./datasets:/data:ro

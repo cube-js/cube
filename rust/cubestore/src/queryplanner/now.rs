@@ -1,5 +1,6 @@
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use datafusion::error::DataFusionError;
+use datafusion::execution::context::ExecutionProps;
 use datafusion::logical_plan::{Expr, ExprRewriter, LogicalPlan};
 use datafusion::optimizer::optimizer::OptimizerRule;
 use datafusion::optimizer::utils::from_plan;
@@ -10,7 +11,11 @@ use std::time::SystemTime;
 
 pub struct MaterializeNow;
 impl OptimizerRule for MaterializeNow {
-    fn optimize(&self, plan: &LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
+    fn optimize(
+        &self,
+        plan: &LogicalPlan,
+        _execution_props: &ExecutionProps,
+    ) -> Result<LogicalPlan, DataFusionError> {
         let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
             Ok(t) => t,
             Err(e) => {

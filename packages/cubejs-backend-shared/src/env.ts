@@ -44,7 +44,7 @@ export function asPortNumber(input: number, envName: string) {
   return input;
 }
 
-function asPortOrSocket(input: string, envName: string): number|string {
+function asPortOrSocket(input: string, envName: string): number | string {
   if (/^-?\d+$/.test(input)) {
     return asPortNumber(parseInt(input, 10), envName);
   }
@@ -53,7 +53,7 @@ function asPortOrSocket(input: string, envName: string): number|string {
   return input;
 }
 
-function asBoolOrTime(input: string, envName: string): number|boolean {
+function asBoolOrTime(input: string, envName: string): number | boolean {
   if (input.toLowerCase() === 'true') {
     return true;
   }
@@ -274,12 +274,17 @@ const variables: Record<string, (...args: any) => any> = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  agentEndpointUrl: () => get('CUBEJS_AGENT_ENDPOINT_URL')
+    .asString(),
+  agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
+    .default(1000)
+    .asInt(),
   telemetry: () => get('CUBEJS_TELEMETRY')
     .default('true')
     .asBool(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   preAggregationsQueueEventsBus: () => get('CUBEJS_PRE_AGGREGATIONS_QUEUE_EVENTS_BUS')
     .default('false')

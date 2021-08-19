@@ -26,14 +26,15 @@ use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 use datafusion::logical_plan;
-use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, ToDFSchema};
+use datafusion::logical_plan::{Expr, LogicalPlan};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{
-    collect, ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+    collect, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr, SendableRecordBatchStream,
 };
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
@@ -116,7 +117,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 execution_time, &split_plan
             );
         }
-        Ok((split_plan.schema().to_schema_ref(), results?))
+        Ok((split_plan.schema(), results?))
     }
 
     #[instrument(level = "trace", skip(self, plan, remote_to_local_names))]
@@ -178,7 +179,7 @@ impl QueryExecutor for QueryExecutorImpl {
         }
         // TODO: stream results as they become available.
         let results = regroup_batches(results?, max_batch_rows)?;
-        Ok((worker_plan.schema().to_schema_ref(), results))
+        Ok((worker_plan.schema(), results))
     }
 
     async fn router_plan(
@@ -257,12 +258,13 @@ impl CubeTable {
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             index_snapshot
-                .index()
+                .table_path
+                .table
                 .get_row()
                 .get_columns()
                 .iter()
                 .map(|c| c.clone().into())
-                .collect::<Vec<_>>(),
+                .collect(),
         ));
         Ok(Self {
             index_snapshot,
@@ -294,17 +296,25 @@ impl CubeTable {
         batch_size: usize,
         filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
-        let table = self.index_snapshot.table();
-        let index = self.index_snapshot.index();
         let partition_snapshots = self.index_snapshot.partitions();
 
         let mut partition_execs = Vec::<Arc<dyn ExecutionPlan>>::new();
-
-        let mapped_projection = projection.as_ref().map(|p| {
-            CubeTable::project_to_index_positions(&CubeTable::project_to_table(&table, p), &index)
-                .into_iter()
-                .map(|i| i.unwrap())
-                .collect::<Vec<_>>()
+        let table_cols = self.index_snapshot.table().get_row().get_columns();
+        let index_cols = self.index_snapshot.index().get_row().get_columns();
+        let partition_projection = projection.as_ref().map(|p| {
+            let mut partition_projection = Vec::with_capacity(p.len());
+            for table_col_i in p {
+                let name = table_cols[*table_col_i].get_name();
+                let (part_col_i, _) = index_cols
+                    .iter()
+                    .find_position(|c| c.get_name() == name)
+                    .unwrap();
+                partition_projection.push(part_col_i);
+            }
+            // Parquet does not rearrange columns on projection. This looks like a bug, but until
+            // this is fixed, we have to handle this ourselves.
+            partition_projection.sort();
+            partition_projection
         });
 
         let predicate = combine_filters(filters);
@@ -324,7 +334,7 @@ impl CubeTable {
                     .expect(format!("Missing remote path {}", remote_path).as_str());
                 let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path(
                     &local_path,
-                    mapped_projection.clone(),
+                    partition_projection.clone(),
                     predicate.clone(),
                     batch_size,
                     1,
@@ -342,7 +352,7 @@ impl CubeTable {
                     .expect(format!("Missing remote path {}", remote_path).as_str());
                 let node = Arc::new(ParquetExec::try_from_path(
                     local_path,
-                    mapped_projection.clone(),
+                    partition_projection.clone(),
                     predicate.clone(),
                     batch_size,
                     1,
@@ -352,42 +362,76 @@ impl CubeTable {
             }
         }
 
-        if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(EmptyExec::new(false, self.schema.clone())));
+        // We might need extra projection to re-order data.
+        if let Some(projection) = projection {
+            let partition_projection = partition_projection.unwrap();
+            let mut final_reorder = Vec::with_capacity(projection.len());
+            for table_col_i in projection {
+                let name = table_cols[*table_col_i].get_name();
+                let index_col_i = index_cols
+                    .iter()
+                    .find_position(|c| c.get_name() == name)
+                    .unwrap()
+                    .0;
+                let batch_col_i = partition_projection
+                    .iter()
+                    .find_position(|c| **c == index_col_i)
+                    .unwrap()
+                    .0;
+                final_reorder.push(batch_col_i);
+            }
+            if !final_reorder.iter().cloned().eq(0..projection.len()) {
+                for p in &mut partition_execs {
+                    let s = p.schema();
+                    let proj_exprs = final_reorder
+                        .iter()
+                        .map(|c| {
+                            let name = s.field(*c).name();
+                            let col = datafusion::physical_plan::expressions::Column::new(name, *c);
+                            let col: Arc<dyn PhysicalExpr> = Arc::new(col);
+                            (col, name.clone())
+                        })
+                        .collect_vec();
+                    *p = Arc::new(ProjectionExec::try_new(proj_exprs, p.clone()).unwrap())
+                }
+            }
         }
 
-        let projected_schema = if let Some(p) = mapped_projection {
+        let projected_schema = if let Some(p) = projection {
             Arc::new(Schema::new(
-                self.schema
-                    .fields()
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, f)| p.iter().find(|p_i| *p_i == &i).map(|_| f.clone()))
-                    .collect(),
+                p.iter().map(|i| self.schema.field(*i).clone()).collect(),
             ))
         } else {
             self.schema.clone()
         };
+        // TODO: 'nullable' modifiers differ, fix this and re-enable assertion.
+        // for p in &partition_execs {
+        //     assert_eq!(p.schema(), projected_schema);
+        // }
 
-        let schema = projected_schema.to_dfschema_ref()?;
+        if partition_execs.len() == 0 {
+            partition_execs.push(Arc::new(EmptyExec::new(false, projected_schema.clone())));
+        }
+
+        let schema = projected_schema;
+        let read_data = Arc::new(CubeTableExec {
+            schema: schema.clone(),
+            partition_execs,
+            index_snapshot: self.index_snapshot.clone(),
+            filter: predicate,
+        });
+
         let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.sort_on()
         {
-            Arc::new(MergeSortExec::try_new(
-                Arc::new(CubeTableExec {
-                    schema,
-                    partition_execs,
-                    index_snapshot: self.index_snapshot.clone(),
-                    filter: predicate,
-                }),
-                join_columns.clone(),
-            )?)
+            let join_columns = join_columns
+                .iter()
+                .map(|c| {
+                    datafusion::physical_plan::expressions::Column::new_with_schema(c, &schema)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Arc::new(MergeSortExec::try_new(read_data, join_columns)?)
         } else {
-            Arc::new(MergeExec::new(Arc::new(CubeTableExec {
-                schema,
-                partition_execs,
-                index_snapshot: self.index_snapshot.clone(),
-                filter: predicate,
-            })))
+            Arc::new(MergeExec::new(read_data))
         };
 
         Ok(plan)
@@ -421,7 +465,7 @@ impl CubeTable {
 }
 
 pub struct CubeTableExec {
-    schema: DFSchemaRef,
+    schema: SchemaRef,
     pub(crate) index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
     pub(crate) filter: Option<Expr>,
@@ -442,7 +486,7 @@ impl ExecutionPlan for CubeTableExec {
         self
     }
 
-    fn schema(&self) -> DFSchemaRef {
+    fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 
@@ -507,7 +551,7 @@ impl ExecutionPlan for CubeTableExec {
 }
 
 pub struct ClusterSendExec {
-    schema: DFSchemaRef,
+    schema: SchemaRef,
     pub partitions: Vec<(/*node*/ String, /*partition_id*/ Vec<u64>)>,
     /// Never executed, only stored to allow consistent optimization on router and worker.
     pub input_for_optimizations: Arc<dyn ExecutionPlan>,
@@ -518,7 +562,7 @@ pub struct ClusterSendExec {
 
 impl ClusterSendExec {
     pub fn new(
-        schema: DFSchemaRef,
+        schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
         union_snapshots: Vec<Vec<IndexSnapshot>>,
@@ -573,7 +617,7 @@ impl ClusterSendExec {
 
     pub fn with_changed_schema(
         &self,
-        schema: DFSchemaRef,
+        schema: SchemaRef,
         input_for_optimizations: Arc<dyn ExecutionPlan>,
     ) -> Self {
         ClusterSendExec {
@@ -593,7 +637,7 @@ impl ExecutionPlan for ClusterSendExec {
         self
     }
 
-    fn schema(&self) -> DFSchemaRef {
+    fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 
@@ -641,8 +685,7 @@ impl ExecutionPlan for ClusterSendExec {
         } else {
             let record_batches = self.cluster.run_select(node_name, plan).await?;
             // TODO .to_schema_ref()
-            let memory_exec =
-                MemoryExec::try_new(&vec![record_batches], self.schema.to_schema_ref(), None)?;
+            let memory_exec = MemoryExec::try_new(&vec![record_batches], self.schema(), None)?;
             memory_exec.execute(0).await
         }
     }

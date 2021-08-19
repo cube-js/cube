@@ -7,7 +7,7 @@ import { JWTOptions } from './interfaces';
 
 const HEADER_REGEXP = /([a-zA-Z][a-zA-Z_-]*)\s*(?:=(?:"([^"]*)"|([^ \t",;]*)))?/g;
 
-const cacheControlMap: Record<string, [string, (v: string|null) => unknown]> = {
+const cacheControlMap: Record<string, [string, (v: string | null) => unknown]> = {
   public: ['public', () => true],
   'max-age': ['maxAge', (v) => v && parseInt(v, 10)],
   'stale-while-revalidate': ['staleWhileRevalidate', (v) => v && parseInt(v, 10)],
@@ -29,7 +29,7 @@ function parseCacheControl(header: string) {
 
     const [key] = tokens;
 
-    let value: string|null = null;
+    let value: string | null = null;
 
     if (tokens.length > 1) {
       value = tokens[1].trim();

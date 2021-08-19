@@ -11,18 +11,14 @@ type CubesProps = {
   onSelect: (memberType: QueryMemberKey, key: string) => void;
 };
 
-const MEMBER_TYPES = ['measures', 'dimensions', 'timeDimensions'];
+const MEMBER_TYPES = ['measures', 'dimensions', 'segments', 'timeDimensions'];
 
-export function Cubes({
-  selectedKeys,
-  membersByCube,
-  onSelect,
-}: CubesProps) {
+export function Cubes({ selectedKeys, membersByCube, onSelect }: CubesProps) {
   const defaultOpenKeys = selectedKeys.map((key) => key.split('.')[0]);
 
   return (
     <Menu
-      style={{ width: 256 }}
+      style={{ maxWidth: 256 }}
       selectedKeys={selectedKeys}
       defaultOpenKeys={defaultOpenKeys}
       mode="inline"
@@ -39,13 +35,22 @@ export function Cubes({
             {MEMBER_TYPES.map((memberType) => {
               return (
                 <Menu.ItemGroup key={memberType} title={ucfirst(memberType)}>
-                  {cube[memberType].map((member) => {
-                    return (
-                      <Menu.Item key={member.name} data-membertype={memberType}>
-                        {member.title}
-                      </Menu.Item>
-                    );
-                  })}
+                  {cube[memberType]
+                    .filter((member) => {
+                      return !(
+                        memberType === 'dimensions' && member.type === 'time'
+                      );
+                    })
+                    .map((member) => {
+                      return (
+                        <Menu.Item
+                          key={member.name}
+                          data-membertype={memberType}
+                        >
+                          {member.title}
+                        </Menu.Item>
+                      );
+                    })}
                 </Menu.ItemGroup>
               );
             })}

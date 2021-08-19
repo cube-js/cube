@@ -21,29 +21,48 @@ export function dateParser(dateString, timezone, now = new Date()) {
   let momentRange;
   dateString = dateString.toLowerCase();
 
-  if (dateString.match(/(this|last)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
-    const match = dateString.match(/(this|last)\s+(day|week|month|year|quarter|hour|minute|second)/);
+  if (dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
+    const match = dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/);
     let start = moment.tz(timezone);
     let end = moment.tz(timezone);
     if (match[1] === 'last') {
       start = start.add(-1, match[2]);
       end = end.add(-1, match[2]);
     }
+    if (match[1] === 'next') {
+      start = start.add(1, match[2]);
+      end = end.add(1, match[2]);
+    }
+
     const span = match[2] === 'week' ? 'isoWeek' : match[2];
     momentRange = [start.startOf(span), end.endOf(span)];
-  } else if (dateString.match(/last\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
-    const match = dateString.match(/last\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/);
-    const span = match[2] === 'week' ? 'isoWeek' : match[2];
-    momentRange = [
-      moment.tz(timezone).startOf(span).add(-parseInt(match[1], 10), match[2]),
-      moment.tz(timezone).add(-1, match[2]).endOf(span)
-    ];
+  } else if (dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
+    const match = dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/);
+
+    let start = moment.tz(timezone);
+    let end = moment.tz(timezone);
+    if (match[1] === 'last') {
+      start = start.add(-parseInt(match[2], 10), match[3]);
+      end = end.add(-1, match[3]);
+    }
+    if (match[1] === 'next') {
+      start = start.add(parseInt(1, 10), match[3]);
+      end = end.add(parseInt(match[2], 10), match[3]);
+    }
+
+    const span = match[3] === 'week' ? 'isoWeek' : match[3];
+    momentRange = [start.startOf(span), end.endOf(span)];
   } else if (dateString.match(/today/)) {
     momentRange = [moment.tz(timezone).startOf('day'), moment.tz(timezone).endOf('day')];
   } else if (dateString.match(/yesterday/)) {
     momentRange = [
       moment.tz(timezone).startOf('day').add(-1, 'day'),
       moment.tz(timezone).endOf('day').add(-1, 'day')
+    ];
+  } else if (dateString.match(/tomorrow/)) {
+    momentRange = [
+      moment.tz(timezone).startOf('day').add(1, 'day'),
+      moment.tz(timezone).endOf('day').add(1, 'day')
     ];
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
     // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars

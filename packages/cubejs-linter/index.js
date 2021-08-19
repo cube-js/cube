@@ -4,16 +4,13 @@ module.exports = {
   env: {
     node: true,
   },
-  plugins: [
-    'import',
-    '@typescript-eslint/eslint-plugin',
-  ],
+  plugins: ['import', '@typescript-eslint/eslint-plugin'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     sourceType: 'module',
     ecmaVersion: 2020,
     ecmaFeatures: {
-      legacyDecorators: true
+      legacyDecorators: true,
     },
   },
   rules: {
@@ -36,13 +33,8 @@ module.exports = {
     'no-plusplus': 0,
     'no-await-in-loop': 0,
     'operator-linebreak': 0,
-    'max-len': ['error', 120, 2, {
-      ignoreUrls: true,
-      ignoreComments: false,
-      ignoreRegExpLiterals: true,
-      ignoreStrings: true,
-      ignoreTemplateLiterals: true,
-    }],
+    // linter can't fix this itself and, in some cases, conflicts with `arrow-body-style`
+    'max-len': 0,
     'no-trailing-spaces': ['warn', { skipBlankLines: true }],
     'object-curly-newline': 0,
     // TypeScript Recommended
@@ -59,6 +51,7 @@ module.exports = {
     '@typescript-eslint/prefer-namespace-keyword': 'error',
     '@typescript-eslint/triple-slash-reference': 'error',
     '@typescript-eslint/type-annotation-spacing': 'error',
+    '@typescript-eslint/space-infix-ops': 'error',
   },
   overrides: [
     {

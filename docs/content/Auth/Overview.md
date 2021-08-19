@@ -20,6 +20,8 @@ menuOrder: 1
   }}
 />
 
+<GitHubFolderLink href="https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui"/>
+
 In Cube.js, authorization (or access control) is based on the **security
 context**. The diagram below shows how it works during the request processing in
 Cube.js:

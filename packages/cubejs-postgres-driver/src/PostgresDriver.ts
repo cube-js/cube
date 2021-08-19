@@ -1,4 +1,4 @@
-import { types, Pool, PoolConfig, PoolClient } from 'pg';
+import { types, Pool, PoolConfig, PoolClient, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
 import * as moment from 'moment';
@@ -43,7 +43,7 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   readOnly?: boolean,
 };
 
-function getTypeParser(dataType: TypeId, format: TypeFormat|undefined) {
+function getTypeParser(dataType: TypeId, format: TypeFormat | undefined) {
   const isTimestamp = timestampDataTypes.includes(dataType);
   if (isTimestamp) {
     return timestampTypeParser;
@@ -95,6 +95,26 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     };
   }
 
+  /**
+   * It's not possible to detect user defined types via constant oids
+   * For example HLL extensions is using CREATE TYPE HLL which will generate a new pg_type with different oids
+   */
+  protected userDefinedTypes: Record<string, string> | null = null;
+
+  protected getPostgresTypeForField(field: FieldDef) {
+    if (field.dataTypeID in NativeTypeToPostgresType) {
+      return NativeTypeToPostgresType[field.dataTypeID].toLowerCase();
+    }
+
+    if (this.userDefinedTypes && field.dataTypeID in this.userDefinedTypes) {
+      return this.userDefinedTypes[field.dataTypeID].toLowerCase();
+    }
+
+    throw new Error(
+      `Unable to detect type for field "${field.name}" with dataTypeID: ${field.dataTypeID}`
+    );
+  }
+
   public async testConnection(): Promise<void> {
     try {
       await this.pool.query('SELECT $1::int AS number', ['1']);
@@ -107,6 +127,20 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
+    if (!this.userDefinedTypes) {
+      const customTypes = await conn.query(
+        'SELECT oid, typname FROM pg_type WHERE typcategory = \'U\'',
+        []
+      );
+
+      this.userDefinedTypes = customTypes.rows.reduce(
+        (prev, current) => ({ [current.oid]: current.typname, ...prev }),
+        {}
+      );
+    }
+  }
+
   protected async prepareConnection(
     conn: PoolClient,
     options: { executionTimeout: number } = {
@@ -115,6 +149,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
+
+    await this.loadUserDefinedTypes(conn);
   }
 
   public async stream(
@@ -140,7 +176,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         rowStream,
         types: meta.map((f: any) => ({
           name: f.name,
-          type: this.toGenericType(NativeTypeToPostgresType[f.dataTypeID].toLowerCase())
+          type: this.toGenericType(this.getPostgresTypeForField(f))
         })),
         release: async () => {
           await conn.release();
@@ -187,7 +223,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       rows: res.rows,
       types: res.fields.map(f => ({
         name: f.name,
-        type: this.toGenericType(NativeTypeToPostgresType[f.dataTypeID].toLowerCase())
+        type: this.toGenericType(this.getPostgresTypeForField(f))
       })),
     };
   }

@@ -35,7 +35,7 @@ export class QueryCache {
 
   protected queue: { [dataSource: string]: QueryQueue } = {};
 
-  protected externalQueue: QueryQueue|null = null;
+  protected externalQueue: QueryQueue | null = null;
 
   protected memoryCache: LRUCache<string, CacheEntry>;
 
@@ -43,7 +43,7 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    protected readonly options: {
+    public readonly options: {
       refreshKeyRenewalThreshold?: number;
       externalQueueOptions?: any;
       externalDriverFactory?: DriverFactory;

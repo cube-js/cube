@@ -1618,7 +1618,7 @@ export class BaseQuery {
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath];
-      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql);
+      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql, true);
       if (onGroupedColumn) {
         return onGroupedColumn;
       }
@@ -1643,11 +1643,11 @@ export class BaseQuery {
     return `${symbol.type}(${evaluateSql})`;
   }
 
-  aggregateOnGroupedColumn(symbol, evaluateSql) {
+  aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge) {
     if (symbol.type === 'count' || symbol.type === 'sum') {
       return `sum(${evaluateSql})`;
     } else if (symbol.type === 'countDistinctApprox') {
-      return this.hllMerge(evaluateSql);
+      return topLevelMerge ? this.hllCardinalityMerge(evaluateSql) : this.hllMergeOnly(evaluateSql);
     } else if (symbol.type === 'min' || symbol.type === 'max') {
       return `${symbol.type}(${evaluateSql})`;
     }
@@ -1660,6 +1660,14 @@ export class BaseQuery {
 
   hllMerge(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
+  }
+
+  hllMergeOnly(sql) {
+    return this.hllMerge(sql);
+  }
+
+  hllCardinalityMerge(sql) {
+    return this.hllMerge(sql);
   }
 
   countDistinctApprox(sql) {
@@ -2243,7 +2251,6 @@ export class BaseQuery {
         }
 
         if (
-          preAggregation.partitionGranularity &&
           !preAggregationQueryForSql.allCubeNames.find(c => {
             const fromPath = this.cubeEvaluator.cubeFromPath(c);
             return fromPath.refreshKey && fromPath.refreshKey.sql;
@@ -2253,25 +2260,7 @@ export class BaseQuery {
           return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
             () => preAggregationQueryForSql.cacheKeyQueries(
               (refreshKeyCube, [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery]) => {
-                if (cubeFromPath.refreshKey && cubeFromPath.refreshKey.immutable) {
-                  /**
-                   * It's not supported in Cube Store, because it doesnt support Sub Query
-                   * There is a PR with fix for that https://github.com/cube-js/cube.js/pull/3098
-                   * But probably we will remove immutable refreshKeys in the future
-                   */
-                  return [
-                    this.refreshKeySelect(
-                      this.incrementalRefreshKey(preAggregationQueryForSql, `(${refreshKeySQL})`, {
-                        refreshKeyQuery
-                      })
-                    ),
-                    {
-                      external: refreshKeyQueryOptions.external,
-                      renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
-                    },
-                    refreshKeyQuery
-                  ];
-                } else if (!cubeFromPath.refreshKey) {
+                if (!cubeFromPath.refreshKey) {
                   const [sql, external, query] = this.everyRefreshKeySql({
                     every: '1 hour'
                   });

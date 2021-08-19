@@ -104,6 +104,7 @@ jobs:
       - name: Birdbox
         run: |
           cd packages/cubejs-testing/
+          export DEBUG=testcontainers
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
           yarn run dataset:minimal
           yarn run birdbox:${{ matrix.target }}
@@ -158,6 +159,7 @@ jobs:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
           cd packages/cubejs-testing/
+          export DEBUG=testcontainers
           export BIRDBOX_CYPRESS_BROWSER=${{ matrix.browser }}
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
           yarn run cypress:install

@@ -27,9 +27,9 @@ export interface RedisPoolOptions {
 const MAX_ALLOWED_POOL_ERRORS = 100;
 
 export class RedisPool {
-  protected readonly pool: Pool<AsyncRedisClient>|null = null;
+  protected readonly pool: Pool<AsyncRedisClient> | null = null;
 
-  protected readonly create: CreateRedisClientFn|null = null;
+  protected readonly create: CreateRedisClientFn | null = null;
 
   protected poolErrors: number = 0;
 

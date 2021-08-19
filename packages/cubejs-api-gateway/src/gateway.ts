@@ -502,30 +502,23 @@ export class ApiGateway {
           compilerApi,
           query
         );
-
-      const preAggregationVersionEntries = preAggregationPartitions &&
+        
+      const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
           preAggregationPartitions,
           compilerApi.preAggregationsSchema
         );
 
-      const mergePartitionsAndVersionEntries = () => {
-        const preAggregationVersionEntriesByName = preAggregationVersionEntries.reduce((obj, versionEntry) => {
-          if (!obj[versionEntry.table_name]) obj[versionEntry.table_name] = [];
-          obj[versionEntry.table_name].push(versionEntry);
-          return obj;
-        }, {});
-
-        return ({ preAggregation, partitions, ...props }) => ({
-          ...props,
-          preAggregation,
-          partitions: partitions.map(partition => {
-            partition.versionEntries = preAggregationVersionEntriesByName[partition.sql?.tableName] || [];
-            return partition;
-          }),
-        });
-      };
+      const mergePartitionsAndVersionEntries = () => ({ preAggregation, partitions, ...props }) => ({
+        ...props,
+        preAggregation,
+        partitions: partitions.map(partition => {
+          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition.sql?.tableName] || [];
+          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition.sql?.tableName];
+          return partition;
+        }),
+      });
 
       res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
@@ -543,7 +536,7 @@ export class ApiGateway {
     const requestStarted = new Date();
     try {
       query = normalizeQueryPreAggregationPreview(this.parseQueryParam(query));
-      const { preAggregationId, refreshRange, versionEntry, timezone } = query;
+      const { preAggregationId, versionEntry, timezone } = query;
 
       const orchestratorApi = this.getAdapterApi(context);
       const compilerApi = this.getCompilerApi(context);
@@ -554,7 +547,7 @@ export class ApiGateway {
           compilerApi,
           {
             timezones: [timezone],
-            preAggregations: [{ id: preAggregationId, refreshRange }]
+            preAggregations: [{ id: preAggregationId }]
           }
         );
       const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
@@ -955,8 +948,7 @@ export class ApiGateway {
   }
 
   protected resToResultFn(res: Response) {
-    // @ts-ignore
-    return (message, { status } = {}) => (status ? res.status(status).json(message) : res.json(message));
+    return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
   }
 
   protected parseQueryParam(query) {
@@ -1135,7 +1127,7 @@ export class ApiGateway {
   }
 
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
-    type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
+    type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
@@ -1165,7 +1157,7 @@ export class ApiGateway {
       }
 
       checkAuthFn = async (auth) => {
-        const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
+        const decoded = <Record<string, any> | null>jwt.decode(auth, { complete: true });
         if (!decoded) {
           throw new CubejsHandlerError(
             403,

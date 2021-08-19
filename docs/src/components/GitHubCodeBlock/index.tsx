@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import parseHref from '../../utils/parseHref';
 
 const GitHubCodeBlock = (props: propsType) => {
   const { href, titleSuffixCount, part, lang } = props;
@@ -30,23 +31,6 @@ const GitHubCodeBlock = (props: propsType) => {
 };
 
 export default GitHubCodeBlock;
-
-function parseHref(href: string, titleSuffixCount: number): parseHref {
-  const stringWithOutGitHubSlug = href.replace('https://github.com/', '');
-  const arrayOfStringData = stringWithOutGitHubSlug.split('/');
-  const user = arrayOfStringData?.[0] || null;
-  const repo = arrayOfStringData?.[1] || null;
-  const branch = arrayOfStringData?.[3] || null;
-  const title =
-    [...arrayOfStringData]
-      ?.reverse()
-      ?.splice(0, titleSuffixCount)
-      ?.reverse()
-      ?.join('/') || '';
-  const filePath = arrayOfStringData?.splice(4)?.join('/') || null;
-
-  return { user, repo, branch, filePath, title };
-}
 
 async function fetchCodeFromGitHub(
   url: string,
@@ -109,8 +93,4 @@ interface propsType {
   titleSuffixCount: number;
   part: string | null;
   lang: string;
-}
-interface parseHref {
-  [key: string]: string | null;
-  title: string;
 }

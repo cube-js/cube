@@ -64,6 +64,7 @@ pub fn rewrite_plan<R: PlanRewriter>(
             right,
             on,
             join_type,
+            join_constraint,
             schema,
         } => LogicalPlan::Join {
             left: Arc::new(rewrite_plan(
@@ -78,6 +79,7 @@ pub fn rewrite_plan<R: PlanRewriter>(
             )?),
             on: on.clone(),
             join_type: *join_type,
+            join_constraint: *join_constraint,
             schema: schema.clone(),
         },
         LogicalPlan::Repartition {
@@ -119,6 +121,11 @@ pub fn rewrite_plan<R: PlanRewriter>(
                     .collect::<Result<Vec<_>, _>>()?,
             ),
         },
+        LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
+            return Err(DataFusionError::Internal(
+                "unsupported operation".to_string(),
+            ))
+        }
     };
 
     // Update the resulting plan.

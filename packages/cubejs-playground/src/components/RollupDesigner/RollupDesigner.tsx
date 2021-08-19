@@ -19,13 +19,8 @@ import styled from 'styled-components';
 
 import { CodeSnippet } from '../../atoms';
 import { Box, Flex } from '../../grid';
-import {
-  useDeepEffect,
-  useIsCloud,
-  useIsMounted,
-  useToggle,
-  useToken,
-} from '../../hooks';
+import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
+import { useCloud } from '../../playground/cloud';
 import {
   getMembersByCube,
   getNameMemberPairs,
@@ -33,6 +28,7 @@ import {
 } from '../../shared/helpers';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
+import { RollupSettings, Settings } from './components/Settings';
 import { TimeDimension } from './components/TimeDimension';
 import {
   getPreAggregationDefinitionFromReferences,
@@ -41,16 +37,33 @@ import {
   updateQuery,
 } from './utils';
 
-const { Paragraph, Link } = Typography;
+const { Paragraph, Link, Text } = Typography;
 const { TabPane } = Tabs;
 
-const MainWrapper = styled.div`
-  flex-grow: 1;
-  min-width: 0;
-`;
+const Layout = styled.div`
+  display: flex;
+  gap: 16px;
 
-const RightSidePanel = styled.div`
-  max-width: 300px;
+  & > div {
+    max-width: 280px;
+
+    & > div {
+      flex-basis: 140px;
+    }
+  }
+
+  @media (max-width: 1280px) {
+    flex-direction: column;
+    gap: 32px;
+
+    & > div {
+      max-width: 280px;
+
+      & > div {
+        flex-basis: 0;
+      }
+    }
+  }
 `;
 
 type RollupDesignerProps = {
@@ -67,8 +80,11 @@ export function RollupDesigner({
   transformedQuery,
 }: RollupDesignerProps) {
   const isMounted = useIsMounted();
-  const isCloud = useIsCloud();
   const token = useToken();
+  const { isCloud, ...cloud } = useCloud();
+
+  const [activeTab, setActiveTab] = useState<string>('members');
+  const [settings, setSettings] = useState<RollupSettings>({});
 
   const canBeRolledUp =
     transformedQuery.leafMeasureAdditive &&
@@ -78,35 +94,41 @@ export function RollupDesigner({
   const [matching, setMatching] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [preAggName, setPreAggName] = useState<string>('main');
-  const [isRollupCodeVisible, toggleRollupCode] = useToggle(!canBeRolledUp);
 
   const { order, limit, filters, ...matchedQuery } = defaultQuery;
 
+  const segments = new Set<string>();
+  availableMembers.segments.forEach(({ members }) => {
+    members.forEach(({ name }) => segments.add(name));
+  });
+
   const [references, setReferences] = useState<PreAggregationReferences>(
-    getPreAggregationReferences(transformedQuery)
+    getPreAggregationReferences(transformedQuery, segments)
   );
 
   const selectedKeys = useMemo(() => {
     const keys: string[] = [];
 
-    ['measures', 'dimensions', 'timeDimensions'].map((memberKey) => {
-      if (memberKey === 'timeDimensions') {
-        const { dimension } = references[memberKey]?.[0] || {};
+    ['measures', 'dimensions', 'timeDimensions', 'segments'].map(
+      (memberKey) => {
+        if (memberKey === 'timeDimensions') {
+          const { dimension } = references[memberKey]?.[0] || {};
 
-        if (dimension) {
-          keys.push(dimension);
+          if (dimension) {
+            keys.push(dimension);
+          }
+        } else {
+          references[memberKey]?.map((key) => keys.push(key));
         }
-      } else {
-        references[memberKey]?.map((key) => keys.push(key));
       }
-    });
+    );
 
     return keys;
   }, [references]);
 
   useDeepEffect(() => {
     let mutext = canUseMutex.current;
-    const { measures, dimensions, timeDimensions } = references;
+    const { measures, segments, dimensions, timeDimensions } = references;
 
     async function load() {
       const { json } = await request(
@@ -118,7 +140,7 @@ export function RollupDesigner({
             transformedQuery,
             references: {
               measures,
-              dimensions,
+              dimensions: dimensions.concat(segments),
               timeDimensions,
             },
           },
@@ -149,39 +171,110 @@ export function RollupDesigner({
       ...availableMembers.measures,
       ...availableMembers.dimensions,
       ...availableMembers.timeDimensions,
+      ...availableMembers.segments,
     ])
   );
 
   async function handleAddToSchemaClick() {
-    setSaving(true);
+    const definition = {
+      preAggregationName: preAggName,
+      cubeName,
+      code: getPreAggregationDefinitionFromReferences(
+        references,
+        preAggName,
+        settings
+      ).value,
+    };
 
-    const response = await request(
-      '/playground/schema/pre-aggregation',
-      'POST',
-      {
-        body: {
-          preAggregationName: preAggName,
-          cubeName,
-          code: getPreAggregationDefinitionFromReferences(
-            references,
-            preAggName
-          ).value,
-        },
-      }
-    );
-
-    setSaving(false);
-
-    if (response.ok) {
+    function showSuccessMessage() {
       notification.success({
-        message: `Pre-aggregation has been added to the ${cubeName} cube`,
-      });
-    } else {
-      const { error } = response.json;
-      notification.error({
-        message: error,
+        message: `Rollup has been added to the ${cubeName} cube`,
       });
     }
+
+    setSaving(true);
+
+    if (!isCloud) {
+      const response = await request(
+        '/playground/schema/pre-aggregation',
+        'POST',
+        {
+          body: definition,
+        }
+      );
+
+      if (response.ok) {
+        showSuccessMessage();
+      } else {
+        const { error } = response.json;
+        notification.error({
+          message: error,
+        });
+      }
+    } else {
+      if (cloud.addPreAggregationToSchema == null) {
+        throw new Error('cloud.addPreAggregationToSchema is not defined');
+      }
+
+      const { error } = await cloud.addPreAggregationToSchema(definition);
+      if (!error) {
+        showSuccessMessage();
+      } else {
+        notification.error({
+          message: error,
+        });
+      }
+    }
+
+    setSaving(false);
+  }
+
+  function handleSettingsChange(values) {
+    const nextSettings: RollupSettings = {};
+
+    if (values['refreshKey.option'] === 'every') {
+      nextSettings.refreshKey = {
+        every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
+      };
+    } else if (
+      values['refreshKey.option'] === 'sql' &&
+      values['refreshKey.sql']
+    ) {
+      nextSettings.refreshKey = {
+        sql: `\`${values['refreshKey.sql']}\``,
+      };
+    }
+
+    if (values.partitionGranularity) {
+      nextSettings.partitionGranularity = `\`${values.partitionGranularity}\``;
+
+      if (values['updateWindow.value']) {
+        const value = [
+          values['updateWindow.value'],
+          values['updateWindow.granularity'],
+        ].join(' ');
+
+        nextSettings.refreshKey = {
+          ...nextSettings.refreshKey,
+          updateWindow: `\`${value}\``,
+        };
+      }
+
+      nextSettings.refreshKey = {
+        ...nextSettings.refreshKey,
+        incremental: values['incrementalRefresh'],
+      };
+    }
+
+    if (Array.isArray(values.indexes) && values.indexes.length > 0) {
+      nextSettings.indexes = {
+        indexName: {
+          columns: values.indexes,
+        },
+      };
+    }
+
+    setSettings(nextSettings);
   }
 
   function handleMemberToggle(memberType) {
@@ -191,185 +284,194 @@ export function RollupDesigner({
   }
 
   function rollupBody() {
-    if (isRollupCodeVisible) {
-      if (!canBeRolledUp) {
-        return (
-          <Paragraph>
-            <Link
-              href="https://cube.dev/docs/pre-aggregations#rollup-rollup-selection-rules"
-              target="_blank"
-            >
-              Current query cannot be rolled up due to it is not additive
-            </Link>
-            . Please consider removing not additive measures like
-            `countDistinct` or `avg`. You can also try to use{' '}
-            <Link
-              href="https://cube.dev/docs/pre-aggregations#original-sql"
-              target="_blank"
-            >
-              originalSql
-            </Link>{' '}
-            pre-aggregation instead.
-          </Paragraph>
-        );
-      }
-
+    if (!canBeRolledUp) {
       return (
-        <div>
-          <Paragraph>
-            Add the following pre-aggregation to the <b>{cubeName}</b> cube.
-          </Paragraph>
-
-          <CodeSnippet
-            style={{ marginBottom: 16 }}
-            code={
-              getPreAggregationDefinitionFromReferences(references, preAggName)
-                .code
-            }
-          />
-
-          <Flex justifyContent="flex-end" gap={2}>
-            <Button onClick={toggleRollupCode}>Back to editing</Button>
-
-            {!isCloud ? (
-              <Button
-                type="primary"
-                loading={saving}
-                onClick={handleAddToSchemaClick}
-              >
-                Add to the Data Schema
-              </Button>
-            ) : null}
-          </Flex>
-        </div>
+        <Paragraph>
+          <Link
+            href="https://cube.dev/docs/caching/rollups/getting-started#ensuring-rollups-are-targeted-by-queries"
+            target="_blank"
+          >
+            Current query cannot be rolled up due to it is not additive
+          </Link>
+          . Please consider removing not additive measures like `countDistinct`
+          or `avg`. You can also try to use{' '}
+          <Link
+            href="https://cube.dev/docs/rollups#parameters-type-originalsql"
+            target="_blank"
+          >
+            originalSql
+          </Link>{' '}
+          rollup instead.
+        </Paragraph>
       );
     }
 
-    return null;
+    return (
+      <div style={{ minWidth: 200 }}>
+        <CodeSnippet
+          style={{ marginBottom: 16 }}
+          code={
+            getPreAggregationDefinitionFromReferences(
+              references,
+              preAggName,
+              settings
+            ).code
+          }
+          copyMessage="Rollup definition is copied"
+        />
+
+        <Button
+          type="primary"
+          loading={saving}
+          style={{ width: '100%' }}
+          onClick={handleAddToSchemaClick}
+        >
+          Add to the Data Schema
+        </Button>
+      </div>
+    );
   }
 
   return (
-    <Flex justifyContent="space-between" gap={2}>
-      {!isRollupCodeVisible ? (
-        <div>
-          <Cubes
-            selectedKeys={selectedKeys}
-            membersByCube={getMembersByCube(availableMembers)}
-            onSelect={(memberType, key) => {
-              handleMemberToggle(memberType)(key);
-            }}
-          />
-        </div>
-      ) : null}
-
-      <MainWrapper>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          {!isRollupCodeVisible && (
-            <Flex justifyContent="flex-end">
-              <Button type="primary" onClick={toggleRollupCode}>
-                Preview rollup definition
-              </Button>
-            </Flex>
-          )}
-
-          <Flex direction="column" gap={2}>
-            {isRollupCodeVisible ? (
-              <Input
-                value={preAggName}
-                onChange={(event) => setPreAggName(event.target.value)}
+    <Flex justifyContent="space-between" gap={4}>
+      <Box grow={1}>
+        <Tabs onChange={setActiveTab}>
+          <TabPane tab="Members" key="members">
+            <Flex gap={2}>
+              <Cubes
+                selectedKeys={selectedKeys}
+                membersByCube={getMembersByCube(availableMembers)}
+                onSelect={(memberType, key) => {
+                  handleMemberToggle(memberType)(key);
+                }}
               />
-            ) : null}
 
-            <Box>{rollupBody()}</Box>
-          </Flex>
+              <Box style={{ width: '100%' }}>
+                {references.measures?.length ? (
+                  <>
+                    <Members
+                      title="Measures"
+                      members={references.measures.map(
+                        (name) => indexedMembers[name]
+                      )}
+                      onRemove={handleMemberToggle('measures')}
+                    />
 
-          {!isRollupCodeVisible ? (
-            <Tabs>
-              <TabPane tab="Members" key="members">
-                {!isRollupCodeVisible ? (
-                  <div>
-                    {references.measures?.length ? (
-                      <>
-                        <Members
-                          title="Measures"
-                          members={references.measures.map(
-                            (name) => indexedMembers[name]
-                          )}
-                          onRemove={handleMemberToggle('measures')}
-                        />
-
-                        <Divider />
-                      </>
-                    ) : null}
-
-                    {references.dimensions?.length ? (
-                      <>
-                        <Members
-                          title="Dimensions"
-                          members={references.dimensions.map(
-                            (name) => indexedMembers[name]
-                          )}
-                          onRemove={handleMemberToggle('dimensions')}
-                        />
-
-                        <Divider />
-                      </>
-                    ) : null}
-
-                    {references.timeDimensions.length ? (
-                      <TimeDimension
-                        member={
-                          indexedMembers[references.timeDimensions[0].dimension]
-                        }
-                        granularity={references.timeDimensions[0].granularity}
-                        onGranularityChange={(granularity) => {
-                          setReferences({
-                            ...references,
-                            timeDimensions: [
-                              {
-                                ...(references.timeDimensions[0] || {}),
-                                ...(granularity ? { granularity } : null),
-                              } as TimeDimensionBase,
-                            ],
-                          });
-                        }}
-                        onRemove={handleMemberToggle('timeDimensions')}
-                      />
-                    ) : null}
-                  </div>
+                    <Divider />
+                  </>
                 ) : null}
-              </TabPane>
 
-              {/*<TabPane tab="Settings" key="settings">*/}
-              {/*  settings*/}
-              {/*</TabPane>*/}
+                {references.dimensions?.length ? (
+                  <>
+                    <Members
+                      title="Dimensions"
+                      members={references.dimensions.map(
+                        (name) => indexedMembers[name]
+                      )}
+                      onRemove={handleMemberToggle('dimensions')}
+                    />
 
-              {/*<TabPane tab="Queries" key="queries">*/}
-              {/*  queries*/}
-              {/*</TabPane>*/}
-            </Tabs>
-          ) : null}
-        </Space>
-      </MainWrapper>
+                    <Divider />
+                  </>
+                ) : null}
 
-      <RightSidePanel>
-        <Flex direction="column" gap={2}>
-          {canBeRolledUp &&
-            (matching ? (
-              <Alert message="This pre-aggregation will match and accelerate this query:" />
-            ) : (
-              <Alert
-                type="warning"
-                message="This pre-aggregation will not match this query:"
-              />
-            ))}
+                {references.segments.length ? (
+                  <>
+                    <Members
+                      title="Segments"
+                      members={references.segments.map(
+                        (name) => indexedMembers[name]
+                      )}
+                      onRemove={handleMemberToggle('segments')}
+                    />
 
-          <CodeSnippet
-            style={{ marginBottom: 16 }}
-            code={JSON.stringify(matchedQuery, null, 2)}
-          />
+                    <Divider />
+                  </>
+                ) : null}
+
+                {references.timeDimensions.length ? (
+                  <TimeDimension
+                    member={
+                      indexedMembers[references.timeDimensions[0].dimension]
+                    }
+                    granularity={references.timeDimensions[0].granularity}
+                    onGranularityChange={(granularity) => {
+                      setReferences({
+                        ...references,
+                        timeDimensions: [
+                          {
+                            ...(references.timeDimensions[0] || {}),
+                            ...(granularity ? { granularity } : null),
+                          } as TimeDimensionBase,
+                        ],
+                      });
+                    }}
+                    onRemove={handleMemberToggle('timeDimensions')}
+                  />
+                ) : null}
+              </Box>
+            </Flex>
+          </TabPane>
+
+          <TabPane tab="Settings" key="settings">
+            <Settings
+              hasTimeDimension={references.timeDimensions.length > 0}
+              members={references.measures
+                .concat(references.dimensions)
+                .concat(references.timeDimensions.map((td) => td.dimension))}
+              onChange={handleSettingsChange}
+            />
+          </TabPane>
+        </Tabs>
+      </Box>
+
+      <Layout>
+        <Flex direction="column" justifyContent="flex-start" gap={2}>
+          <Box>
+            <Paragraph strong>Rollup Definition</Paragraph>
+
+            <Paragraph>
+              Add the following pre-aggregation to the <b>{cubeName}</b> cube.
+            </Paragraph>
+
+            <Input
+              value={preAggName}
+              onChange={(event) => setPreAggName(event.target.value)}
+            />
+          </Box>
+
+          <Box>{rollupBody()}</Box>
         </Flex>
-      </RightSidePanel>
+
+        {activeTab === 'members' ? (
+          <Flex direction="column" justifyContent="flex-start" gap={2}>
+            <Box>
+              <Paragraph strong>Query Compatibility</Paragraph>
+
+              {canBeRolledUp && matching ? (
+                <Alert message="This rollup will match the following query:" />
+              ) : (
+                <Alert
+                  type="warning"
+                  message={
+                    <Text>
+                      This rollup will <b>NOT</b> match the following query:
+                    </Text>
+                  }
+                />
+              )}
+            </Box>
+
+            <Box>
+              <CodeSnippet
+                style={{ minWidth: 200 }}
+                code={JSON.stringify(matchedQuery, null, 2)}
+                copyMessage="Query is copied"
+              />
+            </Box>
+          </Flex>
+        ) : null}
+      </Layout>
     </Flex>
   );
 }
