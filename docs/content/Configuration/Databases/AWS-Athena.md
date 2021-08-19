@@ -22,16 +22,18 @@ CUBEJS_AWS_KEY=AKIA************
 CUBEJS_AWS_SECRET=****************************************
 CUBEJS_AWS_REGION=us-east-1
 CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
+CUBEJS_AWS_ATHENA_WORKGROUP=primary
 ```
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                       | Possible Values                        | Required |
-| ------------------------------- | ----------------------------------------------------------------- | -------------------------------------- | :------: |
-| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections             | A valid AWS Access Key ID              |    ✅    |
-| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections         | A valid AWS Secret Access Key          |    ✅    |
-| `CUBEJS_AWS_REGION`             | The AWS region of the Cube.js deployment                          | [A valid AWS region][aws-docs-regions] |    ✅    |
-| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment | A valid S3 path                        |    ❌    |
+| Environment Variable            | Description                                                       | Possible Values                                  | Required |
+| ------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------ | :------: |
+| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections             | A valid AWS Access Key ID                        |    ✅    |
+| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections         | A valid AWS Secret Access Key                    |    ✅    |
+| `CUBEJS_AWS_REGION`             | The AWS region of the Cube.js deployment                          | [A valid AWS region][aws-docs-regions]           |    ✅    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment | A valid S3 path                                  |    ❌    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started     | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
 
 ## SSL
 
@@ -39,6 +41,7 @@ Cube.js does not require any additional configuration to enable SSL as AWS
 Athena connections are made over HTTPS.
 
 [aws-athena]: https://aws.amazon.com/athena
+[aws-athena-workgroup]: https://docs.aws.amazon.com/athena/latest/ug/workgroups-benefits.html
 [aws-s3]: https://aws.amazon.com/s3/
 [aws-docs-athena-access]:
   https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html
