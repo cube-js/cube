@@ -5,7 +5,7 @@ use ipc_channel::ipc::{IpcOneShotServer, IpcSender};
 use mysql_common::serde::de::DeserializeOwned;
 use mysql_common::serde::Serialize;
 
-use crate::sys::process::die_with_parent;
+use crate::sys::process::{avoid_child_zombies, die_with_parent};
 use crate::CubeError;
 use std::any::type_name;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -64,6 +64,8 @@ pub fn register_handler<Args: Serialize + DeserializeOwned + 'static>(f: fn(Args
 }
 
 pub fn init() {
+    avoid_child_zombies();
+
     let handler_name = match std::env::var(HANDLER_ENV) {
         Ok(h) => h,
         Err(_) => return, // we're the main process.
