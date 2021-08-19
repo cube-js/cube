@@ -10,5 +10,6 @@
       "Users.firstName",
       "Users.lastName",
       "Users.createdAt"
-    ]
+    ],
+    "limit": 5
   }

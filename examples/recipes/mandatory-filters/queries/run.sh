@@ -5,7 +5,8 @@ port=4000
 loadUrl=cubejs-api/v1/load
 readyzUrl=readyz
 
-query=$(cat query/queries/query.json)
+usersQuery=$(cat query/queries/users.json)
+ordersQuery=$(cat query/queries/orders.json)
 
 # Wait for the Cube API to become ready
 until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
@@ -13,11 +14,11 @@ until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
 done
 
 # Send the query
-curl "$host":"$port"/"$loadUrl" -G -s --data-urlencode "query=${query}" -o managerResponse.json
-curl "$host":"$port"/"$loadUrl" -G -s --data-urlencode "query=${query}" -o operatorResponse.json
+curl "$host":"$port"/"$loadUrl" -G -s --data-urlencode "query=${usersQuery}" -o usersResponse.json
+curl "$host":"$port"/"$loadUrl" -G -s --data-urlencode "query=${ordersQuery}" -o ordersResponse.json
 
-echo "Manager's data:"
-jq ".data" managerResponse.json
+echo "Users created after 30 Dec 2019:"
+jq ".data" usersResponse.json
 
-echo "Operator's data:"
-jq ".data" operatorResponse.json
+echo "Orders created after 30 Dec 2019:"
+jq ".data" ordersResponse.json
