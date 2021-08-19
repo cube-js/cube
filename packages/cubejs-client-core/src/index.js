@@ -194,7 +194,7 @@ class CubejsApi {
       return;
     }
     
-    if (typeof this.apiToken === 'function' && !this.updateAuthorizationPromise) {
+    if (typeof this.apiToken === 'function') {
       this.updateAuthorizationPromise = new Promise(async (resolve, reject) => {
         try {
           const token = await this.apiToken();
