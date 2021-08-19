@@ -117,7 +117,7 @@ Please note that it makes sense to make the `StatusSnapshots` cube
 the original `Statuses` cube in order to reuse the dimension definitions. We only need
 to add a new dimension that indicates the `date` of a snapshot. We're also referencing
 the definition of the `Statuses` cube with the
-[`sql()` function](https://cube.dev/docs/schema/reference/cube#parameters-sql).
+[`sql()` property](https://cube.dev/docs/schema/reference/cube#parameters-sql).
 
 ## Query
 
