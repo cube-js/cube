@@ -99,3 +99,8 @@ These recipes will show you the best practices of using Cube.js.
 ### Code reusability
 
 - [Schema Generation](/recipes/schema-generation)
+- [Polymorphic Cubes](/recipes/polymorphic-cubes)
+
+### Queries
+
+- [Enforcing Mandatory Filters in a Query](/recipes/enforcing-mandatory-filters)
