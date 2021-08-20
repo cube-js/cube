@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
+
+
+### Features
+
+* **@cubejs-client/playground:** support quarter granularity ([b93972a](https://github.com/cube-js/cube.js/commit/b93972a0f5b01140eed559036efec2feea6c2a73))
+
+
+
+
+
 ## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
 
 

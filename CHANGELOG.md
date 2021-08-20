@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** prevent redundant auth updates ([#3288](https://github.com/cube-js/cube.js/issues/3288)) ([5ebf211](https://github.com/cube-js/cube.js/commit/5ebf211fde56aeee1a59f0cabc9f7ae3f8e9ffaa))
+* **cubestore:** do not keep zombie child processes ([bfe3483](https://github.com/cube-js/cube.js/commit/bfe34839bcc1382b0a207995c06890adeedf38e7))
+
+
+### Features
+
+* **@cubejs-backend/dremio-driver:** support quarter granularity ([b193b04](https://github.com/cube-js/cube.js/commit/b193b048db4f104683ca5dc518b09647a8435a4e))
+* **@cubejs-backend/mysql-driver:** Support quarter granularity ([#3289](https://github.com/cube-js/cube.js/issues/3289)) ([6922e5d](https://github.com/cube-js/cube.js/commit/6922e5da50d2056c00a2ca248665e133a6de28be))
+* **@cubejs-client/playground:** support quarter granularity ([b93972a](https://github.com/cube-js/cube.js/commit/b93972a0f5b01140eed559036efec2feea6c2a73))
+* **athena-driver:** Allow to configure workGroup ([#3254](https://github.com/cube-js/cube.js/issues/3254)) ([a300038](https://github.com/cube-js/cube.js/commit/a300038921c8fb93f2d255b32afc5c7e8150cf65))
+
+
+
+
+
 ## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
+
+
+### Features
+
+* **athena-driver:** Allow to configure workGroup ([#3254](https://github.com/cube-js/cube.js/issues/3254)) ([a300038](https://github.com/cube-js/cube.js/commit/a300038921c8fb93f2d255b32afc5c7e8150cf65))
+
+
+
+
+
 ## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver
