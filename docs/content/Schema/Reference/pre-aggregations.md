@@ -360,7 +360,7 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `year`. This property is
+The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. This property is
 required when using [`timeDimension`][self-timedimension].
 
 ### segments
@@ -418,7 +418,7 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `year`. A
+The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 [`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
