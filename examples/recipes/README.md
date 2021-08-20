@@ -20,6 +20,7 @@ These recipes will show you the best practices of using Cube.js.
 
 ### Data schema
 
+- [Calculating Average and Percentiles](https://cube.dev/docs/recipes/percentiles)
 - [Dynamically Union Tables](https://cube.dev/docs/recipes/dynamically-union-tables)
 - [Data Blending](https://cube.dev/docs/recipes/data-blending)
 
