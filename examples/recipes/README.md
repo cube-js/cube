@@ -35,3 +35,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Extending Cubes](https://cube.dev/docs/recipes/extending-cubes)
 - [Schema Generation](https://cube.dev/docs/recipes/schema-generation)
 - [Polymorphic Cubes](https://cube.dev/docs/recipes/polymorphic-cubes)
+
+### Query acceleration
+
+- [Accelerating Non-Additive Measures](https://cube.dev/docs/recipes/non-additivity)
