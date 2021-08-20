@@ -18,7 +18,7 @@ we'll learn how to add mandatory filters to all queries.
 
 To enforce mandatory filters we'll use the
 [`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
-extension.
+parameter in the `cube.js` configuration file.
 
 To solve this, first we need to get all measures and
 dimensions from a query. Next, we add filters for the
