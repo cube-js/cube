@@ -64,14 +64,8 @@ We can see that statuses change occasionally. How do we count orders that remain
 in the `shipped` status at a particular date?
 
 First, we need to generate a range with all dates of interest, from the earliest to
-the latest. Generating a range would require using database-specific functions,
-such as `GENERATE_SERIES` in
-[Postgres](https://www.postgresql.org/docs/current/functions-srf.html) and
-`GENERATE_DATE_ARRAY` in
-[BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array).
-
-Second, we need to join the dates with the statuses and leave only the most recent
-statuses to date. 
+the latest. Second, we need to join the dates with the statuses and leave only the
+most recent statuses to date. 
 
 ```javascript
 cube(`StatusSnapshots`, {
