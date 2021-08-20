@@ -80,7 +80,7 @@ included.
 
 ## Result
 
-Using the measures defined above, we can explore the statistics about users' ages:
+Using the measures defined above, we can explore statistics about the age of our users.
 
 ```javascript
 [
