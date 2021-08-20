@@ -8,8 +8,8 @@ menuOrder: 2
 
 ## Use case
 
-We want to display a table of data with hundreds of rows. For the convenience of
-displaying, we will use a pagination. At the recipe below, we will get the
+We want to display a table of data with hundreds of rows.
+To make the table easier to digest and to improve the performance of the query, we'll use pagination. With the recipe below, we'll get the
 orders list sorted by the order number. Every page will have 5 orders.
 
 ## Query
@@ -17,7 +17,7 @@ orders list sorted by the order number. Every page will have 5 orders.
 To creating the pagination we can use the `limit` and `offset` query properties.
 First, we get the number of all orders that we have. Then we should set the
 `limit` and `offset` properties for the queries that will get the orders from
-Cube.js API.
+the Cube.js API.
 
 ```bash
 // Get count of the orders
@@ -39,7 +39,7 @@ curl cube:4000/cubejs-api/v1/load \
 
 ## Result
 
-We have received five orders per query and can use it as we want.
+We have received five orders per query and can use them as we want.
 
 ```javascript
 // Orders count:
