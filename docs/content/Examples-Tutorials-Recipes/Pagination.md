@@ -8,9 +8,38 @@ menuOrder: 2
 
 ## Use case
 
-We want to display a table of data with hundreds of rows.
-To make the table easier to digest and to improve the performance of the query, we'll use pagination. With the recipe below, we'll get the
-orders list sorted by the order number. Every page will have 5 orders.
+We want to display a table of data with hundreds of rows. To make the table
+easier to digest and to improve the performance of the query, we'll use
+pagination. With the recipe below, we'll get the orders list sorted by the order
+number. Every page will have 5 orders.
+
+## Data schema
+
+We have the following data schema.
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM public.orders`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    number: {
+      sql: `number`,
+      type: `number`,
+    },
+
+    createdAt: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
 
 ## Query
 
