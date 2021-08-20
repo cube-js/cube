@@ -3,18 +3,11 @@ cube(`Orders`, {
 
   measures: {
     count: {
-      type: `count`,
-      drillMembers: [id, createdAt]
+      type: `count`
     }
   },
   
   dimensions: {
-    id: {
-      sql: `id`,
-      type: `number`,
-      primaryKey: true
-    },
-    
     number: {
       sql: `number`,
       type: `number`

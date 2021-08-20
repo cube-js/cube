@@ -73,7 +73,7 @@ We have received five orders per query and can use them as we want.
 ];
 ```
 
-```json
+```javascript
 // The next five orders:
 
 [
