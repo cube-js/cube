@@ -22,7 +22,7 @@ the Cube.js API.
 ```bash
 // Get count of the orders
 curl cube:4000/cubejs-api/v1/load \
--G -s --data-urlencode "query={"measures": ["Orders.count"], "timeDimensions": [{"dimension": "Orders.createdAt"}]}"
+-G -s --data-urlencode "query={"measures": ["Orders.count"]}"
 ```
 
 ```bash
@@ -73,7 +73,7 @@ We have received five orders per query and can use them as we want.
 ];
 ```
 
-```javascript
+```json
 // The next five orders:
 
 [
