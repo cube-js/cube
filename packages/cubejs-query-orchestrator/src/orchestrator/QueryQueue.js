@@ -91,6 +91,10 @@ export class QueryQueue {
           queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
+          metadata: query.metadata,
+          partitionId: query.preAggregation?.tableName,
+          newVersionEntry: query.newVersionEntry,
+          forceBuild: query.forceBuild
         });
       }
 
@@ -214,7 +218,10 @@ export class QueryQueue {
         this.logger('Cancelling query manual', {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
-          requestId: query.requestId
+          requestId: query.requestId,
+          partitionId: query.preAggregation?.tableName,
+          metadata: query.metadata,
+          newVersionEntry: query.newVersionEntry,
         });
         await this.sendCancelMessageFn(query);
       }
@@ -240,7 +247,10 @@ export class QueryQueue {
           this.logger('Removing orphaned query', {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            partitionId: query.preAggregation?.tableName,
+            metadata: query.metadata,
+            newVersionEntry: query.newVersionEntry
           });
           await this.sendCancelMessageFn(query);
         }
@@ -399,7 +409,10 @@ export class QueryQueue {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
-          timeInQueue
+          timeInQueue,
+          metadata: retrieveResult[4]?.query?.metadata,
+          partitionId: retrieveResult[4]?.query?.preAggregation?.tableName,
+          newVersionEntry: retrieveResult[4]?.query?.newVersionEntry,
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
@@ -420,7 +433,10 @@ export class QueryQueue {
                       queryKey: query.queryKey,
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
-                      requestId: query.requestId
+                      requestId: query.requestId,
+                      partitionId: query.preAggregation?.tableName,
+                      metadata: query.metadata,
+                      newVersionEntry: query.newVersionEntry,
                     });
                   }
                   return null;
@@ -435,7 +451,10 @@ export class QueryQueue {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            timeInQueue
+            timeInQueue,
+            partitionId: query.preAggregation?.tableName,
+            metadata: query.metadata,
+            newVersionEntry: query.newVersionEntry,
           });
         } catch (e) {
           executionResult = {
@@ -449,6 +468,9 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             timeInQueue,
+            partitionId: query.preAggregation?.tableName,
+            metadata: query.metadata,
+            newVersionEntry: query.newVersionEntry,
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
@@ -458,7 +480,10 @@ export class QueryQueue {
                 processingId,
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
-                requestId: queryWithCancelHandle.requestId
+                requestId: queryWithCancelHandle.requestId,
+                partitionId: queryWithCancelHandle.preAggregation?.tableName,
+                metadata: queryWithCancelHandle.metadata,
+                newVersionEntry: queryWithCancelHandle.newVersionEntry,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
             }
@@ -473,7 +498,10 @@ export class QueryQueue {
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            partitionId: query.preAggregation?.tableName,
+            metadata: query.metadata,
+            newVersionEntry: query.newVersionEntry,
           });
         }
 
