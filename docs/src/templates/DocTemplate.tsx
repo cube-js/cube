@@ -65,6 +65,8 @@ class DocTemplate extends Component<Props, State> {
   componentWillMount() {
     const { markdownRemark = {} } = this.props.data;
     const { html, frontmatter } = markdownRemark;
+    console.log(this.props.data);
+    console.log('markdownRemark', markdownRemark);
     this.props.changePage({
       scope: frontmatter.scope,
       category: renameCategory(frontmatter.category),
@@ -269,6 +271,13 @@ export const pageQuery = graphql`
         scope
         category
         frameworkOfChoice
+      }
+      fields {
+        pageMenu {
+          id
+          depth
+          title
+        }
       }
     }
   }

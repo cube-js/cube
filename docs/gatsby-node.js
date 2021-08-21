@@ -6,25 +6,32 @@ exports.createPages = ({ actions, graphql }) => {
 
   const DocTemplate = path.resolve('src/templates/DocTemplate.tsx');
 
-  return graphql(`{
-    allMarkdownRemark(
-      limit: 1000
-    ) {
-      edges {
-        node {
-          html
-          fileAbsolutePath
-          frontmatter {
-            permalink
-            title
-            scope
-            category
-            menuOrder
+  return graphql(`
+    {
+      allMarkdownRemark(limit: 1000) {
+        edges {
+          node {
+            html
+            fileAbsolutePath
+            frontmatter {
+              permalink
+              title
+              scope
+              category
+              menuOrder
+            }
+            fields {
+              pageMenu {
+                id
+                depth
+                title
+              }
+            }
           }
         }
       }
     }
-  }`).then(result => {
+  `).then((result) => {
     if (result.errors) {
       return Promise.reject(result.errors);
     }
