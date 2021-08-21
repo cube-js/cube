@@ -32,6 +32,12 @@ const MyH3 = (props) => <h3 name={kebabCase(props.children)} {...props} />;
 
 const components = { GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
 
+const MDX = (props) => (
+  <MDXProvider components={components}>
+    <MDXRenderer>{props?.data?.mdx?.body}</MDXRenderer>
+  </MDXProvider>
+);
+
 const mdContentCallback = () => {
   const accordionTriggers = document.getElementsByClassName(
     'accordion-trigger'
@@ -77,7 +83,7 @@ class DocTemplate extends Component<Props, State> {
 
   componentWillMount() {
     const { mdx = {} } = this.props.data;
-    const { body, frontmatter } = mdx;
+    const { frontmatter } = mdx;
 
     this.props.changePage({
       scope: frontmatter.scope,
@@ -85,7 +91,7 @@ class DocTemplate extends Component<Props, State> {
       noscrollmenu: false,
     });
     this.createAnchors(
-      body,
+      <MDX {...this.props} />,
       frontmatter.title,
       getGithubUrl(this.props.pageContext.fileAbsolutePath)
     );
@@ -111,16 +117,11 @@ class DocTemplate extends Component<Props, State> {
     }, 100);
   };
 
-  createAnchors = (html: string, title: string, githubUrl: string) => {
-    if (!html) {
+  createAnchors = (element: any, title: string, githubUrl: string) => {
+    if (!element) {
       this.props.setScrollSectionsAndGithubUrl([], '');
       return;
     }
-    const element = (
-      <MDXProvider components={components}>
-        <MDXRenderer>{this?.props?.data?.mdx?.body}</MDXRenderer>
-      </MDXProvider>
-    );
     const stringElement = renderToString(element);
     // the code below transforms html from markdown to section-based html
     // for normal scrollspy
@@ -257,9 +258,7 @@ class DocTemplate extends Component<Props, State> {
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
             <h1 name="top">{frontmatter.title}</h1>
-            <MDXProvider components={components}>
-              <MDXRenderer>{this.props.data.mdx.body}</MDXRenderer>
-            </MDXProvider>
+            <MDX {...this.props} />
           </div>
         </div>
       </div>
