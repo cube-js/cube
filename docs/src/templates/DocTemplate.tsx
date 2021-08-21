@@ -1,23 +1,36 @@
 import React, { Component } from 'react';
+import { renderToString } from 'react-dom/server';
 import { graphql } from 'gatsby';
 import { MDXRenderer } from 'gatsby-plugin-mdx';
-import { MDXProvider } from '@mdx-js/react'
+import { MDXProvider } from '@mdx-js/react';
 import Helmet from 'react-helmet';
+import ReactHtmlParser from 'react-html-parser';
 import { scroller } from 'react-scroll';
+import { Icon } from 'antd';
+import cx from 'classnames';
+import kebabCase from 'lodash/kebabCase';
 import get from 'lodash/get';
+import last from 'lodash/last';
 import { renameCategory } from '../rename-category';
 
-import "gatsby-remark-mathjax-ssr/mathjax.css";
+import 'gatsby-remark-mathjax-ssr/mathjax.css';
+
+import ScrollLink, {
+  SCROLL_OFFSET,
+} from '../components/templates/ScrollSpyLink';
 
 import * as styles from '../../static/styles/index.module.scss';
-import { Page, SetScrollSectionsAndGithubUrlFunction } from '../types';
+import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
 
 // define components to using in MDX
-import GitHubCodeBlock from "../components/GitHubCodeBlock"
-import CubeQueryResultSet from "../components/CubeQueryResultSet"
-import GitHubFolderLink from "../components/GitHubFolderLink"
+import GitHubCodeBlock from '../components/GitHubCodeBlock';
+import CubeQueryResultSet from '../components/CubeQueryResultSet';
+import GitHubFolderLink from '../components/GitHubFolderLink';
 
-const components = { GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink }
+const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
+const MyH3 = (props) => <h3 name={kebabCase(props.children)} {...props} />;
+
+const components = { GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
 
 const mdContentCallback = () => {
   const accordionTriggers = document.getElementsByClassName(
@@ -64,13 +77,18 @@ class DocTemplate extends Component<Props, State> {
 
   componentWillMount() {
     const { mdx = {} } = this.props.data;
-    const { frontmatter } = mdx;
+    const { body, frontmatter } = mdx;
 
     this.props.changePage({
       scope: frontmatter.scope,
       category: renameCategory(frontmatter.category),
       noscrollmenu: false,
     });
+    this.createAnchors(
+      body,
+      frontmatter.title,
+      getGithubUrl(this.props.pageContext.fileAbsolutePath)
+    );
   }
 
   componentDidMount() {
@@ -93,36 +111,152 @@ class DocTemplate extends Component<Props, State> {
     }, 100);
   };
 
-  // setNamesToHeaders() {
-  //   // hack to work side navigation
-  //   const h1 = document.body.getElementsByTagName('h1');
-  //   const h2 = document.body.getElementsByTagName('h2');
-  //   const h3 = document.body.getElementsByTagName('h3');
-  //   const headers = [h2, h3];
+  createAnchors = (html: string, title: string, githubUrl: string) => {
+    if (!html) {
+      this.props.setScrollSectionsAndGithubUrl([], '');
+      return;
+    }
+    const element = (
+      <MDXProvider components={components}>
+        <MDXRenderer>{this?.props?.data?.mdx?.body}</MDXRenderer>
+      </MDXProvider>
+    );
+    const stringElement = renderToString(element);
+    // the code below transforms html from markdown to section-based html
+    // for normal scrollspy
+    const rawNodes = ReactHtmlParser(stringElement);
+    const sectionTags: Section[] = [
+      {
+        id: 'top',
+        type: 'h1',
+        className: styles.topSection,
+        nodes: [
+          React.createElement(
+            'h1',
+            { key: 'top', className: styles.topHeader },
+            title
+          ),
+        ],
+        title,
+      },
+    ];
 
-  //   console.log(document.body);
+    let currentParentID: string;
+    let currentID = 'top';
 
-  //   h1?.[0]?.setAttribute('name', 'top');
+    rawNodes.forEach((item) => {
+      let linkedHTag;
 
-  //   headers.forEach((tag, index) => {
-  //     tag.forEach(header => {
-  //       console.log(header, index);
-  //       header.setAttribute('name', kebabCase(header.innerHTML));
-  //     })
-  //   })
-  // }
+      // This skips over any inline-comments in the Markdown source, such as
+      // `<!-- prettier-ignore-start -->`
+      if (!item) {
+        return;
+      }
+
+      if (
+        item.type === 'p' &&
+        item.props.children.length === 1 &&
+        item.props.children[0].type === 'a'
+      ) {
+        item = (
+          <div
+            id={`${item.key}:block-link`}
+            key={`${item.key}:block-link`}
+            className="block-link"
+          >
+            {item.props.children[0]}
+          </div>
+        );
+      }
+
+      if (item.type === 'table') {
+        item = React.createElement('div', {
+          id: `${item.key}:wrapper`,
+          key: `${item.key}:wrapper`,
+          className: 'table-wrapper',
+          children: [
+            item,
+            React.createElement('div', {
+              id: `${item.key}:padding`,
+              key: `${item.key}:padding`,
+            }),
+          ],
+        });
+      }
+
+      if (item.type === 'h2' || item.type === 'h3') {
+        let className = '';
+        const prevSection = last(sectionTags) as Section;
+
+        const isPreviousSectionClearable =
+          (prevSection.type === 'h1' || prevSection.type === 'h2') &&
+          ((prevSection.type === 'h1' && prevSection.nodes.length > 2) ||
+            prevSection.nodes.length === 1);
+
+        className = cx(className, {
+          [styles.postClearSection]: isPreviousSectionClearable,
+        });
+
+        // anchors like 'h2-h3'
+        if (item.type === 'h2') {
+          prevSection.className = cx(prevSection.className, {
+            [styles.lastSection]: true,
+            [styles.clearSection]: isPreviousSectionClearable,
+          });
+
+          currentID = kebabCase(item.props.children[0]);
+          currentParentID = currentID;
+        } else if (!!currentParentID) {
+          currentID = kebabCase(item.props.children[0]);
+        } else {
+          currentID = kebabCase(item.props.children[0]);
+        }
+
+        sectionTags.push({
+          id: currentID,
+          type: item.type,
+          nodes: [],
+          title: item.props.children[0],
+          className,
+        });
+
+        linkedHTag = React.cloneElement(
+          item,
+          { className: styles.hTag },
+          React.createElement(
+            ScrollLink,
+            { to: currentID },
+            React.createElement(Icon, {
+              type: 'link',
+              className: styles.hTagIcon,
+            }),
+            item.props.children[0]
+          )
+        );
+      }
+
+      last(sectionTags)?.nodes?.push(linkedHTag || item);
+    });
+
+    const sections = sectionTags.map((item) => ({
+      id: item.id,
+      title: item.title,
+      type: item.type,
+    }));
+
+    this.props.setScrollSectionsAndGithubUrl(sections, githubUrl);
+  };
 
   render() {
     const { mdx = {} } = this.props.data;
     const { frontmatter } = mdx;
-
 
     return (
       <div>
         <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
-            <h1>{frontmatter.title}</h1>
+            <h1 name="top">{frontmatter.title}</h1>
             <MDXProvider components={components}>
               <MDXRenderer>{this.props.data.mdx.body}</MDXRenderer>
             </MDXProvider>
