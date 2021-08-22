@@ -97,7 +97,7 @@ drawbacks:
 
 - This type is approximate, so the measures might yield slightly different results compared to their `countDistinct` counterparts. Please comsult with your database's
 documentation to learn more.
-- The support for `countDistinctApprox` is dependent on the database. Currently, Cube supports it for BigQuery, Athena, and Snowflake.
+- The `countDistinctApprox` is not supported on all databases. Currently, Cube supports it for Athena, BigQuery, and Snowflake.
 
 For example, the `distinctAges` measure can be rewritten as follows:
 
