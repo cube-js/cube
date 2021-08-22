@@ -16,7 +16,7 @@ the real world: for example, 2.5 is the average value for both `(1, 2, 3, 4)` an
 `(0, 0, 0, 10)`.
 
 So, it's usually better to use [percentiles](https://en.wikipedia.org/wiki/Percentile).
-Parameterized by a fractional number `n = 0..1`, the n-th percentile equals to a value
+Parameterized by a fractional number `n = 0..1`, where the n-th percentile is equal to a value
 that exceeds a specified ratio of values in the distribution.
 The [median](https://en.wikipedia.org/wiki/Median) is a special case: it's defined as
 the 50th percentile (`n = 0.5`), and it can be casually thought of as "the middle"
