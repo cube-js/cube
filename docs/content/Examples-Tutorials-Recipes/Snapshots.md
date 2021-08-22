@@ -10,7 +10,7 @@ menuOrder: 3
 
 For a dataset that contains a sequence of changes to a property over time,
 we want to be able to get the most recent state of said property at any given date.
-In the recipe below we'll learn, for a cube with `Product Id`, `Status`, and
+In this recipe, we'll learn how to calculate snapshots of statuses at any given date
 `Changed At` dimensions, how to calculate the snapshots of statuses at any given date.
 
 <!-- prettier-ignore-start -->
