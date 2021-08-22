@@ -43,7 +43,7 @@ the count of unique age values (`distinctAges`), the average age (`avgAge`), and
     },
 ```
 
-All of these measures are non-additive. Practically speaking, it means that the following pre-aggregation would accelerate only a query that fully matches its
+All of these measures are non-additive. Practically speaking, it means that the following pre-aggregation would only accelerate a query that fully matches its
 definition:
 
 ```javascript
