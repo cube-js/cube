@@ -86,7 +86,7 @@ Meanwhile, this query won't match the same pre-aggregation because it contains n
 }
 ```
 
-Let's explore possible workarounds.
+Let's explore some possible workarounds.
 
 ### Replacing with approximate additive measures
 
