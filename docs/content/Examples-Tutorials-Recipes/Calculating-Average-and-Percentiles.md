@@ -11,7 +11,7 @@ menuOrder: 1
 We want to understand the distribution of values for a certain numeric property
 within a dataset. We're used to average values and intuitively understand how to
 calculate them. However, we also know that average values can be misleading for
-[skewed](https://en.wikipedia.org/wiki/Skewness) distributions which are frequent in
+[skewed](https://en.wikipedia.org/wiki/Skewness) distributions which are common in
 the real world: for example, 2.5 is the average value for both `(1, 2, 3, 4)` and
 `(0, 0, 0, 10)`.
 
