@@ -64,6 +64,10 @@ spec:
             - name: remotedir
               mountPath: /cube/data
             {{- end }}
+      initContainers:
+        - name: init-router
+          image: busybox
+          command: ['sh', '-c', 'until nc -vz {{ printf "%s-router" (include "cubestore.fullname" .)}} {{ .Values.router.metaPort }}; do echo "Waiting for router"; sleep 2; done;']
       volumes:
       {{- if not .Values.workers.persistence.enabled }}
         - name: datadir
