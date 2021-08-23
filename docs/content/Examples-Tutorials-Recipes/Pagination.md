@@ -43,27 +43,27 @@ cube(`Orders`, {
 
 ## Query
 
-To select orders that belong to a particular page, we can use the `limit` and `offset` query properties.
-First, we get the number of all orders that we have. Then we should set the
-`limit` and `offset` properties for the queries that will get the orders from
-the Cube API.
+To select orders that belong to a particular page, we can use the `limit` and
+`offset` query properties. First, we get the number of all orders that we have.
+Then we should set the `limit` and `offset` properties for the queries that will
+get the orders from the Cube API.
 
 ```bash
 // Get count of the orders
 curl cube:4000/cubejs-api/v1/load \
--G -s --data-urlencode "query={"measures": ["Orders.count"]}"
+"query={"measures": ["Orders.count"]}"
 ```
 
 ```bash
 // Get first five orders
 curl cube:4000/cubejs-api/v1/load \
--G -s --data-urlencode "query={"order": [["Orders.number", "asc"]], "dimensions": ["Orders.number"], "limit": 5}"
+"query={"order": [["Orders.number", "asc"]], "dimensions": ["Orders.number"], "limit": 5}"
 ```
 
 ```bash
 // Get next five orders
 curl cube:4000/cubejs-api/v1/load \
--G -s --data-urlencode "query={"order": [["Orders.number", "asc"]], "dimensions": ["Orders.number"], "limit": 5, "offset": 5}"
+"query={"order": [["Orders.number", "asc"]], "dimensions": ["Orders.number"], "limit": 5, "offset": 5}"
 ```
 
 ## Result
