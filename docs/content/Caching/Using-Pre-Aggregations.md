@@ -132,46 +132,6 @@ must be configured to keep the pre-aggregations up-to-date.
 | build is complete before returning results.
 <!-- prettier-ignore-end -->
 
-## Read Only Data Source
-
-In some cases, it may not be possible to stage pre-aggregation query results in
-materialized tables in the source database. For example, the database driver may
-not support it, or the source database may be read-only.
-
-To fallback to a strategy where the pre-aggregation query results are downloaded
-without first being materialized, set the `readOnly` property of
-[`driverFactory`][ref-config-driverfactory] in your configuration:
-
-```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
-module.exports = {
-  driverFactory: () =>
-    new PostgresDriver({
-      readOnly: true,
-    }),
-};
-```
-
-<!-- prettier-ignore-start -->
-[[warning |]]
-| Read only pre-aggregations are only suitable for small datasets
-| since they require loading all the data into Cube.js process memory. We **do not**
-| recommend using `readOnly` mode for production workloads.
-<!-- prettier-ignore-end -->
-
-By default, Cube.js uses temporary tables to extract data types from executed
-query while `readOnly` is `false`. If the driver is used in `readOnly` mode, it
-will use heuristics to extract data types from the database's response, but this
-strategy has certain limitations:
-
-- The aggregation results can be empty, and Cube.js will throw an exception
-  because it is impossible to detect types
-- Data types can be incorrectly inferred, in rare cases
-
-We highly recommend leaving `readOnly` unset or explicitly setting it to
-`false`.
-
 ## Partitioning
 
 [Partitioning][wiki-partitioning] is an extremely effective optimization for
