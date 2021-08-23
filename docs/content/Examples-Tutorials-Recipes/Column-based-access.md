@@ -14,8 +14,8 @@ products. A supplier can't see other supplier's products.
 
 ## Data schema
 
-To implement column-based access, we will use supplier's email from
-a [JSON Web Token](https://cube.dev/docs/security), and the
+To implement column-based access, we will use supplier's email from a
+[JSON Web Token](https://cube.dev/docs/security), and the
 [`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
 extension point to manage data access.
 
@@ -29,18 +29,19 @@ cube(`Products`, {
   joins: {
     Suppliers: {
       sql: `${Suppliers}.id = ${CUBE}.supplier_id`,
-      relationship: `hasOne`
-    }
+      relationship: `hasOne`,
+    },
   },
-  
+
   dimensions: {
     name: {
       sql: `name`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 ```
+
 ```javascript
 cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
@@ -48,25 +49,30 @@ cube(`Suppliers`, {
   dimensions: {
     email: {
       sql: `email`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 ```
 
 ## Configuration
 
-Let's add the supplier email filter if a query includes any dimension from the `Products` cube:
+Let's add the supplier email filter if a query includes any dimensions or
+measures from the `Products` cube:
 
 ```javascript
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
-    const queryDimensions = Array.from(
-      query.dimensions,
-      (element) => element.split('.')[0]
-    );
+    const cubeNames = [
+      ...Array.from(query.measures, (e) => e.split('.')[0]),
+      ...Array.from(query.dimensions, (e) => e.split('.')[0]),
+    ];
 
-    if (queryDimensions.includes('Products')) {
+    if (cubeNames.includes('Products')) {
+      if (!securityContext.email) {
+        throw new Error('No email found in Security Context!');
+      }
+
       query.filters.push({
         member: `Suppliers.email`,
         operator: 'equals',
@@ -88,14 +94,14 @@ different emails inside JWTs.
 // purus.accumsan@Proin.org
 curl cube:4000/cubejs-api/v1/load \
 -H "Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJwdXJ1cy5hY2N1bXNhbkBQcm9pbi5vcmcifQ.vA_pzTOBYS10D2mhno0COJux7hhchfNmx-eh52SwSko" \
--G -s --data-urlencode "query={"order": {"Suppliers.email": "asc"}, "dimensions": ["Products.name"]}"
+-G -s --data-urlencode "query={"measures": [],"order": {"Suppliers.email": "asc"}, "dimensions": ["Products.name"]}"
 ```
 
 ```bash
 // gravida.sit.amet@risus.net
 curl cube:4000/cubejs-api/v1/load \
 -H "Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJncmF2aWRhLnNpdC5hbWV0QHJpc3VzLm5ldCJ9.ZOkiky821CZwoNi3VTcTsiiULl5tBkjmgX-1uW0UEjA" \
--G -s --data-urlencode "query={"order": {"Suppliers.email": "asc"}, "dimensions": ["Products.name"]}"
+-G -s --data-urlencode "query={"measures": [], "order": {"Suppliers.email": "asc"}, "dimensions": ["Products.name"]}"
 ```
 
 ## Result

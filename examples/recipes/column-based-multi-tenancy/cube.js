@@ -1,8 +1,15 @@
 module.exports = {
     queryRewrite: (query, { securityContext }) => {
-        const queryDimensions = Array.from(query.dimensions, element => element.split('.')[0]);
+        const cubeNames = [
+            ...(Array.from(query.measures, (e) => e.split('.')[0])),
+            ...(Array.from(query.dimensions, (e) => e.split('.')[0])),
+        ];
 
-        if (queryDimensions.includes('Products')) {
+        if (cubeNames.includes('Products')) {
+            if (!securityContext.email) {
+                throw new Error('No email found in Security Context!')
+            }
+
             query.filters.push(
                 {
                     member: `Suppliers.email`,
