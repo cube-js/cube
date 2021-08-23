@@ -58,7 +58,7 @@ const AppLayout = ({ children }) => (
           <Menu.Item key="1">
             <a href="https://github.com/cube-js/cube.js">
               <Icon type="github" />
-              Github
+              GitHub
             </a>
           </Menu.Item>
           <Menu.Item key="2">
