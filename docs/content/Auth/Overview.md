@@ -8,7 +8,7 @@ menuOrder: 1
 <GitHubCodeBlock
   href="https://github.com/YakovlevCoded/test/blob/master/test.txt"
   titleSuffixCount={2}
-  part={null}
+  part={'value-test'}
   lang="js"
 />
 
