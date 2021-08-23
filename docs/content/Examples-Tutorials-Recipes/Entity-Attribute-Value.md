@@ -231,7 +231,7 @@ We can eliminate the list of statuses from the cube's code by loading this list 
 external source. Let's assume that we've created an API service that fetches statuses,
 obviously, by running a Cube query. Here's the code from the `fetch.js` file that defines
 the `fetchStatuses` function that would load the statuses from an API service. Let's keep
-this file outside the `schema` foilder:
+this file outside the `schema` folder:
 
 ```javascript
 const fetch = require('node-fetch');
