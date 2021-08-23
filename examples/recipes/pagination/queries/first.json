@@ -1,10 +1,7 @@
 {
-    "order": [
-        [
-            "Orders.number",
-            "asc"
-        ]
-    ],
+    "order": {
+        "Orders.number": "asc"
+    },
     "dimensions": [
         "Orders.number"
     ],

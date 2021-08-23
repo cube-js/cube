@@ -43,10 +43,10 @@ cube(`Orders`, {
 
 ## Query
 
-To creating the pagination we can use the `limit` and `offset` query properties.
+To select orders that belong to a particular page, we can use the `limit` and `offset` query properties.
 First, we get the number of all orders that we have. Then we should set the
 `limit` and `offset` properties for the queries that will get the orders from
-the Cube.js API.
+the Cube API.
 
 ```bash
 // Get count of the orders
