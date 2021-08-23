@@ -138,7 +138,7 @@ cube(`UsersStatuses_Joins`, {
 
 Querying the cube would yield data like this. As we can see, every user has attributes
 that show the earliest creation date for their orders in all three statuses. However,
-some attrbutes don't have values (meaning that a user doesn't have orders in this status). 
+some attributes don't have values (meaning that a user doesn't have orders in this status). 
 
 ```javascript
 [
