@@ -10,7 +10,7 @@ menuOrder: 1
 
 Let's imagine that on New Year's Eve, December 30th, 2019, we renamed our store,
 changed the design, and started selling completely different products. At the
-same time, we preserve the database from the previous store. Our goal is to only show
+same time, we decided to reuse the database for the new store. So, we'd like to only show
 orders and users created after December 30th, 2019. In the recipe below,
 we'll learn how to add mandatory filters to all queries.
 
