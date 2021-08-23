@@ -19,12 +19,10 @@ a [JSON Web Token](https://cube.dev/docs/security), and the
 [`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
 extension point to manage data access.
 
-We have `Products` and `Suppliers` tables with `hasOne` relationship from
+We have `Products` and `Suppliers` cubes with a `hasOne` relationship from
 products to suppliers:
 
 ```javascript
-// schema/Products.js
-
 cube(`Products`, {
   sql: `SELECT * FROM public.products`,
 
@@ -44,8 +42,6 @@ cube(`Products`, {
 });
 ```
 ```javascript
-// schema/Suppliers.js
-
 cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
 
@@ -86,7 +82,7 @@ module.exports = {
 ## Query
 
 To get the supplier's products, we will send two identical requests with
-different emails inside the JWT.
+different emails inside JWTs.
 
 ```bash
 // purus.accumsan@Proin.org
