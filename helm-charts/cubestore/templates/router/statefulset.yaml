@@ -18,7 +18,8 @@ spec:
     spec:
       containers:
         - name: cubestore
-          image: "cubejs/cubestore:v{{ .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.router.httpPort }}

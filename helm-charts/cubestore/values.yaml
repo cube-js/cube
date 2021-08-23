@@ -6,6 +6,22 @@ nameOverride: ""
 ##
 fullnameOverride: ""
 
+image:
+  ## Docker image repository
+  ##
+  repository: cubejs/cubestore
+
+  ## Docker image tag.
+  ## Defaults to Chart AppVersion
+  ##
+  tag:
+
+  ## Specify a imagePullPolicy
+  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  ##
+  pullPolicy: IfNotPresent
+
+
 global:
   ## The logging level for Cube Store.
   ##
