@@ -1,8 +1,8 @@
 ---
-title: Enforcing Mandatory Filters in a Query
+title: Enforcing Mandatory Filters
 permalink: /recipes/enforcing-mandatory-filters
 category: Examples & Tutorials
-subCategory: queries
+subCategory: Queries
 menuOrder: 1
 ---
 
@@ -52,7 +52,7 @@ curl cube:4000/cubejs-api/v1/load \
       "operator": "equals",
       "values": ["completed"]
     }
-  ], 
+  ],
   "limit": 5}"
 ```
 

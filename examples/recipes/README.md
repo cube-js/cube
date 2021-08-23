@@ -21,10 +21,10 @@ These recipes will show you the best practices of using Cube.js.
 ### Data schema
 
 - [Dynamically Union Tables](https://cube.dev/docs/recipes/dynamically-union-tables)
-- [Data Blending](https://cube.dev/docs/recipes/data-blending)
 
 ### Queries
 
+- [Enforcing Mandatory Filters](https://cube.dev/docs/recipes/enforcing-mandatory-filters)
 - [Pagination](https://cube.dev/docs/recipes/pagination)
 
 ### Code reusability
@@ -33,7 +33,3 @@ These recipes will show you the best practices of using Cube.js.
 - [Extending Cubes](https://cube.dev/docs/recipes/extending-cubes)
 - [Schema Generation](https://cube.dev/docs/recipes/schema-generation)
 - [Polymorphic Cubes](https://cube.dev/docs/recipes/polymorphic-cubes)
-
-### Queries
-
-- [Enforcing Mandatory Filters in a Query](https://cube.dev/docs/recipes/enforcing-mandatory-filters)
