@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-master" (include "cubejs.fullname" .) }}
+  labels:
+    {{- include "cubejs.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: master
+      {{- include "cubejs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: master
+        {{- include "cubejs.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: cube
+          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.port }}
+              protocol: TCP
+          env:
+            {{- include "cubejs.common-env" . | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /livez
+              port: http
+          {{- if .Values.master.resources }}
+          resources:
+            {{- toYaml .Values.master.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.schema.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.schema.volumeMounts | nindent 12 }}
+          {{- end }}
+      {{- if .Values.master.affinity }}
+      affinity:
+        {{- toYaml .Values.master.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.master.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.master.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      {{- if .Values.schema.volumes }}
+      volumes:
+        {{- toYaml .Values.schema.volumes | nindent 8 }}
+      {{- end }}

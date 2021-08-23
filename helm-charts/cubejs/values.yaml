@@ -1,0 +1,476 @@
+## Override the name
+##
+nameOverride: ""
+
+## Provide a name to substitute for the full names of resources
+##
+fullnameOverride: ""
+
+image:
+  ## Docker image repository
+  ##
+  repository: cubejs/cube
+
+  ## Docker image tag.
+  ##
+  tag:
+
+  ## Specify a imagePullPolicy
+  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  ##
+  pullPolicy: IfNotPresent
+
+global:
+  ## The port for a Cube.js deployment to listen to API connections on
+  ##
+  port: 4000
+
+  ## If true, enables development mode.
+  ##
+  devMode: false
+
+  ## If true, enables debug logging.
+  ##
+  debug: false
+
+  ## The logging level for Cube.js.
+  ##
+  logLevel: "warn"
+
+  ## If true, then send telemetry to CubeJS
+  ##
+  telemetry: false
+
+  ## An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups.
+  ## Defaults to cubejs
+  ##
+  app:
+
+  ## A comma-separated list of timezones to schedule refreshes for.
+  ##
+  scheduledRefreshTimezones:
+
+  ## If true, then use WebSocket for data fetching. Defaults to true
+  ##
+  webSockets:
+
+  ## The cache and queue driver to use for the Cube.js deployment. Defaults to redis
+  ##
+  cacheAndQueueDriver:
+
+schema:
+  ## The path where Cube.js loads schemas from. Defaults to schema
+  ##
+  path:
+
+  ## The schema volumes
+  ## Will be used to both master and workers
+  volumes: []
+  # - name: schema
+  #   configMap:
+  #     name: extra-conf
+
+  ## The volumeMounts of the Ingress controller pods.
+  ## Will be used to both master and workers
+  volumeMounts: []
+  # - name: schema
+  #   mountPath: /etc/nginx/conf.d/extra.conf
+  #   subPath: extra.conf
+
+redis:
+  ## The host URL for a Redis server
+  ##
+  url:
+
+  ## The password used to connect to the Redis server
+  ##
+  password:
+  # passwordFromSecret:
+  #   name:
+  #   key:
+
+  ## If true, then the connection to the Redis server is protected by TLS authentication. Defaults to false
+  ##
+  tls:
+
+  ## The minimum number of connections to keep active in the Redis connection pool for a single appId (tenant).
+  ## Must be lower than poolMax. Defaults to 2
+  ##
+  poolMin:
+
+  ## The maximum number of connections to keep active in the Redis connection pool for a single appId (tenant).
+  ## Must be higher than poolMin. Defaults to 1000
+  ##
+  poolMax:
+
+  ## Use ioredis instead of redis. Defaults to false
+  ##
+  useIoRedis:
+
+jwt:
+  ## A valid URL to a JSON Web Key Sets (JWKS)
+  ##
+  url:
+
+  ## The secret key used to sign and verify JWTs. Generated on project scaffold
+  ##
+  key:
+  # keyFromSecret:
+  #   name:
+  #   key:
+
+  ## An audience value which will be used to enforce the aud claim from inbound JWTs
+  ##
+  audience:
+
+  ## An issuer value which will be used to enforce the iss claim from inbound JWTs
+  ##
+  issuer:
+
+  ## A subject value which will be used to enforce the sub claim from inbound JWTs
+  ##
+  subject:
+
+  ## Any supported algorithm for decoding JWTs
+  ##
+  algs:
+
+  ## A namespace within the decoded JWT under which any custom claims can be found
+  ##
+  claimsNamespace:
+
+## Database configuration
+##
+database:
+  ## A database type supported by Cube.js
+  ##
+  type:
+
+  ## The URL for a database
+  ##
+  url:
+
+  ## The host URL for a database
+  ##
+  host:
+
+  ## The port for the database connection
+  ##
+  port:
+
+  ## The schema within the database to connect to
+  ##
+  schema:
+
+  ## The name of the database to connect to
+  ##
+  name:
+
+  ## The username used to connect to the database
+  ##
+  user:
+
+  ## The password used to connect to the database
+  ##
+  pass:
+
+  ## A domain name within the database to connect to
+  ##
+  domain:
+
+  ## The path to a Unix socket for a MySQL database
+  ##
+  socketPath:
+
+  ## The catalog within the database to connect to
+  ##
+  catalog:
+
+  ## The maximum number of connections to keep active in the database connection pool
+  ##
+  maxPool:
+
+  ssl:
+    ## If true, enables SSL encryption for database connections from Cube.js
+    ##
+    enabled: false
+
+    ## If true, verifies the CA chain with the system's built-in CA chain
+    ##
+    rejectUnAuthorized:
+    ## The contents of a CA bundle in PEM format, or a path to one.
+    ## For more information, check the options.ca property for TLS Secure Contexts in the Node.js documentation
+    ## https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+    ##
+    ca:
+
+    ## The contents of an SSL certificate in PEM format, or a path to one.
+    ## For more information, check the options.cert property for TLS Secure Contexts in the Node.js documentation
+    ## https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+    ##
+    cert:
+
+    ## The contents of a private key in PEM format, or a path to one.
+    ## For more information, check the options.key property for TLS Secure Contexts in the Node.js documentation
+    ## https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+    ##
+    key:
+
+    ## The ciphers used by the SSL certificate.
+    ## For more information, check the options.ciphers property for TLS Secure Contexts in the Node.js documentation
+    ## https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+    ##
+    ciphers:
+
+    ## The server name for the SNI TLS extension.
+    ## For more information, check the options.servername property for TLS Connections in the Node.js documentation
+    ## https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+    ##
+    serverName:
+
+    ## The passphrase used to encrypt the SSL private key.
+    ## For more information, check the options.passphrase property for TLS Secure Contexts in the Node.js documentation
+    ## https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+    ##
+    passPhrase:
+
+  aws:
+    ## The AWS Access Key ID to use for database connections
+    ##
+    key:
+    # keyFromSecret:
+    #   name:
+    #   key:
+
+    ## The AWS region of the Cube.js deployment
+    ##
+    region:
+
+    ## The S3 path to store query results made by the Cube.js deployment
+    ##
+    outputLocation:
+
+    ## The AWS Secret Access Key to use for database connections
+    ##
+    secret:
+    # secretFromSecret:
+    #   name:
+    #   key:
+
+    ## The name of the workgroup in which the query is being started
+    ##
+    athenaWorkgroup:
+
+  bigquery:
+    ## The Google BigQuery project ID to connect to
+    ##
+    projectId:
+
+    ## The Google BigQuery dataset location to connect to
+    ##
+    location:
+
+    ## A Base64 encoded JSON key file for connecting to Google BigQuery
+    ##
+    credentials:
+    # credentialsFromSecret:
+    #   name:
+    #   key:
+
+  hive:
+    ## The version of the CDH instance for Apache Hive
+    ##
+    cdhVersion:
+
+    ## The version of Thrift Server for Apache Hive
+    ##
+    thriftVersion:
+
+    ## The type of Apache Hive server
+    ##
+    type:
+
+    ## The version of Apache Hive
+    version:
+
+  jdbc:
+    ## The driver of jdbc connection
+    ##
+    driver:
+
+    ## The URL for a JDBC connection
+    url:
+
+  snowFlake:
+    ## The Snowflake account ID to use when connecting to the database
+    ##
+    account:
+
+    ## The Snowflake region to use when connecting to the database
+    ##
+    region:
+
+    ## The Snowflake role to use when connecting to the database
+    ##
+    role:
+
+    ## The Snowflake warehouse to use when connecting to the database
+    ##
+    warehouse:
+
+    ## If true, keep the Snowflake connection alive indefinitely
+    ##
+    clientSessionKeepAlive:
+
+    ## The type of authenticator to use with Snowflake.
+    ## Use SNOWFLAKE with username/password, or SNOWFLAKE_JWT with key pairs.
+    ## Defaults to SNOWFLAKE
+    ##
+    authenticator:
+
+    ## The path to the private RSA key folder
+    ##
+    privateKeyPath:
+
+    ## The password for the private RSA key. Only required for encrypted keys
+    ##
+    privateKeyPass:
+
+  databricks:
+    ## The URL for a JDBC connection
+    ##
+    url:
+
+## Export Bucket configuration
+##
+exportBucket:
+  ## The name of a bucket in cloud storage
+  ##
+  name:
+
+  ## The cloud provider where the bucket is hosted (gcs, s3)
+  ##
+  type:
+
+  ## A Base64 encoded JSON key file for connecting to Google Cloud
+  ##
+  gcsCredentials:
+  # gcsCredentialsFromSecret:
+  #   name:
+  #   key:
+
+## Cubestore configuration
+##
+cubestore:
+  ## The hostname of the Cube Store deployment
+  ##
+  host:
+
+  ## The port of the Cube Store deployment
+  ##
+  port:
+
+master:
+  ## Affinity for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+
+  ## topology spread constraint for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+  ##
+  topologySpreadConstraints: {}
+
+  ## Define resources requests and limits for single Pods.
+  ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
+  ##
+  resources: {}
+
+workers:
+  workersCount: 1
+
+  ## Affinity for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+
+  ## topology spread constraint for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+  ##
+  topologySpreadConstraints: {}
+
+  ## Define resources requests and limits for single Pods.
+  ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
+  ##
+  resources: {}
+
+service:
+  ## Master service type
+  ##
+  type: ClusterIP
+
+  ## Master service port
+  ##
+  port: 80
+
+  ## Node port for master
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+  ## NOTE: choose port between <30000-32767>
+  ##
+  nodePort:
+
+  ## Master service external traffic policy
+  ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+  ##
+  externalTrafficPolicy: Cluster
+
+  ## Master service Cluster IP
+  ##
+  clusterIP:
+
+  ## Master service Load Balancer IP
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+  ##
+  loadBalancerIP:
+
+  ## Master service Load Balancer sources
+  ## https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
+  ## e.g.
+  ## loadBalancerSourceRanges:
+  ##   - 10.10.10.0/24
+  ##
+  loadBalancerSourceRanges: []
+
+  ## Additional custom annotations for master service
+  ##
+  annotations: {}
+
+## Configure the ingress resource that allows you to access the
+## Cubejs installation. Set up the URL
+## ref: http://kubernetes.io/docs/user-guide/ingress/
+##
+ingress:
+  ## Set to true to enable ingress record generation
+  ##
+  enabled: false
+
+  ## When the ingress is enabled, a host pointing to this will be created
+  ##
+  hostname: cubejs.local
+
+  ## The Path to Cubejs. You may need to set this to '/*' in order to use this
+  ## with ALB ingress controllers.
+  ##
+  path: /
+
+  ## Ingress annotations done as key:value pairs
+  ## For a full list of possible ingress annotations, please see
+  ## ref: https://github.com/kubernetes/ingress-nginx/blob/master/docs/user-guide/nginx-configuration/annotations.md
+  ##
+  annotations: {}
+
+  ## Enable TLS configuration for the hostname defined at ingress.hostname parameter
+  ## TLS certificates will be retrieved from a TLS secret with name: {{- printf "%s-tls" .Values.ingress.hostname }}
+  ## You can use the ingress.secrets parameter to create this TLS secret or relay on cert-manager to create it
+  ##
+  tls: false
