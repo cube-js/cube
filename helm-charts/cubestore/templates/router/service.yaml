@@ -19,4 +19,3 @@ spec:
   selector:
     app.kubernetes.io/component: router
     {{- include "cubestore.selectorLabels" . | nindent 4 }}
-

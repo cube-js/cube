@@ -9,7 +9,6 @@ metadata:
 spec:
   type: ClusterIP
   clusterIP: None
-  publishNotReadyAddresses: true
   ports:
     - name: worker
       port: {{ .Values.workers.port }}
@@ -18,4 +17,3 @@ spec:
     app.kubernetes.io/component: workers
     {{- include "cubestore.selectorLabels" . | nindent 4 }}
 {{- end}}
-
