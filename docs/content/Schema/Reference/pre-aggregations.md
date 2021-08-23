@@ -360,8 +360,8 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `year`. This property is
-required when using [`timeDimension`][self-timedimension].
+The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. This
+property is required when using [`timeDimension`][self-timedimension].
 
 ### segments
 
@@ -418,7 +418,7 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `year`. A
+The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 [`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
@@ -450,8 +450,8 @@ cube(`Orders`, {
 ```
 
 In the above example, the refresh key SQL will be executed every 10 seconds, as
-[`every`][self-refreshkey-every] is not defined. If the results of the
-SQL refresh key differ from the last execution, then the pre-aggregation will be
+[`every`][self-refreshkey-every] is not defined. If the results of the SQL
+refresh key differ from the last execution, then the pre-aggregation will be
 refreshed.
 
 <h4 id="parameters-refresh-key-every">
