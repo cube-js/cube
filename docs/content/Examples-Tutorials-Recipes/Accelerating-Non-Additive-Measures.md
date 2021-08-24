@@ -77,7 +77,7 @@ So, this query will match the pre-aggregation above and, thus, will be accelerat
 }
 ```
 
-Meanwhile, this query won't match the same pre-aggregation because it contains non-addtive measures and omits the `gender` dimension. Thus, it won't be accelerated:
+Meanwhile, the query below won't match the same pre-aggregation because it contains non-additive measures and omits the `gender` dimension. It won't be accelerated:
 
 ```javascript
 {
