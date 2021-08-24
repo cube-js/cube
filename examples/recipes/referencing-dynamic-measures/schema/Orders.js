@@ -1,19 +1,25 @@
-const statuses = ['completed'];
+const statuses = ['processing', 'shipped', 'completed'];
 
 const createTotalByStatusMeasure = (status) => ({
+  [`Total_${status}_orders`]: {
     type: `count`,
+    title: `Total ${status} orders`,
     filters: [
       {
         sql: (CUBE) => `${CUBE}."status" = '${status}'`,
       },
     ],
+  },
 });
 
 const createPercentangeMeasure = (status) => ({
-  type: `number`,
-  format: `percent`,
-  title: `Percentage for ${status}`,
-  sql: (CUBE) => `${CUBE[`Total_${status}`]} / ${CUBE.totalOrders} * 100.0`,
+  [`Percentage_of_${status}`]: {
+    type: `number`,
+    format: `percent`,
+    title: `Percentage of ${status} orders`,
+    sql: (CUBE) =>
+      `${CUBE[`Total_${status}_orders`]}::decimal / ${CUBE.totalOrders}::decimal * 100.0`,
+  },
 });
 
 cube(`Orders`, {
@@ -22,14 +28,17 @@ cube(`Orders`, {
   measures: Object.assign(
     {
       totalOrders: {
-        type: `count`
+        type: `count`,
+        title: `Total orders`,
       },
     },
-    statuses
-      .map((status) => ({
-        [`Total_${status}`]: createTotalByStatusMeasure(status),
-        [`Percentage_for_${status}`]: createPercentangeMeasure(status),
-      }))
-      .reduce((status) => Object.assign(status))
+    statuses.reduce(
+      (all, status) => ({
+        ...all,
+        ...createTotalByStatusMeasure(status),
+        ...createPercentangeMeasure(status),
+      }),
+      {}
+    )
   ),
 });
