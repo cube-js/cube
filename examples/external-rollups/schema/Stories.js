@@ -36,15 +36,15 @@ export const yesNoCase = ({ sql }) => {
  }
 
 cube(`Stories`, {
-  sql: `select * from \`bigquery-public-data.hacker_news.stories\` WHERE time_ts IS NOT NULL`,
-
-  joins: {
-  },
+  sql: `
+    SELECT *
+    FROM \`bigquery-public-data.hacker_news.stories\`
+    WHERE time_ts IS NOT NULL
+  `,
 
   measures: {
     count: {
-      type: `count`,
-      drillMembers: [id, title, text, score]
+      type: `count`
     },
 
     authorsCount: {
@@ -54,7 +54,9 @@ cube(`Stories`, {
 
     showOrAskCount: {
       type: `count`,
-      filters: [{ sql: `${showOrAsk}` }]
+      filters: [
+        { sql: `${showOrAsk}` }
+      ]
     },
 
     deadCount: {
@@ -155,10 +157,8 @@ cube(`Stories`, {
 
     deleted: yesNoCase({ sql: `deleted` }),
     dead: yesNoCase({ sql: `dead` }),
-    scoreTier: tiers({field: `score`, tiers: [5, 10, 50, 100, 500]})
+    scoreTier: tiers({ field: `score`, tiers: [5, 10, 50, 100, 500] })
   },
-
- 
 
   segments: {
     showOrAsk: {
