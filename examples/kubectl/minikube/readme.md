@@ -1,6 +1,13 @@
 # Minikube Setup for K8s with `kubectl`
 
-A set of YAML files to configure Cube with K8s. It uses `apiVersion: v1`.
+A set of YAML files to configure Cube with K8s running in Minikube.
+
+Tested with:
+- `apiVersion: v1`.
+- `Kubernetes v1.21.2`
+- `kubectl v1.22.1`
+- `Docker 20.10.7`
+- `Minikube v1.22.0`
 
 Maintainers:
 
