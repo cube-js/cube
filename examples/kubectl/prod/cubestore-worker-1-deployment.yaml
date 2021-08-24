@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    service: cubestore-worker-1
+  name: cubestore-worker-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: cubestore-worker-1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        service: cubestore-worker-1
+    spec:
+      containers:
+        - env:
+            - name: CUBESTORE_META_ADDR
+              value: cubestore-router:9999
+            - name: CUBESTORE_REMOTE_DIR
+              value: /cube/data
+            - name: CUBESTORE_SERVER_NAME
+              value: cubestore-worker-1:10001
+            - name: CUBESTORE_WORKERS
+              value: cubestore-worker-1:10001,cubestore-worker-2:10002
+            - name: CUBESTORE_WORKER_PORT
+              value: "10001"
+          image: cubejs/cubestore:v0.28.14
+          name: cubestore-worker-1
+          ports:
+            - containerPort: 10001
+          resources: {}
+          volumeMounts:
+            - mountPath: /cube/data
+              name: cubestore-pv
+      restartPolicy: Always
+      volumes:
+        - name: cubestore-pv
+          persistentVolumeClaim:
+            claimName: cubestore-pvc
+status: {}

@@ -1,0 +1,195 @@
+apiVersion: v1
+data:
+  # Here's where you define the schema files
+  GithubEvents.js: |
+    cube(`GithubEvents`, {
+      sql: `SELECT * FROM default.github_events`,
+      
+      preAggregations: {
+        // Pre-Aggregations definitions go here
+        // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+        eventsCountRollup: {
+          type: 'rollup',
+          measures: [count],
+          indexes: {
+            eventsCountRollupIndex: {
+              columns: [count],
+            },
+          },
+        }
+      },
+      
+      joins: {
+        
+      },
+      
+      measures: {
+        count: {
+          type: `count`,
+          drillMembers: [repoName, title, commitId, originalCommitId, releaseTagName, releaseName, createdAt, updatedAt]
+        },
+        
+        number: {
+          sql: `number`,
+          type: `sum`
+        }
+      },
+      
+      dimensions: {
+        actorLogin: {
+          sql: `actor_login`,
+          type: `string`
+        },
+        
+        repoName: {
+          sql: `repo_name`,
+          type: `string`
+        },
+        
+        body: {
+          sql: `body`,
+          type: `string`
+        },
+        
+        path: {
+          sql: `path`,
+          type: `string`
+        },
+        
+        ref: {
+          sql: `ref`,
+          type: `string`
+        },
+        
+        creatorUserLogin: {
+          sql: `creator_user_login`,
+          type: `string`
+        },
+        
+        title: {
+          sql: `title`,
+          type: `string`
+        },
+        
+        labels: {
+          sql: `labels`,
+          type: `string`
+        },
+        
+        assignee: {
+          sql: `assignee`,
+          type: `string`
+        },
+        
+        assignees: {
+          sql: `assignees`,
+          type: `string`
+        },
+        
+        mergeCommitSha: {
+          sql: `merge_commit_sha`,
+          type: `string`
+        },
+        
+        requestedReviewers: {
+          sql: `requested_reviewers`,
+          type: `string`
+        },
+        
+        requestedTeams: {
+          sql: `requested_teams`,
+          type: `string`
+        },
+        
+        headRef: {
+          sql: `head_ref`,
+          type: `string`
+        },
+        
+        headSha: {
+          sql: `head_sha`,
+          type: `string`
+        },
+        
+        baseRef: {
+          sql: `base_ref`,
+          type: `string`
+        },
+        
+        baseSha: {
+          sql: `base_sha`,
+          type: `string`
+        },
+        
+        mergedBy: {
+          sql: `merged_by`,
+          type: `string`
+        },
+        
+        diffHunk: {
+          sql: `diff_hunk`,
+          type: `string`
+        },
+        
+        commitId: {
+          sql: `commit_id`,
+          type: `string`
+        },
+        
+        originalCommitId: {
+          sql: `original_commit_id`,
+          type: `string`
+        },
+        
+        memberLogin: {
+          sql: `member_login`,
+          type: `string`
+        },
+        
+        releaseTagName: {
+          sql: `release_tag_name`,
+          type: `string`
+        },
+        
+        releaseName: {
+          sql: `release_name`,
+          type: `string`
+        },
+        
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        },
+        
+        updatedAt: {
+          sql: `updated_at`,
+          type: `time`
+        },
+        
+        fileTime: {
+          sql: `file_time`,
+          type: `time`
+        },
+        
+        action: {
+          sql: `action`,
+          type: `time`
+        },
+        
+        closedAt: {
+          sql: `closed_at`,
+          type: `time`
+        },
+        
+        mergedAt: {
+          sql: `merged_at`,
+          type: `time`
+        }
+      },
+      
+      dataSource: `default`
+    });
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: cube-api-schema

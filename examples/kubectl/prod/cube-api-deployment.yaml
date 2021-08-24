@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  creationTimestamp: null
+  labels:
+    service: cube-api
+  name: cube-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: cube-api
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        service: cube-api
+    spec:
+      containers:
+        - env:
+            - name: CUBEJS_API_SECRET
+              value: secret
+            - name: CUBEJS_CUBESTORE_HOST
+              value: "cubestore-router"
+            - name: CUBEJS_CUBESTORE_PORT
+              value: "3030"
+            - name: CUBEJS_DB_CLICKHOUSE_READONLY
+              value: "true"
+            - name: CUBEJS_DB_HOST
+              value: github.demo.trial.altinity.cloud
+            - name: CUBEJS_DB_NAME
+              value: default
+            - name: CUBEJS_DB_PASS
+              value: demo
+            - name: CUBEJS_DB_PORT
+              value: "8443"
+            - name: CUBEJS_DB_SSL
+              value: "true"
+            - name: CUBEJS_DB_TYPE
+              value: clickhouse
+            - name: CUBEJS_DB_USER
+              value: demo
+            - name: CUBEJS_DEV_MODE
+              value: "false" # NEVER RUN DEV MODE IN K8S
+            - name: CUBEJS_EXTERNAL_DEFAULT
+              value: "true"
+            - name: CUBEJS_REDIS_URL
+              value: redis://redis:6379
+          image: cubejs/cube:v0.28.14
+          name: cube-api
+          ports:
+            - containerPort: 3000
+            - containerPort: 4000
+          resources: {}
+          volumeMounts:
+            - mountPath: /cube/conf/schema
+              name: cube-api-schema
+      restartPolicy: Always
+      volumes:
+        - name: cube-api-schema
+          configMap:
+            name: cube-api-schema
+status: {}

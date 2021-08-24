@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    service: cubestore-router
+  name: cubestore-router
+spec:
+  ports:
+    - name: "9999"
+      port: 9999
+      targetPort: 9999
+    - name: "3306"
+      port: 3306
+      targetPort: 3306
+    - name: "3030"
+      port: 3030
+      targetPort: 3030
+  selector:
+    service: cubestore-router
+status:
+  loadBalancer: {}
