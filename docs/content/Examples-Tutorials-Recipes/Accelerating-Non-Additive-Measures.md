@@ -23,8 +23,11 @@ to accelerate a query. However, there are a few ways to work around that.
 ## Data schema
 
 Let's explore the `Users` cube that contains various measures describing users' age:
-the count of unique age values (`distinctAges`), the average age (`avgAge`), and the
-90th [percentile](https://cube.dev/docs/recipes/percentiles) of age (`p90Age`).
+
+- count of unique age values (`distinctAges`)
+- average age (`avgAge`)
+- 90th [percentile](https://cube.dev/docs/recipes/percentiles) of age (`p90Age`)
+
 
 ```javascript
     distinctAges: {
