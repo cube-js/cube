@@ -46,7 +46,7 @@ Let's explore the `Users` cube that contains various measures describing users' 
     },
 ```
 
-All of these measures are non-additive. Practically speaking, it means that the following pre-aggregation would only accelerate a query that fully matches its
+All of these measures are non-additive. Practically speaking, it means that the pre-aggregation below would only accelerate a query that fully matches its
 definition:
 
 ```javascript
