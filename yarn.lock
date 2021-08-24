@@ -20608,12 +20608,12 @@ presto-client@^0.8.0:
   resolved "https://registry.yarnpkg.com/presto-client/-/presto-client-0.8.1.tgz#3cc95e678dee00a6bea84c90377757f19e5456f8"
   integrity sha512-1R+0lLYths2JTQGgbggNpnTseJb2iV26b0pQbOD5u7d6YuHevrsnYCjRTHYu7jfy37D3yWZHaYXXtka7I8T06g==
 
-prettier@^1.16.4, prettier@^1.18.2, prettier@^1.19.1:
+prettier@^1.16.4, prettier@^1.18.2:
   version "1.19.1"
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-1.19.1.tgz#f7d7f5ff8a9cd872a7be4ca142095956a60797cb"
   integrity sha512-s7PoyDv/II1ObgQunCbB9PdLmUcBZcnWOcxDh7O0N/UwDEsHyqkW+Qh28jW+mVuCdx7gLB0BotYI1Y6uI9iyew==
 
-prettier@^2.0.5:
+prettier@^2.0.5, prettier@^2.3.2:
   version "2.3.2"
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-2.3.2.tgz#ef280a05ec253712e486233db5c6f23441e7342d"
   integrity sha512-lnJzDfJ66zkMy58OL5/NY5zp70S7Nz6KqcKkXYzn2tMVrNxvbqaBpg7H3qHaLxCJ5lNMsGuM8+ohS7cZrthdLQ==
