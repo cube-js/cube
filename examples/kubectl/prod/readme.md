@@ -1,7 +1,5 @@
 # Prod Setup for K8s with `kubectl`
 
-A set of YAML files to configure Cube with K8s running in prod.
-
 This is a generic config to cover as many deployment cases as possible.
 
 The Cube API is configured to run with schema files loaded a `ConfigMap`. A Cube Refresh Worker is included in the config.
