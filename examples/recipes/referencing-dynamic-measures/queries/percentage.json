@@ -1,0 +1,7 @@
+{
+  "measures": [
+    "Orders.Percentage_of_processing",
+    "Orders.Percentage_of_shipped",
+    "Orders.Percentage_of_completed"
+  ]
+}

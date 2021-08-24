@@ -22,7 +22,7 @@ const createPercentangeMeasure = (status) => ({
     format: `percent`,
     title: `Percentage of ${status} orders`,
     sql: (CUBE) =>
-      `${CUBE[`Total_${status}_orders`]}::decimal / ${CUBE.totalOrders}::decimal * 100.0`,
+      `ROUND(${CUBE[`Total_${status}_orders`]}::numeric / ${CUBE.totalOrders}::numeric * 100.0, 2)`,
   },
 });
 
