@@ -7,3 +7,7 @@ Maintainers:
 - email: adnan@cube.dev  
   name: Adnan Rahic
 
+Contributors:
+  
+- email: luc.vauvillier@gmail.com  
+  name: Luc Vauvillier
