@@ -1,4 +1,8 @@
-const statuses = ['processing', 'shipped', 'completed'];
+const statuses = [
+  'processing',
+  'shipped',
+  'completed'
+];
 
 const createTotalByStatusMeasure = (status) => ({
   [`Total_${status}_orders`]: {
