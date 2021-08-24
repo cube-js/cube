@@ -6,12 +6,10 @@ metadata:
     service: cubestore-router
   name: cubestore-router
 spec:
-  replicas: 1 # MAKE SURE TO ONLY ONE 1 ROUTER AS USING MULTIPLE MIGTH CAUSE RACE CONDITIONS
+  serviceName: cubestore-router
   selector:
     matchLabels:
       service: cubestore-router
-  strategy:
-    type: Recreate
   template:
     metadata:
       creationTimestamp: null
@@ -41,4 +39,3 @@ spec:
         - name: cubestore-pv
           persistentVolumeClaim:
             claimName: cubestore-pvc
-status: {}
