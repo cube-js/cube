@@ -89,18 +89,14 @@ returns new results, then the pre-aggregation will be refreshed.
 
 To make Cube.js _only_ serve requests from pre-aggregations, the
 [`CUBEJS_ROLLUP_ONLY` environment variable][ref-config-env-general] can be set
-to `true` on an API instance. This will prevent it from checking the freshness
-of the pre-aggregations; a separate [Refresh Worker][ref-deploy-refresh-wrkr]
-must be configured to keep the pre-aggregations up-to-date.
+to `true` on an API instance. This will prevent serving data on API requests from the source database.
 
 <!-- prettier-ignore-start -->
 [[warning |]]
-| In a single node deployment (where the API instance and [Refresh Worker
+| When using this configuration in a single node deployment (where the API instance and [Refresh Worker
 | ][ref-deploy-refresh-wrkr] are configured on the same host), requests made to
 | the API that cannot be satisfied by a rollup throw an error. Scheduled
-| refreshes will continue to work in the background; if a pre-aggregation is
-| being built at the time of a request, then the request will wait until the
-| build is complete before returning results.
+| refreshes will continue to work in the background.
 <!-- prettier-ignore-end -->
 
 ## Partitioning
