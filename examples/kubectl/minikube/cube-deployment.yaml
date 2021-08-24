@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    service: cube
+  name: cube
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: cube
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        service: cube
+    spec:
+      containers:
+        - env:
+            - name: CUBEJS_API_SECRET
+              value: secret
+            - name: CUBEJS_CUBESTORE_HOST
+              value: "cubestore"
+            - name: CUBEJS_CUBESTORE_PORT
+              value: "3030"
+            - name: CUBEJS_DB_CLICKHOUSE_READONLY
+              value: "true"
+            - name: CUBEJS_DB_HOST
+              value: github.demo.trial.altinity.cloud
+            - name: CUBEJS_DB_NAME
+              value: default
+            - name: CUBEJS_DB_PASS
+              value: demo
+            - name: CUBEJS_DB_PORT
+              value: "8443"
+            - name: CUBEJS_DB_SSL
+              value: "true"
+            - name: CUBEJS_DB_TYPE
+              value: clickhouse
+            - name: CUBEJS_DB_USER
+              value: demo
+            - name: CUBEJS_DEV_MODE
+              value: "true" # NEVER RUN DEV MODE IN K8S
+            - name: CUBEJS_EXTERNAL_DEFAULT
+              value: "true" 
+            - name: CUBEJS_SCHEDULED_REFRESH_DEFAULT
+              value: "true"
+          image: cubejs/cube:latest
+          name: cube
+          ports:
+            - containerPort: 3000
+            - containerPort: 4000
+          resources: {}
+          volumeMounts:
+            - mountPath: /cube/conf
+              name: cube-hostpath0
+      restartPolicy: Always
+      volumes:
+        - hostPath:  # ONLY WORKS FOR MINIKUBE OR SINGLE INSTANCE K8S CLUSTER
+            path: /home/docker/conf/
+          name: cube-hostpath0
+status: {}

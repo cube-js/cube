@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    service: cube
+  name: cube
+spec:
+  ports:
+    - name: "3000"
+      port: 3000
+      targetPort: 3000
+    - name: "4000"
+      port: 4000
+      targetPort: 4000
+  # ONLY WORKS FOR MINIKUBE OR SINGLE INSTANCE K8S CLUSTER
+  # externalIPs: # EXPOSE EXTERNAL IP IF NEEDED
+  #   - xxx.yyy.zzz.www
+  selector:
+    service: cube
+status:
+  loadBalancer: {}
