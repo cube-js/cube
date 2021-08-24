@@ -1,44 +1,52 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   creationTimestamp: null
   labels:
-    service: cubestore-worker-2
-  name: cubestore-worker-2
+    service: cubestore-workers
+  name: cubestore-workers
 spec:
   replicas: 1
   selector:
     matchLabels:
-      service: cubestore-worker-2
+      service: cubestore-workers
   strategy:
     type: Recreate
   template:
     metadata:
       creationTimestamp: null
       labels:
-        service: cubestore-worker-2
+        service: cubestore-workers
     spec:
       containers:
         - env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: CUBESTORE_META_ADDR
               value: cubestore-router:9999
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             - name: CUBESTORE_SERVER_NAME
-              value: cubestore-worker-2:10002
+              value: cubestore-workers:10000
             - name: CUBESTORE_WORKERS
-              value: cubestore-worker-1:10001,cubestore-worker-2:10002
+              value: cubestore-workers:10000
             - name: CUBESTORE_WORKER_PORT
-              value: "10002"
+              value: "10000"
           image: cubejs/cubestore:v0.28.14
-          name: cubestore-worker-2
+          name: cubestore-workers
           ports:
-            - containerPort: 10002
+            - containerPort: 10000
           resources: {}
           volumeMounts:
             - mountPath: /cube/data
               name: cubestore-pv
       restartPolicy: Always
+      initContainers:
+        - name: init-router
+          image: busybox
+          command: ['sh', '-c', 'until nc -vz cubestore-router:9999; do echo "Waiting for router"; sleep 2; done;']
       volumes:
         - name: cubestore-pv
           persistentVolumeClaim:

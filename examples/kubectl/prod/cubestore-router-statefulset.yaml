@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   creationTimestamp: null
   labels:
@@ -27,7 +27,7 @@ spec:
             - name: CUBESTORE_SERVER_NAME
               value: cubestore-router:9999
             - name: CUBESTORE_WORKERS
-              value: cubestore-worker-1:10001,cubestore-worker-2:10002
+              value: cubestore-workers:10000
           image: cubejs/cubestore:v0.28.14
           name: cubestore-router
           ports:
