@@ -4,4 +4,4 @@ This is a place for community members to share their Helm Chart examples to depl
 
 ## Support
 
-The Helm Charts in this directory are community supported and should be used at your own risk. If you have any questions about individual Helm Charts, you should contact the original author. 
+The Helm Charts in this directory are **community supported** and should be used at your own risk. If you have any questions about individual Helm Charts, you should contact the original author. 
