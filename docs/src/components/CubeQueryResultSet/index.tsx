@@ -33,9 +33,10 @@ async function fetchDataFromCube(
 ) {
   try {
     const resultSet = await cubejsApi.load(query);
-    const result = resultSet?.rawData()?.[0]
+    const result = resultSet?.rawData()
     if (result) {
-      setCode(JSON.stringify(result, null, 2));
+      const resultCode = result.length === 1 ? result?.[0] : result;
+      setCode(JSON.stringify(resultCode, null, 2));
     }
     highlightCode();
   } catch (e) {
