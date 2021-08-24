@@ -28,14 +28,15 @@ spec:
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             - name: CUBESTORE_SERVER_NAME
-              value: "$(POD_NAME):10000"
+              value: "$(POD_NAME).cubestore-workers:10000"
               # The $(POD_NAME) is a way of referencing dependent env vars
               # It will resolve to "cubestore-workers-n" where n is the replica number
               # With 3 replicas the POD_NAMEs will be cubestore-workers-0,cubestore-workers-1, and cubestore-workers-2
               # These will then be needed in the CUBESTORE_WORKERS env var as an array
+              # We use "cubestore-workers-0.cubestore-workers:10000" as it points to the headless service
               # See also cubestore-router-statefulset.yaml
             - name: CUBESTORE_WORKERS
-              value: cubestore-workers-0:10000,cubestore-workers-1:10000,cubestore-workers-2:10000
+              value: cubestore-workers-0.cubestore-workers:10000,cubestore-workers-1.cubestore-workers:10000,cubestore-workers-2.cubestore-workers:10000
             - name: CUBESTORE_WORKER_PORT
               value: "10000"
           image: cubejs/cubestore:v0.28.14
