@@ -138,7 +138,7 @@ For example, the `avgAge` measure can be rewritten as follows:
 
 ### Providing multiple pre-aggregations
 
-If two workarounds described above don't apply to your use case, feel free to create
+If the two workarounds described above don't apply to your use case, feel free to create
 additional pre-aggregations with definitions that fully match your queries with
 non-additive measures. You will get a performance boost at the expense of a slightly
 increased overall pre-aggregation build time and space consumed.
