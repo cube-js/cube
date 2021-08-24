@@ -43,7 +43,7 @@ spec:
             - name: CUBEJS_DB_USER
               value: demo
             - name: CUBEJS_DEV_MODE
-              value: "true" # NEVER RUN DEV MODE IN K8S
+              value: "false" # NEVER RUN DEV MODE IN K8S
             - name: CUBEJS_EXTERNAL_DEFAULT
               value: "true" 
             - name: CUBEJS_SCHEDULED_REFRESH_DEFAULT
