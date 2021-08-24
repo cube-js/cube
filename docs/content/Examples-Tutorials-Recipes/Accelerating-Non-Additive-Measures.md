@@ -62,7 +62,7 @@ definition:
     },
 ```
 
-So, this query will match the pre-aggregation above and, thus, will be accelerated:
+This query will match the pre-aggregation above and, thus, will be accelerated:
 
 ```javascript
 {
