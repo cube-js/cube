@@ -85,35 +85,6 @@ When `every` and `sql` are used together, Cube.js will run the query from the
 `sql` property on an interval defined by the `every` property. If the query
 returns new results, then the pre-aggregation will be refreshed.
 
-## Background Refresh
-
-Background refreshes are enabled by default for all Cube.js deployments, but
-this behaviour can be modified by setting `scheduledRefresh: false`. You can
-find more information about this setting in the [Pre-Aggregation
-Reference][ref-schema-ref-preaggs-sched-refresh].
-
-In development mode, Cube.js enables background refresh by default and will
-refresh all pre-aggregations marked with the
-[`scheduledRefresh`][ref-schema-ref-preaggs-sched-refresh] parameter.
-
-Please consult the [Production Checklist][ref-prod-list-refresh] for best
-practices on running background refresh in production environments.
-
-```js
-cube(`Orders`, {
-
-  ...,
-
-  preAggregations: {
-    amountByCreated: {
-      measures: [amount],
-      timeDimension: createdAt,
-      granularity: `month`,
-    },
-  },
-});
-```
-
 ## Rollup Only Mode
 
 To make Cube.js _only_ serve requests from pre-aggregations, the
