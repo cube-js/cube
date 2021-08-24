@@ -1,8 +1,8 @@
 {{- if .Values.ingress.enabled }}
-apiVersion: {{ include "common.capabilities.ingress.apiVersion" . }}
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "common.names.fullname" . }}
+  name: {{ include "cubejs.fullname" . }}
   labels: 
     {{- include "cubejs.labels" . | nindent 4 }}
   annotations:
@@ -18,7 +18,7 @@ spec:
           - path: {{ .Values.ingress.path }}
             backend:
               service:
-                name:  {{ include "cubejs.fullname" $ }}
+                name: {{ include "cubejs.fullname" . }}
                 port: 
                   name: http
     {{- end }}
