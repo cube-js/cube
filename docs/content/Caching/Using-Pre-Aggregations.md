@@ -89,7 +89,8 @@ returns new results, then the pre-aggregation will be refreshed.
 
 To make Cube.js _only_ serve requests from pre-aggregations, the
 [`CUBEJS_ROLLUP_ONLY` environment variable][ref-config-env-general] can be set
-to `true` on an API instance. This will prevent serving data on API requests from the source database.
+to `true` on an API instance. This will prevent serving data on API requests
+from the source database.
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -139,11 +140,28 @@ cube(`Orders`, {
 ## Inspecting Pre-Aggregations
 
 Cube Store partially supports the MySQL protocol. This allows you to execute
-simple queries using a familiar SQL syntax. To check which pre-aggregations are
-managed by Cube Store, for example, you could run the following query:
+simple queries using a familiar SQL syntax. You can connect using the MySQL CLI
+client, for example:
+
+```bash
+mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore
+```
+
+To check which pre-aggregations are managed by Cube Store, you could run the
+following query:
 
 ```sql
 SELECT * FROM information_schema.tables;
++----------------------+-----------------------------------------------+
+| table_schema         | table_name                                    |
++----------------------+-----------------------------------------------+
+| dev_pre_aggregations | orders_main20190101_23jnqarg_uiyfxd0f_1gifflf |
+| dev_pre_aggregations | orders_main20190301_24ph0a1c_utzntnv_1gifflf  |
+| dev_pre_aggregations | orders_main20190201_zhrh5kj1_rkmsrffi_1gifflf |
+| dev_pre_aggregations | orders_main20191001_mdw2hxku_waxajvwc_1gifflf |
+| dev_pre_aggregations | orders_main20190701_izc2tl0h_bxsf1zlb_1gifflf |
++----------------------+-----------------------------------------------+
+5 rows in set (0.01 sec)
 ```
 
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
