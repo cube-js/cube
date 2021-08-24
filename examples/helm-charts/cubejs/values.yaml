@@ -41,6 +41,10 @@ global:
   ##
   telemetry: false
 
+  ## The path where Cube.js loads schemas from. Defaults to schema
+  ##
+  schemaPath:
+
   ## An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups.
   ## Defaults to cubejs
   ##
@@ -58,24 +62,19 @@ global:
   ##
   cacheAndQueueDriver:
 
-schema:
-  ## The path where Cube.js loads schemas from. Defaults to schema
-  ##
-  path:
-
-  ## The schema volumes
+  ## The config volumes
   ## Will be used to both master and workers
   volumes: []
   # - name: schema
   #   configMap:
-  #     name: extra-conf
+  #     name: schema
 
-  ## The volumeMounts of the Ingress controller pods.
+  ## The config volumeMounts
   ## Will be used to both master and workers
   volumeMounts: []
   # - name: schema
-  #   mountPath: /etc/nginx/conf.d/extra.conf
-  #   subPath: extra.conf
+  #   readOnly: true
+  #   mountPath: /cube/conf/schema
 
 redis:
   ## The host URL for a Redis server

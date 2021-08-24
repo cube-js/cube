@@ -40,9 +40,9 @@ spec:
           resources:
             {{- toYaml .Values.workers.resources | nindent 12 }}
           {{- end }}
-          {{- if .Values.schema.volumeMounts }}
+          {{- if .Values.global.volumeMounts }}
           volumeMounts:
-            {{- toYaml .Values.schema.volumeMounts | nindent 12 }}
+            {{- toYaml .Values.global.volumeMounts | nindent 12 }}
           {{- end }}
       {{- if .Values.workers.affinity }}
       affinity:
@@ -52,9 +52,9 @@ spec:
       topologySpreadConstraints:
         {{- toYaml .Values.workers.topologySpreadConstraints | nindent 8 }}
       {{- end }}
-      {{- if .Values.schema.volumes }}
+      {{- if .Values.global.volumes }}
       volumes:
-        {{- toYaml .Values.schema.volumes | nindent 8 }}
+        {{- toYaml .Values.global.volumes | nindent 8 }}
       {{- end }}
 
 {{- end }}

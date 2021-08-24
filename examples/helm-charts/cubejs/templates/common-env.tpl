@@ -29,9 +29,9 @@
 {{- end }}
 - name: CUBEJS_TELEMETRY
   value: {{ .Values.global.telemetry | quote }}
-{{- if .Values.schema.path }}
+{{- if .Values.global.schemaPath }}
 - name: CUBEJS_SCHEMA_PATH
-  value: {{ .Values.schema.path | quote }}
+  value: {{ .Values.global.schemaPath | quote }}
 {{- end }}
 {{- if .Values.redis.url }}
 - name: CUBEJS_REDIS_URL
