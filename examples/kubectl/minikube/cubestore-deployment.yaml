@@ -22,6 +22,12 @@ spec:
         - env:
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
+            - name: CUBESTORE_PORT
+              value: "3306"
+            - name: CUBESTORE_HTTP_PORT
+              value: "3030"
+            - name: CUBESTORE_META_PORT
+              value: "9999"
           image: cubejs/cubestore:latest
           name: cubestore
           resources: {}
