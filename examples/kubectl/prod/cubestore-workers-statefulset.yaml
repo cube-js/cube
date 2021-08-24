@@ -6,7 +6,7 @@ metadata:
     service: cubestore-workers
   name: cubestore-workers
 spec:
-  replicas: 3
+  replicas: 3 # If you edit this, make sure to edit the CUBESTORE_WORKERS as well
   serviceName: cubestore-workers
   selector:
     matchLabels:
@@ -29,7 +29,11 @@ spec:
               value: /cube/data
             - name: CUBESTORE_SERVER_NAME
               value: "$(POD_NAME):10000"
-              # the $(POD_NAME) is a way of referencing dependent env vars; it will resolve to "cubestore-workers-n" where n is the replica number; with 3 replicas the POD_NAMEs will be cubestore-workers-0,cubestore-workers-1, and cubestore-workers-2; these will then be needed in the CUBESTORE_WORKERS env var as an array
+              # The $(POD_NAME) is a way of referencing dependent env vars
+              # It will resolve to "cubestore-workers-n" where n is the replica number
+              # With 3 replicas the POD_NAMEs will be cubestore-workers-0,cubestore-workers-1, and cubestore-workers-2
+              # These will then be needed in the CUBESTORE_WORKERS env var as an array
+              # See also cubestore-router-statefulset.yaml
             - name: CUBESTORE_WORKERS
               value: cubestore-workers-0:10000,cubestore-workers-1:10000,cubestore-workers-2:10000
             - name: CUBESTORE_WORKER_PORT

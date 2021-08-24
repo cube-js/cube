@@ -7,7 +7,7 @@ metadata:
   name: cubestore-workers
 spec:
   type: ClusterIP
-  clusterIP: None
+  clusterIP: None # Headless Service
   ports:
     - name: "10000"
       port: 10000
