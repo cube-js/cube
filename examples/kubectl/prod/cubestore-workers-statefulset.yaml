@@ -6,8 +6,8 @@ metadata:
     service: cubestore-workers
   name: cubestore-workers
 spec:
-  replicas: 1
-  serviceName: cubestore-router
+  replicas: 3
+  serviceName: cubestore-workers
   selector:
     matchLabels:
       service: cubestore-workers
@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - env:
-            - name: MY_POD_NAME
+            - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
@@ -28,16 +28,16 @@ spec:
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             - name: CUBESTORE_SERVER_NAME
-              value: cubestore-workers:10000
+              value: "$(POD_NAME):10000"
+              # the $(POD_NAME) is a way of referencing dependent env vars; it will resolve to "cubestore-workers-n" where n is the replica number; with 3 replicas the POD_NAMEs will be cubestore-workers-0,cubestore-workers-1, and cubestore-workers-2; these will then be needed in the CUBESTORE_WORKERS env var as an array
             - name: CUBESTORE_WORKERS
-              value: cubestore-workers:10000
+              value: cubestore-workers-0:10000,cubestore-workers-1:10000,cubestore-workers-2:10000
             - name: CUBESTORE_WORKER_PORT
               value: "10000"
           image: cubejs/cubestore:v0.28.14
           name: cubestore-workers
           ports:
             - containerPort: 10000
-          resources: {}
           volumeMounts:
             - mountPath: /cube/data
               name: cubestore-pv

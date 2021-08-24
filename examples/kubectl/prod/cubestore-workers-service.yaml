@@ -14,5 +14,3 @@ spec:
       targetPort: 10000
   selector:
     service: cubestore-workers
-status:
-  loadBalancer: {}
