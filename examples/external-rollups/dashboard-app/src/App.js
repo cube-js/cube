@@ -94,7 +94,7 @@ const Dashboard = ({ children, onPreAggChange, onDateRangeChange, onCategoryChan
     <Col span={24} lg={12} align="left">
       <Switch
         onChange={checked => onPreAggChange(checked ? "PreAgg" : "")}
-      /> Enable pre-aggregations
+      /> Use external rollups (pre-aggregations)
     </Col>
     <Col span={24} lg={6} align="right">
       <Radio.Group
