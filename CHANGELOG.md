@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.26](https://github.com/cube-js/cube.js/compare/v0.28.25...v0.28.26) (2021-08-24)
+
+
+### Bug Fixes
+
+* **cubestore:** "Unsupported Encoding DELTA_BYTE_ARRAY" ([29fcd40](https://github.com/cube-js/cube.js/commit/29fcd407e6d00e8d2080224cc2a86befb8cbeeac))
+
+
+### Features
+
+* **cubestore:** SQL extension for rolling window queries ([88a91e7](https://github.com/cube-js/cube.js/commit/88a91e74682ed4b65eea227db415c7a4845805cf))
+
+
+
+
+
 ## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
 
 
