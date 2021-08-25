@@ -101,6 +101,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("now", now),
         t("dump", dump),
         t("unsorted_merge_assertion", unsorted_merge_assertion),
+        t("unsorted_data_timestamps", unsorted_data_timestamps),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -3330,6 +3331,42 @@ async fn unsorted_merge_assertion(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3, 2, 2), (2, 3, 2), (1, 4, 2)]));
+}
+
+async fn unsorted_data_timestamps(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(t timestamp, n string)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(t, n) VALUES \
+            ('2020-01-01T00:00:00.000000005Z', 'a'), \
+            ('2020-01-01T00:00:00.000000001Z', 'b'), \
+            ('2020-01-01T00:00:00.000000002Z', 'c')",
+        )
+        .await
+        .unwrap();
+
+    // CubeStore currently truncs timestamps to millisecond precision.
+    // This checks we sort trunced precisions on inserts. We rely on implementation details of
+    // CubeStore here.
+    let r = service.exec_query("SELECT t, n FROM s.data").await.unwrap();
+
+    let t = timestamp_from_string("2020-01-01T00:00:00Z").unwrap();
+    assert_eq!(to_rows(&r), rows(&[(t, "a"), (t, "b"), (t, "c")]));
+
+    // This ends up using MergeSortExec, make sure we see no assertions.
+    let r = service
+        .exec_query(
+            "SELECT t, n FROM (SELECT * FROM s.data UNION ALL SELECT * FROM s.data) data \
+        GROUP BY 1, 2 \
+        ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(t, "a"), (t, "b"), (t, "c")]));
 }
 
 async fn now(service: Box<dyn SqlClient>) {
