@@ -434,9 +434,9 @@ export class QueryQueue {
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
                       requestId: query.requestId,
-                      metadata: query.metadata,
-                      preAggregationId: query.preAggregation?.preAggregationId,
-                      newVersionEntry: query.newVersionEntry,
+                      metadata: query.query?.metadata,
+                      preAggregationId: query.query?.preAggregation?.preAggregationId,
+                      newVersionEntry: query.query?.newVersionEntry,
                     });
                   }
                   return null;
@@ -452,9 +452,9 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             timeInQueue,
-            metadata: query.metadata,
-            preAggregationId: query.preAggregation?.preAggregationId,
-            newVersionEntry: query.newVersionEntry,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
         } catch (e) {
           executionResult = {
@@ -468,9 +468,9 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             timeInQueue,
-            metadata: query.metadata,
-            preAggregationId: query.preAggregation?.preAggregationId,
-            newVersionEntry: query.newVersionEntry,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
@@ -499,9 +499,9 @@ export class QueryQueue {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            metadata: query.metadata,
-            preAggregationId: query.preAggregation?.preAggregationId,
-            newVersionEntry: query.newVersionEntry,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
         }
 
