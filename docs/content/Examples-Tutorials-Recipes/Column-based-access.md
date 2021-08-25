@@ -28,9 +28,9 @@ cube(`Products`, {
 
   joins: {
     Suppliers: {
-      sql: `${Suppliers}.id = ${CUBE}.supplier_id`,
-      relationship: `hasOne`,
-    },
+      relationship: `belongsTo`,
+      sql: `${CUBE}.supplier_id = ${Suppliers}.id`
+    }
   },
 
   dimensions: {
