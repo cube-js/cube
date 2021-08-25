@@ -482,7 +482,7 @@ export class QueryQueue {
                 queuePrefix: this.redisQueuePrefix,
                 requestId: queryWithCancelHandle.requestId,
                 metadata: queryWithCancelHandle.metadata,
-                preAggregationId: query.preAggregation?.preAggregationId,
+                preAggregationId: queryWithCancelHandle.preAggregation?.preAggregationId,
                 newVersionEntry: queryWithCancelHandle.newVersionEntry,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
