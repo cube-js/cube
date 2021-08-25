@@ -410,9 +410,9 @@ export class QueryQueue {
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
           timeInQueue,
-          metadata: retrieveResult[4]?.query?.metadata,
-          preAggregationId: query.preAggregation?.preAggregationId,
-          newVersionEntry: retrieveResult[4]?.query?.newVersionEntry,
+          metadata: query.query?.metadata,
+          preAggregationId: query.query?.preAggregation?.preAggregationId,
+          newVersionEntry: query.query?.newVersionEntry,
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
