@@ -77,8 +77,7 @@ cube(`Users`, {
 
 ## Query
 
-We should set a `timeDimensions` with the `dateRange` in the query that will
-send to Cube API.
+We should set a `timeDimensions` with the `dateRange`.
 
 ```bash
 curl cube:4000/cubejs-api/v1/load \
