@@ -408,6 +408,12 @@ impl From<tokio::sync::AcquireError> for CubeError {
     }
 }
 
+impl From<warp::Error> for CubeError {
+    fn from(v: warp::Error) -> Self {
+        return CubeError::from_error(v);
+    }
+}
+
 impl Into<ArrowError> for CubeError {
     fn into(self) -> ArrowError {
         ArrowError::ExternalError(Box::new(self))

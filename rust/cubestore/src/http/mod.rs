@@ -1,3 +1,5 @@
+pub mod status;
+
 use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};

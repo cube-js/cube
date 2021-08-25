@@ -1,5 +1,6 @@
 use cubestore::app_metrics;
 use cubestore::config::{Config, CubeServices};
+use cubestore::http::status::serve_status_probes;
 use cubestore::telemetry::track_event;
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
@@ -38,9 +39,12 @@ fn main() {
     cubestore::util::respawn::init();
 
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-
     runtime.block_on(async move {
-        let services = config.configure().await;
+        config.configure_injector().await;
+
+        serve_status_probes(&config);
+
+        let services = config.cube_services().await;
 
         track_event("Cube Store Start".to_string(), HashMap::new()).await;
 
