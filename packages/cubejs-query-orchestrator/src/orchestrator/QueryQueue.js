@@ -92,7 +92,7 @@ export class QueryQueue {
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
           metadata: query.metadata,
-          partitionId: query.preAggregation?.tableName,
+          preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: query.newVersionEntry,
           forceBuild: query.forceBuild
         });
@@ -219,8 +219,8 @@ export class QueryQueue {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
-          partitionId: query.preAggregation?.tableName,
           metadata: query.metadata,
+          preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: query.newVersionEntry,
         });
         await this.sendCancelMessageFn(query);
@@ -248,8 +248,8 @@ export class QueryQueue {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            partitionId: query.preAggregation?.tableName,
             metadata: query.metadata,
+            preAggregationId: query.preAggregation?.preAggregationId,
             newVersionEntry: query.newVersionEntry
           });
           await this.sendCancelMessageFn(query);
@@ -411,7 +411,7 @@ export class QueryQueue {
           requestId: query.requestId,
           timeInQueue,
           metadata: retrieveResult[4]?.query?.metadata,
-          partitionId: retrieveResult[4]?.query?.preAggregation?.tableName,
+          preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: retrieveResult[4]?.query?.newVersionEntry,
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
@@ -434,8 +434,8 @@ export class QueryQueue {
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
                       requestId: query.requestId,
-                      partitionId: query.preAggregation?.tableName,
                       metadata: query.metadata,
+                      preAggregationId: query.preAggregation?.preAggregationId,
                       newVersionEntry: query.newVersionEntry,
                     });
                   }
@@ -452,8 +452,8 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             timeInQueue,
-            partitionId: query.preAggregation?.tableName,
             metadata: query.metadata,
+            preAggregationId: query.preAggregation?.preAggregationId,
             newVersionEntry: query.newVersionEntry,
           });
         } catch (e) {
@@ -468,8 +468,8 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             timeInQueue,
-            partitionId: query.preAggregation?.tableName,
             metadata: query.metadata,
+            preAggregationId: query.preAggregation?.preAggregationId,
             newVersionEntry: query.newVersionEntry,
             error: (e.stack || e).toString()
           });
@@ -481,8 +481,8 @@ export class QueryQueue {
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
                 requestId: queryWithCancelHandle.requestId,
-                partitionId: queryWithCancelHandle.preAggregation?.tableName,
                 metadata: queryWithCancelHandle.metadata,
+                preAggregationId: query.preAggregation?.preAggregationId,
                 newVersionEntry: queryWithCancelHandle.newVersionEntry,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
@@ -499,8 +499,8 @@ export class QueryQueue {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            partitionId: query.preAggregation?.tableName,
             metadata: query.metadata,
+            preAggregationId: query.preAggregation?.preAggregationId,
             newVersionEntry: query.newVersionEntry,
           });
         }
