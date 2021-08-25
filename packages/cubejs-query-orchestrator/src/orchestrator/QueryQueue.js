@@ -219,9 +219,9 @@ export class QueryQueue {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
-          metadata: query.metadata,
-          preAggregationId: query.preAggregation?.preAggregationId,
-          newVersionEntry: query.newVersionEntry,
+          metadata: query.query?.metadata,
+          preAggregationId: query.query?.preAggregation?.preAggregationId,
+          newVersionEntry: query.query?.newVersionEntry,
         });
         await this.sendCancelMessageFn(query);
       }
