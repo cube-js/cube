@@ -12,7 +12,7 @@ We want to create a cube for a dataset which uses the
 [Entity-Attribute-Value](https://en.wikipedia.org/wiki/Entity–attribute–value_model)
 model (EAV). It stores entities in a table that can be joined to another table with
 numerous attribute-value pairs. Each entity is not guaranteed to have the same set of
-accociated attributes, thus, making the entity-attribute-value relation a sparse
+associated attributes, thus making the entity-attribute-value relation a sparse
 matrix. In the cube, we'd like every attribute to be modeled as a dimension.
 
 ## Data schema
