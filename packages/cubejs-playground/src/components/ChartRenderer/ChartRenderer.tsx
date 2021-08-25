@@ -10,7 +10,10 @@ import styled from 'styled-components';
 import { Button, CubeLoader, FatalError } from '../../atoms';
 import { UIFramework } from '../../types';
 import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
-import { useChartRendererState, useChartRendererStateMethods } from '../QueryTabs/ChartRendererStateProvider';
+import {
+  useChartRendererState,
+  useChartRendererStateMethods,
+} from '../QueryTabs/ChartRendererStateProvider';
 
 const { Text } = Typography;
 
@@ -110,7 +113,6 @@ export default function ChartRenderer({
     useChartRendererStateMethods();
 
   const runButtonRef = useRef<HTMLButtonElement>(null);
-  // const [isTokenRefreshing, setTokenRefreshing] = useState<boolean>(false);
 
   // for you, ovr :)
   useHotkeys('cmd+enter', () => {
@@ -191,11 +193,7 @@ export default function ChartRenderer({
               type="primary"
               loading={!isChartRendererReady || isFetchingMeta}
               icon={<PlaySquareOutlined />}
-              onClick={async () => {
-                // setTokenRefreshing(true);
-                await onRunButtonClick();
-                // setTokenRefreshing(false);
-              }}
+              onClick={onRunButtonClick}
             >
               Run
             </Button>
