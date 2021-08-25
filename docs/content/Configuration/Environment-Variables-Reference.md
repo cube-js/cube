@@ -164,7 +164,7 @@ databases [in this guide][link-connecting-to-db].
 | `CUBESTORE_WORKER_PORT`         | The port for Cube Store workers to listen to connections on. When set, the node will start as a **worker** in the cluster                                                 | A valid port number                                         |
 | `CUBESTORE_WORKERS`             | A comma-separated list of address/port pairs; for example `worker-1:3123,localhost:3124,123.124.125.128:3123`                                                             | A comma-separated list of address/port pairs                |
 
-### Cloud Storage
+### <--{"name" : "Cube Store"}--> Cloud Storage
 
 | Environment variable              | Description                                                                                             | Possible Values                                                                         |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |

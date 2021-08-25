@@ -28,7 +28,31 @@ import CubeQueryResultSet from '../components/CubeQueryResultSet';
 import GitHubFolderLink from '../components/GitHubFolderLink';
 
 const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
-const MyH3 = (props) => <h3 name={kebabCase(props.children)} {...props} />;
+const MyH3 = (props) => {
+  const startCommentIndex = props.children.indexOf('<--');
+  const endCommentIndex = props.children.indexOf('-->');
+  const isCustom = startCommentIndex !== -1 && endCommentIndex !== -1;
+
+  if (isCustom) {
+    const propsData = props.children?.slice(startCommentIndex + 3, endCommentIndex);
+
+    if (propsData?.length) {
+      const jsonProps = JSON.parse(propsData);
+      const text = props.children.slice(endCommentIndex + 3);
+
+      return (
+        <h3
+          id={kebabCase(jsonProps?.name) + '-' + kebabCase(text)}
+          name={kebabCase(text)}
+          {...props}
+        >
+          {text}
+        </h3>
+      );
+    }
+  }
+  return <h3 name={kebabCase(props.children)} {...props} />;
+};
 
 const components = { GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
 

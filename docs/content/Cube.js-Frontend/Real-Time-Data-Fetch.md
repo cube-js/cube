@@ -41,7 +41,7 @@ const cubejsApi = cubejs({
 
 Multiple APIs are provided to support data subscription scenarios.
 
-### Vanilla JavaScript
+### <--{"name" : "Client Subscriptions"}-->  Vanilla JavaScript
 
 ```javascript
 import cubejs from '@cubejs-client/core';
@@ -74,7 +74,7 @@ cubejsApi.subscribe(
 );
 ```
 
-### React hooks
+### <--{"name" : "Client Subscriptions"}-->  React hooks
 
 ```javascript
 import { useCubeQuery } from '@cubejs-client/react';

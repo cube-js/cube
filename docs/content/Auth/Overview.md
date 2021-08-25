@@ -152,7 +152,7 @@ Cube.js has out-of-the-box support for the following identity providers:
 [ref-jwt-auth0]: /security/jwt/auth0
 [ref-jwt-aws-cognito]: /security/jwt/aws-cognito
 
-### Configuration
+### <--{"name" : "Using JSON Web Key Sets (JWKS)"}-->  Configuration
 
 As mentioned previously, Cube.js supports verifying JWTs using industry-standard
 JWKS. The JWKS can be provided either from a URL, or as a JSON object conforming
@@ -200,7 +200,7 @@ Or configure the same using environment variables:
 CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
 ```
 
-### Verifying claims
+### <--{"name" : "Using JSON Web Key Sets (JWKS)"}-->  Verifying claims
 
 Cube.js can also verify the audience, subject and issuer claims in JWTs.
 Similarly to JWK configuration, these can also be configured in the `cube.js`
@@ -224,7 +224,7 @@ CUBEJS_JWT_ISSUER='<ISSUER_FROM_IDENTITY_PROVIDER>'
 CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'
 ```
 
-### Custom claims namespace
+### <--{"name" : "Using JSON Web Key Sets (JWKS)"}-->  Custom claims namespace
 
 Cube.js can also extract claims defined in custom namespaces. Simply specify the
 namespace in your `cube.js` configuration file:
@@ -237,7 +237,7 @@ module.exports = {
 };
 ```
 
-### Caching
+### <--{"name" : "Using JSON Web Key Sets (JWKS)"}-->  Caching
 
 Cube.js caches JWKS by default when [`CUBEJS_JWK_URL` or `jwt.jwkUrl` is
 specified](#configuration).
