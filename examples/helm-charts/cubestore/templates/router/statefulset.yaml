@@ -4,6 +4,13 @@ metadata:
   name: {{ printf "%s-router" (include "cubestore.fullname" .) }}
   labels:
     {{- include "cubestore.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+  {{- end }}
 spec:
   serviceName: {{ printf "%s-router" (include "cubestore.fullname" .) }}
   selector:
@@ -78,9 +85,9 @@ spec:
       affinity:
         {{- toYaml .Values.router.affinity | nindent 8 }}
       {{- end }}
-      {{- if .Values.router.topologySpreadConstraints }}
+      {{- if .Values.router.spreadConstraints }}
       topologySpreadConstraints:
-        {{- toYaml .Values.router.topologySpreadConstraints | nindent 8 }}
+        {{- toYaml .Values.router.spreadConstraints | nindent 8 }}
       {{- end }}
   
   {{- if .Values.router.persistence.enabled }}

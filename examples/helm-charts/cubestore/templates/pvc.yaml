@@ -3,15 +3,23 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: {{ printf "%s-remote-storage" (include "cubestore.fullname" .) }}
-  {{- if eq .Values.remoteDir.persistence.resourcePolicy "keep" }}
-  annotations:
-    helm.sh/resource-policy: keep
-  {{- end }}
   labels: 
     app.kubernetes.io/component: remote-storage
     {{- include "cubestore.selectorLabels" . | nindent 4 }}
-  {{- if .Values.remoteDir.persistence.annotations }}
-  annotations: {{- toYaml .Values.remoteDir.persistence.annotations | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if or .Values.remoteDir.persistence.annotations (eq .Values.remoteDir.persistence.resourcePolicy "keep") .Values.commonAnnotations }}
+  annotations:
+    {{- if .Values.remoteDir.persistence.annotations }}
+    {{- toYaml .Values.remoteDir.persistence.annotations | nindent 4 }}
+    {{- end }}
+    {{- if eq .Values.remoteDir.persistence.resourcePolicy "keep" }}
+    helm.sh/resource-policy: keep
+    {{- end }}
+    {{- if .Values.commonAnnotations }}
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   accessModes:

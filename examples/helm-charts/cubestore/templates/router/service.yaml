@@ -5,6 +5,13 @@ metadata:
   labels:
     app.kubernetes.io/component: router
     {{- include "cubestore.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+  {{- end }}
 spec:
   ports:
     - name: http

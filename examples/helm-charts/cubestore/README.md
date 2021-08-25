@@ -53,10 +53,12 @@ By default local dir are not persisted. You can enable persistance on router and
 
 ### Common parameters
 
-| Name               | Description                                                  | Value |
-| ------------------ | ------------------------------------------------------------ | ----- |
-| `nameOverride`     | Override the name                                            | `""`  |
-| `fullnameOverride` | Provide a name to substitute for the full names of resources | `""`  |
+| Name                | Description                                                  | Value |
+| ------------------- | ------------------------------------------------------------ | ----- |
+| `nameOverride`      | Override the name                                            | `""`  |
+| `fullnameOverride`  | Provide a name to substitute for the full names of resources | `""`  |
+| `commonLabels`      | Labels to add to all deployed objects                        | `{}`  |
+| `commonAnnotations` | Annotations to add to all deployed objects                   | `{}`  |
 
 ### Image parameters
 
@@ -106,29 +108,29 @@ By default local dir are not persisted. You can enable persistance on router and
 
 ### Router parameters
 
-| Name                               | Description                                                      | Value             |
-| ---------------------------------- | ---------------------------------------------------------------- | ----------------- |
-| `router.httpPort`                  | The port for Cube Store to listen to HTTP connections on         | `3030`            |
-| `router.metaPort`                  | The port for the router node to listen for connections on        | `9999`            |
-| `router.mysqlPort`                 | The port for Cube Store to listen to connections on              | `3306`            |
-| `router.persistence.enabled`       | Enable persistence for local data using Persistent Volume Claims | `false`           |
-| `router.persistance.size`          | Persistent Volume size                                           | `10Gi`            |
-| `router.persistance.accessModes`   | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
-| `router.persistance.annotations`   | Additional custom annotations for the PVC                        | `{}`              |
-| `router.affinity`                  | Affinity for pod assignment                                      | `{}`              |
-| `router.topologySpreadConstraints` | Topology spread constraint for pod assignment                    | `{}`              |
-| `router.resources`                 | Define resources requests and limits for single Pods             | `{}`              |
+| Name                             | Description                                                      | Value             |
+| -------------------------------- | ---------------------------------------------------------------- | ----------------- |
+| `router.httpPort`                | The port for Cube Store to listen to HTTP connections on         | `3030`            |
+| `router.metaPort`                | The port for the router node to listen for connections on        | `9999`            |
+| `router.mysqlPort`               | The port for Cube Store to listen to connections on              | `3306`            |
+| `router.persistence.enabled`     | Enable persistence for local data using Persistent Volume Claims | `false`           |
+| `router.persistance.size`        | Persistent Volume size                                           | `10Gi`            |
+| `router.persistance.accessModes` | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
+| `router.persistance.annotations` | Additional custom annotations for the PVC                        | `{}`              |
+| `router.affinity`                | Affinity for pod assignment                                      | `{}`              |
+| `router.spreadConstraints`       | Topology spread constraint for pod assignment                    | `{}`              |
+| `router.resources`               | Define resources requests and limits for single Pods             | `{}`              |
 
 ### Workers parameters
 
-| Name                                | Description                                                      | Value             |
-| ----------------------------------- | ---------------------------------------------------------------- | ----------------- |
-| `workers.workersCount`              | Number of workers to deploy                                      | `2`               |
-| `workers.port`                      | The port for the router node to listen for connections on        | `9001`            |
-| `workers.persistence.enabled`       | Enable persistence for local data using Persistent Volume Claims | `false`           |
-| `workers.persistance.size`          | Persistent Volume size                                           | `10Gi`            |
-| `workers.persistance.accessModes`   | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
-| `workers.persistance.annotations`   | Additional custom annotations for the PVC                        | `{}`              |
-| `workers.affinity`                  | Affinity for pod assignment                                      | `{}`              |
-| `workers.topologySpreadConstraints` | Topology spread constraint for pod assignment                    | `{}`              |
-| `workers.resources`                 | Define resources requests and limits for single Pods             | `{}`              |
+| Name                              | Description                                                      | Value             |
+| --------------------------------- | ---------------------------------------------------------------- | ----------------- |
+| `workers.workersCount`            | Number of workers to deploy                                      | `2`               |
+| `workers.port`                    | The port for the router node to listen for connections on        | `9001`            |
+| `workers.persistence.enabled`     | Enable persistence for local data using Persistent Volume Claims | `false`           |
+| `workers.persistance.size`        | Persistent Volume size                                           | `10Gi`            |
+| `workers.persistance.accessModes` | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
+| `workers.persistance.annotations` | Additional custom annotations for the PVC                        | `{}`              |
+| `workers.affinity`                | Affinity for pod assignment                                      | `{}`              |
+| `workers.spreadConstraints`       | Topology spread constraint for pod assignment                    | `{}`              |
+| `workers.resources`               | Define resources requests and limits for single Pods             | `{}`              |

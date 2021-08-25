@@ -5,6 +5,13 @@ metadata:
   name: {{ printf "%s-workers" (include "cubestore.fullname" .) }}
   labels:
     {{- include "cubestore.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.workers.workersCount }}
   serviceName: {{ printf "%s-headless" (include "cubestore.fullname" .) }}
@@ -82,9 +89,9 @@ spec:
       affinity:
         {{- toYaml .Values.workers.affinity | nindent 8 }}
       {{- end }}
-      {{- if .Values.workers.topologySpreadConstraints }}
+      {{- if .Values.workers.spreadConstraints }}
       topologySpreadConstraints:
-        {{- toYaml .Values.workers.topologySpreadConstraints | nindent 8 }}
+        {{- toYaml .Values.workers.spreadConstraints | nindent 8 }}
       {{- end }}
   
   {{- if .Values.workers.persistence.enabled }}
