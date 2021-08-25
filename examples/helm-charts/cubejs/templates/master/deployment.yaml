@@ -4,6 +4,13 @@ metadata:
   name: {{ printf "%s-master" (include "cubejs.fullname" .) }}
   labels:
     {{- include "cubejs.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+  {{- end }}
 spec:
   selector:
     matchLabels:
@@ -44,9 +51,9 @@ spec:
       affinity:
         {{- toYaml .Values.master.affinity | nindent 8 }}
       {{- end }}
-      {{- if .Values.master.topologySpreadConstraints }}
+      {{- if .Values.master.spreadConstraints }}
       topologySpreadConstraints:
-        {{- toYaml .Values.master.topologySpreadConstraints | nindent 8 }}
+        {{- toYaml .Values.master.spreadConstraints | nindent 8 }}
       {{- end }}
       {{- if .Values.global.volumes }}
       volumes:

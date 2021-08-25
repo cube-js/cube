@@ -5,8 +5,8 @@
 ```bash
 $ cd examples/helm-charts
 $ helm install my-release \
---set database.type=<db-type>
---set ...
+--set database.type=<db-type> \
+--set ... \
 ./cubejs
 ```
 
@@ -18,19 +18,22 @@ To uninstall/delete the `my-release` deployment:
 $ helm delete my-release
 ```
 
-## Customize values
+## Setup
 
-By default a router and one workers will be deployed. You can customize the deployment using helm values.
+By default a router and one worker will be deployed. You can customize the deployment using helm values.
 
 Refer to the official documentation for more information:
 https://cube.dev/docs/reference/environment-variables
 
 ### Injecting schema
 
-To inject your schema files in the deployment you have to set custom volumes on all your cubejs instances.
-A good practice is to create a single configmap containing all your cube files:
+To inject your schema files in the deployment you have to use `global.volumes` and `global.volumeMounts` values.
 
-```
+Mount path is `/cube/conf/schema` by default and can be customized with the `global.schemaPath` value.
+
+A good practice is to use a ConfigMap to store your all the cube definition files:
+
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -56,13 +59,19 @@ data:
         },
       },
     });
-
 ```
 
-### Example
+### Injecting javascript config
+
+To inject a javascript config in the deployment you can use `global.volumes` and `global.volumeMounts` values.
+
+Mount path is `/cube/conf/`
+
+### Production Example
 
 Deployment with:
 
+- 2 workers
 - BigQuery db with exportBucket on GCS
 - Schema located in a `cube-schema` ConfigMap
 - Redis (using pasword in a secret)
@@ -70,23 +79,30 @@ Deployment with:
 
 ```bash
 $ helm install my-release \
+# Set two workers (default 1)
+--set workers.workerCount=2 \
+# Mount schema volume from ConfigMap
 --set global.volumes[0].name=schema \
 --set global.volumes[0].configMap.name=cube-schema \
 --set global.volumeMounts[0].name=schema \
 --set global.volumeMounts[0].readOnly=true \
 --set global.volumeMounts[0].mountPath=/cube/conf/schema \
+# Database configuration using secret
 --set database.type=bigquery \
 --set database.bigquery.projectId=<project-id> \
 --set database.bigquery.credentialsFromSecret.name=<service-account-secret-name> \
 --set database.bigquery.credentialsFromSecret.key=<service-account-secret-key> \
+# External Bucket configuration
 --set exportBucket.type=gcp \
 --set exportBucket.name.key=<bucket-name> \
 --set exportBucket.gcsCredentialsFromSecret.name=<service-account-secret-name> \
 --set exportBucket.gcsCredentialsFromSecret.name=<service-account-secret-key> \
+# Redis configuration
 --set redis.url=<redis-url> \
 --set redis.passwordFromSecret.name=<redis-secret-name> \
 --set redis.passwordFromSecret.key=<redis-secret-key> \
---set cubestore.host=<cubestore-host>
+# Cubestore configuration
+--set cubestore.host=<cubestore-host> \
 ./cubejs
 ```
 
@@ -97,7 +113,7 @@ $ helm install my-release -f path/to/values.yaml ./cubejs
 ```
 
 ```yaml
-# values.yaml
+# path/to/values.yaml
 global:
   volumes:
     - name: schema
@@ -107,6 +123,9 @@ global:
     - name: schema
       readOnly: true
       mountPath: /cube/conf/schema
+
+workers:
+  workersCount: 2
 
 redis:
   url: <redis-url>
@@ -137,10 +156,12 @@ cubestore:
 
 ### Common parameters
 
-| Name               | Description                                                  | Value |
-| ------------------ | ------------------------------------------------------------ | ----- |
-| `nameOverride`     | Override the name                                            | `""`  |
-| `fullnameOverride` | Provide a name to substitute for the full names of resources | `""`  |
+| Name                | Description                                                  | Value |
+| ------------------- | ------------------------------------------------------------ | ----- |
+| `nameOverride`      | Override the name                                            | `""`  |
+| `fullnameOverride`  | Provide a name to substitute for the full names of resources | `""`  |
+| `commonLabels`      | Labels to add to all deployed objects                        | `{}`  |
+| `commonAnnotations` | Annotations to add to all deployed objects                   | `{}`  |
 
 ### Image parameters
 
@@ -284,20 +305,20 @@ cubestore:
 
 ### Master parameters
 
-| Name                               | Description                                          | Value |
-| ---------------------------------- | ---------------------------------------------------- | ----- |
-| `master.affinity`                  | Affinity for pod assignment                          | `{}`  |
-| `master.topologySpreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
-| `master.resources`                 | Define resources requests and limits for single Pods | `{}`  |
+| Name                       | Description                                          | Value |
+| -------------------------- | ---------------------------------------------------- | ----- |
+| `master.affinity`          | Affinity for pod assignment                          | `{}`  |
+| `master.spreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
+| `master.resources`         | Define resources requests and limits for single Pods | `{}`  |
 
 ### Workers parameters
 
-| Name                                | Description                                          | Value |
-| ----------------------------------- | ---------------------------------------------------- | ----- |
-| `workers.workersCount`              | Number of workers to deploy                          | `1`   |
-| `workers.affinity`                  | Affinity for pod assignment                          | `{}`  |
-| `workers.topologySpreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
-| `workers.resources`                 | Define resources requests and limits for single Pods | `{}`  |
+| Name                        | Description                                          | Value |
+| --------------------------- | ---------------------------------------------------- | ----- |
+| `workers.workersCount`      | Number of workers to deploy                          | `1`   |
+| `workers.affinity`          | Affinity for pod assignment                          | `{}`  |
+| `workers.spreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
+| `workers.resources`         | Define resources requests and limits for single Pods | `{}`  |
 
 ## Service parameters
 

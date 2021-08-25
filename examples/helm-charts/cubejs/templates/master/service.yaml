@@ -6,9 +6,17 @@ metadata:
   labels:
     app.kubernetes.io/component: master
     {{- include "cubejs.labels" . | nindent 4 }}
-  {{- if .Values.service.annotations }}
-  annotations:  
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if or .Values.commonAnnotations .Values.service.annotations }}
+  annotations:
+   {{- if .Values.commonAnnotations }}
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+    {{- end }}
+    {{- if .Values.service.annotations }}
     {{- toYaml .Values.service.annotations | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   type: {{ .Values.service.type }}

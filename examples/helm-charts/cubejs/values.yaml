@@ -6,6 +6,14 @@ nameOverride: ""
 ##
 fullnameOverride: ""
 
+##  Labels to add to all deployed objects
+##
+commonLabels: {}
+
+## Annotations to add to all deployed objects
+##
+commonAnnotations: {}
+
 image:
   ## Docker image repository
   ##
@@ -416,10 +424,10 @@ master:
   ##
   affinity: {}
 
-  ## topology spread constraint for pod assignment
+  ## Topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
-  topologySpreadConstraints: {}
+  spreadConstraints: {}
 
   ## Define resources requests and limits for single Pods.
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
@@ -437,7 +445,7 @@ workers:
   ## topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
-  topologySpreadConstraints: {}
+  spreadConstraints: {}
 
   ## Define resources requests and limits for single Pods.
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
