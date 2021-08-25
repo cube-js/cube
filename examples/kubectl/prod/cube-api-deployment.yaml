@@ -20,7 +20,7 @@ spec:
         service: cube-api
     spec:
       containers:
-        - env:
+        - env: # Refer to https://cube.dev/docs/reference/environment-variables for more options
             - name: CUBEJS_API_SECRET
               value: secret
             - name: CUBEJS_CUBESTORE_HOST

@@ -18,7 +18,7 @@ spec:
         service: cubestore-workers
     spec:
       containers:
-        - env:
+        - env: # Refer to https://cube.dev/docs/reference/environment-variables for more options
             - name: POD_NAME
               valueFrom:
                 fieldRef:

@@ -19,7 +19,7 @@ spec:
         service: cube-refresh-worker
     spec:
       containers:
-        - env:
+        - env: # Refer to https://cube.dev/docs/reference/environment-variables for more options
             - name: CUBEJS_API_SECRET
               value: secret
             - name: CUBEJS_CUBESTORE_HOST
