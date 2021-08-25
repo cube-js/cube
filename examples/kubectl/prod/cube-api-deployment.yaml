@@ -28,19 +28,15 @@ spec:
             - name: CUBEJS_CUBESTORE_PORT
               value: "3030"
             - name: CUBEJS_DB_HOST
-              value: "demo-db.cube.dev"
+              value: demo-db.cube.dev
             - name: CUBEJS_DB_NAME
-              value: "ecom"
+              value: ecom
             - name: CUBEJS_DB_USER
-              value: "cube"
+              value: cube
             - name: CUBEJS_DB_PASS
               value: "12345"
-            - name: CUBEJS_DB_PORT
-              value: "3306"
-            - name: CUBEJS_DB_SSL
-              value: "true"
             - name: CUBEJS_DB_TYPE
-              value: "postgres"
+              value: postgres
             - name: CUBEJS_DEV_MODE
               value: "false" # NEVER RUN DEV MODE IN K8S
             - name: CUBEJS_EXTERNAL_DEFAULT
