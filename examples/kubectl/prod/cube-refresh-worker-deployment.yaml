@@ -26,24 +26,24 @@ spec:
               value: "cubestore-router"
             - name: CUBEJS_CUBESTORE_PORT
               value: "3030"
-            - name: CUBEJS_DB_CLICKHOUSE_READONLY
-              value: "true"
             - name: CUBEJS_DB_HOST
-              value: github.demo.trial.altinity.cloud
+              value: "demo-db.cube.dev"
             - name: CUBEJS_DB_NAME
-              value: default
+              value: "ecom"
+            - name: CUBEJS_DB_USER
+              value: "cube"
             - name: CUBEJS_DB_PASS
-              value: demo
+              value: "12345"
             - name: CUBEJS_DB_PORT
-              value: "8443"
+              value: "3306"
             - name: CUBEJS_DB_SSL
               value: "true"
             - name: CUBEJS_DB_TYPE
-              value: clickhouse
-            - name: CUBEJS_DB_USER
-              value: demo
+              value: "postgres"
             - name: CUBEJS_DEV_MODE
-              value: "false"
+              value: "false" # NEVER RUN DEV MODE IN K8S
+            - name: CUBEJS_EXTERNAL_DEFAULT
+              value: "true"
             - name: CUBEJS_REDIS_URL
               value: redis://redis:6379
             # SPECIFY THIS INSTANCE TO ACT AS A REFRESH WORKER
