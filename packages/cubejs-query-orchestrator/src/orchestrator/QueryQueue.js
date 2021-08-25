@@ -94,7 +94,7 @@ export class QueryQueue {
           metadata: query.metadata,
           preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: query.newVersionEntry,
-          forceBuild: query.forceBuild
+          forceBuild: query.forceBuild,
         });
       }
 
@@ -250,7 +250,7 @@ export class QueryQueue {
             requestId: query.requestId,
             metadata: query.metadata,
             preAggregationId: query.preAggregation?.preAggregationId,
-            newVersionEntry: query.newVersionEntry
+            newVersionEntry: query.newVersionEntry,
           });
           await this.sendCancelMessageFn(query);
         }
