@@ -41,7 +41,7 @@ spec:
             - name: CUBEJS_EXTERNAL_DEFAULT
               value: "true"
             - name: CUBEJS_REDIS_URL
-              value: redis://redis:6379
+              value: redis://redis:6379 # USING THIS REDIS URL BECAUSE THE REDIS SERVICE IS NAMED "REDIS"
             # SPECIFY THIS INSTANCE TO ACT AS A REFRESH WORKER
             - name: CUBEJS_REFRESH_WORKER
               value: "true"
