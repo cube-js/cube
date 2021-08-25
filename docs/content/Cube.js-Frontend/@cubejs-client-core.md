@@ -156,7 +156,7 @@ cubejsApi.subscribe(
 
 Default transport implementation.
 
-### constructor
+### HttpTransport constructor
 
 >  **new HttpTransport**(**options**: [TransportOptions](#types-transport-options)): *[HttpTransport](#http-transport)*
 

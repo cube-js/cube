@@ -10,7 +10,7 @@ WebSocket transport for Cube.js client
 
 ## WebSocketTransport
 
-### constructor
+### WebSocketTransport constructor
 
 >  **new WebSocketTransport**(**__namedParameters**: object): *[WebSocketTransport](#web-socket-transport)*
 
@@ -58,7 +58,7 @@ WebSocket transport for Cube.js client
 
 ## WebSocketTransportResult
 
-### constructor
+### WebSocketTransportResult constructor
 
 >  **new WebSocketTransportResult**(**__namedParameters**: object): *[WebSocketTransportResult](#result)*
 
