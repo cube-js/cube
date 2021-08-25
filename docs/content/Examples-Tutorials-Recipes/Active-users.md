@@ -19,7 +19,7 @@ Daily, weekly, and monthly active users are commonly referred to as DAU, WAU,
 MAU. To get these metrics, we need to use a rolling time frame to calculate a
 daily count of how many users interacted with the product or website in the
 prior day, 7 days, or 30 days. Also, we can build other metrics on top of these
-basic metrics. For example, the WAU to MAU ratio. We can add it, using already
+basic metrics. For example, the WAU to MAU ratio, which we can add by using already
 defined `weeklyActiveUsers` and `monthlyActiveUsers`.
 
 To calculate daily, weekly, or monthly active users we’re going to use the
