@@ -21,7 +21,6 @@ image:
   ##
   pullPolicy: IfNotPresent
 
-
 global:
   ## The logging level for Cube Store.
   ##
@@ -51,7 +50,7 @@ global:
 ## Prefer use cloudStorage if your are running on "gcp" or "aws"
 ## If a cloudStorage configuration is used, no remoteDir will be created
 ##
-remoteDir:  
+remoteDir:
   persistence:
     ## Resource Policy
     ## Setting it to "keep" to avoid removing PVCs during a helm delete operation
@@ -119,7 +118,7 @@ router:
   ## The port for Cube Store to listen to connections on
   ##
   mysqlPort: 3306
-  
+
   persistence:
     ## Enable persistence for local data using Persistent Volume Claims
     ##
@@ -137,13 +136,13 @@ router:
     ## Additional custom annotations for the PVC
     ##
     annotations: {}
-  
+
   ## Affinity for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
 
-  ## topology spread constraint for pod assignment
+  ## Topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
   topologySpreadConstraints: {}
@@ -157,7 +156,7 @@ workers:
   ## Number of workers to deploy
   ##
   workersCount: 2
-  
+
   ## The port for Cube Store workers to listen to connections on
   ##
   port: 9001
@@ -179,12 +178,12 @@ workers:
     ## Additional custom annotations for the PVC
     ##
     annotations: {}
-  
+
   ## Affinity for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
   affinity: {}
-  
+
   ## topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
