@@ -188,7 +188,7 @@ cubestore:
 | `global.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
 | `global.topicName`                 | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
 | `global.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
-| `global.volumeMounts`              | he config volumeMounts. Will be used to both master and workers                                                                 | `[]`    |
+| `global.volumeMounts`              | The config volumeMounts. Will be used to both master and workers                                                                | `[]`    |
 
 ### Redis parameters
 
@@ -329,7 +329,7 @@ cubestore:
 | `service.port`                     | Master service port                              | `80`        |
 | `service.nodePort`                 | Node port for master                             | `""`        |
 | `service.externalTrafficPolicy`    | Master service external traffic policy           | `Cluster`   |
-| `service.clusterIP`                | aster service Cluster IP                         | `""`        |
+| `service.clusterIP`                | Master service Cluster IP                        | `""`        |
 | `service.loadBalancerIP`           | Master service Load Balancer IP                  | `""`        |
 | `service.loadBalancerSourceRanges` | Master service Load Balancer sources             | `[]`        |
 | `service.annotations`              | Additional custom annotations for master service | `{}`        |
