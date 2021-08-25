@@ -11,6 +11,7 @@ use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::DIService;
+use crate::config::is_router;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
@@ -654,7 +655,7 @@ impl ClusterImpl {
     }
 
     pub fn is_select_worker(&self) -> bool {
-        self.config_obj.worker_bind_address().is_some()
+        !is_router(self.config_obj.as_ref())
     }
 
     pub async fn wait_for_worker_to_close(&self) {

@@ -5,11 +5,13 @@ use std::future::Future;
 use std::pin::Pin;
 use std::raw::TraitObject;
 use std::sync::{Arc, Weak};
+use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
 pub struct Injector {
     this: Weak<Injector>,
-    services: RwLock<HashMap<String, Arc<RwLock<Option<Arc<dyn DIService>>>>>>,
+    init_guards: RwLock<HashMap<String, Arc<Mutex<()>>>>,
+    services: RwLock<HashMap<String, Arc<dyn DIService>>>,
     factories: RwLock<
         HashMap<
             String,
@@ -26,6 +28,7 @@ impl Injector {
     pub fn new() -> Arc<Self> {
         Arc::new_cyclic(|this| Self {
             this: this.clone(),
+            init_guards: RwLock::new(HashMap::new()),
             services: RwLock::new(HashMap::new()),
             factories: RwLock::new(HashMap::new()),
         })
@@ -61,10 +64,10 @@ impl Injector {
                 })
             }),
         );
-        self.services
+        self.init_guards
             .write()
             .await
-            .insert(name, Arc::new(RwLock::new(None)));
+            .insert(name, Arc::new(Mutex::new(())));
     }
 
     pub async fn register<F>(
@@ -81,55 +84,64 @@ impl Injector {
                 Box::pin(async move { fn_to_move(i.clone()).await })
             }),
         );
-        self.services
+        self.init_guards
             .write()
             .await
-            .insert(name.to_string(), Arc::new(RwLock::new(None)));
+            .insert(name.to_string(), Arc::new(Mutex::new(())));
     }
 }
 
 impl Injector {
     pub async fn get_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> Arc<T> {
-        if self
-            .services
+        if let Some(s) = self.try_get_service(name).await {
+            return s;
+        }
+
+        let pending = self
+            .init_guards
             .read()
             .await
             .get(name)
             .expect(&format!("Service is not found: {}", name))
-            .read()
-            .await
-            .is_none()
-        {
-            let service_opt_lock = {
-                let map_lock = self.services.read().await;
-                map_lock.get(name).unwrap().clone()
-            };
-            // println!("Locking service: {}", name);
-            // TODO cycle depends lead to dead lock here
-            let mut service_opt = service_opt_lock.write().await;
-            if service_opt.is_none() {
-                let factories = self.factories.read().await;
-                let factory = factories
-                    .get(name)
-                    .expect(&format!("Service not found: {}", name));
-                let service = factory(self.this.upgrade().unwrap()).await;
-                // println!("Setting service: {}", name);
-                *service_opt = Some(service);
-            }
-        }
-        let map_lock = self.services.read().await;
-        let opt_lock = map_lock.get(name).unwrap();
-        let arc = opt_lock
-            .read()
-            .await
-            .as_ref()
-            .expect("Unexpected state")
             .clone();
-        arc.downcast::<T>(arc.clone()).unwrap()
+        // println!("Locking service: {}", name);
+        // TODO cycle depends lead to dead lock here
+        let _l = pending.lock().await;
+
+        if let Some(s) = self.try_get_service(name).await {
+            return s;
+        }
+
+        let factories = self.factories.read().await;
+        let factory = factories
+            .get(name)
+            .expect(&format!("Service not found: {}", name));
+        let service = factory(self.this.upgrade().unwrap()).await;
+        // println!("Setting service: {}", name);
+        self.services
+            .write()
+            .await
+            .insert(name.to_string(), service.clone());
+        return service.clone().downcast(service).unwrap();
+    }
+
+    pub async fn try_get_service<T: ?Sized + Send + Sync + 'static>(
+        &self,
+        name: &str,
+    ) -> Option<Arc<T>> {
+        self.services
+            .read()
+            .await
+            .get(name)
+            .map(|s| s.clone().downcast(s.clone()).unwrap())
     }
 
     pub async fn get_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> Arc<T> {
         self.get_service(type_name::<T>()).await
+    }
+
+    pub async fn try_get_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.try_get_service(type_name::<T>()).await
     }
 
     pub async fn has_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> bool {
