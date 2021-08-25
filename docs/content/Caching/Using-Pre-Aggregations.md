@@ -5,15 +5,6 @@ category: Caching
 menuOrder: 3
 ---
 
-<!-- prettier-ignore-start -->
-[[info |]]
-| The Cube.js pre-aggregations workshop is on August 18th at 9-11 am PST! If you
-| want to learn why/when you want to use pre-aggregations, how to get started,
-| tips & tricks, you will want to attend this event 😀 <br/> You can register
-| for the workshop at [the event
-| page](https://cube.dev/events/pre-aggregations/).
-<!-- prettier-ignore-end -->
-
 Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
 many configuration options to consider. Please make sure to also check [the
 Pre-Aggregations reference in the data schema section][ref-schema-ref-preaggs].
@@ -94,92 +85,19 @@ When `every` and `sql` are used together, Cube.js will run the query from the
 `sql` property on an interval defined by the `every` property. If the query
 returns new results, then the pre-aggregation will be refreshed.
 
-## Background Refresh
-
-Background refreshes are enabled by default for all Cube.js deployments, but
-this behaviour can be modified by setting `scheduledRefresh: false`. You can
-find more information about this setting in the [Pre-Aggregation
-Reference][ref-schema-ref-preaggs-sched-refresh].
-
-In development mode, Cube.js enables background refresh by default and will
-refresh all pre-aggregations marked with the
-[`scheduledRefresh`][ref-schema-ref-preaggs-sched-refresh] parameter.
-
-Please consult the [Production Checklist][ref-prod-list-refresh] for best
-practices on running background refresh in production environments.
-
-```js
-cube(`Orders`, {
-
-  ...,
-
-  preAggregations: {
-    amountByCreated: {
-      measures: [amount],
-      timeDimension: createdAt,
-      granularity: `month`,
-    },
-  },
-});
-```
-
 ## Rollup Only Mode
 
 To make Cube.js _only_ serve requests from pre-aggregations, the
 [`CUBEJS_ROLLUP_ONLY` environment variable][ref-config-env-general] can be set
-to `true` on an API instance. This will prevent it from checking the freshness
-of the pre-aggregations; a separate [Refresh Worker][ref-deploy-refresh-wrkr]
-must be configured to keep the pre-aggregations up-to-date.
+to `true` on an API instance. This will prevent serving data on API requests from the source database.
 
 <!-- prettier-ignore-start -->
 [[warning |]]
-| In a single node deployment (where the API instance and [Refresh Worker
+| When using this configuration in a single node deployment (where the API instance and [Refresh Worker
 | ][ref-deploy-refresh-wrkr] are configured on the same host), requests made to
 | the API that cannot be satisfied by a rollup throw an error. Scheduled
-| refreshes will continue to work in the background; if a pre-aggregation is
-| being built at the time of a request, then the request will wait until the
-| build is complete before returning results.
+| refreshes will continue to work in the background.
 <!-- prettier-ignore-end -->
-
-## Read Only Data Source
-
-In some cases, it may not be possible to stage pre-aggregation query results in
-materialized tables in the source database. For example, the database driver may
-not support it, or the source database may be read-only.
-
-To fallback to a strategy where the pre-aggregation query results are downloaded
-without first being materialized, set the `readOnly` property of
-[`driverFactory`][ref-config-driverfactory] in your configuration:
-
-```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
-module.exports = {
-  driverFactory: () =>
-    new PostgresDriver({
-      readOnly: true,
-    }),
-};
-```
-
-<!-- prettier-ignore-start -->
-[[warning |]]
-| Read only pre-aggregations are only suitable for small datasets
-| since they require loading all the data into Cube.js process memory. We **do not**
-| recommend using `readOnly` mode for production workloads.
-<!-- prettier-ignore-end -->
-
-By default, Cube.js uses temporary tables to extract data types from executed
-query while `readOnly` is `false`. If the driver is used in `readOnly` mode, it
-will use heuristics to extract data types from the database's response, but this
-strategy has certain limitations:
-
-- The aggregation results can be empty, and Cube.js will throw an exception
-  because it is impossible to detect types
-- Data types can be incorrectly inferred, in rare cases
-
-We highly recommend leaving `readOnly` unset or explicitly setting it to
-`false`.
 
 ## Partitioning
 
@@ -227,18 +145,6 @@ cube(`Orders`, {
   },
 });
 ```
-
-## Garbage Collection
-
-When pre-aggregations are refreshed, Cube.js will create new pre-aggregation
-tables each time a version change is detected. This allows for seamless,
-transparent hot swapping of tables for users of any database, even for those
-without DDL transactions support.
-
-However, it does lead to orphaned tables which need to be collected over time.
-By default, Cube.js will store all content versions for 10 minutes and all
-structure versions for 7 days. Then it will retain only the most recent ones and
-orphaned tables are dropped from the database.
 
 ## Inspecting Pre-Aggregations
 

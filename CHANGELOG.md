@@ -3,6 +3,61 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.26](https://github.com/cube-js/cube.js/compare/v0.28.25...v0.28.26) (2021-08-24)
+
+
+### Bug Fixes
+
+* **cubestore:** "Unsupported Encoding DELTA_BYTE_ARRAY" ([29fcd40](https://github.com/cube-js/cube.js/commit/29fcd407e6d00e8d2080224cc2a86befb8cbeeac))
+
+
+### Features
+
+* **cubestore:** SQL extension for rolling window queries ([88a91e7](https://github.com/cube-js/cube.js/commit/88a91e74682ed4b65eea227db415c7a4845805cf))
+
+
+
+
+
+## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** prevent redundant auth updates ([#3288](https://github.com/cube-js/cube.js/issues/3288)) ([5ebf211](https://github.com/cube-js/cube.js/commit/5ebf211fde56aeee1a59f0cabc9f7ae3f8e9ffaa))
+* **cubestore:** do not keep zombie child processes ([bfe3483](https://github.com/cube-js/cube.js/commit/bfe34839bcc1382b0a207995c06890adeedf38e7))
+
+
+### Features
+
+* **@cubejs-backend/dremio-driver:** support quarter granularity ([b193b04](https://github.com/cube-js/cube.js/commit/b193b048db4f104683ca5dc518b09647a8435a4e))
+* **@cubejs-backend/mysql-driver:** Support quarter granularity ([#3289](https://github.com/cube-js/cube.js/issues/3289)) ([6922e5d](https://github.com/cube-js/cube.js/commit/6922e5da50d2056c00a2ca248665e133a6de28be))
+* **@cubejs-client/playground:** support quarter granularity ([b93972a](https://github.com/cube-js/cube.js/commit/b93972a0f5b01140eed559036efec2feea6c2a73))
+* **athena-driver:** Allow to configure workGroup ([#3254](https://github.com/cube-js/cube.js/issues/3254)) ([a300038](https://github.com/cube-js/cube.js/commit/a300038921c8fb93f2d255b32afc5c7e8150cf65))
+
+
+
+
+
+## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** gaps in Safari 13 ([2336a94](https://github.com/cube-js/cube.js/commit/2336a94c065a1ee59dadaa385ddca4709fb9a197))
+* **server-core:** Recreate agent transport after rejected WS connection, on retries ([#3280](https://github.com/cube-js/cube.js/issues/3280)) ([48c4e88](https://github.com/cube-js/cube.js/commit/48c4e88bd1a641bf016fc9fa78d5d150a08e0239))
+
+
+### Features
+
+* Added Quarter to the timeDimensions of ([3f62b2c](https://github.com/cube-js/cube.js/commit/3f62b2c125b2b7b752e370b65be4c89a0c65a623))
+* Support quarter granularity ([4ad1356](https://github.com/cube-js/cube.js/commit/4ad1356ac2d2c4d479c25e60519b0f7b4c1605bb))
+* **oracle-driver:** Allow to specify port via env variable, fix [#3210](https://github.com/cube-js/cube.js/issues/3210) ([#3274](https://github.com/cube-js/cube.js/issues/3274)) ([95230c9](https://github.com/cube-js/cube.js/commit/95230c9ffc59819c297d4d3e393a4a1665ec4e23))
+
+
+
+
+
 ## [0.28.23](https://github.com/cube-js/cube.js/compare/v0.28.22...v0.28.23) (2021-08-18)
 
 

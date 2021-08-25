@@ -13,6 +13,8 @@ use arrow::datatypes::DataType;
 use datafusion::cube_ext::alias::LogicalAlias;
 use datafusion::cube_ext::join::SkewedLeftCrossJoin;
 use datafusion::cube_ext::joinagg::CrossJoinAgg;
+use datafusion::cube_ext::rolling::RollingWindowAggregate;
+use datafusion::logical_plan::window_frames::WindowFrameBound;
 use datafusion::logical_plan::{
     Column, DFSchemaRef, Expr, JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
     PlanVisitor,
@@ -174,6 +176,16 @@ pub enum SerializedLogicalPlan {
         group_expr: Vec<SerializedExpr>,
         agg_expr: Vec<SerializedExpr>,
         schema: DFSchemaRef,
+    },
+    RollingWindowAgg {
+        schema: DFSchemaRef,
+        input: Arc<SerializedLogicalPlan>,
+        dimension: Column,
+        partition_by: Vec<Column>,
+        from: SerializedExpr,
+        to: SerializedExpr,
+        every: SerializedExpr,
+        rolling_aggs: Vec<SerializedExpr>,
     },
 }
 
@@ -363,6 +375,27 @@ impl SerializedLogicalPlan {
                     schema: schema.clone(),
                 }),
             },
+            SerializedLogicalPlan::RollingWindowAgg {
+                schema,
+                input,
+                dimension,
+                partition_by,
+                from,
+                to,
+                every,
+                rolling_aggs,
+            } => LogicalPlan::Extension {
+                node: Arc::new(RollingWindowAggregate {
+                    schema: schema.clone(),
+                    input: input.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                    dimension: dimension.clone(),
+                    from: from.expr(),
+                    to: to.expr(),
+                    every: every.expr(),
+                    partition_by: partition_by.clone(),
+                    rolling_aggs: exprs(&rolling_aggs),
+                }),
+            },
         })
     }
 }
@@ -425,6 +458,11 @@ pub enum SerializedExpr {
     AggregateUDF {
         fun: CubeAggregateUDFKind,
         args: Vec<SerializedExpr>,
+    },
+    RollingAggregate {
+        agg: Box<SerializedExpr>,
+        start: WindowFrameBound,
+        end: WindowFrameBound,
     },
     InList {
         expr: Box<SerializedExpr>,
@@ -514,6 +552,11 @@ impl SerializedExpr {
                 negated: *negated,
                 low: Box::new(low.expr()),
                 high: Box::new(high.expr()),
+            },
+            SerializedExpr::RollingAggregate { agg, start, end } => Expr::RollingAggregate {
+                agg: Box::new(agg.expr()),
+                start: start.clone(),
+                end: end.clone(),
             },
             SerializedExpr::InList {
                 expr,
@@ -749,6 +792,17 @@ impl SerializedPlan {
                         alias: alias.alias.clone(),
                         schema: alias.schema.clone(),
                     }
+                } else if let Some(r) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
+                    SerializedLogicalPlan::RollingWindowAgg {
+                        schema: r.schema.clone(),
+                        input: Arc::new(Self::serialized_logical_plan(&r.input)),
+                        dimension: r.dimension.clone(),
+                        partition_by: r.partition_by.clone(),
+                        from: Self::serialized_expr(&r.from),
+                        to: Self::serialized_expr(&r.to),
+                        every: Self::serialized_expr(&r.every),
+                        rolling_aggs: Self::serialized_exprs(&r.rolling_aggs),
+                    }
                 } else {
                     panic!("unknown extension");
                 }
@@ -900,7 +954,24 @@ impl SerializedPlan {
                 list: list.iter().map(|e| Self::serialized_expr(&e)).collect(),
                 negated: *negated,
             },
+            Expr::RollingAggregate {
+                agg,
+                start: start_bound,
+                end: end_bound,
+            } => SerializedExpr::RollingAggregate {
+                agg: Box::new(Self::serialized_expr(&agg)),
+                start: start_bound.clone(),
+                end: end_bound.clone(),
+            },
             Expr::WindowFunction { .. } => panic!("window functions are not supported"),
         }
     }
+
+    fn serialized_exprs(e: &[Expr]) -> Vec<SerializedExpr> {
+        e.iter().map(|e| Self::serialized_expr(e)).collect()
+    }
+}
+
+fn exprs(e: &[SerializedExpr]) -> Vec<Expr> {
+    e.iter().map(|e| e.expr()).collect()
 }

@@ -23,6 +23,7 @@ const granularities = [
   { name: 'day', title: 'Day' },
   { name: 'week', title: 'Week' },
   { name: 'month', title: 'Month' },
+  { name: 'quarter', title: 'Quarter' },
   { name: 'year', title: 'Year' },
 ];
 

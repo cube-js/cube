@@ -88,14 +88,26 @@ These recipes will show you the best practices of using Cube.js.
 - [Funnel Analysis](/recipes/funnels)
 - [Retention Analysis](/recipes/cohort-retention)
 
+### Access control
+
+- [Role-Based Access](/recipes/role-based-access)
+- [Column-Based Access](/recipes/column-based-access)
+
 ### Data Sources
 
 - [Enable SSL Connections to the Database](/recipes/enable-ssl-connections-to-database)
 
 ### Data schema
 
+- [Calculating Average and Percentiles](https://cube.dev/docs/recipes/percentiles)
 - [Dynamically Union Tables](/recipes/dynamically-union-tables)
+
+### Queries
+
+- [Enforcing Mandatory Filters](/recipes/enforcing-mandatory-filters)
+- [Pagination](/recipes/pagination)
 
 ### Code reusability
 
 - [Schema Generation](/recipes/schema-generation)
+- [Polymorphic Cubes](/recipes/polymorphic-cubes)

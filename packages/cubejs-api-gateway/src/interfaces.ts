@@ -29,7 +29,8 @@ export type QueryTimeDimensionGranularity =
   | 'day'
   | 'week'
   | 'month'
-  | 'year';
+  | 'year'
+  | 'quarter';
 
 export interface QueryTimeDimension {
   dimension: string;

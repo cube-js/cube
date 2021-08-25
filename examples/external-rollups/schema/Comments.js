@@ -1,5 +1,9 @@
 cube(`Comments`, {
-  sql: `select * from \`bigquery-public-data.hacker_news.comments\` WHERE time_ts IS NOT NULL`,
+  sql: `
+    SELECT *
+    FROM \`bigquery-public-data.hacker_news.comments\`
+    WHERE time_ts IS NOT NULL
+  `,
 
   joins: {
     Stories: {
@@ -30,20 +34,20 @@ cube(`Comments`, {
 
 cube(`CommentsPreAgg`, {
   extends: Comments,
+
   joins: {
     StoriesPreAgg: {
       sql: `${CUBE}.parent = ${StoriesPreAgg}.id`,
       relationship: `belongsTo`
     }
   },
+
   preAggregations: {
     rollupByDay: {
-      type: `rollup`,
-      measureReferences: [count],
-      dimensionReferences: [StoriesPreAgg.category],
+      measures: [ count ],
+      dimensions: [ StoriesPreAgg.category ],
       granularity: `day`,
-      timeDimensionReference: time,
-      external: true
+      timeDimension: time
     }
   }
 });

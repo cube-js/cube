@@ -8,7 +8,6 @@ pub mod serialized_plan;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
-mod datetime;
 mod now;
 pub mod udfs;
 

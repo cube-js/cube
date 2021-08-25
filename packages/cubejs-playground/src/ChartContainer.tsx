@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { Component, useEffect } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -90,9 +90,17 @@ type ChartContainerProps = {
   [k: string]: any;
 };
 
+type ChartContainerState = {
+  sql: {
+    loading: boolean;
+    value?: string;
+  };
+  [k: string]: any;
+};
+
 class ChartContainer extends Component<
   ChartContainerProps & RouteComponentProps,
-  any
+  ChartContainerState
 > {
   static defaultProps = {
     query: {},
@@ -153,7 +161,10 @@ class ChartContainer extends Component<
     this.state = {
       showCode: false,
       chartRendererError: null,
-    } as any;
+      sql: {
+        loading: false,
+      },
+    };
   }
 
   render() {
@@ -165,6 +176,7 @@ class ChartContainer extends Component<
       showCode,
       addingToDashboard,
       chartRendererError,
+      sql,
     } = this.state;
     const {
       isChartRendererReady,
@@ -448,14 +460,32 @@ class ChartContainer extends Component<
           <QueryRenderer
             loadSql="only"
             query={query}
-            render={({ sqlQuery, error }) => {
+            render={({ sqlQuery, loadingState, error }) => {
               if (error) {
                 return <FatalError error={error} />;
               }
 
-              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
-              return <PrismCode code={query && format(query.sql())} />;
+              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
+              const value = query && format(query.sql());
+
+              return (
+                <>
+                  <PrismCode code={value} />
+                  <SqlEmitter
+                    loading={loadingState.isLoading}
+                    sql={value}
+                    onChange={({ sql, loading }) => {
+                      this.setState({
+                        sql: {
+                          loading,
+                          value: sql,
+                        },
+                      });
+                    }}
+                  />
+                </>
+              );
             }}
           />
         );
@@ -471,6 +501,7 @@ class ChartContainer extends Component<
       title = (
         <SectionRow style={{ alignItems: 'center' }}>
           <div>Code</div>
+
           <Button
             data-testid="copy-code-btn"
             icon={<CopyOutlined />}
@@ -490,6 +521,7 @@ class ChartContainer extends Component<
       title = (
         <SectionRow>
           <div>Query</div>
+
           <Button
             data-testid="copy-cube-query-btn"
             icon={<CopyOutlined />}
@@ -505,7 +537,26 @@ class ChartContainer extends Component<
         </SectionRow>
       );
     } else if (showCode === 'sql') {
-      title = 'SQL';
+      title = (
+        <SectionRow>
+          <div>SQL</div>
+
+          {!sql.loading && sql.value ? (
+            <Button
+              data-testid="copy-sql-btn"
+              icon={<CopyOutlined />}
+              size="small"
+              onClick={async () => {
+                await copyToClipboard(sql.value, 'The SQL has been copied');
+                playgroundAction('Copy SQL to Clipboard');
+              }}
+              type="primary"
+            >
+              Copy to Clipboard
+            </Button>
+          ) : null}
+        </SectionRow>
+      );
     } else if (showCode === 'cache') {
       title = 'Cache';
     } else {
@@ -520,6 +571,25 @@ class ChartContainer extends Component<
       </StyledCard>
     );
   }
+}
+
+type SqlEmitterOnChangeProps = {
+  sql?: string;
+  loading: boolean;
+};
+
+type SqlEmitterProps = {
+  loading: boolean;
+  sql?: string;
+  onChange: (props: SqlEmitterOnChangeProps) => void;
+};
+
+function SqlEmitter({ sql, loading, onChange }: SqlEmitterProps) {
+  useEffect(() => {
+    onChange({ sql, loading });
+  }, [sql, loading]);
+
+  return null;
 }
 
 export default withRouter(ChartContainer);
