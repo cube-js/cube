@@ -147,12 +147,12 @@ function QueryChangeEmitter({
   query2,
   onChange,
 }: QueryChangeEmitterProps) {
-  useEffect(() => {
+  useDeepEffect(() => {
     if (!areQueriesEqual(query1, query2)) {
       onChange();
     }
-  }, [areQueriesEqual(query1, query2)]);
-
+  }, [query1, query2]);
+  
   return null;
 }
 
@@ -207,7 +207,7 @@ export function PlaygroundQueryBuilder({
 
   const { refreshToken } = useSecurityContext();
 
-  const ref = useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
 
   const [tokenRefreshed, setTokenRefreshed] = useState<boolean>(false);
@@ -225,30 +225,34 @@ export function PlaygroundQueryBuilder({
   }, [isMounted]);
 
   useEffect(() => {
-    if (isChartRendererReady && ref.current) {
-      dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
-        token: cubejsToken,
-        apiUrl,
-      });
+    if (isChartRendererReady && iframeRef.current) {
+      dispatchPlaygroundEvent(
+        iframeRef.current.contentDocument,
+        'credentials',
+        {
+          token: cubejsToken,
+          apiUrl,
+        }
+      );
     }
-  }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
+  }, [iframeRef, cubejsToken, apiUrl, isChartRendererReady]);
 
   function handleRunButtonClick({
     query,
     pivotConfig,
     chartType,
   }: HandleRunButtonClickProps) {
-    if (ref.current) {
+    if (iframeRef.current) {
       if (areQueriesEqual(query, queryRef.current)) {
-        dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
+        dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
           pivotConfig,
           query,
           chartType,
           chartingLibrary,
         });
-        dispatchPlaygroundEvent(ref.current.contentDocument, 'refetch');
+        dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'refetch');
       } else {
-        dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
+        dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
           pivotConfig,
           query,
           chartType,
@@ -413,9 +417,9 @@ export function PlaygroundQueryBuilder({
                       playgroundAction('Change Chart Type');
                       updateChartType(type);
 
-                      if (ref.current) {
+                      if (iframeRef.current) {
                         dispatchPlaygroundEvent(
-                          ref.current.contentDocument,
+                          iframeRef.current.contentDocument,
                           'chart',
                           {
                             chartType: type,
@@ -473,7 +477,7 @@ export function PlaygroundQueryBuilder({
                   <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
-                    iframeRef={ref}
+                    iframeRef={iframeRef}
                     isChartRendererReady={isChartRendererReady}
                     query={query}
                     error={error}
@@ -489,9 +493,9 @@ export function PlaygroundQueryBuilder({
                       }
                     }}
                     setChartLibrary={(value) => {
-                      if (ref.current) {
+                      if (iframeRef.current) {
                         dispatchPlaygroundEvent(
-                          ref.current.contentDocument,
+                          iframeRef.current.contentDocument,
                           'chart',
                           {
                             chartingLibrary: value,
@@ -520,12 +524,12 @@ export function PlaygroundQueryBuilder({
                           chartType={chartType || 'line'}
                           query={query}
                           pivotConfig={pivotConfig}
-                          iframeRef={ref}
+                          iframeRef={iframeRef}
                           queryHasMissingMembers={missingMembers.length > 0}
                           onRunButtonClick={async () => {
                             if (
                               isChartRendererReady &&
-                              ref.current &&
+                              iframeRef.current &&
                               missingMembers.length === 0
                             ) {
                               await refreshToken();
@@ -549,7 +553,7 @@ export function PlaygroundQueryBuilder({
             </Row>
 
             <PivotChangeEmitter
-              iframeRef={ref}
+              iframeRef={iframeRef}
               chartType={chartType || 'line'}
               pivotConfig={pivotConfig}
             />
