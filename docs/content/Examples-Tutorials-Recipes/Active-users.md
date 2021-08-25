@@ -8,88 +8,118 @@ redirect_from:
   - /active-users
 ---
 
-<!-- prettier-ignore-start -->
-[[info | ]]
-| This content is being moved to the [Cube.js community forum](https://forum.cube.dev/).
-| We encourage you to follow the content and discussions [in the new forum post](https://forum.cube.dev/t/daily-weekly-monthly-active-users).
-<!-- prettier-ignore-end -->
+## Use case
 
-You may be familiar with <b>Active Users metric</b>, which is commonly used to
-get a sense of your engagement. Daily, weekly, and monthly active users are
-commonly referred to as <b>DAU, WAU, MAU</b>. To get these metrics, we need to
-use a <b>rolling time frame</b> to calculate a daily count of how many users
-interacted with the product or website in the prior day, 7 days, or 30 days.
+We want to know the customer engagement of our store. To do this, we need to use
+an [Active Users metric](https://en.wikipedia.org/wiki/Active_users).
 
-You need event data to build this analysis. You can use tools like Google
-Analytics, Segment, Snowplow, or your custom event tracking system.
+## Data schema
+
+Daily, weekly, and monthly active users are commonly referred to as DAU, WAU,
+MAU. To get these metrics, we need to use a rolling time frame to calculate a
+daily count of how many users interacted with the product or website in the
+prior day, 7 days, or 30 days. Also, we can build other metrics on top of these
+basic metrics. For example, the WAU to MAU ratio, which we can add by using already
+defined `weeklyActiveUsers` and `monthlyActiveUsers`.
 
 To calculate daily, weekly, or monthly active users we’re going to use the
-`rollingWindow` measure parameter. `rollingWindow` accepts 3 parameters:
-trailing, leading, and offset. You can read about what each of them does
-[here](/schema/reference/measures#parameters-rolling-window).
-
-For our purpose, we need only offset and trailing. We will set offset to
-<b>start</b> and the trailing parameter to the number of days – 1, 7, or 30.
-
-In the example below, we’ll create a cube called `ActiveUsers` with data from
-our events table.
-
-<div class="block help-block">Please note, we are using interval literal in the trailing parameter.
-The example below should work in Redshift and BigQuery. The exact interval literal could be different, depending on your database.
-</div>
+[`rollingWindow`](https://cube.dev/docs/schema/reference/measures#parameters-rolling-window)
+measure parameter.
 
 ```javascript
-cube(`ActiveUsers`, {
-  sql: `select id, user_id, timestamp from events`,
+cube(`Users`, {
+  sql: `SELECT * FROM public.users`,
+
   measures: {
     monthlyActiveUsers: {
-      sql: `user_id`,
+      sql: `id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `30 day`,
         offset: `start`,
       },
     },
+
     weeklyActiveUsers: {
-      sql: `user_id`,
+      sql: `id`,
       type: `countDistinct`,
       rollingWindow: {
-        trailing: `1 week`,
+        trailing: `7 day`,
         offset: `start`,
       },
     },
+
     dailyActiveUsers: {
-      sql: `user_id`,
+      sql: `id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `1 day`,
         offset: `start`,
       },
     },
+
+    wauToMau: {
+      title: `WAU to MAU`,
+      sql: `100.000 * ${weeklyActiveUsers} / NULLIF(${monthlyActiveUsers}, 0)`,
+      type: `number`,
+      format: `percent`,
+    },
   },
+
   dimensions: {
-    timestamp: {
-      sql: `timestamp`,
+    createdAt: {
+      sql: `created_at`,
       type: `time`,
     },
   },
 });
 ```
 
-Going further, we can build other metrics on top of these basic metrics. For
-example, <b>the DAU to MAU ratio</b> is one of the most popular metrics used to
-<b>measure the stickiness of the product</b>. We can easily add it, using
-already defined `dailyActiveUsers` and `monthlyActiveUsers`.
+## Query
+
+We should set a `timeDimensions` with the `dateRange`.
+
+```bash
+curl cube:4000/cubejs-api/v1/load \
+'query={
+  "measures": [
+    "Users.monthlyActiveUsers",
+    "Users.weeklyActiveUsers",
+    "Users.dailyActiveUsers",
+    "Users.wauToMau"
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "Users.createdAt",
+      "dateRange": [
+        "2020-01-01",
+        "2020-12-31"
+      ]
+    }
+  ]
+}'
+```
+
+## Result
+
+We got the data with our daily, weekly, and monthly active users.
 
 ```javascript
-cube(`ActiveUsers`, {
-  measures: {
-    dauToMau: {
-      title: `DAU to MAU`,
-      sql: `100.000 * ${dailyActiveUsers} / NULLIF(${monthlyActiveUsers}, 0)`,
-      type: `number`,
-      format: `percent`,
-    },
-  },
-});
+{
+  "data": [
+    {
+      "Users.monthlyActiveUsers": "22",
+      "Users.weeklyActiveUsers": "4",
+      "Users.dailyActiveUsers": "0",
+      "Users.wauToMau": "18.1818181818181818"
+    }
+  ]
+}
 ```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/active-users)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.
