@@ -172,6 +172,9 @@ database:
   ## The password used to connect to the database
   ##
   pass:
+  # passFromSecret:
+  #   name:
+  #   key:
 
   ## A domain name within the database to connect to
   ##
@@ -404,6 +407,10 @@ workers:
   resources: {}
 
 service:
+  ## Set to true to enable service generation
+  ##
+  enabled: true
+
   ## Master service type
   ##
   type: ClusterIP

@@ -126,6 +126,13 @@
 {{- if .Values.database.pass }}
 - name: CUBEJS_DB_PASS
   value: {{ .Values.database.pass | quote }}
+{{- else if .Values.database.passFromSecret }}
+- name: CUBEJS_DB_PASS
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.database.passFromSecret.name | required "database.passFromSecret.name is required" }}
+      key: {{ .Values.database.passFromSecret.key | required "database.passFromSecret.key is required" }}
+
 {{- end }}
 {{- if .Values.database.domain }}
 - name: CUBEJS_DB_DOMAIN
