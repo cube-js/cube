@@ -33,6 +33,10 @@
 {{- end }}
 - name: CUBEJS_TELEMETRY
   value: {{ .Values.global.telemetry | quote }}
+{{- if .Values.global.apiSecret }}
+- name: CUBEJS_API_SECRET
+  value: {{ .Values.global.apiSecret | quote }}
+{{- end }}
 {{- if .Values.global.schemaPath }}
 - name: CUBEJS_SCHEMA_PATH
   value: {{ .Values.global.schemaPath | quote }}

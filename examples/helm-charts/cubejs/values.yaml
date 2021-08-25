@@ -49,6 +49,10 @@ global:
   ##
   telemetry: false
 
+  ## The secret key used to sign and verify JWTs. Generated on project scaffold
+  ##
+  apiSecret:
+
   ## The path where Cube.js loads schemas from. Defaults to schema
   ##
   schemaPath:
