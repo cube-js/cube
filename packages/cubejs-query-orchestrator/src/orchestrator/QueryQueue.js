@@ -481,9 +481,9 @@ export class QueryQueue {
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
                 requestId: queryWithCancelHandle.requestId,
-                metadata: queryWithCancelHandle.metadata,
-                preAggregationId: queryWithCancelHandle.preAggregation?.preAggregationId,
-                newVersionEntry: queryWithCancelHandle.newVersionEntry,
+                metadata: queryWithCancelHandle.query?.metadata,
+                preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
+                newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
             }
