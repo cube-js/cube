@@ -5,6 +5,8 @@ port=4000
 loadUrl=cubejs-api/v1/load
 readyzUrl=readyz
 
+token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o
+
 countQuery=$(cat query/queries/count.json)
 firstQuery=$(cat query/queries/first.json)
 secondQuery=$(cat query/queries/second.json)
@@ -15,9 +17,9 @@ until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
 done
 
 # Send the query
-curl "$host":"$port"/"$loadUrl" -G -s --data-urlencode "query=${countQuery}" -o countResponse.json
-curl "$host":"$port"/"$loadUrl" -G -s --data-urlencode "query=${firstQuery}" -o firstResponse.json
-curl "$host":"$port"/"$loadUrl" -G -s --data-urlencode "query=${secondQuery}" -o secondResponse.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${countQuery}" -o countResponse.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${firstQuery}" -o firstResponse.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${secondQuery}" -o secondResponse.json
 
 echo "Orders count:"
 jq ".data" countResponse.json

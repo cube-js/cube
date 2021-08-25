@@ -51,18 +51,21 @@ get the orders from the Cube API.
 ```bash
 // Get count of the orders
 curl cube:4000/cubejs-api/v1/load \
+-H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
 "query={"measures": ["Orders.count"]}"
 ```
 
 ```bash
 // Get first five orders
 curl cube:4000/cubejs-api/v1/load \
+-H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
 "query={"order": [["Orders.number", "asc"]], "dimensions": ["Orders.number"], "limit": 5}"
 ```
 
 ```bash
 // Get next five orders
 curl cube:4000/cubejs-api/v1/load \
+-H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
 "query={"order": [["Orders.number", "asc"]], "dimensions": ["Orders.number"], "limit": 5, "offset": 5}"
 ```
 
