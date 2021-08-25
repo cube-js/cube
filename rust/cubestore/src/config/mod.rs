@@ -6,7 +6,7 @@ use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
 use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
-use crate::config::injection::{get_service, get_service_typed, DIService, Injector, InjectorRef};
+use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
@@ -747,8 +747,8 @@ impl Config {
                         let meta_store = RocksMetaStore::load_from_remote(
                             &path,
                             // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                            get_service(&i, "original_remote_fs").await,
-                            get_service_typed::<dyn ConfigObj>(&i).await,
+                            i.get_service("original_remote_fs").await,
+                            i.get_service_typed::<dyn ConfigObj>().await,
                         )
                         .await
                         .unwrap();
@@ -864,9 +864,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    i.get_service_typed::<dyn ConfigObj>()
-                        .await
-                        .wal_split_threshold() as usize,
+                    c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     c.max_cached_queries(),
                 )
