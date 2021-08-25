@@ -1,0 +1,309 @@
+# Cubejs Chart
+
+## Installing the Chart
+
+```bash
+$ cd examples/helm-charts
+$ helm install my-release \
+--set database.type=<db-type>
+--set ...
+./cubejs
+```
+
+## Uninstalling the Chart
+
+To uninstall/delete the `my-release` deployment:
+
+```bash
+$ helm delete my-release
+```
+
+## Customize values
+
+By default a router and one workers will be deployed. You can customize the deployment using helm values.
+
+Refer to the official documentation for more information:
+https://cube.dev/docs/reference/environment-variables
+
+### Injecting schema
+
+To inject your schema files in the deployment you have to set custom volumes on all your cubejs instances.
+A good practice is to create a single configmap containing all your cube files:
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cube-schema
+data:
+  Cube1.js: |
+    cube(`Cube1`, {
+      sql: `SELECT * FROM cube1_data`,
+
+      measures: {
+        count: {
+          type: `count`,
+        },
+      },
+    });
+  Cube2.js: |
+    cube(`Cube2`, {
+      sql: `SELECT * FROM cube2_data`,
+
+      measures: {
+        count: {
+          type: `count`,
+        },
+      },
+    });
+
+```
+
+### Example
+
+Deployment with:
+
+- BigQuery db with exportBucket on GCS
+- Schema located in a `cube-schema` ConfigMap
+- Redis (using pasword in a secret)
+- Cubestore
+
+```bash
+$ helm install my-release \
+--set global.volumes[0].name=schema \
+--set global.volumes[0].configMap.name=cube-schema \
+--set global.volumeMounts[0].name=schema \
+--set global.volumeMounts[0].readOnly=true \
+--set global.volumeMounts[0].mountPath=/cube/conf/schema \
+--set database.type=bigquery \
+--set database.bigquery.projectId=<project-id> \
+--set database.bigquery.credentialsFromSecret.name=<service-account-secret-name> \
+--set database.bigquery.credentialsFromSecret.key=<service-account-secret-key> \
+--set exportBucket.type=gcp \
+--set exportBucket.name.key=<bucket-name> \
+--set exportBucket.gcsCredentialsFromSecret.name=<service-account-secret-name> \
+--set exportBucket.gcsCredentialsFromSecret.name=<service-account-secret-key> \
+--set redis.url=<redis-url> \
+--set redis.passwordFromSecret.name=<redis-secret-name> \
+--set redis.passwordFromSecret.key=<redis-secret-key> \
+--set cubestore.host=<cubestore-host>
+./cubejs
+```
+
+Or for more readability, using a custom `values.yaml` file:
+
+```bash
+$ helm install my-release -f path/to/values.yaml ./cubejs
+```
+
+```yaml
+# values.yaml
+global:
+  volumes:
+    - name: schema
+      configMap:
+        name: cube-schema
+  volumeMounts:
+    - name: schema
+      readOnly: true
+      mountPath: /cube/conf/schema
+
+redis:
+  url: <redis-url>
+  passwordFromSecret:
+    name: <redis-secret-name>
+    key: <redis-secret-key>
+
+database:
+  type: bigquery
+  bigquery:
+    projectId: <project-id>
+    credentialsFromSecret:
+      name: <service-account-secret-name>
+      key: <service-account-secret-key>
+
+exportBucket:
+  type: gcp
+  name: <bucket-name>
+  gcsCredentialsFromSecret:
+    name: <service-account-secret-name>
+    key: <service-account-secret-key>
+
+cubestore:
+  host: <cubestore-host>
+```
+
+## Parameters
+
+### Common parameters
+
+| Name               | Description                                                  | Value |
+| ------------------ | ------------------------------------------------------------ | ----- |
+| `nameOverride`     | Override the name                                            | `""`  |
+| `fullnameOverride` | Provide a name to substitute for the full names of resources | `""`  |
+
+### Image parameters
+
+| Name               | Description                                          | Value          |
+| ------------------ | ---------------------------------------------------- | -------------- |
+| `image.repository` | Cubestore image repository                           | `cubejs/cube`  |
+| `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`      |
+| `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent` |
+
+### Global parameters
+
+| Name                               | Description                                                                                                                     | Value   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `global.port`                      | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
+| `global.devMode`                   | If true, enables development mode                                                                                               | `false` |
+| `global.debug`                     | If true, enables debug logging                                                                                                  | `false` |
+| `global.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
+| `global.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
+| `global.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
+| `global.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
+| `global.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   | `false` |
+| `global.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 | `false` |
+| `global.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 | `false` |
+| `global.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
+| `global.volumeMounts`              | he config volumeMounts. Will be used to both master and workers                                                                 | `[]`    |
+
+### Redis parameters
+
+| Name                            | Description                                                                                                                                              | Value |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `redis.url`                     | The host URL for a Redis server                                                                                                                          |       |
+| `redis.password`                | The password used to connect to the Redis server                                                                                                         |       |
+| `redis.passwordFromSecret.name` | The password used to connect to the Redis server (using secret)                                                                                          |       |
+| `redis.passwordFromSecret.key`  | The password used to connect to the Redis server (using secret)                                                                                          |       |
+| `redis.tls`                     | If true, then the connection to the Redis server is protected by TLS authentication. Defaults to false                                                   |
+| `redis.poolMin`                 | The minimum number of connections to keep active in the Redis connection pool for a single appId (tenant). Must be lower than poolMax. Defaults to 2     |
+| `redis.poolMax`                 | The maximum number of connections to keep active in the Redis connection pool for a single appId (tenant). Must be higher than poolMin. Defaults to 1000 |       |
+| `redis.useIoRedis`              | Use ioredis instead of redis. Defaults to false                                                                                                          |       |
+
+### JWT parameters
+
+| Name                      | Description                                                                               | Value |
+| ------------------------- | ----------------------------------------------------------------------------------------- | ----- |
+| `jwt.url`                 | A valid URL to a JSON Web Key Sets (JWKS)                                                 |       |
+| `jwt.key`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                |       |
+| `jwt.keyFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret) |       |
+| `jwt.keyFromSecret.value` | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret) |       |
+| `jwt.audience`            | An audience value which will be used to enforce the aud claim from inbound JWTs           |       |
+| `jwt.issuer`              | An issuer value which will be used to enforce the iss claim from inbound JWTs             |       |
+| `jwt.subject`             | A subject value which will be used to enforce the sub claim from inbound JWTs             |       |
+| `jwt.algs`                | Any supported algorithm for decoding JWTs                                                 |       |
+| `jwt.claimsNamespace`     | A namespace within the decoded JWT under which any custom claims can be found             |       |
+
+### Database parameters
+
+| Name                                           | Description                                                                      | Value   |
+| ---------------------------------------------- | -------------------------------------------------------------------------------- | ------- |
+| `database.type`                                | A database type supported by Cube.js                                             |         |
+| `database.url`                                 | The URL for a database                                                           |         |
+| `database.host`                                | The host URL for a database                                                      |         |
+| `database.port`                                | The port for the database connection                                             |         |
+| `database.schema`                              | The schema within the database to connect to                                     |         |
+| `database.name`                                | The name of the database to connect to                                           |         |
+| `database.user`                                | The username used to connect to the database                                     |         |
+| `database.pass`                                | The password used to connect to the database                                     |         |
+| `database.passFromSecret.name`                 | The password used to connect to the database (using secret)                      |         |
+| `database.passFromSecret.key`                  | The password used to connect to the database (using secret)                      |         |
+| `database.domain`                              | A domain name within the database to connect to                                  |         |
+| `database.socketPath`                          | The path to a Unix socket for a MySQL database                                   |         |
+| `database.catalog`                             | The catalog within the database to connect to                                    |         |
+| `database.maxPool`                             | The maximum number of connections to keep active in the database connection pool |         |
+| `database.ssl.enabled`                         | If true, enables SSL encryption for database connections from Cube.js            | `false` |
+| `database.ssl.rejectUnAuthorized`              | If true, verifies the CA chain with the system's built-in CA chain               |         |
+| `database.ssl.ca`                              | The contents of a CA bundle in PEM format, or a path to one                      |         |
+| `database.ssl.cert`                            | The contents of an SSL certificate in PEM format, or a path to one               |         |
+| `database.ssl.key`                             | The contents of a private key in PEM format, or a path to one                    |         |
+| `database.ssl.ciphers`                         | The ciphers used by the SSL certificate                                          |         |
+| `database.ssl.serverName`                      | The server name for the SNI TLS extension                                        |         |
+| `database.ssl.passPhrase`                      | he passphrase used to encrypt the SSL private key                                |         |
+| `database.aws.key`                             | The AWS Access Key ID to use for database connections                            |         |
+| `database.aws.keyFromSecret.name`              | The AWS Access Key ID to use for database connections (using secret)             |         |
+| `database.aws.keyFromSecret.key`               | The AWS Access Key ID to use for database connections (using secret)             |         |
+| `database.aws.region`                          | The AWS region of the Cube.js deployment                                         |         |
+| `database.aws.outputLocation`                  | The S3 path to store query results made by the Cube.js deployment                |         |
+| `database.aws.secret`                          | The AWS Secret Access Key to use for database connections                        |         |
+| `database.aws.secretFromSecret.name`           | The AWS Secret Access Key to use for database connections (using secret)         |         |
+| `database.aws.secretFromSecret.key`            | The AWS Secret Access Key to use for database connections (using secret)         |         |
+| `database.aws.athenaWorkgroup`                 | The name of the workgroup in which the query is being started                    |         |
+| `database.bigquery.projectId`                  | The Google BigQuery project ID to connect to                                     |         |
+| `database.bigquery.location`                   | The Google BigQuery dataset location to connect to                               |         |
+| `database.bigquery.credentials`                | A Base64 encoded JSON key file for connecting to Google BigQuery                 |         |
+| `database.bigquery.credentialsFromSecret.name` | A Base64 encoded JSON key file for connecting to Google BigQuery (using secret)  |         |
+| `database.bigquery.credentialsFromSecret.key`  | A Base64 encoded JSON key file for connecting to Google BigQuery (using secret)  |         |
+| `database.hive.cdhVersion`                     | The version of the CDH instance for Apache Hive                                  |         |
+| `database.hive.thriftVersion`                  | The version of Thrift Server for Apache Hive                                     |         |
+| `database.hive.type`                           | The type of Apache Hive server                                                   |         |
+| `database.hive.version`                        | The version of Apache Hive                                                       |         |
+| `database.jdbc.driver`                         | The driver of jdbc connection                                                    |         |
+| `database.jdbc.url`                            | The URL for a JDBC connection                                                    |         |
+| `database.snowFlake.account`                   | The Snowflake account ID to use when connecting to the database                  |         |
+| `database.snowFlake.region`                    | The Snowflake region to use when connecting to the database                      |         |
+| `database.snowFlake.role`                      | The Snowflake role to use when connecting to the database                        |         |
+| `database.snowFlake.warehouse`                 | The Snowflake warehouse to use when connecting to the database                   |         |
+| `database.snowFlake.clientSessionKeepAlive`    | If true, keep the Snowflake connection alive indefinitely                        |         |
+| `database.snowFlake.authenticator`             | The type of authenticator to use with Snowflake. Defaults to SNOWFLAKE           |         |
+| `database.snowFlake.privateKeyPath`            | The path to the private RSA key folder                                           |         |
+| `database.snowFlake.privateKeyPass`            | The password for the private RSA key. Only required for encrypted keys           |         |
+| `database.databricks.url`                      | The URL for a JDBC connection                                                    |         |
+
+### Export Bucket parameters
+
+| Name                                         | Description                                                                | Value |
+| -------------------------------------------- | -------------------------------------------------------------------------- | ----- |
+| `exportBucket.name`                          | The name of a bucket in cloud storage                                      |       |
+| `exportBucket.type`                          | The cloud provider where the bucket is hosted (gcs, s3)                    |       |
+| `exportBucket.gcsCredentials`                | Base64 encoded JSON key file for connecting to Google Cloud                |       |
+| `exportBucket.gcsCredentialsFromSecret.name` | Base64 encoded JSON key file for connecting to Google Cloud (using secret) |       |
+| `exportBucket.gcsCredentialsFromSecret.key`  | Base64 encoded JSON key file for connecting to Google Cloud (using secret) |       |
+
+### Cubestore parameters
+
+| Name             | Description                               | Value |
+| ---------------- | ----------------------------------------- | ----- |
+| `cubestore.host` | The hostname of the Cube Store deployment |       |
+| `cubestore.port` | The port of the Cube Store deployment     |       |
+
+### Master parameters
+
+| Name                               | Description                                          | Value |
+| ---------------------------------- | ---------------------------------------------------- | ----- |
+| `master.affinity`                  | Affinity for pod assignment                          | `{}`  |
+| `master.topologySpreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
+| `master.resources`                 | Define resources requests and limits for single Pods | `{}`  |
+
+### Workers parameters
+
+| Name                                | Description                                          | Value |
+| ----------------------------------- | ---------------------------------------------------- | ----- |
+| `workers.workersCount`              | Number of workers to deploy                          | `1`   |
+| `workers.affinity`                  | Affinity for pod assignment                          | `{}`  |
+| `workers.topologySpreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
+| `workers.resources`                 | Define resources requests and limits for single Pods | `{}`  |
+
+## Service parameters
+
+| Name                               | Description                                      | Value       |
+| ---------------------------------- | ------------------------------------------------ | ----------- |
+| `service.enabled`                  | Set to true to enable service generation         | `true`      |
+| `service.type`                     | Master service type                              | `ClusterIP` |
+| `service.port`                     | Master service port                              | `80`        |
+| `service.nodePort`                 | Node port for master                             | `""`        |
+| `service.externalTrafficPolicy`    | Master service external traffic policy           | `Cluster`   |
+| `service.clusterIP`                | aster service Cluster IP                         | `""`        |
+| `service.loadBalancerIP`           | Master service Load Balancer IP                  | `""`        |
+| `service.loadBalancerSourceRanges` | Master service Load Balancer sources             | `[]`        |
+| `service.annotations`              | Additional custom annotations for master service | `{}`        |
+
+## Ingress parameters
+
+| Name                  | Description                                                                     | Value          |
+| --------------------- | ------------------------------------------------------------------------------- | -------------- |
+| `ingress.enabled`     | Set to true to enable ingress record generation                                 | `false`        |
+| `ingress.hostname`    | When the ingress is enabled, a host pointing to this will be created            | `cubejs.local` |
+| `ingress.path`        | The Path to Cubejs                                                              | `/`            |
+| `ingress.annotations` | Ingress annotations                                                             | `{}`           |
+| `ingress.tls`         | Enable TLS configuration for the hostname defined at ingress.hostname parameter | `false`        |
