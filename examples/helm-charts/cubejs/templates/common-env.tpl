@@ -144,7 +144,6 @@
     secretKeyRef:
       name: {{ .Values.database.passFromSecret.name | required "database.passFromSecret.name is required" }}
       key: {{ .Values.database.passFromSecret.key | required "database.passFromSecret.key is required" }}
-
 {{- end }}
 {{- if .Values.database.domain }}
 - name: CUBEJS_DB_DOMAIN
@@ -351,7 +350,6 @@
     secretKeyRef:
       name: {{ .Values.externalDatabase.passFromSecret.name | required "externalDatabase.passFromSecret.name is required" }}
       key: {{ .Values.externalDatabase.passFromSecret.key | required "externalDatabase.passFromSecret.key is required" }}
-
 {{- end }}
 {{- if .Values.externalDatabase.user }}
 - name: CUBEJS_EXT_DB_USER
