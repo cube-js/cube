@@ -650,13 +650,13 @@ cube(`Users`, {
 });
 ```
 
-[ref-config-dbtype]: /config#options-reference-db-type
-[ref-config-driverfactory]: /config#options-reference-driver-factory
-[ref-config-ext-ctx]: /config#options-reference-extend-context
-[ref-config-queryrewrite]: /config#options-reference-query-rewrite
+[ref-config-dbtype]: /config#db-type
+[ref-config-driverfactory]: /config#driver-factory
+[ref-config-ext-ctx]: /config#extend-context
+[ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-req-ctx]: /config#request-context
 [ref-dev-playground]: /dev-tools/dev-playground
-[ref-restapi-meta]: /rest-api#api-reference-v-1-meta
-[ref-restapi-sql]: /rest-api#api-reference-v-1-sql
+[ref-restapi-meta]: /rest-api#v-1-meta
+[ref-restapi-sql]: /rest-api#v-1-sql
 [ref-sec-ctx]: /security/context
 [wiki-camelcase]: https://en.wikipedia.org/wiki/Camel_case

@@ -334,6 +334,6 @@ cube(`PurchaseFunnel`, {
 ```
 
 [ref-partitioned-rollups]:
-  /caching/using-pre-aggregations#partitioning-time-partitioning
+  /caching/using-pre-aggregations#time-partitioning
 [ref-schema-ref-preaggs-origsql]:
-  /schema/reference/pre-aggregations#parameters-type-originalsql
+  /schema/reference/pre-aggregations#type-originalsql

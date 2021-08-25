@@ -21,7 +21,7 @@ additional security context, which can be used in the
 [`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
 configuration file][ref-config-js].
 
-[ref-config-queryrewrite]: /config#options-reference-query-rewrite
+[ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-js]: /config
 
 The API Token is passed via the Authorization Header. The token itself is a

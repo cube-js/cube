@@ -769,27 +769,27 @@ cube(`Orders`, {
 [ref-caching-readonly]: /caching/using-pre-aggregations#read-only-data-source
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
-[ref-config-driverfactory]: /config/#options-reference-driver-factory
-[ref-cube-refreshkey]: /schema/reference/cube#parameters-refresh-key
+[ref-config-driverfactory]: /config/#driver-factory
+[ref-cube-refreshkey]: /schema/reference/cube#refresh-key
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
 [ref-recipe-funnels]: /recipes/funnels
-[ref-sqlalias]: /schema/reference/cube#parameters-sql-alias
+[ref-sqlalias]: /schema/reference/cube#sql-alias
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments
 [ref-schema-types-dim-time]:
-  /schema/reference/types-and-formats#dimensions-types-time
-[self-granularity]: #parameters-granularity
-[self-incremental]: #parameters-refresh-key-incremental
+  /schema/reference/types-and-formats#types-time
+[self-granularity]: #granularity
+[self-incremental]: #refresh-key-incremental
 [self-origsql-preaggs]: #use-original-sql-pre-aggregations
-[self-originalsql]: #parameters-type-originalsql
-[self-refreshkey]: #parameters-refresh-key
-[self-refreshkey-every]: #parameters-refresh-key-every
-[self-refreshkey-sql]: #parameters-refresh-key-sql
-[self-rollup]: #parameters-type-rollup
-[self-rollupjoin]: #parameters-type-rollupjoin
-[self-timedimension]: #parameters-time-dimension
+[self-originalsql]: #type-originalsql
+[self-refreshkey]: #refresh-key
+[self-refreshkey-every]: #refresh-key-every
+[self-refreshkey-sql]: #refresh-key-sql
+[self-rollup]: #type-rollup
+[self-rollupjoin]: #type-rollupjoin
+[self-timedimension]: #time-dimension
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions

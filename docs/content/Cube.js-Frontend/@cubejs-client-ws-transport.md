@@ -60,7 +60,7 @@ WebSocket transport for Cube.js client
 
 ### constructor
 
->  **new WebSocketTransportResult**(**__namedParameters**: object): *[WebSocketTransportResult](#web-socket-transport-result)*
+>  **new WebSocketTransportResult**(**__namedParameters**: object): *[WebSocketTransportResult](#result)*
 
 ### result
 
@@ -89,7 +89,7 @@ requestId | any |
 
 Name | Type |
 ------ | ------ |
-callback |  (**result**: [WebSocketTransportResult](#web-socket-transport-result)) => *void* |
+callback |  (**result**: [WebSocketTransportResult](#result)) => *void* |
 message | [Message](#types-message) |
 
 ### WebSocketTransportOptions

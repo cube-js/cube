@@ -26,7 +26,7 @@ Analytics, Segment, Snowplow, or your custom event tracking system.
 To calculate daily, weekly, or monthly active users we’re going to use the
 `rollingWindow` measure parameter. `rollingWindow` accepts 3 parameters:
 trailing, leading, and offset. You can read about what each of them does
-[here](/schema/reference/measures#parameters-rolling-window).
+[here](/schema/reference/measures#rolling-window).
 
 For our purpose, we need only offset and trailing. We will set offset to
 <b>start</b> and the trailing parameter to the number of days – 1, 7, or 30.

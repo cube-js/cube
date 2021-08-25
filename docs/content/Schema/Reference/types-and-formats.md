@@ -458,6 +458,6 @@ cube('Orders', {
 [ref-string-time-dims]:
   /schema/fundamentals/additional-concepts#string-time-dimensions
 [ref-schema-ref-preaggs-rollup]:
-  /schema/reference/pre-aggregations#parameters-type-rollup
+  /schema/reference/pre-aggregations#type-rollup
 [ref-schema-ref-calc-measures]: /schema/reference/measures#calculated-measures
 [ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns

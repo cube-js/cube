@@ -291,7 +291,7 @@ considered in this case.
 [bq-parse-timestamp]:
   https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp
 [ref-cubejs-client-ref-resultset-drilldown]:
-  /@cubejs-client-core#result-set-drill-down
+  /@cubejs-client-core#drill-down
 [ref-schema-ref-dimensions]: /schema/reference/dimensions
 [ref-schema-ref-joins]: /schema/reference/joins
 [ref-schema-ref-measures]: /schema/reference/measures

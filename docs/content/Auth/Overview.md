@@ -13,11 +13,10 @@ menuOrder: 1
 />
 
 <CubeQueryResultSet
-  api="https://irish-idalia.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
-  token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjkxMjkxODR9.G4xg8Ah219GvWTPVRn45_950lZJ4uZw7GygaEotYz5k"
-  query={{ 
-    measures: ['Events.count']
-  }}
+  api="https://aqua-chipmunk.aws-us-east-2.cubecloudapp.dev/dev-mode/dev-anton-72df7d78/cubejs-api/v1"
+  query={{"dimensions": ['Orders.number'], "order": {
+    "Orders.number": "asc"
+  },"limit": 5}}
 />
 
 <GitHubFolderLink href="https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui"/>
@@ -241,7 +240,7 @@ module.exports = {
 ### Caching
 
 Cube.js caches JWKS by default when [`CUBEJS_JWK_URL` or `jwt.jwkUrl` is
-specified](##using-json-web-key-sets-jwks-configuration).
+specified](#configuration).
 
 - If the response contains a `Cache-Control` header, then Cube.js uses it to
   determine cache expiry.
@@ -286,7 +285,7 @@ module.exports = {
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
-[ref-config-check-auth]: /config#options-reference-check-auth
+[ref-config-check-auth]: /config#check-auth
 [ref-config-migrate-cubejs]:
   /configuration/overview#migration-from-express-to-docker-template
 [ref-sec-ctx]: /security/context

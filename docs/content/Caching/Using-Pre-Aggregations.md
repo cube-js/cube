@@ -417,29 +417,29 @@ retention policies to clean up the data in the export bucket as Cube.js does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
 [ref-caching-in-mem-default-refresh-key]:
-  /caching#in-memory-cache-default-refresh-keys
+  /caching#default-refresh-keys
 [ref-config-connect-db]: /connecting-to-the-database
-[ref-config-driverfactory]: /config#options-reference-driver-factory
+[ref-config-driverfactory]: /config#driver-factory
 [ref-config-env]: /reference/environment-variables#cube-store
 [ref-config-env-general]: /config#general
-[ref-config-extdbtype]: /config#options-reference-external-db-type
-[ref-config-extdriverfactory]: /config#options-reference-external-driver-factory
+[ref-config-extdbtype]: /config#external-db-type
+[ref-config-extdriverfactory]: /config#external-driver-factory
 [ref-connect-db-athena]: /config/databases/aws-athena
 [ref-connect-db-redshift]: /config/databases/aws-redshift
 [ref-connect-db-bigquery]: /config/databases/google-bigquery
 [ref-connect-db-mysql]: /config/databases/mysql
 [ref-connect-db-postgres]: /config/databases/postgres
 [ref-connect-db-snowflake]: /config/databases/snowflake
-[ref-schema-timedimension]: /types-and-formats#dimensions-types-time
+[ref-schema-timedimension]: /types-and-formats#types-time
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-ref-preaggs-refresh-key]:
-  /schema/reference/pre-aggregations#parameters-refresh-key
+  /schema/reference/pre-aggregations#refresh-key
 [ref-schema-ref-preaggs-refresh-key-every]:
-  /schema/reference/pre-aggregations#parameters-refresh-key-every
+  /schema/reference/pre-aggregations#refresh-key-every
 [ref-schema-ref-preaggs-refresh-key-sql]:
-  /schema/reference/pre-aggregations#parameters-refresh-key-sql
+  /schema/reference/pre-aggregations#refresh-key-sql
 [ref-deploy-refresh-wrkr]: /deployment/overview#refresh-worker
 [ref-schema-ref-preaggs-sched-refresh]:
-  /schema/reference/pre-aggregations#parameters-scheduled-refresh
+  /schema/reference/pre-aggregations#scheduled-refresh
 [ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)

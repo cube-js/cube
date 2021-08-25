@@ -94,4 +94,4 @@ cube(`PageViews`, {
 
 [mdn-js-objects]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
-[ref-schema-ref-cube-extends]: /schema/reference/cube#parameters-extends
+[ref-schema-ref-cube-extends]: /schema/reference/cube#extends

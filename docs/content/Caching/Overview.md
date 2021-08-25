@@ -199,11 +199,11 @@ versions.
 
 [link-cube-cloud]: https://cube.dev/cloud
 [link-redis]: https://redis.io
-[ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
+[ref-config-preagg-schema]: /config#pre-aggregations-schema
 [ref-dev-playground]: /dev-tools/dev-playground
 [ref-development-mode]: /configuration/overview#development-mode
 [ref-production-checklist]: /deployment/production-checklist
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
-[ref-schema-ref-cube-refresh-key]: /schema/reference/cube#parameters-refresh-key
+[ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations

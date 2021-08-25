@@ -106,5 +106,5 @@ As in the case of a regular data fetch, real-time data fetch obeys
 [refreshKey refresh rules](caching#refresh-keys). In order to provide desired
 refresh rate `refreshKey` should reflect changes of the underlying data set as
 well it's querying time should be much less than the desired refresh rate.
-Please use the [refreshKey every](/schema/reference/cube#parameters-refresh-key)
+Please use the [refreshKey every](/schema/reference/cube#refresh-key)
 parameter to adjust refresh interval.

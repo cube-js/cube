@@ -698,22 +698,22 @@ the additional transpiler for check duplicates.
 [ref-development-mode]: /overview#development-mode
 [ref-multitenancy]: /multitenancy-setup
 [ref-rest-api]: /rest-api
-[ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-rest-api-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
-[ref-schema-cube-ref-refresh-key]: /schema/reference/cube#parameters-refresh-key
+[ref-schema-cube-ref-refresh-key]: /schema/reference/cube#refresh-key
 [ref-schema-cube-ref-ctx-sec-ctx]:
-  /schema/reference/cube#context-variables-security-context
+  /schema/reference/cube#security-context
 [ref-schema-ref-preaggs-rollup]:
-  /schema/reference/pre-aggregations#parameters-type-rollup
+  /schema/reference/pre-aggregations#type-rollup
 [ref-sec]: /security
 [ref-sec-ctx]: /security/context
 [self-opts-req-ctx]: #request-context
-[self-opts-checkauth]: #options-reference-check-auth
-[self-opts-ctx-to-appid]: #options-reference-context-to-app-id
-[self-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
-[self-opts-sched-refresh-ctxs]: #options-reference-scheduled-refresh-contexts
-[self-opts-sched-refresh-tz]: #options-reference-scheduled-refresh-time-zones
+[self-opts-checkauth]: #check-auth
+[self-opts-ctx-to-appid]: #context-to-app-id
+[self-opts-ctx-to-datasourceid]: #context-to-data-source-id
+[self-opts-sched-refresh-ctxs]: #scheduled-refresh-contexts
+[self-opts-sched-refresh-tz]: #scheduled-refresh-time-zones
 [self-repofactory]: #repositoryFactory
 [self-schemafilerepo]: #SchemaFileRepository
 [self-schemapath]: #schemaPath

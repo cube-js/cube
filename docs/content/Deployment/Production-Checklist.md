@@ -147,9 +147,9 @@ deployment's health and be alerted to any issues.
 [ref-caching-cubestore]: /caching/running-in-production
 [ref-env-vars-general]: /reference/environment-variables#general
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
-[ref-api-scheduled-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-api-scheduled-refresh]: /rest-api#v-1-run-scheduled-refresh
 [ref-sec-ctx]: /security/context
-[ref-config-jwt]: /config#options-reference-jwt
+[ref-config-jwt]: /config#jwt
 [ref-config-env-vars-general]: /reference/environment-variables#general
-[ref-api-readyz]: /rest-api#api-reference-readyz
-[ref-api-livez]: /rest-api#api-reference-livez
+[ref-api-readyz]: /rest-api#readyz
+[ref-api-livez]: /rest-api#livez

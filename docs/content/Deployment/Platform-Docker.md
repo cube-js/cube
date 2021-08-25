@@ -352,4 +352,4 @@ services:
 [link-docker-app]: https://www.docker.com/products/docker-app
 [link-nginx]: https://www.nginx.com/
 [ref-config-js]: /config
-[ref-config-sched-ref-ctx]: /config#options-reference-scheduled-refresh-contexts
+[ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts

@@ -501,10 +501,10 @@ Some extra considerations for pre-aggregation selection:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-schema-dims]: /schema/reference/dimensions
 [ref-schema-joins]: /schema/reference/joins
-[ref-schema-joins-hasmany]: /schema/reference/joins#parameters-relationship
+[ref-schema-joins-hasmany]: /schema/reference/joins#relationship
 [ref-schema-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-preaggs-origsql]:
-  /schema/reference/pre-aggregations#parameters-type-originalsql
+  /schema/reference/pre-aggregations#type-originalsql
 [self-select-pre-agg]:
-  #ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
+  #selecting-the-pre-aggregation
 [wiki-gcd]: https://en.wikipedia.org/wiki/Greatest_common_divisor

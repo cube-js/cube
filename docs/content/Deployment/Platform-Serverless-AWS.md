@@ -195,5 +195,5 @@ npm][link-cubejs-sls-npm]. Then update your `package.json` to use the version:
 [link-cubejs-sls-npm]: https://www.npmjs.com/package/@cubejs-backend/serverless
 [link-docker-app]: https://www.docker.com/products/docker-app
 [ref-caching-prod]: /caching/running-in-production
-[ref-config-sched-ref-ctx]: /config#options-reference-scheduled-refresh-contexts
-[ref-restapi-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts
+[ref-restapi-sched-refresh]: /rest-api#v-1-run-scheduled-refresh

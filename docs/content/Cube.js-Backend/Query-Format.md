@@ -60,7 +60,7 @@ A Query has the following properties:
   be returned without grouping. By default `ungrouped` queries require a primary
   key as a dimension of every cube involved in the query for security purposes.
   To disable this behavior please see the
-  [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#options-reference-allow-ungrouped-without-primary-key)
+  [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#allow-ungrouped-without-primary-key)
   server option. In case of `ungrouped` query measures will be rendered as
   underlying `sql` of measures without aggregation and time dimensions will be
   truncated as usual however not grouped by.
@@ -142,7 +142,7 @@ results after the measure has been calculated.
 
 Only some operators are available for measures. For dimensions, the available
 operators depend on the
-[type of the dimension](/schema/reference/types-and-formats#dimensions-types).
+[type of the dimension](/schema/reference/types-and-formats#types).
 
 ### equals
 

@@ -279,5 +279,5 @@ algorithm][wiki-djikstra-alg] to find join path between cubes given requested
 members.
 
 [ref-schema-advanced-join-direction]: /direction-of-joins
-[ref-restapi-query-filter-op-set]: query-format#filters-operators-set
+[ref-restapi-query-filter-op-set]: query-format#set
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm

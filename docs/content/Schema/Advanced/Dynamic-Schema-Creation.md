@@ -160,7 +160,7 @@ module.exports = {
 };
 ```
 
-[link-config-schema-version]: /config#options-reference-schema-version
+[link-config-schema-version]: /config#schema-version
 
 ## Usage with COMPILE_CONTEXT
 
@@ -223,8 +223,8 @@ schemas, as well as ensuring the corresponding database drivers are set up with
 [`driverFactory()`][ref-config-driverfactory] in your [`cube.js` configuration
 file][ref-config].
 
-[ref-schema-datasource]: /schema/reference/cube#parameters-data-source
-[ref-config-driverfactory]: /config#options-reference-driver-factory
+[ref-schema-datasource]: /schema/reference/cube#data-source
+[ref-config-driverfactory]: /config#driver-factory
 [ref-config]: /config
 
 For an example scenario where schemas may use either MySQL or Postgres
