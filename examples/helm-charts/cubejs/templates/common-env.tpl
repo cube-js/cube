@@ -23,6 +23,10 @@
 - name: CUBEJS_SCHEDULED_REFRESH_TIMEZONES
   value: {{ .Values.global.scheduledRefreshTimezones | quote }}
 {{- end }}
+{{- if .Values.global.preAggregationsSchema }}
+- name: CUBEJS_PRE_AGGREGATIONS_SCHEMA
+  value: {{ .Values.global.preAggregationsSchema | quote }}
+{{- end }}
 {{- if .Values.global.webSockets }}
 - name: CUBEJS_WEB_SOCKETS
   value: {{ .Values.global.webSockets | quote }}
@@ -32,6 +36,10 @@
 {{- if .Values.global.schemaPath }}
 - name: CUBEJS_SCHEMA_PATH
   value: {{ .Values.global.schemaPath | quote }}
+{{- end }}
+{{- if .Values.global.topicName }}
+- name: CUBEJS_TOPIC_NAME
+  value: {{ .Values.global.topicName | quote }}
 {{- end }}
 {{- if .Values.redis.url }}
 - name: CUBEJS_REDIS_URL
@@ -317,5 +325,36 @@
 {{- if .Values.cubestore.port }}
 - name: CUBEJS_CUBESTORE_PORT
   value: {{ .Values.cubestore.port | quote }}
+{{- end }}
+{{- if .Values.externalDatabase.type }}
+- name: CUBEJS_EXT_DB_TYPE
+  value: {{ .Values.externalDatabase.type | quote }}
+{{- end }}
+{{- if .Values.externalDatabase.host }}
+- name: CUBEJS_EXT_DB_HOST
+  value: {{ .Values.externalDatabase.host | quote }}
+{{- end }}
+{{- if .Values.externalDatabase.name }}
+- name: CUBEJS_EXT_DB_NAME
+  value: {{ .Values.externalDatabase.name | quote }}
+{{- end }}
+{{- if .Values.externalDatabase.pass }}
+- name: CUBEJS_EXT_DB_PASS
+  value: {{ .Values.externalDatabase.pass | quote }}
+{{- else if .Values.externalDatabase.passFromSecret }}
+- name: CUBEJS_EXT_DB_PASS
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.externalDatabase.passFromSecret.name | required "externalDatabase.passFromSecret.name is required" }}
+      key: {{ .Values.externalDatabase.passFromSecret.key | required "externalDatabase.passFromSecret.key is required" }}
+
+{{- end }}
+{{- if .Values.externalDatabase.user }}
+- name: CUBEJS_EXT_DB_USER
+  value: {{ .Values.externalDatabase.user | quote }}
+{{- end }}
+{{- if .Values.externalDatabase.port }}
+- name: CUBEJS_EXT_DB_PORT
+  value: {{ .Values.externalDatabase.port | quote }}
 {{- end }}
 {{- end }}

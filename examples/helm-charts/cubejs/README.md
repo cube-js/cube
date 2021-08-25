@@ -161,9 +161,11 @@ cubestore:
 | `global.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
 | `global.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
 | `global.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
-| `global.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   | `false` |
-| `global.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 | `false` |
-| `global.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 | `false` |
+| `global.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
+| `global.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
+| `global.preAggregationsSchema`     | The schema name to use for storing pre-aggregations true                                                                        |         |
+| `global.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
+| `global.topicName`                 | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
 | `global.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
 | `global.volumeMounts`              | he config volumeMounts. Will be used to both master and workers                                                                 | `[]`    |
 
@@ -249,6 +251,19 @@ cubestore:
 | `database.snowFlake.privateKeyPath`            | The path to the private RSA key folder                                           |         |
 | `database.snowFlake.privateKeyPass`            | The password for the private RSA key. Only required for encrypted keys           |         |
 | `database.databricks.url`                      | The URL for a JDBC connection                                                    |         |
+
+### External Database parameters
+
+| Name                                   | Description                                                                           | Value |
+| -------------------------------------- | ------------------------------------------------------------------------------------- | ----- |
+| `externalDatabase.type`                | Alternative to Cube Store storage for pre-aggregations                                |       |
+| `externalDatabase.host`                | The host URL for an external pre-aggregations database                                |       |
+| `externalDatabase.port`                | The port for the external pre-aggregations database                                   |       |
+| `externalDatabase.name`                | The name of the external pre-aggregations database to connect to                      |       |
+| `externalDatabase.pass`                | Base64 encoded JSON key file for connecting to Google Cloud                           |       |
+| `externalDatabase.passFromSecret.name` | The password used to connect to the external pre-aggregations database (using secret) |       |
+| `externalDatabase.passFromSecret.key`  | The password used to connect to the external pre-aggregations database (using secret) |       |
+| `externalDatabase.user`                | The username used to connect to the external pre-aggregations database                |       |
 
 ### Export Bucket parameters
 

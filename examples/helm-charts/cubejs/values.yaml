@@ -54,6 +54,11 @@ global:
   ##
   scheduledRefreshTimezones:
 
+  ## The schema name to use for storing pre-aggregations.
+  ## Defaults to dev_pre_aggregations/prod_pre_aggregations for development/production mode
+  ##
+  preAggregationsSchema:
+
   ## If true, then use WebSocket for data fetching. Defaults to true
   ##
   webSockets:
@@ -61,6 +66,11 @@ global:
   ## The cache and queue driver to use for the Cube.js deployment. Defaults to redis
   ##
   cacheAndQueueDriver:
+
+  ## The name of the Amazon SNS or Google Cloud Pub/Sub topic
+  ## Defaults to <process.env.CUBEJS_APP>-process if undefined, and finally cubejs-process
+  ##
+  topicName:
 
   ## The config volumes
   ## Will be used to both master and workers
@@ -342,6 +352,34 @@ database:
     ## The URL for a JDBC connection
     ##
     url:
+
+externalDatabase:
+  ## Alternative to Cube Store storage for pre-aggregations
+  ##
+  type:
+
+  ## The host URL for an external pre-aggregations database
+  ##
+  host:
+
+  ## The name of the external pre-aggregations database to connect to
+  ##
+  name:
+
+  ## The password used to connect to the external pre-aggregations database
+  ##
+  pass:
+  # passFromSecret:
+  #   name:
+  #   key:
+
+  ## The port for the external pre-aggregations database
+  ##
+  port:
+
+  ## The username used to connect to the external pre-aggregations database
+  ##
+  user:
 
 ## Export Bucket configuration
 ##
