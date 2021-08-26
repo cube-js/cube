@@ -163,7 +163,9 @@ some attributes don't have values (meaning that a user doesn't have orders in th
 ]
 ```
 
-The drawback is that when the set of statuses changes, we'll need to amend the cube definition in several places: update selected values and joins in SQL as well as update the dimensions. Let's see how to work around that.
+The drawback is that when the set of statuses changes, we'll need to amend the cube definition
+in several places: update selected values and joins in SQL as well as update the dimensions.
+Let's see how to work around that.
 
 ### Static attributes, DRY version
 
@@ -271,7 +273,8 @@ runs lightning-fast:
     }
 ```
 
-In the cube file, we will use the function to load the list of statuses. We will also wrap the cube definition with the `asyncModule` built-in function that allows the data schema
+In the cube file, we will use the function to load the list of statuses. We will also wrap
+the cube definition with the `asyncModule` built-in function that allows the data schema
 to be created [dynamically](https://cube.dev/docs/schema/advanced/dynamic-schema-creation).
 
 ```javascript
