@@ -132,10 +132,7 @@ export class CubeEvaluator extends CubeSymbols {
                 refreshRangeEnd: refreshRangeEnd && refreshRangeEnd.sql && { sql: refreshRangeEnd.sql() }
               },
               refreshKeyReferences: {
-                refreshKey: refreshKey && {
-                  ...refreshKey,
-                  sql: refreshKey && refreshKey.sql && refreshKey.sql()
-                }
+                refreshKey
               },
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
                 obj[indexName] = {
