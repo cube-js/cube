@@ -27,7 +27,7 @@ spec:
           image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
           ports:
             - name: http
-              containerPort: {{ .Values.global.port }}
+              containerPort: {{ .Values.global.apiPort }}
               protocol: TCP
           env:
             {{- include "cubejs.common-env" . | nindent 12 }}

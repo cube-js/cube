@@ -175,7 +175,7 @@ cubestore:
 
 | Name                               | Description                                                                                                                     | Value   |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `global.port`                      | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
+| `global.apiPort`                   | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
 | `global.devMode`                   | If true, enables development mode                                                                                               | `false` |
 | `global.debug`                     | If true, enables debug logging                                                                                                  | `false` |
 | `global.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |

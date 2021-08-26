@@ -31,7 +31,7 @@ image:
 global:
   ## The port for a Cube.js deployment to listen to API connections on
   ##
-  port: 4000
+  apiPort: 4000
 
   ## If true, enables development mode.
   ##

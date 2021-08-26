@@ -1,4 +1,6 @@
 {{- define "cubejs.common-env" -}}
+- name: PORT
+  value: {{ .Values.global.apiPort | quote }}
 {{- if .Values.global.debug }}
 - name: DEBUG_LOG
   value: {{ .Values.global.debug | quote }}
