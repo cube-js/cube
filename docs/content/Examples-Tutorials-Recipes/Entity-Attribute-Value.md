@@ -222,7 +222,7 @@ cube(`UsersStatuses_DRY`, {
 ```
 
 The new `UsersStatuses_DRY` cube is functionally identical to the `UsersStatuses_Joins`
-cube above. So, querying this new cube would yield the same data. However, there's still
+cube above. Querying this new cube would yield the same data. However, there's still
 a static list of statuses present in the cube's cube. Let's see how to work around that.
 
 ### Dynamic attributes
