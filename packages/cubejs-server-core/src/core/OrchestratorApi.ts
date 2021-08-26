@@ -186,7 +186,7 @@ export class OrchestratorApi {
     } catch (err) {
       if (err instanceof ContinueWaitError) {
         throw {
-          error: err.message
+          error: 'Continue wait'
         };
       }
       throw err;
