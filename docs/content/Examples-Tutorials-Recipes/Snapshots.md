@@ -3,7 +3,7 @@ title: Snapshots
 permalink: /recipes/snapshots
 category: Examples & Tutorials
 subCategory: Data schema
-menuOrder: 3
+menuOrder: 4
 ---
 
 ## Use case
