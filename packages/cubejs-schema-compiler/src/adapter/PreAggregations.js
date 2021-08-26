@@ -732,7 +732,8 @@ export class PreAggregations {
           this.query.aggregateOnGroupedColumn(
             measure.measureDefinition(),
             measure.aliasName(),
-            !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate
+            !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate,
+            path
           ) || `sum(${measure.aliasName()})`
         ];
       }),

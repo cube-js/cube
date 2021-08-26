@@ -1,6 +1,6 @@
 import Moment from 'moment-timezone';
 import { extendMoment } from 'moment-range';
-import { timeSeries, FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
+import { timeSeries, FROM_PARTITION_RANGE, TO_PARTITION_RANGE, BUILD_RANGE_START_LOCAL, BUILD_RANGE_END_LOCAL } from '@cubejs-backend/shared';
 
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -111,6 +111,10 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateFromFormatted()));
   }
 
+  localDateTimeFromOrBuildRangeParam() {
+    return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateFromFormatted() : BUILD_RANGE_START_LOCAL));
+  }
+
   dateToFormatted() {
     if (!this.dateToFormattedValue) {
       this.dateToFormattedValue = this.formatToDate(this.dateRange[1]);
@@ -133,6 +137,10 @@ export class BaseTimeDimension extends BaseFilter {
 
   localDateTimeToParam() {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateToFormatted()));
+  }
+
+  localDateTimeToOrBuildRangeParam() {
+    return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateToFormatted() : BUILD_RANGE_END_LOCAL));
   }
 
   dateRangeGranularity() {

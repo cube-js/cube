@@ -94,7 +94,14 @@ export class QueryOrchestrator {
   }
 
   public async fetchQuery(queryBody: any): Promise<any> {
-    const preAggregationsTablesToTempTables = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+    const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+
+    if (values) {
+      queryBody = {
+        ...queryBody,
+        values
+      };
+    }
 
     const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {

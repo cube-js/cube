@@ -8,6 +8,9 @@ import {
   inDbTimeZone,
   timeSeries,
   TO_PARTITION_RANGE,
+  BUILD_RANGE_START_LOCAL,
+  BUILD_RANGE_END_LOCAL,
+  utcToLocalTimeZone
 } from '@cubejs-backend/shared';
 
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
@@ -105,6 +108,7 @@ type PreAggregationDescription = {
   matchedTimeDimensionDateRange: QueryDateRange;
   partitionGranularity: string;
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
+  timestampFormat: string;
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -1057,6 +1061,24 @@ export class PreAggregationPartitionRangeLoader {
     return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
+  public async replaceQueryBuildRangeParams(queryValues: string[]): Promise<string[] | null> {
+    if (queryValues?.find(p => p === BUILD_RANGE_START_LOCAL || p === BUILD_RANGE_END_LOCAL)) {
+      const [buildRangeStart, buildRangeEnd] = await this.loadBuildRange();
+      return queryValues?.map(
+        param => {
+          if (param === BUILD_RANGE_START_LOCAL) {
+            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeStart);
+          } else if (param === BUILD_RANGE_END_LOCAL) {
+            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeEnd);
+          } else {
+            return param;
+          }
+        },
+      );
+    }
+    return null;
+  }
+
   private replacePartitionSqlAndParams(
     query: QueryWithParams,
     dateRange: QueryDateRange,
@@ -1162,54 +1184,43 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   private async partitionRanges() {
+    const buildRange = await this.loadBuildRange();
+    let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
+      buildRange,
+      this.preAggregation.matchedTimeDimensionDateRange,
+    );
+    if (!dateRange) {
+      // If there's no date range intersection between query data range and pre-aggregation build range
+      // use last partition so outer query can receive expected table structure.
+      dateRange = [buildRange[1], buildRange[1]];
+    }
+    return PreAggregationPartitionRangeLoader.timeSeries(
+      this.preAggregation.partitionGranularity,
+      dateRange,
+    );
+  }
+
+  public async loadBuildRange(): Promise<QueryDateRange> {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
         async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
       ),
     );
-    let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
-      [startDate, endDate],
-      this.preAggregation.matchedTimeDimensionDateRange,
-    );
-    if (!dateRange) {
-      // If there's no date range intersection between query data range and pre-aggregation build range
-      // use last partition so outer query can receive expected table structure.
-      dateRange = [endDate, endDate];
-    }
-    let timeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
-      this.preAggregation.partitionGranularity,
-      dateRange,
-    );
     const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       [startDate, endDate],
     );
-    const [preciseStartDate, preciseEndDate] = await Promise.all(
+    const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
         async (rangeQuery, i) => PreAggregationPartitionRangeLoader.extractDate(
           await this.loadRangeQuery(
-            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1]
-          )
+            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
+          ),
         ),
       ),
     );
-    if (preciseStartDate !== startDate || preciseEndDate !== endDate) {
-      dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
-        [preciseStartDate, preciseEndDate],
-        this.preAggregation.matchedTimeDimensionDateRange,
-      );
-      if (!dateRange) {
-        // If there's no date range intersection between query data range and pre-aggregation build range
-        // use last partition so outer query can receive expected table structure.
-        dateRange = [preciseEndDate, preciseEndDate];
-      }
-      timeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
-        this.preAggregation.partitionGranularity,
-        dateRange,
-      );
-    }
-    return timeSeriesRanges;
+    return [rangeStart, rangeEnd];
   }
 
   private static checkDataRangeType(range: QueryDateRange) {
@@ -1358,7 +1369,9 @@ export class PreAggregations {
       return loadCacheByDataSource[dataSource];
     };
 
-    return preAggregations.map(p => (preAggregationsTablesToTempTables) => {
+    let queryParamsReplacement = null;
+
+    const preAggregationsTablesToTempTablesPromise = preAggregations.map((p, i) => (preAggregationsTablesToTempTables) => {
       const loader = new PreAggregationPartitionRangeLoader(
         this.redisPrefix,
         () => this.driverFactory(p.dataSource || 'default'),
@@ -1385,11 +1398,20 @@ export class PreAggregations {
         };
         await this.addTableUsed(usedPreAggregation.targetTableName);
 
+        if (i === preAggregations.length - 1 && queryBody.values) {
+          queryParamsReplacement = await loader.replaceQueryBuildRangeParams(queryBody.values);
+        }
+
         return [p.tableName, usedPreAggregation];
       });
 
       return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
+
+    return preAggregationsTablesToTempTablesPromise.then(preAggregationsTablesToTempTables => ({
+      preAggregationsTablesToTempTables,
+      values: queryParamsReplacement
+    }));
   }
 
   public async expandPartitionsInPreAggregations(queryBody) {

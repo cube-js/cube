@@ -89,11 +89,15 @@ export class BaseMeasure {
     return definition.type === 'runningTotal' || !!definition.rollingWindow;
   }
 
-  dateJoinCondition() {
+  rollingWindowDefinition() {
     if (this.measureDefinition().type === 'runningTotal') {
-      return this.query.runningTotalDateJoinCondition();
+      return { trailing: 'unbounded' };
     }
-    const { rollingWindow } = this.measureDefinition();
+    return this.measureDefinition().rollingWindow;
+  }
+
+  dateJoinCondition() {
+    const rollingWindow = this.rollingWindowDefinition();
     if (rollingWindow) {
       return this.query.rollingWindowDateJoinCondition(
         rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset
