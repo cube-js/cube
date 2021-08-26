@@ -467,7 +467,7 @@ service:
 
   ## Master service port
   ##
-  port: 80
+  port: 4000
 
   ## Node port for master
   ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
