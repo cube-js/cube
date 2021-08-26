@@ -337,10 +337,11 @@ cubestore:
 
 ## Ingress parameters
 
-| Name                  | Description                                                                     | Value          |
-| --------------------- | ------------------------------------------------------------------------------- | -------------- |
-| `ingress.enabled`     | Set to true to enable ingress record generation                                 | `false`        |
-| `ingress.hostname`    | When the ingress is enabled, a host pointing to this will be created            | `cubejs.local` |
-| `ingress.path`        | The Path to Cubejs                                                              | `/`            |
-| `ingress.annotations` | Ingress annotations                                                             | `{}`           |
-| `ingress.tls`         | Enable TLS configuration for the hostname defined at ingress.hostname parameter | `false`        |
+| Name                  | Description                                                                     | Value                    |
+| --------------------- | ------------------------------------------------------------------------------- | ------------------------ |
+| `ingress.enabled`     | Set to true to enable ingress record generation                                 | `false`                  |
+| `ingress.hostname`    | When the ingress is enabled, a host pointing to this will be created            | `cubejs.local`           |
+| `ingress.path`        | The Path to Cubejs                                                              | `/`                      |
+| `ingress.pathPrefix`  | The PathPrefix                                                                  | `ImplementationSpecific` |
+| `ingress.annotations` | Ingress annotations                                                             | `{}`                     |
+| `ingress.tls`         | Enable TLS configuration for the hostname defined at ingress.hostname parameter | `false`                  |

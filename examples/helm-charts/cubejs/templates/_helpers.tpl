@@ -49,3 +49,29 @@ Selector labels
 app.kubernetes.io/name: {{ include "cubejs.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+
+{{/*
+Return the appropriate apiVersion for ingress.
+*/}}
+{{- define "cubejs.ingress.apiVersion" -}}
+{{- if semverCompare "<1.14-0" .Capabilities.KubeVersion.Version -}}
+{{- print "extensions/v1beta1" -}}
+{{- else if semverCompare "<1.19-0" .Capabilities.KubeVersion.Version -}}
+{{- print "networking.k8s.io/v1beta1" -}}
+{{- else -}}
+{{- print "networking.k8s.io/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return "true" if the API pathType field is supported
+*/}}
+{{- define "cubejs.ingress.supportsPathType" -}}
+{{- if semverCompare "<1.18-0" .Capabilities.KubeVersion.Version -}}
+{{- print "false" -}}
+{{- else -}}
+{{- print "true" -}}
+{{- end -}}
+{{- end -}}
+
