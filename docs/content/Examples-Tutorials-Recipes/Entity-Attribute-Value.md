@@ -228,8 +228,8 @@ a static list of statuses present in the cube's cube. Let's see how to work arou
 ### Dynamic attributes
 
 We can eliminate the list of statuses from the cube's code by loading this list from an
-external source. Let's assume that we've created an API service that fetches statuses,
-obviously, by running a Cube query. Here's the code from the `fetch.js` file that defines
+external source. Let's assume that we've created an API service that fetches statuses
+by running a Cube query. Here's the code from the `fetch.js` file that defines
 the `fetchStatuses` function that would load the statuses from an API service. Let's keep
 this file outside the `schema` folder:
 
