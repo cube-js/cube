@@ -3,7 +3,7 @@ title: Role-Based Access
 permalink: /recipes/role-based-access
 category: Examples & Tutorials
 subCategory: Access control
-menuOrder: 1
+menuOrder: 2
 ---
 
 ## Use case

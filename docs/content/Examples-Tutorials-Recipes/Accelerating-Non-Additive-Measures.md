@@ -3,7 +3,7 @@ title: Accelerating Non-Additive Measures
 permalink: /recipes/non-additivity
 category: Examples & Tutorials
 subCategory: Query acceleration
-menuOrder: 1
+menuOrder: 6
 ---
 
 ## Use case
