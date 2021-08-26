@@ -159,7 +159,7 @@ export function Settings({
 
           <Form.Item name="refreshKey.option" noStyle>
             <StyledRadioGroup>
-              <Row gutter={[8, 100]} wrap={false}>
+              <Row gutter={8} wrap={false}>
                 <Col flex="85px">
                   <Radio value="every">Every</Radio>
                 </Col>
