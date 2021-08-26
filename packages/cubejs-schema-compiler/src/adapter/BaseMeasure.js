@@ -1,3 +1,5 @@
+import { UserError } from '../compiler/UserError';
+
 export class BaseMeasure {
   constructor(query, measure) {
     this.query = query;
@@ -91,13 +93,16 @@ export class BaseMeasure {
 
   rollingWindowDefinition() {
     if (this.measureDefinition().type === 'runningTotal') {
-      return { trailing: 'unbounded' };
+      throw new UserError(`runningTotal rollups aren't supported. Please consider replacing runningTotal measure with rollingWindow.`);
     }
     return this.measureDefinition().rollingWindow;
   }
 
   dateJoinCondition() {
-    const rollingWindow = this.rollingWindowDefinition();
+    if (this.measureDefinition().type === 'runningTotal') {
+      return this.query.runningTotalDateJoinCondition();
+    }
+    const { rollingWindow } = this.measureDefinition();
     if (rollingWindow) {
       return this.query.rollingWindowDateJoinCondition(
         rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset
