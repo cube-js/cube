@@ -108,6 +108,10 @@ These recipes will show you the best practices of using Cube.js.
 - [Enforcing Mandatory Filters](/recipes/enforcing-mandatory-filters)
 - [Pagination](/recipes/pagination)
 
+### Query acceleration
+
+- [Accelerating Non-Additive Measures](/recipes/non-additivity)
+
 ### Code reusability
 
 - [Schema Generation](/recipes/schema-generation)

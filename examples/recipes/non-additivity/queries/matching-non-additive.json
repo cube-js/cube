@@ -1,0 +1,10 @@
+{
+  "measures": [
+    "Users.distinctAges",
+    "Users.avgAge",
+    "Users.p90Age"
+  ],
+  "dimensions": [
+    "Users.gender"
+  ]
+}

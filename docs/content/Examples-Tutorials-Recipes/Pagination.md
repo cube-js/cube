@@ -3,7 +3,7 @@ title: Pagination
 permalink: /recipes/pagination
 category: Examples & Tutorials
 subCategory: Queries
-menuOrder: 2
+menuOrder: 5
 ---
 
 ## Use case

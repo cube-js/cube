@@ -3,7 +3,7 @@ title: Dynamically Union Tables
 permalink: /recipes/dynamically-union-tables
 category: Examples & Tutorials
 subCategory: Data schema
-menuOrder: 2
+menuOrder: 4
 redirect_from:
   - /dynamically-union-tables
 ---

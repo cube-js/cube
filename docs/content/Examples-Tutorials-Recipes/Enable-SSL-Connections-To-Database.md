@@ -3,7 +3,7 @@ title: Enable SSL Connections to the Database
 permalink: /recipes/enable-ssl-connections-to-database
 category: Examples & Tutorials
 subCategory: Data Sources
-menuOrder: 1
+menuOrder: 3
 ---
 
 Cube.js supports SSL-encrypted connections for:

@@ -29,9 +29,11 @@ These recipes will show you the best practices of using Cube.js.
 - [Enforcing Mandatory Filters](https://cube.dev/docs/recipes/enforcing-mandatory-filters)
 - [Pagination](https://cube.dev/docs/recipes/pagination)
 
+### Query acceleration
+
+- [Accelerating Non-Additive Measures](https://cube.dev/docs/recipes/non-additivity)
+
 ### Code reusability
 
-- [Export and Import](https://cube.dev/docs/recipes/export-import)
-- [Extending Cubes](https://cube.dev/docs/recipes/extending-cubes)
 - [Schema Generation](https://cube.dev/docs/recipes/schema-generation)
 - [Polymorphic Cubes](https://cube.dev/docs/recipes/polymorphic-cubes)

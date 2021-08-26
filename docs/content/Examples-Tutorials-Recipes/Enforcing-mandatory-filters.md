@@ -3,7 +3,7 @@ title: Enforcing Mandatory Filters
 permalink: /recipes/enforcing-mandatory-filters
 category: Examples & Tutorials
 subCategory: Queries
-menuOrder: 1
+menuOrder: 5
 ---
 
 ## Use case

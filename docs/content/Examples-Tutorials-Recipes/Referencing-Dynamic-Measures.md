@@ -3,7 +3,7 @@ title: Referencing Dynamic Measures
 permalink: /recipes/referencing-dynamic-measures
 category: Examples & Tutorials
 subCategory: Data schema
-menuOrder: 3
+menuOrder: 4
 ---
 
 ## Use case
