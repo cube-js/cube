@@ -180,8 +180,17 @@ export class OrchestratorApi {
     return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, versionEntry);
   }
 
-  public expandPartitionsInPreAggregations(queryBody) {
-    return this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+  public async expandPartitionsInPreAggregations(queryBody) {
+    try {
+      return await this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+    } catch (err) {
+      if (err instanceof ContinueWaitError) {
+        throw {
+          error: 'Continue wait'
+        };
+      }
+      throw err;
+    }
   }
 
   public async getPreAggregationQueueStates() {
