@@ -5,6 +5,22 @@ category: Authentication & Authorization
 menuOrder: 1
 ---
 
+<GitHubCodeBlock
+  href="https://github.com/YakovlevCoded/test/blob/master/test.txt"
+  titleSuffixCount={2}
+  part={'value-test'}
+  lang="js"
+/>
+
+<CubeQueryResultSet
+  api="https://aqua-chipmunk.aws-us-east-2.cubecloudapp.dev/dev-mode/dev-anton-72df7d78/cubejs-api/v1"
+  query={{"dimensions": ['Orders.number'], "order": {
+    "Orders.number": "asc"
+  },"limit": 5}}
+/>
+
+<GitHubFolderLink href="https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui"/>
+
 In Cube.js, authorization (or access control) is based on the **security
 context**. The diagram below shows how it works during the request processing in
 Cube.js:
