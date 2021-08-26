@@ -11,6 +11,7 @@ const GRANULARITY_TO_INTERVAL = {
   minute: date => `DATE_TRUNC('minute', ${date}::datetime)`,
   second: date => `DATE_TRUNC('second', ${date}::datetime)`,
   month: date => `DATE_TRUNC('month', ${date}::datetime)`,
+  quarter: date => `DATE_TRUNC('quarter', ${date}::datetime)`,
   year: date => `DATE_TRUNC('year', ${date}::datetime)`
 };
 

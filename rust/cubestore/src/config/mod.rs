@@ -6,7 +6,7 @@ use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
 use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
-use crate::config::injection::{get_service, get_service_typed, DIService, Injector, InjectorRef};
+use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
@@ -207,6 +207,8 @@ pub trait ConfigObj: DIService {
 
     fn bind_address(&self) -> &Option<String>;
 
+    fn status_bind_address(&self) -> &Option<String>;
+
     fn http_bind_address(&self) -> &Option<String>;
 
     fn query_timeout(&self) -> u64;
@@ -255,6 +257,7 @@ pub struct ConfigObjImpl {
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
     pub bind_address: Option<String>,
+    pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
@@ -305,6 +308,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn bind_address(&self) -> &Option<String> {
         &self.bind_address
+    }
+
+    fn status_bind_address(&self) -> &Option<String> {
+        &self.status_bind_address
     }
 
     fn http_bind_address(&self) -> &Option<String> {
@@ -460,6 +467,9 @@ impl Config {
                         .ok()
                         .unwrap_or(format!("0.0.0.0:{}", env_parse("CUBESTORE_PORT", 3306))),
                 ),
+                status_bind_address: Some(env::var("CUBESTORE_STATUS_BIND_ADDR").ok().unwrap_or(
+                    format!("0.0.0.0:{}", env_parse("CUBESTORE_STATUS_PORT", 3031)),
+                )),
                 http_bind_address: Some(env::var("CUBESTORE_HTTP_BIND_ADDR").ok().unwrap_or(
                     format!("0.0.0.0:{}", env_parse("CUBESTORE_HTTP_PORT", 3030)),
                 )),
@@ -513,6 +523,7 @@ impl Config {
                 select_worker_pool_size: 0,
                 job_runners_count: 4,
                 bind_address: None,
+                status_bind_address: None,
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
@@ -728,11 +739,7 @@ impl Config {
                 .await;
         }
 
-        if self
-            .injector
-            .has_service_typed::<dyn MetaStoreTransport>()
-            .await
-        {
+        if uses_remote_metastore(&self.injector).await {
             self.injector
                 .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
                     let transport = ClusterMetaStoreClient::new(i.get_service_typed().await);
@@ -747,8 +754,8 @@ impl Config {
                         let meta_store = RocksMetaStore::load_from_remote(
                             &path,
                             // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                            get_service(&i, "original_remote_fs").await,
-                            get_service_typed::<dyn ConfigObj>(&i).await,
+                            i.get_service("original_remote_fs").await,
+                            i.get_service_typed::<dyn ConfigObj>().await,
                         )
                         .await
                         .unwrap();
@@ -864,9 +871,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    i.get_service_typed::<dyn ConfigObj>()
-                        .await
-                        .wal_split_threshold() as usize,
+                    c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     c.max_cached_queries(),
                 )
@@ -958,3 +963,11 @@ impl Config {
 }
 
 type LoopHandle = JoinHandle<Result<(), CubeError>>;
+
+pub async fn uses_remote_metastore(i: &Injector) -> bool {
+    i.has_service_typed::<dyn MetaStoreTransport>().await
+}
+
+pub fn is_router(c: &dyn ConfigObj) -> bool {
+    !c.worker_bind_address().is_some()
+}

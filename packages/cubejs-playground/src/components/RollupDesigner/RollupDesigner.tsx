@@ -42,26 +42,21 @@ const { TabPane } = Tabs;
 
 const Layout = styled.div`
   display: flex;
-  gap: 16px;
 
   & > div {
     max-width: 280px;
+  }
 
-    & > div {
-      flex-basis: 140px;
-    }
+  & > div > div {
+    flex-basis: 140px;
   }
 
   @media (max-width: 1280px) {
     flex-direction: column;
-    gap: 32px;
+    margin-right: 0;
 
-    & > div {
-      max-width: 280px;
-
-      & > div {
-        flex-basis: 0;
-      }
+    & > div > div {
+      flex-basis: 0;
     }
   }
 `;
@@ -333,8 +328,8 @@ export function RollupDesigner({
   }
 
   return (
-    <Flex justifyContent="space-between" gap={4}>
-      <Box grow={1}>
+    <Flex justifyContent="space-between">
+      <Box grow={1} style={{ marginRight: 32 }}>
         <Tabs onChange={setActiveTab}>
           <TabPane tab="Members" key="members">
             <Flex gap={2}>
@@ -426,8 +421,15 @@ export function RollupDesigner({
       </Box>
 
       <Layout>
-        <Flex direction="column" justifyContent="flex-start" gap={2}>
-          <Box>
+        <Flex
+          direction="column"
+          justifyContent="flex-start"
+          style={{
+            marginRight: 16,
+            marginBottom: 64,
+          }}
+        >
+          <Box style={{ marginBottom: 16 }}>
             <Paragraph strong>Rollup Definition</Paragraph>
 
             <Paragraph>
@@ -444,8 +446,8 @@ export function RollupDesigner({
         </Flex>
 
         {activeTab === 'members' ? (
-          <Flex direction="column" justifyContent="flex-start" gap={2}>
-            <Box>
+          <Flex direction="column" justifyContent="flex-start">
+            <Box style={{ marginBottom: 16 }}>
               <Paragraph strong>Query Compatibility</Paragraph>
 
               {canBeRolledUp && matching ? (

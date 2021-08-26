@@ -9,15 +9,6 @@ redirect_from:
   - /pre-aggregations
 ---
 
-<!-- prettier-ignore-start -->
-[[info |]]
-| The Cube.js pre-aggregations workshop is on August 18th at 9-11 am PST! If you
-| want to learn why/when you want to use pre-aggregations, how to get started,
-| tips & tricks, you will want to attend this event 😀 <br/> You can register
-| for the workshop at [the event
-| page](https://cube.dev/events/pre-aggregations/).
-<!-- prettier-ignore-end -->
-
 Pre-aggregations are materialized query results persisted as tables. Cube.js has
 an ability to analyze queries against a defined set of pre-aggregation rules in
 order to choose the optimal one that will be used to create pre-aggregation
@@ -369,8 +360,8 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `year`. This property is
-required when using [`timeDimension`][self-timedimension].
+The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. This
+property is required when using [`timeDimension`][self-timedimension].
 
 ### <--{"name" : "Parameters"}--> segments
 
@@ -427,7 +418,7 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `year`. A
+The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 [`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
@@ -459,8 +450,8 @@ cube(`Orders`, {
 ```
 
 In the above example, the refresh key SQL will be executed every 10 seconds, as
-[`every`][self-refreshkey-every] is not defined. If the results of the
-SQL refresh key differ from the last execution, then the pre-aggregation will be
+[`every`][self-refreshkey-every] is not defined. If the results of the SQL
+refresh key differ from the last execution, then the pre-aggregation will be
 refreshed.
 
 <h4 id="parameters-refresh-key-every">

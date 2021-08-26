@@ -1,0 +1,17 @@
+{
+  "measures": [
+    "StatusSnapshots.count"
+  ],
+  "filters": [
+    {
+      "member": "StatusSnapshots.date",
+      "operator": "equals",
+      "values": [ "2019-05-01" ]
+    },
+    {
+      "member": "StatusSnapshots.status",
+      "operator": "equals",
+      "values": [ "shipped" ]
+    }
+  ]
+}

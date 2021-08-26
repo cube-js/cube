@@ -22,8 +22,8 @@ const GitHubCodeBlock = (props: propsType) => {
 
   return (
     <div>
-      <h4>{title}</h4>
-      <pre>
+      <a href={href} target="_blank">{title}</a>
+      <pre style={{marginTop: '0.5rem'}}>
         <code className={`language-${lang}`}>{code}</code>
       </pre>
     </div>

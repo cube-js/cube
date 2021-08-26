@@ -10,7 +10,7 @@ permalink: /config/databases/druid
 
 ## Setup
 
-### Manual
+### <--{"name" : "Setup"}-->  Manual
 
 Add the following to a `.env` file in your Cube.js project:
 

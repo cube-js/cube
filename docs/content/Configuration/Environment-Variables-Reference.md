@@ -83,6 +83,7 @@ databases [in this guide][link-connecting-to-db].
 | `CUBEJS_AWS_REGION`                             | AWS Athena, JDBC     | The AWS region of the Cube.js deployment                                                                                                                                                                    | [A valid AWS region][link-aws-regions]                           |
 | `CUBEJS_AWS_S3_OUTPUT_LOCATION`                 | AWS Athena, JDBC     | The S3 path to store query results made by the Cube.js deployment                                                                                                                                           | A valid S3 path                                                  |
 | `CUBEJS_AWS_SECRET`                             | AWS Athena, JDBC     | The AWS Secret Access Key to use for database connections                                                                                                                                                   | A valid AWS Secret Access Key                                    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`                   | AWS Athena           | The name of the workgroup in which the query is being started                                                                                                                                               | [A valid Athena Workgroup][link-aws-athena-workgroup]            |
 | `CUBEJS_DB_POLL_TIMEOUT`                        | BigQuery, AWS Athena | Timeout for query polling                                                                                                                                                                                   | A number in seconds or a string that specify time (`1s`, `5m`)   |
 | `CUBEJS_DB_PULL_MAX_INTERVAL`                   | BigQuery, AWS Athena | Max interval on retries for query polling                                                                                                                                                                   | A number in seconds or a string that specify time (`5s`, `1m`)   |
 | `CUBEJS_DB_BQ_CREDENTIALS`                      | BigQuery             | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                            | A valid Google BigQuery JSON key file encoded as a Base64 string |
@@ -182,6 +183,8 @@ databases [in this guide][link-connecting-to-db].
   https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys
 [link-aws-regions]:
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[link-aws-athena-workgroup]:
+  https://docs.aws.amazon.com/athena/latest/ug/workgroups-benefits.html
 [link-elastic-api-keys]:
   https://www.elastic.co/guide/en/kibana/master/api-keys.html#create-api-key
 [link-gcp-creds-json]:

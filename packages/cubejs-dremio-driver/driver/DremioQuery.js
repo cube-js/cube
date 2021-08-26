@@ -8,6 +8,7 @@ const GRANULARITY_TO_INTERVAL = {
   hour: (date) => `DATE_TRUNC('hour', ${date})`,
   day: (date) => `DATE_TRUNC('day', ${date})`,
   month: (date) => `DATE_TRUNC('month', ${date})`,
+  quarter: (date) => `DATE_TRUNC('quarter', ${date})`,
   year: (date) => `DATE_TRUNC('year', ${date})`
 };
 

@@ -679,7 +679,7 @@ options? | Object | - |
 
 ## ITransport
 
-### request
+### <--{"name" : "ITransport"}-->  request
 
 >  **request**(**method**: string, **params**: any): () => *Promise‹void›*
 

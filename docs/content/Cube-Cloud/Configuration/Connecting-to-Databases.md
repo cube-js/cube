@@ -152,7 +152,7 @@ database credentials:
   />
 </div>
 
-### Custom SSL certificates
+### <--{"name" : "Connecting via SSL"}-->  Custom SSL certificates
 
 To use custom SSL certificates between Cube Cloud and your database server, go
 to the **Env vars** tab in **Settings**:

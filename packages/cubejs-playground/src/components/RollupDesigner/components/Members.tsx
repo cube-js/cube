@@ -1,7 +1,6 @@
 import { TCubeMember } from '@cubejs-client/core';
-import { Typography } from 'antd';
+import { Space, Typography } from 'antd';
 
-import { Flex } from '../../../grid';
 import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
 import RemoveButtonGroup from '../../../QueryBuilder/RemoveButtonGroup';
 
@@ -18,7 +17,7 @@ export function Members({ title, members, onRemove }: MembersProps) {
         <Typography.Text>{title}</Typography.Text>
       </Typography.Paragraph>
 
-      <Flex gap={2} wrap>
+      <Space wrap>
         {members.map((member) => (
           <RemoveButtonGroup
             key={member.name}
@@ -33,7 +32,7 @@ export function Members({ title, members, onRemove }: MembersProps) {
             </MemberDropdown>
           </RemoveButtonGroup>
         ))}
-      </Flex>
+      </Space>
     </>
   );
 }

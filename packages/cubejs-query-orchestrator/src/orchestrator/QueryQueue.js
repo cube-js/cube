@@ -91,6 +91,10 @@ export class QueryQueue {
           queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
+          metadata: query.metadata,
+          preAggregationId: query.preAggregation?.preAggregationId,
+          newVersionEntry: query.newVersionEntry,
+          forceBuild: query.forceBuild,
         });
       }
 
@@ -214,7 +218,10 @@ export class QueryQueue {
         this.logger('Cancelling query manual', {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
-          requestId: query.requestId
+          requestId: query.requestId,
+          metadata: query.query?.metadata,
+          preAggregationId: query.query?.preAggregation?.preAggregationId,
+          newVersionEntry: query.query?.newVersionEntry,
         });
         await this.sendCancelMessageFn(query);
       }
@@ -240,7 +247,10 @@ export class QueryQueue {
           this.logger('Removing orphaned query', {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
           await this.sendCancelMessageFn(query);
         }
@@ -399,7 +409,10 @@ export class QueryQueue {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
-          timeInQueue
+          timeInQueue,
+          metadata: query.query?.metadata,
+          preAggregationId: query.query?.preAggregation?.preAggregationId,
+          newVersionEntry: query.query?.newVersionEntry,
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
@@ -420,7 +433,10 @@ export class QueryQueue {
                       queryKey: query.queryKey,
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
-                      requestId: query.requestId
+                      requestId: query.requestId,
+                      metadata: query.query?.metadata,
+                      preAggregationId: query.query?.preAggregation?.preAggregationId,
+                      newVersionEntry: query.query?.newVersionEntry,
                     });
                   }
                   return null;
@@ -435,7 +451,10 @@ export class QueryQueue {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            timeInQueue
+            timeInQueue,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
         } catch (e) {
           executionResult = {
@@ -449,6 +468,9 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             timeInQueue,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
@@ -458,7 +480,10 @@ export class QueryQueue {
                 processingId,
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
-                requestId: queryWithCancelHandle.requestId
+                requestId: queryWithCancelHandle.requestId,
+                metadata: queryWithCancelHandle.query?.metadata,
+                preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
+                newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
             }
@@ -473,7 +498,10 @@ export class QueryQueue {
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
         }
 

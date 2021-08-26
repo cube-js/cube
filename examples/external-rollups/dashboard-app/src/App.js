@@ -58,7 +58,7 @@ const AppLayout = ({ children }) => (
           <Menu.Item key="1">
             <a href="https://github.com/cube-js/cube.js">
               <Icon type="github" />
-              Github
+              GitHub
             </a>
           </Menu.Item>
           <Menu.Item key="2">
@@ -94,7 +94,7 @@ const Dashboard = ({ children, onPreAggChange, onDateRangeChange, onCategoryChan
     <Col span={24} lg={12} align="left">
       <Switch
         onChange={checked => onPreAggChange(checked ? "PreAgg" : "")}
-      /> Enable pre-aggregations
+      /> Use external rollups (pre-aggregations)
     </Col>
     <Col span={24} lg={6} align="right">
       <Radio.Group

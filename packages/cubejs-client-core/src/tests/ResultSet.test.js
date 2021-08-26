@@ -27,6 +27,22 @@ describe('ResultSet', () => {
       expect(resultSet.timeSeries(timeDimension)).toEqual(output);
     });
 
+    test('it generates array of dates - granularity quarter', () => {
+      const resultSet = new ResultSet({});
+      const timeDimension = {
+        dateRange: ['2015-01-01', '2015-12-31'],
+        granularity: 'quarter',
+        timeDimension: 'Events.time'
+      };
+      const output = [
+        '2015-01-01T00:00:00.000',
+        '2015-04-01T00:00:00.000',
+        '2015-07-01T00:00:00.000',
+        '2015-10-01T00:00:00.000',
+      ];
+      expect(resultSet.timeSeries(timeDimension)).toEqual(output);
+    });
+
     test('it generates array of dates - granularity hour', () => {
       const resultSet = new ResultSet({});
       const timeDimension = {
