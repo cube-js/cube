@@ -1,5 +1,5 @@
 ---
-title: Deploy with Kubernetes
+title: Kubernetes
 permalink: /deployment/platforms/kubernetes
 category: Deployment
 subCategory: Platforms
@@ -14,9 +14,9 @@ containers.
 [[warning |]]
 | This is an example of a production-ready deployment, but real-world
 | deployments can vary significantly depending on desired performance and
-| scale. For more examples of deploying with [Kubernetes][k8s], check out a
-| community-contributed and supported [example here
-| ][gh-cubejs-examples-k8s-helm].
+| scale. For an example of deploying with [Helm][helm-k8s] and
+| [Kubernetes][k8s], check out a community-contributed and supported
+| [project here][gh-cubejs-examples-k8s-helm].
 <!-- prettier-ignore-end -->
 
 ## Prerequisites
@@ -536,8 +536,9 @@ spec:
           image: cubejs/cube:v%CURRENT_VERSION
 ```
 
-[gh-cubejs-examples-k8s-helm]: https://github.com/cube-js/cube.js/tree/master/examples/helm-charts
 [dockerhub-cubejs]: https://hub.docker.com/r/cubejs/cube
+[gh-cubejs-examples-k8s-helm]: https://github.com/cube-js/cube.js/tree/master/examples/helm-charts
+[helm-k8s]: https://helm.sh/
 [k8s-docs-deployment]:
   https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
 [k8s-docs-headless-svc]:
