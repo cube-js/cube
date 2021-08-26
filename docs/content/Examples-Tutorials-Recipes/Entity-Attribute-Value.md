@@ -168,7 +168,7 @@ The drawback is that when the set of statuses changes, we'll need to amend the c
 ### Static attributes, DRY version
 
 We can embrace the
-[Don't repeat yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself) principle
+[Don't Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself) principle
 and eliminate the repetition by generating the cube definition dynamically based on the
 list of statuses. Let's move all repeated code patterns into handy functions and iterate
 over statuses in relevant parts of the cube's code.
