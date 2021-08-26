@@ -223,7 +223,7 @@ cube(`UsersStatuses_DRY`, {
 
 The new `UsersStatuses_DRY` cube is functionally identical to the `UsersStatuses_Joins`
 cube above. Querying this new cube would yield the same data. However, there's still
-a static list of statuses present in the cube's cube. Let's see how to work around that.
+a static list of statuses present in the cube's source code. Let's work around that next.
 
 ### Dynamic attributes
 
