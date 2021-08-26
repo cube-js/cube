@@ -323,7 +323,7 @@ asyncModule(async () => {
 ```
 
 Again, the new `UsersStatuses_Dynamic` cube is functionally identical to the previously
-created cubes. So, querying this new cube would yield the same data, too. The only drawback
+created cubes. So, querying this new cube would yield the same data too. The only drawback
 is that now we need to maintain the API service that fetches statuses.
 
 ## Source code
