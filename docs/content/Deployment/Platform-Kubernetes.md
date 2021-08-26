@@ -458,7 +458,8 @@ spec:
 [[info |]]
 | For more advanced configuration, or for platforms where ingress is manually
 | managed, please refer to the Kubernetes documentation for [Ingress
-| Controllers][k8s-docs-ingress-controllers].
+| Controllers][k8s-docs-ingress-controllers]. You can also find an [example of
+| an Ingress Controller here][gh-cubejs-examples-k8s-ingress-ctrl].
 <!-- prettier-ignore-end -->
 
 ## Security
@@ -538,6 +539,8 @@ spec:
 
 [dockerhub-cubejs]: https://hub.docker.com/r/cubejs/cube
 [gh-cubejs-examples-k8s-helm]: https://github.com/cube-js/cube.js/tree/master/examples/helm-charts
+[gh-cubejs-examples-k8s-ingress-ctrl]:
+  https://github.com/cube-js/cube.js/blob/master/examples/kubernetes/prod/ingress-controller.yaml
 [helm-k8s]: https://helm.sh/
 [k8s-docs-deployment]:
   https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
