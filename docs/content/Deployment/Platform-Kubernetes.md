@@ -517,7 +517,7 @@ kubectl logs
 
 ## Update to the latest version
 
-Specify the tag for the Docker image available from [from Docker
+Specify the tag for the Docker image available from [Docker
 Hub][dockerhub-cubejs] (currently `v%CURRENT_VERSION`). Then update your
 `cube-api-deployment.yaml` and `cube-refresh-deployment.yaml` to use the new
 tag:
