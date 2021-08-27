@@ -95,6 +95,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "rolling_window_query_timestamps",
             rolling_window_query_timestamps,
         ),
+        t(
+            "rolling_window_extra_aggregate",
+            rolling_window_extra_aggregate,
+        ),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
         t("date_add", date_add),
@@ -3091,6 +3095,130 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
             (jan[5], 5)
         ])
     );
+}
+
+async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, Some(17)),
+            (2, 17, None),
+            (3, 23, Some(23)),
+            (4, 23, None),
+            (5, 5, Some(5))
+        ])
+    );
+
+    // We could also distribute differently.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION CASE WHEN day <= 3 THEN 1 ELSE 5 END \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, Some(40)),
+            (2, 17, None),
+            (3, 23, None),
+            (4, 23, None),
+            (5, 5, Some(5))
+        ])
+    );
+
+    // Putting everything into an out-of-range dimension.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 6 \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, NULL),
+            (2, 17, NULL),
+            (3, 23, NULL),
+            (4, 23, NULL),
+            (5, 5, NULL)
+        ])
+    );
+
+    // Check errors.
+    // Mismatched types.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 'aaa' \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+    // Aggregate without GROUP BY DIMENSION.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+    // GROUP BY DIMENSION without aggregates.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 0 \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
 }
 
 async fn decimal_index(service: Box<dyn SqlClient>) {
