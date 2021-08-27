@@ -1,7 +1,6 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  creationTimestamp: null
   labels:
     service: cubestore-workers
   name: cubestore-workers
@@ -13,7 +12,6 @@ spec:
       service: cubestore-workers
   template:
     metadata:
-      creationTimestamp: null
       labels:
         service: cubestore-workers
     spec:

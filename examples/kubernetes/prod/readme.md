@@ -16,7 +16,6 @@ We opted for what we think is best practice. We create a single configmap contai
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  creationTimestamp: null
   name: cube-api-schema
 data:
   Cube1.js: |

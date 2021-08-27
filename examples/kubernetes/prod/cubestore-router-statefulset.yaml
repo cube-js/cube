@@ -1,7 +1,6 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  creationTimestamp: null
   labels:
     service: cubestore-router
   name: cubestore-router
@@ -12,7 +11,6 @@ spec:
       service: cubestore-router
   template:
     metadata:
-      creationTimestamp: null
       labels:
         service: cubestore-router
     spec:
