@@ -186,6 +186,8 @@ pub enum SerializedLogicalPlan {
         to: SerializedExpr,
         every: SerializedExpr,
         rolling_aggs: Vec<SerializedExpr>,
+        group_by_dimension: Option<SerializedExpr>,
+        aggs: Vec<SerializedExpr>,
     },
 }
 
@@ -384,6 +386,8 @@ impl SerializedLogicalPlan {
                 to,
                 every,
                 rolling_aggs,
+                group_by_dimension,
+                aggs,
             } => LogicalPlan::Extension {
                 node: Arc::new(RollingWindowAggregate {
                     schema: schema.clone(),
@@ -394,6 +398,8 @@ impl SerializedLogicalPlan {
                     every: every.expr(),
                     partition_by: partition_by.clone(),
                     rolling_aggs: exprs(&rolling_aggs),
+                    group_by_dimension: group_by_dimension.as_ref().map(|d| d.expr()),
+                    aggs: exprs(&aggs),
                 }),
             },
         })
@@ -802,6 +808,11 @@ impl SerializedPlan {
                         to: Self::serialized_expr(&r.to),
                         every: Self::serialized_expr(&r.every),
                         rolling_aggs: Self::serialized_exprs(&r.rolling_aggs),
+                        group_by_dimension: r
+                            .group_by_dimension
+                            .as_ref()
+                            .map(|d| Self::serialized_expr(d)),
+                        aggs: Self::serialized_exprs(&r.aggs),
                     }
                 } else {
                     panic!("unknown extension");
