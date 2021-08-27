@@ -1,0 +1,328 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cube-api-schema
+data:
+  # Here's where you define the schema files
+  Users.js: |
+    cube(`Users`, {
+      sql: `SELECT * FROM public.users`,
+      
+      preAggregations: {
+        // Pre-Aggregations definitions go here
+        // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+      },
+      
+      joins: {
+        
+      },
+      
+      measures: {
+        count: {
+          type: `count`,
+          drillMembers: [id, city, firstName, lastName, createdAt]
+        }
+      },
+      
+      dimensions: {
+        id: {
+          sql: `id`,
+          type: `number`,
+          primaryKey: true
+        },
+        
+        city: {
+          sql: `city`,
+          type: `string`
+        },
+        
+        company: {
+          sql: `company`,
+          type: `string`
+        },
+        
+        gender: {
+          sql: `gender`,
+          type: `string`
+        },
+        
+        firstName: {
+          sql: `first_name`,
+          type: `string`
+        },
+        
+        lastName: {
+          sql: `last_name`,
+          type: `string`
+        },
+        
+        state: {
+          sql: `state`,
+          type: `string`
+        },
+        
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        }
+      },
+      
+      dataSource: `default`
+    });
+  
+  Products.js: |
+    cube(`Products`, {
+      sql: `SELECT * FROM public.products`,
+      
+      preAggregations: {
+        // Pre-Aggregations definitions go here
+        // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+      },
+      
+      joins: {
+        Suppliers: {
+          sql: `${CUBE}.supplier_id = ${Suppliers}.id`,
+          relationship: `belongsTo`
+        },
+        
+        ProductCategories: {
+          sql: `${CUBE}.product_category_id = ${ProductCategories}.id`,
+          relationship: `belongsTo`
+        }
+      },
+      
+      measures: {
+        count: {
+          type: `count`,
+          drillMembers: [id, name, createdAt]
+        }
+      },
+      
+      dimensions: {
+        id: {
+          sql: `id`,
+          type: `number`,
+          primaryKey: true
+        },
+        
+        name: {
+          sql: `name`,
+          type: `string`
+        },
+        
+        description: {
+          sql: `description`,
+          type: `string`
+        },
+        
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        }
+      },
+      
+      dataSource: `default`
+    });
+  
+  LineItems.js: |
+    cube(`LineItems`, {
+      sql: `SELECT * FROM public.line_items`,
+      
+      preAggregations: {
+        // Pre-Aggregations definitions go here
+        // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+      },
+      
+      joins: {
+        Products: {
+          sql: `${CUBE}.product_id = ${Products}.id`,
+          relationship: `belongsTo`
+        },
+        
+        Orders: {
+          sql: `${CUBE}.order_id = ${Orders}.id`,
+          relationship: `belongsTo`
+        }
+      },
+      
+      measures: {
+        count: {
+          type: `count`,
+          drillMembers: [id, createdAt]
+        },
+        
+        quantity: {
+          sql: `quantity`,
+          type: `sum`
+        },
+        
+        price: {
+          sql: `price`,
+          type: `sum`
+        }
+      },
+      
+      dimensions: {
+        id: {
+          sql: `id`,
+          type: `number`,
+          primaryKey: true
+        },
+        
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        }
+      },
+      
+      dataSource: `default`
+    });
+  
+  Suppliers.js: |
+    cube(`Suppliers`, {
+      sql: `SELECT * FROM public.suppliers`,
+      
+      preAggregations: {
+        // Pre-Aggregations definitions go here
+        // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+      },
+      
+      joins: {
+        
+      },
+      
+      measures: {
+        count: {
+          type: `count`,
+          drillMembers: [id, createdAt]
+        }
+      },
+      
+      dimensions: {
+        id: {
+          sql: `id`,
+          type: `number`,
+          primaryKey: true
+        },
+        
+        address: {
+          sql: `address`,
+          type: `string`
+        },
+        
+        email: {
+          sql: `email`,
+          type: `string`
+        },
+        
+        company: {
+          sql: `company`,
+          type: `string`
+        },
+        
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        }
+      },
+      
+      dataSource: `default`
+    });
+  
+  ProductCategories.js: |
+    cube(`ProductCategories`, {
+      sql: `SELECT * FROM public.product_categories`,
+      
+      preAggregations: {
+        // Pre-Aggregations definitions go here
+        // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
+      },
+      
+      joins: {
+        
+      },
+      
+      measures: {
+        count: {
+          type: `count`,
+          drillMembers: [id, name, createdAt]
+        }
+      },
+      
+      dimensions: {
+        id: {
+          sql: `id`,
+          type: `number`,
+          primaryKey: true
+        },
+        
+        name: {
+          sql: `name`,
+          type: `string`
+        },
+        
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        }
+      },
+      
+      dataSource: `default`
+    });
+  
+  Orders.js: |
+    cube(`Orders`, {
+      sql: `SELECT * FROM public.orders`,
+      preAggregations: {
+        // Pre-Aggregations definitions go here
+        // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    
+        main: {
+          measures: [CUBE.count],
+          dimensions: [CUBE.status],
+          timeDimension: CUBE.createdAt,
+          granularity: `day`,
+          partitionGranularity: `month`,
+        },
+      },
+      joins: {
+        Users: {
+          sql: `${CUBE}.user_id = ${Users}.id`,
+          relationship: `belongsTo`
+        },
+        Products: {
+          sql: `${CUBE}.product_id = ${Products}.id`,
+          relationship: `belongsTo`
+        }
+      },
+      measures: {
+        count: {
+          type: `count`,
+          drillMembers: [id, createdAt]
+        },
+        number: {
+          sql: `number`,
+          type: `sum`
+        }
+      },
+      dimensions: {
+        id: {
+          sql: `id`,
+          type: `number`,
+          primaryKey: true
+        },
+        status: {
+          sql: `status`,
+          type: `string`
+        },
+        createdAt: {
+          sql: `created_at`,
+          type: `time`
+        },
+        completedAt: {
+          sql: `completed_at`,
+          type: `time`
+        }
+      },
+      dataSource: `default`
+    });
