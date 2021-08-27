@@ -738,9 +738,7 @@ export class PreAggregations {
         ];
       }),
       R.fromPairs
-    )(preAggregationForQuery.preAggregation.type === 'autoRollup' ?
-      preAggregationForQuery.preAggregation.measures :
-      this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures);
+    )(this.rollupMeasures(preAggregationForQuery));
 
     // TODO granularity shouldn't be null?
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
@@ -761,5 +759,11 @@ export class PreAggregations {
         rollupGranularity,
       }
     );
+  }
+
+  rollupMeasures(preAggregationForQuery) {
+    return preAggregationForQuery.preAggregation.type === 'autoRollup' ?
+      preAggregationForQuery.preAggregation.measures :
+      this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures;
   }
 }

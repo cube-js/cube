@@ -1363,6 +1363,8 @@ export class BaseQuery {
     const context = this.safeEvaluateSymbolContext();
     if (context.rollupQuery) {
       return this.escapeColumnName(dimension.unescapedAliasName(context.rollupGranularity));
+    } else if (context.wrapQuery) {
+      return this.escapeColumnName(dimension.unescapedAliasName(context.wrappedGranularity));
     }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }
@@ -1653,7 +1655,10 @@ export class BaseQuery {
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
     const cumulativeMeasureFilters = (this.safeEvaluateSymbolContext().cumulativeMeasureFilters || {})[measurePath];
     if (cumulativeMeasureFilters) {
-      evaluateSql = this.caseWhenStatement([{ sql: cumulativeMeasureFilters.filterToWhere(), label: evaluateSql }]);
+      const sql = cumulativeMeasureFilters.filterToWhere();
+      if (sql) {
+        evaluateSql = this.caseWhenStatement([{ sql, label: evaluateSql }]);
+      }
     }
     if (symbol.type === 'count' || symbol.type === 'sum') {
       return `sum(${evaluateSql})`;

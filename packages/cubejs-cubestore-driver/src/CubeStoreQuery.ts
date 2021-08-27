@@ -119,26 +119,36 @@ export class CubeStoreQuery extends BaseQuery {
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(commonDateCondition, true, true) || []
     );
     const rollupGranularity = this.preAggregations?.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
+    const granularityOverride = timeDimension &&
+      cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimension.granularity) || rollupGranularity;
     return this.evaluateSymbolSqlWithContext(
       () => this.overTimeSeriesSelectRollup(
         cumulativeMeasuresWithoutMultiplied,
         regularMeasures.concat(multipliedMeasures),
-        this.preAggregations?.rollupPreAggregation(preAggregationForQuery, allMeasures, false, filters),
+        this.evaluateSymbolSqlWithContext(() => this.preAggregations?.rollupPreAggregation(preAggregationForQuery, allMeasures, false, filters), {
+          granularityOverride
+        }),
         baseQueryAlias,
-        timeDimension
+        timeDimension,
+        preAggregationForQuery
       ),
       {
-        rollupQuery: true,
-        rollupGranularity,
+        wrapQuery: true,
+        wrappedGranularity: timeDimension?.granularity || rollupGranularity,
+        rollupGranularity: granularityOverride
       }
     );
   }
 
-  public overTimeSeriesSelectRollup(cumulativeMeasures, otherMeasures, baseQuery, baseQueryAlias, timeDimension) {
-    const rollingWindowClause = timeDimension &&
-      ` ROLLING_WINDOW DIMENSION ${timeDimension.aliasName()} FROM ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeFromOrBuildRangeParam())} TO ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeToOrBuildRangeParam())} EVERY INTERVAL '1 ${timeDimension.granularity}'` || '';
-    const forSelect = this.overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension);
-    return `SELECT ${forSelect} FROM (${baseQuery}) ${baseQueryAlias}${rollingWindowClause}${this.groupByClause()}`;
+  public overTimeSeriesSelectRollup(cumulativeMeasures, otherMeasures, baseQuery, baseQueryAlias, timeDimension, preAggregationForQuery) {
+    const cumulativeDimensions = this.dimensions.map(s => s.cumulativeSelectColumns()).filter(c => !!c).join(', ');
+    const partitionByClause = this.dimensions.length ? `PARTITION BY ${cumulativeDimensions}` : '';
+    const groupByDimensionClause = otherMeasures.length && timeDimension ? ` GROUP BY DIMENSION ${timeDimension.dimensionSql()}` : '';
+    const rollingWindowOrGroupByClause = timeDimension ?
+      ` ROLLING_WINDOW DIMENSION ${timeDimension.aliasName()}${partitionByClause}${groupByDimensionClause} FROM ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeFromOrBuildRangeParam())} TO ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeToOrBuildRangeParam())} EVERY INTERVAL '1 ${timeDimension.granularity}'` :
+      this.groupByClause();
+    const forSelect = this.overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension, preAggregationForQuery);
+    return `SELECT ${forSelect} FROM (${baseQuery}) ${baseQueryAlias}${rollingWindowOrGroupByClause}`;
   }
 
   public toInterval(interval) {
@@ -178,53 +188,49 @@ export class CubeStoreQuery extends BaseQuery {
     };
   }
 
-  public overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension) {
-    const cumulativeSelectColumns = cumulativeMeasures.map(m => {
-      if (timeDimension) {
-        const measureSql = m.cumulativeMeasureSql();
-        const rollingWindow = m.rollingWindowDefinition();
-        const preceding = rollingWindow.trailing ? `${this.toInterval(rollingWindow.trailing)} PRECEDING` : '';
-        const following = rollingWindow.leading ? `${this.toInterval(rollingWindow.leading)} FOLLOWING` : '';
-        // TODO OFFSET ${rollingWindow.offset || 'END'}
-        return [`ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following}) ${m.aliasName()}`];
-      } else {
-        const dateJoinCondition = m.dateJoinCondition();
-        const conditionFn = this.dateFromStartToEndConditionSql(dateJoinCondition, true, true)[0];
-        return this.evaluateSymbolSqlWithContext(
-          () => {
-            const aliasName = m.aliasName();
-            const measureSql = this.aggregateOnGroupedColumn(
-              m.measureDefinition(),
-              aliasName,
-              true,
-              m.measure
-            );
-            return [`${measureSql} ${aliasName}`];
-          },
-          {
-            cumulativeMeasureFilters: { [m.measure]: conditionFn }
-          }
-        );
-      }
-    });
-    const otherSelectColumns = otherMeasures.map(m => this.evaluateSymbolSqlWithContext(
-      () => {
-        const aliasName = m.aliasName();
-        const measureSql = this.aggregateOnGroupedColumn(
-          m.measureDefinition(),
-          aliasName,
-          true,
-          m.measure
-        );
-        return [`${measureSql} ${aliasName}`];
-      },
+  public overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension, preAggregationForQuery) {
+    const rollupMeasures = this.preAggregations?.rollupMeasures(preAggregationForQuery);
+    const renderedReference = rollupMeasures.map(measure => {
+      const m = this.newMeasure(measure);
+      const renderSql = () => {
+        if (timeDimension && m.isCumulative()) {
+          const measureSql = m.cumulativeMeasureSql();
+          const rollingWindow = m.rollingWindowDefinition();
+          const preceding = rollingWindow.trailing ? `${this.toInterval(rollingWindow.trailing)} PRECEDING` : '';
+          const following = rollingWindow.leading ? `${this.toInterval(rollingWindow.leading)} FOLLOWING` : '';
+          // TODO OFFSET ${rollingWindow.offset || 'END'}
+          return `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following})`;
+        } else {
+          const conditionFn = m.isCumulative() ? this.dateFromStartToEndConditionSql(m.dateJoinCondition(), true, true)[0] : timeDimension;
+          return this.evaluateSymbolSqlWithContext(
+            () => {
+              const aliasName = m.aliasName();
+              return this.aggregateOnGroupedColumn(
+                m.measureDefinition(),
+                aliasName,
+                true,
+                m.measure
+              );
+            },
+            {
+              cumulativeMeasureFilters: { [m.measure]: conditionFn }
+            }
+          );
+        }
+      };
+
+      return {
+        [measure]: renderSql()
+      };
+    }).reduce((a, b) => ({ ...a, ...b }), {});
+    return this.evaluateSymbolSqlWithContext(
+      () => this.dimensions.concat(this.timeDimensions.filter(d => d.granularity)).map(s => s.cumulativeSelectColumns()).concat(
+        this.measures.map(m => m.selectColumns())
+      ).filter(c => !!c)
+        .join(', '),
       {
-        cumulativeMeasureFilters: { [m.measure]: timeDimension }
+        renderedReference
       }
-    ));
-    return this.dimensions.concat(this.timeDimensions.filter(d => d.granularity)).map(s => s.cumulativeSelectColumns()).concat(
-      cumulativeSelectColumns.concat(otherSelectColumns),
-    ).filter(c => !!c)
-      .join(', ');
+    );
   }
 }

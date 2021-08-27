@@ -21,14 +21,16 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   selectColumns() {
-    if (!this.granularity) {
+    const context = this.query.safeEvaluateSymbolContext();
+    if (!context.granularityOverride && !this.granularity) {
       return null;
     }
     return super.selectColumns();
   }
 
   aliasName() {
-    if (!this.granularity) {
+    const context = this.query.safeEvaluateSymbolContext();
+    if (!context.granularityOverride && !this.granularity) {
       return null;
     }
     return super.aliasName();
@@ -55,7 +57,7 @@ export class BaseTimeDimension extends BaseFilter {
     const context = this.query.safeEvaluateSymbolContext();
     const granularity = context.granularityOverride || this.granularity;
 
-    if (context.rollupQuery) {
+    if (context.rollupQuery || context.wrapQuery) {
       if (context.rollupGranularity === this.granularity) {
         return super.dimensionSql();
       }
