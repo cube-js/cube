@@ -1,0 +1,67 @@
+{{- if gt (.Values.workers.workersCount | int) 0 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-cube-workers" (include "cubejs.fullname" .) }}
+  labels:
+    {{- include "cubejs.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.workers.workersCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: cube-workers
+      {{- include "cubejs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: cube-workers
+        {{- include "cubejs.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: cube
+          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.apiPort }}
+              protocol: TCP
+          env:
+            {{- include "cubejs.common-env" . | nindent 12 }}
+            - name: CUBEJS_REFRESH_WORKER
+              value: "true"
+          livenessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /livez
+              port: http
+          {{- if .Values.workers.resources }}
+          resources:
+            {{- toYaml .Values.workers.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.global.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.global.volumeMounts | nindent 12 }}
+          {{- end }}
+      {{- if .Values.workers.affinity }}
+      affinity:
+        {{- toYaml .Values.workers.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.spreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.workers.spreadConstraints | nindent 8 }}
+      {{- end }}
+      {{- if .Values.global.volumes }}
+      volumes:
+        {{- toYaml .Values.global.volumes | nindent 8 }}
+      {{- end }}
+
+{{- end }}

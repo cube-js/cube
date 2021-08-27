@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ printf "%s-router" (include "cubestore.fullname" .) }}
+  labels:
+    {{- include "cubestore.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+  {{- end }}
+spec:
+  serviceName: {{ printf "%s-router" (include "cubestore.fullname" .) }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: router
+      {{- include "cubestore.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: router
+        {{- include "cubestore.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: cubestore
+          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.router.httpPort }}
+              protocol: TCP
+            - name: meta
+              containerPort: {{ .Values.router.metaPort }}
+              protocol: TCP
+            - name: mysql
+              containerPort: {{ .Values.router.mysqlPort }}
+              protocol: TCP
+          env:
+            {{- include "cubestore.common-env" . | nindent 12 }}
+            {{- $fullName := include "cubestore.fullname" . }}
+            {{- $headlessServiceName := printf "%s-%s" $fullName "headless" }}
+            {{- $workerPort := .Values.workers.port | int }}
+            - name: CUBESTORE_SERVER_NAME
+              value: {{ printf "%s-router:%d" (include "cubestore.fullname" .) (.Values.router.metaPort | int) }}
+            - name: CUBESTORE_META_PORT
+              value: {{ .Values.router.metaPort | quote }}
+            {{ if gt (.Values.workers.workersCount | int) 0 }}
+            {{- $workers := list }}
+            {{- range $e, $i := until ($.Values.workers.workersCount | int) }}
+            {{- $workers = append $workers (printf "%s-workers-%d.%s:%d" $fullName $i $headlessServiceName $workerPort) }}
+            {{- end }}
+            - name: CUBESTORE_WORKERS
+              value: {{ join "," $workers | quote }}
+            {{- end }}
+            - name: CUBESTORE_DATA_DIR
+              value: /cube/.cubestore/data
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            - name: CUBESTORE_REMOTE_DIR
+              value: /cube/data
+            {{- end}}
+          {{- if .Values.router.resources }}
+          resources:
+            {{- toYaml .Values.router.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts: 
+            - name: datadir
+              mountPath: /cube/.cubestore/data
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            - name: remotedir
+              mountPath: /cube/data
+            {{- end }}
+      volumes:
+      {{- if not .Values.router.persistence.enabled }}
+        - name: datadir
+          emptyDir: {}
+      {{- end }}
+      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+        - name: remotedir
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-remote-storage" (include "cubestore.fullname" .) }}
+      {{- end }}
+      {{- if .Values.router.affinity }}
+      affinity:
+        {{- toYaml .Values.router.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.router.spreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.router.spreadConstraints | nindent 8 }}
+      {{- end }}
+  
+  {{- if .Values.router.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir
+        labels:
+          app.kubernetes.io/component: router
+          {{- include "cubestore.selectorLabels" . | nindent 10 }}
+        {{- if .Values.router.persistence.annotations }}
+        annotations: {{- toYaml .Values.router.persistence.annotations | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+        {{- range .Values.router.persistence.accessModes }}
+          - {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.router.persistence.size | quote }}
+  {{- end}}
