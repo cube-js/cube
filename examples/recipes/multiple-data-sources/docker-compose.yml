@@ -17,7 +17,7 @@ services:
       - 5432:5432
     environment:
       POSTGRES_PASSWORD: example
-      POSTGRES_DB: cubeDev
+      POSTGRES_DB: localDB
     volumes:
       - ./scripts:/docker-entrypoint-initdb.d
 
@@ -27,4 +27,4 @@ services:
       - cube
     volumes:
       - .:/query
-    entrypoint: ["sh", "query/queries/run.sh"]
+    entrypoint: ["bash", "query/queries/run.sh"]

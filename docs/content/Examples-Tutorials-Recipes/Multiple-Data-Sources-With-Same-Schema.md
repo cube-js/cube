@@ -1,5 +1,5 @@
 ---
-title: Manage Access to Multiple Data Sources
+title: Using Multiple Data Sources
 permalink: /recipes/multiple-sources-same-schema
 category: Examples & Tutorials
 subCategory: Data sources
@@ -14,13 +14,10 @@ can only view their data. The same data schema is used for all clients.
 
 ## Configuration
 
-Each client has own database. To manage access to the databases, we need to use
-the
-[`contextToAppId`](https://cube.dev/docs/config#options-reference-context-to-app-id)
-function and the
-[`driverFactory`](https://cube.dev/docs/config#options-reference-driver-factory)
-property. [JSON Web Token](https://cube.dev/docs/security) includes information
-about the tenant name in the `tenant` property.
+Each client has its own database. In this recipe, the `Mango Inc` tenant keeps its data in the remote `ecom` database while the `Avocado Inc` tenant works with the local database (bootstrapped in the `docker-compose.yml` file) which has the same schema.
+To enable multitenancy, use the [`contextToAppId`](https://cube.dev/docs/config#options-reference-context-to-app-id) function to provide distinct identifiers for each tenant.
+Also, implement the [`driverFactory`](https://cube.dev/docs/config#options-reference-driver-factory) function where you can select a data source based on the tenant name. [JSON Web Token](https://cube.dev/docs/security) includes information
+about the tenant name in the `tenant` property of the `securityContext`.
 
 ```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -57,18 +54,21 @@ To get users for different tenants, we will send two identical requests with
 different JWTs:
 
 ```javascript
+// JWT`s payload for "Avocado Inc"
 {
-  "order": [
-    [
-      "Users.id",
-      "desc"
-    ]
-  ],
-  "dimensions": [
-    "Users.id",
-    "Users.name"
-  ],
-  "limit": 5
+  "sub": "1234567890",
+  "tenant": "Avocado Inc",
+  "iat": 1516239022,
+  "exp": 1724995581
+}
+```
+```javascript
+// JWT`s payload for "Mango Inc"
+{
+  "sub": "1234567890",
+  "tenant": "Mango Inc",
+  "iat": 1516239022,
+  "exp": 1724995581
 }
 ```
 
@@ -91,15 +91,7 @@ tenant`s name:
   {
     'Users.id': 698,
     'Users.name': 'Macie Ryan',
-  },
-  {
-    'Users.id': 697,
-    'Users.name': 'Hailie Mosciski',
-  },
-  {
-    'Users.id': 696,
-    'Users.name': 'Gia Abbott',
-  },
+  }
 ];
 ```
 
@@ -117,15 +109,7 @@ tenant`s name:
   {
     'Users.id': 703,
     'Users.name': 'Moyra Denney',
-  },
-  {
-    'Users.id': 702,
-    'Users.name': 'Bondy Davidman',
-  },
-  {
-    'Users.id': 701,
-    'Users.name': 'Caritta Hiley',
-  },
+  }
 ];
 ```
 
