@@ -125,12 +125,12 @@ cubejs:
 
   redis:
     ## The host URL for a Redis server
-    ##
-    url:
+    ## Naming this release "cubestack" will give you this default Redis URL 
+    url: redis://cubestack-redis-master:6379
 
     ## The password used to connect to the Redis server
     ##
-    password:
+    password: "your-password"
     # passwordFromSecret:
     #   name:
     #   key:
@@ -778,12 +778,12 @@ redis:
 
   global:
     redis:
-      password:
+      password: "your-password"
 
   auth:
     ## @param auth.enabled Enable password authentication
     ##
-    enabled: false
+    enabled: true
     ## @param auth.sentinel Enable password authentication on sentinels too
     ##
     sentinel: true
