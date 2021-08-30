@@ -22,6 +22,7 @@ use datafusion::logical_plan::{
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
+use sqlparser::ast::RollingOffset;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -469,6 +470,7 @@ pub enum SerializedExpr {
         agg: Box<SerializedExpr>,
         start: WindowFrameBound,
         end: WindowFrameBound,
+        offset_to_end: bool,
     },
     InList {
         expr: Box<SerializedExpr>,
@@ -559,10 +561,19 @@ impl SerializedExpr {
                 low: Box::new(low.expr()),
                 high: Box::new(high.expr()),
             },
-            SerializedExpr::RollingAggregate { agg, start, end } => Expr::RollingAggregate {
+            SerializedExpr::RollingAggregate {
+                agg,
+                start,
+                end,
+                offset_to_end,
+            } => Expr::RollingAggregate {
                 agg: Box::new(agg.expr()),
                 start: start.clone(),
                 end: end.clone(),
+                offset: match offset_to_end {
+                    false => RollingOffset::Start,
+                    true => RollingOffset::End,
+                },
             },
             SerializedExpr::InList {
                 expr,
@@ -969,10 +980,15 @@ impl SerializedPlan {
                 agg,
                 start: start_bound,
                 end: end_bound,
+                offset,
             } => SerializedExpr::RollingAggregate {
                 agg: Box::new(Self::serialized_expr(&agg)),
                 start: start_bound.clone(),
                 end: end_bound.clone(),
+                offset_to_end: match offset {
+                    RollingOffset::Start => false,
+                    RollingOffset::End => true,
+                },
             },
             Expr::WindowFunction { .. } => panic!("window functions are not supported"),
         }

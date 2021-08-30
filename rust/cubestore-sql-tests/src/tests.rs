@@ -99,6 +99,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "rolling_window_extra_aggregate",
             rolling_window_extra_aggregate,
         ),
+        t(
+            "rolling_window_extra_aggregate_timestamps",
+            rolling_window_extra_aggregate_timestamps,
+        ),
+        t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
         t("date_add", date_add),
@@ -3219,6 +3224,102 @@ async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap_err();
+}
+
+async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=5)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE INTERVAL '1 day' PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM date_trunc('day', to_timestamp('2021-01-01T00:00:00Z')) \
+             TO date_trunc('day', to_timestamp('2021-01-05T00:00:00Z')) \
+             EVERY INTERVAL '1 day' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], 17, Some(17)),
+            (jan[2], 17, None),
+            (jan[3], 23, Some(23)),
+            (jan[4], 23, None),
+            (jan[5], 5, Some(5))
+        ])
+    );
+}
+
+async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO s.data(day, n) VALUES (1, 1), (2, 2), (3, 3), (5, 5), (9, 9)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET END) \
+             FROM s.data \
+             ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2 \
+             ORDER BY day",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, 1), (2, 6), (4, 11), (6, 11), (8, 20), (10, 20)])
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING OFFSET END) \
+             FROM s.data \
+             ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2 \
+             ORDER BY day",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (0, Some(3)),
+            (2, Some(5)),
+            (4, Some(5)),
+            (6, None),
+            (8, Some(9)),
+            (10, None)
+        ])
+    );
 }
 
 async fn decimal_index(service: Box<dyn SqlClient>) {
