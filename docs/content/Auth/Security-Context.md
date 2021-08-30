@@ -168,7 +168,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"name" : "Using COMPILE_CONTEXT"}-->  Usage with Pre-Aggregations
+### <--{"id" : "Using COMPILE_CONTEXT"}-->  Usage with Pre-Aggregations
 
 To generate pre-aggregations that rely on `SECURITY_CONTEXT` and/or
 `COMPILE_CONTEXT`, [configure `scheduledRefreshContexts` in your `cube.js`

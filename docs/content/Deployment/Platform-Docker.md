@@ -182,7 +182,7 @@ services:
 
 ## Security
 
-### <--{"name" : "Security"}--> Use JSON Web Tokens
+### <--{"id" : "Security"}--> Use JSON Web Tokens
 
 Cube.js can be configured to use industry-standard JSON Web Key Sets for
 securing its API and limiting access to data. To do this, we'll define the
@@ -223,7 +223,7 @@ services:
       - redis
 ```
 
-### <--{"name" : "Security"}--> Securing Cube Store
+### <--{"id" : "Security"}--> Securing Cube Store
 
 All Cube Store nodes (both router and workers) should only be accessible to
 Cube.js API instances and refresh workers. To do this with Docker Compose, we

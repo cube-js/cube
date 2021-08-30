@@ -110,7 +110,7 @@ scanned and processed, and possibly even reduced cost, depending on your
 database solution. Cube.js supports partitioning data using the `timeDimension`
 property in [a pre-aggregation definition][ref-schema-ref-preaggs].
 
-### <--{"name" : "Partitioning"}-->  Time partitioning
+### <--{"id" : "Partitioning"}-->  Time partitioning
 
 Time-based partitioning is especially helpful for incremental refreshes; when
 configured, Cube.js will only refresh partitions as necessary. Without
@@ -272,7 +272,7 @@ memory before writing them to Cube Store (or an external database).
 If the dataset is large (more than 100k rows), then Cube.js can face issues when
 the Node runtime runs out of memory.
 
-### <--{"name" : "Optimizing Pre-Aggregation Build Times"}-->  Batching
+### <--{"id" : "Optimizing Pre-Aggregation Build Times"}-->  Batching
 
 Batching is a more performant strategy where Cube.js sends compressed CSVs for
 Cube Store to ingest.
@@ -292,7 +292,7 @@ The performance scales to the amount of memory available on the Cube.js
 instance. Batching is automatically enabled for any databases that can support
 it.
 
-### <--{"name" : "Optimizing Pre-Aggregation Build Times"}-->  Export bucket
+### <--{"id" : "Optimizing Pre-Aggregation Build Times"}-->  Export bucket
 
 When dealing with larger pre-aggregations (more than 100k rows), performance can
 be significantly improved by using an export bucket. This allows the source

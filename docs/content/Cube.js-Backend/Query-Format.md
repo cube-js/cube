@@ -89,7 +89,7 @@ A Query has the following properties:
 }
 ```
 
-### <--{"name" : "Query Properties"}-->  Default order
+### <--{"id" : "Query Properties"}-->  Default order
 
 If the `order` property is not specified in the query, Cube.js sorts results by
 default using the following rules:
@@ -99,7 +99,7 @@ default using the following rules:
 - The first measure, descending. If no measure exists...
 - The first dimension, ascending.
 
-### <--{"name" : "Query Properties"}-->  Alternative order format
+### <--{"id" : "Query Properties"}-->  Alternative order format
 
 Also you can control the ordering of the `order` specification, Cube.js support
 alternative order format - array of tuples:
@@ -144,7 +144,7 @@ Only some operators are available for measures. For dimensions, the available
 operators depend on the
 [type of the dimension](/schema/reference/types-and-formats#types).
 
-### <--{"name" : "Filters Operators"}-->  equals
+### <--{"id" : "Filters Operators"}-->  equals
 
 Use it when you need an exact match. It supports multiple values.
 
@@ -159,7 +159,7 @@ Use it when you need an exact match. It supports multiple values.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  notEquals
+### <--{"id" : "Filters Operators"}-->  notEquals
 
 The opposite operator of `equals`. It supports multiple values.
 
@@ -174,7 +174,7 @@ The opposite operator of `equals`. It supports multiple values.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  contains
+### <--{"id" : "Filters Operators"}-->  contains
 
 The `contains` filter acts as a wildcard case insensitive `LIKE` operator. In
 the majority of SQL backends it uses `ILIKE` operator with values being
@@ -190,7 +190,7 @@ surrounded by `%`. It supports multiple values.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  notContains
+### <--{"id" : "Filters Operators"}-->  notContains
 
 The opposite operator of `contains`. It supports multiple values.
 
@@ -204,7 +204,7 @@ The opposite operator of `contains`. It supports multiple values.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  gt
+### <--{"id" : "Filters Operators"}-->  gt
 
 The `gt` operator means **greater than** and is used with measures or dimensions
 of type `number`.
@@ -220,7 +220,7 @@ of type `number`.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  gte
+### <--{"id" : "Filters Operators"}-->  gte
 
 The `gte` operator means **greater than or equal to** and is used with measures
 or dimensions of type `number`.
@@ -236,7 +236,7 @@ or dimensions of type `number`.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  lt
+### <--{"id" : "Filters Operators"}-->  lt
 
 The `lt` operator means **less than** and is used with measures or dimensions of
 type `number`.
@@ -252,7 +252,7 @@ type `number`.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  lte
+### <--{"id" : "Filters Operators"}-->  lte
 
 The `lte` operator means **less than or equal to** and is used with measures or
 dimensions of type `number`.
@@ -268,7 +268,7 @@ dimensions of type `number`.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  set
+### <--{"id" : "Filters Operators"}-->  set
 
 Operator `set` checks whether the value of the member **is not** `NULL`. You
 don't need to pass `values` for this operator.
@@ -283,7 +283,7 @@ don't need to pass `values` for this operator.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  notSet
+### <--{"id" : "Filters Operators"}-->  notSet
 
 An opposite to the `set` operator. It checks whether the value of the member
 **is** `NULL`. You don't need to pass `values` for this operator.
@@ -298,7 +298,7 @@ An opposite to the `set` operator. It checks whether the value of the member
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  inDateRange
+### <--{"id" : "Filters Operators"}-->  inDateRange
 
 The operator `inDateRange` is used to filter a time dimension into a specific
 date range. The values must be an array of dates with the following format
@@ -318,7 +318,7 @@ There is a convient way to use date filters with grouping -
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  notInDateRange
+### <--{"id" : "Filters Operators"}-->  notInDateRange
 
 An opposite operator to `inDateRange`, use it when you want to exclude specific
 dates. The values format is the same as for `inDateRange`.
@@ -333,7 +333,7 @@ dates. The values format is the same as for `inDateRange`.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  beforeDate
+### <--{"id" : "Filters Operators"}-->  beforeDate
 
 Use it when you want to retreive all results before some specific date. The
 values should be an array of one element in `YYYY-MM-DD` format.
@@ -348,7 +348,7 @@ values should be an array of one element in `YYYY-MM-DD` format.
 }
 ```
 
-### <--{"name" : "Filters Operators"}-->  afterDate
+### <--{"id" : "Filters Operators"}-->  afterDate
 
 The same as `beforeDate`, but is used to get all results after a specific date.
 

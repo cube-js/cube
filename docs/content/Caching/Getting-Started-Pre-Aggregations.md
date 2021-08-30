@@ -181,7 +181,7 @@ it receives via the API. The process for selection is summarized below:
 
 You can find a complete flowchart [here][self-select-pre-agg].
 
-### <--{"name" : "Ensuring pre-aggregations are targeted by queries"}-->  Additivity
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Additivity
 
 So far, we've described pre-aggregations as aggregated versions of your existing
 data. However, there are some rules that apply when Cube.js uses the
@@ -277,7 +277,7 @@ additive** query. Additive leaf measures can only be of the following
 
 [ref-schema-types-measure]: /types-and-formats#measures-types
 
-### <--{"name" : "Ensuring pre-aggregations are targeted by queries"}-->  Non-Additivity
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Non-Additivity
 
 Using the same sample data for `line_items`, there's a `profit_margin` field
 which is different for each row. However, despite the value being numerical, it
@@ -421,7 +421,7 @@ cube(`LineItems`, {
 });
 ```
 
-### <--{"name" : "Ensuring pre-aggregations are targeted by queries"}-->  Selecting the pre-aggregation
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Selecting the pre-aggregation
 
 To recap what we've learnt so far:
 

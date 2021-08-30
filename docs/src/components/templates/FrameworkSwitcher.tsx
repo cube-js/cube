@@ -18,10 +18,10 @@ const FrameworkSwitcher: React.FC<Props> = () => {
 
   function onChange(event: RadioChangeEvent) {
     const framework = event.target.value;
-
+    console.log('env', process.env);
     setFrameworkOfChoice(framework);
     navigate(
-      `${process.env.PATH_PREFIX}/frontend-introduction${
+      `${process.env.PATH_PREFIX || ''}/frontend-introduction${
         framework !== FRAMEWORKS[0].slug ? `/${framework}` : ''
       }`
     );

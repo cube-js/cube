@@ -30,7 +30,7 @@ vendors.
 
 ## Guides
 
-### <--{"name" : "Guides"}--> AWS Athena
+### <--{"id" : "Guides"}--> AWS Athena
 
 The following fields are required when creating an AWS Athena connection:
 
@@ -52,7 +52,7 @@ The following fields are required when creating an AWS Athena connection:
   />
 </div>
 
-### <--{"name" : "Guides"}--> AWS Redshift
+### <--{"id" : "Guides"}--> AWS Redshift
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -82,7 +82,7 @@ The following fields are required when creating an AWS Redshift connection:
   />
 </div>
 
-### <--{"name" : "Guides"}--> BigQuery
+### <--{"id" : "Guides"}--> BigQuery
 
 The following fields are required when creating a BigQuery connection:
 
@@ -103,7 +103,7 @@ The following fields are required when creating a BigQuery connection:
   />
 </div>
 
-### <--{"name" : "Guides"}--> Snowflake
+### <--{"id" : "Guides"}--> Snowflake
 
 The following fields are required when creating a Snowflake connection:
 
@@ -152,7 +152,7 @@ database credentials:
   />
 </div>
 
-### <--{"name" : "Connecting via SSL"}-->  Custom SSL certificates
+### <--{"id" : "Connecting via SSL"}-->  Custom SSL certificates
 
 To use custom SSL certificates between Cube Cloud and your database server, go
 to the **Env vars** tab in **Settings**:

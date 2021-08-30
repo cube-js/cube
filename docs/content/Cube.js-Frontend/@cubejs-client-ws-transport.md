@@ -10,73 +10,73 @@ WebSocket transport for Cube.js client
 
 ## WebSocketTransport
 
-### <--{"name" : "WebSocketTransport"}--> WebSocketTransport constructor
+### <--{"id" : "WebSocketTransport"}--> WebSocketTransport constructor
 
 >  **new WebSocketTransport**(**__namedParameters**: object): *[WebSocketTransport](#web-socket-transport)*
 
-### <--{"name" : "WebSocketTransport"}--> apiUrl
+### <--{"id" : "WebSocketTransport"}--> apiUrl
 
 > **apiUrl**: *string*
 
-### <--{"name" : "WebSocketTransport"}--> hearBeatInterval
+### <--{"id" : "WebSocketTransport"}--> hearBeatInterval
 
 > **hearBeatInterval**: *number*
 
-### <--{"name" : "WebSocketTransport"}--> messageCounter
+### <--{"id" : "WebSocketTransport"}--> messageCounter
 
 > **messageCounter**: *number*
 
-### <--{"name" : "WebSocketTransport"}--> messageIdToSubscription
+### <--{"id" : "WebSocketTransport"}--> messageIdToSubscription
 
 > **messageIdToSubscription**: *Record‹number, [Subscription](#types-subscription)›*
 
-### <--{"name" : "WebSocketTransport"}--> messageQueue
+### <--{"id" : "WebSocketTransport"}--> messageQueue
 
 > **messageQueue**: *[Message](#types-message)[]*
 
-### <--{"name" : "WebSocketTransport"}--> token
+### <--{"id" : "WebSocketTransport"}--> token
 
 > **token**: *string*
 
-### <--{"name" : "WebSocketTransport"}--> ws
+### <--{"id" : "WebSocketTransport"}--> ws
 
 > **ws**: *any*
 
-### <--{"name" : "WebSocketTransport"}--> authorization
+### <--{"id" : "WebSocketTransport"}--> authorization
 
-### <--{"name" : "WebSocketTransport"}--> initSocket
+### <--{"id" : "WebSocketTransport"}--> initSocket
 
 >  **initSocket**(): *any*
 
-### <--{"name" : "WebSocketTransport"}--> request
+### <--{"id" : "WebSocketTransport"}--> request
 
 >  **request**(**method**: string, **__namedParameters**: object): *object*
 
-### <--{"name" : "WebSocketTransport"}--> sendMessage
+### <--{"id" : "WebSocketTransport"}--> sendMessage
 
 > `protected` **sendMessage**(**message**: any): *void*
 
 ## WebSocketTransportResult
 
-### <--{"name" : "WebSocketTransportResult"}--> WebSocketTransportResult constructor
+### <--{"id" : "WebSocketTransportResult"}--> WebSocketTransportResult constructor
 
 >  **new WebSocketTransportResult**(**__namedParameters**: object): *[WebSocketTransportResult](#result)*
 
-### <--{"name" : "WebSocketTransportResult"}--> result
+### <--{"id" : "WebSocketTransportResult"}--> result
 
 > **result**: *unknown*
 
-### <--{"name" : "WebSocketTransportResult"}--> status
+### <--{"id" : "WebSocketTransportResult"}--> status
 
 > **status**: *unknown*
 
-### <--{"name" : "WebSocketTransportResult"}--> json
+### <--{"id" : "WebSocketTransportResult"}--> json
 
 >  **json**(): *Promise‹unknown›*
 
 ## Types
 
-### <--{"name" : "Types"}--> Message
+### <--{"id" : "Types"}--> Message
 
 Name | Type |
 ------ | ------ |
@@ -85,14 +85,14 @@ method | string |
 params | string |
 requestId | any |
 
-### <--{"name" : "Types"}--> Subscription
+### <--{"id" : "Types"}--> Subscription
 
 Name | Type |
 ------ | ------ |
 callback |  (**result**: [WebSocketTransportResult](#result)) => *void* |
 message | [Message](#types-message) |
 
-### <--{"name" : "Types"}--> WebSocketTransportOptions
+### <--{"id" : "Types"}--> WebSocketTransportOptions
 
 Name | Type |
 ------ | ------ |

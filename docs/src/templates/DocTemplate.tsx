@@ -42,7 +42,7 @@ const MyH3 = (props) => {
 
       return (
         <h3
-          id={kebabCase(jsonProps?.name) + '-' + kebabCase(text)}
+          id={kebabCase(jsonProps?.id) + '-' + kebabCase(text)}
           name={kebabCase(text)}
           {...props}
         >

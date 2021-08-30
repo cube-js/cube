@@ -114,7 +114,7 @@ cube('LineItems', {
 Dimensions can be of different types, and you can find them all
 [here][ref-schema-dimension-types].
 
-### <--{"name" : "Dimensions"}--> Time Dimensions
+### <--{"id" : "Dimensions"}--> Time Dimensions
 
 Time-based properties should be represented as dimensions with type `time`. Time
 dimensions allow grouping the result set by a unit of time (e.g. hours, days,

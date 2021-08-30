@@ -86,7 +86,7 @@ functions:
           resource: 'projects/${self:provider.project}/topics/${self:service.name}-${self:provider.stage}-process'
 ```
 
-### <--{"name" : "Configuration"}--> Refresh Worker
+### <--{"id" : "Configuration"}--> Refresh Worker
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -107,7 +107,7 @@ once they are successfully built, the response will change to:
 }
 ```
 
-### <--{"name" : "Configuration"}--> Cube Store
+### <--{"id" : "Configuration"}--> Cube Store
 
 Unfortunately, Cube Store currently cannot be run using serverless platforms; we
 recommend using [Cube Cloud][link-cube-cloud] which provides a similar
@@ -118,7 +118,7 @@ Caching][ref-caching-prod].
 
 ## Security
 
-### <--{"name" : "Security"}--> Networking
+### <--{"id" : "Security"}--> Networking
 
 To run Cube.js within a VPC, add a `vpc` property to the function definition in
 `serverless.yml`:
@@ -133,7 +133,7 @@ functions:
     vpc: 'projects/<PROJECT_ID>/locations/<LOCATION>/connectors/<VPC_CONNECTOR_NAME>'
 ```
 
-### <--{"name" : "Security"}--> Use JSON Web Tokens
+### <--{"id" : "Security"}--> Use JSON Web Tokens
 
 Cube.js can be configured to use industry-standard JSON Web Key Sets for
 securing its API and limiting access to data. To do this, we'll define the
@@ -159,7 +159,7 @@ provider:
 ...
 ```
 
-### <--{"name" : "Security"}--> Cube Store
+### <--{"id" : "Security"}--> Cube Store
 
 All Cube Store nodes (both router and workers) should only be accessible to
 Cube.js API instances and refresh workers.

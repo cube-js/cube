@@ -215,7 +215,7 @@ cube(`SalesManagers`, {
 });
 ```
 
-### <--{"name" : "Subquery"}--> Under the hood
+### <--{"id" : "Subquery"}--> Under the hood
 
 Based on the subquery dimension definition, Cube.js will create a query that
 will include the primary key dimension of the main cube and all

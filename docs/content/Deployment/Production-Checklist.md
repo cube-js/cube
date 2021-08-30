@@ -70,7 +70,7 @@ environment variable. Set the `CUBEJS_REDIS_TLS` environment variable to `true`
 if you want to enable SSL-secured connections. Ensure your Redis cluster allows
 at least 15 concurrent connections.
 
-### <--{"name" : "Set up Redis"}--> Redis Sentinel
+### <--{"id" : "Set up Redis"}--> Redis Sentinel
 
 Redis provides functionality for high availability through
 [`Redis Sentinel`][link-redis-sentinel].
@@ -89,7 +89,7 @@ to connect to the Redis Sentinel.
 | lead to incorrect pre-aggregation states and intermittent data access errors.
 <!-- prettier-ignore-end -->
 
-### <--{"name" : "Set up Redis"}--> Redis Pool
+### <--{"id" : "Set up Redis"}--> Redis Pool
 
 If `CUBEJS_REDIS_URL` is provided Cube.js, will create a Redis connection pool
 with a minimum of 2 and maximum of 1000 concurrent connections, by default. The
@@ -105,7 +105,7 @@ you have enough connections for all Cube.js server instances. A lower number of
 connections still can work, however Redis becomes a performance bottleneck in
 this case.
 
-### <--{"name" : "Set up Redis"}--> Running without Redis
+### <--{"id" : "Set up Redis"}--> Running without Redis
 
 If you want to run Cube.js in production without Redis, you can use
 `CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.

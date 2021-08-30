@@ -48,7 +48,7 @@ export default function App() {
 
 - **TData**
 
-### <--{"name" : "useCubeQuery"}--> UseCubeQueryOptions
+### <--{"id" : "useCubeQuery"}--> UseCubeQueryOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -57,7 +57,7 @@ resetResultSetOnChange? | boolean | When `true` the resultSet will be reset to `
 skip? | boolean | Query execution will be skipped when `skip` is set to `true`. You can use this flag to avoid sending incomplete queries. |
 subscribe? | boolean | Use continuous fetch behavior. See [Real-Time Data Fetch](real-time-data-fetch) |
 
-### <--{"name" : "useCubeQuery"}--> UseCubeQueryResult
+### <--{"id" : "useCubeQuery"}--> UseCubeQueryResult
 
 Name | Type |
 ------ | ------ |
@@ -136,7 +136,7 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(<App />, rootElement);
 ```
 
-### <--{"name" : "QueryBuilder"}--> QueryBuilderProps
+### <--{"id" : "QueryBuilder"}--> QueryBuilderProps
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -151,7 +151,7 @@ stateChangeHeuristics? |  (**state**: [QueryBuilderState](#query-builder-state))
 vizState? | [VizState](#types-viz-state) | - |
 wrapWithQueryRenderer? | boolean | - |
 
-### <--{"name" : "QueryBuilder"}--> QueryBuilderRenderProps
+### <--{"id" : "QueryBuilder"}--> QueryBuilderRenderProps
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -173,7 +173,7 @@ updateQuery |  (**query**: Query) => *void* | Used for partial of full query upd
 updateSegments | [MemberUpdater](#types-member-updater) | - |
 updateTimeDimensions | [MemberUpdater](#types-member-updater) | - |
 
-### <--{"name" : "QueryBuilder"}--> QueryBuilderState
+### <--{"id" : "QueryBuilder"}--> QueryBuilderState
 
 > **QueryBuilderState**: *[VizState](#types-viz-state) & object*
 
@@ -183,7 +183,7 @@ updateTimeDimensions | [MemberUpdater](#types-member-updater) | - |
 
 `<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
 
-### <--{"name" : "QueryRenderer"}--> QueryRendererProps
+### <--{"id" : "QueryRenderer"}--> QueryRendererProps
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -195,7 +195,7 @@ render |  (**renderProps**: [QueryRendererRenderProps](#query-renderer-render-pr
 resetResultSetOnChange? | boolean | When `true` the **resultSet** will be reset to `null` first on every state change |
 updateOnlyOnStateChange? | boolean | - |
 
-### <--{"name" : "QueryRenderer"}--> QueryRendererRenderProps
+### <--{"id" : "QueryRenderer"}--> QueryRendererRenderProps
 
 Name | Type |
 ------ | ------ |
@@ -265,24 +265,24 @@ export default function DisplayComponent() {
 
 ## Types
 
-### <--{"name" : "Types"}--> ChartType
+### <--{"id" : "Types"}--> ChartType
 
 > **ChartType**: *"line" | "bar" | "table" | "area"*
 
-### <--{"name" : "Types"}--> CubeContextProps
+### <--{"id" : "Types"}--> CubeContextProps
 
 Name | Type |
 ------ | ------ |
 cubejsApi | CubejsApi |
 
-### <--{"name" : "Types"}--> CubeProviderProps
+### <--{"id" : "Types"}--> CubeProviderProps
 
 Name | Type |
 ------ | ------ |
 children | React.ReactNode |
 cubejsApi | CubejsApi |
 
-### <--{"name" : "Types"}--> MemberUpdater
+### <--{"id" : "Types"}--> MemberUpdater
 
 You can use the following methods for member manipulaltion
 ```js
@@ -358,13 +358,13 @@ add |  (**member**: MemberType) => *void* |
 remove |  (**member**: MemberType) => *void* |
 update |  (**member**: MemberType, **updateWith**: MemberType) => *void* |
 
-### <--{"name" : "Types"}--> TLoadingState
+### <--{"id" : "Types"}--> TLoadingState
 
 Name | Type |
 ------ | ------ |
 isLoading | boolean |
 
-### <--{"name" : "Types"}--> VizState
+### <--{"id" : "Types"}--> VizState
 
 Name | Type |
 ------ | ------ |

@@ -81,7 +81,7 @@ query hasn't changed, the cached value will be returned. Otherwise, an SQL query
 will be executed against either the pre-aggregations storage or the source
 database to populate the cache with the results and return them.
 
-### <--{"name" : "In-memory Cache"}-->  Refresh Keys
+### <--{"id" : "In-memory Cache"}-->  Refresh Keys
 
 Cube.js takes great care to prevent unnecessary queries from hitting your
 database. The first stage caching system caches query results in Redis (or in
@@ -124,7 +124,7 @@ If background refresh is disabled, Cube.js will refresh the cache during query
 execution. Since this could lead to delays in responding to end-users, we
 recommend always enabling background refresh.
 
-### <--{"name" : "In-memory Cache"}-->  Default Refresh Keys
+### <--{"id" : "In-memory Cache"}-->  Default Refresh Keys
 
 The default values for `refreshKey` are
 
@@ -137,7 +137,7 @@ Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option,
 or examining a metadata table for whatever system is managing the data to see
 when it last ran.
 
-### <--{"name" : "In-memory Cache"}-->  Disabling the cache
+### <--{"id" : "In-memory Cache"}-->  Disabling the cache
 
 There's no straightforward way to disable caching in Cube.js. The reason is that
 Cube.js not only stores cached values but also uses the cache as a point of

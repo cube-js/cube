@@ -56,7 +56,7 @@ query with.
 
 ## Parameters
 
-### <--{"name" : "Parameters"}--> type
+### <--{"id" : "Parameters"}--> type
 
 Cube.js supports three types of pre-aggregations:
 
@@ -248,7 +248,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"name" : "Parameters"}--> measures
+### <--{"id" : "Parameters"}--> measures
 
 The `measures` property is an array of [measures from the
 cube][ref-schema-measures] that should be included in the pre-aggregation:
@@ -271,7 +271,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"name" : "Parameters"}--> dimensions
+### <--{"id" : "Parameters"}--> dimensions
 
 The `dimensions` property is an array of [dimensions from the
 cube][ref-schema-dimensions] that should be included in the pre-aggregation:
@@ -295,7 +295,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"name" : "Parameters"}--> timeDimension
+### <--{"id" : "Parameters"}--> timeDimension
 
 The `timeDimension` property can be any [`dimension`][ref-schema-dimensions] of
 type [`time`][ref-schema-types-dim-time]. All other measures and dimensions in
@@ -337,7 +337,7 @@ cube('Orders', {
 A [`granularity`][self-granularity] **must** also be included in the
 pre-aggregation definition.
 
-### <--{"name" : "Parameters"}--> granularity
+### <--{"id" : "Parameters"}--> granularity
 
 The `granularity` property defines the granularity of data _within_ the
 pre-aggregation. If set to `week`, for example, then Cube.js will pre-aggregate
@@ -363,7 +363,7 @@ cube('Orders', {
 The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. This
 property is required when using [`timeDimension`][self-timedimension].
 
-### <--{"name" : "Parameters"}--> segments
+### <--{"id" : "Parameters"}--> segments
 
 The `segments` property is an array of [segments from the
 cube][ref-schema-segments] that can target the pre-aggregation:
@@ -395,7 +395,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"name" : "Parameters"}--> partitionGranularity
+### <--{"id" : "Parameters"}--> partitionGranularity
 
 The `partitionGranularity` defines the granularity for each
 [partition][ref-caching-partitioning] of the pre-aggregation:
@@ -423,7 +423,7 @@ The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
 
-### <--{"name" : "Parameters"}--> refreshKey
+### <--{"id" : "Parameters"}--> refreshKey
 
 Cube.js can also take care of keeping pre-aggregations up to date with the
 `refreshKey` property. By default, it is set to `every: '1 hour'`.
@@ -575,7 +575,7 @@ cube(`Orders`, {
 This property is required when using [`incremental`][self-incremental]
 refreshes.
 
-### <--{"name" : "Parameters"}--> useOriginalSqlPreAggregations
+### <--{"id" : "Parameters"}--> useOriginalSqlPreAggregations
 
 Cube.js supports multi-stage pre-aggregations by reusing original SQL
 pre-aggregations in rollups through the `useOriginalSqlPreAggregations`
@@ -623,7 +623,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"name" : "Parameters"}--> scheduledRefresh
+### <--{"id" : "Parameters"}--> scheduledRefresh
 
 To always keep pre-aggregations up-to-date, you can set
 `scheduledRefresh: true`. This option defaults to `true`. If set to `false`,
@@ -663,7 +663,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"name" : "Parameters"}--> buildRangeStart and buildRangeEnd
+### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
 The build range defines what partitions should be built by a scheduled refresh.
 Scheduled refreshes will **never** look beyond this range.
@@ -702,7 +702,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"name" : "Parameters"}--> indexes
+### <--{"id" : "Parameters"}--> indexes
 
 In case of pre-aggregation tables having significant cardinality, you might want
 to create indexes for them in databases which support it. This is can be done as

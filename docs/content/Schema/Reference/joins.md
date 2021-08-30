@@ -36,7 +36,7 @@ filter][ref-restapi-query-filter-op-set] satisfies this requirement.
 
 ## Parameters
 
-### <--{"name" : "Parameters"}--> relationship
+### <--{"id" : "Parameters"}--> relationship
 
 `relationship` enables you to describe the join relationship between joined
 cubes. It’s important to properly define the type of relationship in order for
@@ -111,7 +111,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"name" : "Parameters"}--> sql
+### <--{"id" : "Parameters"}--> sql
 
 `sql` is necessary to indicate a related column between cubes. It is important
 to properly specify a matching column when creating joins. Take a look at the
