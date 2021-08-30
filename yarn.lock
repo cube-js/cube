@@ -1106,7 +1106,7 @@
   dependencies:
     tslib "^2.0.0"
 
-"@azure/core-auth@1.2.0", "@azure/core-auth@^1.1.4":
+"@azure/core-auth@^1.1.4":
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/@azure/core-auth/-/core-auth-1.2.0.tgz#a5a181164e99f8446a3ccf9039345ddc9bb63bb9"
   integrity sha512-KUl+Nwn/Sm6Lw5d3U90m1jZfNSL087SPcqHLxwn2T6PupNKmcgsEbDjHB25gDvHO4h7pBsTlrdJAY7dz+Qk8GA==
@@ -5499,7 +5499,7 @@
   resolved "https://registry.yarnpkg.com/@types/qs/-/qs-6.9.7.tgz#63bb7d067db107cc1e457c303bc25d511febf6cb"
   integrity sha512-FGa1F62FT09qcrueBA6qYTrJPVDzah9a+493+o2PCXsesWHIn27G98TsSMs3WPNbZIEj4+VJf6saSFpvD+3Zsw==
 
-"@types/ramda@0.27.40", "@types/ramda@^0.27.32", "@types/ramda@^0.27.34", "@types/ramda@^0.27.40":
+"@types/ramda@^0.27.32", "@types/ramda@^0.27.34", "@types/ramda@^0.27.40":
   version "0.27.40"
   resolved "https://registry.yarnpkg.com/@types/ramda/-/ramda-0.27.40.tgz#99f307356fe553095ee4d3c2af2b0eb3af7a8413"
   integrity sha512-V99ZfTH2tqVYdLDAlgh2uT+N074HPgqnAsMjALKSBqogYd0HbuuGMqNukJ6fk9Ml/Htaus76fsc4Yh3p7q1VdQ==
@@ -9719,6 +9719,11 @@ cron-parser@^3.5.0:
   dependencies:
     is-nan "^1.3.2"
     luxon "^1.26.0"
+
+cron-validator@^1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/cron-validator/-/cron-validator-1.2.1.tgz#0f0de2de36d231a6ace0e43ffc6c0564fe6edf1a"
+  integrity sha512-RqdpGSokGFICPc8qAkT38aXqZLLanXghQTK2q7a2x2FabSwDd2ARrazd5ElEWAXzToUcMG4cZIwDH+5RM0q1mA==
 
 cross-fetch@^3.0.2:
   version "3.1.4"
@@ -21423,7 +21428,7 @@ rc-tree-select@~4.3.0:
     rc-tree "^4.0.0"
     rc-util "^5.0.5"
 
-rc-tree@4.1.5, rc-tree@^4.0.0, rc-tree@~4.1.0:
+rc-tree@^4.0.0, rc-tree@~4.1.0:
   version "4.1.5"
   resolved "https://registry.yarnpkg.com/rc-tree/-/rc-tree-4.1.5.tgz#734ab1bfe835e78791be41442ca0e571147ab6fa"
   integrity sha512-q2vjcmnBDylGZ9/ZW4F9oZMKMJdbFWC7um+DAQhZG1nqyg1iwoowbBggUDUaUOEryJP+08bpliEAYnzJXbI5xQ==
@@ -24563,7 +24568,7 @@ test-exclude@^6.0.0:
     glob "^7.1.4"
     minimatch "^3.0.4"
 
-testcontainers@7.12.1, testcontainers@^7.11.1, testcontainers@^7.5.0, testcontainers@^7.6.2, testcontainers@^7.9.0:
+testcontainers@^7.11.1, testcontainers@^7.5.0, testcontainers@^7.6.2, testcontainers@^7.9.0:
   version "7.12.1"
   resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-7.12.1.tgz#8ca81eadf559ee2ab648d64623e350a13d681d09"
   integrity sha512-iqUBvEChe7+Z1Q4ChInx21g1vm/Q5mxFnu4B4Y8RgXdaOmLN4eNAbJj0ZbYtR70waFrqJQHBZrODLQzc4uYo5Q==

@@ -15,6 +15,7 @@ import {
 } from 'antd';
 import { useMemo, useState } from 'react';
 import styled from 'styled-components';
+import { isValidCron } from 'cron-validator';
 
 import { Flex } from '../../../grid';
 import { ucfirst } from '../../../shared/helpers';
@@ -70,20 +71,24 @@ export type RollupSettings = {
 type SettingsProps = {
   hasTimeDimension: boolean;
   members: string[];
+  onCronExpressionValidityChange: (valid: boolean) => void;
   onChange: (values: Record<string, string>) => void;
 };
 
 export function Settings({
   members,
   hasTimeDimension,
+  onCronExpressionValidityChange,
   onChange,
 }: SettingsProps) {
+  const [form] = Form.useForm();
   const initialValues = {
     refreshKey: {
       option: 'every',
       sql: '',
       value: 1,
       granularity: 'day',
+      cron: '',
     },
     partitionGranularity: '',
     updateWindow: {
@@ -122,10 +127,27 @@ export function Settings({
 
   return (
     <Form
+      form={form}
+      validateTrigger="onBlur"
       initialValues={flatten(initialValues)}
       onValuesChange={(values) => {
         setValues((prevValues) => {
           onChange({ ...prevValues, ...values });
+
+          Object.keys(values).forEach((field) => {
+            const error = form.getFieldError(field);
+
+            if (!error.length) {
+              return;
+            }
+
+            form.setFields([
+              {
+                name: field,
+                errors: [],
+              },
+            ]);
+          });
 
           return { ...prevValues, ...values };
         });
@@ -137,7 +159,7 @@ export function Settings({
 
           <Form.Item name="refreshKey.option" noStyle>
             <StyledRadioGroup>
-              <Row gutter={8}>
+              <Row gutter={8} wrap={false}>
                 <Col flex="85px">
                   <Radio value="every">Every</Radio>
                 </Col>
@@ -157,6 +179,34 @@ export function Settings({
                       disabled={values['refreshKey.option'] !== 'every'}
                       name="refreshKey.granularity"
                     />
+
+                    <Typography.Text>or</Typography.Text>
+
+                    <Form.Item
+                      name="refreshKey.cron"
+                      rules={[
+                        {
+                          validator: (_, value, callback) => {
+                            if (
+                              value &&
+                              !isValidCron(value, { seconds: true })
+                            ) {
+                              onCronExpressionValidityChange(false);
+                              callback('Cron expression is invalid');
+                            } else {
+                              onCronExpressionValidityChange(true);
+                            }
+                          },
+                        },
+                      ]}
+                    >
+                      <Input
+                        allowClear
+                        placeholder="Cron Expression"
+                        disabled={values['refreshKey.option'] !== 'every'}
+                        style={{ maxWidth: 200 }}
+                      />
+                    </Form.Item>
                   </Space>
                 </Col>
               </Row>
