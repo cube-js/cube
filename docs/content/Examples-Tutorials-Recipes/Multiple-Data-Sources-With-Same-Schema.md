@@ -72,7 +72,7 @@ different JWTs:
 ```
 
 ```javascript
-// JWT`s payload for "Mango Inc"
+// JWT payload for "Mango Inc"
 {
   "sub": "1234567890",
   "tenant": "Mango Inc",
