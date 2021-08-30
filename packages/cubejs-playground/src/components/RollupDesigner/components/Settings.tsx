@@ -1,3 +1,4 @@
+import { QuestionCircleFilled } from '@ant-design/icons';
 import { GRANULARITIES, TimeDimensionGranularity } from '@cubejs-client/core';
 import {
   Card,
@@ -14,17 +15,13 @@ import {
   Tooltip,
   Typography,
 } from 'antd';
+import { isValidCron } from 'cron-validator';
 import { useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { isValidCron } from 'cron-validator';
 
 import { Flex } from '../../../grid';
 import { ucfirst } from '../../../shared/helpers';
 import { flatten } from '../utils';
-import {
-  QuestionCircleFilled,
-  QuestionCircleOutlined,
-} from '@ant-design/icons';
 
 const Wrapper = styled.div`
   display: flex;
