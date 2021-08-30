@@ -15,7 +15,7 @@ The client has methods to communicate with Cube.js API Gateway, retrieve, and pr
 
 The client provides methods to solve common tasks:
 
-**Abstract from the transport and query data.** You can [fetch data](https://cube.dev/docs/@cubejs-client-core#load)  from Cube.js Backend or subscribe to [real-time updates](https://cube.dev/docs/real-time-data-fetch) regardless of the protocol, be it HTTP or WebSockets.
+**Abstract from the transport and query data.** You can [fetch data](https://cube.dev/docs/@cubejs-client-core#load) from Cube.js Backend or subscribe to [real-time updates](https://cube.dev/docs/real-time-data-fetch) regardless of the protocol, be it HTTP or WebSockets.
 
 **Transform data for visualization.** You can [pivot](https://cube.dev/docs/@cubejs-client-core#pivot) the result set to display as a [chart](https://cube.dev/docs/@cubejs-client-core#chart-pivot) or as a [table](https://cube.dev/docs/@cubejs-client-core#table-pivot), split into [series](https://cube.dev/docs/@cubejs-client-core#series) or [table columns](https://cube.dev/docs/@cubejs-client-core#table-columns).
 
