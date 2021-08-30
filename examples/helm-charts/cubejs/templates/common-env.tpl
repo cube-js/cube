@@ -42,6 +42,12 @@
 {{- if .Values.global.apiSecret }}
 - name: CUBEJS_API_SECRET
   value: {{ .Values.global.apiSecret | quote }}
+{{- else if .Values.global.apiSecretFromSecret }}
+- name: CUBEJS_API_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.global.apiSecretFromSecret.name | required "global.apiSecretFromSecret.name is required" }}
+      key: {{ .Values.global.apiSecretFromSecret.key | required "global.apiSecretFromSecret.key is required" }}
 {{- end }}
 {{- if .Values.global.schemaPath }}
 - name: CUBEJS_SCHEMA_PATH
