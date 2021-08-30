@@ -228,7 +228,7 @@ export function RollupDesigner({
   function handleSettingsChange(values) {
     const nextSettings: RollupSettings = {};
 
-    if (values['refreshKey.option'] === 'every') {
+    if (values['refreshKey.checked.every']) {
       if (values['refreshKey.cron']) {
         nextSettings.refreshKey = {
           every: `\`${values['refreshKey.cron']}\``,
@@ -238,11 +238,11 @@ export function RollupDesigner({
           every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
         };
       }
-    } else if (
-      values['refreshKey.option'] === 'sql' &&
-      values['refreshKey.sql']
-    ) {
+    }
+
+    if (values['refreshKey.checked.sql'] && values['refreshKey.sql']) {
       nextSettings.refreshKey = {
+        ...nextSettings.refreshKey,
         sql: `\`${values['refreshKey.sql']}\``,
       };
     }
