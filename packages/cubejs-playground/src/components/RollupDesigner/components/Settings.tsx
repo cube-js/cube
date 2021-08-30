@@ -392,7 +392,12 @@ type TitleWithTooltipProps = {
 
 function TitleWithTooltip({ title, children }: TitleWithTooltipProps) {
   return (
-    <Space style={{ display: 'flex' }}>
+    <Space
+      align="baseline"
+      style={{
+        display: 'flex',
+      }}
+    >
       <Typography.Paragraph strong>{title}</Typography.Paragraph>
       <Tooltip title={children}>
         <QuestionCircleFilled style={{ color: '#1414464D' }} />
