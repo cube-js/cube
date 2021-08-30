@@ -1,0 +1,44 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: {{ include "cubejs.ingress.apiVersion" . }}
+kind: Ingress
+metadata:
+  name: {{ include "cubejs.fullname" . }}
+  labels: 
+    {{- include "cubejs.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if or .Values.ingress.annotations .Values.commonAnnotations }}
+  annotations:
+    {{- if .Values.commonAnnotations }}
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+    {{- end }}
+    {{- if .Values.ingress.annotations }}
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  rules:
+    {{- if .Values.ingress.hostname }}
+    - host: {{ .Values.ingress.hostname }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            {{- if eq "true" (include "cubejs.ingress.supportsPathType" .) }}
+            pathType: {{ .Values.ingress.pathType }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ include "cubejs.fullname" . }}
+                port: 
+                  name: http
+    {{- end }}
+  {{- if .Values.ingress.tls  }}
+  tls:
+    {{- if .Values.ingress.tls }}
+    - hosts:
+        - {{ .Values.ingress.hostname }}
+      secretName: {{ printf "%s-tls" .Values.ingress.hostname }}
+    {{- end }}
+  {{- end }}
+{{- end }}

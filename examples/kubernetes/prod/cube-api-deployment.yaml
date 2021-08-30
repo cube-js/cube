@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    service: cube-api
+  name: cube-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: cube-api
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        service: cube-api
+    spec:
+      containers:
+        - env: # Refer to https://cube.dev/docs/reference/environment-variables for more options
+            - name: CUBEJS_API_SECRET
+              value: secret
+            - name: CUBEJS_CUBESTORE_HOST
+              value: "cubestore-router"
+            - name: CUBEJS_CUBESTORE_PORT
+              value: "3030"
+            - name: CUBEJS_DB_HOST
+              value: demo-db.cube.dev
+            - name: CUBEJS_DB_NAME
+              value: ecom
+            - name: CUBEJS_DB_USER
+              value: cube
+            - name: CUBEJS_DB_PASS
+              value: "12345"
+            - name: CUBEJS_DB_TYPE
+              value: postgres
+            - name: CUBEJS_DEV_MODE
+              value: "false" # NEVER RUN DEV MODE IN K8S
+            - name: CUBEJS_EXTERNAL_DEFAULT
+              value: "true"
+            - name: CUBEJS_REDIS_URL
+              value: redis://redis:6379 # USING THIS REDIS URL BECAUSE THE REDIS SERVICE IS NAMED "REDIS"
+          image: cubejs/cube:v0.28.14
+          name: cube-api
+          ports:
+            - containerPort: 3000
+            - containerPort: 4000
+          resources: {}
+          volumeMounts:
+            - mountPath: /cube/conf/schema
+              name: cube-api-schema
+      restartPolicy: Always
+      volumes:
+        - name: cube-api-schema
+          configMap:
+            name: cube-api-schema
+status: {}

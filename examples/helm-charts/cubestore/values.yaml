@@ -1,0 +1,203 @@
+## Override the name
+##
+nameOverride: ""
+
+## Provide a name to substitute for the full names of resources
+##
+fullnameOverride: ""
+
+##  Labels to add to all deployed objects
+##
+commonLabels: {}
+
+## Annotations to add to all deployed objects
+##
+commonAnnotations: {}
+
+image:
+  ## Docker image repository
+  ##
+  repository: cubejs/cubestore
+
+  ## Docker image tag.
+  ## Defaults to Chart AppVersion
+  ##
+  tag:
+
+  ## Specify a imagePullPolicy
+  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  ##
+  pullPolicy: IfNotPresent
+
+global:
+  ## The logging level for Cube Store.
+  ##
+  logLevel: "error"
+
+  ## If true, prevents uploading serialized pre-aggregations to cloud storage
+  ##
+  noUpload:
+
+  ## The number of parallel tasks that process non-interactive jobs like data insertion, compaction etc. Defaults to 4
+  ##
+  jobRunners:
+
+  ## The timeout for SQL queries in seconds. Defaults to 120
+  ##
+  queryTimeout:
+
+  ## The number of Cube Store sub-processes that handle SELECT queries. Defaults to 4
+  ##
+  selectWorkers:
+
+  ## The maximum number of rows to keep in a single chunk of data right after insertion. Defaults to 262144
+  ##
+  walSplitThreshold:
+
+## Used to define the shared volume to store metadata and datasets
+## Prefer use cloudStorage if your are running on "gcp" or "aws"
+## If a cloudStorage configuration is used, no remoteDir will be created
+##
+remoteDir:
+  persistence:
+    ## Resource Policy
+    ## Setting it to "keep" to avoid removing PVCs during a helm delete operation
+    ##
+    resourcePolicy: keep
+
+    ## Persistent Volume size
+    ##
+    size: 10Gi
+
+    ## Additional custom annotations for the PVC
+    ##
+    annotations: {}
+
+cloudStorage:
+  gcp:
+    ## A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage
+    ##
+    credentials:
+    # credentialsFromSecret:
+    #   name:
+    #   key:
+
+    ## The name of a bucket in GCS. Required when using GCS
+    ##
+    bucket:
+
+    ## The path in a GCS bucket to store pre-aggregations. Optional
+    ##
+    subPath:
+
+  aws:
+    ## The Access Key ID for AWS. Required when using AWS S3
+    ##
+    accessKeyID:
+
+    ## The Secret Access Key for AWS. Required when using AWS S3
+    ##
+    secretKey:
+    # secretKeyFromSecret:
+    #   name:
+    #   key:
+
+    ## The name of a bucket in AWS S3. Required when using AWS S3
+    ##
+    bucket:
+
+    ## The region of a bucket in AWS S3. Required when using AWS S3
+    ##
+    region:
+
+    ## The path in a AWS S3 bucket to store pre-aggregations. Optional
+    ##
+    subPath:
+
+router:
+  ## The port for Cube Store to listen to HTTP connections on
+  ##
+  httpPort: 3030
+
+  ## The port for the router node to listen for connections on
+  ##
+  metaPort: 9999
+
+  ## The port for Cube Store to listen to connections on
+  ##
+  mysqlPort: 3306
+
+  persistence:
+    ## Enable persistence for local data using Persistent Volume Claims
+    ##
+    enabled: false
+
+    ## Persistent Volume size
+    ##
+    size: 10Gi
+
+    ## Persistent Volume access modes
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+    ## Additional custom annotations for the PVC
+    ##
+    annotations: {}
+
+  ## Affinity for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+
+  ## Topology spread constraint for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+  ##
+  spreadConstraints: {}
+
+  ## Define resources requests and limits for single Pods.
+  ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
+  ##
+  resources: {}
+
+workers:
+  ## Number of workers to deploy
+  ##
+  workersCount: 2
+
+  ## The port for Cube Store workers to listen to connections on
+  ##
+  port: 9001
+
+  persistence:
+    ## Enable persistence for local data using Persistent Volume Claims
+    ##
+    enabled: false
+
+    ## Persistent Volume size
+    ##
+    size: 10Gi
+
+    ## Persistent Volume access modes
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+    ## Additional custom annotations for the PVC
+    ##
+    annotations: {}
+
+  ## Affinity for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+
+  ## topology spread constraint for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+  ##
+  spreadConstraints: {}
+
+  ## Define resources requests and limits for single Pods.
+  ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
+  ##
+  resources: {}

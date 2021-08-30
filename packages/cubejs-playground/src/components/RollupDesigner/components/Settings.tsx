@@ -191,7 +191,7 @@ export function Settings({
           {hasTimeDimension ? (
             <>
               <Typography.Paragraph strong>
-                Partion Granularity
+                Partition Granularity
               </Typography.Paragraph>
 
               <Form.Item name="partitionGranularity">

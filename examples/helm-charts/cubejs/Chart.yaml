@@ -1,0 +1,13 @@
+apiVersion: v2
+name: cubejs
+description: A Helm chart for Cubejs
+type: application
+version: 0.1.0
+appVersion: "0.28.26"
+keywords:
+  - cubejs
+maintainers:
+  - email: luc.vauvillier@gmail.com
+    name: Luc Vauvillier
+sources:
+  - https://github.com/cube-js/cube.js

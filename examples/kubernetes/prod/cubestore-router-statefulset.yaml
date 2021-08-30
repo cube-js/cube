@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    service: cubestore-router
+  name: cubestore-router
+spec:
+  serviceName: cubestore-router
+  selector:
+    matchLabels:
+      service: cubestore-router
+  template:
+    metadata:
+      labels:
+        service: cubestore-router
+    spec:
+      containers:
+        - env: # Refer to https://cube.dev/docs/reference/environment-variables for more options
+            - name: CUBESTORE_META_PORT
+              value: "9999"
+            - name: CUBESTORE_REMOTE_DIR
+              value: /cube/data
+            - name: CUBESTORE_SERVER_NAME
+              value: cubestore-router:9999
+            - name: CUBESTORE_WORKERS # Edit the workers if you change the number of worker replicas
+              value: cubestore-workers-0.cubestore-workers:10000,cubestore-workers-1.cubestore-workers:10000,cubestore-workers-2.cubestore-workers:10000
+          image: cubejs/cubestore:v0.28.14
+          name: cubestore-router
+          ports:
+            - containerPort: 9999
+          resources: {}
+          volumeMounts:
+            - mountPath: /cube/data
+              name: cubestore-pv
+      restartPolicy: Always
+      volumes:
+        - name: cubestore-pv
+          persistentVolumeClaim:
+            claimName: cubestore-pvc
