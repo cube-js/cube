@@ -13,6 +13,10 @@
 - name: CUBEJS_LOG_LEVEL
   value: {{ .Values.global.logLevel | quote }}
 {{- end }}
+{{- if .Values.global.externalDefault }}
+- name: CUBEJS_EXTERNAL_DEFAULT
+  value: {{ .Values.global.externalDefault | quote }}
+{{- end }}
 {{- if .Values.global.app }}
 - name: CUBEJS_APP
   value: {{ .Values.global.app | quote }}
