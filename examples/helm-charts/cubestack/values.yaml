@@ -1,3 +1,19 @@
+## Override the name
+##
+nameOverride: ""
+
+## Provide a name to substitute for the full names of resources
+##
+fullnameOverride: ""
+
+##  Labels to add to all deployed objects
+##
+commonLabels: {}
+
+## Annotations to add to all deployed objects
+##
+commonAnnotations: {}
+
 #### Cubejs ####
 ################
 cubejs:
@@ -56,7 +72,7 @@ cubejs:
 
     ## The secret key used to sign and verify JWTs. Generated on project scaffold
     ##
-    apiSecret:
+    apiSecret: secret
 
     ## The path where Cube.js loads schemas from. Defaults to schema
     ##
@@ -170,7 +186,7 @@ cubejs:
   database:
     ## A database type supported by Cube.js
     ##
-    type:
+    type: postgres
 
     ## The URL for a database
     ##
@@ -178,7 +194,7 @@ cubejs:
 
     ## The host URL for a database
     ##
-    host:
+    host: demo-db.cube.dev
 
     ## The port for the database connection
     ##
@@ -190,15 +206,15 @@ cubejs:
 
     ## The name of the database to connect to
     ##
-    name:
+    name: ecom
 
     ## The username used to connect to the database
     ##
-    user:
+    user: cube
 
     ## The password used to connect to the database
     ##
-    pass:
+    pass: "12345"
     # passFromSecret:
     #   name:
     #   key:
@@ -541,8 +557,8 @@ cubejs:
     tls: false
 
 
-## Cubestore
-#
+#### Cubestore ####
+###################
 cubestore:
   enabled: true
 
@@ -751,20 +767,14 @@ cubestore:
     resources: {}
 
 
-## Redis
-# 
+#### Redis ####
+###############
 redis:
   enabled: true
 
   global:
     redis:
       password: ""
-
-  metrics:
-    enabled: true
-    serviceMonitor:
-      enabled: true
-      namespace: "monitoring"
 
   master:
     persistence:
