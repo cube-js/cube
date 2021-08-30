@@ -181,7 +181,7 @@ it receives via the API. The process for selection is summarized below:
 
 You can find a complete flowchart [here][self-select-pre-agg].
 
-### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Additivity
+### Additivity
 
 So far, we've described pre-aggregations as aggregated versions of your existing
 data. However, there are some rules that apply when Cube.js uses the
@@ -277,7 +277,7 @@ additive** query. Additive leaf measures can only be of the following
 
 [ref-schema-types-measure]: /types-and-formats#measures-types
 
-### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Non-Additivity
+### Non-Additivity
 
 Using the same sample data for `line_items`, there's a `profit_margin` field
 which is different for each row. However, despite the value being numerical, it
@@ -421,7 +421,7 @@ cube(`LineItems`, {
 });
 ```
 
-### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Selecting the pre-aggregation
+### Selecting the pre-aggregation
 
 To recap what we've learnt so far:
 
@@ -492,10 +492,10 @@ Some extra considerations for pre-aggregation selection:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-schema-dims]: /schema/reference/dimensions
 [ref-schema-joins]: /schema/reference/joins
-[ref-schema-joins-hasmany]: /schema/reference/joins#relationship
+[ref-schema-joins-hasmany]: /schema/reference/joins#parameters-relationship
 [ref-schema-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-preaggs-origsql]:
-  /schema/reference/pre-aggregations#type-originalsql
+  /schema/reference/pre-aggregations#parameters-type-originalsql
 [self-select-pre-agg]:
-  #selecting-the-pre-aggregation
+  #ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
 [wiki-gcd]: https://en.wikipedia.org/wiki/Greatest_common_divisor

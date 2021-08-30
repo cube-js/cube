@@ -60,7 +60,7 @@ Cube Cloud will automatically deploy from the specified production branch
 You can use the CLI to set up continuous deployment for a Git repository. You
 can also use the CLI to manually deploy changes without continuous deployment.
 
-### <--{"id" : "Deploy with CLI"}--> Manual Deploys
+### Manual Deploys
 
 You can deploy your Cube.js project manually. This method uploads data schema
 and configuration files directly from your local project directory.
@@ -71,7 +71,7 @@ You can obtain Cube Cloud deploy token from your deployment **Settings** page.
 $ npx cubejs-cli deploy --token TOKEN
 ```
 
-### <--{"id" : "Deploy with CLI"}--> Continuous Deployment
+### Continuous Deployment
 
 You can use Cube.js CLI with your continuous integration tool.
 

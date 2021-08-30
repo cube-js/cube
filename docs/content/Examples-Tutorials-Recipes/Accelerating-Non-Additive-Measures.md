@@ -91,7 +91,7 @@ Meanwhile, the query below won't match the same pre-aggregation because it conta
 
 Let's explore some possible workarounds.
 
-### <--{"id" : "Data schema"}-->  Replacing with approximate additive measures
+### Replacing with approximate additive measures
 
 Often, non-additive `countDistinct` measures can be changed to have the [`countDistinctApprox` type](https://cube.dev/docs/schema/reference/types-and-formats#measures-types-count-distinct-approx)
 which will make them additive and orders of magnitude more performant. This
@@ -111,7 +111,7 @@ For example, the `distinctAges` measure can be rewritten as follows:
     },
 ```
 
-### <--{"id" : "Data schema"}-->  Decomposing into a formula with additive measures
+### Decomposing into a formula with additive measures
 
 Non-additive `avg` measures can be rewritten as
 [calculated measures](https://cube.dev/docs/schema/reference/measures#calculated-measures)
@@ -136,7 +136,7 @@ For example, the `avgAge` measure can be rewritten as follows:
     },
 ```
 
-### <--{"id" : "Data schema"}-->  Providing multiple pre-aggregations
+### Providing multiple pre-aggregations
 
 If the two workarounds described above don't apply to your use case, feel free to create
 additional pre-aggregations with definitions that fully match your queries with

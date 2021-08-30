@@ -22,7 +22,7 @@ permalink: /config/databases/google-bigquery
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -58,7 +58,7 @@ BigQuery connections are made over HTTPS.
 
 ## Export bucket
 
-### <--{"id" : "Export bucket"}-->  Google Cloud Storage
+### Google Cloud Storage
 
 <!-- prettier-ignore-start -->
 [[warning |]]

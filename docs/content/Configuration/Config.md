@@ -118,7 +118,7 @@ interface FileContent {
 }
 ```
 
-### <--{"id" : "Options Reference"}--> dbType
+### dbType
 
 Either `String` or `Function` could be passed. Providing a `Function` allows to
 dynamically select a database type depending on the user's context. It is
@@ -129,20 +129,20 @@ If no option is passed, Cube.js will lookup for environment variable
 
 Called only once per [`appId`][self-opts-ctx-to-appid].
 
-### <--{"id" : "Options Reference"}--> schemaPath
+### schemaPath
 
 Path to schema files. The default value is `/schema`.
 
-### <--{"id" : "Options Reference"}--> basePath
+### basePath
 
 [REST API](/rest-api) base path. The default value is `/cubejs-api`.
 
-### <--{"id" : "Options Reference"}--> webSocketsBasePath
+### webSocketsBasePath
 
 The base path for the websockets server. By default, the WebSockets server will
 run on the root path.
 
-### <--{"id" : "Options Reference"}--> logger
+### logger
 
 A function to setup a custom logger. It accepts the following arguments:
 
@@ -157,7 +157,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> driverFactory
+### driverFactory
 
 Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
@@ -175,7 +175,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> contextToAppId
+### contextToAppId
 
 It is a [Multitenancy Setup][ref-multitenancy] option.
 
@@ -192,7 +192,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> contextToOrchestratorId
+### contextToOrchestratorId
 
 `contextToOrchestratorId` is a function to determine a caching key for Query
 Orchestrator instance. Query Orchestrator instance holds database connections,
@@ -214,7 +214,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> repositoryFactory
+### repositoryFactory
 
 This option allows to customize the repository for Cube.js data schema files. It
 is a function, which accepts a context object and can dynamically select
@@ -246,7 +246,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> checkAuth
+### checkAuth
 
 Used in both REST and WebSockets API. Can be an `async` functon. Default
 implementation parses [JSON Web Tokens (JWT)][link-jwt] in `Authorization`
@@ -267,7 +267,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> queryRewrite
+### queryRewrite
 
 <!-- prettier-ignore-start -->
 [[warning | Note]]
@@ -298,7 +298,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> preAggregationsSchema
+### preAggregationsSchema
 
 Schema name to use for storing pre-aggregations. For some drivers like MySQL
 it's name for pre-aggregation database as there's no database schema concept
@@ -332,7 +332,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> schemaVersion
+### schemaVersion
 
 Schema version can be used to tell Cube.js schema should be recompiled in case
 schema code depends on dynamic definitions fetched from some external database
@@ -351,7 +351,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> scheduledRefreshTimer
+### scheduledRefreshTimer
 
 <!-- prettier-ignore-start -->
 [[warning | Note]]
@@ -382,7 +382,7 @@ You may also need to configure
 [`scheduledRefreshTimeZones`][self-opts-sched-refresh-tz] and
 [`scheduledRefreshContexts`][self-opts-sched-refresh-ctxs].
 
-### <--{"id" : "Options Reference"}--> scheduledRefreshTimeZones
+### scheduledRefreshTimeZones
 
 All time-based calculations performed within Cube.js are timezone-aware. Using
 this property you can specify multiple timezones in [TZ Database
@@ -405,7 +405,7 @@ comma-separated list of timezones to refresh in
 CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 ```
 
-### <--{"id" : "Options Reference"}--> scheduledRefreshContexts
+### scheduledRefreshContexts
 
 When trying to configure scheduled refreshes for pre-aggregations that use the
 `securityContext` inside `contextToAppId` or `contextToOrchestratorId`, you must
@@ -439,7 +439,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> extendContext
+### extendContext
 
 Option to extend the `RequestContext` with custom values. This method is called
 on each request. Can be async.
@@ -468,29 +468,29 @@ cube(`Users`, {
 });
 ```
 
-### <--{"id" : "Options Reference"}--> compilerCacheSize
+### compilerCacheSize
 
 Maximum number of compiled schemas to persist with in-memory cache. Defaults to
 250, but optimum value will depend on deployed environment. When the max is
 reached, will start dropping the least recently used schemas from the cache.
 
-### <--{"id" : "Options Reference"}--> maxCompilerCacheKeepAlive
+### maxCompilerCacheKeepAlive
 
 Maximum length of time in ms to keep compiled schemas in memory. Default keeps
 schemas in memory indefinitely.
 
-### <--{"id" : "Options Reference"}--> updateCompilerCacheKeepAlive
+### updateCompilerCacheKeepAlive
 
 Providing `updateCompilerCacheKeepAlive: true` keeps frequently used schemas in
 memory by reseting their `maxCompilerCacheKeepAlive` every time they are
 accessed.
 
-### <--{"id" : "Options Reference"}--> allowUngroupedWithoutPrimaryKey
+### allowUngroupedWithoutPrimaryKey
 
 Providing `allowUngroupedWithoutPrimaryKey: true` disables primary key inclusion
 check for `ungrouped` queries.
 
-### <--{"id" : "Options Reference"}--> telemetry
+### telemetry
 
 Cube.js collects high-level anonymous usage statistics for servers started in
 development mode. It doesn't track any credentials, schema contents or queries
@@ -506,51 +506,51 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> http
+### http
 
-#### <--{"id" : "Options Reference"}--> cors
+#### cors
 
 CORS settings for the Cube.js REST API can be configured by providing an object
 with options [from here][link-express-cors-opts].
 
-### <--{"id" : "Options Reference"}--> jwt
+### jwt
 
-#### <--{"id" : "Options Reference"}--> jwkUrl
+#### jwkUrl
 
 The URL from which JSON Web Key Sets (JWKS) can be retrieved. Can also be set
 using `CUBEJS_JWK_URL`.
 
-#### <--{"id" : "Options Reference"}--> key
+#### key
 
 A JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
 also be set using `CUBEJS_JWT_KEY`.
 
-#### <--{"id" : "Options Reference"}--> algorithms
+#### algorithms
 
 [Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs]. Can also be
 set using `CUBEJS_JWT_ALGS`.
 
-#### <--{"id" : "Options Reference"}--> issuer
+#### issuer
 
 An issuer value which will be used to enforce the [`iss` claim from inbound
 JWTs][link-jwt-ref-iss]. Can also be set using `CUBEJS_JWT_ISSUER`.
 
-#### <--{"id" : "Options Reference"}--> audience
+#### audience
 
 An audience value which will be used to enforce the [`aud` claim from inbound
 JWTs][link-jwt-ref-aud]. Can also be set using `CUBEJS_JWT_AUDIENCE`.
 
-#### <--{"id" : "Options Reference"}--> subject
+#### subject
 
 A subject value which will be used to enforce the [`sub` claim from inbound
 JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 
-#### <--{"id" : "Options Reference"}--> claimsNamespace
+#### claimsNamespace
 
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
-### <--{"id" : "Options Reference"}--> externalDbType
+### externalDbType
 
 Should be used in conjunction with
 [`externalDriverFactory`](#external-driver-factory) option. Either `String` or
@@ -560,7 +560,7 @@ select a database type depending on the user's context. It is usually used in
 
 Called only once per [`appId`][self-opts-ctx-to-appid].
 
-### <--{"id" : "Options Reference"}--> externalDriverFactory
+### externalDriverFactory
 
 Set database driver for external rollup database. Please refer to the [`rollup`
 reference][ref-schema-ref-preaggs-rollup] documentation for more guidance. The
@@ -587,12 +587,12 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Options Reference"}--> cacheAndQueueDriver
+### cacheAndQueueDriver
 
 The cache and queue driver to use for the Cube.js deployment. Defaults to
 `memory` in development, `redis` in production.
 
-### <--{"id" : "Options Reference"}--> orchestratorOptions
+### orchestratorOptions
 
 <!-- prettier-ignore-start -->
 [[warning | ]]
@@ -650,7 +650,7 @@ Timeout and interval options' values are in seconds.
 
 `RequestContext` object is filled by context data on a HTTP request level.
 
-### <--{"id" : "RequestContext"}--> securityContext
+### securityContext
 
 Defined as `req.securityContext` which should be set by
 [`checkAuth`][self-opts-checkauth]. Default implementation of
@@ -679,7 +679,7 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "SchemaFileRepository"}--> allowJsDuplicatePropsInSchema
+### allowJsDuplicatePropsInSchema
 
 Boolean to enable or disable a check duplicate property names in all objects of
 a schema. The default value is `false`, and it is means the compiler would use
@@ -698,22 +698,22 @@ the additional transpiler for check duplicates.
 [ref-development-mode]: /overview#development-mode
 [ref-multitenancy]: /multitenancy-setup
 [ref-rest-api]: /rest-api
-[ref-rest-api-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
+[ref-rest-api-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
-[ref-schema-cube-ref-refresh-key]: /schema/reference/cube#refresh-key
+[ref-schema-cube-ref-refresh-key]: /schema/reference/cube#parameters-refresh-key
 [ref-schema-cube-ref-ctx-sec-ctx]:
-  /schema/reference/cube#security-context
+  /schema/reference/cube#context-variables-security-context
 [ref-schema-ref-preaggs-rollup]:
-  /schema/reference/pre-aggregations#type-rollup
+  /schema/reference/pre-aggregations#parameters-type-rollup
 [ref-sec]: /security
 [ref-sec-ctx]: /security/context
 [self-opts-req-ctx]: #request-context
-[self-opts-checkauth]: #check-auth
-[self-opts-ctx-to-appid]: #context-to-app-id
-[self-opts-ctx-to-datasourceid]: #context-to-data-source-id
-[self-opts-sched-refresh-ctxs]: #scheduled-refresh-contexts
-[self-opts-sched-refresh-tz]: #scheduled-refresh-time-zones
+[self-opts-checkauth]: #options-reference-check-auth
+[self-opts-ctx-to-appid]: #options-reference-context-to-app-id
+[self-opts-ctx-to-datasourceid]: #options-reference-context-to-data-source-id
+[self-opts-sched-refresh-ctxs]: #options-reference-scheduled-refresh-contexts
+[self-opts-sched-refresh-tz]: #options-reference-scheduled-refresh-time-zones
 [self-repofactory]: #repositoryFactory
 [self-schemafilerepo]: #SchemaFileRepository
 [self-schemapath]: #schemaPath

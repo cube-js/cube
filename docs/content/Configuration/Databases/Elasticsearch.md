@@ -22,7 +22,7 @@ with the username and password embedded in the URL, if required.
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### Manual
 
 For a self-hosted Elasticsearch instance, add the following to a `.env` file in
 your Cube.js project:

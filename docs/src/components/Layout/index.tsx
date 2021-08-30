@@ -204,9 +204,9 @@ class AppLayout extends React.Component<
         setScrollSectionsAndGithubUrl: this.setScrollSectionsAndGithubUrl,
       })
     );
-    console.log(pageData);
+
     const pageFrameworkOfChoice: string =
-      pageData && pageData?.mdx?.frontmatter?.frameworkOfChoice!;
+      pageData && pageData.markdownRemark.frontmatter.frameworkOfChoice!;
 
     return (
       <FrameworkOfChoiceStore>
@@ -215,60 +215,60 @@ class AppLayout extends React.Component<
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
             <>
-              <EventBanner />
-              <Row>
-                <Header
-                  className={cx(styles.header, {
-                    [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
-                  })}
-                  mobileSearch={this.state.mobileMode === MobileModes.SEARCH}
-                >
-                  <Search
-                    mobile={this.state.mobileMode === MobileModes.SEARCH}
-                    onClose={() => this.setMobileMode(MobileModes.CONTENT)}
-                    navigate={this.props.navigate}
-                  />
-                </Header>
-                <Col
-                  md={24}
-                  className={cx(styles.contentColumn, {
-                    fixed: this.state.mobileMode === MobileModes.MENU,
-                  })}
-                >
-                  <MainMenu
-                    items={parseResults(data.allMdx.edges)}
-                    {...menuProps}
-                  />
-                  <Col
-                    {...layout.contentArea.width}
-                    xs={
-                      this.state.mobileMode === 'content'
-                        ? { span: 22, offset: 1 }
-                        : 0
-                    }
-                  >
-                    {pageFrameworkOfChoice && (
-                      <FrameworkSwitcher value={pageFrameworkOfChoice} />
-                    )}
-                    <Layout.Content
-                      className={styles.contentWrapper}
-                      style={{ margin: '0 24px 100px 24px' }}
-                    >
-                      {childrenWithProps}
-                    </Layout.Content>
-                  </Col>
-                  {!this.state.noscrollmenu && (
-                    <ScrollMenu
-                      sections={this.state.sections}
-                      githubUrl={this.state.githubUrl}
-                    />
-                  )}
-                </Col>
-                <MobileFooter
-                  mobileMode={this.state.mobileMode}
-                  setMobileMode={this.setMobileMode}
+            <EventBanner />
+            <Row>
+              <Header
+                className={cx(styles.header, {
+                  [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
+                })}
+                mobileSearch={this.state.mobileMode === MobileModes.SEARCH}
+              >
+                <Search
+                  mobile={this.state.mobileMode === MobileModes.SEARCH}
+                  onClose={() => this.setMobileMode(MobileModes.CONTENT)}
+                  navigate={this.props.navigate}
                 />
-              </Row>
+              </Header>
+              <Col
+                md={24}
+                className={cx(styles.contentColumn, {
+                  fixed: this.state.mobileMode === MobileModes.MENU,
+                })}
+              >
+                <MainMenu
+                  items={parseResults(data.allMarkdownRemark.edges)}
+                  {...menuProps}
+                />
+                <Col
+                  {...layout.contentArea.width}
+                  xs={
+                    this.state.mobileMode === 'content'
+                      ? { span: 22, offset: 1 }
+                      : 0
+                  }
+                >
+                  {pageFrameworkOfChoice && (
+                    <FrameworkSwitcher value={pageFrameworkOfChoice} />
+                  )}
+                  <Layout.Content
+                    className={styles.contentWrapper}
+                    style={{ margin: '0 24px 100px 24px' }}
+                  >
+                    {childrenWithProps}
+                  </Layout.Content>
+                </Col>
+                {!this.state.noscrollmenu && (
+                  <ScrollMenu
+                    sections={this.state.sections}
+                    githubUrl={this.state.githubUrl}
+                  />
+                )}
+              </Col>
+              <MobileFooter
+                mobileMode={this.state.mobileMode}
+                setMobileMode={this.setMobileMode}
+              />
+            </Row>
             </>
           )}
         />
@@ -286,17 +286,17 @@ interface Edge<T> {
 }
 
 interface LayoutQueryResponse {
-  allMdx: {
+  allMarkdownRemark: {
     edges: Edge<MarkdownNode>[];
   };
 }
 
 const layoutQuery = graphql`
   query LayoutQuery {
-    allMdx(limit: 1000) {
+    allMarkdownRemark(limit: 1000) {
       edges {
         node {
-          body
+          html
           fileAbsolutePath
           frontmatter {
             permalink

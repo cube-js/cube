@@ -54,9 +54,9 @@ options][link-config].
 | `CUBEJS_TOPIC_NAME`                  | The name of the Amazon SNS or Google Cloud Pub/Sub topic (defaults to `<process.env.CUBEJS_APP>-process` if undefined, and finally `cubejs-process`)                             | A valid topic name                                          |
 
 [ref-config-sched-refresh-timer]:
-  /config#scheduled-refresh-timer
+  /config#options-reference-scheduled-refresh-timer
 [ref-config-preagg-schema-name]:
-  /config#pre-aggregations-schema
+  /config#options-reference-pre-aggregations-schema
 [gh-ioredis]: https://github.com/luin/ioredis
 [gh-node-redis]: https://github.com/NodeRedis/node-redis
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -165,7 +165,7 @@ databases [in this guide][link-connecting-to-db].
 | `CUBESTORE_WORKER_PORT`         | The port for Cube Store workers to listen to connections on. When set, the node will start as a **worker** in the cluster                                                 | A valid port number                                         |
 | `CUBESTORE_WORKERS`             | A comma-separated list of address/port pairs; for example `worker-1:3123,localhost:3124,123.124.125.128:3123`                                                             | A comma-separated list of address/port pairs                |
 
-### <--{"id" : "Cube Store"}--> Cloud Storage
+### Cloud Storage
 
 | Environment variable              | Description                                                                                             | Possible Values                                                                         |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |

@@ -86,7 +86,7 @@ functions:
           resource: 'projects/${self:provider.project}/topics/${self:service.name}-${self:provider.stage}-process'
 ```
 
-### <--{"id" : "Configuration"}--> Refresh Worker
+### Refresh Worker
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -107,7 +107,7 @@ once they are successfully built, the response will change to:
 }
 ```
 
-### <--{"id" : "Configuration"}--> Cube Store
+### Cube Store
 
 Unfortunately, Cube Store currently cannot be run using serverless platforms; we
 recommend using [Cube Cloud][link-cube-cloud] which provides a similar
@@ -118,7 +118,7 @@ Caching][ref-caching-prod].
 
 ## Security
 
-### <--{"id" : "Security"}--> Networking
+### Networking
 
 To run Cube.js within a VPC, add a `vpc` property to the function definition in
 `serverless.yml`:
@@ -133,7 +133,7 @@ functions:
     vpc: 'projects/<PROJECT_ID>/locations/<LOCATION>/connectors/<VPC_CONNECTOR_NAME>'
 ```
 
-### <--{"id" : "Security"}--> Use JSON Web Tokens
+### Use JSON Web Tokens
 
 Cube.js can be configured to use industry-standard JSON Web Key Sets for
 securing its API and limiting access to data. To do this, we'll define the
@@ -159,7 +159,7 @@ provider:
 ...
 ```
 
-### <--{"id" : "Security"}--> Cube Store
+### Cube Store
 
 All Cube Store nodes (both router and workers) should only be accessible to
 Cube.js API instances and refresh workers.
@@ -196,5 +196,5 @@ npm][link-cubejs-sls-npm]. Then update your `package.json` to use the version:
 [link-cubejs-sls-npm]: https://www.npmjs.com/package/@cubejs-backend/serverless
 [link-docker-app]: https://www.docker.com/products/docker-app
 [ref-caching-prod]: /caching/running-in-production
-[ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts
-[ref-restapi-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
+[ref-config-sched-ref-ctx]: /config#options-reference-scheduled-refresh-contexts
+[ref-restapi-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh

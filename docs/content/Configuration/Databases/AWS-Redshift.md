@@ -20,7 +20,7 @@ permalink: /config/databases/aws-redshift
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -52,7 +52,7 @@ Database][ref-recipe-enable-ssl].
 
 ## Export bucket
 
-### <--{"id" : "Export bucket"}-->  AWS S3
+### AWS S3
 
 <!-- prettier-ignore-start -->
 [[warning |]]
