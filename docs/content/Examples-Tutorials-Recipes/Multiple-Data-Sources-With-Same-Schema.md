@@ -14,10 +14,16 @@ can only view their data. The same data schema is used for all clients.
 
 ## Configuration
 
-Each client has its own database. In this recipe, the `Mango Inc` tenant keeps its data in the remote `ecom` database while the `Avocado Inc` tenant works with the local database (bootstrapped in the `docker-compose.yml` file) which has the same schema.
-To enable multitenancy, use the [`contextToAppId`](https://cube.dev/docs/config#options-reference-context-to-app-id) function to provide distinct identifiers for each tenant.
-Also, implement the [`driverFactory`](https://cube.dev/docs/config#options-reference-driver-factory) function where you can select a data source based on the tenant name. [JSON Web Token](https://cube.dev/docs/security) includes information
-about the tenant name in the `tenant` property of the `securityContext`.
+Each client has its own database. In this recipe, the `Mango Inc` tenant keeps
+its data in the remote `ecom` database while the `Avocado Inc` tenant works with
+the local database (bootstrapped in the `docker-compose.yml` file) which has the
+same schema. To enable multitenancy, use the
+[`contextToAppId`](https://cube.dev/docs/config#options-reference-context-to-app-id)
+function to provide distinct identifiers for each tenant. Also, implement the
+[`driverFactory`](https://cube.dev/docs/config#options-reference-driver-factory)
+function where you can select a data source based on the tenant name.
+[JSON Web Token](https://cube.dev/docs/security) includes information about the
+tenant name in the `tenant` property of the `securityContext`.
 
 ```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -62,6 +68,7 @@ different JWTs:
   "exp": 1724995581
 }
 ```
+
 ```javascript
 // JWT`s payload for "Mango Inc"
 {
@@ -91,7 +98,7 @@ tenant`s name:
   {
     'Users.id': 698,
     'Users.name': 'Macie Ryan',
-  }
+  },
 ];
 ```
 
@@ -109,7 +116,7 @@ tenant`s name:
   {
     'Users.id': 703,
     'Users.name': 'Moyra Denney',
-  }
+  },
 ];
 ```
 
