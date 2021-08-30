@@ -1,7 +1,7 @@
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 module.exports = {
-  // Provides distinct identifiers for each tenant which is used as caching key
+  // Provides distinct identifiers for each tenant which are used as caching keys
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.tenant}`,
 
