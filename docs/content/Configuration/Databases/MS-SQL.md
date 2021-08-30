@@ -11,7 +11,7 @@ permalink: /config/databases/mssql
 
 ## Setup
 
-### Manual
+### <--{"id" : "Setup"}-->  Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -44,7 +44,7 @@ Database][ref-recipe-enable-ssl].
 
 ## Additional Configuration
 
-### Windows Authentication
+### <--{"id" : "Additional Configuration"}-->  Windows Authentication
 
 To connect to a MSSQL database using Windows Authentication (also sometimes
 known as `trustedConnection`), instantiate the driver with

@@ -55,7 +55,7 @@ can refer to the
 [create-react-app deployment](https://create-react-app.dev/docs/deployment)
 guide for additional deployment options.
 
-### Netlify
+### <--{"id" : "Deployment"}-->  Netlify
 
 Install Netlify CLI:
 
@@ -74,7 +74,7 @@ $ netlify deploy
 Next follow command line prompts and choose yes for new project and `build` as
 your deploy folder.
 
-### ZEIT
+### <--{"id" : "Deployment"}-->  ZEIT
 
 Install ZEIT Now CLI:
 

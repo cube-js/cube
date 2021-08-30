@@ -161,7 +161,7 @@ LIMIT
 
 ## Funnel parameters
 
-### userId
+### <--{"id" : "Funnel parameters"}--> userId
 
 A unique key to identify the users moving through the funnel.
 
@@ -171,7 +171,7 @@ userId: {
 }
 ```
 
-### nextStepUserId
+### <--{"id" : "Funnel parameters"}--> nextStepUserId
 
 In the situation where `user_id` changes between steps, you can pass a unique
 key to join two adjacent steps. For example, if a user signs in after having
@@ -219,7 +219,7 @@ cube(`OnboardingFunnel`, {
 });
 ```
 
-### time
+### <--{"id" : "Funnel parameters"}--> time
 
 A timestamp of the event.
 
@@ -229,7 +229,7 @@ time: {
 }
 ```
 
-### steps
+### <--{"id" : "Funnel parameters"}--> steps
 
 An array of steps. Each step has 2 required and 1 optional parameters:
 
@@ -289,7 +289,7 @@ Cube.js is based on
 
 Funnel-based cubes have the following structure:
 
-### Measures
+### <--{"id" : "Using funnels"}--> Measures
 
 - **conversions** - Count of conversions in the funnel. The most useful when
   broken down by **steps**. It's the classic funnel view.
@@ -297,7 +297,7 @@ Funnel-based cubes have the following structure:
   to inspect a specific step, or set of steps, and find out how a conversion has
   changed over time.
 
-### Dimensions
+### <--{"id" : "Using funnels"}--> Dimensions
 
 - **step** - Describes funnels' steps. Use it to break down **conversions** or
   **conversionsPercent** by steps, or to filter for a specific step.
@@ -334,6 +334,6 @@ cube(`PurchaseFunnel`, {
 ```
 
 [ref-partitioned-rollups]:
-  /caching/using-pre-aggregations#partitioning-time-partitioning
+  /caching/using-pre-aggregations#time-partitioning
 [ref-schema-ref-preaggs-origsql]:
-  /schema/reference/pre-aggregations#parameters-type-originalsql
+  /schema/reference/pre-aggregations#type-originalsql

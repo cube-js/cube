@@ -371,7 +371,7 @@ on top of it.
 
 ## More metrics for Sessions
 
-### Number of Events per Session
+### <--{"id" : "More metrics for Sessions"}--> Number of Events per Session
 
 This one is super easy to add with a subQuery dimension. We just calculate count
 of Events, which we already have as a measure in the Events cube, as a dimension
@@ -385,7 +385,7 @@ numberEvents: {
 }
 ```
 
-### Bounce Rate
+### <--{"id" : "More metrics for Sessions"}--> Bounce Rate
 
 A bounced session is usually defined as a session with only one event. Since
 we’ve just defined the number of events per session, we can easily add a
@@ -421,7 +421,7 @@ measures: {
 }
 ```
 
-### First Referrer
+### <--{"id" : "More metrics for Sessions"}--> First Referrer
 
 We already have this column in place in our base table. We’re just going to
 define a dimension on top of this.
@@ -433,7 +433,7 @@ firstReferrer: {
 }
 ```
 
-### Sessions New vs Returning
+### <--{"id" : "More metrics for Sessions"}--> Sessions New vs Returning
 
 Same as for the first referrer. We already have a `session_sequence` field in
 the base table, which we can use for the `isFirst` dimension. If
@@ -468,7 +468,7 @@ repeatPercent: {
 }
 ```
 
-### Filter Sessions, where user performs specific event
+### <--{"id" : "More metrics for Sessions"}--> Filter Sessions, where user performs specific event
 
 Often, you want to select specific sessions where a user performed some
 important action. In the example below, we’ll filter out sessions where the

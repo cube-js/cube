@@ -92,7 +92,7 @@ plugins:
   - serverless-express
 ```
 
-### Refresh Worker
+### <--{"id" : "Configuration"}--> Refresh Worker
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -113,7 +113,7 @@ once they are successfully built, the response will change to:
 }
 ```
 
-### Cube Store
+### <--{"id" : "Configuration"}--> Cube Store
 
 Unfortunately, Cube Store currently cannot be run using serverless platforms; we
 recommend using [Cube Cloud][link-cube-cloud] which provides a similar
@@ -123,7 +123,7 @@ in the [Running in Production page under Caching][ref-caching-prod].
 
 ## Security
 
-### Networking
+### <--{"id" : "Security"}--> Networking
 
 To run Cube.js within a VPC, add a `vpc` property to the `serverless.yml`:
 
@@ -138,7 +138,7 @@ provider:
       - subnet-12345678901234567
 ```
 
-### Use JSON Web Tokens
+### <--{"id" : "Security"}--> Use JSON Web Tokens
 
 Cube.js can be configured to use industry-standard JSON Web Key Sets for
 securing its API and limiting access to data. To do this, we'll define the
@@ -195,5 +195,5 @@ npm][link-cubejs-sls-npm]. Then update your `package.json` to use the version:
 [link-cubejs-sls-npm]: https://www.npmjs.com/package/@cubejs-backend/serverless
 [link-docker-app]: https://www.docker.com/products/docker-app
 [ref-caching-prod]: /caching/running-in-production
-[ref-config-sched-ref-ctx]: /config#options-reference-scheduled-refresh-contexts
-[ref-restapi-sched-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts
+[ref-restapi-sched-refresh]: /rest-api#v-1-run-scheduled-refresh

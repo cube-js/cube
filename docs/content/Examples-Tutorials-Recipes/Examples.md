@@ -40,7 +40,7 @@ The following tutorials cover advanced concepts of Cube.js:
   [Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1),
   [Part 2: Conversion Funnels ](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
 
-### Features
+### <--{"id" : "Tutorials"}--> Features
 
 Learn more about prominent features of Cube.js:
 
@@ -54,7 +54,7 @@ Learn more about prominent features of Cube.js:
 | [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)           | [Auth0 integration](https://github.com/cube-js/cube.js/tree/master/examples/auth0)                                   | —                                                 |
 | [Authentication](https://cube.dev/docs/security#using-json-web-key-sets-jwks)           | [AWS Cognito integration](https://github.com/cube-js/cube.js/tree/master/examples/cognito)                           | —                                                 |
 
-### Front-end integrations
+### <--{"id" : "Tutorials"}--> Front-end integrations
 
 Explore how to integrate Cube.js with data visualization tools:
 
@@ -68,7 +68,7 @@ Explore how to integrate Cube.js with data visualization tools:
 | 📊 [AG Grid](https://awesome.cube.dev/tools/ag-grid)                   | [React Pivot Table with AG Grid](https://react-pivot-table.cube.dev)                                                 | [Demo](https://react-pivot-table-demo.cube.dev)     |
 | 🗺 [Mapbox](https://awesome.cube.dev/tools/mapbox-gl)                   | [Building map-based data visualizations with Mapbox](https://mapbox-guide.cube.dev)                                  | [Demo](https://mapbox-demo.cube.dev)                |
 
-### Demo applications
+### <--{"id" : "Tutorials"}--> Demo applications
 
 Have a look at some demo applications you can build with Cube.js:
 
@@ -81,39 +81,39 @@ Have a look at some demo applications you can build with Cube.js:
 
 These recipes will show you the best practices of using Cube.js.
 
-### Analytics
+### <--{"id" : "Recipes"}--> Analytics
 
 - [Daily, Weekly, Monthly Active Users](/recipes/active-users)
 - [Event Analytics](/recipes/event-analytics)
 - [Funnel Analysis](/recipes/funnels)
 - [Retention Analysis](/recipes/cohort-retention)
 
-### Access control
+### <--{"id" : "Recipes"}--> Access control
 
 - [Role-Based Access](/recipes/role-based-access)
 - [Column-Based Access](/recipes/column-based-access)
 
-### Data Sources
+### <--{"id" : "Recipes"}--> Data Sources
 
 - [Enable SSL Connections to the Database](/recipes/enable-ssl-connections-to-database)
 
-### Data schema
+### <--{"id" : "Recipes"}--> Data schema
 
 - [Calculating Average and Percentiles](https://cube.dev/docs/recipes/percentiles)
 - [Dynamically Union Tables](/recipes/dynamically-union-tables)
 - [Referencing Dynamic Measures](/recipes/referencing-dynamic-measures)
 - [Snapshots](/recipes/snapshots)
 
-### Queries
+### <--{"id" : "Recipes"}--> Queries
 
 - [Enforcing Mandatory Filters](/recipes/enforcing-mandatory-filters)
 - [Pagination](/recipes/pagination)
 
-### Query acceleration
+### <--{"id" : "Recipes"}--> Query acceleration
 
 - [Accelerating Non-Additive Measures](/recipes/non-additivity)
 
-### Code reusability
+### <--{"id" : "Recipes"}--> Code reusability
 
 - [Schema Generation](/recipes/schema-generation)
 - [Polymorphic Cubes](/recipes/polymorphic-cubes)

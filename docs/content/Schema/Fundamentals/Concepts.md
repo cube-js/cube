@@ -114,7 +114,7 @@ cube('LineItems', {
 Dimensions can be of different types, and you can find them all
 [here][ref-schema-dimension-types].
 
-### Time Dimensions
+### <--{"id" : "Dimensions"}--> Time Dimensions
 
 Time-based properties should be represented as dimensions with type `time`. Time
 dimensions allow grouping the result set by a unit of time (e.g. hours, days,
@@ -292,13 +292,13 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-backend-query-filters]: /query-format#filters-format
 [ref-caching-preaggs-intro]: /caching/pre-aggregations/getting-started
 [ref-caching-use-preaggs-partition-time]:
-  /caching/using-pre-aggregations#partitioning-time-partitioning
+  /caching/using-pre-aggregations#time-partitioning
 [ref-schema-dimension-types]:
-  /docs/schema/reference/types-and-formats#dimensions-types
+  /docs/schema/reference/types-and-formats#types
 [ref-schema-measure-types]:
   /docs/schema/reference/types-and-formats#measures-types
-[ref-schema-ref-joins-types]: /schema/reference/joins#parameters-relationship
-[ref-schema-ref-sql]: /schema/reference/cube#parameters-sql
+[ref-schema-ref-joins-types]: /schema/reference/joins#relationship
+[ref-schema-ref-sql]: /schema/reference/cube#sql
 [ref-tutorial-incremental-preagg]: /incremental-pre-aggregations
 [self-dimensions]: #dimensions
 [self-measures]: #measures

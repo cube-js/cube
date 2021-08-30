@@ -18,7 +18,7 @@ permalink: /config/databases/mongodb
 
 ## Setup
 
-### Manual
+### <--{"id" : "Setup"}-->  Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -50,7 +50,7 @@ Database][ref-recipe-enable-ssl].
 
 ## Additional Configuration
 
-### MongoDB Atlas
+### <--{"id" : "Additional Configuratio"}-->  MongoDB Atlas
 
 Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. All other
 SSL-related environment variables can be left unset.

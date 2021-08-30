@@ -178,7 +178,7 @@ variable. In a case of using custom port, please make sure to change
 `CUBEJS_CUBESTORE_PORT` environment variable for Cube.js API Instances and
 Refresh Worker.
 
-### Scaling
+### <--{"id" : "Cube Store"}--> Scaling
 
 Although Cube Store _can_ be run in single-instance mode, this is often
 unsuitable for production deployments. For high concurrency and data throughput,
@@ -246,7 +246,7 @@ services:
       - .cubestore:/cube/data
 ```
 
-### Storage
+### <--{"id" : "Cube Store"}--> Storage
 
 Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
@@ -294,7 +294,7 @@ Set the `CUBEJS_REDIS_TLS` environment variable to true if you want to enable
 SSL-secured connections. Ensure your Redis cluster allows at least 15 concurrent
 connections.
 
-### Redis Sentinel
+### <--{"id" : "Redis"}--> Redis Sentinel
 
 Cube.js supports Redis Sentinel via `CUBEJS_REDIS_USE_IOREDIS=true` environment
 variable. Then set `CUBEJS_REDIS_URL` to the
@@ -305,7 +305,7 @@ Cube.js server instances used by same tenant environments should have same Redis
 instances. Otherwise they will have different query queues which can lead to
 incorrect pre-aggregation states and intermittent data access errors.
 
-### Redis Pool
+### <--{"id" : "Redis"}--> Redis Pool
 
 If `CUBEJS_REDIS_URL` is provided Cube.js, will create a Redis connection pool
 with a minimum of 2 and maximum of 1000 concurrent connections, by default. The
@@ -321,7 +321,7 @@ you have enough connections for all Cube.js server instances. A lower number of
 connections still can work, however Redis becomes a performance bottleneck in
 this case.
 
-### Running without Redis
+### <--{"id" : "Redis"}--> Running without Redis
 
 If you want to run Cube.js in production without Redis, you can use
 `CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.

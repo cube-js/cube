@@ -62,7 +62,6 @@ databases][ref-cloud-connecting-to-databases] guide for more details.
   style="border: none"
   width="100%"
   />
-
 </div>
 
 ## Step 4: Try out Cube Cloud
@@ -79,7 +78,6 @@ application to Cube Cloud API.
   style="border: none"
   width="100%"
   />
-
 </div>
 
 [ref-cloud-connecting-to-databases]:

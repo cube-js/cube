@@ -25,7 +25,7 @@ containers.
 
 ## Configuration
 
-### Create Cube.js API instance and Refresh Worker
+### <--{"id" : "Configuration"}--> Create Cube.js API instance and Refresh Worker
 
 To deploy Cube.js, we will use [`Deployment`][k8s-docs-deployment]s and
 [Service][k8s-docs-service]s. We'll start by creating a Redis deployment in a
@@ -239,7 +239,7 @@ spec:
 status: {}
 ```
 
-### Create Cube Store Router and Worker nodes
+### <--{"id" : "Configuration"}--> Create Cube Store Router and Worker nodes
 
 With our Cube.js API and Refresh Worker set up, we can now begin setting up Cube
 Store. We will make two [`StatefulSet`][k8s-docs-statefulset]s with
@@ -464,7 +464,7 @@ spec:
 
 ## Security
 
-### Use JSON Web Tokens
+### <--{"id" : "Security"}--> Use JSON Web Tokens
 
 Cube.js can be configured to use industry-standard JSON Web Key Sets for
 securing its API and limiting access to data. To do this, we'll define the
@@ -500,7 +500,7 @@ spec:
             value: <CLAIMS_NAMESPACE>
 ```
 
-### Securing Cube Store
+### <--{"id" : "Security"}--> Securing Cube Store
 
 All Cube Store nodes, both router and workers, should only be accessible to
 Cube.js API instances and refresh workers. To do this with Kubernetes, we need

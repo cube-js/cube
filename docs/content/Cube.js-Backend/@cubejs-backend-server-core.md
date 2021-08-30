@@ -9,7 +9,7 @@ menuOrder: 6
 This package provides wiring of all essential Cube.js components and is used by  [@cubejs-backend/server](@cubejs-backend-server).
 
 ## API Reference
-### CubejsServerCore.create(options)
+### <--{"id" : "API Reference"}-->  CubejsServerCore.create(options)
 
 `CubejsServerCore.create` is an entry point for a Cube.js server application. It creates an instance of `CubejsServerCore`, which could be embedded for example into Express application.
 
@@ -35,6 +35,6 @@ core.initApp(expressApp);
 
 `CubejsServerCore.create` method accepts an object with the [Cube.js configuration options](/config).
 
-### CubejsServerCore.version()
+### <--{"id" : "API Reference"}-->  CubejsServerCore.version()
 
 `CubejsServerCore.version` is a method that returns the semantic package version of `@cubejs-backend/server`.

@@ -19,7 +19,7 @@ If you haven't already created a User Pool, please follow [the instructions in
 the AWS Cognito documentation][link-aws-cognito-hosted-ui] to create one, along
 with enabling the Hosted UI.
 
-### Custom claims
+### <--{"id" : "Create and configure a User Pool"}--> Custom claims
 
 To add custom claims to the JWT, you will need to associate [a Lambda
 function][link-aws-lambda] to the [Pre Token Generation event
@@ -88,7 +88,7 @@ CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
 
 ## Testing with the Developer Playground
 
-### Retrieving a JWT
+### <--{"id" : "Testing with the Developer Playground"}-->  Retrieving a JWT
 
 Go to the [OpenID Playground from Auth0][link-openid-playground] to and click
 Configuration.
@@ -171,7 +171,7 @@ verify the JWT signature as well as decode the identity token:
   />
 </div>
 
-### Set JWT in Developer Playground
+### <--{"id" : "Testing with the Developer Playground"}-->  Set JWT in Developer Playground
 
 Now open the Developer Playground (at `http://localhost:4000`) and on the Build
 page, click Add Security Context.
