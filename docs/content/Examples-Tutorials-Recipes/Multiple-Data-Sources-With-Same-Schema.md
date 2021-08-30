@@ -62,7 +62,7 @@ To get users for different tenants, we will send two identical requests with
 different JWTs:
 
 ```javascript
-// JWT`s payload for "Avocado Inc"
+// JWT payload for "Avocado Inc"
 {
   "sub": "1234567890",
   "tenant": "Avocado Inc",
