@@ -127,6 +127,10 @@ router:
   ##
   mysqlPort: 3306
 
+  ## The port for Cube Store to expose status probes
+  ##
+  statusPort: 3031
+
   persistence:
     ## Enable persistence for local data using Persistent Volume Claims
     ##
@@ -153,7 +157,7 @@ router:
   ## Topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
-  spreadConstraints: {}
+  spreadConstraints: []
 
   ## Define resources requests and limits for single Pods.
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
@@ -195,7 +199,7 @@ workers:
   ## topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
-  spreadConstraints: {}
+  spreadConstraints: []
 
   ## Define resources requests and limits for single Pods.
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
