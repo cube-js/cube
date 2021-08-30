@@ -112,7 +112,7 @@ export class CubeStoreQuery extends BaseQuery {
     );
     const timeDimension = this.timeDimensions.find(d => d.granularity);
     const baseQueryAlias = this.cubeAlias('base');
-    const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow>{});
+    const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
     const commonDateCondition =
       this.rollingWindowDateJoinCondition(maxRollingWindow.trailing, maxRollingWindow.leading, maxRollingWindow.offset);
     const filters = this.segments.concat(this.filters).concat(
@@ -159,8 +159,13 @@ export class CubeStoreQuery extends BaseQuery {
     }
   }
 
-  // TODO offset
   public maxRollingWindow(a: RollingWindow, b: RollingWindow): RollingWindow {
+    if (!a) {
+      return b;
+    }
+    if (!b) {
+      return a;
+    }
     let trailing;
     if (a.trailing === 'unbounded' || b.trailing === 'unbounded') {
       trailing = 'unbounded';
@@ -183,8 +188,15 @@ export class CubeStoreQuery extends BaseQuery {
       leading = this.parseSecondDuration(a.leading) > this.parseSecondDuration(b.leading) ? a.leading : b.leading;
     }
 
+    if ((a.offset || 'end') !== (b.offset || 'end')) {
+      // TODO introduce virtual 'both' offset and return it if max receives 'start' and 'end'
+      throw new Error('Mixed offset rolling window querying is not supported');
+    }
+
     return {
-      trailing, leading
+      trailing,
+      leading,
+      offset: a.offset
     };
   }
 
@@ -198,8 +210,8 @@ export class CubeStoreQuery extends BaseQuery {
           const rollingWindow = m.rollingWindowDefinition();
           const preceding = rollingWindow.trailing ? `${this.toInterval(rollingWindow.trailing)} PRECEDING` : '';
           const following = rollingWindow.leading ? `${this.toInterval(rollingWindow.leading)} FOLLOWING` : '';
-          // TODO OFFSET ${rollingWindow.offset || 'END'}
-          return `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following})`;
+          const offset = ` OFFSET ${rollingWindow.offset || 'end'}`;
+          return `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following}${offset})`;
         } else {
           const conditionFn = m.isCumulative() ? this.dateFromStartToEndConditionSql(m.dateJoinCondition(), true, true)[0] : timeDimension;
           return this.evaluateSymbolSqlWithContext(
