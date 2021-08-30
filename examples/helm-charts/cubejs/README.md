@@ -183,6 +183,7 @@ cubestore:
 | `global.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
 | `global.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
 | `global.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
+| `global.rollupOnly`                | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
 | `global.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
 | `global.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
 | `global.preAggregationsSchema`     | The schema name to use for storing pre-aggregations true                                                                        |         |
@@ -309,7 +310,7 @@ cubestore:
 | Name                       | Description                                          | Value |
 | -------------------------- | ---------------------------------------------------- | ----- |
 | `master.affinity`          | Affinity for pod assignment                          | `{}`  |
-| `master.spreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
+| `master.spreadConstraints` | Topology spread constraint for pod assignment        | `[]`  |
 | `master.resources`         | Define resources requests and limits for single Pods | `{}`  |
 
 ### Workers parameters
@@ -318,7 +319,7 @@ cubestore:
 | --------------------------- | ---------------------------------------------------- | ----- |
 | `workers.workersCount`      | Number of workers to deploy                          | `1`   |
 | `workers.affinity`          | Affinity for pod assignment                          | `{}`  |
-| `workers.spreadConstraints` | Topology spread constraint for pod assignment        | `{}`  |
+| `workers.spreadConstraints` | Topology spread constraint for pod assignment        | `[]`  |
 | `workers.resources`         | Define resources requests and limits for single Pods | `{}`  |
 
 ## Service parameters

@@ -96,10 +96,8 @@ By default local dir are not persisted. You can enable persistance on router and
 | `cloudStorage.gcp.credentialsFromSecret.key`  | A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage (using secret) |       |
 | `cloudStorage.gcp.bucket`                     | The name of a bucket in GCS. Required when using GCS                                                                   |       |
 | `cloudStorage.gcp.subPath`                    | The path in a GCS bucket to store pre-aggregations. Optional                                                           |       |
-| `cloudStorage.aws.accessKeyID`                | The Access Key ID for AWS. Required when using AWS S3                                                                  |
-|                                               |
-| `cloudStorage.aws.secretKey`                  | A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage                |
-|                                               |
+| `cloudStorage.aws.accessKeyID`                | The Access Key ID for AWS. Required when using AWS S3                                                                  |       |
+| `cloudStorage.aws.secretKey`                  | A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage                |       |
 | `cloudStorage.aws.secretKeyFromSecret.name`   | The Secret Access Key for AWS. Required when using AWS S3 (using secret)                                               |       |
 | `cloudStorage.aws.secretKeyFromSecret.key`    | The Secret Access Key for AWS. Required when using AWS S3 (using secret)                                               |       |
 | `cloudStorage.aws.bucket`                     | The name of a bucket in AWS S3. Required when using AWS S3                                                             |       |
@@ -113,12 +111,13 @@ By default local dir are not persisted. You can enable persistance on router and
 | `router.httpPort`                | The port for Cube Store to listen to HTTP connections on         | `3030`            |
 | `router.metaPort`                | The port for the router node to listen for connections on        | `9999`            |
 | `router.mysqlPort`               | The port for Cube Store to listen to connections on              | `3306`            |
+| `router.statusPort`              | The port for Cube Store to expose status probes                  | `3331`            |
 | `router.persistence.enabled`     | Enable persistence for local data using Persistent Volume Claims | `false`           |
 | `router.persistance.size`        | Persistent Volume size                                           | `10Gi`            |
 | `router.persistance.accessModes` | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
 | `router.persistance.annotations` | Additional custom annotations for the PVC                        | `{}`              |
 | `router.affinity`                | Affinity for pod assignment                                      | `{}`              |
-| `router.spreadConstraints`       | Topology spread constraint for pod assignment                    | `{}`              |
+| `router.spreadConstraints`       | Topology spread constraint for pod assignment                    | `[]`              |
 | `router.resources`               | Define resources requests and limits for single Pods             | `{}`              |
 
 ### Workers parameters
@@ -132,5 +131,5 @@ By default local dir are not persisted. You can enable persistance on router and
 | `workers.persistance.accessModes` | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
 | `workers.persistance.annotations` | Additional custom annotations for the PVC                        | `{}`              |
 | `workers.affinity`                | Affinity for pod assignment                                      | `{}`              |
-| `workers.spreadConstraints`       | Topology spread constraint for pod assignment                    | `{}`              |
+| `workers.spreadConstraints`       | Topology spread constraint for pod assignment                    | `[]`              |
 | `workers.resources`               | Define resources requests and limits for single Pods             | `{}`              |
