@@ -1,5 +1,5 @@
 cube(`Suppliers`, {
-  sql: `SELECT * FROM \`ecom-mysql\`.suppliers`,
+  sql: `SELECT * FROM public.suppliers`,
   
   preAggregations: {
     // Pre-Aggregations definitions go here
@@ -21,7 +21,8 @@ cube(`Suppliers`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
+      shown: true
     },
     
     address: {
