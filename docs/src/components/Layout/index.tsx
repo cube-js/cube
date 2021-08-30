@@ -204,7 +204,7 @@ class AppLayout extends React.Component<
         setScrollSectionsAndGithubUrl: this.setScrollSectionsAndGithubUrl,
       })
     );
-    console.log(pageData);
+    
     const pageFrameworkOfChoice: string =
       pageData && pageData?.mdx?.frontmatter?.frameworkOfChoice!;
 
