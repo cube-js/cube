@@ -21,6 +21,3 @@
 .idea/
 *.tmproj
 .vscode/
-
-# Chart .tgz
-charts/
