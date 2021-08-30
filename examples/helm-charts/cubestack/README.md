@@ -28,7 +28,7 @@ helm install cubestack . -f ./values.yaml
 
 Because this is an Umbrella Chart, you can set any value from the dependent charts in the `values.yaml`.
 
-Any value from the `../cubejs/values.yaml`, `../cubestore/values.yaml`, and `/bitnami/redis` can be set in the `./values.yaml`.
+Any value from the `../cubejs/values.yaml`, `../cubestore/values.yaml`, and `bitnami/redis` can be set in the `./values.yaml`.
 
 The requirement is to prefix the values with `cubejs`, `cubestore`, and `redis` respectively.
 
@@ -57,6 +57,15 @@ cubejs:
     ## The password used to connect to the Redis server
     ##
     password: "your-password"
+
+...
+
+redis:
+  enabled: true
+
+  global:
+    redis:
+      password: "your-password"
 ...
 ```
 
