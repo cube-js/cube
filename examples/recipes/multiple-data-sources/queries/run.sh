@@ -42,5 +42,5 @@ echo "---------"
 echo "Mango Inc JWT payload:"
 decode_jwt $mangoToken
 
-echo "Mango Dev last users:"
+echo "Mango Inc last users:"
 jq ".data" mangoResponse.json
