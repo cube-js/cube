@@ -5,11 +5,10 @@ port=4000
 loadUrl=cubejs-api/v1/load
 readyzUrl=readyz
 
-token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o
+cubeDevtoken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidGVuYW50IjoiY3ViZURldiIsImlhdCI6MTUxNjIzOTAyMiwiZXhwIjoxNzI0OTk1NTgxfQ.i9n4vjnuL3-Ly9aWTbj9pdZQWZpxrle6KIStmD3huqI
+cubeIncToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidGVuYW50IjoiY3ViZUluYyIsImlhdCI6MTUxNjIzOTAyMiwiZXhwIjoxNzI0OTk1NTgxfQ.JWoqbgonhuGhMj0aTIxa4DuZTy1EksN7CaxyF7zi5qE
 
-countQuery=$(cat query/queries/count.json)
-firstQuery=$(cat query/queries/first.json)
-secondQuery=$(cat query/queries/second.json)
+query=$(cat query/queries/users.json)
 
 # Wait for the Cube API to become ready
 until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
@@ -17,15 +16,11 @@ until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
 done
 
 # Send the query
-curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${countQuery}" -o countResponse.json
-curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${firstQuery}" -o firstResponse.json
-curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${secondQuery}" -o secondResponse.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${cubeIncToken}" -G -s --data-urlencode "query=${query}" -o cubeIncResponse.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${cubeDevtoken}" -G -s --data-urlencode "query=${query}" -o cubeDevResponse.json
 
-echo "Orders count:"
-jq ".data" countResponse.json
+echo "Cube Inc last users:"
+jq ".data" cubeIncResponse.json
 
-echo "The first five orders:"
-jq ".data" firstResponse.json
-
-echo "The second five orders:"
-jq ".data" secondResponse.json
+echo "Cube Dev last users:"
+jq ".data" cubeDevResponse.json

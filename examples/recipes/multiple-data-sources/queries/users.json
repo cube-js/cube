@@ -1,0 +1,13 @@
+{
+  "order": [
+    [
+      "Users.id",
+      "desc"
+    ]
+  ],
+  "dimensions": [
+    "Users.id",
+    "Users.name"
+  ],
+  "limit": 5
+}
