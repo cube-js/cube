@@ -10,7 +10,7 @@ menuOrder: 7
 
 ## API Reference
 
-### <--{"id" : "API Reference"}-->  CubejsServer.create(options)
+### CubejsServer.create(options)
 
 Creates an instance of `CubejsServer`.
 
@@ -79,7 +79,7 @@ const server = new CubejsServer(options);
 ```
 
 
-### <--{"id" : "API Reference"}-->  CubejsServer.version()
+### CubejsServer.version()
 
 `CubejsServer.version` is a method that returns the semantic package version of `@cubejs-backend/server`.
 
@@ -89,7 +89,7 @@ const CubejsServer = require('@cubejs-backend/server');
 console.log(CubejsServer.version());
 ```
 
-### <--{"id" : "API Reference"}-->  this.listen(options)
+### this.listen([options])
 
 Instantiates the Express.js App to listen to the specified `PORT`. Returns a promise that resolves with the following members:
 
@@ -101,10 +101,10 @@ Instantiates the Express.js App to listen to the specified `PORT`. Returns a pro
 
 Cube.js can also support TLS encryption. See the [Security page on how to enable tls](security#enabling-tls) for more information.
 
-### <--{"id" : "API Reference"}-->  this.testConnections()
+### this.testConnections()
 
 Tests all existing open connections in the application. 
 
-### <--{"id" : "API Reference"}-->  this.close()
+### this.close()
 
 Shuts down the server and closes any open db connections.

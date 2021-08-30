@@ -162,9 +162,9 @@ module.exports = {
 ```
 
 [link-config]: /config
-[link-config-cors-opts]: /config#http
+[link-config-cors-opts]: /config#options-reference-http
 [link-dev-playground]: /dev-tools/dev-playground
 [link-env-vars]: /reference/environment-variables
 [link-scheduled-refresh]:
-  /schema/reference/pre-aggregations#scheduled-refresh
+  /schema/reference/pre-aggregations#parameters-scheduled-refresh
 [link-v-023-release]: https://github.com/cube-js/cube.js/releases/tag/v0.23.0

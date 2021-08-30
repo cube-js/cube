@@ -101,4 +101,4 @@ cube(`Lessons`, {
 ```
 
 [ref-schema-advanced-extend]: /schema/advanced/extending-cubes
-[ref-schema-ref-cubes-extends]: /schema/reference/cube#extends
+[ref-schema-ref-cubes-extends]: /schema/reference/cube#parameters-extends

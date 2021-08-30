@@ -168,7 +168,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Using COMPILE_CONTEXT"}-->  Usage with Pre-Aggregations
+### Usage with Pre-Aggregations
 
 To generate pre-aggregations that rely on `SECURITY_CONTEXT` and/or
 `COMPILE_CONTEXT`, [configure `scheduledRefreshContexts` in your `cube.js`
@@ -184,12 +184,12 @@ build one from a JSON object.
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
 [link-multitenancy]: /multitenancy-setup
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-config-sched-refresh]: /config#scheduled-refresh-contexts
-[ref-config-sec-ctx]: /config#security-context
-[ref-schema-sec-ctx]: /schema/reference/cube#security-context
+[ref-config-queryrewrite]: /config#options-reference-query-rewrite
+[ref-config-sched-refresh]: /config#options-reference-scheduled-refresh-contexts
+[ref-config-sec-ctx]: /config#request-context-security-context
+[ref-schema-sec-ctx]: /schema/reference/cube#context-variables-security-context
 [ref-cubes-compile-ctx]:
-  https://cube.dev/docs/cube#compile-context
+  https://cube.dev/docs/cube#context-variables-compile-context
 [ref-sec-ctx-vs-compile-ctx]:
   /multitenancy-setup#security-context-vs-multitenant-compile-context
 [ref-devtools-playground]:

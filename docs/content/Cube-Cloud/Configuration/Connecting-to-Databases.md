@@ -23,14 +23,14 @@ You can connect all Cube.js supported databases to your Cube Cloud deployment.
 Below you can find guides on how to use Cube Cloud with specific database
 vendors.
 
-- [AWS Athena](#aws-athena)
-- [AWS Redshift](#aws-redshift)
-- [BigQuery](#big-query)
-- [Snowflake](#snowflake)
+- [AWS Athena](#guides-aws-athena)
+- [AWS Redshift](#guides-aws-redshift)
+- [BigQuery](#guides-big-query)
+- [Snowflake](#guides-snowflake)
 
 ## Guides
 
-### <--{"id" : "Guides"}--> AWS Athena
+### AWS Athena
 
 The following fields are required when creating an AWS Athena connection:
 
@@ -52,7 +52,7 @@ The following fields are required when creating an AWS Athena connection:
   />
 </div>
 
-### <--{"id" : "Guides"}--> AWS Redshift
+### AWS Redshift
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -82,7 +82,7 @@ The following fields are required when creating an AWS Redshift connection:
   />
 </div>
 
-### <--{"id" : "Guides"}--> BigQuery
+### BigQuery
 
 The following fields are required when creating a BigQuery connection:
 
@@ -103,7 +103,7 @@ The following fields are required when creating a BigQuery connection:
   />
 </div>
 
-### <--{"id" : "Guides"}--> Snowflake
+### Snowflake
 
 The following fields are required when creating a Snowflake connection:
 
@@ -152,7 +152,7 @@ database credentials:
   />
 </div>
 
-### <--{"id" : "Connecting via SSL"}-->  Custom SSL certificates
+### Custom SSL certificates
 
 To use custom SSL certificates between Cube Cloud and your database server, go
 to the **Env vars** tab in **Settings**:

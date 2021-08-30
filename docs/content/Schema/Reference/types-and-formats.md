@@ -14,7 +14,7 @@ redirect_from:
 This section describes the various types that can be assigned to a **measure**.
 A measure can only have one type.
 
-### <--{"id" : "Measures Types"}--> number
+### number
 
 The `sql` parameter is required and can take any valid SQL expression that
 results in a number or integer. Type `number` is usually used, when performing
@@ -47,7 +47,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> count
+### count
 
 Performs a table count, similar to SQL’s `COUNT` function. However, unlike
 writing raw SQL, Cube.js will properly calculate counts even if your query’s
@@ -70,7 +70,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> countDistinct
+### countDistinct
 
 Calculates the number of distinct values in a given field. It makes use of SQL’s
 `COUNT DISTINCT` function.
@@ -89,7 +89,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> countDistinctApprox
+### countDistinctApprox
 
 Calculates approximate number of distinct values in a given field. Unlike
 `countDistinct` measure type, `countDistinctApprox` is decomposable aggregate
@@ -113,7 +113,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> sum
+### sum
 
 Adds up the values in a given field. It is similar to SQL’s `SUM` function.
 However, unlike writing raw SQL, Cube.js will properly calculate sums even if
@@ -157,7 +157,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> avg
+### avg
 
 Averages the values in a given field. It is similar to SQL’s AVG function.
 However, unlike writing raw SQL, Cube.js will properly calculate averages even
@@ -177,7 +177,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> min
+### min
 
 Type of measure `min` is calculated as a minimum of values defined in `sql`.
 
@@ -192,7 +192,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> max
+### max
 
 Type of measure `max` is calculated as a maximum of values defined in `sql`.
 
@@ -207,7 +207,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> runningTotal
+### runningTotal
 
 Type of measure `runningTotal` is calculated as summation of values defined in
 `sql`. Use it to calculate cumulative measures.
@@ -228,7 +228,7 @@ cube('Orders', {
 When creating a **measure** you can explicitly define the format you’d like to
 see as output.
 
-### <--{"id" : "Measures Formats"}--> percent
+### percent
 
 `percent` is used for formatting numbers with a percent symbol.
 
@@ -244,7 +244,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Formats"}--> currency
+### currency
 
 `currency` is used for monetary values.
 
@@ -265,7 +265,7 @@ cube('Orders', {
 This section describes the various types that can be assigned to a
 **dimension**. A dimension can only have one type.
 
-### <--{"id" : "Dimensions Types"}--> time
+### time
 
 In order to be able to create time series charts, Cube.js needs to identify time
 dimension which is a timestamp column in your database.
@@ -285,7 +285,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> string
+### string
 
 `string` is typically used with fields that contain letters or special
 characters. The `sql` parameter is required and can take any valid SQL
@@ -305,7 +305,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> number
+### number
 
 `number` is typically used with fields that contain number or integer.
 
@@ -320,7 +320,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> boolean
+### boolean
 
 `boolean` is used with fields that contain boolean data or data coercible to
 boolean. For example:
@@ -336,7 +336,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> geo
+### geo
 
 `geo` dimension is used to display data on the map. Unlike other dimension types
 it requires to set two fields: latitude and longitude.
@@ -359,7 +359,7 @@ cube('Orders', {
 
 ## Dimensions Formats
 
-### <--{"id" : "Dimensions Formats"}--> imageUrl
+### imageUrl
 
 `imageUrl` is used for displaying images in table visualization. In this case
 `sql` parameter should contain full path to the image.
@@ -376,7 +376,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> id
+### id
 
 `id` is used for IDs. It allows to eliminate applying of comma for 5+ digit
 numbers which is default for type `number`. The `sql` parameter is required and
@@ -394,7 +394,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> link
+### link
 
 `link` is used for creating hyperlinks. `link` parameter could be either String
 or Object. Use Object, when you want to give a specific label to link. See
@@ -423,7 +423,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> currency
+### currency
 
 `currency` is used for monetary values.
 
@@ -439,7 +439,7 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> percent
+### percent
 
 `percent` is used for formatting numbers with a percent symbol.
 
@@ -458,6 +458,6 @@ cube('Orders', {
 [ref-string-time-dims]:
   /schema/fundamentals/additional-concepts#string-time-dimensions
 [ref-schema-ref-preaggs-rollup]:
-  /schema/reference/pre-aggregations#type-rollup
+  /schema/reference/pre-aggregations#parameters-type-rollup
 [ref-schema-ref-calc-measures]: /schema/reference/measures#calculated-measures
 [ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns

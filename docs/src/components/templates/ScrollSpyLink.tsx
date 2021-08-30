@@ -11,21 +11,19 @@ type Props = {
   to: string;
 };
 
-const ScrollLink: React.FC<Props> = (props) => {
-  return (
-    <div className={styles.scrollspyLinkWrapper}>
-      <Link
-        offset={SCROLL_OFFSET}
-        smooth
-        {...props}
-        spy
-        duration={SCROLL_DURATION}
-        onClick={() => window.history.pushState('', '', `#${props.to}`)}
-      >
-        {props.children}
-      </Link>
-    </div>
-  )
-};
+const ScrollLink: React.FC<Props> = (props) => (
+  <div className={styles.scrollspyLinkWrapper}>
+    <Link
+      offset={SCROLL_OFFSET}
+      smooth
+      {...props}
+      spy
+      duration={SCROLL_DURATION}
+      onClick={() => window.history.pushState('', '', `#${props.to}`)}
+    >
+      {props.children}
+    </Link>
+  </div>
+);
 
 export default ScrollLink;

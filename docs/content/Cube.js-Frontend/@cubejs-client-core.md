@@ -57,7 +57,7 @@ options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 Main class for accessing Cube.js API
 
-### <--{"id" : "CubejsApi"}-->  dryRun
+### dryRun
 
 >  **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[TDryRunResponse](#types-t-dry-run-response)›*
 
@@ -65,7 +65,7 @@ Main class for accessing Cube.js API
 
 Get query related meta without query execution
 
-### <--{"id" : "CubejsApi"}-->  load
+### load
 
 >  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[ResultSet](#result-set)›*
 
@@ -101,7 +101,7 @@ query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object](qu
 options? | [LoadMethodOptions](#types-load-method-options) | - |
 callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)› | - |
 
-### <--{"id" : "CubejsApi"}-->  meta
+### meta
 
 >  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[Meta](#meta)›*
 
@@ -109,7 +109,7 @@ callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#res
 
 Get meta description of cubes available for querying.
 
-### <--{"id" : "CubejsApi"}-->  sql
+### sql
 
 >  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
 
@@ -125,7 +125,7 @@ query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object](qu
 options? | [LoadMethodOptions](#types-load-method-options) | - |
 callback? | [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)› | - |
 
-### <--{"id" : "CubejsApi"}-->  subscribe
+### subscribe
 
 >  **subscribe**(**query**: [Query](#types-query) | [Query](#types-query)[], **options**: [LoadMethodOptions](#types-load-method-options) | null, **callback**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
 
@@ -156,11 +156,11 @@ cubejsApi.subscribe(
 
 Default transport implementation.
 
-### <--{"id" : "HttpTransport"}-->  HttpTransport constructor
+### constructor
 
 >  **new HttpTransport**(**options**: [TransportOptions](#types-transport-options)): *[HttpTransport](#http-transport)*
 
-### <--{"id" : "HttpTransport"}-->  request
+### request
 
 >  **request**(**method**: string, **params**: any): () => *Promise‹any›*
 
@@ -170,15 +170,15 @@ Default transport implementation.
 
 Contains information about available cubes and it's members.
 
-### <--{"id" : "Meta"}-->  defaultTimeDimensionNameFor
+### defaultTimeDimensionNameFor
 
 >  **defaultTimeDimensionNameFor**(**memberName**: string): *string*
 
-### <--{"id" : "Meta"}-->  filterOperatorsForMember
+### filterOperatorsForMember
 
 >  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type) | [MemberType](#types-member-type)[]): *any*
 
-### <--{"id" : "Meta"}-->  membersForQuery
+### membersForQuery
 
 >  **membersForQuery**(**query**: [Query](#types-query) | null, **memberType**: [MemberType](#types-member-type)): *[TCubeMeasure](#types-t-cube-measure)[] | [TCubeDimension](#types-t-cube-dimension)[] | [TCubeMember](#types-t-cube-member)[]*
 
@@ -192,7 +192,7 @@ Name | Type | Description |
 query | [Query](#types-query) &#124; null | context query to provide filtering of members available to add to this query  |
 memberType | [MemberType](#types-member-type) | - |
 
-### <--{"id" : "Meta"}-->  resolveMember
+### resolveMember
 
 >  **resolveMember**‹**T**›(**memberName**: string, **memberType**: T | T[]): *object | [TCubeMemberByType](#types-t-cube-member-by-type)‹T›*
 
@@ -222,11 +222,11 @@ memberType | T &#124; T[] | - |
 
 ## ProgressResult
 
-### <--{"id" : "ProgressResult"}-->  stage
+### stage
 
 >  **stage**(): *string*
 
-### <--{"id" : "ProgressResult"}-->  timeElapsed
+### timeElapsed
 
 >  **timeElapsed**(): *string*
 
@@ -234,11 +234,11 @@ memberType | T &#124; T[] | - |
 
 Provides a convenient interface for data manipulation.
 
-### <--{"id" : "ResultSet"}-->  annotation
+### annotation
 
 >  **annotation**(): *[QueryAnnotations](#types-query-annotations)*
 
-### <--{"id" : "ResultSet"}-->  chartPivot
+### chartPivot
 
 >  **chartPivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[ChartPivotRow](#types-chart-pivot-row)[]*
 
@@ -322,7 +322,7 @@ to give each series a unique prefix. This is useful for `blending queries` which
 ];
 ```
 
-### <--{"id" : "ResultSet"}-->  decompose
+### decompose
 
 >  **decompose**(): *Object*
 
@@ -333,7 +333,7 @@ resultSet.decompose().forEach((currentResultSet) => {
 });
 ```
 
-### <--{"id" : "ResultSet"}-->  drillDown
+### drillDown
 
 >  **drillDown**(**drillDownLocator**: [DrillDownLocator](#types-drill-down-locator), **pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Query](#types-query) | null*
 
@@ -394,7 +394,7 @@ const drillDownResponse = useCubeQuery(
  );
 ```
 
-### <--{"id" : "ResultSet"}-->  pivot
+### pivot
 
 >  **pivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[PivotRow](#types-pivot-row)[]*
 
@@ -437,21 +437,21 @@ You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
 ]
 ```
 
-### <--{"id" : "ResultSet"}-->  query
+### query
 
 >  **query**(): *[Query](#types-query)*
 
-### <--{"id" : "ResultSet"}-->  rawData
+### rawData
 
 >  **rawData**(): *T[]*
 
-### <--{"id" : "ResultSet"}-->  serialize
+### serialize
 
 >  **serialize**(): *Object*
 
 Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
 
-### <--{"id" : "ResultSet"}-->  series
+### series
 
 >  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
 
@@ -486,7 +486,7 @@ Returns an array of series with key, title and series data.
 
 - **SeriesItem**
 
-### <--{"id" : "ResultSet"}-->  seriesNames
+### seriesNames
 
 >  **seriesNames**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[SeriesNamesColumn](#types-series-names-column)[]*
 
@@ -512,7 +512,7 @@ Returns an array of series objects, containing `key` and `title` parameters.
 ]
 ```
 
-### <--{"id" : "ResultSet"}-->  tableColumns
+### tableColumns
 
 >  **tableColumns**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[TableColumn](#types-table-column)[]*
 
@@ -608,7 +608,7 @@ then `tableColumns` will group the table head and return
 // ...
 ```
 
-### <--{"id" : "ResultSet"}-->  tablePivot
+### tablePivot
 
 >  **tablePivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *Array‹object›*
 
@@ -637,7 +637,7 @@ For example:
 ]
 ```
 
-### <--{"id" : "ResultSet"}-->  deserialize
+### deserialize
 
 > `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#result-set)‹TData›*
 
@@ -663,29 +663,29 @@ Name | Type | Description |
 data | Object | the result of [serialize](#result-set-serialize)  |
 options? | Object | - |
 
-### <--{"id" : "ResultSet"}-->  getNormalizedPivotConfig
+### getNormalizedPivotConfig
 
 > `static` **getNormalizedPivotConfig**(**query**: [PivotQuery](#types-pivot-query), **pivotConfig?**: Partial‹[PivotConfig](#types-pivot-config)›): *[PivotConfig](#types-pivot-config)*
 
 ## SqlQuery
 
-### <--{"id" : "SqlQuery"}-->  rawQuery
+### rawQuery
 
 >  **rawQuery**(): *[SqlData](#types-sql-data)*
 
-### <--{"id" : "SqlQuery"}-->  sql
+### sql
 
 >  **sql**(): *string*
 
 ## ITransport
 
-### <--{"id" : "ITransport"}-->  request
+### request
 
 >  **request**(**method**: string, **params**: any): () => *Promise‹void›*
 
 ## Types
 
-### <--{"id" : "Types"}-->  Annotation
+### Annotation
 
 Name | Type |
 ------ | ------ |
@@ -694,7 +694,7 @@ shortTitle | string |
 title | string |
 type | string |
 
-### <--{"id" : "Types"}-->  BinaryFilter
+### BinaryFilter
 
 Name | Type |
 ------ | ------ |
@@ -705,18 +705,18 @@ operator | [BinaryOperator](#types-binary-operator) |
 or? | [BinaryFilter](#types-binary-filter)[] |
 values | string[] |
 
-### <--{"id" : "Types"}-->  BinaryOperator
+### BinaryOperator
 
 > **BinaryOperator**: *"equals" | "notEquals" | "contains" | "notContains" | "gt" | "gte" | "lt" | "lte" | "inDateRange" | "notInDateRange" | "beforeDate" | "afterDate"*
 
-### <--{"id" : "Types"}-->  ChartPivotRow
+### ChartPivotRow
 
 Name | Type |
 ------ | ------ |
 x | string |
 xValues | string[] |
 
-### <--{"id" : "Types"}-->  Column
+### Column
 
 Name | Type |
 ------ | ------ |
@@ -724,7 +724,7 @@ key | string |
 series | [] |
 title | string |
 
-### <--{"id" : "Types"}-->  CubeJSApiOptions
+### CubeJSApiOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -735,26 +735,26 @@ parseDateMeasures? | boolean | - |
 pollInterval? | number | - |
 transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
 
-### <--{"id" : "Types"}-->  DateRange
+### DateRange
 
 > **DateRange**: *string | [string, string]*
 
-### <--{"id" : "Types"}-->  DrillDownLocator
+### DrillDownLocator
 
 Name | Type |
 ------ | ------ |
 xValues | string[] |
 yValues? | string[] |
 
-### <--{"id" : "Types"}-->  Filter
+### Filter
 
 > **Filter**: *[BinaryFilter](#types-binary-filter) | [UnaryFilter](#types-unary-filter)*
 
-### <--{"id" : "Types"}-->  LoadMethodCallback
+### LoadMethodCallback
 
 > **LoadMethodCallback**: *function*
 
-### <--{"id" : "Types"}-->  LoadMethodOptions
+### LoadMethodOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -763,7 +763,7 @@ mutexKey? | string | Key to store the current request's MUTEX inside the `mutexO
 mutexObj? | Object | Object to store MUTEX |
 subscribe? | boolean | Pass `true` to use continuous fetch behavior. |
 
-### <--{"id" : "Types"}-->  LoadResponse
+### LoadResponse
 
 Name | Type |
 ------ | ------ |
@@ -771,7 +771,7 @@ pivotQuery | [PivotQuery](#types-pivot-query) |
 queryType | [QueryType](#types-query-type) |
 results | [LoadResponseResult](#types-load-response-result)‹T›[] |
 
-### <--{"id" : "Types"}-->  LoadResponseResult
+### LoadResponseResult
 
 Name | Type |
 ------ | ------ |
@@ -780,11 +780,11 @@ data | T[] |
 lastRefreshTime | string |
 query | [Query](#types-query) |
 
-### <--{"id" : "Types"}-->  MemberType
+### MemberType
 
 > **MemberType**: *"measures" | "dimensions" | "segments"*
 
-### <--{"id" : "Types"}-->  PivotConfig
+### PivotConfig
 
 Configuration object that contains information about pivot axes and other options.
 
@@ -847,25 +847,25 @@ fillMissingDates? | boolean &#124; null | If `true` missing dates on the time di
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
 y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
-### <--{"id" : "Types"}-->  PivotQuery
+### PivotQuery
 
 > **PivotQuery**: *[Query](#types-query) & object*
 
-### <--{"id" : "Types"}-->  PivotRow
+### PivotRow
 
 Name | Type |
 ------ | ------ |
 xValues | Array‹string &#124; number› |
 yValuesArray | Array‹[string[], number]› |
 
-### <--{"id" : "Types"}-->  ProgressResponse
+### ProgressResponse
 
 Name | Type |
 ------ | ------ |
 stage | string |
 timeElapsed | number |
 
-### <--{"id" : "Types"}-->  Query
+### Query
 
 Name | Type |
 ------ | ------ |
@@ -881,7 +881,7 @@ timeDimensions? | [TimeDimension](#types-time-dimension)[] |
 timezone? | string |
 ungrouped? | boolean |
 
-### <--{"id" : "Types"}-->  QueryAnnotations
+### QueryAnnotations
 
 Name | Type |
 ------ | ------ |
@@ -889,15 +889,15 @@ dimensions | Record‹string, [Annotation](#types-annotation)› |
 measures | Record‹string, [Annotation](#types-annotation)› |
 timeDimensions | Record‹string, [Annotation](#types-annotation)› |
 
-### <--{"id" : "Types"}-->  QueryOrder
+### QueryOrder
 
 > **QueryOrder**: *"asc" | "desc"*
 
-### <--{"id" : "Types"}-->  QueryType
+### QueryType
 
 > **QueryType**: *"regularQuery" | "compareDateRangeQuery" | "blendingQuery"*
 
-### <--{"id" : "Types"}-->  Series
+### Series
 
 Name | Type |
 ------ | ------ |
@@ -905,7 +905,7 @@ key | string |
 series | T[] |
 title | string |
 
-### <--{"id" : "Types"}-->  SeriesNamesColumn
+### SeriesNamesColumn
 
 Name | Type |
 ------ | ------ |
@@ -913,13 +913,13 @@ key | string |
 title | string |
 yValues | string[] |
 
-### <--{"id" : "Types"}-->  SqlApiResponse
+### SqlApiResponse
 
 Name | Type |
 ------ | ------ |
 sql | [SqlData](#types-sql-data) |
 
-### <--{"id" : "Types"}-->  SqlData
+### SqlData
 
 Name | Type |
 ------ | ------ |
@@ -929,19 +929,19 @@ dataSource | boolean |
 external | boolean |
 sql | [SqlQueryTuple](#types-sql-query-tuple) |
 
-### <--{"id" : "Types"}-->  SqlQueryTuple
+### SqlQueryTuple
 
 > **SqlQueryTuple**: *[string, boolean | string | number]*
 
-### <--{"id" : "Types"}-->  TCubeDimension
+### TCubeDimension
 
 > **TCubeDimension**: *[TCubeMember](#types-t-cube-member) & object*
 
-### <--{"id" : "Types"}-->  TCubeMeasure
+### TCubeMeasure
 
 > **TCubeMeasure**: *[TCubeMember](#types-t-cube-member) & object*
 
-### <--{"id" : "Types"}-->  TCubeMember
+### TCubeMember
 
 Name | Type |
 ------ | ------ |
@@ -950,26 +950,26 @@ shortTitle | string |
 title | string |
 type | [TCubeMemberType](#types-t-cube-member-type) |
 
-### <--{"id" : "Types"}-->  TCubeMemberByType
+### TCubeMemberByType
 
 > **TCubeMemberByType**: *T extends "measures" ? TCubeMeasure : T extends "dimensions" ? TCubeDimension : T extends "segments" ? TCubeSegment : never*
 
-### <--{"id" : "Types"}-->  TCubeMemberType
+### TCubeMemberType
 
 > **TCubeMemberType**: *"time" | "number" | "string" | "boolean"*
 
-### <--{"id" : "Types"}-->  TCubeSegment
+### TCubeSegment
 
 > **TCubeSegment**: *Pick‹[TCubeMember](#types-t-cube-member), "name" | "shortTitle" | "title"›*
 
-### <--{"id" : "Types"}-->  TDefaultHeuristicsOptions
+### TDefaultHeuristicsOptions
 
 Name | Type |
 ------ | ------ |
 meta | [Meta](#meta) |
 sessionGranularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
 
-### <--{"id" : "Types"}-->  TDryRunResponse
+### TDryRunResponse
 
 Name | Type |
 ------ | ------ |
@@ -978,7 +978,7 @@ pivotQuery | [PivotQuery](#types-pivot-query) |
 queryOrder | Array‹object› |
 queryType | [QueryType](#types-query-type) |
 
-### <--{"id" : "Types"}-->  TFlatFilter
+### TFlatFilter
 
 Name | Type |
 ------ | ------ |
@@ -987,13 +987,13 @@ member? | string |
 operator | [BinaryOperator](#types-binary-operator) |
 values | string[] |
 
-### <--{"id" : "Types"}-->  TQueryOrderArray
+### TQueryOrderArray
 
 > **TQueryOrderArray**: *Array‹[string, [QueryOrder](#types-query-order)]›*
 
-### <--{"id" : "Types"}-->  TQueryOrderObject
+### TQueryOrderObject
 
-### <--{"id" : "Types"}-->  TableColumn
+### TableColumn
 
 Name | Type |
 ------ | ------ |
@@ -1006,30 +1006,30 @@ shortTitle | string |
 title | string |
 type | string &#124; number |
 
-### <--{"id" : "Types"}-->  TimeDimension
+### TimeDimension
 
 > **TimeDimension**: *[TimeDimensionComparison](#types-time-dimension-comparison) | [TimeDimensionRanged](#types-time-dimension-ranged)*
 
-### <--{"id" : "Types"}-->  TimeDimensionBase
+### TimeDimensionBase
 
 Name | Type |
 ------ | ------ |
 dimension | string |
 granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
 
-### <--{"id" : "Types"}-->  TimeDimensionComparison
+### TimeDimensionComparison
 
 > **TimeDimensionComparison**: *[TimeDimensionBase](#types-time-dimension-base) & object*
 
-### <--{"id" : "Types"}-->  TimeDimensionGranularity
+### TimeDimensionGranularity
 
 > **TimeDimensionGranularity**: *"second" | "minute" | "hour" | "day" | "week" | "month" | "year"*
 
-### <--{"id" : "Types"}-->  TimeDimensionRanged
+### TimeDimensionRanged
 
 > **TimeDimensionRanged**: *[TimeDimensionBase](#types-time-dimension-base) & object*
 
-### <--{"id" : "Types"}-->  TransportOptions
+### TransportOptions
 
 Name | Type | Description |
 ------ | ------ | ------ |
@@ -1038,7 +1038,7 @@ authorization | string | [jwt auth token](security) |
 credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
 headers? | Record‹string, string› | custom headers |
 
-### <--{"id" : "Types"}-->  UnaryFilter
+### UnaryFilter
 
 Name | Type |
 ------ | ------ |
@@ -1049,6 +1049,6 @@ operator | [UnaryOperator](#types-unary-operator) |
 or? | [UnaryFilter](#types-unary-filter)[] |
 values? | never |
 
-### <--{"id" : "Types"}-->  UnaryOperator
+### UnaryOperator
 
 > **UnaryOperator**: *"set" | "notSet"*

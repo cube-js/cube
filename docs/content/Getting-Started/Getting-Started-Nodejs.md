@@ -49,7 +49,7 @@ $ npm run dev
 Then go to `http://localhost:4000` and use Developer Playground to generate
 schema files.
 
-### <--{"id" : "2. Define Your Data Schema"}-->  Manually creating Data Schema files
+### Manually creating Data Schema files
 
 You can also add schema files to the `schema` folder manually:
 
@@ -101,7 +101,7 @@ chart types, generate sample code and more!
 Cube.js also provides a [REST API](/rest-api) for accessing your data
 programmatically.
 
-### <--{"id" : "3. Visualize Results"}-->  Cube.js Client Installation
+### Cube.js Client Installation
 
 Vanilla JS:
 
@@ -130,7 +130,7 @@ $ npm i --save @cubejs-client/core
 $ npm i --save @cubejs-client/ngx
 ```
 
-### <--{"id" : "3. Visualize Results"}-->  Example Usage
+### Example Usage
 
 #### Vanilla Javascript
 
@@ -326,7 +326,7 @@ export class AppComponent {
 Cube.js has first-class deployment support for [Docker][link-docker] and the
 [Serverless Framework][link-serverless-framework].
 
-### <--{"id" : "4. Deploy to Production"}-->  Docker
+### Docker
 
 For more information on deploying our official Docker image, please consult the
 [Deployment Guide][ref-docker-deployment-guide].
@@ -344,7 +344,7 @@ $ docker run --rm \
   <YOUR-USERNAME>/cubejs-docker-demo
 ```
 
-### <--{"id" : "4. Deploy to Production"}-->  Serverless
+### Serverless
 
 For more information on deploying with the Serverless Framework, consult the
 [Deployment Guide][ref-sls-aws-deployment-guide].

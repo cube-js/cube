@@ -147,7 +147,7 @@ cube(`Contacts`, {
 
 ## Parameters
 
-### <--{"id" : "Parameters"}--> sql
+### sql
 
 The `sql` parameter specifies the SQL that will be used to generate a table that
 will be queried by a cube. It can be any valid SQL query, but usually it takes
@@ -169,7 +169,7 @@ cube(`Companies`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> title
+### title
 
 Use `title` to change the display name of the cube. By default, Cube.js will
 humanize the cube's name, so for instance, `UsersOrder` would become
@@ -186,7 +186,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> description
+### description
 
 Use a description in your cubes to allow your team to better understand what
 this cube is about. It is a very simple and yet useful tool that gives a hint to
@@ -201,7 +201,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> extends
+### extends
 
 You can extend cubes in order to reuse all declared members of a cube. In the
 example below, `ExtendedOrderFacts` will reuse the `sql` and `count` measures
@@ -261,7 +261,7 @@ cube(`ExtendedOrderFacts`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> refreshKey
+### refreshKey
 
 Cube.js caching layer uses `refreshKey` queries to get the current version of
 content for a specific cube. If a query result changes, Cube.js will invalidate
@@ -349,7 +349,7 @@ SQL will be:
 SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 ```
 
-### <--{"id" : "Parameters"}--> Supported cron formats
+### Supported cron formats
 
 - Standard cron syntax
 
@@ -378,7 +378,7 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 └───────────────────────── second (0 - 59, optional)
 ```
 
-### <--{"id" : "Parameters"}--> dataSource
+### dataSource
 
 Each cube in schema can have it's own `dataSource` name to support scenarios
 where data should be fetched from multiple databases. The value of the
@@ -395,7 +395,7 @@ cube(`OrderFacts`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> sqlAlias
+### sqlAlias
 
 Use `sqlAlias` when auto-generated cube alias prefix is too long and truncated
 by DB such as Postgres:
@@ -413,7 +413,7 @@ cube(`OrderFacts`, {
 It'll generate aliases for members such as `ofacts__count`. `sqlAlias` affects
 all member names including pre-aggregation table names.
 
-### <--{"id" : "Parameters"}--> rewriteQueries
+### rewriteQueries
 
 Set this flag to true if you want Cube.js to rewrite your queries after final
 SQL has been generated. This may be helpful to apply filter pushdown
@@ -429,7 +429,7 @@ cube(`Tickets`, {
 
 ## Context Variables
 
-### <--{"id" : "Context Variables"}--> Filter Params
+### Filter Params
 
 `FILTER_PARAMS` allows you to use filter values during SQL generation. You can
 add it for any valid SQL expression as in the case of dimensions.
@@ -511,7 +511,7 @@ cube(`Events`, {
 });
 ```
 
-### <--{"id" : "Context Variables"}--> Security Context
+### Security Context
 
 `SECURITY_CONTEXT` is a user security object that is passed by the Cube.js
 Client. Please read the [Security Context page][ref-sec-ctx] for more
@@ -559,7 +559,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Context Variables"}--> Unsafe Value
+### Unsafe Value
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -584,7 +584,7 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Context Variables"}--> SQL Utils
+### SQL Utils
 
 #### convertTz
 
@@ -623,7 +623,7 @@ cube(`visitors`, {
 });
 ```
 
-### <--{"id" : "Context Variables"}--> Compile context
+### Compile context
 
 There's a global `COMPILE_CONTEXT` that captured as
 [`RequestContext`][ref-config-req-ctx] at the time of schema compilation. It
@@ -650,13 +650,13 @@ cube(`Users`, {
 });
 ```
 
-[ref-config-dbtype]: /config#db-type
-[ref-config-driverfactory]: /config#driver-factory
-[ref-config-ext-ctx]: /config#extend-context
-[ref-config-queryrewrite]: /config#query-rewrite
+[ref-config-dbtype]: /config#options-reference-db-type
+[ref-config-driverfactory]: /config#options-reference-driver-factory
+[ref-config-ext-ctx]: /config#options-reference-extend-context
+[ref-config-queryrewrite]: /config#options-reference-query-rewrite
 [ref-config-req-ctx]: /config#request-context
 [ref-dev-playground]: /dev-tools/dev-playground
-[ref-restapi-meta]: /rest-api#v-1-meta
-[ref-restapi-sql]: /rest-api#v-1-sql
+[ref-restapi-meta]: /rest-api#api-reference-v-1-meta
+[ref-restapi-sql]: /rest-api#api-reference-v-1-sql
 [ref-sec-ctx]: /security/context
 [wiki-camelcase]: https://en.wikipedia.org/wiki/Camel_case

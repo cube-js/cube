@@ -12,7 +12,7 @@ permalink: /config/databases/snowflake
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -52,7 +52,7 @@ connections are made over HTTPS.
 Snowflake supports using both AWS S3 and Google Cloud Storage for export bucket
 functionality.
 
-### <--{"id" : "Export bucket"}-->  AWS S3
+### AWS S3
 
 <!-- prettier-ignore-start -->
 [[info |]]
@@ -68,7 +68,7 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
 CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ```
 
-### <--{"id" : "Export bucket"}-->  Google Cloud Storage
+### Google Cloud Storage
 
 <!-- prettier-ignore-start -->
 [[info |]]

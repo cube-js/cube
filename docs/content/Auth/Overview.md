@@ -136,7 +136,7 @@ Cube.js has out-of-the-box support for the following identity providers:
 [ref-jwt-auth0]: /security/jwt/auth0
 [ref-jwt-aws-cognito]: /security/jwt/aws-cognito
 
-### <--{"id" : "Using JSON Web Key Sets (JWKS)"}-->  Configuration
+### Configuration
 
 As mentioned previously, Cube.js supports verifying JWTs using industry-standard
 JWKS. The JWKS can be provided either from a URL, or as a JSON object conforming
@@ -184,7 +184,7 @@ Or configure the same using environment variables:
 CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
 ```
 
-### <--{"id" : "Using JSON Web Key Sets (JWKS)"}-->  Verifying claims
+### Verifying claims
 
 Cube.js can also verify the audience, subject and issuer claims in JWTs.
 Similarly to JWK configuration, these can also be configured in the `cube.js`
@@ -208,7 +208,7 @@ CUBEJS_JWT_ISSUER='<ISSUER_FROM_IDENTITY_PROVIDER>'
 CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'
 ```
 
-### <--{"id" : "Using JSON Web Key Sets (JWKS)"}-->  Custom claims namespace
+### Custom claims namespace
 
 Cube.js can also extract claims defined in custom namespaces. Simply specify the
 namespace in your `cube.js` configuration file:
@@ -221,10 +221,10 @@ module.exports = {
 };
 ```
 
-### <--{"id" : "Using JSON Web Key Sets (JWKS)"}-->  Caching
+### Caching
 
 Cube.js caches JWKS by default when [`CUBEJS_JWK_URL` or `jwt.jwkUrl` is
-specified](#configuration).
+specified](##using-json-web-key-sets-jwks-configuration).
 
 - If the response contains a `Cache-Control` header, then Cube.js uses it to
   determine cache expiry.
@@ -269,7 +269,7 @@ module.exports = {
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
-[ref-config-check-auth]: /config#check-auth
+[ref-config-check-auth]: /config#options-reference-check-auth
 [ref-config-migrate-cubejs]:
   /configuration/overview#migration-from-express-to-docker-template
 [ref-sec-ctx]: /security/context

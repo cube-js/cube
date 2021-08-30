@@ -409,18 +409,18 @@ number of Redis connections **per-tenant**.
   https://www.npmjs.com/package/@cubejs-backend/serverless-aws
 [ref-config]: /config
 [ref-config-opts]: /config#options-reference
-[ref-config-dbtype]: /config#db-type
-[ref-config-driverfactory]: /config#driver-factory
-[ref-config-preagg-schema]: /config#pre-aggregations-schema
-[ref-config-ctx-to-appid]: /config#context-to-app-id
+[ref-config-dbtype]: /config#options-reference-db-type
+[ref-config-driverfactory]: /config#options-reference-driver-factory
+[ref-config-preagg-schema]: /config#options-reference-pre-aggregations-schema
+[ref-config-ctx-to-appid]: /config#options-reference-context-to-app-id
 [ref-config-ctx-to-orch-id]:
-  /config#context-to-orchestrator-id
-[ref-config-query-rewrite]: /config#query-rewrite
-[ref-config-refresh-ctx]: /config#scheduled-refresh-contexts
-[ref-config-refresh-tz]: /config#scheduled-refresh-time-zones
-[ref-config-security-ctx]: /config#security-context
+  /config#options-reference-context-to-orchestrator-id
+[ref-config-query-rewrite]: /config#options-reference-query-rewrite
+[ref-config-refresh-ctx]: /config#options-reference-scheduled-refresh-contexts
+[ref-config-refresh-tz]: /config#options-reference-scheduled-refresh-time-zones
+[ref-config-security-ctx]: /config#request-context-security-context
 [ref-deployment-sls]: /deployment/serverless/aws
 [ref-security]: /security
-[ref-cube-datasource]: /schema/reference/cube#data-source
+[ref-cube-datasource]: /schema/reference/cube#parameters-data-source
 [ref-cube-security-ctx]:
-  /schema/reference/cube#security-context
+  /schema/reference/cube#context-variables-security-context

@@ -12,7 +12,7 @@ permalink: /config/databases/postgres
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -44,7 +44,7 @@ Database][ref-recipe-enable-ssl].
 
 ## Additional Configuration
 
-### <--{"id" : "Additional Configuration"}-->  AWS RDS
+### AWS RDS
 
 Use `CUBEJS_DB_SSL=true` to enable SSL if you have SSL enabled for your RDS
 cluster. Download the new certificate [here][aws-rds-pem], and provide the
@@ -52,13 +52,13 @@ contents of the downloaded file to `CUBEJS_DB_SSL_CA`. All other SSL-related
 environment variables can be left unset. See [the SSL section][self-ssl] for
 more details. More info on AWS RDS SSL can be found [here][aws-docs-rds-ssl].
 
-### <--{"id" : "Additional Configuration"}-->  Google Cloud SQL
+### Google Cloud SQL
 
 You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
 `true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how
 you are [connecting to Cloud SQL][gcp-docs-sql-connect].
 
-### <--{"id" : "Additional Configuration"}-->  Heroku
+### Heroku
 
 Unless you're using a Private or Shield Heroku Postgres database, Heroku
 Postgres does not currently support verifiable certificates. [Here is the
