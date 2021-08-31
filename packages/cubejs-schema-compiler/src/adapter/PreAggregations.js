@@ -136,11 +136,21 @@ export class PreAggregations {
         td.camelizeOperator === 'inDateRange' // TODO support all date operators
     );
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+
+    const {
+      refreshRangeStart,
+      refreshRangeEnd,
+      refreshKey
+    } = this.query.preAggregationRefreshSql(cube, preAggregation);
+
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
       timestampFormat: queryForSqlEvaluation.timestampFormat(),
       tableName,
+      refreshRangeStart,
+      refreshRangeEnd,
+      refreshKey,
       invalidateKeyQueries,
       external: preAggregation.external,
       previewSql: this.query.preAggregationPreviewSql(tableName),

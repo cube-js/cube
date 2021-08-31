@@ -233,7 +233,7 @@ export const normalizeQueryPreAggregations = (query, defaultValues) => {
 
   return {
     metadata: query.metadata,
-    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues.timezones,
+    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues?.timezones || ['UTC'],
     preAggregations: query.preAggregations
   };
 };

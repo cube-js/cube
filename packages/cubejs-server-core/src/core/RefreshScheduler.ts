@@ -249,9 +249,24 @@ export class RefreshScheduler {
         .reduce((target, source) => [...target, ...source], [])
         .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p.sql?.tableName));
       
+      const [partition] = partitions || [];
+      const { refreshRangeStart, refreshRangeEnd, refreshKey } = partition?.sql || {};
+      
       return {
         timezones,
-        preAggregation,
+        preAggregation: {
+          ...preAggregation,
+          refreshKeyReferences: {
+            refreshKey: preAggregation.refreshKey && {
+              ...preAggregation.refreshKey,
+              sql: refreshKey
+            }
+          },
+          refreshRangeReferences: (refreshRangeStart || refreshRangeEnd) && {
+            refreshRangeStart: refreshRangeStart && { sql: refreshRangeStart },
+            refreshRangeEnd: refreshRangeEnd && { sql: refreshRangeEnd }
+          },
+        },
         partitions
       };
     }));
