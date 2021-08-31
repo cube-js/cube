@@ -17,7 +17,7 @@ done
 
 # Send the query
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${query}" -o loadResponse.json
-curl "$host":"$port"/"$metaUrl" -G -s -o metaResponse.json
+curl "$host":"$port"/"$metaUrl" -H "Authorization: ${token}" -G -s -o metaResponse.json
 
 echo "Users' city unique values:"
 jq ".data" loadResponse.json
