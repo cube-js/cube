@@ -31,12 +31,17 @@ tenant name in the `tenant` property of the `securityContext`.
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 module.exports = {
-  // Provides distinct identifiers for each tenant which is used as caching key
+  // Provides distinct identifiers for each tenant which are used as caching keys
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.tenant}`,
 
   // Selects the database connection configuration based on the tenant name
-  driverFactory: ({ securityContext } = {}) => {
+  driverFactory: ({ securityContext }) => {
+
+    if (!securityContext.tenant) {
+      throw new Error('No tenant found in Security Context!')
+    }
+
     if (securityContext.tenant === 'Avocado Inc') {
       return new PostgresDriver({
         database: 'localDB',
@@ -45,7 +50,9 @@ module.exports = {
         password: 'example',
         port: '5432',
       });
-    } else {
+    }
+
+    if (securityContext.tenant === 'Mango Inc') {
       return new PostgresDriver({
         database: 'ecom',
         host: 'demo-db.cube.dev',
@@ -53,15 +60,19 @@ module.exports = {
         password: '12345',
         port: '5432',
       });
-    }
+    } 
+    
+    throw new Error('Unknown tenant in Security Context')
   },
 };
+
 ```
 
 ## Query
 
 To get users for different tenants, we will send two identical requests with
-different JWTs:
+different JWTs. Also we send a query with unknown tenant to show that he cannot
+access to the data schema of other tenants.
 
 ```javascript
 // JWT payload for "Avocado Inc"
@@ -78,6 +89,16 @@ different JWTs:
 {
   "sub": "1234567890",
   "tenant": "Mango Inc",
+  "iat": 1000000000,
+  "exp": 5000000000
+}
+```
+
+```javascript
+// JWT payload for "Peach Inc"
+{
+  "sub": "1234567890",
+  "tenant": "Peach Inc",
   "iat": 1000000000,
   "exp": 5000000000
 }
@@ -103,7 +124,7 @@ tenant's name:
     'Users.id': 698,
     'Users.name': 'Macie Ryan',
   },
-]
+];
 ```
 
 ```javascript
@@ -121,7 +142,7 @@ tenant's name:
     'Users.id': 703,
     'Users.name': 'Moyra Denney',
   },
-]
+];
 ```
 
 ## Source code

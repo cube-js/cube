@@ -18,6 +18,7 @@ readyzUrl=readyz
 
 avocadoToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidGVuYW50IjoiQXZvY2FkbyBJbmMiLCJpYXQiOjEwMDAwMDAwMDAsImV4cCI6NTAwMDAwMDAwMH0.AJ6DwEbbuMzGBQjtQKtC_lFvOKtirTz7q4m4RT5cVAs
 mangoToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidGVuYW50IjoiTWFuZ28gSW5jIiwiaWF0IjoxMDAwMDAwMDAwLCJleHAiOjUwMDAwMDAwMDB9.iDG8MTmGGRvJU0lfuSlIZZVpJTiVyZuglYVsFnE26mQ
+peachToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidGVuYW50IjoiUGVhY2ggSW5jIiwiaWF0IjoxMDAwMDAwMDAwLCJleHAiOjUwMDAwMDAwMDB9.zs9xM9Z_QxrTXmHq9f_pCPaJ-DWW7GbKByQ0jMTrHd0
 
 query=$(cat query/queries/users.json)
 
@@ -29,6 +30,7 @@ done
 # Send the query
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${avocadoToken}" -G -s --data-urlencode "query=${query}" -o avocadoResponse.json
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${mangoToken}" -G -s --data-urlencode "query=${query}" -o mangoResponse.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${peachToken}" -G -s --data-urlencode "query=${query}" -o peachResponse.json
 
 
 echo "Avocado Inc JWT payload:"
@@ -44,3 +46,11 @@ decode_jwt $mangoToken
 
 echo "Mango Inc last users:"
 jq ".data" mangoResponse.json
+
+echo "---------"
+
+echo "Peach Inc JWT payload:"
+decode_jwt $peachToken
+
+echo "Peach Inc error:"
+echo  "$(<peachResponse.json)"
