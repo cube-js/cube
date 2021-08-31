@@ -37,9 +37,8 @@ module.exports = {
 
   // Selects the database connection configuration based on the tenant name
   driverFactory: ({ securityContext }) => {
-
     if (!securityContext.tenant) {
-      throw new Error('No tenant found in Security Context!')
+      throw new Error('No tenant found in Security Context!');
     }
 
     if (securityContext.tenant === 'Avocado Inc') {
@@ -60,12 +59,11 @@ module.exports = {
         password: '12345',
         port: '5432',
       });
-    } 
-    
-    throw new Error('Unknown tenant in Security Context')
+    }
+
+    throw new Error('Unknown tenant in Security Context');
   },
 };
-
 ```
 
 ## Query
