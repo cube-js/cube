@@ -2,8 +2,8 @@
 title: Getting Unique Values for a Field
 permalink: /recipes/getting-unique-values-for-a-field
 category: Examples & Tutorials
-subCategory: Data schema
-menuOrder: 4
+subCategory: Queries
+menuOrder: 5
 ---
 
 ## Use case
