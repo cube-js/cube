@@ -31,13 +31,15 @@ tenant name in the `tenant` property of the `securityContext`.
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 module.exports = {
+  // Provides distinct identifiers for each tenant which is used as caching key
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.tenant}`,
 
+  // Selects the database connection configuration based on the tenant name
   driverFactory: ({ securityContext } = {}) => {
-    if (securityContext.tenant === 'cubeDev') {
+    if (securityContext.tenant === 'Avocado Inc') {
       return new PostgresDriver({
-        database: 'cubeDev',
+        database: 'localDB',
         host: 'postgres',
         user: 'postgres',
         password: 'example',
@@ -66,8 +68,8 @@ different JWTs:
 {
   "sub": "1234567890",
   "tenant": "Avocado Inc",
-  "iat": 1516239022,
-  "exp": 1724995581
+  "iat": 1000000000,
+  "exp": 5000000000
 }
 ```
 
@@ -76,8 +78,8 @@ different JWTs:
 {
   "sub": "1234567890",
   "tenant": "Mango Inc",
-  "iat": 1516239022,
-  "exp": 1724995581
+  "iat": 1000000000,
+  "exp": 5000000000
 }
 ```
 
@@ -101,7 +103,7 @@ tenant's name:
     'Users.id': 698,
     'Users.name': 'Macie Ryan',
   },
-];
+]
 ```
 
 ```javascript
@@ -119,7 +121,7 @@ tenant's name:
     'Users.id': 703,
     'Users.name': 'Moyra Denney',
   },
-];
+]
 ```
 
 ## Source code
