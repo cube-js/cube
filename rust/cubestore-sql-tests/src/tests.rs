@@ -103,6 +103,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "rolling_window_extra_aggregate_timestamps",
             rolling_window_extra_aggregate_timestamps,
         ),
+        t(
+            "rolling_window_one_week_interval",
+            rolling_window_one_week_interval,
+        ),
         t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
@@ -3273,6 +3277,50 @@ async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) 
             (jan[4], 23, None),
             (jan[5], 5, Some(5))
         ])
+    );
+}
+
+async fn rolling_window_one_week_interval(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=11)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT w, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET START), SUM(CASE WHEN w >= to_timestamp('2021-01-04T00:00:00Z') AND w < to_timestamp('2021-01-11T00:00:00Z') THEN n END) \
+             FROM (SELECT date_trunc('day', day) w, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION w \
+             GROUP BY DIMENSION date_trunc('week', w) \
+             FROM date_trunc('week', to_timestamp('2021-01-04T00:00:00Z')) \
+             TO date_trunc('week', to_timestamp('2021-01-11T00:00:00Z')) \
+             EVERY INTERVAL '1 week' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(jan[4], 40, Some(5)), (jan[11], 45, None),])
     );
 }
 
