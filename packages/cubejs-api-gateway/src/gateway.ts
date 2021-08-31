@@ -492,8 +492,6 @@ export class ApiGateway {
         );
 
       res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
-
-      res({ preAggregations });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
