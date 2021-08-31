@@ -2405,26 +2405,32 @@ export class BaseQuery {
         const cubeName = this.cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
           get: (cubeNameObj, propertyName) => {
-            const filter =
-              allFilters.find(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
+            const filters =
+              allFilters.filter(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
-                const filterParams = filter && filter.filterParams();
-                if (
-                  filterParams && filterParams.length
-                ) {
-                  if (typeof column === 'function') {
-                    // eslint-disable-next-line prefer-spread
-                    return column.apply(
-                      null,
-                      filterParams.map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
-                    );
-                  } else {
-                    return filter.conditionSql(column);
-                  }
-                } else {
+                if (!filters.length) {
                   return '1 = 1';
                 }
+
+                return filters.map(filter => {
+                  const filterParams = filter && filter.filterParams();
+                  if (
+                    filterParams && filterParams.length
+                  ) {
+                    if (typeof column === 'function') {
+                      // eslint-disable-next-line prefer-spread
+                      return column.apply(
+                        null,
+                        filterParams.map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
+                      );
+                    } else {
+                      return filter.conditionSql(column);
+                    }
+                  } else {
+                    return '1 = 1';
+                  }
+                }).join(' AND ');
               }
             };
           }
