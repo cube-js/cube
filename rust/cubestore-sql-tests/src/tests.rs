@@ -58,6 +58,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "count_distinct_group_by_crash",
             count_distinct_group_by_crash,
         ),
+        t("count_distinct_take_crash", count_distinct_take_crash),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -1214,6 +1215,22 @@ async fn count_distinct_group_by_crash(service: Box<dyn SqlClient>) {
             ],
         ]
     );
+}
+
+async fn count_distinct_take_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(id int, n int)")
+        .await
+        .unwrap();
+    service.exec_query("INSERT INTO s.data(id, n) VALUES (1, 1)").await.unwrap();
+    // This used to crash because `take` on empty list returned null. The implementation can easily
+    // change with time, though, so test is not robust.
+    let r = service
+        .exec_query("SELECT n, COUNT(DISTINCT CASE WHEN id = 2 THEN 2 END) FROM s.data GROUP BY n")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 0)]));
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
