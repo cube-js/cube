@@ -84,7 +84,7 @@ different JWTs:
 ## Result
 
 We have received different data from different data sources depending on the
-tenant`s name:
+tenant's name:
 
 ```javascript
 // Cube Inc last users:
