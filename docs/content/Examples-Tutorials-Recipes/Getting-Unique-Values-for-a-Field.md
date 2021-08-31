@@ -8,9 +8,9 @@ menuOrder: 5
 
 ## Use case
 
-We have an internal analytical dashboard with information about the users of our
-online store. To filter users by city, we need to display all unique values in
-the dropdown. In the recipe below, we'll learn how to get unique values from all
+We have a dashboard with information about the users, and we'd like to filter
+them by city. To do so, we need to display all unique values for cities in
+the dropdown. In the recipe below, we'll learn how to get unique values for
 [dimensions](https://cube.dev/docs/schema/reference/dimensions).
 
 ## Data schema
@@ -54,8 +54,8 @@ of that dimension:
 
 ## Result
 
-We got the unique values of the `city` dimension, and now we can add them to the
-dropdown on the dashboard.
+We got the unique values of the `city` dimension, and now we can use them in the
+dropdown on the dashboard:
 
 ```javascript
 [
@@ -71,23 +71,21 @@ dropdown on the dashboard.
   {
     'Users.city': 'Mountain View',
   },
-];
+]
 ```
 
-## Additional
+## Choosing dimensions
 
-What if we want to add dropdowns for other dimensions values without adding
-these values manually? We can use the `/meta`
-[endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-meta) for this! Just
-send a query to `/meta` and get back meta-information for the cube, including
-dimension names.
+In case we need to choose a dimension or render dropdowns for all dimensions,
+we can fetch the list of dimensions for all cubes from the `/meta` 
+[endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-meta):
 
 ```bash
 curl http://localhost:4000/cubejs-api/v1/meta
 ```
 
 ```javascript
-// meta-information including dimensions
+// Information about cubes, dimensions included
 {
   "cubes": [
     {
@@ -116,9 +114,7 @@ curl http://localhost:4000/cubejs-api/v1/meta
 }
 ```
 
-Then we can iterate through dimension names and add them to a query to the
-`/load` [endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-load). This
-action will allow us to add unique values to the dropdowns for every dimension.
+Then, we can iterate through dimension names and use any of them in a [query](#query).
 
 ## Source code
 

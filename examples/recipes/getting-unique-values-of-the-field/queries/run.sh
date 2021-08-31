@@ -22,5 +22,5 @@ curl "$host":"$port"/"$metaUrl" -H "Authorization: ${token}" -G -s -o metaRespon
 echo "Users' city unique values:"
 jq ".data" loadResponse.json
 
-echo "Meta-information:"
+echo "Information about cubes, dimensions included:"
 jq "." metaResponse.json
