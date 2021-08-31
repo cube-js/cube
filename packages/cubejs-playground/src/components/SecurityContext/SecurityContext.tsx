@@ -59,7 +59,12 @@ export function SecurityContext() {
   async function handleTokenSave(values) {
     try {
       setSubmitting(true);
-      saveToken(await onTokenPayloadChange(jwtDecode(values?.token), values?.token || null));
+      saveToken(
+        await onTokenPayloadChange(
+          jwtDecode(values?.token),
+          values?.token || null
+        )
+      );
     } catch (_) {
       saveToken(values?.token || null);
     } finally {
@@ -92,7 +97,9 @@ export function SecurityContext() {
       setSubmitting(true);
 
       try {
-        saveToken(await onTokenPayloadChange(JSON.parse(tmpPayload || '{}'), null));
+        saveToken(
+          await onTokenPayloadChange(JSON.parse(tmpPayload || '{}'), null)
+        );
       } catch (error) {
         console.error(error);
       }
@@ -111,7 +118,7 @@ export function SecurityContext() {
       visible={isModalOpen}
       footer={null}
       bodyStyle={{
-        paddingTop: 16,
+        paddingTop: 8,
       }}
       onCancel={() => {
         setIsModalOpen(false);

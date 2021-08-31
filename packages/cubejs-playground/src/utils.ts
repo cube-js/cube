@@ -1,5 +1,6 @@
 import { notification } from 'antd';
 import fetch, { RequestInit, Response } from 'node-fetch';
+import { pretty } from 'js-object-pretty-print';
 
 import { PlaygroundEvent } from './types';
 
@@ -199,4 +200,10 @@ export async function copyToClipboard(value, message = 'Copied to clipboard') {
 
 export function formatNumber(num: number): string {
   return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
+}
+
+export function prettifyObject(value: Object) {
+  return pretty(value, 2)
+    .replaceAll(/(?<!\/)"/g, `'`)
+    .replaceAll(/\[[\s]+\]/g, '[]');
 }

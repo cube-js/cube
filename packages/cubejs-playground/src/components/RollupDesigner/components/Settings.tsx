@@ -27,6 +27,7 @@ const Wrapper = styled.div`
   display: flex;
   gap: 32px;
   flex-direction: column;
+  padding: 24px;
 `;
 
 const partionGranularities = GRANULARITIES.filter(
@@ -170,7 +171,7 @@ export function Settings({
             </Col>
 
             <Col flex="auto">
-              <Space align="center">
+              <Space align="center" style={{ width: '100%' }}>
                 <Form.Item name="refreshKey.value">
                   <Input
                     disabled={!values['refreshKey.checked.every']}

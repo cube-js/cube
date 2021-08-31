@@ -257,6 +257,14 @@ const GlobalStyles = createGlobalStyle`
   .ant-notification {
     z-index: 9999;
   }
+  
+  .ant-modal-header {
+    padding: 16px 24px;
+  }
+  
+  .ant-modal-body {
+    padding: 24px;
+  }
 `;
 
 export default GlobalStyles;

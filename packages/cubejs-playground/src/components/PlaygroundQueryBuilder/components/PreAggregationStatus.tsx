@@ -19,6 +19,12 @@ const Badge = styled.div`
   background: var(--warning-bg-color);
 `;
 
+const RollupModal = styled(Modal)`
+  & .ant-tabs-nav {
+    padding-left: 24px;
+  }
+`;
+
 type PreAggregationStatusProps = QueryStatus & {
   apiUrl: string;
   availableMembers: AvailableMembers;
@@ -33,7 +39,7 @@ export function PreAggregationStatus({
   ...props
 }: PreAggregationStatusProps) {
   const isVersionGte = useServerCoreVersionGte('0.28.4');
-  const [isModalOpen, toggleModal] = useToggle();
+  const [isModalOpen, toggleModal] = useToggle(true);
 
   // hide it for the time being
   // const renderTime = () => (
@@ -90,6 +96,7 @@ export function PreAggregationStatus({
       <Modal
         title="Rollup Designer"
         visible={isModalOpen}
+        bodyStyle={{ padding: 0 }}
         footer={
           <Link
             style={{ paddingTop: 16 }}
@@ -99,10 +106,7 @@ export function PreAggregationStatus({
             Further reading about pre-aggregations for reference.
           </Link>
         }
-        bodyStyle={{
-          padding: 16,
-        }}
-        width="90%"
+        width={1190}
         onCancel={toggleModal}
       >
         {props.transformedQuery ? (
