@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
+
+
+### Bug Fixes
+
+* **docs:** revert MDX components for recipes ([#3178](https://github.com/cube-js/cube.js/issues/3178)) ([#3343](https://github.com/cube-js/cube.js/issues/3343)) ([1d835f2](https://github.com/cube-js/cube.js/commit/1d835f2510b15d0cd6ae862a805c23508f082915))
+* **playground:** allow both sql and every, info tooltips ([#3344](https://github.com/cube-js/cube.js/issues/3344)) ([a2177e6](https://github.com/cube-js/cube.js/commit/a2177e6e79fc0269be59a8ed20a7f23b9d55b83c))
+* **typings:** schemaVersion supports an async fn ([#3339](https://github.com/cube-js/cube.js/issues/3339)) ([f344ff3](https://github.com/cube-js/cube.js/commit/f344ff3c6f7b1d55c2cd874a84cd31668a131c35))
+
+
+### Features
+
+* Mixed rolling window and regular measure queries from rollup support ([#3326](https://github.com/cube-js/cube.js/issues/3326)) ([3147e33](https://github.com/cube-js/cube.js/commit/3147e339f14ede73e5b0d14d05b9dd1f8b79e7b8))
+* Support multi-value filtering on same column through FILTER_PARAMS ([#2854](https://github.com/cube-js/cube.js/issues/2854)) Thanks to [@omab](https://github.com/omab)! ([efc5745](https://github.com/cube-js/cube.js/commit/efc57452af44ee31092b8dfbb33a7ba23e86bba5))
+* **docs:** MDX components for recipes ([#3178](https://github.com/cube-js/cube.js/issues/3178)) ([69ac9e0](https://github.com/cube-js/cube.js/commit/69ac9e054736b4cb64602f4f85f34a665ae44b01))
+* **helm-charts:** Update to version v0.28.28 ([#3342](https://github.com/cube-js/cube.js/issues/3342)) ([c33473c](https://github.com/cube-js/cube.js/commit/c33473cd0266e6c6b63882046c6b7e2cd9f1fe21))
+* **playground:** support refresh key cron expression ([#3332](https://github.com/cube-js/cube.js/issues/3332)) ([8def69c](https://github.com/cube-js/cube.js/commit/8def69c89b736f83f9d694abf78bd53eca18f0a2))
+* add cubestore helm chart ([50fe798](https://github.com/cube-js/cube.js/commit/50fe798b775d04351b8e9b1648a65a2586c211e0))
+
+
+
+
+
 ## [0.28.28](https://github.com/cube-js/cube.js/compare/v0.28.27...v0.28.28) (2021-08-26)
 
 
