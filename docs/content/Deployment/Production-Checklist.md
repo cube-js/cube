@@ -2,7 +2,7 @@
 title: Production Checklist
 permalink: /deployment/production-checklist
 category: Deployment
-menuOrder: 3
+menuOrder: 2
 ---
 
 This is a checklist for configuring and securing Cube.js for a production

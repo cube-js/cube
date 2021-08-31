@@ -3,7 +3,7 @@ title: Serverless Framework on GCP
 permalink: /deployment/platforms/serverless/google-cloud
 category: Deployment
 subCategory: Platforms
-menuOrder: 3
+menuOrder: 4
 ---
 
 This guide walks you through deploying Cube.js with the [Serverless

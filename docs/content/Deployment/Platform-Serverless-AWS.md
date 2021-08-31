@@ -3,7 +3,7 @@ title: Serverless Framework on AWS
 permalink: /deployment/platforms/serverless/aws
 category: Deployment
 subCategory: Platforms
-menuOrder: 2
+menuOrder: 3
 ---
 
 This guide walks you through deploying Cube.js with the [Serverless

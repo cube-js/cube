@@ -12,6 +12,7 @@ This section contains a general overview of deploying Cube.js cluster in
 production. You can find platform-specific guides for:
 
 - [Docker][ref-deploy-docker]
+- [Kubernetes][ref-deploy-k8s]
 - [AWS Serverless][ref-deploy-sls-aws]
 - [GCP Serverless][ref-deploy-sls-gcp]
 - [Cube Cloud][ref-deploy-cubecloud]
@@ -337,6 +338,7 @@ If you want to run Cube.js in production without Redis, you can use
 [ref-deploy-prod-list]: /deployment/production-checklist
 [ref-deploy-cubecloud]: /deployment/platforms/cube-cloud
 [ref-deploy-docker]: /deployment/platforms/docker
+[ref-deploy-k8s]: /deployment/platforms/kubernetes
 [ref-deploy-sls-aws]: /deployment/platforms/serverless/aws
 [ref-deploy-sls-gcp]: /deployment/platforms/serverless/google-cloud
 [ref-config-env]: /reference/environment-variables

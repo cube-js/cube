@@ -3,7 +3,7 @@ title: Cube Cloud
 permalink: /deployment/platforms/cube-cloud
 category: Deployment
 subCategory: Platforms
-menuOrder: 4
+menuOrder: 5
 ---
 
 This guide walks you through deploying Cube.js with [Cube

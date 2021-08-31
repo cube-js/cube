@@ -3,12 +3,12 @@ title: Kubernetes
 permalink: /deployment/platforms/kubernetes
 category: Deployment
 subCategory: Platforms
-menuOrder: 1
+menuOrder: 2
 ---
 
-This guide walks you through deploying Cube.js with [Kubernetes][k8s]. This particular
-deployment makes use of a `hostPath` volume to mount schema files into the
-containers.
+This guide walks you through deploying Cube.js with [Kubernetes][k8s]. This
+particular deployment makes use of a `hostPath` volume to mount schema files
+into the containers.
 
 <!-- prettier-ignore-start -->
 [[warning |]]
@@ -533,12 +533,13 @@ spec:
     ...
     spec:
       containers:
-        - name: api
+        - name: cube-api
           image: cubejs/cube:v%CURRENT_VERSION
 ```
 
 [dockerhub-cubejs]: https://hub.docker.com/r/cubejs/cube
-[gh-cubejs-examples-k8s-helm]: https://github.com/cube-js/cube.js/tree/master/examples/helm-charts
+[gh-cubejs-examples-k8s-helm]:
+  https://github.com/cube-js/cube.js/tree/master/examples/helm-charts
 [gh-cubejs-examples-k8s-ingress-ctrl]:
   https://github.com/cube-js/cube.js/blob/master/examples/kubernetes/prod/ingress-controller.yaml
 [helm-k8s]: https://helm.sh/
