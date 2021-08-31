@@ -406,28 +406,32 @@ export class BaseQuery {
           return this.preAggregations.rollupPreAggregation(preAggregationForQuery, this.measures, true);
         }
 
-        const regularAndMultiplied = regularMeasures.concat(multipliedMeasures);
-        const toJoin =
-          (regularAndMultiplied.length ? [
-            this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false))
-          ] : []).concat(
-            R.map(
-              ([multiplied, measure]) => this.withCubeAliasPrefix(
-                `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
-                () => this.overTimeSeriesQuery(
-                  (measures, filters) => this.preAggregations.rollupPreAggregation(
-                    preAggregationForQuery, measures, false, filters
-                  ),
-                  measure,
-                  true
-                )
-              )
-            )(cumulativeMeasures)
-          );
-        return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
+        return this.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
       }
     }
     return this.fullKeyQueryAggregate();
+  }
+
+  regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery) {
+    const regularAndMultiplied = regularMeasures.concat(multipliedMeasures);
+    const toJoin =
+      (regularAndMultiplied.length ? [
+        this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false)),
+      ] : []).concat(
+        R.map(
+          ([multiplied, measure]) => this.withCubeAliasPrefix(
+            `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
+            () => this.overTimeSeriesQuery(
+              (measures, filters) => this.preAggregations.rollupPreAggregation(
+                preAggregationForQuery, measures, false, filters,
+              ),
+              measure,
+              true,
+            ),
+          ),
+        )(cumulativeMeasures),
+      );
+    return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
   }
 
   externalPreAggregationQuery() {
@@ -743,34 +747,12 @@ export class BaseQuery {
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure, fromRollup) {
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
     const cumulativeMeasures = [cumulativeMeasure];
-    const dateFromStartToEndConditionSql =
-      (isFromStartToEnd) => dateJoinCondition.map(
-        // TODO these weird conversions to be strict typed for big query.
-        // TODO Consider adding strict definitions of local and UTC time type
-        ([d, f]) => ({
-          filterToWhere: () => {
-            const timeSeries = d.timeSeries();
-            return f(
-              isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[0][0])) :
-                `${this.timeStampInClientTz(d.dateFromParam())}`,
-              isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
-                `${this.timeStampInClientTz(d.dateToParam())}`,
-              `${fromRollup ? this.dimensionSql(d) : d.convertedToTz()}`,
-              `${this.timeStampInClientTz(d.dateFromParam())}`,
-              `${this.timeStampInClientTz(d.dateToParam())}`,
-              isFromStartToEnd
-            );
-          }
-        })
-      );
     if (!this.timeDimensions.find(d => d.granularity)) {
-      const filters = this.segments.concat(this.filters).concat(dateFromStartToEndConditionSql(false));
+      const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, false));
       return baseQueryFn(cumulativeMeasures, filters, false);
     }
     const dateSeriesSql = this.timeDimensions.map(d => this.dateSeriesSql(d)).join(', ');
-    const filters = this.segments.concat(this.filters).concat(dateFromStartToEndConditionSql(true));
+    const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, true));
     const baseQuery = this.groupedUngroupedSelect(
       () => baseQueryFn(cumulativeMeasures, filters),
       cumulativeMeasure.shouldUngroupForCumulative(),
@@ -796,6 +778,30 @@ export class BaseQuery {
       baseQuery,
       dateJoinConditionSql,
       baseQueryAlias
+    );
+  }
+
+  dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
+    return dateJoinCondition.map(
+      // TODO these weird conversions to be strict typed for big query.
+      // TODO Consider adding strict definitions of local and UTC time type
+      ([d, f]) => ({
+        filterToWhere: () => {
+          const timeSeries = d.timeSeries();
+          return f(
+            isFromStartToEnd ?
+              this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[0][0])) :
+              `${this.timeStampInClientTz(d.dateFromParam())}`,
+            isFromStartToEnd ?
+              this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
+              `${this.timeStampInClientTz(d.dateToParam())}`,
+            `${fromRollup ? this.dimensionSql(d) : d.convertedToTz()}`,
+            `${this.timeStampInClientTz(d.dateFromParam())}`,
+            `${this.timeStampInClientTz(d.dateToParam())}`,
+            isFromStartToEnd
+          );
+        }
+      })
     );
   }
 
@@ -1357,6 +1363,8 @@ export class BaseQuery {
     const context = this.safeEvaluateSymbolContext();
     if (context.rollupQuery) {
       return this.escapeColumnName(dimension.unescapedAliasName(context.rollupGranularity));
+    } else if (context.wrapQuery) {
+      return this.escapeColumnName(dimension.unescapedAliasName(context.wrappedGranularity));
     }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }
@@ -1619,7 +1627,7 @@ export class BaseQuery {
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath];
-      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql, true);
+      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql, true, measurePath);
       if (onGroupedColumn) {
         return onGroupedColumn;
       }
@@ -1644,7 +1652,14 @@ export class BaseQuery {
     return `${symbol.type}(${evaluateSql})`;
   }
 
-  aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge) {
+  aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
+    const cumulativeMeasureFilters = (this.safeEvaluateSymbolContext().cumulativeMeasureFilters || {})[measurePath];
+    if (cumulativeMeasureFilters) {
+      const sql = cumulativeMeasureFilters.filterToWhere();
+      if (sql) {
+        evaluateSql = this.caseWhenStatement([{ sql, label: evaluateSql }]);
+      }
+    }
     if (symbol.type === 'count' || symbol.type === 'sum') {
       return `sum(${evaluateSql})`;
     } else if (symbol.type === 'countDistinctApprox') {

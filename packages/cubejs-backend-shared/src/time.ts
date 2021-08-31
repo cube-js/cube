@@ -42,6 +42,10 @@ export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
 
+export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
+
+export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
+
 export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
   if (timestamp.length === 23) {
     const zone = moment.tz.zone(timezone);
@@ -58,6 +62,25 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
     }
   }
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
+};
+
+export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
+  if (timestamp.length === 23) {
+    const zone = moment.tz.zone(timezone);
+    if (!zone) {
+      throw new Error(`Unknown timezone: ${timezone}`);
+    }
+    const parsedTime = Date.parse(`${timestamp}Z`);
+    // TODO parsedTime might be incorrect offset for conversion
+    const offset = zone.utcOffset(parsedTime);
+    const inDbTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
+    if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
+      return inDbTimeZoneDate.toJSON();
+    } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
+      return inDbTimeZoneDate.toJSON().replace('Z', '');
+    }
+  }
+  return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
 };
 
 export const extractDate = (data: any): string => {
