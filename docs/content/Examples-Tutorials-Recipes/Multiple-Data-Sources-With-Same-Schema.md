@@ -110,7 +110,7 @@ We have received different data from different data sources depending on the
 tenant's name:
 
 ```javascript
-// Cube Inc last users:
+// Avocado Inc last users:
 [
   {
     'Users.id': 700,
@@ -128,7 +128,7 @@ tenant's name:
 ```
 
 ```javascript
-// Cube Dev last users:
+// Mango Inc last users:
 [
   {
     'Users.id': 705,
@@ -143,6 +143,11 @@ tenant's name:
     'Users.name': 'Moyra Denney',
   },
 ];
+```
+
+```javascript
+// Peach Inc error:
+{"error":"Error: Unknown tenant in Security Context"}
 ```
 
 ## Source code
