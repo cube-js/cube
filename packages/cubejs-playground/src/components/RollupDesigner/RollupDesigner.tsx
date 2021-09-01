@@ -10,7 +10,6 @@ import {
   Divider,
   Input,
   notification,
-  Space,
   Tabs,
   Typography,
 } from 'antd';
@@ -78,6 +77,7 @@ export function RollupDesigner({
   const token = useToken();
   const { isCloud, ...cloud } = useCloud();
 
+  const [isCronValid, setCronValidity] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('members');
   const [settings, setSettings] = useState<RollupSettings>({});
 
@@ -227,15 +227,21 @@ export function RollupDesigner({
   function handleSettingsChange(values) {
     const nextSettings: RollupSettings = {};
 
-    if (values['refreshKey.option'] === 'every') {
+    if (values['refreshKey.checked.every']) {
+      if (values['refreshKey.cron']) {
+        nextSettings.refreshKey = {
+          every: `\`${values['refreshKey.cron']}\``,
+        };
+      } else {
+        nextSettings.refreshKey = {
+          every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
+        };
+      }
+    }
+
+    if (values['refreshKey.checked.sql'] && values['refreshKey.sql']) {
       nextSettings.refreshKey = {
-        every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
-      };
-    } else if (
-      values['refreshKey.option'] === 'sql' &&
-      values['refreshKey.sql']
-    ) {
-      nextSettings.refreshKey = {
+        ...nextSettings.refreshKey,
         sql: `\`${values['refreshKey.sql']}\``,
       };
     }
@@ -318,6 +324,7 @@ export function RollupDesigner({
         <Button
           type="primary"
           loading={saving}
+          disabled={!isCronValid}
           style={{ width: '100%' }}
           onClick={handleAddToSchemaClick}
         >
@@ -414,6 +421,7 @@ export function RollupDesigner({
               members={references.measures
                 .concat(references.dimensions)
                 .concat(references.timeDimensions.map((td) => td.dimension))}
+              onCronExpressionValidityChange={setCronValidity}
               onChange={handleSettingsChange}
             />
           </TabPane>

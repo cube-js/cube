@@ -1,3 +1,5 @@
+import { UserError } from '../compiler/UserError';
+
 export class BaseMeasure {
   constructor(query, measure) {
     this.query = query;
@@ -87,6 +89,13 @@ export class BaseMeasure {
 
   static isCumulative(definition) {
     return definition.type === 'runningTotal' || !!definition.rollingWindow;
+  }
+
+  rollingWindowDefinition() {
+    if (this.measureDefinition().type === 'runningTotal') {
+      throw new UserError(`runningTotal rollups aren't supported. Please consider replacing runningTotal measure with rollingWindow.`);
+    }
+    return this.measureDefinition().rollingWindow;
   }
 
   dateJoinCondition() {

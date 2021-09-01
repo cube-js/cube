@@ -7029,7 +7029,7 @@ are-we-there-yet@~1.1.2:
     delegates "^1.0.0"
     readable-stream "^2.0.6"
 
-argparse@^1.0.7:
+argparse@^1.0.10, argparse@^1.0.7:
   version "1.0.10"
   resolved "https://registry.yarnpkg.com/argparse/-/argparse-1.0.10.tgz#bcd6791ea5ae09725e17e5ad988134cd40b3d911"
   integrity sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg==
@@ -9719,6 +9719,11 @@ cron-parser@^3.5.0:
   dependencies:
     is-nan "^1.3.2"
     luxon "^1.26.0"
+
+cron-validator@^1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/cron-validator/-/cron-validator-1.2.1.tgz#0f0de2de36d231a6ace0e43ffc6c0564fe6edf1a"
+  integrity sha512-RqdpGSokGFICPc8qAkT38aXqZLLanXghQTK2q7a2x2FabSwDd2ARrazd5ElEWAXzToUcMG4cZIwDH+5RM0q1mA==
 
 cross-fetch@^3.0.2:
   version "3.1.4"
@@ -23608,12 +23613,12 @@ sprintf-js@~1.0.2:
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
   integrity sha1-BOaSb2YolTVPPdAVIDYzuFcpfiw=
 
-sql-formatter@^4.0.2:
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/sql-formatter/-/sql-formatter-4.0.2.tgz#2b359e5a4c611498d327b9659da7329d71724607"
-  integrity sha512-R6u9GJRiXZLr/lDo8p56L+OyyN2QFJPCDnsyEOsbdIpsnDKL8gubYFo7lNR7Zx7hfdWT80SfkoVS0CMaF/DE2w==
+sql-formatter@^3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/sql-formatter/-/sql-formatter-3.1.0.tgz#32035a65aa7f3e0466c0f9b30c306e2c701dc6cd"
+  integrity sha512-PseQ+fm9VcwXxAD71TiDs8x9Ww3IJbfhSR8Yvq//TwtqxqxVZ8Q9rAmsWiL4w/F0VxBZXCmKxxpw4Cyr0cZZ0w==
   dependencies:
-    argparse "^2.0.1"
+    argparse "^1.0.10"
 
 sqlite3@^5.0.2:
   version "5.0.2"

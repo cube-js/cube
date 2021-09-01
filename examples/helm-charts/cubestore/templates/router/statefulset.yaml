@@ -37,6 +37,9 @@ spec:
             - name: mysql
               containerPort: {{ .Values.router.mysqlPort }}
               protocol: TCP
+            - name: status
+              containerPort: {{ .Values.router.statusPort }}
+              protocol: TCP
           env:
             {{- include "cubestore.common-env" . | nindent 12 }}
             {{- $fullName := include "cubestore.fullname" . }}
@@ -44,8 +47,14 @@ spec:
             {{- $workerPort := .Values.workers.port | int }}
             - name: CUBESTORE_SERVER_NAME
               value: {{ printf "%s-router:%d" (include "cubestore.fullname" .) (.Values.router.metaPort | int) }}
+            - name: CUBESTORE_PORT
+              value: {{ .Values.router.mysqlPort | quote }}
+            - name: CUBESTORE_HTTP_PORT
+              value: {{ .Values.router.httpPort | quote }}
             - name: CUBESTORE_META_PORT
               value: {{ .Values.router.metaPort | quote }}
+            - name: CUBESTORE_STATUS_PORT
+              value: {{ .Values.router.statusPort | quote }}
             {{ if gt (.Values.workers.workersCount | int) 0 }}
             {{- $workers := list }}
             {{- range $e, $i := until ($.Values.workers.workersCount | int) }}
@@ -60,6 +69,14 @@ spec:
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             {{- end}}
+          livenessProbe:
+            httpGet:
+              path: /readyz
+              port: status
+          readinessProbe:
+            httpGet:
+              path: /livez
+              port: status
           {{- if .Values.router.resources }}
           resources:
             {{- toYaml .Values.router.resources | nindent 12 }}

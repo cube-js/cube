@@ -62,6 +62,10 @@ global:
   ##
   app:
 
+  ## If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false
+  ##
+  rollupOnly:
+
   ## A comma-separated list of timezones to schedule refreshes for.
   ##
   scheduledRefreshTimezones:
@@ -431,7 +435,7 @@ master:
   ## Topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
-  spreadConstraints: {}
+  spreadConstraints: []
 
   ## Define resources requests and limits for single Pods.
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
@@ -449,7 +453,7 @@ workers:
   ## topology spread constraint for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
   ##
-  spreadConstraints: {}
+  spreadConstraints: []
 
   ## Define resources requests and limits for single Pods.
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/

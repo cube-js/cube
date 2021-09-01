@@ -21,6 +21,10 @@
 - name: CUBEJS_CACHE_AND_QUEUE_DRIVER
   value: {{ .Values.global.cacheAndQueueDriver | quote }}
 {{- end }}
+{{- if .Values.global.rollupOnly }}
+- name: CUBEJS_ROLLUP_ONLY
+  value: {{ .Values.global.rollupOnly | quote }}
+{{- end }}
 {{- if .Values.global.scheduledRefreshTimezones }}
 - name: CUBEJS_SCHEDULED_REFRESH_TIMEZONES
   value: {{ .Values.global.scheduledRefreshTimezones | quote }}
