@@ -1,6 +1,6 @@
 ---
-title: Passing Dynamic Values In Query
-permalink: /recipes/passing-dynamic-values-in-query
+title: Passing Dynamic Values in a Query
+permalink: /recipes/passing-dynamic-values-in-a-query
 category: Examples & Tutorials
 subCategory: Data schema
 menuOrder: 4
