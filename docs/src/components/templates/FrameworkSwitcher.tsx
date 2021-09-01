@@ -15,16 +15,20 @@ type Props = {
 
 const FrameworkSwitcher: React.FC<Props> = () => {
   const [frameworkOfChoice, setFrameworkOfChoice] = useFrameworkOfChoice();
+  const isBrowser = typeof window === 'object';
 
   function onChange(event: RadioChangeEvent) {
     const framework = event.target.value;
 
     setFrameworkOfChoice(framework);
-    navigate(
-      `${process.env.PATH_PREFIX || ''}/frontend-introduction${
-        framework !== FRAMEWORKS[0].slug ? `/${framework}` : ''
-      }`
-    );
+
+    if (isBrowser) {
+      navigate(
+        `${process.env.PATH_PREFIX || ''}/frontend-introduction${
+          framework !== FRAMEWORKS[0].slug ? `/${framework}` : ''
+        }`
+      );
+    }
   }
 
   return (
