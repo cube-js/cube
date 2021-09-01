@@ -52,6 +52,7 @@ const RollupQueryBox = styled.div`
   padding: 0 24px;
   background: var(--layout-body-background);
   width: 420px;
+  max-width: 420px;
 
   & div.ant-typography {
     color: #14144680;
@@ -91,7 +92,6 @@ export function RollupDesigner({
   const { isCloud, ...cloud } = useCloud();
 
   const [isCronValid, setCronValidity] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<string>('members');
   const [settings, setSettings] = useState<RollupSettings>({});
 
   const canBeRolledUp =
@@ -321,7 +321,7 @@ export function RollupDesigner({
     }
 
     return (
-      <div style={{ minWidth: 200 }}>
+      <>
         <CodeSnippet
           style={{ marginBottom: 16 }}
           code={
@@ -344,14 +344,14 @@ export function RollupDesigner({
         >
           Add to the Data Schema
         </Button>
-      </div>
+      </>
     );
   }
 
   return (
-    <Flex justifyContent="space-between">
+    <Flex justifyContent="space-between" margin={[0, 0, 2, 0]}>
       <MainBox grow={1}>
-        <Tabs onChange={setActiveTab}>
+        <Tabs>
           <TabPane tab="Members" key="members">
             <Flex gap={2}>
               <Box style={{ minWidth: 256 }}>
@@ -457,19 +457,23 @@ export function RollupDesigner({
               justifyContent="flex-start"
               style={{ marginBottom: 64 }}
             >
-              <Box style={{ marginBottom: 16 }}>
-                <Paragraph>
-                  Add the following pre-aggregation to the <b>{cubeName}</b>{' '}
-                  cube.
-                </Paragraph>
+              {canBeRolledUp ? (
+                <Box style={{ marginBottom: 16 }}>
+                  <Paragraph>
+                    Add the following rollup pre-aggregation
+                    <br /> to the <b>{cubeName}</b> cube:
+                  </Paragraph>
 
-                <Paragraph style={{ marginBottom: 4 }}>Rollup Name</Paragraph>
-                <Input
-                  value={preAggName}
-                  suffix={<EditOutlined />}
-                  onChange={(event) => setPreAggName(event.target.value)}
-                />
-              </Box>
+                  <Paragraph style={{ margin: '24px 0 4px' }}>
+                    Rollup Name
+                  </Paragraph>
+                  <Input
+                    value={preAggName}
+                    suffix={<EditOutlined />}
+                    onChange={(event) => setPreAggName(event.target.value)}
+                  />
+                </Box>
+              ) : null}
 
               <Box>{rollupBody()}</Box>
             </Flex>
@@ -477,7 +481,7 @@ export function RollupDesigner({
 
           <TabPane
             tab={
-              matching ? (
+              canBeRolledUp && matching ? (
                 'Query Compatibility'
               ) : (
                 <Typography.Text>
