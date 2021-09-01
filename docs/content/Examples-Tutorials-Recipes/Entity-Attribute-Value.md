@@ -230,52 +230,39 @@ a static list of statuses present in the cube's source code. Let's work around t
 ### Dynamic attributes
 
 We can eliminate the list of statuses from the cube's code by loading this list from an
-external source. Let's assume that we've created an API service that fetches statuses
-by running a Cube query. Here's the code from the `fetch.js` file that defines
-the `fetchStatuses` function that would load the statuses from an API service. Let's keep
+external source, e.g., the data source. Here's the code from the `fetch.js` file that defines
+the `fetchStatuses` function that would load the statuses from the database. Note that it uses
+the `pg` package (Node.js client for Postgres) and reuses the credentials from Cube. Let's keep
 this file outside the `schema` folder:
 
 ```javascript
-const fetch = require('node-fetch');
+const { Pool } = require('pg');
 
-const statusesQuery = {
-  dimensions: [
-    "Orders.status"
-  ]
-};
+const pool = new Pool({
+  host: process.env.CUBEJS_DB_HOST,
+  port: process.env.CUBEJS_DB_PORT,
+  user: process.env.CUBEJS_DB_USER,
+  password: process.env.CUBEJS_DB_PASS,
+  database: process.env.CUBEJS_DB_NAME
+});
 
-const host = 'our-api-service';
-const path = '/cubejs-api/v1/load';
+const statusesQuery = `
+  SELECT DISTINCT status
+  FROM public.orders
+`;
 
 exports.fetchStatuses = async () => {
-  const encodedQuery = encodeURIComponent(JSON.stringify(statusesQuery));
-  const uri = `http://${host}${path}?query=${encodedQuery}`;
-  
-  const request = await fetch(uri)
-  const json = await request.json()
-  const statuses = json.data.map(entry => entry['Orders.status'])
+  const client = await pool.connect();
+  const result = await client.query(statusesQuery);
+  client.release();
 
-  return statuses;
-}
+  return result.rows.map(row => row.status);
+};
 ```
 
-It would be wise to define a pre-aggregation in the `Orders` cube so the `statusesQuery`
-runs lightning-fast:
-
-```javascript
-    statuses: {
-      dimensions: [
-        CUBE.status
-      ],
-      refreshKey: {
-        every: `1 day`
-      }
-    }
-```
-
-In the cube file, we will use the function to load the list of statuses. We will also wrap
-the cube definition with the `asyncModule` built-in function that allows the data schema
-to be created [dynamically](https://cube.dev/docs/schema/advanced/dynamic-schema-creation).
+In the cube file, we will use the `fetchStatuses` function to load the list of statuses.
+We will also wrap  the cube definition with the `asyncModule` built-in function that allows
+the data schema  to be created [dynamically](https://cube.dev/docs/schema/advanced/dynamic-schema-creation).
 
 ```javascript
 const fetchStatuses = require('../fetch').fetchStatuses;
@@ -326,8 +313,7 @@ asyncModule(async () => {
 ```
 
 Again, the new `UsersStatuses_Dynamic` cube is functionally identical to the previously
-created cubes. So, querying this new cube would yield the same data too. The only drawback
-is that now we need to maintain the API service that fetches statuses.
+created cubes. So, querying this new cube would yield the same data too.
 
 ## Source code
 

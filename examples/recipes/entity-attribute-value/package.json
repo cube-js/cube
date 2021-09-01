@@ -1,0 +1,8 @@
+{
+  "name": "entity-attribute-value",
+  "version": "1.0.0",
+  "dependencies": {
+    "pg": "^8.7.1"
+  },
+  "devDependencies": {}
+}

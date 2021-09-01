@@ -1,33 +1,22 @@
-const fetch = require('node-fetch');
+const { Pool } = require('pg');
 
-const statusesQuery = {
-  dimensions: [
-    "Orders.status"
-  ]
+const pool = new Pool({
+  host: process.env.CUBEJS_DB_HOST,
+  port: process.env.CUBEJS_DB_PORT,
+  user: process.env.CUBEJS_DB_USER,
+  password: process.env.CUBEJS_DB_PASS,
+  database: process.env.CUBEJS_DB_NAME
+});
+
+const statusesQuery = `
+  SELECT DISTINCT status
+  FROM public.orders
+`;
+
+exports.fetchStatuses = async () => {
+  const client = await pool.connect();
+  const result = await client.query(statusesQuery);
+  client.release();
+
+  return result.rows.map(row => row.status);
 };
-
-exports.fetchStatuses = async (host, path, token) => {
-  const encodedQuery = encodeURIComponent(JSON.stringify(statusesQuery));
-  const cubePath = `http://${host}${path}?query=${encodedQuery}`;
-  
-  const request = fetch(cubePath, {
-    headers: {
-      'Authorization': token
-    }
-  })
-
-  // Works, because Cube runs this request asynchronously
-  request
-    .then(data => data.json())
-    .then(json => json.data.map(entry => entry['Orders.status']))
-    .then(statuses => console.log(statuses))
-
-  // Doesn't work, because Cube is blocked by the original request being executed
-  // const statuses = await request
-  //   .then(data => data.json())
-  //   .then(json => json.data.map(entry => entry['Orders.status']))
-
-  // return statuses;
-  
-  return [ 'completed', 'processing', 'shipped' ];
-}

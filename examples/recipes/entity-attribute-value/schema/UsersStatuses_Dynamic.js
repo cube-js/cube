@@ -1,9 +1,7 @@
 const fetchStatuses = require('../fetch').fetchStatuses;
 
-const { token, host, path } = COMPILE_CONTEXT;
-
 asyncModule(async () => {
-  const statuses = await fetchStatuses(host, path, token)
+  const statuses = await fetchStatuses()
 
   const createValue = (status, index) =>
     `MIN(orders_${index}.created_at) AS createdAt_${index}`
