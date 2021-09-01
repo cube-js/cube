@@ -44,6 +44,7 @@
     "flexsearch": "^0.6.32",
     "history": "^4.9.0",
     "js-cookie": "^2.2.1",
+    "js-object-pretty-print": "^0.3.0",
     "jwt-decode": "^3.1.2",
     "less": "^4.1.1",
     "mitt": "^2.1.0",

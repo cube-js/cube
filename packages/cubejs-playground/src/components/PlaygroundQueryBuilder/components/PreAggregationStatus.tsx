@@ -1,8 +1,12 @@
-import Icon from '@ant-design/icons';
+import Icon, {
+  ArrowRightOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
 import { Query } from '@cubejs-client/core';
 import { AvailableMembers } from '@cubejs-client/react';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
 import styled from 'styled-components';
+import { Box, Flex } from '../../../grid';
 
 import { useServerCoreVersionGte, useToggle } from '../../../hooks';
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
@@ -17,6 +21,12 @@ const Badge = styled.div`
   padding: 2px 4px;
   border-radius: 4px;
   background: var(--warning-bg-color);
+`;
+
+const RollupModal = styled(Modal)`
+  & .ant-tabs-nav {
+    padding-left: 24px;
+  }
 `;
 
 type PreAggregationStatusProps = QueryStatus & {
@@ -90,19 +100,26 @@ export function PreAggregationStatus({
       <Modal
         title="Rollup Designer"
         visible={isModalOpen}
+        bodyStyle={{ padding: 0 }}
         footer={
           <Link
-            style={{ paddingTop: 16 }}
             href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
             target="_blank"
           >
-            Further reading about pre-aggregations for reference.
+            <Flex justifyContent="center" gap={1}>
+              <Box>
+                <InfoCircleOutlined />
+              </Box>
+
+              <Box>Further reading about pre-aggregations for reference.</Box>
+
+              <Box>
+                <ArrowRightOutlined />
+              </Box>
+            </Flex>
           </Link>
         }
-        bodyStyle={{
-          padding: 16,
-        }}
-        width="90%"
+        width={1190}
         onCancel={toggleModal}
       >
         {props.transformedQuery ? (

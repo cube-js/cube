@@ -3,11 +3,13 @@ import {
   TCubeMember,
   TimeDimensionGranularity,
 } from '@cubejs-client/core';
-import { Typography, Menu } from 'antd';
+import { Typography, Menu, Space } from 'antd';
 import styled from 'styled-components';
 import ButtonDropdown from '../../../QueryBuilder/ButtonDropdown';
 import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
 import RemoveButtonGroup from '../../../QueryBuilder/RemoveButtonGroup';
+import { MemberType } from './Members';
+import { MemberTag } from './MemberTag';
 
 const Flex = styled.div`
   display: flex;
@@ -31,23 +33,14 @@ export function TimeDimension({
 }: TimeDimensionProps) {
   return (
     <>
-      <Typography.Paragraph>
-        <Typography.Text>Time dimension</Typography.Text>
-      </Typography.Paragraph>
+      <MemberType>Time dimension</MemberType>
 
-      <Flex>
-        <RemoveButtonGroup
-          key={member.name}
-          onRemoveClick={() => onRemove(member.name)}
-        >
-          <MemberDropdown
-            showNoMembersPlaceholder={false}
-            availableMembers={[]}
-            onClick={() => undefined}
-          >
-            {member.title}
-          </MemberDropdown>
-        </RemoveButtonGroup>
+      <Space>
+        <MemberTag
+          name={member.shortTitle}
+          cubeName={member.title.replace(member.shortTitle, '')}
+          onClose={() => onRemove(member.name)}
+        />
 
         {granularity ? (
           <ButtonDropdown
@@ -67,7 +60,7 @@ export function TimeDimension({
             {granularity}
           </ButtonDropdown>
         ) : null}
-      </Flex>
+      </Space>
     </>
   );
 }

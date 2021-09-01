@@ -19,7 +19,7 @@ import { isValidCron } from 'cron-validator';
 import { useMemo, useState } from 'react';
 import styled from 'styled-components';
 
-import { Flex } from '../../../grid';
+import { Box, Flex } from '../../../grid';
 import { ucfirst } from '../../../shared/helpers';
 import { flatten } from '../utils';
 
@@ -27,6 +27,7 @@ const Wrapper = styled.div`
   display: flex;
   gap: 32px;
   flex-direction: column;
+  padding: 24px;
 `;
 
 const partionGranularities = GRANULARITIES.filter(
@@ -87,7 +88,7 @@ export function Settings({
       },
       sql: '',
       value: 1,
-      granularity: 'day',
+      granularity: 'hour',
       cron: '',
     },
     partitionGranularity: '',
@@ -170,7 +171,7 @@ export function Settings({
             </Col>
 
             <Col flex="auto">
-              <Space align="center">
+              <Flex alignItems="center" gap={2}>
                 <Form.Item name="refreshKey.value">
                   <Input
                     disabled={!values['refreshKey.checked.every']}
@@ -189,29 +190,30 @@ export function Settings({
                   <Typography.Text>or</Typography.Text>
                 </div>
 
-                <Form.Item
-                  name="refreshKey.cron"
-                  rules={[
-                    {
-                      validator: (_, value, callback) => {
-                        if (value && !isValidCron(value, { seconds: true })) {
-                          onCronExpressionValidityChange(false);
-                          callback('Cron expression is invalid');
-                        } else {
-                          onCronExpressionValidityChange(true);
-                        }
+                <Box grow={1}>
+                  <Form.Item
+                    name="refreshKey.cron"
+                    rules={[
+                      {
+                        validator: (_, value, callback) => {
+                          if (value && !isValidCron(value, { seconds: true })) {
+                            onCronExpressionValidityChange(false);
+                            callback('Cron expression is invalid');
+                          } else {
+                            onCronExpressionValidityChange(true);
+                          }
+                        },
                       },
-                    },
-                  ]}
-                >
-                  <Input
-                    allowClear
-                    placeholder="Cron Expression"
-                    disabled={!values['refreshKey.checked.every']}
-                    style={{ maxWidth: 200 }}
-                  />
-                </Form.Item>
-              </Space>
+                    ]}
+                  >
+                    <Input
+                      allowClear
+                      placeholder="Cron Expression"
+                      disabled={!values['refreshKey.checked.every']}
+                    />
+                  </Form.Item>
+                </Box>
+              </Flex>
             </Col>
           </Row>
 
@@ -305,7 +307,9 @@ export function Settings({
               placeholder="(list column names)"
             >
               {members.map((name) => (
-                <Select.Option value={name}>{name}</Select.Option>
+                <Select.Option key={name} value={name}>
+                  {name}
+                </Select.Option>
               ))}
             </Select>
           </Form.Item>

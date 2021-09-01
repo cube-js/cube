@@ -24,7 +24,6 @@ export function RunOnCubeCloud() {
     <StyledMenuButton
       data-testid="live-preview-btn"
       onClick={() => {
-        console.log({ active });
         if (!active) {
           livePreviewContext.startLivePreview();
         }

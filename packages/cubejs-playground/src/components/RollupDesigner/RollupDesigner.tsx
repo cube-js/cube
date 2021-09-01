@@ -1,3 +1,4 @@
+import { EditOutlined, WarningFilled } from '@ant-design/icons';
 import {
   Query,
   TimeDimensionBase,
@@ -25,6 +26,7 @@ import {
   getNameMemberPairs,
   request,
 } from '../../shared/helpers';
+import { prettifyObject } from '../../utils';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
 import { RollupSettings, Settings } from './components/Settings';
@@ -39,24 +41,35 @@ import {
 const { Paragraph, Link, Text } = Typography;
 const { TabPane } = Tabs;
 
-const Layout = styled.div`
-  display: flex;
+const MainBox = styled(Box)`
+  & .ant-tabs-nav {
+    padding-left: 24px;
+    margin: 0;
+  }
+`;
 
-  & > div {
-    max-width: 280px;
+const RollupQueryBox = styled.div`
+  padding: 0 24px;
+  background: var(--layout-body-background);
+  width: 420px;
+
+  & div.ant-typography {
+    color: #14144680;
   }
 
-  & > div > div {
-    flex-basis: 140px;
+  & .ant-tabs-nav {
+    margin-bottom: 24px;
   }
 
-  @media (max-width: 1280px) {
-    flex-direction: column;
-    margin-right: 0;
-
-    & > div > div {
-      flex-basis: 0;
+  & .ant-tabs-tab {
+    div,
+    .ant-typography {
+      font-weight: 500;
     }
+  }
+
+  & .ant-typography > .anticon {
+    padding-left: 12px;
   }
 `;
 
@@ -319,6 +332,7 @@ export function RollupDesigner({
             ).code
           }
           copyMessage="Rollup definition is copied"
+          theme="light"
         />
 
         <Button
@@ -336,19 +350,26 @@ export function RollupDesigner({
 
   return (
     <Flex justifyContent="space-between">
-      <Box grow={1} style={{ marginRight: 32 }}>
+      <MainBox grow={1}>
         <Tabs onChange={setActiveTab}>
           <TabPane tab="Members" key="members">
             <Flex gap={2}>
-              <Cubes
-                selectedKeys={selectedKeys}
-                membersByCube={getMembersByCube(availableMembers)}
-                onSelect={(memberType, key) => {
-                  handleMemberToggle(memberType)(key);
-                }}
-              />
+              <Box style={{ minWidth: 256 }}>
+                <Cubes
+                  selectedKeys={selectedKeys}
+                  membersByCube={getMembersByCube(availableMembers)}
+                  onSelect={(memberType, key) => {
+                    handleMemberToggle(memberType)(key);
+                  }}
+                />
+              </Box>
 
-              <Box style={{ width: '100%' }}>
+              <Box
+                grow={1}
+                style={{
+                  marginTop: 24,
+                }}
+              >
                 {references.measures?.length ? (
                   <>
                     <Members
@@ -426,62 +447,75 @@ export function RollupDesigner({
             />
           </TabPane>
         </Tabs>
-      </Box>
+      </MainBox>
 
-      <Layout>
-        <Flex
-          direction="column"
-          justifyContent="flex-start"
-          style={{
-            marginRight: 16,
-            marginBottom: 64,
-          }}
-        >
-          <Box style={{ marginBottom: 16 }}>
-            <Paragraph strong>Rollup Definition</Paragraph>
+      <RollupQueryBox>
+        <Tabs>
+          <TabPane tab="Rollup Definition" key="rollup">
+            <Flex
+              direction="column"
+              justifyContent="flex-start"
+              style={{ marginBottom: 64 }}
+            >
+              <Box style={{ marginBottom: 16 }}>
+                <Paragraph>
+                  Add the following pre-aggregation to the <b>{cubeName}</b>{' '}
+                  cube.
+                </Paragraph>
 
-            <Paragraph>
-              Add the following pre-aggregation to the <b>{cubeName}</b> cube.
-            </Paragraph>
-
-            <Input
-              value={preAggName}
-              onChange={(event) => setPreAggName(event.target.value)}
-            />
-          </Box>
-
-          <Box>{rollupBody()}</Box>
-        </Flex>
-
-        {activeTab === 'members' ? (
-          <Flex direction="column" justifyContent="flex-start">
-            <Box style={{ marginBottom: 16 }}>
-              <Paragraph strong>Query Compatibility</Paragraph>
-
-              {canBeRolledUp && matching ? (
-                <Alert message="This rollup will match the following query:" />
-              ) : (
-                <Alert
-                  type="warning"
-                  message={
-                    <Text>
-                      This rollup will <b>NOT</b> match the following query:
-                    </Text>
-                  }
+                <Paragraph style={{ marginBottom: 4 }}>Rollup Name</Paragraph>
+                <Input
+                  value={preAggName}
+                  suffix={<EditOutlined />}
+                  onChange={(event) => setPreAggName(event.target.value)}
                 />
-              )}
-            </Box>
+              </Box>
 
-            <Box>
+              <Box>{rollupBody()}</Box>
+            </Flex>
+          </TabPane>
+
+          <TabPane
+            tab={
+              matching ? (
+                'Query Compatibility'
+              ) : (
+                <Typography.Text>
+                  Query Compatibility
+                  <WarningFilled style={{ color: '#FBBC05' }} />
+                </Typography.Text>
+              )
+            }
+            key="query"
+          >
+            <Flex direction="column" justifyContent="flex-start">
+              <Box style={{ marginBottom: 16 }}>
+                {canBeRolledUp && matching ? (
+                  <Typography.Paragraph>
+                    This rollup will match the following query:
+                  </Typography.Paragraph>
+                ) : (
+                  <Alert
+                    type="warning"
+                    message={
+                      <Text>
+                        This rollup does <b>NOT</b> match the following query:
+                      </Text>
+                    }
+                  />
+                )}
+              </Box>
+
               <CodeSnippet
                 style={{ minWidth: 200 }}
-                code={JSON.stringify(matchedQuery, null, 2)}
+                code={prettifyObject(matchedQuery)}
                 copyMessage="Query is copied"
+                theme="light"
               />
-            </Box>
-          </Flex>
-        ) : null}
-      </Layout>
+            </Flex>
+          </TabPane>
+        </Tabs>
+      </RollupQueryBox>
     </Flex>
   );
 }

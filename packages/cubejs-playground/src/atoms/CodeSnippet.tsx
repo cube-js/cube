@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled, { ThemeProvider } from 'styled-components';
 import { CSSProperties } from 'react';
 import { Button } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
@@ -11,12 +11,13 @@ type CodeSnippetProps = {
   language?: string;
   style?: CSSProperties;
   copyMessage?: string;
+  theme?: 'dark' | 'light';
 };
 
 const StyledCodeSnippet = styled.div`
   display: flex;
   border-radius: 4px;
-  background: var(--layout-body-background);
+  background: ${(props) => props.theme.background};
   width: 100%;
   max-width: 100%;
 `;
@@ -48,25 +49,35 @@ const ButtonWrapper = styled.div`
     bottom: 0;
     background: linear-gradient(
       to right,
-      rgba(246, 246, 248, 0),
-      rgba(246, 246, 248, 1)
+      ${(props) => `${props.theme.background}00`},
+      ${(props) => props.theme.background}
     );
   }
 `;
 
-export function CodeSnippet({ code, language, style, copyMessage }: CodeSnippetProps) {
+export function CodeSnippet({
+  code,
+  language,
+  style,
+  copyMessage,
+  theme = 'dark',
+}: CodeSnippetProps) {
   return (
-    <StyledCodeSnippet style={style}>
-      <PrismCode code={code} language={language} style={{ flexGrow: 1 }} />
+    <ThemeProvider
+      theme={{
+        background: theme === 'dark' ? '#F6F6F8' : '#FFFFFF',
+      }}
+    >
+      <StyledCodeSnippet style={style}>
+        <PrismCode code={code} language={language} style={{ flexGrow: 1 }} />
 
-      <ButtonWrapper>
-        <Button
-          icon={<CopyOutlined />}
-          onClick={() =>
-            copyToClipboard(code, copyMessage || 'Copied')
-          }
-        />
-      </ButtonWrapper>
-    </StyledCodeSnippet>
+        <ButtonWrapper>
+          <Button
+            icon={<CopyOutlined />}
+            onClick={() => copyToClipboard(code, copyMessage || 'Copied')}
+          />
+        </ButtonWrapper>
+      </StyledCodeSnippet>
+    </ThemeProvider>
   );
 }
