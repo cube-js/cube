@@ -428,6 +428,12 @@ required when using [partitioned pre-aggregations][ref-caching-partitioning].
 Cube.js can also take care of keeping pre-aggregations up to date with the
 `refreshKey` property. By default, it is set to `every: '1 hour'`.
 
+<!-- prettier-ignore-start -->
+[[info | ]]
+| When using [partitioned pre-aggregations][ref-caching-partitioning], the
+| refresh key is evaluated for each partition separately.
+<!-- prettier-ignore-end -->
+
 <h4 id="parameters-refresh-key-sql">
 sql
 </h4>
