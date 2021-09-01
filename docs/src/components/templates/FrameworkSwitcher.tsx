@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Radio } from 'antd';
-import { RadioChangeEvent } from 'antd/lib/radio/interface';
-// import { navigate } from 'gatsby';
 import Link from 'gatsby-link';
 import {
-  useFrameworkOfChoice,
   FRAMEWORKS,
 } from '../../stores/frameworkOfChoice';
 
@@ -14,18 +11,22 @@ type Props = {
   value: string;
 };
 
+// Check if window is defined (so if in the browser or in node.js).
+const isBrowser = typeof window !== "undefined"
+
 const FrameworkSwitcher: React.FC<Props> = () => {
 
   const [framework, setFramework] = useState('vanilla');
 
-  useEffect(() => {
-    const arrayOfPath = window.location.pathname.split('/');
-    const framework = arrayOfPath[arrayOfPath.length - 1];
-    console.log(framework);
+  if (isBrowser) {
+    useEffect(() => {
+      const arrayOfPath = window.location.pathname.split('/');
+      const framework = arrayOfPath[arrayOfPath.length - 1];
+      const allFrameworks = ['vue', 'react', 'angular']
 
-    setFramework(framework === 'frontend-introduction' ? 'vanilla' : framework);
-
-  }, [window.location.pathname]);
+      setFramework(allFrameworks.includes(framework) ? framework : 'vanilla');
+    }, [window.location.pathname]);
+  }
 
   return (
     <Radio.Group className={styles.frameworkSwitcher} value={framework}>
