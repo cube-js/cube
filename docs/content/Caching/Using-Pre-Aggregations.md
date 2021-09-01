@@ -143,7 +143,7 @@ reloaded, and even reduced cost for some databases like [BigQuery](/config/datab
 Any `rollup` pre-aggregation can be partitioned by time using the
 `partitionGranularity` property in [a pre-aggregation definition][ref-schema-ref-preaggs]. In the example below, the
 `partitionGranularity` is set to `month`, which means Cube will generate
-separate tables for each month's worth of data. Once built, it will continue to refresh on daily basis last 3
+separate tables for each month's worth of data. Once built, it will continue to refresh on a daily basis the last 3
 months of data.
 
 ```javascript
