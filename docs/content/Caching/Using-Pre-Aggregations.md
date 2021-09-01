@@ -101,32 +101,17 @@ to `true` on an API instance. This will prevent serving data on API requests fro
 
 ## Partitioning
 
-[Partitioning][wiki-partitioning] is an extremely effective optimization for
-improving data access. It effectively "shards" the data between multiple tables,
-splitting them by a defined attribute. An incoming query would be checked for
-this attribute, and **only** valid partitions required to satisfy it are
-selected. This results in faster refresh times due to unnecessary data not being
-scanned and processed, and possibly even reduced cost, depending on your
-database solution. Cube.js supports partitioning data using the `timeDimension`
-property in [a pre-aggregation definition][ref-schema-ref-preaggs].
-
-### Time partitioning
-
-Time-based partitioning is especially helpful for incremental refreshes; when
-configured, Cube.js will only refresh partitions as necessary. Without
-incremental refreshing, Cube.js will re-calculate the entire pre-aggregation
-whenever [the refresh key][ref-schema-ref-preaggs-refresh-key] changes.
-
-<!-- prettier-ignore-start -->
-[[warning |]]
-| Partitioned rollups currently cannot be used by queries without time
-| dimensions.
-<!-- prettier-ignore-end -->
+[Partitioning][wiki-partitioning] is an extremely effective optimization
+for accelerating pre-aggregations build and refresh time. It effectively "shards" the data between multiple tables,
+splitting them by a defined attribute. Cube can be configured to incrementally refresh only the last set of partitions through the `updateWindow` property.
+This leads to faster refresh times due to unnecessary data not being
+reloaded, and even reduced cost for some databases like [BigQuery](/config/databases/google-bigquery) or [AWS Athena](/config/databases/aws-athena).
 
 Any `rollup` pre-aggregation can be partitioned by time using the
-`partitionGranularity` property. In the example below, the
-`partitionGranularity` is set to `month`, which means Cube.js will generate
-separate tables for each month's worth of data:
+`partitionGranularity` property in [a pre-aggregation definition][ref-schema-ref-preaggs]. In the example below, the
+`partitionGranularity` is set to `month`, which means Cube will generate
+separate tables for each month's worth of data. Once built, it will continue to refresh on a daily basis the last 3
+months of data.
 
 ```javascript
 cube(`Orders`, {
@@ -141,6 +126,11 @@ cube(`Orders`, {
       timeDimension: createdAt,
       granularity: `day`,
       partitionGranularity: `month`,
+      refreshKey: {
+        every: `1 day`,
+        incremental: true,
+        updateWindow: `3 months`
+      }
     },
   },
 });
