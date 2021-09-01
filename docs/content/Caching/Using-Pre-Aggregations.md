@@ -137,7 +137,7 @@ must be configured to keep the pre-aggregations up-to-date.
 [Partitioning][wiki-partitioning] is an extremely effective optimization
 for accelerating pre-aggregations build and refresh time. It effectively "shards" the data between multiple tables,
 splitting them by a defined attribute. Cube can be configured to incrementally refresh only the last set of partitions through the `updateWindow` property.
-It leads to faster refresh times due to unnecessary data not being
+This leads to faster refresh times due to unnecessary data not being
 reloaded, and even reduced cost for some databases like [BigQuery](/config/databases/google-bigquery) or [AWS Athena](/config/databases/aws-athena).
 
 Any `rollup` pre-aggregation can be partitioned by time using the
