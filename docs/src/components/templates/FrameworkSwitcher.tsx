@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Radio } from 'antd';
 import { RadioChangeEvent } from 'antd/lib/radio/interface';
-import { navigate } from 'gatsby';
+// import { navigate } from 'gatsby';
+import Link from 'gatsby-link';
 import {
   useFrameworkOfChoice,
   FRAMEWORKS,
@@ -14,33 +15,30 @@ type Props = {
 };
 
 const FrameworkSwitcher: React.FC<Props> = () => {
-  const [frameworkOfChoice, setFrameworkOfChoice] = useFrameworkOfChoice();
-  const isBrowser = typeof window === 'object';
 
-  function onChange(event: RadioChangeEvent) {
-    const framework = event.target.value;
+  const [framework, setFramework] = useState('vanilla');
 
-    setFrameworkOfChoice(framework);
+  useEffect(() => {
+    const arrayOfPath = window.location.pathname.split('/');
+    const framework = arrayOfPath[arrayOfPath.length - 1];
+    console.log(framework);
 
-    if (isBrowser) {
-      navigate(
-        `${process.env.PATH_PREFIX || ''}/frontend-introduction${
-          framework !== FRAMEWORKS[0].slug ? `/${framework}` : ''
-        }`
-      );
-    }
-  }
+    setFramework(framework === 'frontend-introduction' ? 'vanilla' : framework);
+
+  }, [window.location.pathname]);
 
   return (
-    <Radio.Group
-      className={styles.frameworkSwitcher}
-      value={frameworkOfChoice}
-      onChange={onChange}
-    >
+    <Radio.Group className={styles.frameworkSwitcher} value={framework}>
       {FRAMEWORKS.map((framework) => (
-        <Radio.Button key={framework.slug} value={framework.slug}>
-          {framework.name}
-        </Radio.Button>
+        <Link
+          to={`/frontend-introduction/${
+            framework.slug === 'vanilla' ? '' : framework.slug
+          }`}
+        >
+          <Radio.Button key={framework.slug} value={framework.slug}>
+            {framework.name}
+          </Radio.Button>
+        </Link>
       ))}
     </Radio.Group>
   );
