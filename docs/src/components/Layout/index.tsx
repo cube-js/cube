@@ -4,9 +4,7 @@ import uniq from 'lodash/uniq';
 import { Layout, Row, Col } from 'antd';
 import { StaticQuery, graphql } from 'gatsby';
 
-import FrameworkOfChoiceStore, {
-  useFrameworkOfChoice,
-} from '../../stores/frameworkOfChoice';
+import FrameworkOfChoiceStore from '../../stores/frameworkOfChoice';
 import EventBanner from '../EventBanner';
 import Search from '../Search';
 import Header from '../Header';
@@ -95,21 +93,6 @@ const parseResults = (
   });
 
   return (allNodes as unknown) as ParsedNodeResults;
-};
-
-type FrameworkChoiceFixProps = {
-  framework: string;
-};
-
-const FrameworkChoiceFix: React.FC<FrameworkChoiceFixProps> = (props) => {
-  const framework = props.framework;
-  const [frameworkOfChoice, setFrameworkOfChoice] = useFrameworkOfChoice();
-
-  if (framework && framework !== frameworkOfChoice) {
-    setFrameworkOfChoice(framework);
-  }
-
-  return null;
 };
 
 type Props = {
@@ -206,11 +189,10 @@ class AppLayout extends React.Component<
     );
 
     const pageFrameworkOfChoice: string =
-      pageData && pageData.mdx.frontmatter.frameworkOfChoice!;
+      pageData && pageData?.mdx?.frontmatter?.frameworkOfChoice!;
 
     return (
       <FrameworkOfChoiceStore>
-        <FrameworkChoiceFix framework={pageFrameworkOfChoice} />
         <StaticQuery
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Radio } from 'antd';
 import { RadioChangeEvent } from 'antd/lib/radio/interface';
-import { navigate } from '@reach/router';
+import { navigate } from 'gatsby';
 import {
   useFrameworkOfChoice,
   FRAMEWORKS,
@@ -18,7 +18,7 @@ const FrameworkSwitcher: React.FC<Props> = () => {
 
   function onChange(event: RadioChangeEvent) {
     const framework = event.target.value;
-    console.log('env', process.env);
+
     setFrameworkOfChoice(framework);
     navigate(
       `${process.env.PATH_PREFIX || ''}/frontend-introduction${
