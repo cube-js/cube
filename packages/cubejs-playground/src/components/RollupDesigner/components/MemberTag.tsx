@@ -12,6 +12,10 @@ const StyledTag = styled(Tag)`
     color: var(--primary-color);
     padding-left: 6px;
   }
+
+  b {
+    font-weight: 600;
+  }
 `;
 
 type MemberTagProps = {

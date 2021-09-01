@@ -1,4 +1,4 @@
-import { WarningFilled } from '@ant-design/icons';
+import { EditOutlined, WarningFilled } from '@ant-design/icons';
 import {
   Query,
   TimeDimensionBase,
@@ -354,17 +354,19 @@ export function RollupDesigner({
         <Tabs onChange={setActiveTab}>
           <TabPane tab="Members" key="members">
             <Flex gap={2}>
-              <Cubes
-                selectedKeys={selectedKeys}
-                membersByCube={getMembersByCube(availableMembers)}
-                onSelect={(memberType, key) => {
-                  handleMemberToggle(memberType)(key);
-                }}
-              />
+              <Box style={{ minWidth: 256 }}>
+                <Cubes
+                  selectedKeys={selectedKeys}
+                  membersByCube={getMembersByCube(availableMembers)}
+                  onSelect={(memberType, key) => {
+                    handleMemberToggle(memberType)(key);
+                  }}
+                />
+              </Box>
 
               <Box
+                grow={1}
                 style={{
-                  width: '100%',
                   marginTop: 24,
                 }}
               >
@@ -464,6 +466,7 @@ export function RollupDesigner({
                 <Paragraph style={{ marginBottom: 4 }}>Rollup Name</Paragraph>
                 <Input
                   value={preAggName}
+                  suffix={<EditOutlined />}
                   onChange={(event) => setPreAggName(event.target.value)}
                 />
               </Box>
@@ -474,10 +477,14 @@ export function RollupDesigner({
 
           <TabPane
             tab={
-              <Typography.Text>
-                Query Compatibility
-                <WarningFilled style={{ color: '#FBBC05' }} />
-              </Typography.Text>
+              matching ? (
+                'Query Compatibility'
+              ) : (
+                <Typography.Text>
+                  Query Compatibility
+                  <WarningFilled style={{ color: '#FBBC05' }} />
+                </Typography.Text>
+              )
             }
             key="query"
           >

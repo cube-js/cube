@@ -1,8 +1,12 @@
-import Icon from '@ant-design/icons';
+import Icon, {
+  ArrowRightOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
 import { Query } from '@cubejs-client/core';
 import { AvailableMembers } from '@cubejs-client/react';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
 import styled from 'styled-components';
+import { Box, Flex } from '../../../grid';
 
 import { useServerCoreVersionGte, useToggle } from '../../../hooks';
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
@@ -99,11 +103,20 @@ export function PreAggregationStatus({
         bodyStyle={{ padding: 0 }}
         footer={
           <Link
-            style={{ paddingTop: 16 }}
             href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
             target="_blank"
           >
-            Further reading about pre-aggregations for reference.
+            <Flex justifyContent="center" gap={1}>
+              <Box>
+                <InfoCircleOutlined />
+              </Box>
+
+              <Box>Further reading about pre-aggregations for reference.</Box>
+
+              <Box>
+                <ArrowRightOutlined />
+              </Box>
+            </Flex>
           </Link>
         }
         width={1190}

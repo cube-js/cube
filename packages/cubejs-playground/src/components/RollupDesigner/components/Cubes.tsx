@@ -68,7 +68,6 @@ export function Cubes({ selectedKeys, membersByCube, onSelect }: CubesProps) {
 
   return (
     <StyledMenu
-      style={{ maxWidth: 256 }}
       selectedKeys={selectedKeys}
       defaultOpenKeys={defaultOpenKeys}
       mode="inline"
