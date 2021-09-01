@@ -52,7 +52,7 @@ const RollupQueryBox = styled.div`
   padding: 0 24px;
   background: var(--layout-body-background);
   width: 420px;
-  max-width: 420px;
+  min-width: 420px;
 
   & div.ant-typography {
     color: #14144680;
