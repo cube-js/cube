@@ -9,8 +9,8 @@ menuOrder: 5
 ## Use case
 
 We have a dashboard with information about the users, and we'd like to filter
-them by city. To do so, we need to display all unique values for cities in
-the dropdown. In the recipe below, we'll learn how to get unique values for
+them by city. To do so, we need to display all unique values for cities in the
+dropdown. In the recipe below, we'll learn how to get unique values for
 [dimensions](https://cube.dev/docs/schema/reference/dimensions).
 
 ## Data schema
@@ -22,12 +22,6 @@ cube(`Users`, {
   sql: `SELECT * FROM public.users`,
 
   dimensions: {
-    id: {
-      sql: `id`,
-      type: `number`,
-      primaryKey: true,
-    },
-
     city: {
       sql: `city`,
       type: `string`,
@@ -37,7 +31,7 @@ cube(`Users`, {
       sql: `state`,
       type: `string`,
     },
-  },
+  }
 });
 ```
 
@@ -70,14 +64,14 @@ dropdown on the dashboard:
   },
   {
     'Users.city': 'Mountain View',
-  },
-]
+  }
+];
 ```
 
 ## Choosing dimensions
 
-In case we need to choose a dimension or render dropdowns for all dimensions,
-we can fetch the list of dimensions for all cubes from the `/meta` 
+In case we need to choose a dimension or render dropdowns for all dimensions, we
+can fetch the list of dimensions for all cubes from the `/meta`
 [endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-meta):
 
 ```bash
@@ -114,7 +108,8 @@ curl http://localhost:4000/cubejs-api/v1/meta
 }
 ```
 
-Then, we can iterate through dimension names and use any of them in a [query](#query).
+Then, we can iterate through dimension names and use any of them in a
+[query](#query).
 
 ## Source code
 
