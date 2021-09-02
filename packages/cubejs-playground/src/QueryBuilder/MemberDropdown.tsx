@@ -20,12 +20,12 @@ const Menu = styled(AntdMenu)`
 `;
 
 const SearchMenuItem = styled(Menu.Item)`
-  position: sticky !important;
+  position: sticky;
   top: 0;
-  background: white !important;
-  padding-top: 10px !important;
-  padding-bottom: 0 !important;
-  margin-bottom: 16px !important;
+  background: white;
+  padding-top: 10px;
+  padding-bottom: 0;
+  margin-bottom: 16px;
 
   ::after {
     display: block;
