@@ -1,0 +1,17 @@
+{
+  "name": "k6",
+  "version": "1.0.0",
+  "description": "",
+  "main": "bq-api.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cubejs-client/core": "^0.28.10",
+    "@google-cloud/bigquery": "^5.7.0"
+  }
+}
