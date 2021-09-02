@@ -337,9 +337,9 @@
 - name: CUBEJS_DB_SSL_CIPHERS
   value: {{ .Value.database.ssl.ciphers | quote }}
 {{- end }}
-{{- if .Value.database.ssl.configName }}
-- name: CUBEJS_DB_SSL_configNAME
-  value: {{ .Value.database.ssl.configName | quote }}
+{{- if .Value.database.ssl.serverName }}
+- name: CUBEJS_DB_SSL_SERVERNAME
+  value: {{ .Value.database.ssl.serverName | quote }}
 {{- end }}
 {{- if .Value.database.ssl.passPhrase }}
 - name: CUBEJS_DB_SSL_PASSPHRASE
