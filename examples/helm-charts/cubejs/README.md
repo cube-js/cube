@@ -179,7 +179,7 @@ cubestore:
 | `global.devMode`                   | If true, enables development mode                                                                                               | `false` |
 | `global.debug`                     | If true, enables debug logging                                                                                                  | `false` |
 | `global.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
-| `global.externalDefault`           | If true, uses Cube Store for storing Pre-aggregations                                                                           | `true`  |
+| `global.externalDefault`           | If true, uses Cube Store or an external database for storing Pre-aggregations                                                                           | `true`  |
 | `global.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
 | `global.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
 | `global.apiSecretFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
