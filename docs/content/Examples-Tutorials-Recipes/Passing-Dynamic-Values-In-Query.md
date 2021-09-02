@@ -118,7 +118,7 @@ filter in the query:
 
 ## Result
 
-With join the data table with itself and using the dimensions defined above, we
+By joining the data table with itself and using the dimensions defined above, we
 can get the ratio we wanted to achieve:
 
 ```javascript
