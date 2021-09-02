@@ -23,7 +23,7 @@ helm dependency update
 Installing the Chart with the `values.yaml` file looks like this:
 
 ```bash
-helm install cubestack . -f ./values.yaml
+helm install cube-stack . -f ./values.yaml
 ```
 
 Because this is an Umbrella Chart, you can set any value from the dependent charts in the `values.yaml`.
@@ -37,26 +37,30 @@ Here's an example:
 ```yaml
 # values.yaml
 
+global:
+  cubejs:
+    enabled: true
+  cubestore:
+    enabled: true
+  redis:
+    enabled: true
+
 cubejs:
 ...
 
-  redis:
-    ## Naming this release "cubestack" will give you this default Redis URL 
-    url: redis://cube-stack-redis-master:6379
-    ## Not setting a password under redis.password will autogenerate a password and put it in a secret
-    passwordFromSecret:
-      name: redis
-      key: redis-password
+  config:
+    apiSecret: secret
 
-...
-
-redis:
-  enabled: true
-  
+    volumes:
+      - name: schema
+        configMap:
+          name: schema
+    volumeMounts:
+      - name: schema
+        readOnly: true
+        mountPath: /cube/conf/schema
 ...
 ```
-
-> Note: If you name the Helm release `cube-stack`, the default value for the Redis URL will be valid.
 
 ## Details
 
