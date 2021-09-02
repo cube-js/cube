@@ -204,6 +204,7 @@ export function formatNumber(num: number): string {
 
 export function prettifyObject(value: Object) {
   return pretty(value, 2)
-    .replaceAll(/(?<!\/)"/g, `'`)
+    .replaceAll(/([^\\]|)'/g, `\\'`)
+    .replaceAll(/"/g, `'`)
     .replaceAll(/\[[\s]+\]/g, '[]');
 }
