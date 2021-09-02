@@ -29,7 +29,7 @@ image:
   ##
   pullPolicy: IfNotPresent
 
-global:
+config:
   ## The logging level for Cube Store.
   ##
   logLevel: "error"

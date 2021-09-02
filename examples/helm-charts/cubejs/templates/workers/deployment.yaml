@@ -29,7 +29,7 @@ spec:
           image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
           ports:
             - name: http
-              containerPort: {{ .Values.global.apiPort }}
+              containerPort: {{ .Values.config.apiPort }}
               protocol: TCP
           env:
             {{- include "cubejs.common-env" . | nindent 12 }}
@@ -47,9 +47,9 @@ spec:
           resources:
             {{- toYaml .Values.workers.resources | nindent 12 }}
           {{- end }}
-          {{- if .Values.global.volumeMounts }}
+          {{- if .Values.config.volumeMounts }}
           volumeMounts:
-            {{- toYaml .Values.global.volumeMounts | nindent 12 }}
+            {{- toYaml .Values.config.volumeMounts | nindent 12 }}
           {{- end }}
       {{- if .Values.workers.affinity }}
       affinity:
@@ -59,9 +59,9 @@ spec:
       topologySpreadConstraints:
         {{- toYaml .Values.workers.spreadConstraints | nindent 8 }}
       {{- end }}
-      {{- if .Values.global.volumes }}
+      {{- if .Values.config.volumes }}
       volumes:
-        {{- toYaml .Values.global.volumes | nindent 8 }}
+        {{- toYaml .Values.config.volumes | nindent 8 }}
       {{- end }}
 
 {{- end }}

@@ -17,12 +17,12 @@ dependencies:
 - name: cubejs
   version: "0.1.*"
   repository: file://../cubejs
-  condition: cubejs.enabled
+  condition: global.cubejs.enabled
 - name: cubestore
   version: "0.1.*"
   repository: file://../cubestore
-  condition: cubestore.enabled
+  condition: global.cubestore.enabled
 - name: redis
   version: "~11.2"
   repository: "@bitnami"
-  condition: redis.enabled
+  condition: global.redis.enabled
