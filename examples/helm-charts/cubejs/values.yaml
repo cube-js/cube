@@ -45,6 +45,10 @@ global:
   ##
   logLevel: "warn"
 
+  ## If true, uses Cube Store for Pre-aggregation storage and caching
+  ##
+  externalDefault: true
+
   ## If true, then send telemetry to CubeJS
   ##
   telemetry: false
