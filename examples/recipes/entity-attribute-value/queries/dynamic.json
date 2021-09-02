@@ -1,0 +1,27 @@
+{
+  "dimensions": [
+    "UsersStatuses_Dynamic.name",
+    "UsersStatuses_Dynamic.completedCreatedAt",
+    "UsersStatuses_Dynamic.processingCreatedAt",
+    "UsersStatuses_Dynamic.shippedCreatedAt"
+  ],
+  "filters": [
+    {
+      "or": [
+        {
+          "member": "UsersStatuses_Dynamic.completedCreatedAt",
+          "operator": "notSet"
+        },
+        {
+          "member": "UsersStatuses_Dynamic.processingCreatedAt",
+          "operator": "notSet"
+        },
+        {
+          "member": "UsersStatuses_Dynamic.shippedCreatedAt",
+          "operator": "notSet"
+        }
+      ]
+    }
+  ],
+  "limit": 3
+}

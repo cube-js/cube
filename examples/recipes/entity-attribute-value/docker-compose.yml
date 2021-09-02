@@ -1,0 +1,21 @@
+version: '2.2'
+
+services:
+  cube:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 4000:4000
+      - 3000:3000
+    env_file: .env
+    volumes:
+      - .:/cube/conf
+
+  query:
+    image: cfmanteiga/alpine-bash-curl-jq
+    depends_on:
+      - cube
+    volumes:
+      - .:/query
+    entrypoint: ["sh", "query/queries/run.sh"]
