@@ -84,9 +84,11 @@ type RollupDesignerProps = {
 export function RollupDesigner({
   apiUrl,
   defaultQuery,
-  availableMembers,
+  availableMembers: memberTypeCubeMap,
   transformedQuery,
 }: RollupDesignerProps) {
+  console.log('...', memberTypeCubeMap);
+
   const isMounted = useIsMounted();
   const token = useToken();
   const { isCloud, ...cloud } = useCloud();
@@ -106,7 +108,7 @@ export function RollupDesigner({
   const { order, limit, filters, ...matchedQuery } = defaultQuery;
 
   const segments = new Set<string>();
-  availableMembers.segments.forEach(({ members }) => {
+  memberTypeCubeMap.segments.forEach(({ members }) => {
     members.forEach(({ name }) => segments.add(name));
   });
 
@@ -176,10 +178,10 @@ export function RollupDesigner({
 
   const indexedMembers = Object.fromEntries(
     getNameMemberPairs([
-      ...availableMembers.measures,
-      ...availableMembers.dimensions,
-      ...availableMembers.timeDimensions,
-      ...availableMembers.segments,
+      ...memberTypeCubeMap.measures,
+      ...memberTypeCubeMap.dimensions,
+      ...memberTypeCubeMap.timeDimensions,
+      ...memberTypeCubeMap.segments,
     ])
   );
 
@@ -351,13 +353,13 @@ export function RollupDesigner({
   return (
     <Flex justifyContent="space-between" margin={[0, 0, 2, 0]}>
       <MainBox grow={1}>
-        <Tabs>
+        <Tabs style={{ minHeight: '100%' }}>
           <TabPane tab="Members" key="members">
             <Flex gap={2}>
               <Box style={{ minWidth: 256 }}>
                 <Cubes
                   selectedKeys={selectedKeys}
-                  membersByCube={getMembersByCube(availableMembers)}
+                  memberTypeCubeMap={memberTypeCubeMap}
                   onSelect={(memberType, key) => {
                     handleMemberToggle(memberType)(key);
                   }}

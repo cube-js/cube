@@ -1,6 +1,7 @@
 import { QuestionCircleFilled } from '@ant-design/icons';
 import { GRANULARITIES, TimeDimensionGranularity } from '@cubejs-client/core';
 import {
+  Alert,
   Card,
   Checkbox,
   Col,
@@ -216,6 +217,14 @@ export function Settings({
               </Flex>
             </Col>
           </Row>
+
+          {!values['refreshKey.checked.every'] && (
+            <Alert
+              style={{ marginBottom: 24 }}
+              type="info"
+              message="Refresh key always defaults to every 1 hour"
+            />
+          )}
 
           <Row gutter={8}>
             <Col flex="85px">

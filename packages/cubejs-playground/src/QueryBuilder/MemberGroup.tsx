@@ -38,7 +38,7 @@ export default function MemberGroup({
           >
             <MemberDropdown
               disabled={disabled}
-              availableMembers={availableMembers}
+              availableCubes={availableMembers}
               onClick={(updateWith) => updateMethods.update(m, updateWith)}
             >
               {m.title}
@@ -58,7 +58,7 @@ export default function MemberGroup({
       <MemberDropdown
         data-testid={addMemberName}
         disabled={disabled}
-        availableMembers={availableMembers}
+        availableCubes={availableMembers}
         type="dashed"
         icon={<PlusOutlined />}
         onClick={handleClick}

@@ -20,12 +20,12 @@ const Menu = styled(AntdMenu)`
 `;
 
 const SearchMenuItem = styled(Menu.Item)`
-  position: sticky;
+  position: sticky !important;
   top: 0;
-  background: white;
-  padding-top: 10px;
-  padding-bottom: 0;
-  margin-bottom: 16px;
+  background: white !important;
+  padding-top: 10px !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 16px !important;
 
   ::after {
     display: block;
@@ -57,13 +57,13 @@ function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
 }
 
 type MemberDropdownProps = {
-  availableMembers: AvailableCube[];
+  availableCubes: AvailableCube[];
   showNoMembersPlaceholder?: boolean;
   onClick: (member: TCubeMember) => void;
 } & ButtonProps;
 
 export default function MemberMenu({
-  availableMembers,
+  availableCubes,
   showNoMembersPlaceholder = true,
   onClick,
   ...buttonProps
@@ -73,21 +73,22 @@ export default function MemberMenu({
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
   const index = flexSearch.current;
-  const hasMembers = availableMembers.some((cube) => cube.members.length > 0);
+  const hasMembers = availableCubes.some((cube) => cube.members.length > 0);
 
   const indexedMembers = useDeepMemo(() => {
-    getNameMemberPairs(availableMembers).forEach(([name, { title }]) =>
+    getNameMemberPairs(availableCubes).forEach(([name, { title }]) =>
       index.add(name as any, title)
     );
 
-    return Object.fromEntries(getNameMemberPairs(availableMembers));
-  }, [availableMembers]);
+    return Object.fromEntries(getNameMemberPairs(availableCubes));
+  }, [availableCubes]);
 
   useEffect(() => {
     let currentSearch = search;
 
     (async () => {
       const results = await index.search(search);
+
       if (currentSearch !== search) {
         return;
       }
@@ -101,8 +102,10 @@ export default function MemberMenu({
   }, [index, search]);
 
   const members = search
-    ? filterMembersByKeys(availableMembers, filteredKeys)
-    : availableMembers;
+    ? filterMembersByKeys(availableCubes, filteredKeys)
+    : availableCubes;
+
+  // console.log('availableMembers', availableMembers);
 
   return (
     <ButtonDropdown
