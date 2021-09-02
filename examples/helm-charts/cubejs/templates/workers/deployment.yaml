@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ printf "%s-cube-workers" (include "cubejs.fullname" .) }}
+  name: {{ printf "%s-workers" (include "cubejs.fullname" .) }}
   labels:
     {{- include "cubejs.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -16,12 +16,12 @@ spec:
   replicas: {{ .Values.workers.workersCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/component: cube-workers
+      app.kubernetes.io/component: workers
       {{- include "cubejs.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/component: cube-workers
+        app.kubernetes.io/component: workers
         {{- include "cubejs.selectorLabels" . | nindent 8 }}
     spec:
       containers:

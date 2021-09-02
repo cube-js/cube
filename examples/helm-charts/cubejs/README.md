@@ -181,6 +181,8 @@ cubestore:
 | `global.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
 | `global.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
 | `global.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
+| `global.apiSecretFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
+| `global.apiSecretFromSecret.key`   | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
 | `global.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
 | `global.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
 | `global.rollupOnly`                | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
