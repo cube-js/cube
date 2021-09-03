@@ -126,7 +126,7 @@ export function PreAggregationStatus({
           <RollupDesigner
             apiUrl={props.apiUrl}
             defaultQuery={props.query}
-            availableMembers={props.availableMembers}
+            memberTypeCubeMap={props.availableMembers}
             transformedQuery={props.transformedQuery}
           />
         ) : null}

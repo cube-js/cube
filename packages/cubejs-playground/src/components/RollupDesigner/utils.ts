@@ -141,9 +141,7 @@ export function updateQuery(
 
 function isBuffer(obj) {
   return (
-    obj &&
-    obj.constructor &&
-    typeof obj.constructor.isBuffer === 'function' &&
+    typeof obj?.constructor?.isBuffer === 'function' &&
     obj.constructor.isBuffer(obj)
   );
 }

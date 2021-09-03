@@ -11,7 +11,7 @@ export function ucfirst(s: string): string {
 }
 
 export function getNameMemberPairs(members: AvailableCube[]) {
-  const items: [string, TCubeMember & MemberType][] = [];
+  const items: [memberName: string, member: TCubeMember & MemberType][] = [];
 
   members.forEach((cube) =>
     cube.members.forEach((member) => {

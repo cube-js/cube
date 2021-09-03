@@ -28,7 +28,7 @@ const FilterGroup = ({
         >
           <MemberDropdown
             disabled={disabled}
-            availableMembers={availableMembers}
+            availableCubes={availableMembers}
             style={{
               width: 150,
               textOverflow: 'ellipsis',
@@ -74,7 +74,7 @@ const FilterGroup = ({
       );
     })}
     <MemberDropdown
-      availableMembers={availableMembers}
+      availableCubes={availableMembers}
       type="dashed"
       disabled={disabled}
       icon={<PlusOutlined />}
