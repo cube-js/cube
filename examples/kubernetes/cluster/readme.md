@@ -46,8 +46,8 @@ In the root folder of your Cube app add a `Dockerfile`:
 
 ```Dockerfile
 FROM cubejs/cube
-WORKDIR /cube/conf
-COPY ./schema /cube/conf
+WORKDIR /cube/conf/schema
+COPY ./schema /cube/conf/schema
 RUN npm install
 ```
 
