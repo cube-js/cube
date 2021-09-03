@@ -13,6 +13,7 @@ import {
   notification,
   Tabs,
   Typography,
+  Space,
 } from 'antd';
 import { useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -21,11 +22,7 @@ import { CodeSnippet } from '../../atoms';
 import { Box, Flex } from '../../grid';
 import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
 import { useCloud } from '../../playground/cloud';
-import {
-  getMembersByCube,
-  getNameMemberPairs,
-  request,
-} from '../../shared/helpers';
+import { getNameMemberPairs, request } from '../../shared/helpers';
 import { prettifyObject } from '../../utils';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
@@ -54,10 +51,6 @@ const RollupQueryBox = styled.div`
   width: 420px;
   min-width: 420px;
 
-  & div.ant-typography {
-    color: #14144680;
-  }
-
   & .ant-tabs-nav {
     margin-bottom: 24px;
   }
@@ -78,17 +71,15 @@ type RollupDesignerProps = {
   apiUrl: string;
   transformedQuery: TransformedQuery;
   defaultQuery: Query;
-  availableMembers: AvailableMembers;
+  memberTypeCubeMap: AvailableMembers;
 };
 
 export function RollupDesigner({
   apiUrl,
   defaultQuery,
-  availableMembers: memberTypeCubeMap,
+  memberTypeCubeMap,
   transformedQuery,
 }: RollupDesignerProps) {
-  console.log('...', memberTypeCubeMap);
-
   const isMounted = useIsMounted();
   const token = useToken();
   const { isCloud, ...cloud } = useCloud();
@@ -117,7 +108,7 @@ export function RollupDesigner({
   );
 
   const selectedKeys = useMemo(() => {
-    const keys: string[] = [];
+    const keys = new Set<string>();
 
     ['measures', 'dimensions', 'timeDimensions', 'segments'].map(
       (memberKey) => {
@@ -125,19 +116,19 @@ export function RollupDesigner({
           const { dimension } = references[memberKey]?.[0] || {};
 
           if (dimension) {
-            keys.push(dimension);
+            keys.add(dimension);
           }
         } else {
-          references[memberKey]?.map((key) => keys.push(key));
+          references[memberKey]?.map((key) => keys.add(key));
         }
       }
     );
 
-    return keys;
+    return Array.from(keys.values());
   }, [references]);
 
   useDeepEffect(() => {
-    let mutext = canUseMutex.current;
+    let mutex = canUseMutex.current;
     const { measures, segments, dimensions, timeDimensions } = references;
 
     async function load() {
@@ -157,7 +148,7 @@ export function RollupDesigner({
         }
       );
 
-      if (isMounted() && mutext === canUseMutex.current) {
+      if (isMounted() && mutex === canUseMutex.current) {
         setMatching(json.canUsePreAggregationForTransformedQuery);
         canUseMutex.current++;
       }
@@ -495,20 +486,36 @@ export function RollupDesigner({
             key="query"
           >
             <Flex direction="column" justifyContent="flex-start">
-              <Box style={{ marginBottom: 16 }}>
+              <Box style={{ marginBottom: 32 }}>
                 {canBeRolledUp && matching ? (
-                  <Typography.Paragraph>
-                    This rollup will match the following query:
-                  </Typography.Paragraph>
+                  <Text>This rollup will match the following query:</Text>
                 ) : (
-                  <Alert
-                    type="warning"
-                    message={
-                      <Text>
-                        This rollup does <b>NOT</b> match the following query:
-                      </Text>
-                    }
-                  />
+                  <Space direction="vertical">
+                    <Alert
+                      type="warning"
+                      message={
+                        <Text>
+                          This rollup does <b>NOT</b> match the following query:
+                        </Text>
+                      }
+                    />
+
+                    <Button
+                      type="primary"
+                      ghost
+                      onClick={() => {
+                        setReferences(
+                          getPreAggregationReferences(
+                            transformedQuery,
+                            segments
+                          )
+                        );
+                        setMatching(true);
+                      }}
+                    >
+                      Match Rollup
+                    </Button>
+                  </Space>
                 )}
               </Box>
 

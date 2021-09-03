@@ -1,7 +1,9 @@
 import { CheckOutlined, SearchOutlined } from '@ant-design/icons';
 import { AvailableMembers } from '@cubejs-client/react';
 import { Input, Menu } from 'antd';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
+import useDeepMemo from '../../../hooks/deep-memo';
 
 import { getMembersByCube, MembersByCube } from '../../../shared/helpers';
 import { QueryMemberKey } from '../../../types';
@@ -113,6 +115,13 @@ export function Cubes({
   onSelect,
 }: CubesProps) {
   const defaultOpenKeys = selectedKeys.map((key) => key.split('.')[0]);
+
+  const [openKeys, setOpenKeys] = useState<string[]>(defaultOpenKeys);
+
+  const allCubeKeys = useDeepMemo(() => {
+    return getMembersByCube(memberTypeCubeMap).map(({ cubeName }) => cubeName);
+  }, [memberTypeCubeMap]);
+
   const { keys, search, inputProps } = useCubeMemberSearch(memberTypeCubeMap);
 
   const membersByCube = search
@@ -132,7 +141,7 @@ export function Cubes({
 
       <StyledMenu
         selectedKeys={selectedKeys}
-        defaultOpenKeys={defaultOpenKeys}
+        openKeys={search ? allCubeKeys : openKeys}
         mode="inline"
         onClick={(event) => {
           // @ts-ignore
@@ -143,7 +152,17 @@ export function Cubes({
       >
         {membersByCube.map((cube) => {
           return (
-            <SubMenu key={cube.cubeName} title={cube.cubeTitle}>
+            <SubMenu
+              key={cube.cubeName}
+              title={cube.cubeTitle}
+              onTitleClick={({ key }) => {
+                if (openKeys.includes(key)) {
+                  setOpenKeys(openKeys.filter((value) => value !== key));
+                } else {
+                  setOpenKeys([...openKeys, key]);
+                }
+              }}
+            >
               {MEMBER_TYPES.map((memberType) => {
                 if (!cube[memberType].length) {
                   return null;
