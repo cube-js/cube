@@ -10,6 +10,8 @@ use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
 use s3::{Bucket, Region};
 use std::env;
+use std::fmt;
+use std::fmt::Formatter;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -18,12 +20,26 @@ use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::sync::Mutex;
 
-#[derive(Debug)]
 pub struct S3RemoteFs {
     dir: PathBuf,
     bucket: std::sync::RwLock<Bucket>,
     sub_path: Option<String>,
     delete_mut: Mutex<()>,
+}
+
+impl fmt::Debug for S3RemoteFs {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let mut s = f.debug_struct("S3RemoteFs");
+        s.field("dir", &self.dir).field("sub_path", &self.sub_path);
+        // Do not expose AWS credentials.
+        match self.bucket.try_read() {
+            Ok(bucket) => s
+                .field("bucket_name", &bucket.name)
+                .field("bucket_region", &bucket.region),
+            Err(_) => s.field("bucket", &"<locked>"),
+        };
+        s.finish_non_exhaustive()
+    }
 }
 
 impl S3RemoteFs {
