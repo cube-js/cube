@@ -1223,7 +1223,10 @@ async fn count_distinct_take_crash(service: Box<dyn SqlClient>) {
         .exec_query("CREATE TABLE s.data(id int, n int)")
         .await
         .unwrap();
-    service.exec_query("INSERT INTO s.data(id, n) VALUES (1, 1)").await.unwrap();
+    service
+        .exec_query("INSERT INTO s.data(id, n) VALUES (1, 1)")
+        .await
+        .unwrap();
     // This used to crash because `take` on empty list returned null. The implementation can easily
     // change with time, though, so test is not robust.
     let r = service
