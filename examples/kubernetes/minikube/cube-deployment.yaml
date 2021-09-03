@@ -22,8 +22,6 @@ spec:
               value: secret
             - name: CUBEJS_CUBESTORE_HOST
               value: "cubestore-router"
-            - name: CUBEJS_CUBESTORE_PORT
-              value: "3030"
             - name: CUBEJS_DB_HOST
               value: demo-db.cube.dev
             - name: CUBEJS_DB_NAME

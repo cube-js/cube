@@ -9,6 +9,7 @@ The Cube Store is configured to persist data with a `hostPath` volume.
 Contains:
 - Cube API - `Deployment` and `Service`
 - Cube Store - `Deployment` and `Service`
+- Redis - `Deployment` and `Service`
 
 Tested with:
 - `apiVersion: v1`.
