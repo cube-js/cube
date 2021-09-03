@@ -40,6 +40,25 @@ data:
     });
 ```
 
+Alternatively, you can bake the schema files into the `cubejs/cube` Docker image by building your own image. This will remove the need for a `ConfigMap`.
+
+In the root folder of your Cube app add a `Dockerfile`:
+
+```Dockerfile
+FROM cubejs/cube
+WORKDIR /cube/conf
+COPY ./schema /cube/conf
+RUN npm install
+```
+
+Next, build a custom Docker image:
+
+```bash
+docker build -t <YOUR-USERNAME>/cubejs-custom-build .
+```
+
+Then, instead of using `cubejs/cube:v0.28.14` use your custom image `<YOUR-USERNAME>/cubejs-custom-build` instead.
+
 ## Cube Refresh Worker
 
 A Cube Refresh Worker is included in the config.
