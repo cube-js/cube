@@ -9,20 +9,20 @@ menuOrder: 2
 
 The `create` command generates barebones Cube.js app.
 
-### Usage
+### <--{"id" : "create"}--> Usage
 
 ```bash
 $ cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
 ```
 
-### Flags
+### <--{"id" : "create"}--> Flags
 
 | Parameter                 | Description                                     | Values                                                                                                                  |
 | ------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| -d, --db-type <db-type>   | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto`, `druid` |
-| -t, --template <template> | Framework running Cube.js backend.              | `docker` (default), `express`, `serverless`, `serverless-aws`                                                           |
+| `-d, --db-type <db-type>`   | Preconfigure Cube.js app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto`, `druid` |
+| `-t, --template <template>` | Framework running Cube.js backend.              | `docker` (default), `express`, `serverless`, `serverless-aws`                                                           |
 
-### Example
+### <--{"id" : "create"}--> Example
 
 Create app called `demo-app` using default (`docker`) template and `mysql`
 database:
@@ -65,7 +65,7 @@ With debug information:
 $ cubejs server --debug
 ```
 
-### Usage
+### <--{"id" : "server"}--> Usage
 
 ```bash
 $ cubejs server
@@ -78,19 +78,19 @@ You can only run `generate` from the Cube.js app directory. This command could
 not be used without an active
 [Database connection](/connecting-to-the-database).
 
-### Usage
+### <--{"id" : "generate"}--> Usage
 
 ```bash
 $ cubejs generate -t TABLE-NAMES
 ```
 
-### Flags
+### <--{"id" : "generate"}--> Flags
 
 | Parameter             | Description                                            | Values                      |
 | --------------------- | ------------------------------------------------------ | --------------------------- |
-| -t, --tables <tables> | Comma delimited list of tables to generate schema for. | `TABLE-NAME-1,TABLE-NAME-2` |
+| `-t, --tables <tables>` | Comma delimited list of tables to generate schema for. | `TABLE-NAME-1,TABLE-NAME-2` |
 
-### Example
+### <--{"id" : "generate"}--> Example
 
 Generate schema files for tables `orders` and `customers`:
 
@@ -104,17 +104,17 @@ The `token` command generates a JWT Cube.js token. It either uses the value of
 the `CUBEJS_API_SECRET` environment variable or provided value with `-s` flag.
 You can only run `token` command from the Cube.js app directory.
 
-_Use these manually generated tokens in production with caution._ <br> _Please
+_Use these manually generated tokens in production with caution._ <br/> _Please
 refer to the [Security Guide](https://cube.dev/docs/security) for production
 security best practices._
 
-### Usage
+### <--{"id" : "token"}--> Usage
 
 ```bash
 $ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 ```
 
-### Flags
+### <--{"id" : "token"}--> Flags
 
 | Parameter                                       | Description                                                                      | Example                                        |
 | ----------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
@@ -123,7 +123,7 @@ $ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 | -p, --payload                                   | Token Payload                                                                    | `foo=bar`, `userId=2`                          |
 | -u, --user-context                              | Token USER_CONTEXT Payload                                                       | `baz=qux`, `companyId=5`                       |
 
-### Example
+### <--{"id" : "token"}--> Example
 
 Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
 

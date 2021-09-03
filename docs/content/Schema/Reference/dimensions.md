@@ -42,7 +42,7 @@ cube(`Products`, {
 
 ## Parameters
 
-### title
+### <--{"id" : "Parameters"}--> title
 
 You can use the `title` parameter to change a dimension's displayed name. By
 default, Cube.js will humanize your dimension key to create a display name. In
@@ -60,7 +60,7 @@ cube('Products', {
 });
 ```
 
-### description
+### <--{"id" : "Parameters"}--> description
 
 You can add details to a dimension's definition via the `description` property:
 
@@ -76,7 +76,7 @@ cube('Products', {
 });
 ```
 
-### shown
+### <--{"id" : "Parameters"}--> shown
 
 You can manage the visibility of the dimension using the `shown` property. The
 default value of `shown` is `true`.
@@ -93,7 +93,7 @@ cube('Products', {
 });
 ```
 
-### case
+### <--{"id" : "Parameters"}--> case
 
 The `case` statement is used to define if/then/else conditions to display data.
 It contains two parameters: `when` and `then`. The first `when` statement
@@ -156,7 +156,7 @@ cube('Products', {
 });
 ```
 
-### primaryKey
+### <--{"id" : "Parameters"}--> primaryKey
 
 Specify which dimension is a primary key for a cube. The default value is
 `false`.
@@ -182,7 +182,7 @@ cube('Products', {
 });
 ```
 
-### subQuery
+### <--{"id" : "Parameters"}--> subQuery
 
 The `subQuery` statement allows you to reference a measure in a dimension. It's
 an advanced concept and you can learn more about it [here][ref-subquery].
@@ -199,7 +199,7 @@ cube('Products', {
 });
 ```
 
-### propagateFiltersToSubQuery
+### <--{"id" : "Parameters"}--> propagateFiltersToSubQuery
 
 When this statement is set to `true`, the filters applied to the query will be
 passed to the [subquery][self-subquery].
@@ -217,7 +217,7 @@ cube('Products', {
 });
 ```
 
-### meta
+### <--{"id" : "Parameters"}--> meta
 
 Custom metadata. Can be used to pass any information to the frontend.
 
@@ -238,4 +238,4 @@ cube('Products', {
 
 [ref-schema-ref-joins]: /schema/reference/joins
 [ref-subquery]: /schema/fundamentals/additional-concepts#subquery
-[self-subquery]: #parameters-sub-query
+[self-subquery]: #sub-query

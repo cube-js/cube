@@ -215,7 +215,7 @@ cube(`SalesManagers`, {
 });
 ```
 
-### Under the hood
+### <--{"id" : "Subquery"}--> Under the hood
 
 Based on the subquery dimension definition, Cube.js will create a query that
 will include the primary key dimension of the main cube and all
@@ -291,7 +291,7 @@ considered in this case.
 [bq-parse-timestamp]:
   https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp
 [ref-cubejs-client-ref-resultset-drilldown]:
-  /@cubejs-client-core#result-set-drill-down
+  /@cubejs-client-core#drill-down
 [ref-schema-ref-dimensions]: /schema/reference/dimensions
 [ref-schema-ref-joins]: /schema/reference/joins
 [ref-schema-ref-measures]: /schema/reference/measures

@@ -4,9 +4,7 @@ import uniq from 'lodash/uniq';
 import { Layout, Row, Col } from 'antd';
 import { StaticQuery, graphql } from 'gatsby';
 
-import FrameworkOfChoiceStore, {
-  useFrameworkOfChoice,
-} from '../../stores/frameworkOfChoice';
+import FrameworkOfChoiceStore from '../../stores/frameworkOfChoice';
 import EventBanner from '../EventBanner';
 import Search from '../Search';
 import Header from '../Header';
@@ -95,21 +93,6 @@ const parseResults = (
   });
 
   return (allNodes as unknown) as ParsedNodeResults;
-};
-
-type FrameworkChoiceFixProps = {
-  framework: string;
-};
-
-const FrameworkChoiceFix: React.FC<FrameworkChoiceFixProps> = (props) => {
-  const framework = props.framework;
-  const [frameworkOfChoice, setFrameworkOfChoice] = useFrameworkOfChoice();
-
-  if (framework && framework !== frameworkOfChoice) {
-    setFrameworkOfChoice(framework);
-  }
-
-  return null;
 };
 
 type Props = {
@@ -206,69 +189,68 @@ class AppLayout extends React.Component<
     );
 
     const pageFrameworkOfChoice: string =
-      pageData && pageData.markdownRemark.frontmatter.frameworkOfChoice!;
+      pageData && pageData?.mdx?.frontmatter?.frameworkOfChoice!;
 
     return (
       <FrameworkOfChoiceStore>
-        <FrameworkChoiceFix framework={pageFrameworkOfChoice} />
         <StaticQuery
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
             <>
-            <EventBanner />
-            <Row>
-              <Header
-                className={cx(styles.header, {
-                  [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
-                })}
-                mobileSearch={this.state.mobileMode === MobileModes.SEARCH}
-              >
-                <Search
-                  mobile={this.state.mobileMode === MobileModes.SEARCH}
-                  onClose={() => this.setMobileMode(MobileModes.CONTENT)}
-                  navigate={this.props.navigate}
-                />
-              </Header>
-              <Col
-                md={24}
-                className={cx(styles.contentColumn, {
-                  fixed: this.state.mobileMode === MobileModes.MENU,
-                })}
-              >
-                <MainMenu
-                  items={parseResults(data.allMarkdownRemark.edges)}
-                  {...menuProps}
-                />
-                <Col
-                  {...layout.contentArea.width}
-                  xs={
-                    this.state.mobileMode === 'content'
-                      ? { span: 22, offset: 1 }
-                      : 0
-                  }
+              <EventBanner />
+              <Row>
+                <Header
+                  className={cx(styles.header, {
+                    [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
+                  })}
+                  mobileSearch={this.state.mobileMode === MobileModes.SEARCH}
                 >
-                  {pageFrameworkOfChoice && (
-                    <FrameworkSwitcher value={pageFrameworkOfChoice} />
-                  )}
-                  <Layout.Content
-                    className={styles.contentWrapper}
-                    style={{ margin: '0 24px 100px 24px' }}
-                  >
-                    {childrenWithProps}
-                  </Layout.Content>
-                </Col>
-                {!this.state.noscrollmenu && (
-                  <ScrollMenu
-                    sections={this.state.sections}
-                    githubUrl={this.state.githubUrl}
+                  <Search
+                    mobile={this.state.mobileMode === MobileModes.SEARCH}
+                    onClose={() => this.setMobileMode(MobileModes.CONTENT)}
+                    navigate={this.props.navigate}
                   />
-                )}
-              </Col>
-              <MobileFooter
-                mobileMode={this.state.mobileMode}
-                setMobileMode={this.setMobileMode}
-              />
-            </Row>
+                </Header>
+                <Col
+                  md={24}
+                  className={cx(styles.contentColumn, {
+                    fixed: this.state.mobileMode === MobileModes.MENU,
+                  })}
+                >
+                  <MainMenu
+                    items={parseResults(data.allMdx.edges)}
+                    {...menuProps}
+                  />
+                  <Col
+                    {...layout.contentArea.width}
+                    xs={
+                      this.state.mobileMode === 'content'
+                        ? { span: 22, offset: 1 }
+                        : 0
+                    }
+                  >
+                    {pageFrameworkOfChoice && (
+                      <FrameworkSwitcher value={pageFrameworkOfChoice} />
+                    )}
+                    <Layout.Content
+                      className={styles.contentWrapper}
+                      style={{ margin: '0 24px 100px 24px' }}
+                    >
+                      {childrenWithProps}
+                    </Layout.Content>
+                  </Col>
+                  {!this.state.noscrollmenu && (
+                    <ScrollMenu
+                      sections={this.state.sections}
+                      githubUrl={this.state.githubUrl}
+                    />
+                  )}
+                </Col>
+                <MobileFooter
+                  mobileMode={this.state.mobileMode}
+                  setMobileMode={this.setMobileMode}
+                />
+              </Row>
             </>
           )}
         />
@@ -286,17 +268,17 @@ interface Edge<T> {
 }
 
 interface LayoutQueryResponse {
-  allMarkdownRemark: {
+  allMdx: {
     edges: Edge<MarkdownNode>[];
   };
 }
 
 const layoutQuery = graphql`
   query LayoutQuery {
-    allMarkdownRemark(limit: 1000) {
+    allMdx(limit: 1000) {
       edges {
         node {
-          html
+          body
           fileAbsolutePath
           frontmatter {
             permalink

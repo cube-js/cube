@@ -41,7 +41,7 @@ cube(`Orders`, {
 
 ## Parameters
 
-### type
+### <--{"id" : "Parameters"}--> type
 
 `type` is a required parameter. There are various types that can be assigned to
 a measure. Please refer to the [Measure Types
@@ -59,7 +59,7 @@ cube(`Orders`, {
 });
 ```
 
-### sql
+### <--{"id" : "Parameters"}--> sql
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
 the `type` of the measure. Please refer to the [Measure Types
@@ -77,7 +77,7 @@ cube(`Orders`, {
 });
 ```
 
-### format
+### <--{"id" : "Parameters"}--> format
 
 `format` is an optional parameter. It is used to format the output of measures
 in different ways, for example, as currency for `revenue`. Please refer to the
@@ -96,7 +96,7 @@ cube(`Orders`, {
 });
 ```
 
-### title
+### <--{"id" : "Parameters"}--> title
 
 You can use the `title` parameter to change a measure’s displayed name. By
 default, Cube.js will humanize your measure key to create a display name. In
@@ -114,7 +114,7 @@ cube(`Orders`, {
 });
 ```
 
-### description
+### <--{"id" : "Parameters"}--> description
 
 You can add details to a measure’s definition via the `description` parameter:
 
@@ -130,7 +130,7 @@ cube(`Orders`, {
 });
 ```
 
-### shown
+### <--{"id" : "Parameters"}--> shown
 
 You can manage the visibility of the measure using the `shown` parameter. The
 default value of `shown` is `true`.
@@ -147,7 +147,7 @@ cube(`Orders`, {
 });
 ```
 
-### filters
+### <--{"id" : "Parameters"}--> filters
 
 If you want to add some conditions for a metric's calculation, you should use
 the `filters` parameter. The syntax looks like the following:
@@ -164,7 +164,7 @@ cube(`Orders`, {
 });
 ```
 
-### rollingWindow
+### <--{"id" : "Parameters"}--> rollingWindow
 
 If you want to calculate some metric within a window, for example a week or a
 month, you should use a `rollingWindow` parameter. The `trailing` and `leading`
@@ -217,7 +217,7 @@ cube(`Orders`, {
 });
 ```
 
-### drillMembers
+### <--{"id" : "Parameters"}--> drillMembers
 
 Using the `drillMembers` parameter, you can define a set of [drill
 down][ref-drilldowns] fields for the measure. `drillMembers` is defined as an
@@ -234,7 +234,7 @@ revenue: {
 }
 ```
 
-### meta
+### <--{"id" : "Parameters"}--> meta
 
 Custom metadata. Can be used to pass any information to the frontend.
 

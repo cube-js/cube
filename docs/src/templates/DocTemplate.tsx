@@ -1,5 +1,8 @@
 import React, { Component } from 'react';
+import { renderToString } from 'react-dom/server';
 import { graphql } from 'gatsby';
+import { MDXRenderer } from 'gatsby-plugin-mdx';
+import { MDXProvider } from '@mdx-js/react';
 import Helmet from 'react-helmet';
 import ReactHtmlParser from 'react-html-parser';
 import { scroller } from 'react-scroll';
@@ -10,7 +13,7 @@ import get from 'lodash/get';
 import last from 'lodash/last';
 import { renameCategory } from '../rename-category';
 
-import "gatsby-remark-mathjax-ssr/mathjax.css";
+import 'gatsby-remark-mathjax-ssr/mathjax.css';
 
 import ScrollLink, {
   SCROLL_OFFSET,
@@ -18,6 +21,46 @@ import ScrollLink, {
 
 import * as styles from '../../static/styles/index.module.scss';
 import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
+
+// define components to using in MDX
+import GitHubCodeBlock from '../components/GitHubCodeBlock';
+import CubeQueryResultSet from '../components/CubeQueryResultSet';
+import GitHubFolderLink from '../components/GitHubFolderLink';
+
+const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
+const MyH3 = (props) => {
+  const startCommentIndex = props.children.indexOf('<--');
+  const endCommentIndex = props.children.indexOf('-->');
+  const isCustom = startCommentIndex !== -1 && endCommentIndex !== -1;
+
+  if (isCustom) {
+    const propsData = props.children?.slice(startCommentIndex + 3, endCommentIndex);
+
+    if (propsData?.length) {
+      const jsonProps = JSON.parse(propsData);
+      const text = props.children.slice(endCommentIndex + 3);
+
+      return (
+        <h3
+          id={kebabCase(jsonProps?.id) + '-' + kebabCase(text)}
+          name={kebabCase(text)}
+          {...props}
+        >
+          {text}
+        </h3>
+      );
+    }
+  }
+  return <h3 name={kebabCase(props.children)} {...props} />;
+};
+
+const components = { GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
+
+const MDX = (props) => (
+  <MDXProvider components={components}>
+    <MDXRenderer>{props?.data?.mdx?.body}</MDXRenderer>
+  </MDXProvider>
+);
 
 const mdContentCallback = () => {
   const accordionTriggers = document.getElementsByClassName(
@@ -63,15 +106,16 @@ class DocTemplate extends Component<Props, State> {
   };
 
   componentWillMount() {
-    const { markdownRemark = {} } = this.props.data;
-    const { html, frontmatter } = markdownRemark;
+    const { mdx = {} } = this.props.data;
+    const { frontmatter } = mdx;
+
     this.props.changePage({
       scope: frontmatter.scope,
       category: renameCategory(frontmatter.category),
       noscrollmenu: false,
     });
     this.createAnchors(
-      html,
+      <MDX {...this.props} />,
       frontmatter.title,
       getGithubUrl(this.props.pageContext.fileAbsolutePath)
     );
@@ -79,6 +123,7 @@ class DocTemplate extends Component<Props, State> {
 
   componentDidMount() {
     window.Prism && window.Prism.highlightAll();
+    // this.setNamesToHeaders();
     this.scrollToHash();
     mdContentCallback();
   }
@@ -96,15 +141,15 @@ class DocTemplate extends Component<Props, State> {
     }, 100);
   };
 
-  createAnchors = (html: string, title: string, githubUrl: string) => {
-    if (!html) {
+  createAnchors = (element: any, title: string, githubUrl: string) => {
+    if (!element) {
       this.props.setScrollSectionsAndGithubUrl([], '');
       return;
     }
-
+    const stringElement = renderToString(element);
     // the code below transforms html from markdown to section-based html
     // for normal scrollspy
-    const rawNodes = ReactHtmlParser(html);
+    const rawNodes = ReactHtmlParser(stringElement);
     const sectionTags: Section[] = [
       {
         id: 'top',
@@ -187,7 +232,7 @@ class DocTemplate extends Component<Props, State> {
           currentID = kebabCase(item.props.children[0]);
           currentParentID = currentID;
         } else if (!!currentParentID) {
-          currentID = `${currentParentID}-${kebabCase(item.props.children[0])}`;
+          currentID = kebabCase(item.props.children[0]);
         } else {
           currentID = kebabCase(item.props.children[0]);
         }
@@ -218,19 +263,6 @@ class DocTemplate extends Component<Props, State> {
       last(sectionTags)?.nodes?.push(linkedHTag || item);
     });
 
-    const nodes = sectionTags.map((item) => {
-      return React.createElement(
-        'section',
-        {
-          key: item.id,
-          id: item.id,
-          type: item.type,
-          className: item.className,
-        },
-        item.nodes
-      );
-    });
-
     const sections = sectionTags.map((item) => ({
       id: item.id,
       title: item.title,
@@ -238,18 +270,20 @@ class DocTemplate extends Component<Props, State> {
     }));
 
     this.props.setScrollSectionsAndGithubUrl(sections, githubUrl);
-    this.setState({ nodes });
   };
 
   render() {
-    const { markdownRemark = {} } = this.props.data;
-    const { frontmatter } = markdownRemark;
+    const { mdx = {} } = this.props.data;
+    const { frontmatter } = mdx;
 
     return (
       <div>
         <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
         <div className={styles.docContentWrapper}>
-          <div className={styles.docContent}>{this.state.nodes}</div>
+          <div className={styles.docContent}>
+            <h1 name="top">{frontmatter.title}</h1>
+            <MDX {...this.props} />
+          </div>
         </div>
       </div>
     );
@@ -260,8 +294,8 @@ export default DocTemplate;
 
 export const pageQuery = graphql`
   query postByPath($path: String!) {
-    markdownRemark(frontmatter: { permalink: { eq: $path } }) {
-      html
+    mdx(frontmatter: { permalink: { eq: $path } }) {
+      body
       frontmatter {
         permalink
         title

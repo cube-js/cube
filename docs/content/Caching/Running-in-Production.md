@@ -220,4 +220,4 @@ allows requests from the Cube.js deployment.
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/environment-variables#cube-store
 [ref-config-env-cloud-storage]:
-  /reference/environment-variables#cube-store-cloud-storage
+  /reference/environment-variables#cloud-storage

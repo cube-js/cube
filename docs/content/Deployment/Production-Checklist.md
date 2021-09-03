@@ -70,7 +70,7 @@ environment variable. Set the `CUBEJS_REDIS_TLS` environment variable to `true`
 if you want to enable SSL-secured connections. Ensure your Redis cluster allows
 at least 15 concurrent connections.
 
-### Redis Sentinel
+### <--{"id" : "Set up Redis"}--> Redis Sentinel
 
 Redis provides functionality for high availability through
 [`Redis Sentinel`][link-redis-sentinel].
@@ -89,7 +89,7 @@ to connect to the Redis Sentinel.
 | lead to incorrect pre-aggregation states and intermittent data access errors.
 <!-- prettier-ignore-end -->
 
-### Redis Pool
+### <--{"id" : "Set up Redis"}--> Redis Pool
 
 If `CUBEJS_REDIS_URL` is provided Cube.js, will create a Redis connection pool
 with a minimum of 2 and maximum of 1000 concurrent connections, by default. The
@@ -105,7 +105,7 @@ you have enough connections for all Cube.js server instances. A lower number of
 connections still can work, however Redis becomes a performance bottleneck in
 this case.
 
-### Running without Redis
+### <--{"id" : "Set up Redis"}--> Running without Redis
 
 If you want to run Cube.js in production without Redis, you can use
 `CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.
@@ -147,9 +147,9 @@ deployment's health and be alerted to any issues.
 [ref-caching-cubestore]: /caching/running-in-production
 [ref-env-vars-general]: /reference/environment-variables#general
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
-[ref-api-scheduled-refresh]: /rest-api#api-reference-v-1-run-scheduled-refresh
+[ref-api-scheduled-refresh]: /rest-api#v-1-run-scheduled-refresh
 [ref-sec-ctx]: /security/context
-[ref-config-jwt]: /config#options-reference-jwt
+[ref-config-jwt]: /config#jwt
 [ref-config-env-vars-general]: /reference/environment-variables#general
-[ref-api-readyz]: /rest-api#api-reference-readyz
-[ref-api-livez]: /rest-api#api-reference-livez
+[ref-api-readyz]: /rest-api#readyz
+[ref-api-livez]: /rest-api#livez

@@ -922,6 +922,7 @@ section[type=h2] h2 {
 
   :global {
     .ant-radio-button-wrapper {
+      border-radius: none;
       color: $pink-hover;
       border: 1px solid $pink-04;
       outline: none;
@@ -933,6 +934,10 @@ section[type=h2] h2 {
       &:focus-within {
         outline: none !important;
       }
+    }
+
+    .ant-radio-button-wrapper:first-child:last-child {
+      border-radius: 0;
     }
 
     .ant-radio-button-wrapper-checked {

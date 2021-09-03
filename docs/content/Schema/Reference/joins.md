@@ -36,7 +36,7 @@ filter][ref-restapi-query-filter-op-set] satisfies this requirement.
 
 ## Parameters
 
-### relationship
+### <--{"id" : "Parameters"}--> relationship
 
 `relationship` enables you to describe the join relationship between joined
 cubes. It’s important to properly define the type of relationship in order for
@@ -111,7 +111,7 @@ cube('Orders', {
 });
 ```
 
-### sql
+### <--{"id" : "Parameters"}--> sql
 
 `sql` is necessary to indicate a related column between cubes. It is important
 to properly specify a matching column when creating joins. Take a look at the
@@ -279,5 +279,5 @@ algorithm][wiki-djikstra-alg] to find join path between cubes given requested
 members.
 
 [ref-schema-advanced-join-direction]: /direction-of-joins
-[ref-restapi-query-filter-op-set]: query-format#filters-operators-set
+[ref-restapi-query-filter-op-set]: query-format#set
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm

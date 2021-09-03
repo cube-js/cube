@@ -3,38 +3,8 @@ publish = "public/"
 command = "source .env.production && ./build-netlify.sh"
 ignore = "cd .. && git diff --quiet HEAD^ HEAD -- docs/"
 
-[[redirects]]
-from = "/favicons/*"
-to = "/favicons/:splat"
-status = 200
-force = true
-
-[[redirects]]
-from = "/fonts/*"
-to = "/fonts/:splat"
-status = 200
-force = true
-
-[[redirects]]
-from = "/icons/*"
-to = "/icons/:splat"
-status = 200
-force = true
-
-[[redirects]]
-from = "/docs/scripts/*"
-to = "/scripts/:splat"
-status = 200
-force = true
-
-[[redirects]]
-from = "/docs/styles/*"
-to = "/styles/:splat"
-status = 200
-force = true
-
-[[redirects]]
-from = "/*"
-to = "/index.html"
-status = 200
-force = false
+# we need to wrap the public files to the docs folder on prod deployment so we use a different script for this
+[context.production]
+  publish = "dist/"
+  command = "source .env.production && ./build-netlify-prod.sh"
+  ignore = "cd .. && git diff --quiet HEAD^ HEAD -- docs/"

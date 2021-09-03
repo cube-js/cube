@@ -49,7 +49,7 @@ Applications.
 Next, go to the application's settings and add the appropriate callback URLs for
 your application (`http://localhost:4000` for the Developer Playground).
 
-### Custom claims
+### <--{"id" : "Create an application"}-->  Custom claims
 
 You can also configure custom claims for your JWT token. Auth0 has two SDKs
 available; [Auth0.js][link-auth0-js] and the [Auth0 SPA
@@ -151,7 +151,7 @@ CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
 
 ## Testing with the Developer Playground
 
-### Retrieving a JWT
+### <--{"id" : "Testing with the Developer Playground"}-->  Retrieving a JWT
 
 Go to the [OpenID Playground from Auth0][link-openid-playground] to and click
 Configuration.
@@ -209,7 +209,7 @@ Copy the `access_token` from the response, and use the [JWT.IO
 Debugger][link-jwt-io-debug] to decode the token and verify any custom claims
 were successfully added.
 
-### Set JWT in Developer Playground
+### <--{"id" : "Testing with the Developer Playground"}-->  Set JWT in Developer Playground
 
 Now open the Developer Playground (at `http://localhost:4000`) and on the Build
 page, click Add Security Context.
