@@ -154,7 +154,7 @@ export class BaseDbRunner {
 
     await Promise.all(preAggregationsDescription.map(
       async desc => {
-        if (desc.preAggregationStartEndQueries) {
+        if (desc.partitionGranularity) {
           desc.dateRange = [
             PreAggregationPartitionRangeLoader.extractDate(
               await this.testQueries([desc.preAggregationStartEndQueries[0]])

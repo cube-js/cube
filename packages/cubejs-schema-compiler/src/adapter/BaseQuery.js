@@ -1627,7 +1627,10 @@ export class BaseQuery {
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath];
-      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql, true, measurePath);
+      const { topLevelMerge } = this.safeEvaluateSymbolContext();
+      const onGroupedColumn = this.aggregateOnGroupedColumn(
+        symbol, evaluateSql, topLevelMerge != null ? topLevelMerge : true, measurePath
+      );
       if (onGroupedColumn) {
         return onGroupedColumn;
       }
@@ -1670,11 +1673,22 @@ export class BaseQuery {
     return undefined;
   }
 
+  topAggregateWrap(symbol, evaluateSql) {
+    if (symbol.type === 'countDistinctApprox') {
+      return this.hllCardinality(evaluateSql);
+    }
+    return evaluateSql;
+  }
+
   hllInit(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
   hllMerge(sql) {
+    throw new UserError('Distributed approximate distinct count is not supported by this DB');
+  }
+
+  hllCardinality(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 

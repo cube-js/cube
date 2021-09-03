@@ -92,6 +92,10 @@ export class CubeStoreQuery extends BaseQuery {
     return `cardinality(merge(${sql}))`;
   }
 
+  public hllCardinality(sql) {
+    return `cardinality(${sql})`;
+  }
+
   public countDistinctApprox(sql) {
     // TODO: We should throw an error, but this gets called even when only `hllMerge` result is used.
     return `approx_distinct_is_unsupported_in_cubestore(${sql}))`;
@@ -126,7 +130,8 @@ export class CubeStoreQuery extends BaseQuery {
         cumulativeMeasuresWithoutMultiplied,
         regularMeasures.concat(multipliedMeasures),
         this.evaluateSymbolSqlWithContext(() => this.preAggregations?.rollupPreAggregation(preAggregationForQuery, allMeasures, false, filters), {
-          granularityOverride
+          granularityOverride,
+          overTimeSeriesAggregate: true
         }),
         baseQueryAlias,
         timeDimension,
@@ -135,7 +140,8 @@ export class CubeStoreQuery extends BaseQuery {
       {
         wrapQuery: true,
         wrappedGranularity: timeDimension?.granularity || rollupGranularity,
-        rollupGranularity: granularityOverride
+        rollupGranularity: granularityOverride,
+        topLevelMerge: false
       }
     );
   }
@@ -211,7 +217,8 @@ export class CubeStoreQuery extends BaseQuery {
           const preceding = rollingWindow.trailing ? `${this.toInterval(rollingWindow.trailing)} PRECEDING` : '';
           const following = rollingWindow.leading ? `${this.toInterval(rollingWindow.leading)} FOLLOWING` : '';
           const offset = ` OFFSET ${rollingWindow.offset || 'end'}`;
-          return `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following}${offset})`;
+          const rollingMeasure = `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following}${offset})`;
+          return this.topAggregateWrap(m.measureDefinition(), rollingMeasure);
         } else {
           const conditionFn = m.isCumulative() ? this.dateFromStartToEndConditionSql(m.dateJoinCondition(), true, true)[0] : timeDimension;
           return this.evaluateSymbolSqlWithContext(
