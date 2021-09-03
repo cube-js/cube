@@ -150,7 +150,7 @@ export class PreAggregations {
       dataSource: queryForSqlEvaluation.dataSource,
       partitionGranularity: preAggregation.partitionGranularity,
       preAggregationStartEndQueries:
-        preAggregation.partitionGranularity &&
+        (preAggregation.partitionGranularity || preAggregation.granularity) &&
         this.refreshRangeQuery().preAggregationStartEndQueries(cube, preAggregation),
       matchedTimeDimensionDateRange:
         preAggregation.partitionGranularity && (
