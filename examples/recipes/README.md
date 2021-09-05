@@ -17,6 +17,7 @@ These recipes will show you the best practices of using Cube.js.
 ### Data sources
 
 - [Enable SSL Connections to the Database](https://cube.dev/docs/recipes/enable-ssl-connections-to-database)
+- [Using Multiple Data Sources](https://cube.dev/docs/recipes/multiple-sources-same-schema)
 
 ### Data schema
 
