@@ -18,6 +18,7 @@ const config = {
     'gatsby-plugin-sharp',
     'gatsby-plugin-root-import',
     `gatsby-plugin-sitemap`,
+    `gatsby-env-variables`,
     {
       resolve: 'gatsby-plugin-manifest',
       options: {
