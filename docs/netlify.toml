@@ -8,3 +8,6 @@
   publish = "dist/"
   command = "source .env.production && ./build-netlify-prod.sh"
   ignore = "cd .. && git diff --quiet HEAD^ HEAD -- docs/"
+
+[context.deploy-preview.environment]
+  DEPLOY_PREVIEW_NETLIFY = "true"
