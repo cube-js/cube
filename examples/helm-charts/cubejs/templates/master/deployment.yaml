@@ -31,14 +31,34 @@ spec:
               protocol: TCP
           env:
             {{- include "cubejs.common-env" . | nindent 12 }}
+          {{- if .Values.master.livenessProbe.enabled }}
           livenessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-          readinessProbe:
+            initialDelaySeconds: {{ .Values.master.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.master.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.master.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.master.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.master.livenessProbe.failureThreshold }}
             httpGet:
               path: /livez
               port: http
+          {{- else if .Values.master.customLivenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.master.customLivenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.master.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.master.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.master.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.master.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.master.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.master.readinessProbe.failureThreshold }}
+            httpGet:
+              path: /readyz
+              port: http
+          {{- else if .Values.master.customReadinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.master.customReadinessProbe | nindent 12 }}
+          {{- end }}
           {{- if .Values.master.resources }}
           resources:
             {{- toYaml .Values.master.resources | nindent 12 }}
