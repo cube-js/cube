@@ -16,7 +16,7 @@ const createTotalByStatusMeasure = (status) => ({
   },
 });
 
-const createPercentangeMeasure = (status) => ({
+const createPercentageMeasure = (status) => ({
   [`Percentage_of_${status}`]: {
     type: `number`,
     format: `percent`,
@@ -40,7 +40,7 @@ cube(`Orders`, {
       (all, status) => ({
         ...all,
         ...createTotalByStatusMeasure(status),
-        ...createPercentangeMeasure(status),
+        ...createPercentageMeasure(status),
       }),
       {}
     )
