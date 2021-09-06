@@ -67,7 +67,6 @@
     "gatsby-plugin-sitemap": "^4",
     "gatsby-redirect-from": "^0.2.4",
     "gatsby-remark-copy-linked-files": "^3",
-    "gatsby-remark-custom-blocks": "^3",
     "gatsby-remark-find-replace": "^0.3.0",
     "gatsby-remark-images": "^5",
     "gatsby-remark-mathjax-ssr": "^1",

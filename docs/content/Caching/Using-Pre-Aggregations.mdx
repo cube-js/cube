@@ -1,0 +1,357 @@
+---
+title: Using Pre-Aggregations
+permalink: /caching/using-pre-aggregations
+category: Caching
+menuOrder: 3
+---
+
+Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
+many configuration options to consider. Please make sure to also check [the
+Pre-Aggregations reference in the data schema section][ref-schema-ref-preaggs].
+
+## Refresh Strategy
+
+Refresh strategy can be customized by setting the
+[`refreshKey`][ref-schema-ref-preaggs-refresh-key] property for the
+pre-aggregation.
+
+The default value of [`refreshKey`][ref-schema-ref-preaggs-refresh-key] is
+`every: '1 hour'`. It can be redefined either by overriding the default value of
+the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
+
+```javascript
+cube(`Orders`, {
+
+  ...,
+
+  preAggregations: {
+    amountByCreated: {
+      type: `rollup`,
+      measures: [amount],
+      timeDimension: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        every: `12 hour`,
+      },
+    },
+  },
+});
+```
+
+Or by providing a [`sql` property][ref-schema-ref-preaggs-refresh-key-sql]
+instead, and leaving `every` unchanged from its' default value:
+
+```javascript
+cube(`Orders`, {
+
+  ...,
+
+  preAggregations: {
+    amountByCreated: {
+      measures: [amount],
+      timeDimension: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        // every will default to `10 seconds` here
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+Or both `every` and `sql` can be defined together:
+
+```javascript
+cube(`Orders`, {
+
+  ...,
+
+  preAggregations: {
+    amountByCreated: {
+      measures: [amount],
+      timeDimension: createdAt,
+      granularity: `month`,
+      refreshKey: {
+        every: `12 hour`,
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+When `every` and `sql` are used together, Cube.js will run the query from the
+`sql` property on an interval defined by the `every` property. If the query
+returns new results, then the pre-aggregation will be refreshed.
+
+## Rollup Only Mode
+
+To make Cube.js _only_ serve requests from pre-aggregations, the
+[`CUBEJS_ROLLUP_ONLY` environment variable][ref-config-env-general] can be set
+to `true` on an API instance. This will prevent serving data on API requests
+from the source database.
+
+<WarningBox>
+
+When using this configuration in a single node deployment (where the API
+instance and [Refresh Worker ][ref-deploy-refresh-wrkr] are configured on the
+same host), requests made to the API that cannot be satisfied by a rollup throw
+an error. Scheduled refreshes will continue to work in the background.
+
+</WarningBox>
+
+## Partitioning
+
+[Partitioning][wiki-partitioning] is an extremely effective optimization for
+accelerating pre-aggregations build and refresh time. It effectively "shards"
+the data between multiple tables, splitting them by a defined attribute. Cube
+can be configured to incrementally refresh only the last set of partitions
+through the `updateWindow` property. This leads to faster refresh times due to
+unnecessary data not being reloaded, and even reduced cost for some databases
+like [BigQuery](/config/databases/google-bigquery) or
+[AWS Athena](/config/databases/aws-athena).
+
+Any `rollup` pre-aggregation can be partitioned by time using the
+`partitionGranularity` property in [a pre-aggregation
+definition][ref-schema-ref-preaggs]. In the example below, the
+`partitionGranularity` is set to `month`, which means Cube will generate
+separate tables for each month's worth of data. Once built, it will continue to
+refresh on a daily basis the last 3 months of data.
+
+```javascript
+cube(`Orders`, {
+  sql: `select * from orders`,
+
+  ...,
+
+  preAggregations: {
+    categoryAndDate: {
+      measures: [Orders.count, revenue],
+      dimensions: [category],
+      timeDimension: createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+      refreshKey: {
+        every: `1 day`,
+        incremental: true,
+        updateWindow: `3 months`
+      }
+    },
+  },
+});
+```
+
+## Inspecting Pre-Aggregations
+
+Cube Store partially supports the MySQL protocol. This allows you to execute
+simple queries using a familiar SQL syntax. You can connect using the MySQL CLI
+client, for example:
+
+```bash
+mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore
+```
+
+To check which pre-aggregations are managed by Cube Store, you could run the
+following query:
+
+```sql
+SELECT * FROM information_schema.tables;
++----------------------+-----------------------------------------------+
+| table_schema         | table_name                                    |
++----------------------+-----------------------------------------------+
+| dev_pre_aggregations | orders_main20190101_23jnqarg_uiyfxd0f_1gifflf |
+| dev_pre_aggregations | orders_main20190301_24ph0a1c_utzntnv_1gifflf  |
+| dev_pre_aggregations | orders_main20190201_zhrh5kj1_rkmsrffi_1gifflf |
+| dev_pre_aggregations | orders_main20191001_mdw2hxku_waxajvwc_1gifflf |
+| dev_pre_aggregations | orders_main20190701_izc2tl0h_bxsf1zlb_1gifflf |
++----------------------+-----------------------------------------------+
+5 rows in set (0.01 sec)
+```
+
+These pre-aggregations are stored as Parquet files under the `.cubestore/`
+folder in the project root during development.
+
+## Pre-Aggregations Storage
+
+The default pre-aggregations storage in Cube.js is its own purpose-built storage
+layer: Cube Store.
+
+Alternatively, you can store pre-aggregations either **internally** in the
+source database, or **externally** in databases such as MySQL or Postgres.
+
+In order to make external pre-aggregations work outside of Cube Store, you
+should set the [`externalDriverFactory`][ref-config-extdriverfactory] and
+[`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
+configuration file. These properties can also be set through the environment
+variables.
+
+```bash
+CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
+CUBEJS_EXT_DB_PORT=<YOUR_DB_PORT_HERE>
+CUBEJS_EXT_DB_NAME=<YOUR_DB_NAME_HERE>
+CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
+CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
+CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
+```
+
+<WarningBox>
+
+Please be aware of the limitations when using internal and external (outside of
+Cube Store) pre-aggregations.
+
+</WarningBox>
+
+<div style="text-align: center">
+  <img
+    alt="Internal vs External vs External with Cube Store diagram"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-aggregations.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+#### Some known limitations when using Postgres/MySQL as a storage layer listed below.
+
+**Performance issues with high cardinality rollups:** Queries over billions of
+datapoints or higher start exhibiting severe latency issues, negatively
+impacting end-user experience.
+
+**Lack of HyperLogLog support:** The HyperLogLog algorithm makes fast work of
+distinct counts in queries, a common analytical operation. Unfortunately,
+support between database vendors varies greatly, and therefore cannot be
+guaranteed.
+
+**Degraded performance for big `UNION ALL` queries:** A practical example of
+this would be when querying over a date range using a pre-aggregation with a
+`partitionGranularity`. The query would use several partitioned tables to
+deliver the result set, and therefore needs to join all valid partitions.
+
+**Poor JOIN performance across rolled up tables:** This often affects workloads
+which require cross database joins.
+
+**Table/schema name length mismatches:** A common issue when working across
+different database types is that different databases have different length
+limits on table names. Cube.js allows working around the issue with `sqlAlias`
+but this becomes cumbersome with lots of pre-aggregations.
+
+**SQL type differences between source and external database:** Different
+databases often specify types differently, which can cause type mismatch issues.
+This is also a common issue and source of frustration which Cube Store resolves.
+
+#### Internal pre-aggregations
+
+Internal pre-aggregations are not considered production-ready due to several
+shortcomings, as noted below.
+
+**Concurrency:** Databases (especially RDBMs) generally cannot handle high
+concurrency without special configuration. Application databases such as MySQL
+and Postgres do support concurrency, but often cannot cope with the demands of
+analytical queries without significant tuning. On the other hand, data
+warehousing solutions such as Athena and BigQuery often limit the number of
+concurrent connections too.
+
+**Latency:** Data warehousing solutions (such as BigQuery or Redshift) are often
+slow to return results.
+
+**Cost:** Some databases charge by the amount of data scanned for each query
+(such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
+rack up costs.
+
+## Optimizing Pre-Aggregation Build Times
+
+<InfoBox>
+
+For ideal performance, pre-aggregations should be built using a dedicated
+Refresh Worker. [See here for more details][ref-prod-list-refresh].
+
+</InfoBox>
+
+By default, Cube.js will use the source database as a temporary staging area for
+writing pre-aggregations to determine column types. The data is loaded back into
+memory before writing them to Cube Store (or an external database).
+
+<div style="text-align: center">
+  <img
+    alt="Internal vs External vs External with Cube Store diagram"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-regular.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+If the dataset is large (more than 100k rows), then Cube.js can face issues when
+the Node runtime runs out of memory.
+
+### <--{"id" : "Optimizing Pre-Aggregation Build Times"}--> Batching
+
+Batching is a more performant strategy where Cube.js sends compressed CSVs for
+Cube Store to ingest.
+
+<div style="text-align: center">
+  <img
+    alt="Internal vs External vs External with Cube Store diagram"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-batching.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+The performance scales to the amount of memory available on the Cube.js
+instance. Batching is automatically enabled for any databases that can support
+it.
+
+### <--{"id" : "Optimizing Pre-Aggregation Build Times"}--> Export bucket
+
+When dealing with larger pre-aggregations (more than 100k rows), performance can
+be significantly improved by using an export bucket. This allows the source
+database to persist data directly into cloud storage, which is then loaded into
+Cube Store in parallel:
+
+<div style="text-align: center">
+  <img
+    alt="Internal vs External vs External with Cube Store diagram"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-export-bucket.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+Enabling the export bucket functionality requires extra configuration; please
+refer to the database-specific documentation for more details:
+
+- [AWS Athena][ref-connect-db-athena] (coming soon)
+- [AWS Redshift][ref-connect-db-redshift]
+- [BigQuery][ref-connect-db-bigquery]
+- [Snowflake][ref-connect-db-snowflake]
+
+When using cloud storage, it is important to correctly configure any data
+retention policies to clean up the data in the export bucket as Cube.js does not
+currently manage this. For most use-cases, 1 day is sufficient.
+
+[ref-caching-in-mem-default-refresh-key]: /caching#default-refresh-keys
+[ref-config-connect-db]: /connecting-to-the-database
+[ref-config-driverfactory]: /config#driver-factory
+[ref-config-env]: /reference/environment-variables#cube-store
+[ref-config-env-general]: /config#general
+[ref-config-extdbtype]: /config#external-db-type
+[ref-config-extdriverfactory]: /config#external-driver-factory
+[ref-connect-db-athena]: /config/databases/aws-athena
+[ref-connect-db-redshift]: /config/databases/aws-redshift
+[ref-connect-db-bigquery]: /config/databases/google-bigquery
+[ref-connect-db-mysql]: /config/databases/mysql
+[ref-connect-db-postgres]: /config/databases/postgres
+[ref-connect-db-snowflake]: /config/databases/snowflake
+[ref-schema-timedimension]: /types-and-formats#types-time
+[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
+[ref-schema-ref-preaggs-refresh-key]:
+  /schema/reference/pre-aggregations#refresh-key
+[ref-schema-ref-preaggs-refresh-key-every]:
+  /schema/reference/pre-aggregations#refresh-key-every
+[ref-schema-ref-preaggs-refresh-key-sql]:
+  /schema/reference/pre-aggregations#refresh-key-sql
+[ref-deploy-refresh-wrkr]: /deployment/overview#refresh-worker
+[ref-schema-ref-preaggs-sched-refresh]:
+  /schema/reference/pre-aggregations#scheduled-refresh
+[ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
+[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)

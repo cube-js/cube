@@ -81,29 +81,6 @@ const config = {
               prefix: '%',
             },
           },
-          {
-            resolve: 'gatsby-remark-custom-blocks',
-            options: {
-              blocks: {
-                danger: {
-                  classes: 'danger',
-                  title: 'optional',
-                },
-                info: {
-                  classes: 'info',
-                  title: 'optional',
-                },
-                warning: {
-                  classes: 'warning',
-                  title: 'optional',
-                },
-                success: {
-                  classes: 'success',
-                  title: 'optional',
-                },
-              },
-            },
-          },
         ]
       }
     },

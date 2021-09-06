@@ -26,6 +26,7 @@ import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
 import GitHubCodeBlock from '../components/GitHubCodeBlock';
 import CubeQueryResultSet from '../components/CubeQueryResultSet';
 import GitHubFolderLink from '../components/GitHubFolderLink';
+import { DangerBox, InfoBox, SuccessBox, WarningBox } from '../components/AlertBox/AlertBox';
 
 const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
 const MyH3 = (props) => {
@@ -54,7 +55,7 @@ const MyH3 = (props) => {
   return <h3 name={kebabCase(props.children)} {...props} />;
 };
 
-const components = { GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
+const components = { DangerBox, InfoBox, SuccessBox, WarningBox, GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
 
 const MDX = (props) => (
   <MDXProvider components={components}>
