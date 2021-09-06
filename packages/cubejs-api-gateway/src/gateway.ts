@@ -468,7 +468,6 @@ export class ApiGateway {
     try {
       const metaConfig = await this.getCompilerApi(context).metaConfig({
         requestId: context.requestId,
-        filterOutHiddenMembers: true,
       });
       const cubes = metaConfig
         .map((meta) => meta.config)
