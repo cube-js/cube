@@ -57,17 +57,17 @@ requests with different JWTs:
 
 ```javascript
 {
-  "role": "manager",
   "iat": 1000000000,
-  "exp": 5000000000
+  "exp": 5000000000,
+  "role": "manager"
 }
 ```
 
 ```javascript
 {
-  "role": "operator",
   "iat": 1000000000,
-  "exp": 5000000000
+  "exp": 5000000000,
+  "role": "operator"
 }
 ```
 
