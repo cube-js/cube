@@ -254,7 +254,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
                     Schema files are located and can be edited in the mount
                     volume directory.{' '}
                     <Typography.Link
-                      href="https://cube.dev/docs/getting-started-cubejs-schema"
+                      href="https://cube.dev/docs/schema/getting-started"
                       target="_blank"
                     >
                       Learn more about working with Cube.js data schema in the
