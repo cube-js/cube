@@ -1,5 +1,5 @@
 require('dotenv').config({
-  path: `.env.${process.env.NODE_ENV}`,
+  path: `.env.${process.env.DEPLOY_PREVIEW_NETLIFY ? 'development' : process.env.NODE_ENV}`,
 });
 
 const PACKAGE_VERSION = require('../lerna.json').version;
