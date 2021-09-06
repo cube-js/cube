@@ -56,7 +56,7 @@ const Prod: React.FC<Props> = (props) => (
 
 const Head: React.FC<Props> = (props) => {
   return process.env.NODE_ENV === 'production' &&
-    !process.env.DEPLOY_PREVIEW_NETLIFY ? (
+    !DEPLOY_PREVIEW_NETLIFY ? (
     <Prod {...props} />
   ) : (
     <Dev {...props} />
