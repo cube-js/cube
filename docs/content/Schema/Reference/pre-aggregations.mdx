@@ -511,8 +511,8 @@ You can incrementally refresh partitioned rollups by setting
 
 Partition tables are refreshed as a whole. When a new partition table is
 available, it replaces the old one. Old partition tables are collected by
-[Garbage Collection][ref-caching-garbage-collection]. Append is never used to
-add new rows to the existing tables.
+a garbage collection mechanism. Append is never used to add new rows to the
+existing tables.
 
 </WarningBox>
 
@@ -584,8 +584,8 @@ underlying SQL calculations every time it builds new rollup tables.
 
 `originalSql` pre-aggregations **must only** be used when [storing
 pre-aggregations on the source database][ref-caching-using-preaggs-internal].
-This also means that `originalSql` pre-aggregations require
-[`readOnly: false`][ref-caching-readonly].
+This also means that `originalSql` pre-aggregations require `readOnly: false`
+to be set on their respective database driver.
 
 </WarningBox>
 
@@ -750,11 +750,8 @@ cube(`Orders`, {
 ```
 
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
-[ref-caching-garbage-collection]:
-  /caching/using-pre-aggregations#garbage-collection
 [ref-caching-preaggs-target]:
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
-[ref-caching-readonly]: /caching/using-pre-aggregations#read-only-data-source
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-config-driverfactory]: /config/#driver-factory

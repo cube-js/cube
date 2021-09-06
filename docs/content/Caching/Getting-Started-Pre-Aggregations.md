@@ -152,10 +152,8 @@ data in this pre-aggregated dataset might look like:
 Pre-aggregations can become out-of-date or out-of-sync if the original dataset
 changes. [Cube.js uses a refresh key to check the freshness of the
 data][ref-caching-preaggs-refresh]; if a change in the refresh key is detected,
-the pre-aggregations are rebuilt.
-
-These refreshes can be done on-demand, or [in the background as a scheduled
-process][ref-caching-preaggs-bk-refresh].
+the pre-aggregations are rebuilt. These refreshes are performed in the
+background as a scheduled process, unless configured otherwise.
 
 ## Ensuring pre-aggregations are targeted by queries
 
@@ -483,8 +481,6 @@ Some extra considerations for pre-aggregation selection:
   instruct Cube.js to use the original SQL pre-aggregations by using
   [`useOriginalSqlPreAggregations`][ref-schema-preaggs-origsql].
 
-[ref-caching-preaggs-bk-refresh]:
-  /caching/using-pre-aggregations#background-refresh
 [ref-caching-preaggs-cubestore]:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-caching-preaggs-refresh]: /caching/using-pre-aggregations#refresh-strategy
