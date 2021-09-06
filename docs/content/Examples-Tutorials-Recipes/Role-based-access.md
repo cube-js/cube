@@ -55,18 +55,20 @@ module.exports = {
 To get the number of orders as a manager or operator, we will send two identical
 requests with different JWTs:
 
-```bash
-// Manager
-curl cube:4000/cubejs-api/v1/load \
--H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoibWFuYWdlciIsImlhdCI6MTYyODc0NTAxMSwiZXhwIjoxODAxNTQ1MDExfQ.1cOAjRHhrFKD7Tg3g57ppVm5nX4eI0zSk8JMbinfzTk" \
--G -s --data-urlencode "query={"dimensions": ["Orders.status"], "timeDimensions": [], "order": {"Orders.count": "desc"}, "measures": ["Orders.count"],"filters": []}"
+```javascript
+{
+  "role": "manager",
+  "iat": 1000000000,
+  "exp": 5000000000
+}
 ```
 
-```bash
-// Operator
-curl cube:4000/cubejs-api/v1/load \
--H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
--G -s --data-urlencode "query={"dimensions": ["Orders.status"], "timeDimensions": [], "order": {"Orders.count": "desc"}, "measures": ["Orders.count"],"filters": []}"
+```javascript
+{
+  "role": "operator",
+  "iat": 1000000000,
+  "exp": 5000000000
+}
 ```
 
 ## Result

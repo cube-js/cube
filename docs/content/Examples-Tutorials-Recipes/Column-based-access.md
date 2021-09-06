@@ -29,8 +29,8 @@ cube(`Products`, {
   joins: {
     Suppliers: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.supplier_id = ${Suppliers}.id`
-    }
+      sql: `${CUBE}.supplier_id = ${Suppliers}.id`,
+    },
   },
 
   dimensions: {
@@ -90,18 +90,20 @@ module.exports = {
 To get the supplier's products, we will send two identical requests with
 different emails inside JWTs.
 
-```bash
-// purus.accumsan@Proin.org
-curl cube:4000/cubejs-api/v1/load \
--H "Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJwdXJ1cy5hY2N1bXNhbkBQcm9pbi5vcmcifQ.vA_pzTOBYS10D2mhno0COJux7hhchfNmx-eh52SwSko" \
--G -s --data-urlencode "query={"measures": [],"order": {"Suppliers.email": "asc"}, "dimensions": ["Products.name"]}"
+```javascript
+{
+  "iat": 1000000000,
+  "exp": 5000000000,
+  "email": "purus.accumsan@Proin.org"
+}
 ```
 
-```bash
-// gravida.sit.amet@risus.net
-curl cube:4000/cubejs-api/v1/load \
--H "Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE2MjkyNjY0NzAsImV4cCI6MTY5MjMzODQ3MCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJncmF2aWRhLnNpdC5hbWV0QHJpc3VzLm5ldCJ9.ZOkiky821CZwoNi3VTcTsiiULl5tBkjmgX-1uW0UEjA" \
--G -s --data-urlencode "query={"measures": [], "order": {"Suppliers.email": "asc"}, "dimensions": ["Products.name"]}"
+```javascript
+{
+  "iat": 1000000000,
+  "exp": 5000000000,
+  "email": "gravida.sit.amet@risus.net"
+}
 ```
 
 ## Result
