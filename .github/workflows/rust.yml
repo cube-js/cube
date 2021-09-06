@@ -187,7 +187,7 @@ jobs:
         run: |
           cd rust && cargo build --release --target=${{ matrix.target }}
       - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ startsWith(matrix.os, 'macos') }}
         run: |
           brew update
           brew install upx
