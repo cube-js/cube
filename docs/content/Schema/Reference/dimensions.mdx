@@ -16,13 +16,14 @@ have dimensions like `country`, `age`, `occupation`, etc.
 
 Any dimension should have the following properties: `name`, `sql` and `type`.
 
+## Naming
+
 You can name a dimension by following the same rules as for measure, so each
 name should:
 
 - Be unique within a cube
 - Start with a lowercase letter
-
-You can use `0-9`, `_`, and letters when naming a dimension.
+- Consist of numbers, letters and `_`
 
 ```javascript
 cube(`Products`, {

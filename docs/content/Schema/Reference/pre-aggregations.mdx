@@ -27,8 +27,8 @@ Pre-aggregations can be defined in the `preAggregations` available on each cube.
 ## Naming
 
 Pre-aggregations must have, at minimum, a name and a type. This name, along with
-the name of the cube will be used as a prefix for pre-aggregation tables created
-in the database.
+the [name of the cube][ref-schema-cube-naming] will be used as a prefix for
+pre-aggregation tables created in the database.
 
 Pre-aggregation names should:
 
@@ -763,6 +763,7 @@ cube(`Orders`, {
   /deployment/production-checklist#set-up-refresh-worker
 [ref-recipe-funnels]: /recipes/funnels
 [ref-sqlalias]: /schema/reference/cube#sql-alias
+[ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments

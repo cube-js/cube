@@ -49,9 +49,11 @@ cube(`Users`, {
 
 ## Naming
 
-There are certain rules to follow for a cube and cube member names. You can use
-only `0-9`, `_` and letter characters when naming a cube or a cube member. Names
-**must** always start with a letter.
+There are certain rules to follow for a cube and cube member names:
+
+- Be unique within the project
+- Start with a letter
+- Consist of numbers, letters and `_`
 
 As a convention, cube names start with upper case letters and member names with
 lower case letters. As in JavaScript, [camel case][wiki-camelcase] is used for
@@ -94,7 +96,7 @@ cube(`Users`, {
 });
 
 cube(`Contacts`, {
-  sql: `select * from contacts`
+  sql: `select * from contacts`,
 
   // primary key
   ...

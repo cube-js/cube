@@ -34,6 +34,23 @@ The semantics of `INNER JOIN` can be achieved with additional filtering. For
 example, a simple check of whether the column value `IS NOT NULL` by using [set
 filter][ref-restapi-query-filter-op-set] satisfies this requirement.
 
+## Naming
+
+The name of a join should match the [name of the external
+cube][ref-schema-cube-naming]. For example when a `Products` cube is being
+joined on to an `Orders` cube, we would define the join as follows:
+
+```javascript
+cube('Orders', {
+  joins: {
+    Products: {
+      relationship: `belongsTo`,
+      sql: `${CUBE.id} = Products.orderId`,
+    },
+  },
+});
+```
+
 ## Parameters
 
 ### <--{"id" : "Parameters"}--> relationship
@@ -282,5 +299,6 @@ algorithm][wiki-djikstra-alg] to find join path between cubes given requested
 members.
 
 [ref-schema-advanced-join-direction]: /direction-of-joins
+[ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-restapi-query-filter-op-set]: query-format#set
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm

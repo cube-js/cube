@@ -15,13 +15,14 @@ aggregation over a certain column in your database table.
 
 Any measure should have the following properties: `name`, `sql` and `type`.
 
+## Naming
+
 When you give a name to a measure, there are certain rules to follow. Each
 measure should:
 
 - Be unique within a cube
 - Start with a lowercase letter
-
-You can use `0-9`, `_`, and letters when naming a measure.
+- Consist of numbers, letters and `_`
 
 ```javascript
 cube(`Orders`, {
