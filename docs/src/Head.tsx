@@ -40,30 +40,30 @@ const Prod: React.FC<Props> = (props) => (
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <script
-      src={`${
-        process.env.DEPLOY_PREVIEW_NETLIFY ? '' : process.env.PATH_PREFIX
-      }/scripts/prism.js`}
-    />
+    <script src={`${process.env.PATH_PREFIX}/scripts/prism.js`} />
     <script
       type="text/javascript"
       src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"
     ></script>
     <link
-      href={`${
-        process.env.DEPLOY_PREVIEW_NETLIFY ? '' : process.env.PATH_PREFIX
-      }/styles/content.css`}
+      href={`${process.env.PATH_PREFIX}/styles/content.css`}
       rel="stylesheet"
     />
     {props.css}
   </head>
 );
 
-const Head: React.FC<Props> = (props) =>
-  process.env.NODE_ENV === 'production' ? (
+const Head: React.FC<Props> = (props) => {
+  console.log(
+    process.env.NODE_ENV === 'production' && !process.env.DEPLOY_PREVIEW_NETLIFY
+  );
+  console.log(process.env);
+  return process.env.NODE_ENV === 'production' &&
+    !process.env.DEPLOY_PREVIEW_NETLIFY ? (
     <Prod {...props} />
   ) : (
     <Dev {...props} />
   );
+}
 
 export default Head;
