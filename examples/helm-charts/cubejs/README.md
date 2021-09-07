@@ -171,7 +171,7 @@ cubestore:
 | `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`      |
 | `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent` |
 
-### config parameters
+### Config parameters
 
 | Name                               | Description                                                                                                                     | Value   |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
