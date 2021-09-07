@@ -8,6 +8,7 @@ table {
   border-collapse: separate;
   font-size: 16px;
   line-height: 26px;
+  table-layout: fixed;
 }
 
 table code {
@@ -36,6 +37,7 @@ th, td {
 tbody > tr:not(:last-child), thead > tr {
   & > td, & > th {
     border-bottom: 1px solid #E5E4F7;
+    overflow-wrap: break-word;
   }
 }
 
