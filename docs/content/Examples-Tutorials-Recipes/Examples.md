@@ -6,7 +6,9 @@ redirect_from:
   - /tutorials/
 ---
 
-Below you can find tutorials to help you get started with Cube.js.
+Below you can find tutorials to help you get started with Cube.js. If you're
+already building something with Cube, please explore [recipes](/recipes) —
+short, self-contained, and runnable solutions to popular use cases.
 
 <!-- Also, please review the [recipes](#recipes) for common use cases. -->
 
@@ -17,7 +19,7 @@ These tutorials are great places to start learning Cube.js:
 - [Cube.js, the Open Source Dashboard Framework: Ultimate Guide](https://cube.dev/blog/cubejs-open-source-dashboard-framework-ultimate-guide)
   — launch an API with Cube.js and build a dashboard with React
 
-- [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js) -
+- [Building MongoDB Dashboard using Node.js](https://cube.dev/blog/building-mongodb-dashboard-using-node.js) —
   learn how to use MongoDB Connector for BI to connect Cube.js to MongoDB
 
 - [React Dashboard: an Ultimate Guide](https://react-dashboard.cube.dev) — learn
@@ -30,12 +32,12 @@ These tutorials are great places to start learning Cube.js:
 
 The following tutorials cover advanced concepts of Cube.js:
 
-- [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) -
+- [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) —
   learn about pre-aggregations, one of the most powerful Cube.js features that
   significantly speed up the performance of your applications such as dashboards
   and reports
 
-- _Building an Open Source Mixpanel Alternative_ - a two-part series on building
+- _Building an Open Source Mixpanel Alternative_ — a two-part series on building
   a production-ready application with Cube.js:
   [Part 1: Collecting and Displaying Events](https://cube.dev/blog/building-an-open-source-mixpanel-alternative-1),
   [Part 2: Conversion Funnels ](https://cube.dev/blog/building-open-source-mixpanel-alternative-2/)
