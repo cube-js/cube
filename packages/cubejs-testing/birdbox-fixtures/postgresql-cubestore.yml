@@ -3,7 +3,7 @@ version: "2.2"
 services:
   cube:
     container_name: birdbox-cube
-    image: sha256:b507e3e32d76cbbaaffe2c8eda3883c1a9d76014153a36b2e70ab2fa556ec6d4
+    image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
     environment:
       CUBEJS_DB_TYPE: postgres
       CUBEJS_DB_HOST: db
