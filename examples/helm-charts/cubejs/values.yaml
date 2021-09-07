@@ -28,7 +28,7 @@ image:
   ##
   pullPolicy: IfNotPresent
 
-global:
+config:
   ## The port for a Cube.js deployment to listen to API connections on
   ##
   apiPort: 4000
@@ -44,6 +44,10 @@ global:
   ## The logging level for Cube.js.
   ##
   logLevel: "warn"
+
+  ## If true, uses Cube Store for Pre-aggregation storage and caching
+  ##
+  externalDefault: true
 
   ## If true, then send telemetry to CubeJS
   ##

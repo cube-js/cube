@@ -1,61 +1,74 @@
 {{- define "cubejs.common-env" -}}
 - name: PORT
-  value: {{ .Values.global.apiPort | quote }}
-{{- if .Values.global.debug }}
+  value: {{ .Values.config.apiPort | quote }}
+{{- if .Values.config.debug }}
 - name: DEBUG_LOG
-  value: {{ .Values.global.debug | quote }}
+  value: {{ .Values.config.debug | quote }}
 {{- end }}
-{{- if .Values.global.devMode }}
+{{- if .Values.config.devMode }}
 - name: CUBEJS_DEV_MODE
-  value: {{ .Values.global.devMode | quote }}
+  value: {{ .Values.config.devMode | quote }}
 {{- end }}
-{{- if .Values.global.logLevel }}
+{{- if .Values.config.logLevel }}
 - name: CUBEJS_LOG_LEVEL
-  value: {{ .Values.global.logLevel | quote }}
+  value: {{ .Values.config.logLevel | quote }}
 {{- end }}
-{{- if .Values.global.app }}
+{{- if .Values.config.externalDefault }}
+- name: CUBEJS_EXTERNAL_DEFAULT
+  value: {{ .Values.config.externalDefault | quote }}
+{{- end }}
+{{- if .Values.config.app }}
 - name: CUBEJS_APP
-  value: {{ .Values.global.app | quote }}
+  value: {{ .Values.config.app | quote }}
 {{- end }}
-{{- if .Values.global.cacheAndQueueDriver }}
+{{- if .Values.config.cacheAndQueueDriver }}
 - name: CUBEJS_CACHE_AND_QUEUE_DRIVER
-  value: {{ .Values.global.cacheAndQueueDriver | quote }}
+  value: {{ .Values.config.cacheAndQueueDriver | quote }}
 {{- end }}
-{{- if .Values.global.rollupOnly }}
+{{- if .Values.config.rollupOnly }}
 - name: CUBEJS_ROLLUP_ONLY
-  value: {{ .Values.global.rollupOnly | quote }}
+  value: {{ .Values.config.rollupOnly | quote }}
 {{- end }}
-{{- if .Values.global.scheduledRefreshTimezones }}
+{{- if .Values.config.scheduledRefreshTimezones }}
 - name: CUBEJS_SCHEDULED_REFRESH_TIMEZONES
-  value: {{ .Values.global.scheduledRefreshTimezones | quote }}
+  value: {{ .Values.config.scheduledRefreshTimezones | quote }}
 {{- end }}
-{{- if .Values.global.preAggregationsSchema }}
+{{- if .Values.config.preAggregationsSchema }}
 - name: CUBEJS_PRE_AGGREGATIONS_SCHEMA
-  value: {{ .Values.global.preAggregationsSchema | quote }}
+  value: {{ .Values.config.preAggregationsSchema | quote }}
 {{- end }}
-{{- if .Values.global.webSockets }}
+{{- if .Values.config.webSockets }}
 - name: CUBEJS_WEB_SOCKETS
-  value: {{ .Values.global.webSockets | quote }}
+  value: {{ .Values.config.webSockets | quote }}
 {{- end }}
 - name: CUBEJS_TELEMETRY
-  value: {{ .Values.global.telemetry | quote }}
-{{- if .Values.global.apiSecret }}
+  value: {{ .Values.config.telemetry | quote }}
+{{- if .Values.config.apiSecret }}
 - name: CUBEJS_API_SECRET
-  value: {{ .Values.global.apiSecret | quote }}
-{{- else if .Values.global.apiSecretFromSecret }}
+  value: {{ .Values.config.apiSecret | quote }}
+{{- else if .Values.config.apiSecretFromSecret }}
 - name: CUBEJS_API_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ .Values.global.apiSecretFromSecret.name | required "global.apiSecretFromSecret.name is required" }}
-      key: {{ .Values.global.apiSecretFromSecret.key | required "global.apiSecretFromSecret.key is required" }}
+      name: {{ .Values.config.apiSecretFromSecret.name | required "config.apiSecretFromSecret.name is required" }}
+      key: {{ .Values.config.apiSecretFromSecret.key | required "config.apiSecretFromSecret.key is required" }}
 {{- end }}
-{{- if .Values.global.schemaPath }}
+{{- if .Values.config.schemaPath }}
 - name: CUBEJS_SCHEMA_PATH
-  value: {{ .Values.global.schemaPath | quote }}
+  value: {{ .Values.config.schemaPath | quote }}
 {{- end }}
-{{- if .Values.global.topicName }}
+{{- if .Values.config.topicName }}
 - name: CUBEJS_TOPIC_NAME
-  value: {{ .Values.global.topicName | quote }}
+  value: {{ .Values.config.topicName | quote }}
+{{- end }}
+{{- if .Values.global.redis.enabled }}
+- name: CUBEJS_REDIS_URL
+  value: {{ printf "redis://%s-redis-master:6379" .Release.Name }}
+- name: CUBEJS_REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ printf "%s-redis" .Release.Name }}
+      key: {{ printf "redis-password" }}
 {{- end }}
 {{- if .Values.redis.url }}
 - name: CUBEJS_REDIS_URL

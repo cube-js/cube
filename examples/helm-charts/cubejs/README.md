@@ -27,9 +27,9 @@ https://cube.dev/docs/reference/environment-variables
 
 ### Injecting schema
 
-To inject your schema files in the deployment you have to use `global.volumes` and `global.volumeMounts` values.
+To inject your schema files in the deployment you have to use `config.volumes` and `config.volumeMounts` values.
 
-Mount path is `/cube/conf/schema` by default and can be customized with the `global.schemaPath` value.
+Mount path is `/cube/conf/schema` by default and can be customized with the `config.schemaPath` value.
 
 A good practice is to use a ConfigMap to store your all the cube definition files:
 
@@ -63,7 +63,7 @@ data:
 
 ### Injecting javascript config
 
-To inject a javascript config in the deployment you can use `global.volumes` and `global.volumeMounts` values.
+To inject a javascript config in the deployment you can use `config.volumes` and `config.volumeMounts` values.
 
 Mount path is `/cube/conf/`
 
@@ -82,11 +82,11 @@ $ helm install my-release \
 # Set two workers (default 1)
 --set workers.workerCount=2 \
 # Mount schema volume from ConfigMap
---set global.volumes[0].name=schema \
---set global.volumes[0].configMap.name=cube-schema \
---set global.volumeMounts[0].name=schema \
---set global.volumeMounts[0].readOnly=true \
---set global.volumeMounts[0].mountPath=/cube/conf/schema \
+--set config.volumes[0].name=schema \
+--set config.volumes[0].configMap.name=cube-schema \
+--set config.volumeMounts[0].name=schema \
+--set config.volumeMounts[0].readOnly=true \
+--set config.volumeMounts[0].mountPath=/cube/conf/schema \
 # Database configuration using secret
 --set database.type=bigquery \
 --set database.bigquery.projectId=<project-id> \
@@ -114,7 +114,7 @@ $ helm install my-release -f path/to/values.yaml ./cubejs
 
 ```yaml
 # path/to/values.yaml
-global:
+config:
   volumes:
     - name: schema
       configMap:
@@ -171,28 +171,29 @@ cubestore:
 | `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`      |
 | `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent` |
 
-### Global parameters
+### Config parameters
 
 | Name                               | Description                                                                                                                     | Value   |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `global.apiPort`                   | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
-| `global.devMode`                   | If true, enables development mode                                                                                               | `false` |
-| `global.debug`                     | If true, enables debug logging                                                                                                  | `false` |
-| `global.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
-| `global.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
-| `global.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
-| `global.apiSecretFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
-| `global.apiSecretFromSecret.key`   | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
-| `global.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
-| `global.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
-| `global.rollupOnly`                | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
-| `global.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
-| `global.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
-| `global.preAggregationsSchema`     | The schema name to use for storing pre-aggregations true                                                                        |         |
-| `global.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
-| `global.topicName`                 | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
-| `global.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
-| `global.volumeMounts`              | The config volumeMounts. Will be used to both master and workers                                                                | `[]`    |
+| `config.apiPort`                   | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
+| `config.devMode`                   | If true, enables development mode                                                                                               | `false` |
+| `config.debug`                     | If true, enables debug logging                                                                                                  | `false` |
+| `config.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
+| `config.externalDefault`           | If true, uses Cube Store or an external database for storing Pre-aggregations                                                                           | `true`  |
+| `config.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
+| `config.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
+| `config.apiSecretFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
+| `config.apiSecretFromSecret.key`   | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
+| `config.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
+| `config.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
+| `config.rollupOnly`                | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
+| `config.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
+| `config.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
+| `config.preAggregationsSchema`     | The schema name to use for storing pre-aggregations true                                                                        |         |
+| `config.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
+| `config.topicName`                 | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
+| `config.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
+| `config.volumeMounts`              | The config volumeMounts. Will be used to both master and workers                                                                | `[]`    |
 
 ### Redis parameters
 

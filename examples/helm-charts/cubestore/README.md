@@ -72,12 +72,12 @@ By default local dir are not persisted. You can enable persistance on router and
 
 | Name                       | Description                                                                                                       | Value   |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------- |
-| `global.logLevel`          | The logging level for Cube Store                                                                                  | `error` |
-| `global.noUpload`          | If true, prevents uploading serialized pre-aggregations to cloud storage                                          |         |
-| `global.jobRunners`        | The number of parallel tasks that process non-interactive jobs like data insertion, compaction etc. Defaults to 4 |         |
-| `global.queryTimeout`      | The timeout for SQL queries in seconds. Defaults to 120                                                           |         |
-| `global.selectWorkers`     | The number of Cube Store sub-processes that handle SELECT queries. Defaults to 4                                  |         |
-| `global.walSplitThreshold` | The maximum number of rows to keep in a single chunk of data right after insertion. Defaults to 262144            |         |
+| `config.logLevel`          | The logging level for Cube Store                                                                                  | `error` |
+| `config.noUpload`          | If true, prevents uploading serialized pre-aggregations to cloud storage                                          |         |
+| `config.jobRunners`        | The number of parallel tasks that process non-interactive jobs like data insertion, compaction etc. Defaults to 4 |         |
+| `config.queryTimeout`      | The timeout for SQL queries in seconds. Defaults to 120                                                           |         |
+| `config.selectWorkers`     | The number of Cube Store sub-processes that handle SELECT queries. Defaults to 4                                  |         |
+| `config.walSplitThreshold` | The maximum number of rows to keep in a single chunk of data right after insertion. Defaults to 262144            |         |
 
 ### Remote dir parameters
 
