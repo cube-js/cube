@@ -11,6 +11,7 @@ import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
+  loadScript?: string;
 }
 
 export interface BirdBox {
@@ -74,16 +75,17 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   }
 
   {
-    console.log('[Birdbox] Executing load.sh script');
+    const loadScript = options.loadScript || 'load.sh';
+    console.log(`[Birdbox] Executing ${loadScript} script`);
 
-    const { output, exitCode } = await env.getContainer('birdbox-db').exec(['/scripts/load.sh']);
+    const { output, exitCode } = await env.getContainer('birdbox-db').exec([`/scripts/${loadScript}`]);
 
     if (exitCode === 0) {
-      console.log('[Birdbox] Script load.sh finished successfully');
+      console.log(`[Birdbox] Script ${loadScript} finished successfully`);
     } else {
       console.log(output);
 
-      console.log(`[Birdbox] Script load.sh finished with error: ${exitCode}`);
+      console.log(`[Birdbox] Script ${loadScript} finished with error: ${exitCode}`);
 
       await env.down();
 
