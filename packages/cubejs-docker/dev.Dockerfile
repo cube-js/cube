@@ -27,6 +27,7 @@ COPY packages/cubejs-linter packages/cubejs-linter
 # Backend
 COPY rust/package.json rust/package.json
 COPY rust/bin rust/bin
+COPY rust/dist rust/dist
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
 COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
@@ -107,9 +108,6 @@ COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
 COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
 COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
 COPY packages/cubejs-playground/ packages/cubejs-playground/
-
-RUN yarn build
-RUN yarn lerna run build
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 

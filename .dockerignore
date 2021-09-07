@@ -1,5 +1,6 @@
 **
 !package.json
+!tsconfig.json
 !tsconfig.base.json
 !rollup.config.js
 !yarn.lock
@@ -10,11 +11,10 @@
 !rust/package.json
 !rust/yarn.lock
 !rust/bin
+!rust/dist
 
 packages/*/node_modules/
-packages/*/dist/
 packages/*/coverage/
-packages/cubejs-server-core/playground/
 packages/cubejs-jdbc-driver
 packages/cubejs-serverless
 packages/cubejs-serverless-aws
