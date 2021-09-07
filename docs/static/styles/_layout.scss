@@ -983,7 +983,7 @@ section[type=h2] h2 {
         width: calc(100% / 3);
       }
 
-      &.gettingStartedItemAdjacent {
+      &:nth-child(even) {
         @include card-grid-item-adjacent;
       }
 

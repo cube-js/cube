@@ -28,6 +28,8 @@ import CubeQueryResultSet from '../components/CubeQueryResultSet';
 import GitHubFolderLink from '../components/GitHubFolderLink';
 import { DangerBox, InfoBox, SuccessBox, WarningBox } from '../components/AlertBox/AlertBox';
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
+import { Grid } from '../components/Grid/Grid';
+import { GridItem } from '../components/Grid/GridItem';
 
 const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
 const MyH3 = (props) => {
@@ -56,7 +58,7 @@ const MyH3 = (props) => {
   return <h3 name={kebabCase(props.children)} {...props} />;
 };
 
-const components = { DangerBox, InfoBox, SuccessBox, WarningBox, LoomVideo, GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
+const components = { DangerBox, InfoBox, SuccessBox, WarningBox, LoomVideo, Grid, GridItem, GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
 
 const MDX = (props) => (
   <MDXProvider components={components}>
