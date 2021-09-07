@@ -69,14 +69,34 @@ spec:
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             {{- end}}
+          {{- if .Values.router.livenessProbe.enabled }}
           livenessProbe:
-            httpGet:
-              path: /readyz
-              port: status
-          readinessProbe:
+            initialDelaySeconds: {{ .Values.router.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.router.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.router.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.router.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.router.livenessProbe.failureThreshold }}
             httpGet:
               path: /livez
               port: status
+          {{- else if .Values.router.customLivenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.router.customLivenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.router.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.router.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.router.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.router.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.router.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.router.readinessProbe.failureThreshold }}
+            httpGet:
+              path: /readyz
+              port: status
+          {{- else if .Values.router.customReadinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.router.customReadinessProbe | nindent 12 }}
+          {{- end }}
           {{- if .Values.router.resources }}
           resources:
             {{- toYaml .Values.router.resources | nindent 12 }}

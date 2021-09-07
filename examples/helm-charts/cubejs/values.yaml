@@ -449,6 +449,36 @@ master:
   ##
   resources: {}
 
+  ## Configure options for liveness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ##
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+
+  ## Configure options for liveness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ##
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+
+  ##  Custom livenessProbe that overrides the default one
+  ##
+  customLivenessProbe: {}
+
+  ## Custom readinessProbe that overrides the default one
+  ##
+  customReadinessProbe: {}
+
 workers:
   workersCount: 1
 
@@ -466,6 +496,36 @@ workers:
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
   ##
   resources: {}
+
+  ## Configure options for liveness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ##
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+
+  ## Configure options for liveness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ##
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+
+  ##  Custom livenessProbe that overrides the default one
+  ##
+  customLivenessProbe: {}
+
+  ## Custom readinessProbe that overrides the default one
+  ##
+  customReadinessProbe: {}
 
 service:
   ## Set to true to enable service generation

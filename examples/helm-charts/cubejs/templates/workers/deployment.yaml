@@ -35,14 +35,34 @@ spec:
             {{- include "cubejs.common-env" . | nindent 12 }}
             - name: CUBEJS_REFRESH_WORKER
               value: "true"
+          {{- if .Values.workers.livenessProbe.enabled }}
           livenessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-          readinessProbe:
+            initialDelaySeconds: {{ .Values.workers.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.workers.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.workers.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.workers.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.workers.livenessProbe.failureThreshold }}
             httpGet:
               path: /livez
               port: http
+          {{- else if .Values.workers.customLivenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.workers.customLivenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.workers.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.workers.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.workers.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.workers.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.workers.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.workers.readinessProbe.failureThreshold }}
+            httpGet:
+              path: /readyz
+              port: http
+          {{- else if .Values.workers.customReadinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.workers.customReadinessProbe | nindent 12 }}
+          {{- end }}
           {{- if .Values.workers.resources }}
           resources:
             {{- toYaml .Values.workers.resources | nindent 12 }}

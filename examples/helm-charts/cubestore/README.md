@@ -106,19 +106,33 @@ By default local dir are not persisted. You can enable persistance on router and
 
 ### Router parameters
 
-| Name                             | Description                                                      | Value             |
-| -------------------------------- | ---------------------------------------------------------------- | ----------------- |
-| `router.httpPort`                | The port for Cube Store to listen to HTTP connections on         | `3030`            |
-| `router.metaPort`                | The port for the router node to listen for connections on        | `9999`            |
-| `router.mysqlPort`               | The port for Cube Store to listen to connections on              | `3306`            |
-| `router.statusPort`              | The port for Cube Store to expose status probes                  | `3331`            |
-| `router.persistence.enabled`     | Enable persistence for local data using Persistent Volume Claims | `false`           |
-| `router.persistance.size`        | Persistent Volume size                                           | `10Gi`            |
-| `router.persistance.accessModes` | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
-| `router.persistance.annotations` | Additional custom annotations for the PVC                        | `{}`              |
-| `router.affinity`                | Affinity for pod assignment                                      | `{}`              |
-| `router.spreadConstraints`       | Topology spread constraint for pod assignment                    | `[]`              |
-| `router.resources`               | Define resources requests and limits for single Pods             | `{}`              |
+| Name                                        | Description                                                      | Value             |
+| ------------------------------------------- | ---------------------------------------------------------------- | ----------------- |
+| `router.httpPort`                           | The port for Cube Store to listen to HTTP connections on         | `3030`            |
+| `router.metaPort`                           | The port for the router node to listen for connections on        | `9999`            |
+| `router.mysqlPort`                          | The port for Cube Store to listen to connections on              | `3306`            |
+| `router.statusPort`                         | The port for Cube Store to expose status probes                  | `3331`            |
+| `router.persistence.enabled`                | Enable persistence for local data using Persistent Volume Claims | `false`           |
+| `router.persistance.size`                   | Persistent Volume size                                           | `10Gi`            |
+| `router.persistance.accessModes`            | Persistent Volume access modes                                   | [`ReadWriteOnce`] |
+| `router.persistance.annotations`            | Additional custom annotations for the PVC                        | `{}`              |
+| `router.affinity`                           | Affinity for pod assignment                                      | `{}`              |
+| `router.spreadConstraints`                  | Topology spread constraint for pod assignment                    | `[]`              |
+| `router.resources`                          | Define resources requests and limits for single Pods             | `{}`              |
+| `router.livenessProbe.enabled`              | Enable livenessProbe                                             | `true`            |
+| `router.livenessProbe.initialDelaySeconds`  | Initial delay seconds for livenessProbe                          | `10`              |
+| `router.livenessProbe.periodSeconds`        | Period seconds for livenessProbe                                 | `30`              |
+| `router.livenessProbe.timeoutSeconds`       | Timeout seconds for livenessProbe                                | `3`               |
+| `router.livenessProbe.successThreshold`     | Failure threshold for livenessProbe                              | `1`               |
+| `router.livenessProbe.failureThreshold`     | Success threshold for livenessProbe                              | `3`               |
+| `router.readinessProbe.enabled`             | Enable readinessProbe                                            | `true`            |
+| `router.readinessProbe.initialDelaySeconds` | Initial delay seconds for readinessProbe                         | `10`              |
+| `router.readinessProbe.periodSeconds`       | Period seconds for readinessProbe                                | `30`              |
+| `router.readinessProbe.timeoutSeconds`      | Timeout seconds for readinessProbe                               | `3`               |
+| `router.readinessProbe.successThreshold`    | Failure threshold for readinessProbe                             | `1`               |
+| `router.readinessProbe.failureThreshold`    | Success threshold for readinessProbe                             | `3`               |
+| `router.customLivenessProbe`                | Custom livenessProbe that overrides the default one              | `{}`              |
+| `router.customReadinessProbe`               | Custom readinessProbe that overrides the default one             | `{}`              |
 
 ### Workers parameters
 
