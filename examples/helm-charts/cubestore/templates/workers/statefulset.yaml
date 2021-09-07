@@ -43,7 +43,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: CUBESTORE_SERVER_NAME
-              value: {{ printf "$(MY_POD_NAME).%s:%d" $headlessServiceName $workerPort}}
+              value: {{ printf "$(MY_POD_NAME).%s:%d" $headlessServiceName $workerPort | quote }}
             - name: CUBESTORE_WORKER_PORT
               value: {{ .Values.workers.port | quote }}
             {{- $workers := list }}

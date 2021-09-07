@@ -346,14 +346,45 @@
   value: {{ .Value.database.ssl.passPhrase | quote }}
 {{- end }}
 {{- end }}
+
+{{- /*
+  If global.cubestore.enabled = true,
+  we set the default value for cubestore.host
+  and cubestore.port to the default value
+  defined in the Cube Store Chart if these values
+  are not set explicitly.
+
+  Otherwise, when global.cubestore.enabled = false,
+  we require you to set the cubestore.host and
+  cubestore.port.
+*/ -}}
+
+{{- if .Values.global.cubestore.enabled }}
 {{- if .Values.cubestore.host }}
 - name: CUBEJS_CUBESTORE_HOST
-  value: {{ .Values.cubestore.host | quote }}
+  value: {{ .Values.cubestore.host | quote | required "cubestore.host is required" }}
+{{- else }}
+- name: CUBEJS_CUBESTORE_HOST
+  value: {{ printf "%s-cubestore-router" .Release.Name | quote }}
 {{- end }}
 {{- if .Values.cubestore.port }}
 - name: CUBEJS_CUBESTORE_PORT
-  value: {{ .Values.cubestore.port | quote }}
+  value: {{ .Values.cubestore.port | quote | required "cubestore.port is required, this port is the HTTP PORT" }}
+{{- else }}
+- name: CUBEJS_CUBESTORE_PORT
+  value: {{ printf "3030" | quote }}
 {{- end }}
+{{- else }}
+{{- if .Values.cubestore.host }}
+- name: CUBEJS_CUBESTORE_HOST
+  value: {{ .Values.cubestore.host | quote | required "cubestore.host is required" }}
+{{- end }}
+{{- if .Values.cubestore.port }}
+- name: CUBEJS_CUBESTORE_PORT
+  value: {{ .Values.cubestore.port | quote | required "cubestore.port is required" }}
+{{- end }}
+{{- end }}
+
 {{- if .Values.externalDatabase.type }}
 - name: CUBEJS_EXT_DB_TYPE
   value: {{ .Values.externalDatabase.type | quote }}

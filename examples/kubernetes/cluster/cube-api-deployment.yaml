@@ -21,7 +21,7 @@ spec:
             - name: CUBEJS_API_SECRET
               value: <API_SECRET>
             - name: CUBEJS_CUBESTORE_HOST
-              value: "cubestore-router" # USING THIS CUBESTPRE HOST BECAUSE THE CUBESTORE ROUTER SERVICE IS NAMED "CUBESTORE-ROUTER"
+              value: "cubestore-router" # USING THIS CUBESTORE HOST BECAUSE THE CUBESTORE ROUTER SERVICE IS NAMED "CUBESTORE-ROUTER"
             - name: CUBEJS_DB_HOST
               value: <DB_HOST>
             - name: CUBEJS_DB_NAME
