@@ -90,6 +90,14 @@ const config = {
         query: 'allMdx'
       },
     },
+    {
+      resolve: 'gatsby-plugin-react-svg',
+      options: {
+        rule: {
+          include: /\.inline\.svg$/
+        }
+      }
+    },
     'gatsby-plugin-meta-redirect',
     'gatsby-plugin-percy',
   ],
