@@ -243,7 +243,7 @@ export class BaseFilter extends BaseDimension {
   }
 
   tsQueryWhere(column) {
-    return `${column} @@ plainto_tsquery(CAST(${this.firstParameter()} AS varchar))`;
+    return `${column} @@ phraseto_tsquery(CAST(${this.firstParameter()} AS varchar))`;
   }
 
   expressionEqualsWhere(column) {
