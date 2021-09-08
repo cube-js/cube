@@ -300,7 +300,6 @@ class DocTemplate extends Component<Props, State> {
 
   render() {
     const { mdx = {} } = this.props.data;
-    console.log(mdx);
     const { frontmatter } = mdx;
 
     return (
