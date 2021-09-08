@@ -512,44 +512,44 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> http
 
-#### <--{"id" : "Options Reference"}--> cors
+#### cors
 
 CORS settings for the Cube.js REST API can be configured by providing an object
 with options [from here][link-express-cors-opts].
 
 ### <--{"id" : "Options Reference"}--> jwt
 
-#### <--{"id" : "Options Reference"}--> jwkUrl
+#### jwkUrl
 
 The URL from which JSON Web Key Sets (JWKS) can be retrieved. Can also be set
 using `CUBEJS_JWK_URL`.
 
-#### <--{"id" : "Options Reference"}--> key
+#### key
 
 A JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
 also be set using `CUBEJS_JWT_KEY`.
 
-#### <--{"id" : "Options Reference"}--> algorithms
+#### algorithms
 
 [Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs]. Can also be
 set using `CUBEJS_JWT_ALGS`.
 
-#### <--{"id" : "Options Reference"}--> issuer
+#### issuer
 
 An issuer value which will be used to enforce the [`iss` claim from inbound
 JWTs][link-jwt-ref-iss]. Can also be set using `CUBEJS_JWT_ISSUER`.
 
-#### <--{"id" : "Options Reference"}--> audience
+#### audience
 
 An audience value which will be used to enforce the [`aud` claim from inbound
 JWTs][link-jwt-ref-aud]. Can also be set using `CUBEJS_JWT_AUDIENCE`.
 
-#### <--{"id" : "Options Reference"}--> subject
+#### subject
 
 A subject value which will be used to enforce the [`sub` claim from inbound
 JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 
-#### <--{"id" : "Options Reference"}--> claimsNamespace
+#### claimsNamespace
 
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
