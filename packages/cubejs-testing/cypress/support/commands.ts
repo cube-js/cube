@@ -55,10 +55,12 @@ Cypress.Commands.add('runQuery', () => {
 
 Cypress.Commands.add('addMeasure', (name) => {
   cy.getByTestId('Measure', { timeout: 5 * 1000 }).click();
-  cy.getByTestId(name).click();
+  // Click bottom as top can be overflowed by the Search input
+  cy.getByTestId(name).click('bottom');
 });
 
 Cypress.Commands.add('addDimension', (name) => {
   cy.getByTestId('Dimension', { timeout: 5 * 1000 }).click();
-  cy.getByTestId(name).click();
+  // Click bottom as top can be overflowed by the Search input
+  cy.getByTestId(name).click('bottom');
 });

@@ -1,0 +1,142 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension: Rolling Mixed With Dimension 1`] = `
+Array [
+  Object {
+    "visitors.checkinsRolling2day": null,
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.count": null,
+    "visitors.createdAt": "2017-01-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-02T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRolling2day": null,
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.count": null,
+    "visitors.createdAt": "2017-01-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-03T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRolling2day": null,
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.count": null,
+    "visitors.createdAt": "2017-01-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-04T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRolling2day": null,
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.count": null,
+    "visitors.createdAt": "2017-01-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-05T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRolling2day": "3.0",
+    "visitors.checkinsRollingTotal": "3.0",
+    "visitors.count": "1",
+    "visitors.createdAt": "2017-01-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-03T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsRolling2day": "3.0",
+    "visitors.checkinsRollingTotal": "3.0",
+    "visitors.count": null,
+    "visitors.createdAt": "2017-01-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-04T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsRolling2day": "2.0",
+    "visitors.checkinsRollingTotal": "5.0",
+    "visitors.count": "1",
+    "visitors.createdAt": "2017-01-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-05T00:00:00.000",
+    "visitors.source": "some",
+  },
+]
+`;
+
+exports[`postgresql-cubestore HTTP Transport Rolling Mixed: Rolling Mixed 1`] = `
+Array [
+  Object {
+    "visitors.checkinsRolling2day": null,
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.count": null,
+    "visitors.createdAt": "2017-01-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-02T00:00:00.000",
+  },
+  Object {
+    "visitors.checkinsRolling2day": "3.0",
+    "visitors.checkinsRollingTotal": "3.0",
+    "visitors.count": "1",
+    "visitors.createdAt": "2017-01-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-03T00:00:00.000",
+  },
+  Object {
+    "visitors.checkinsRolling2day": "3.0",
+    "visitors.checkinsRollingTotal": "3.0",
+    "visitors.count": null,
+    "visitors.createdAt": "2017-01-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-04T00:00:00.000",
+  },
+  Object {
+    "visitors.checkinsRolling2day": "2.0",
+    "visitors.checkinsRollingTotal": "5.0",
+    "visitors.count": "1",
+    "visitors.createdAt": "2017-01-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-05T00:00:00.000",
+  },
+]
+`;
+
+exports[`postgresql-cubestore HTTP Transport Rolling: Rolling 1`] = `
+Array [
+  Object {
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.createdAt": "2017-01-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-02T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.createdAt": "2017-01-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-03T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.createdAt": "2017-01-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-04T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "0.0",
+    "visitors.createdAt": "2017-01-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-05T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "3.0",
+    "visitors.createdAt": "2017-01-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-03T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "3.0",
+    "visitors.createdAt": "2017-01-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-04T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "5.0",
+    "visitors.createdAt": "2017-01-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-01-05T00:00:00.000",
+    "visitors.source": "some",
+  },
+]
+`;

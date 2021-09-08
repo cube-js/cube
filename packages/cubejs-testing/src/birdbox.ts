@@ -11,6 +11,7 @@ import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
+  loadScript?: string;
 }
 
 export interface BirdBox {
@@ -48,7 +49,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   const env = await dc
     .withStartupTimeout(30 * 1000)
     .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
-    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'latest')
+    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'edge')
     .up();
 
   const host = '127.0.0.1';
@@ -74,16 +75,17 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   }
 
   {
-    console.log('[Birdbox] Executing load.sh script');
+    const loadScript = options.loadScript || 'load.sh';
+    console.log(`[Birdbox] Executing ${loadScript} script`);
 
-    const { output, exitCode } = await env.getContainer('birdbox-db').exec(['/scripts/load.sh']);
+    const { output, exitCode } = await env.getContainer('birdbox-db').exec([`/scripts/${loadScript}`]);
 
     if (exitCode === 0) {
-      console.log('[Birdbox] Script load.sh finished successfully');
+      console.log(`[Birdbox] Script ${loadScript} finished successfully`);
     } else {
       console.log(output);
 
-      console.log(`[Birdbox] Script load.sh finished with error: ${exitCode}`);
+      console.log(`[Birdbox] Script ${loadScript} finished with error: ${exitCode}`);
 
       await env.down();
 
@@ -113,6 +115,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 
 export interface StartCliWithEnvOptions {
   dbType: string;
+  useCubejsServerBinary?: boolean;
 }
 
 export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
@@ -164,24 +167,29 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     path.join(testDir, 'schema')
   );
 
-  const cli = spawn('npm', ['run', 'dev'], {
-    cwd: testDir,
-    shell: true,
-    // Show output of Cube.js process in console
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      CUBEJS_DB_TYPE: 'postgres',
-      CUBEJS_DB_HOST: db.getHost(),
-      CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
-      CUBEJS_DB_NAME: 'test',
-      CUBEJS_DB_USER: 'test',
-      CUBEJS_DB_PASS: 'test',
-      CUBEJS_DEV_MODE: 'true',
-      CUBEJS_WEB_SOCKETS: 'true',
-      CUBEJS_API_SECRET: 'mysupersecret',
-    },
-  });
+  const cli = spawn(
+    options.useCubejsServerBinary ? '../cubejs-server/bin/server' : 'npm',
+    options.useCubejsServerBinary ? [] : ['run', 'dev'],
+    {
+      cwd: options.useCubejsServerBinary ? process.cwd() : testDir,
+      shell: true,
+      // Show output of Cube.js process in console
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        CUBEJS_SCHEMA_PATH: options.useCubejsServerBinary ? path.join('birdbox-fixtures', options.dbType, 'schema') : 'schema',
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        CUBEJS_DEV_MODE: 'true',
+        CUBEJS_WEB_SOCKETS: 'true',
+        CUBEJS_API_SECRET: 'mysupersecret',
+      },
+    }
+  );
   // cli.stdout.on('data', (msg) => {
   //   console.log(msg.toString());
   // });
