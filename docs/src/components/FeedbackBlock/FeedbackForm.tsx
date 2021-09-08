@@ -9,8 +9,8 @@ const FeedbackForm = (props: propsType) => {
     <div className={styles.feedbackForm}>
       <textarea placeholder="Let us know what you like and how we can improve this page"></textarea>
       <div className={styles.feedbackForm__buttons}>
-        <Button type="primary">Send</Button>
-        <Button type="secondary">Cancel</Button>
+        <Button view="primary">Send</Button>
+        <Button view="secondary">Cancel</Button>
       </div>
     </div>
   );

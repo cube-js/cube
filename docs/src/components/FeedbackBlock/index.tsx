@@ -30,7 +30,7 @@ const FeedbackBlock = (props: propsType) => {
           <Button
             active={feedback === 'like' ? 'active' : null}
             disabled={feedback === 'dislike' ? 'disabled' : null}
-            type="like"
+            view="like"
             onClick={() => setFeedback('like', page)}
           >
             Yes
@@ -38,7 +38,7 @@ const FeedbackBlock = (props: propsType) => {
           <Button
             active={feedback === 'dislike' ? 'active' : null}
             disabled={feedback === 'like' ? 'disabled' : null}
-            type="dislike"
+            view="dislike"
             onClick={() => setFeedback('dislike', page)}
           >
             No

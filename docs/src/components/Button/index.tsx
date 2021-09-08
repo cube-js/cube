@@ -4,11 +4,15 @@ import DislikeIcon from '../../../static/icons/dislike.inline.svg';
 import * as styles from './styles.module.scss';
 
 const Button = (props: propsType) => {
-  const { type = 'primary' } = props;
+  const { view = 'primary' } = props;
   return (
-    <button className={`${styles.button} ${styles[type]}`} {...props}>
-      {type === 'like' && <LikeIcon />}
-      {type === 'dislike' && <DislikeIcon />}
+    <button
+      type="button"
+      className={`${styles.button} ${styles[view]}`}
+      {...props}
+    >
+      {view === 'like' && <LikeIcon />}
+      {view === 'dislike' && <DislikeIcon />}
       <span>{props.children}</span>
     </button>
   );
@@ -17,6 +21,6 @@ const Button = (props: propsType) => {
 export default Button;
 
 interface propsType {
-  type: string,
-  children: string
+  view: 'primary' | 'secondary' | 'like' | 'dislike';
+  children: string;
 }
