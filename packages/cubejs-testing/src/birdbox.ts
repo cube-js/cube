@@ -116,6 +116,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 export interface StartCliWithEnvOptions {
   dbType: string;
   useCubejsServerBinary?: boolean;
+  loadScript?: string;
 }
 
 export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
@@ -141,14 +142,15 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
   {
     console.log('[Birdbox] Executing load.sh script');
 
-    const { output, exitCode } = await db.exec(['/scripts/load.sh']);
+    const loadScript = `/scripts/${options.loadScript || 'load.sh'}`;
+    const { output, exitCode } = await db.exec([loadScript]);
 
     if (exitCode === 0) {
-      console.log('[Birdbox] Script load.sh finished successfully');
+      console.log(`[Birdbox] Script ${loadScript} finished successfully`);
     } else {
       console.log(output);
 
-      console.log(`[Birdbox] Script load.sh finished with error: ${exitCode}`);
+      console.log(`[Birdbox] Script ${loadScript} finished with error: ${exitCode}`);
 
       await db.stop();
 
