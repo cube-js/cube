@@ -857,13 +857,18 @@ export class ApiGateway {
         };
       }));
 
-      this.log({
-        type: 'Load Request Success',
-        query,
-        duration: this.duration(requestStarted),
-        queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length).length,
-        queriesWithData: results.filter((r: any) => r.data?.length).length
-      }, context);
+      this.log(
+        {
+          type: 'Load Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
+          queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
+            .length,
+          queriesWithData: results.filter((r: any) => r.data?.length).length,
+        },
+        context
+      );
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
