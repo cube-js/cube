@@ -556,7 +556,7 @@ export class ApiGateway {
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
-          preAggregationPartition
+          preAggregationPartition.sql
         )
       });
     } catch (e) {
