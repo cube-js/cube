@@ -72,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ['postgresql', 'postgresql-cubestore']
+        target: ['postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
         arch: ['', '-alpine']
     steps:
       - name: Checkout
