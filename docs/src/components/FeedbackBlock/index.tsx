@@ -61,6 +61,7 @@ const FeedbackBlock = (props: propsType) => {
       </div>
       {feedback && date && (
         <FeedbackForm
+          feedback={feedback}
           setFeedbackMessage={setFeedbackMessage}
           clearFeedback={clearFeedback}
         />

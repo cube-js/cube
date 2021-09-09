@@ -3,8 +3,13 @@ import * as styles from './styles.module.scss';
 import Button from '../Button'
 
 const FeedbackForm = (props: propsType) => {
-  const { setFeedbackMessage, clearFeedback } = props;
+  const { setFeedbackMessage, clearFeedback, feedback } = props;
   const [message, setMessage] = useState('');
+
+  const feedbackMessage = {
+    like: 'Let us know what you like and how we can improve this page',
+    dislike: 'Let us know how we can improve this page',
+  };
 
   const handleSubmit = (
     event: Event,
@@ -24,7 +29,7 @@ const FeedbackForm = (props: propsType) => {
         onChange={(e) => {
           setMessage(e.target.value);
         }}
-        placeholder="Let us know what you like and how we can improve this page"
+        placeholder={feedbackMessage[feedback] || ''}
       ></textarea>
       <div className={styles.feedbackForm__buttons}>
         <Button
@@ -46,6 +51,7 @@ const FeedbackForm = (props: propsType) => {
 };
 
 interface propsType {
+  feedback: string;
   setFeedbackMessage: (message: string) => void;
   clearFeedback: () => void;
 }
