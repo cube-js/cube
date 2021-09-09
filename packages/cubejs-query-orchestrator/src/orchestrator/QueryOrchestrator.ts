@@ -2,7 +2,7 @@ import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
 import { QueryCache } from './QueryCache';
-import { PreAggregations } from './PreAggregations';
+import { PreAggregations, PreAggregationDescription } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
@@ -228,20 +228,16 @@ export class QueryOrchestrator {
     };
   }
 
-  public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {
-    if (!preAggregation.sql) return [];
-
-    const { previewSql, tableName, external, dataSource } = preAggregation.sql;
-    const targetTableName = PreAggregations.targetTableName(versionEntry);
-    const querySql = QueryCache.replacePreAggregationTableNames(previewSql, [[tableName, { targetTableName }]]);
-    const query = querySql && querySql[0];
-
-    const data = query && await this.fetchQuery({
+  public async getPreAggregationPreview(requestId: string, preAggregation: PreAggregationDescription) {
+    if (!preAggregation) return [];
+    const [query] = preAggregation.previewSql;
+    const data = await this.fetchQuery({
       continueWait: true,
-      external,
-      dataSource,
       query,
-      requestId
+      preAggregations: [
+        preAggregation
+      ],
+      requestId,
     });
 
     return data || [];

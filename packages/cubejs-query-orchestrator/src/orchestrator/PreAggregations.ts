@@ -95,7 +95,7 @@ type IndexDescription = {
   indexName: string;
 };
 
-type PreAggregationDescription = {
+export type PreAggregationDescription = {
   preAggregationId: string;
   priority: number;
   previewSql: QueryWithParams;
