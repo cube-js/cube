@@ -2,11 +2,11 @@ cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
 
   preAggregations: {
-    suppliersRollup: {
-      type:`rollup`,
-      external: true,
-      dimensions: [CUBE.id, CUBE.address]
-    },
+    // suppliersRollup: {
+    //   type:`rollup`,
+    //   external: true,
+    //   dimensions: [CUBE.id, CUBE.address]
+    // },
   },
 
   measures: {
@@ -42,5 +42,7 @@ cube(`Suppliers`, {
       sql: `created_at`,
       type: `time`
     }
-  }
+  },
+
+  dataSource: 'suppliers'
 });
