@@ -295,7 +295,7 @@ export function RollupDesigner({
       return (
         <Paragraph>
           <Link
-            href="https://cube.dev/docs/caching/rollups/getting-started#ensuring-rollups-are-targeted-by-queries"
+            href="https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries"
             target="_blank"
           >
             Current query cannot be rolled up due to it is not additive
@@ -303,7 +303,7 @@ export function RollupDesigner({
           . Please consider removing not additive measures like `countDistinct`
           or `avg`. You can also try to use{' '}
           <Link
-            href="https://cube.dev/docs/rollups#parameters-type-originalsql"
+            href="https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-originalsql"
             target="_blank"
           >
             originalSql

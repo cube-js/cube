@@ -199,8 +199,7 @@ export class BaseDriver {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
       throw new Error(
-        'Unable to detect column types for pre-aggregation on empty values in readOnly mode. \n' +
-        'https://cube.dev/docs/caching/using-pre-aggregations#read-only-data-source'
+        'Unable to detect column types for pre-aggregation on empty values in readOnly mode.'
       );
     }
 

@@ -120,7 +120,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
       const annotationForMember = annotation[memberName];
 
       if (!annotationForMember) {
-        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
+        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
       }
 
       const transformResult = [
@@ -502,7 +502,7 @@ export class ApiGateway {
           compilerApi,
           query
         );
-        
+
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
