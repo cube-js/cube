@@ -1,10 +1,4 @@
-$danger-text: #ef404a;
-$success-text: #59a36c;
-$purple: #7A77FF;
-$white: #FFF;
-$purple-text: #665DE8;
-$cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
-      Ubuntu, "DejaVu Sans", Arial, sans-serif;
+@import "../../../static/styles/variables.scss";
 
 .button {
   min-width: 88px;
@@ -20,7 +14,7 @@ $cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
     margin-right: 9px;
   }
   span {
-    font-family: $cera-pro-font;
+    font-family: $header-font;
   }
 }
 

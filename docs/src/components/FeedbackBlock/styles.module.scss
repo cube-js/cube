@@ -1,7 +1,4 @@
-$danger-text: #ef404a;
-$success-text: #59a36c;
-$cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
-  Ubuntu, "DejaVu Sans", Arial, sans-serif;
+@import "../../../static/styles/variables.scss";
 
 .feedbackBlock {
   display: flex;
@@ -27,7 +24,7 @@ $cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
     font-size: 16px;
     line-height: 24px;
     margin: 0;
-    font-family: $cera-pro-font;
+    font-family: $header-font;
     @media (max-width: 950px) {
       margin-bottom: 16px;
     }
@@ -56,7 +53,7 @@ $cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
     margin-right: 8px;
   }
   textarea {
-    font-family: $cera-pro-font;
+    font-family: $header-font;
     outline: transparent;
     padding: 10px 12px;
     background: #f6f6f8;
@@ -73,7 +70,7 @@ $cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
 }
 
 .thanksBlock {
-  font-family: $cera-pro-font;
+  font-family: $header-font;
   padding: 40px 64px;
   background: rgba(65, 181, 111, 0.1);
   border-radius: 8px;
