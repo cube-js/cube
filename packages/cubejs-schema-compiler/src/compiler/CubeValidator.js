@@ -78,7 +78,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
       timezone: everyCronTimeZone,
       incremental: Joi.boolean(),
-      updateWindow: timeInterval
+      updateWindow: everyInterval
     })
   ),
   sqlAlias: Joi.string().optional(),

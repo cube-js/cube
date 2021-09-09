@@ -134,7 +134,7 @@ cube(`visitors`, {
       refreshKey: {
         every: '1 hour',
         incremental: true,
-        updateWindow: '7 day'
+        updateWindow: '7 days'
       }
     },
     partitionedHourly: {
