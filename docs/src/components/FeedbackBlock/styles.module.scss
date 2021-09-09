@@ -1,5 +1,7 @@
 $danger-text: #EF404A;
 $success-text: #59A36C;
+$cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
+      Ubuntu, "DejaVu Sans", Arial, sans-serif;
 
 .feedbackBlock {
   display: flex;
@@ -18,82 +20,14 @@ $success-text: #59A36C;
     font-size: 16px;
     line-height: 24px;
     margin: 0;
-    font-family: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
-      Ubuntu, "DejaVu Sans", Arial, sans-serif;
+    font-family: $cera-pro-font;
   }
 
   &__buttons {
     display: flex;
   }
-  &__button {
-    min-width: 88px;
-    padding: 10px 12px;
-    border: none;
-    font: inherit;
-    color: inherit;
-    background-color: transparent;
-    cursor: pointer;
-    transition: background-color 0.3s ease-in-out, border 0.3s ease-in-out;
-
-    span {
-      margin-left: 9px;
-    }
-  }
-
   &__like {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     margin-right: 8px;
-    background: rgba(65, 181, 111, 0.12);
-    border-radius: 4px;
-    color: $success-text;
-    border: 1px solid rgba(103, 192, 130, 0);
-
-    &:hover {
-      background: rgba(65, 181, 111, 0.2);
-      color: $success-text;
-    }
-
-    &:active {
-      background: rgba(65, 181, 111, 0.12);
-      border: 1px solid rgba(103, 192, 130, 0.4);
-    }
-    &[active="active"] {
-      background: rgba(65, 181, 111, 0.12);
-      border: 1px solid rgba(103, 192, 130, 0.4);
-    }
-    &[disabled] {
-      background: rgba(20, 20, 70, 0.04);
-      color: rgba(20, 20, 70, 0.3);
-    }
-  }
-
-  &__dislike {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 100, 109, 0.1);
-    border-radius: 4px;
-    color: $danger-text;
-    border: 1px solid rgba(255, 100, 109, 0);
-
-    &:hover {
-      background: rgba(255, 100, 109, 0.16);
-    }
-    &:active {
-      background: rgba(255, 100, 109, 0.1);
-      border: 1px solid rgba(255, 100, 109, 0.4);
-    }
-    &[active="active"] {
-      background: rgba(255, 100, 109, 0.1);
-      border: 1px solid rgba(255, 100, 109, 0.4);
-    }
-
-    &[disabled] {
-      background: rgba(20, 20, 70, 0.04);
-      color: rgba(20, 20, 70, 0.3);
-    }
   }
 }
 
@@ -103,17 +37,37 @@ $success-text: #59A36C;
   &__buttons {
     margin-top: 16px;
   }
+  &__sendButton {
+    margin-right: 8px;
+  }
   textarea {
+    font-family: $cera-pro-font;
+    outline: transparent;
     padding: 10px 12px;
     background: #F6F6F8;
     border-radius: 4px;
     border: none;
     width: 100%;
-    color: rgba(20, 20, 70, 0.3);
+    color: rgba(20, 20, 70, 0.85);
     min-height: 110px;
     resize: none;
     &::placeholder {
       color: rgba(20, 20, 70, 0.3);
     }
   }
+}
+
+.thanksBlock {
+  font-family: $cera-pro-font;
+  padding: 40px 64px;
+  background: rgba(65, 181, 111, 0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 104px;
+  width: 100%;
+  color: rgba(20, 20, 70, 0.85);
+  font-size: 16px;
+  line-height: 24px;
 }

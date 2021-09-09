@@ -8,8 +8,12 @@ const Button = (props: propsType) => {
   return (
     <button
       type="button"
-      className={`${styles.button} ${styles[view]}`}
       {...props}
+      className={
+        props.className
+          ? `${styles.button} ${styles[view]} ${props.className}`
+          : `${styles.button} ${styles[view]}`
+      }
     >
       {view === 'like' && <LikeIcon />}
       {view === 'dislike' && <DislikeIcon />}
@@ -21,6 +25,6 @@ const Button = (props: propsType) => {
 export default Button;
 
 interface propsType {
-  view: 'primary' | 'secondary' | 'like' | 'dislike';
+  view: 'primary' | 'secondary' | 'like' | 'dislike' | 'outline';
   children: string;
 }

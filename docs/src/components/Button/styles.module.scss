@@ -3,10 +3,10 @@ $success-text: #59a36c;
 $purple: #7A77FF;
 $white: #FFF;
 $purple-text: #665DE8;
+$cera-pro-font: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
+      Ubuntu, "DejaVu Sans", Arial, sans-serif;
 
 .button {
-  font-family: "Cera Pro", "Avenir Next", Avenir, "Helvetica Neue", Helvetica,
-    Ubuntu, "DejaVu Sans", Arial, sans-serif;
   min-width: 88px;
   padding: 4px 12px;
   border: none;
@@ -19,13 +19,15 @@ $purple-text: #665DE8;
   svg {
     margin-right: 9px;
   }
+  span {
+    font-family: $cera-pro-font;
+  }
 }
 
 .primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 8px;
   background: $purple;
   border-radius: 4px;
   color: $white;
@@ -54,7 +56,6 @@ $purple-text: #665DE8;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 8px;
   background: rgba(102, 93, 232, 0.1);
   border-radius: 4px;
   color: $purple-text;
@@ -78,11 +79,39 @@ $purple-text: #665DE8;
   }
 }
 
+.outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: $white;
+  border-radius: 4px;
+  color: $purple-text;
+  border: 1px solid rgba(102, 93, 232, 0.3);
+
+  &:hover {
+    background: rgba(102, 93, 232, 0.16);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+
+  &:active {
+    background: rgba(102, 93, 232, 0.1);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+  &[active="active"] {
+    background: rgba(102, 93, 232, 0.1);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+  &[disabled] {
+    background: $white;
+    border: 1px solid rgba(20, 20, 70, 0.12);
+    color: rgba(20, 20, 70, 0.3);
+  }
+}
+
 .like {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 8px;
   background: rgba(65, 181, 111, 0.12);
   border-radius: 4px;
   color: $success-text;

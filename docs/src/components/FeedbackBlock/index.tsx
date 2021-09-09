@@ -8,17 +8,30 @@ const FeedbackBlock = (props: propsType) => {
   const { page } = props;
   const [date, setDate] = useState('');
   const [feedback, setFeedbackState] = useState('');
-  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackMessage, setFeedbackMessageState] = useState('');
 
   const setFeedback = (state: string, page: string) => {
+    if (feedback) {
+      return
+    }
     const date = new Date().toISOString();
     setDate(date);
     event('page-feedback-like', { page, date, feedback });
     setFeedbackState(state);
   };
+  const setFeedbackMessage = (message: string) => {
+    event('page-feedback-comment', { page, date, feedback, comment: message });
+    setFeedbackMessageState(message);
+  }
+  const clearFeedback = () => {
+    setFeedbackState('');
+    setFeedbackMessageState('');
+  }
 
   if (feedbackMessage) {
-    return <h1>Thank you!</h1>;
+    return (
+      <div className={styles.thanksBlock}>Thank you for the feedback!</div>
+    );
   }
   return (
     <div className={styles.feedbackBlock}>
@@ -28,6 +41,7 @@ const FeedbackBlock = (props: propsType) => {
         </p>
         <div className={styles.feedbackBlock__buttons}>
           <Button
+            className={styles.feedbackBlock__like}
             active={feedback === 'like' ? 'active' : null}
             disabled={feedback === 'dislike' ? 'disabled' : null}
             view="like"
@@ -46,7 +60,10 @@ const FeedbackBlock = (props: propsType) => {
         </div>
       </div>
       {feedback && date && (
-        <FeedbackForm setFeedbackMessage={setFeedbackMessage} date={date} />
+        <FeedbackForm
+          setFeedbackMessage={setFeedbackMessage}
+          clearFeedback={clearFeedback}
+        />
       )}
     </div>
   );
