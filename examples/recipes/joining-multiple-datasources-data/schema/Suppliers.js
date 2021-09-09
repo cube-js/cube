@@ -2,11 +2,11 @@ cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
 
   preAggregations: {
-    // suppliersRollup: {
-    //   type:`rollup`,
-    //   external: true,
-    //   dimensions: [CUBE.id, CUBE.address]
-    // },
+    suppliersRollup: {
+      type:`rollup`,
+      external: true,
+      dimensions: [CUBE.id, CUBE.company, CUBE.email]
+    },
   },
 
   measures: {
@@ -21,11 +21,6 @@ cube(`Suppliers`, {
       type: `number`,
       primaryKey: true,
       shown:true
-    },
-
-    address: {
-      sql: `address`,
-      type: `string`
     },
 
     email: {

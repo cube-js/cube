@@ -2,20 +2,18 @@ cube(`Products`, {
   sql: `SELECT * FROM public.products`,
 
   preAggregations: {
-    // productsRollup: {
-    //   type:`rollup`,
-    //   external: true,
-    //   measures:[CUBE.count],
-    //   dimensions: [CUBE.name, CUBE.description, CUBE.supplierId],
-    // },
+    productsRollup: {
+      type:`rollup`,
+      external: true,
+      dimensions: [CUBE.name, CUBE.supplierId],
+    },
 
-    // combinedRollup: {
-    //   type: `rollupJoin`,
-    //   measures:[CUBE.count],
-    //   dimensions: [Suppliers.id, Suppliers.address, CUBE.name, CUBE.description],
-    //   rollups: [Suppliers.suppliersRollup, CUBE.productsRollup],
-    //   external: true,
-    // },
+    combinedRollup: {
+      type: `rollupJoin`,
+      dimensions: [Suppliers.email, Suppliers.company, CUBE.name],
+      rollups: [Suppliers.suppliersRollup, CUBE.productsRollup],
+      external: true,
+    },
   },
 
   joins: {
@@ -24,6 +22,7 @@ cube(`Products`, {
       relationship: `belongsTo`
     }
   },
+
   measures: {
     count: {
       type: `count`
@@ -38,10 +37,6 @@ cube(`Products`, {
     },
     name: {
       sql: `name`,
-      type: `string`
-    },
-    description: {
-      sql: `description`,
       type: `string`
     },
     createdAt: {

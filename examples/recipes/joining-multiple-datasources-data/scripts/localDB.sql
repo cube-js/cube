@@ -118,4 +118,4 @@ INSERT INTO "public"."suppliers" ("id", "address", "email", "created_at", "compa
 (97, 'Ap #209-4483 Quis, Ave', 'orci.Donec.nibh@velit.org', '2016-09-29 11:12:37', 'Aliquam Inc.'),
 (98, '574-2867 Non, St.', 'laoreet.ipsum@eleifendnunc.co.uk', '2017-10-12 17:42:40', 'Adipiscing Ligula Aenean Inc.'),
 (99, 'Ap #537-5867 Ligula. St.', 'enim@consectetuerrhoncusNullam.org', '2019-02-27 05:52:58', 'Nullam Limited'),
-(100, 'Ap #543-7572 Consectetuer Rd.', 'purus.accumsan@Proin.org', '2018-10-19 12:01:47', 'Massa Integer LLC'),
+(100, 'Ap #543-7572 Consectetuer Rd.', 'purus.accumsan@Proin.org', '2018-10-19 12:01:47', 'Massa Integer LLC')
