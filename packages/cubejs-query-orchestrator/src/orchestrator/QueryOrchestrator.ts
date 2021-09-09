@@ -228,20 +228,17 @@ export class QueryOrchestrator {
     };
   }
 
-  public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {
+  public async getPreAggregationPreview(requestId, preAggregation) {
     if (!preAggregation.sql) return [];
-
-    const { previewSql, tableName, external, dataSource } = preAggregation.sql;
-    const targetTableName = PreAggregations.targetTableName(versionEntry);
-    const querySql = QueryCache.replacePreAggregationTableNames(previewSql, [[tableName, { targetTableName }]]);
-    const query = querySql && querySql[0];
-
-    const data = query && await this.fetchQuery({
+    const [query] = preAggregation.sql.previewSql;
+    const data = await this.fetchQuery({
       continueWait: true,
-      external,
-      dataSource,
       query,
-      requestId
+      preAggregations: [
+        preAggregation.sql
+      ],
+      requestId,
+      
     });
 
     return data || [];
