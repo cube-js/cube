@@ -87,9 +87,8 @@ export function RollupDesigner({
   const [isCronValid, setCronValidity] = useState<boolean>(true);
   const [settings, setSettings] = useState<RollupSettings>({});
 
-  const canBeRolledUp =
-    transformedQuery.leafMeasureAdditive &&
-    !transformedQuery.hasMultipliedMeasures;
+  // todo: check other measures (not only the initial query measures)
+  const hasNonAdditiveMeasures = transformedQuery.leafMeasureAdditive;
 
   const canUseMutex = useRef<number>(0);
   const [matching, setMatching] = useState<boolean>(false);
@@ -291,27 +290,27 @@ export function RollupDesigner({
   }
 
   function rollupBody() {
-    if (!canBeRolledUp) {
-      return (
-        <Paragraph>
-          <Link
-            href="https://cube.dev/docs/caching/rollups/getting-started#ensuring-rollups-are-targeted-by-queries"
-            target="_blank"
-          >
-            Current query cannot be rolled up due to it is not additive
-          </Link>
-          . Please consider removing not additive measures like `countDistinct`
-          or `avg`. You can also try to use{' '}
-          <Link
-            href="https://cube.dev/docs/rollups#parameters-type-originalsql"
-            target="_blank"
-          >
-            originalSql
-          </Link>{' '}
-          rollup instead.
-        </Paragraph>
-      );
-    }
+    // if (!hasNonAdditiveMeasures) {
+    //   return (
+    //     <Paragraph>
+    //       <Link
+    //         href="https://cube.dev/docs/caching/rollups/getting-started#ensuring-rollups-are-targeted-by-queries"
+    //         target="_blank"
+    //       >
+    //         Current query cannot be rolled up due to it is not additive
+    //       </Link>
+    //       . Please consider removing not additive measures like `countDistinct`
+    //       or `avg`. You can also try to use{' '}
+    //       <Link
+    //         href="https://cube.dev/docs/rollups#parameters-type-originalsql"
+    //         target="_blank"
+    //       >
+    //         originalSql
+    //       </Link>{' '}
+    //       rollup instead.
+    //     </Paragraph>
+    //   );
+    // }
 
     return (
       <>
@@ -450,23 +449,39 @@ export function RollupDesigner({
               justifyContent="flex-start"
               style={{ marginBottom: 64 }}
             >
-              {canBeRolledUp ? (
-                <Box style={{ marginBottom: 16 }}>
-                  <Paragraph>
-                    Add the following rollup pre-aggregation
-                    <br /> to the <b>{cubeName}</b> cube:
-                  </Paragraph>
+              <Box style={{ marginBottom: 16 }}>
+                <Paragraph>
+                  Add the following rollup pre-aggregation
+                  <br /> to the <b>{cubeName}</b> cube:
+                </Paragraph>
 
-                  <Paragraph style={{ margin: '24px 0 4px' }}>
-                    Rollup Name
-                  </Paragraph>
-                  <Input
-                    value={preAggName}
-                    suffix={<EditOutlined />}
-                    onChange={(event) => setPreAggName(event.target.value)}
+                {!hasNonAdditiveMeasures && (
+                  <Alert
+                    type="warning"
+                    message={
+                      <Text>
+                        Note that this rollup contains{' '}
+                        <Link
+                          href="https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries"
+                          target="_blank"
+                        >
+                          non-additive measures
+                        </Link>
+                      </Text>
+                    }
                   />
-                </Box>
-              ) : null}
+                )}
+
+                <Paragraph style={{ margin: '24px 0 4px' }}>
+                  Rollup Name
+                </Paragraph>
+
+                <Input
+                  value={preAggName}
+                  suffix={<EditOutlined />}
+                  onChange={(event) => setPreAggName(event.target.value)}
+                />
+              </Box>
 
               <Box>{rollupBody()}</Box>
             </Flex>
@@ -474,7 +489,7 @@ export function RollupDesigner({
 
           <TabPane
             tab={
-              canBeRolledUp && matching ? (
+              matching ? (
                 'Query Compatibility'
               ) : (
                 <Typography.Text>
@@ -487,7 +502,7 @@ export function RollupDesigner({
           >
             <Flex direction="column" justifyContent="flex-start">
               <Box style={{ marginBottom: 32 }}>
-                {canBeRolledUp && matching ? (
+                {matching ? (
                   <Text>This rollup will match the following query:</Text>
                 ) : (
                   <Space direction="vertical">

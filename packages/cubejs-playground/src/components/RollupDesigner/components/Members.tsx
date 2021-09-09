@@ -24,6 +24,7 @@ export function Members({ title, members, onRemove }: MembersProps) {
       <Space wrap>
         {members.map((member) => (
           <MemberTag
+            key={member.name}
             name={member.shortTitle}
             cubeName={member.title.replace(member.shortTitle, '')}
             onClose={() => onRemove(member.name)}
