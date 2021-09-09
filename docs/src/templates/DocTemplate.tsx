@@ -301,6 +301,7 @@ class DocTemplate extends Component<Props, State> {
   render() {
     const { mdx = {} } = this.props.data;
     const { frontmatter } = mdx;
+    const { isDisableFeedbackBlock } = frontmatter;
 
     return (
       <div>
@@ -309,7 +310,9 @@ class DocTemplate extends Component<Props, State> {
           <div className={styles.docContent}>
             <h1 name="top">{frontmatter.title}</h1>
             <MDX {...this.props} />
-            <FeedbackBlock page={frontmatter.permalink} />
+            {!isDisableFeedbackBlock && (
+              <FeedbackBlock page={frontmatter.permalink} />
+            )}
           </div>
         </div>
       </div>
@@ -330,6 +333,7 @@ export const pageQuery = graphql`
         scope
         category
         frameworkOfChoice
+        isDisableFeedbackBlock
       }
     }
   }

@@ -58,12 +58,25 @@ exports.onCreateNode = ({ node, actions, getNode }) => {
   }
 };
 
-exports.onCreateWebpackConfig = ({ actions, stage }) => {
+exports.onCreateWebpackConfig = ({ actions, stage, loaders }) => {
   // If production JavaScript and CSS build
   if (stage === 'build-javascript') {
     // Turn off source maps
     actions.setWebpackConfig({
       devtool: false,
+    });
+  }
+  // https://www.gatsbyjs.com/docs/debugging-html-builds/#fixing-third-party-modules
+  if (stage === 'build-html' || stage === 'develop-html') {
+    actions.setWebpackConfig({
+      module: {
+        rules: [
+          {
+            test: /cubedev-tracking/,
+            use: loaders.null(),
+          },
+        ],
+      },
     });
   }
 };
