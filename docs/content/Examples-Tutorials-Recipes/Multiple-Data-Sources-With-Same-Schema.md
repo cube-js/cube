@@ -151,6 +151,6 @@ tenant's name:
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/multiple-sources-same-schema)
+[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/multiple-data-sources)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
