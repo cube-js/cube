@@ -119,9 +119,10 @@ RUN yarn lerna run build
 
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
-FROM prod_dependencies AS final
+FROM base AS final
 
 COPY --from=build /cubejs .
+COPY --from=prod_dependencies /cubejs .
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
