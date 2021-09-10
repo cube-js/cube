@@ -6,9 +6,10 @@
   padding: 40px 64px;
   border: 1px solid rgba(20, 20, 70, 0.12);
   border-radius: 8px;
+  margin: 48px 0;
 
   @media (max-width: 950px) {
-    padding: 20px 32px;
+    padding: 32px;
   }
 
   &__wrap {
@@ -41,10 +42,13 @@
 
 .feedbackForm {
   margin-top: 40px;
+  @media (max-width: 950px) {
+    margin-top: 32px;
+  }
 
   &__buttons {
     margin-top: 16px;
-     @media (max-width: 950px) {
+    @media (max-width: 950px) {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -54,7 +58,6 @@
     margin-right: 8px;
   }
   textarea {
-    font-family: $header-font;
     outline: transparent;
     padding: 10px 12px;
     background: #f6f6f8;
@@ -64,6 +67,8 @@
     color: rgba(20, 20, 70, 0.85);
     min-height: 110px;
     resize: none;
+    font-size: 14px;
+    line-height: 20px;
     &::placeholder {
       color: rgba(20, 20, 70, 0.3);
     }
@@ -83,6 +88,7 @@
   color: rgba(20, 20, 70, 0.85);
   font-size: 16px;
   line-height: 24px;
+  font-weight: 500;
   @media (max-width: 950px) {
     padding: 20px 32px;
   }
