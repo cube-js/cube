@@ -1,5 +1,4 @@
 import { notification } from 'antd';
-import fetch, { RequestInit, Response } from 'node-fetch';
 import { pretty } from 'js-object-pretty-print';
 
 import { PlaygroundEvent } from './types';

@@ -29,7 +29,7 @@ import { Members } from './components/Members';
 import { RollupSettings, Settings } from './components/Settings';
 import { TimeDimension } from './components/TimeDimension';
 import {
-  getPreAggregationDefinitionFromReferences,
+  getRollupDefinitionFromReferences,
   getPreAggregationReferences,
   PreAggregationReferences,
   updateQuery,
@@ -97,6 +97,14 @@ export function RollupDesigner({
   const [preAggName, setPreAggName] = useState<string>('main');
 
   const { order, limit, filters, ...matchedQuery } = defaultQuery;
+
+  const [timeDimension] = matchedQuery.timeDimensions || [];
+
+  // There's nothing we can do to for a rollup to match such query
+  const hideMatchRollupButton =
+    timeDimension?.dimension &&
+    !timeDimension?.dateRange &&
+    !timeDimension?.granularity;
 
   const segments = new Set<string>();
   memberTypeCubeMap.segments.forEach(({ members }) => {
@@ -180,11 +188,8 @@ export function RollupDesigner({
     const definition = {
       preAggregationName: preAggName,
       cubeName,
-      code: getPreAggregationDefinitionFromReferences(
-        references,
-        preAggName,
-        settings
-      ).value,
+      code: getRollupDefinitionFromReferences(references, preAggName, settings)
+        .value,
     };
 
     function showSuccessMessage() {
@@ -318,11 +323,8 @@ export function RollupDesigner({
         <CodeSnippet
           style={{ marginBottom: 16 }}
           code={
-            getPreAggregationDefinitionFromReferences(
-              references,
-              preAggName,
-              settings
-            ).code
+            getRollupDefinitionFromReferences(references, preAggName, settings)
+              .code
           }
           copyMessage="Rollup definition is copied"
           theme="light"
@@ -450,6 +452,15 @@ export function RollupDesigner({
               justifyContent="flex-start"
               style={{ marginBottom: 64 }}
             >
+              {!references.timeDimensions.length && (
+                <Box style={{ marginBottom: 24 }}>
+                  <Alert
+                    type="warning"
+                    message="This rollup has no time dimension so it cannot be partitioned"
+                  />
+                </Box>
+              )}
+
               {canBeRolledUp ? (
                 <Box style={{ marginBottom: 16 }}>
                   <Paragraph>
@@ -460,6 +471,7 @@ export function RollupDesigner({
                   <Paragraph style={{ margin: '24px 0 4px' }}>
                     Rollup Name
                   </Paragraph>
+
                   <Input
                     value={preAggName}
                     suffix={<EditOutlined />}
@@ -500,21 +512,23 @@ export function RollupDesigner({
                       }
                     />
 
-                    <Button
-                      type="primary"
-                      ghost
-                      onClick={() => {
-                        setReferences(
-                          getPreAggregationReferences(
-                            transformedQuery,
-                            segments
-                          )
-                        );
-                        setMatching(true);
-                      }}
-                    >
-                      Match Rollup
-                    </Button>
+                    {!hideMatchRollupButton && (
+                      <Button
+                        type="primary"
+                        ghost
+                        onClick={() => {
+                          setReferences(
+                            getPreAggregationReferences(
+                              transformedQuery,
+                              segments
+                            )
+                          );
+                          setMatching(true);
+                        }}
+                      >
+                        Match Rollup
+                      </Button>
+                    )}
                   </Space>
                 )}
               </Box>

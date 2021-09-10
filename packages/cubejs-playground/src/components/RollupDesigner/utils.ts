@@ -35,11 +35,15 @@ export function getPreAggregationReferences(
     timeDimensions: [],
   };
 
-  if (transformedQuery?.leafMeasures.length) {
+  if (!transformedQuery) {
+    return references;
+  }
+
+  if (transformedQuery.leafMeasures.length) {
     references.measures = [...transformedQuery.leafMeasures];
   }
 
-  if (transformedQuery?.sortedDimensions.length) {
+  if (transformedQuery.sortedDimensions.length) {
     references.dimensions = [
       ...transformedQuery.sortedDimensions.filter(
         (name) => !segments.has(name)
@@ -50,15 +54,12 @@ export function getPreAggregationReferences(
     ];
   }
 
-  if (
-    transformedQuery?.sortedTimeDimensions.length &&
-    transformedQuery.sortedTimeDimensions[0]?.[1] != null
-  ) {
+  if (transformedQuery.sortedTimeDimensions?.[0]?.[0]) {
     const [dimension, granularity] = transformedQuery.sortedTimeDimensions[0];
     references.timeDimensions = [
       {
         dimension,
-        granularity: <TimeDimensionGranularity>granularity,
+        granularity: <TimeDimensionGranularity>granularity || 'day',
       },
     ];
   }
@@ -71,7 +72,7 @@ type PreAggregationDefinitionResult = {
   value: Object;
 };
 
-export function getPreAggregationDefinitionFromReferences(
+export function getRollupDefinitionFromReferences(
   references: PreAggregationReferences,
   name: string = 'main',
   settings: RollupSettings

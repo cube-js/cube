@@ -75,3 +75,11 @@ export function generateAnsiHTML(txt) {
 
   return result;
 }
+
+export function removeEmpty(obj) {
+  return Object.fromEntries(
+    Object.entries(obj)
+      .filter(([, v]) => v != null)
+      .map(([k, v]) => [k, typeof v === 'object' && !Array.isArray(v) ? removeEmpty(v) : v])
+  );
+}

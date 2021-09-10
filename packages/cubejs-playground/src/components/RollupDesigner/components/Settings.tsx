@@ -7,11 +7,11 @@ import {
   Col,
   DatePicker,
   Form,
-  FormItemProps,
   Input,
   Radio,
   Row,
   Select,
+  SelectProps,
   Space,
   Tooltip,
   Typography,
@@ -182,10 +182,11 @@ export function Settings({
                   />
                 </Form.Item>
 
-                <GranularitySelect
-                  disabled={!values['refreshKey.checked.every']}
-                  name="refreshKey.granularity"
-                />
+                <Form.Item name="refreshKey.granularity">
+                  <GranularitySelect
+                    disabled={!values['refreshKey.checked.every']}
+                  />
+                </Form.Item>
 
                 <div style={{ marginBottom: 24 }}>
                   <Typography.Text>or</Typography.Text>
@@ -280,23 +281,33 @@ export function Settings({
                     <Checkbox>Incremental Refresh</Checkbox>
                   </Form.Item>
 
-                  <TitleWithTooltip title="Update Window">
-                    Any partition which includes this span of time into the past
-                    from now will be refreshed according to the Refresh Key set
-                    above. Otherwise, if left unset, only the most recent
-                    partition will be refreshed regularly.
-                  </TitleWithTooltip>
+                  {values['incrementalRefresh'] && (
+                    <>
+                      <TitleWithTooltip title="Update Window">
+                        Any partition which includes this span of time into the
+                        past from now will be refreshed according to the Refresh
+                        Key set above. Otherwise, if left unset, only the most
+                        recent partition will be refreshed regularly.
+                      </TitleWithTooltip>
 
-                  <Space align="start">
-                    <Form.Item name="updateWindow.value">
-                      <Input type="number" min={0} style={{ maxWidth: 80 }} />
-                    </Form.Item>
+                      <Space align="start">
+                        <Form.Item name="updateWindow.value">
+                          <Input
+                            type="number"
+                            min={0}
+                            style={{ maxWidth: 80 }}
+                          />
+                        </Form.Item>
 
-                    <GranularitySelect
-                      name="updateWindow.granularity"
-                      excludedGranularities={['second']}
-                    />
-                  </Space>
+                        <Form.Item name="updateWindow.granularity">
+                          <GranularitySelect
+                            excludedGranularities={['second']}
+                          />
+                        </Form.Item>
+                      </Space>
+                    </>
+                  )}
+
                   {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
                   {/* <Flex direction="column" gap={4}>
   <BuildRange time="since" />
@@ -350,7 +361,9 @@ function BuildRange({ time }: BuildRangeProps) {
                   <Input type="number" min={0} style={{ maxWidth: 80 }} />
                 </Form.Item>
 
-                <GranularitySelect name={name('granularity')} noStyle />
+                <Form.Item name={name('granularity')} noStyle>
+                  <GranularitySelect />
+                </Form.Item>
               </Space>
 
               <Space>
@@ -375,26 +388,22 @@ function BuildRange({ time }: BuildRangeProps) {
 
 type GranularitySelectProps = {
   excludedGranularities?: TimeDimensionGranularity[];
-  disabled?: boolean;
-};
+} & SelectProps<any>;
 
-function GranularitySelect({
-  disabled,
+export function GranularitySelect({
   excludedGranularities = [],
   ...props
-}: FormItemProps & GranularitySelectProps) {
+}: GranularitySelectProps) {
   return (
-    <Form.Item {...props}>
-      <Select disabled={disabled} showSearch style={{ minWidth: 100 }}>
-        {GRANULARITIES.filter(
-          ({ name }) => name != null && !excludedGranularities.includes(name)
-        ).map(({ name, title }) => (
-          <Select.Option key={name} value={name as string}>
-            {title}
-          </Select.Option>
-        ))}
-      </Select>
-    </Form.Item>
+    <Select style={{ minWidth: 100 }} showSearch {...props}>
+      {GRANULARITIES.filter(
+        ({ name }) => name != null && !excludedGranularities.includes(name)
+      ).map(({ name, title }) => (
+        <Select.Option key={name} value={name as string}>
+          {title}
+        </Select.Option>
+      ))}
+    </Select>
   );
 }
 
