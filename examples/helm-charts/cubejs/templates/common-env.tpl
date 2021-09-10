@@ -81,7 +81,7 @@
   value: {{ .Values.redis.url | quote }}
 {{- else }}
 - name: CUBEJS_REDIS_URL
-  value: {{ printf "redis://%s-redis-master:6379" .Release.Name }}
+  value: {{ printf "redis://%s-redis-master:6379" .Release.Name | quote }}
 {{- end }}
 {{- if .Values.redis.password }}
 - name: CUBEJS_REDIS_PASSWORD
@@ -97,7 +97,7 @@
   valueFrom:
     secretKeyRef:
       name: {{ printf "%s-redis" .Release.Name }}
-      key: {{ printf "redis-password" }}
+      key: "redis-password"
 {{- end }}
 {{- else }}
 {{- if .Values.redis.url }}
