@@ -223,24 +223,27 @@ export class BaseDriver {
     return false;
   }
 
+  /**
+   * @protected
+   */
+  informationColumnsSchemaReducer(result, i) {
+    let schema = (result[i.table_schema] || {});
+    const tables = (schema[i.table_name] || []);
+
+    tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
+
+    tables.sort();
+    schema[i.table_name] = tables;
+    schema = sortByKeys(schema);
+    result[i.table_schema] = schema;
+
+    return sortByKeys(result);
+  }
+
   tablesSchema() {
     const query = this.informationSchemaQuery();
 
-    const reduceCb = (result, i) => {
-      let schema = (result[i.table_schema] || {});
-      const tables = (schema[i.table_name] || []);
-
-      tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
-
-      tables.sort();
-      schema[i.table_name] = tables;
-      schema = sortByKeys(schema);
-      result[i.table_schema] = schema;
-
-      return sortByKeys(result);
-    };
-
-    return this.query(query).then(data => reduce(reduceCb, {}, data));
+    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
   }
 
   /**
