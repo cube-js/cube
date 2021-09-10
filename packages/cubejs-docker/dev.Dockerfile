@@ -1,4 +1,4 @@
-FROM node:12.22.1
+FROM node:12.22.1 AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -68,6 +68,12 @@ RUN yarn policies set-version v1.22.5
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
+FROM base as prod_dependencies
+RUN npm install -g lerna patch-package
+RUN yarn install --prod
+
+FROM base as build
+
 RUN yarn install
 
 # Backend
@@ -110,6 +116,13 @@ COPY packages/cubejs-playground/ packages/cubejs-playground/
 
 RUN yarn build
 RUN yarn lerna run build
+
+RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
+
+FROM base AS final
+
+COPY --from=build /cubejs .
+COPY --from=prod_dependencies /cubejs .
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
