@@ -26,7 +26,7 @@
     "noImplicitAny": false,
     "incremental": true,
     "target": "es5",
-    "noEmit": true
+    "noEmit": true,
   },
   "include": [
     "src/**/*"

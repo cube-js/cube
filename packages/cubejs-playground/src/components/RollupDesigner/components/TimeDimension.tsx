@@ -1,20 +1,9 @@
-import {
-  GRANULARITIES,
-  TCubeMember,
-  TimeDimensionGranularity,
-} from '@cubejs-client/core';
-import { Typography, Menu, Space } from 'antd';
-import styled from 'styled-components';
-import ButtonDropdown from '../../../QueryBuilder/ButtonDropdown';
-import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
-import RemoveButtonGroup from '../../../QueryBuilder/RemoveButtonGroup';
+import { TCubeMember, TimeDimensionGranularity } from '@cubejs-client/core';
+import { Space } from 'antd';
+
 import { MemberType } from './Members';
 import { MemberTag } from './MemberTag';
-
-const Flex = styled.div`
-  display: flex;
-  gap: 16px;
-`;
+import { GranularitySelect } from './Settings';
 
 type TimeDimensionProps = {
   member: TCubeMember;
@@ -27,7 +16,7 @@ type TimeDimensionProps = {
 
 export function TimeDimension({
   member,
-  granularity,
+  granularity = 'day',
   onGranularityChange,
   onRemove,
 }: TimeDimensionProps) {
@@ -42,24 +31,7 @@ export function TimeDimension({
           onClose={() => onRemove(member.name)}
         />
 
-        {granularity ? (
-          <ButtonDropdown
-            overlay={
-              <Menu>
-                {GRANULARITIES.map(({ name, title }) => (
-                  <Menu.Item
-                    key={title}
-                    onClick={() => onGranularityChange(name)}
-                  >
-                    {title}
-                  </Menu.Item>
-                ))}
-              </Menu>
-            }
-          >
-            {granularity}
-          </ButtonDropdown>
-        ) : null}
+        <GranularitySelect value={granularity} onChange={onGranularityChange} />
       </Space>
     </>
   );

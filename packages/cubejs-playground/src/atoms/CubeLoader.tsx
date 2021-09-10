@@ -9,7 +9,7 @@ const POSITIONS = [
 
 const cubeImage = `data:image/svg+xml,%3Csvg width='36' height='41' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M35.899 10.351l-18 10.25L.1 10.25l18-10.25L35.9 10.351z' fill='%23FAFAFF'/%3E%3Cpath d='M18 41L0 30.75l.101-20.5L18 20.5' fill='%23E5E5F6'/%3E%3Cpath d='M36 30.75L18 41V20.6l17.899-10.25L36 30.75z' fill='%23C0C0EA'/%3E%3C/svg%3E`;
 
-function pos(index) {
+function pos(index: number) {
   return `transform: translate(${POSITIONS[index][0]}%, ${POSITIONS[index][1]}%);`;
 }
 
@@ -126,7 +126,7 @@ const RawImg = styled.img<TRawImgProps>(
 `
 );
 
-const Cube = (props) => {
+const Cube = (props: any) => {
   return <RawImg role="presentation" src={cubeImage} alt="" {...props} />;
 };
 

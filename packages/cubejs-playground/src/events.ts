@@ -1,4 +1,3 @@
-import { fetch } from 'whatwg-fetch';
 import cookie from 'js-cookie';
 import { v4 as uuidv4 } from 'uuid';
 

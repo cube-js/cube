@@ -1,10 +1,10 @@
 import { CheckOutlined, SearchOutlined } from '@ant-design/icons';
 import { AvailableMembers } from '@cubejs-client/react';
 import { Input, Menu } from 'antd';
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import styled from 'styled-components';
-import useDeepMemo from '../../../hooks/deep-memo';
 
+import useDeepMemo from '../../../hooks/deep-memo';
 import { getMembersByCube, MembersByCube } from '../../../shared/helpers';
 import { QueryMemberKey } from '../../../types';
 import { useCubeMemberSearch } from './cube-member-search';
@@ -12,6 +12,7 @@ import { useCubeMemberSearch } from './cube-member-search';
 const { SubMenu } = Menu;
 
 const StyledMenu = styled(Menu)`
+  position: relative;
   max-height: 600px;
   overflow-y: scroll;
 
@@ -89,7 +90,10 @@ type CubesProps = {
 
 const MEMBER_TYPES = ['measures', 'dimensions', 'segments', 'timeDimensions'];
 
-function filterMembersByCube(membersByCube: MembersByCube[], keys: string[]) {
+function filterMembersByCube(
+  membersByCube: MembersByCube[],
+  keys: string[]
+): MembersByCube[] {
   return membersByCube
     .map((cube) => {
       const membersByType = MEMBER_TYPES.map((type) => [
@@ -115,6 +119,7 @@ export function Cubes({
   onSelect,
 }: CubesProps) {
   const defaultOpenKeys = selectedKeys.map((key) => key.split('.')[0]);
+  const [firstOpenCubeName] = defaultOpenKeys;
 
   const [openKeys, setOpenKeys] = useState<string[]>(defaultOpenKeys);
 
@@ -128,6 +133,19 @@ export function Cubes({
     ? filterMembersByCube(getMembersByCube(memberTypeCubeMap), keys)
     : getMembersByCube(memberTypeCubeMap);
 
+  useLayoutEffect(() => {
+    if (firstOpenCubeName) {
+      document.querySelector('[data-menu="cubes"]')?.scroll({
+        top: (
+          document.querySelector(
+            `[data-cube="${firstOpenCubeName}"]`
+          ) as HTMLElement
+        )?.offsetTop,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+
   return (
     <>
       <SearchInputWrapper>
@@ -140,12 +158,12 @@ export function Cubes({
       </SearchInputWrapper>
 
       <StyledMenu
+        data-menu="cubes"
         selectedKeys={selectedKeys}
         openKeys={search ? allCubeKeys : openKeys}
         mode="inline"
         onClick={(event) => {
-          // @ts-ignore
-          const { membertype } = event.domEvent.target.dataset;
+          const { membertype } = (event.domEvent.target as HTMLElement).dataset;
 
           onSelect(membertype as QueryMemberKey, event.key.toString());
         }}
@@ -154,6 +172,7 @@ export function Cubes({
           return (
             <SubMenu
               key={cube.cubeName}
+              data-cube={cube.cubeName}
               title={cube.cubeTitle}
               onTitleClick={({ key }) => {
                 if (openKeys.includes(key)) {
@@ -177,30 +196,19 @@ export function Cubes({
                         : memberType
                     }
                   >
-                    {cube[memberType]
-                      .filter(
-                        (member) =>
-                          !(
-                            memberType === 'dimensions' &&
-                            member.type === 'time'
-                          )
-                      )
-                      .map((member) => (
-                        <Menu.Item
-                          key={member.name}
-                          data-membertype={memberType}
-                        >
-                          <CheckOutlined
-                            style={{
-                              visibility: selectedKeys.includes(member.name)
-                                ? 'visible'
-                                : 'hidden',
-                            }}
-                          />
+                    {cube[memberType].map((member) => (
+                      <Menu.Item key={member.name} data-membertype={memberType}>
+                        <CheckOutlined
+                          style={{
+                            visibility: selectedKeys.includes(member.name)
+                              ? 'visible'
+                              : 'hidden',
+                          }}
+                        />
 
-                          {member.shortTitle}
-                        </Menu.Item>
-                      ))}
+                        {member.shortTitle}
+                      </Menu.Item>
+                    ))}
                   </Menu.ItemGroup>
                 );
               })}

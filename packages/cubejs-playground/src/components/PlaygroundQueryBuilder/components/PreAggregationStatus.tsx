@@ -6,8 +6,8 @@ import { Query } from '@cubejs-client/core';
 import { AvailableMembers } from '@cubejs-client/react';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
 import styled from 'styled-components';
-import { Box, Flex } from '../../../grid';
 
+import { Box, Flex } from '../../../grid';
 import { useServerCoreVersionGte, useToggle } from '../../../hooks';
 import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { RollupDesigner } from '../../RollupDesigner';
@@ -21,12 +21,6 @@ const Badge = styled.div`
   padding: 2px 4px;
   border-radius: 4px;
   background: var(--warning-bg-color);
-`;
-
-const RollupModal = styled(Modal)`
-  & .ant-tabs-nav {
-    padding-left: 24px;
-  }
 `;
 
 type PreAggregationStatusProps = QueryStatus & {
