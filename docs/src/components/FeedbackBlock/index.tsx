@@ -16,11 +16,11 @@ const FeedbackBlock = (props: propsType) => {
     }
     const date = new Date().toISOString();
     setDate(date);
-    event('page-feedback-like', { page, date, feedback });
+    event('page_feedback_like', { page, date, feedback });
     setFeedbackState(state);
   };
   const setFeedbackMessage = (message: string) => {
-    event('page-feedback-comment', { page, date, feedback, comment: message });
+    event('page_feedback_comment', { page, date, feedback, comment: message });
     setFeedbackMessageState(message);
   }
   const clearFeedback = () => {
