@@ -417,7 +417,7 @@ provides a convenient shortcut to pass a dimension and a filter as a
 - `compareDateRange`: An array of date ranges to compare a measure change over
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
-  values `second`, `minute`, `hour`, `day`, `week`, `month`, `year`. If you pass
+  values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter` `year`. If you pass
   `null` to the granularity, Cube.js will only perform filtering by a specified
   time dimension, without grouping.
 
