@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.28.34",
+  "version": "0.28.35",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -39,9 +39,9 @@
   ],
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.28.34",
-    "@cubejs-backend/schema-compiler": "^0.28.34",
+    "@cubejs-backend/schema-compiler": "^0.28.35",
     "@cubejs-backend/shared": "^0.28.29",
-    "@cubejs-client/ws-transport": "^0.28.25",
+    "@cubejs-client/ws-transport": "^0.28.35",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.6.1",
@@ -50,7 +50,7 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.28.22",
-    "@cubejs-client/core": "^0.28.25",
+    "@cubejs-client/core": "^0.28.35",
     "@jest/globals": "^26.6.2",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^26.0.22",
