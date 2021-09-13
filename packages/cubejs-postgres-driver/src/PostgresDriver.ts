@@ -12,6 +12,8 @@ import { QueryStream } from './QueryStream';
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
   double: 'decimal',
+  // Revert mapping for internal pre-aggregations
+  HLL_POSTGRES: 'hll',
 };
 
 const NativeTypeToPostgresType: Record<string, string> = {};
@@ -25,6 +27,8 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   bpchar: 'varchar',
   // Numeric is an alias
   numeric: 'decimal',
+  // External mapping
+  hll: 'HLL_POSTGRES',
 };
 
 const timestampDataTypes = [
@@ -35,23 +39,14 @@ const timestampDataTypes = [
   // @link TypeId.TIMESTAMPTZ
   1184
 ];
-const timestampTypeParser = (val: any) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+const hllTypeParser = (val: string) => Buffer.from(val).toString('base64');
 
 export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
 };
-
-function getTypeParser(dataType: TypeId, format: TypeFormat | undefined) {
-  const isTimestamp = timestampDataTypes.includes(dataType);
-  if (isTimestamp) {
-    return timestampTypeParser;
-  }
-
-  const parser = types.getTypeParser(dataType, format);
-  return (val: any) => parser(val);
-}
 
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
@@ -95,13 +90,33 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     };
   }
 
+  protected getTypeParser = (dataTypeID: TypeId, format: TypeFormat | undefined) => {
+    const isTimestamp = timestampDataTypes.includes(dataTypeID);
+    if (isTimestamp) {
+      return timestampTypeParser;
+    }
+
+    // Sometimes driver returns 19 which is a name type. It's not declared in TypeId & NativeTypeToPostgresType.
+    // If we pass it to getPostgresTypeForField, driver will throw an error
+    if (dataTypeID !== 19) {
+      // We are using base64 encoding as main format for all HLL sketches, but in pg driver it uses binary encoding
+      const typeName = this.getPostgresTypeForField(<any>{ dataTypeID, name: '@parser' });
+      if (typeName && typeName === 'hll') {
+        return hllTypeParser;
+      }
+    }
+
+    const parser = types.getTypeParser(dataTypeID, format);
+    return (val: any) => parser(val);
+  };
+
   /**
    * It's not possible to detect user defined types via constant oids
    * For example HLL extensions is using CREATE TYPE HLL which will generate a new pg_type with different oids
    */
   protected userDefinedTypes: Record<string, string> | null = null;
 
-  protected getPostgresTypeForField(field: FieldDef) {
+  protected getPostgresTypeForField(field: FieldDef): string {
     if (field.dataTypeID in NativeTypeToPostgresType) {
       return NativeTypeToPostgresType[field.dataTypeID].toLowerCase();
     }
@@ -165,7 +180,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
       const queryStream = new QueryStream(query, values, {
         types: {
-          getTypeParser,
+          getTypeParser: this.getTypeParser,
         },
         highWaterMark
       });
@@ -199,7 +214,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         text: query,
         values: values || [],
         types: {
-          getTypeParser,
+          getTypeParser: this.getTypeParser,
         },
       });
       return res;
