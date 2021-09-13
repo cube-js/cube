@@ -19,12 +19,12 @@ export class CubeToMetaTransformer {
     this.cubes = this.queries = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)))
-      .filter(c => !!c);
+      .filter(Boolean);
   }
 
-  // eslint-disable-next-line no-unused-vars
-  transform(cube, errorReporter) {
+  transform(cube) {
     const cubeTitle = cube.title || this.titleize(cube.name);
+    
     return {
       config: {
         name: cube.name,
@@ -32,8 +32,10 @@ export class CubeToMetaTransformer {
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],
         measures: R.compose(
-          R.map((nameToMetric) => this.measureConfig(cube.name, cubeTitle, nameToMetric)),
-          R.filter((nameToMetric) => this.isVisible(nameToMetric[1], true)),
+          R.map((nameToMetric) => ({
+            ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
+            isVisible: this.isVisible(nameToMetric[1], true)
+          })),
           R.toPairs
         )(cube.measures || {}),
         dimensions: R.compose(
@@ -47,10 +49,8 @@ export class CubeToMetaTransformer {
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format,
             meta: nameToDimension[1].meta,
+            isVisible: this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
           })),
-          R.filter(
-            nameToDimension => this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
-          ),
           R.toPairs
         )(cube.dimensions || {}),
         segments: R.compose(
