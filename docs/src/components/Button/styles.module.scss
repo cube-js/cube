@@ -1,0 +1,160 @@
+@import "../../../static/styles/variables.scss";
+
+.button {
+  min-width: 88px;
+  padding: 4px 12px;
+  border: none;
+  font: inherit;
+  color: inherit;
+  background-color: transparent;
+  cursor: pointer;
+  transition: background-color 0.3s ease-in-out, border 0.3s ease-in-out;
+
+  svg {
+    margin-right: 9px;
+  }
+  span {
+    font-family: $header-font;
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: $purple;
+  border-radius: 4px;
+  color: $white;
+  border: 1px solid rgba(102, 93, 232, 0);
+
+  &:hover {
+    background: $purple-text;
+    color: $white;
+  }
+
+  &:active {
+    background: #7A77FF;
+    border: 1px solid $purple-text;
+  }
+  &[active="active"] {
+    background: #7A77FF;
+    border: 1px solid $purple-text;
+  }
+  &[disabled] {
+    background: rgba(20, 20, 70, 0.04);
+    color: rgba(20, 20, 70, 0.3);
+  }
+}
+
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(102, 93, 232, 0.1);
+  border-radius: 4px;
+  color: $purple-text;
+  border: 1px solid rgba(102, 93, 232, 0);
+
+  &:hover {
+    background: rgba(102, 93, 232, 0.16);
+  }
+
+  &:active {
+    background: rgba(102, 93, 232, 0.1);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+  &[active="active"] {
+    background: rgba(102, 93, 232, 0.1);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+  &[disabled] {
+    background: rgba(20, 20, 70, 0.04);
+    color: rgba(20, 20, 70, 0.3);
+  }
+}
+
+.outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: $white;
+  border-radius: 4px;
+  color: $purple-text;
+  border: 1px solid rgba(102, 93, 232, 0.3);
+
+  &:hover {
+    background: rgba(102, 93, 232, 0.16);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+
+  &:active {
+    background: rgba(102, 93, 232, 0.1);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+  &[active="active"] {
+    background: rgba(102, 93, 232, 0.1);
+    border: 1px solid rgba(102, 93, 232, 0.3);
+  }
+  &[disabled] {
+    background: $white;
+    border: 1px solid rgba(20, 20, 70, 0.12);
+    color: rgba(20, 20, 70, 0.3);
+  }
+}
+
+.like {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(65, 181, 111, 0.12);
+  border-radius: 4px;
+  color: $success-text;
+  border: 1px solid rgba(103, 192, 130, 0);
+
+  &:hover {
+    background: rgba(65, 181, 111, 0.2);
+    color: $success-text;
+  }
+
+  &:active {
+    background: rgba(65, 181, 111, 0.12);
+    border: 1px solid rgba(103, 192, 130, 0.4);
+  }
+  &[active="active"] {
+    background: rgba(65, 181, 111, 0.12);
+    border: 1px solid rgba(103, 192, 130, 0.4);
+  }
+  &[disabled] {
+    background: rgba(20, 20, 70, 0.04);
+    color: rgba(20, 20, 70, 0.3);
+  }
+}
+
+.dislike {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 100, 109, 0.1);
+  border-radius: 4px;
+  color: $danger-text;
+  border: 1px solid rgba(255, 100, 109, 0);
+
+  &:hover {
+    background: rgba(255, 100, 109, 0.16);
+  }
+  &:active {
+    background: rgba(255, 100, 109, 0.1);
+    border: 1px solid rgba(255, 100, 109, 0.4);
+  }
+  &[active="active"] {
+    background: rgba(255, 100, 109, 0.1);
+    border: 1px solid rgba(255, 100, 109, 0.4);
+  }
+
+  &[disabled] {
+    background: rgba(20, 20, 70, 0.04);
+    color: rgba(20, 20, 70, 0.3);
+  }
+}
