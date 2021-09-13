@@ -1,29 +1,16 @@
 import { BigQuery } from '@google-cloud/bigquery';
 import http from 'http';
+import bqQueries from './bq-queries.js';
+const { generate } = bqQueries;
 
 async function queryBQ() {
   const bigqueryClient = new BigQuery();
-  const sqlQuery =
-  `
-  SELECT
-    repository_name,
-    type,
-    count(*) as stars
-  FROM
-    \`cube-devrel-team.github.events\`
-  WHERE
-    type = 'WatchEvent'
-  GROUP BY
-    1,
-    2
-  ORDER BY
-    3 DESC
-  LIMIT
-    10
-  `
+
+  const generatedData = generate.data()
+  const generatedQuery = generate.query(generatedData)
 
   const options = {
-    query: sqlQuery,
+    query: generatedQuery,
     location: 'US',
   };
 
