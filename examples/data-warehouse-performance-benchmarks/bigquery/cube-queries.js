@@ -13,15 +13,13 @@ export default {
   generate: {
     data: () => {
       return {
-        month1: pad(getRandomInRange(1, 12), 2),
-        month2: pad(getRandomInRange(1, 12), 2),
+        month1: pad(getRandomInRange(4, 7), 2),
+        month2: pad(getRandomInRange(4, 7), 2),
         day1: pad(getRandomInRange(1, 28), 2),
         day2: pad(getRandomInRange(1, 28), 2),
-        hour1: pad(getRandomInRange(0, 23), 2),
-        hour2: pad(getRandomInRange(0, 23), 2),
       }
     },
-    query: ({ month1, month2, day1, day2, hour1, hour2 }) => {
+    query: ({ month1, month2, day1, day2 }) => {
       return {
         "measures": [
           "Events.count"
@@ -31,8 +29,8 @@ export default {
             "dimension": "Events.createdAt",
             "granularity": "day",
             "dateRange": [
-              `2012-${month1}-${day1} ${hour1}:00:00`,
-              `2012-${month2}-${day2} ${hour2}:00:00`,
+              `2012-${month1}-${day1}`,
+              `2012-${month2}-${day2}`,
             ]
           }
         ],
@@ -40,9 +38,7 @@ export default {
           "Events.count": "desc"
         },
         "dimensions": [
-          "Events.repositoryName",
-          "Events.type",
-          "Events.createdAt"
+          "Events.repositoryName"
         ],
         "filters": [
           {

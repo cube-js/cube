@@ -7,10 +7,9 @@ const cubejsApi = cubejs.default(
   { apiUrl: 'https://irish-idalia.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1' }
 );
 
-const generatedData = generate.data();
-const generatedQuery = generate.query(generatedData);
-
 async function queryCube () {
+  const generatedData = generate.data();
+  const generatedQuery = generate.query(generatedData);
   await cubejsApi.load(generatedQuery);
 }
 
