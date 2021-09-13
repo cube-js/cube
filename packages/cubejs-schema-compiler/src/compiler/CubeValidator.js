@@ -5,7 +5,7 @@ const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
 const identifier = Joi.string().regex(identifierRegex, 'identifier');
 const timeInterval =
   Joi.alternatives([
-    Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
+    Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|quarter|year)$/, 'time interval'),
     Joi.any().valid('unbounded')
   ]);
 const everyInterval = Joi.string().regex(/^(\d+) (second|minute|hour|day|week)s?$/, 'refresh time interval');
@@ -242,7 +242,7 @@ const cubeSchema = Joi.object().keys({
       segmentReferences: Joi.func(),
       timeDimensionReference: Joi.func().required(),
       granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+        'second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'
       ).required(),
       rollupReferences: Joi.func().required(),
     })),
@@ -261,7 +261,7 @@ const cubeSchema = Joi.object().keys({
       segments: Joi.func(),
       timeDimension: Joi.func().required(),
       granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+         'second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'
       ).required(),
       rollups: Joi.func().required(),
     })),
@@ -279,7 +279,7 @@ const cubeSchema = Joi.object().keys({
       segmentReferences: Joi.func(),
       timeDimensionReference: Joi.func().required(),
       granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+        'second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'
       ).required()
     })),
     // Rollup without References postfix
@@ -296,7 +296,7 @@ const cubeSchema = Joi.object().keys({
       segments: Joi.func(),
       timeDimension: Joi.func().required(),
       granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+        'second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'
       ).required()
     }))
   ))
