@@ -35,7 +35,7 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
 use crate::metastore::{
-    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
@@ -763,6 +763,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
                         "hll_snowflake" => ColumnType::HyperLogLog(HllFlavour::Snowflake),
+                        "hll_postgres" => ColumnType::HyperLogLog(HllFlavour::Postgres),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
@@ -834,10 +835,15 @@ fn parse_hyper_log_log<'a>(
             *buffer = hll.write();
             Ok(buffer)
         }
-        f => {
-            assert!(f.imports_from_binary());
+        HllFlavour::Postgres => {
             let bytes = parse_binary_string(buffer, v)?;
-            is_valid_binary_hll_input(bytes, f)?;
+            let hll = HllSketch::read_hll_storage_spec(bytes)?;
+            *buffer = hll.write();
+            Ok(buffer)
+        }
+        HllFlavour::Airlift | HllFlavour::ZetaSketch => {
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_plain_binary_hll(bytes, f)?;
             Ok(bytes)
         }
     }
