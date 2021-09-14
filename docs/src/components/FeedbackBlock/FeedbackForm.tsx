@@ -16,7 +16,7 @@ const FeedbackForm = (props: propsType) => {
     message: string,
   ) => {
     event.preventDefault();
-    setFeedbackMessage(message || 'empty message');
+    setFeedbackMessage(message);
   };
 
   return (
