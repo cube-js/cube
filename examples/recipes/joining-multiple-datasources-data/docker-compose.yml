@@ -22,21 +22,10 @@ services:
     links:
       - cubestore
 
-  # postgres:
-  #   image: postgres
-  #   restart: always
-  #   ports:
-  #     - 5432:5432
-  #   environment:
-  #     POSTGRES_PASSWORD: example
-  #     POSTGRES_DB: localDB
-  #   volumes:
-  #     - ./scripts:/docker-entrypoint-initdb.d
-
-  # query:
-  #   image: cfmanteiga/alpine-bash-curl-jq
-  #   depends_on:
-  #     - cube
-  #   volumes:
-  #     - .:/query
-  #   entrypoint: ["bash", "query/queries/run.sh"]
+  query:
+    image: cfmanteiga/alpine-bash-curl-jq
+    depends_on:
+      - cube
+    volumes:
+      - .:/query
+    entrypoint: ["sh", "query/queries/run.sh"]

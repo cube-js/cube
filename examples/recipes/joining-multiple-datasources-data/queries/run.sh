@@ -7,9 +7,7 @@ readyzUrl=readyz
 
 token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjEwMDAwMDAwMDAsImV4cCI6NTAwMDAwMDAwMH0.OHZOpOBVKr-sCwn8sbZ5UFsqI3uCs6e4omT7P6WVMFw
 
-statusesQuery=$(cat query/queries/statuses.json)
-snapshotQuery1=$(cat query/queries/snapshot-1.json)
-snapshotQuery2=$(cat query/queries/snapshot-2.json)
+preAggQuery=$(cat query/queries/pre-agg-query.json)
 
 # Wait for the Cube API to become ready
 until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
@@ -17,15 +15,10 @@ until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
 done
 
 # Send the queries
-curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${statusesQuery}" -o statusesResponse.json
-curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${snapshotQuery1}" -o snapshotResponse1.json
-curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${snapshotQuery2}" -o snapshotResponse2.json
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${preAggQuery}" -o preAggResponse.json
 
-echo "Statuses (excerpt):"
-jq ".data" statusesResponse.json
+echo "Product suppliers:"
+jq ".data" preAggResponse.json
 
-echo "Shipped as of April 1, 2019:"
-jq ".data" snapshotResponse1.json
-
-echo "Shipped as of May 1, 2019:"
-jq ".data" snapshotResponse2.json
+echo "Names of the used pre-aggregations:"
+jq ".usedPreAggregations" preAggResponse.json

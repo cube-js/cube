@@ -14,18 +14,11 @@ cube(`Suppliers`, {
     },
   },
 
-  measures: {
-    count: {
-      type: `count`
-    }
-  },
-
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       primaryKey: true,
-      shown:true
     },
 
     email: {
@@ -36,11 +29,6 @@ cube(`Suppliers`, {
     company: {
       sql: `company`,
       type: `string`
-    },
-
-    createdAt: {
-      sql: `created_at`,
-      type: `time`
     }
   },
 
