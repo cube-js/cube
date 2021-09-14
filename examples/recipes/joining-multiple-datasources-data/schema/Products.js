@@ -2,6 +2,7 @@ cube(`Products`, {
   sql: `SELECT * FROM public.products`,
 
   preAggregations: {
+    // start part: productsRollup
     productsRollup: {
       type:`rollup`,
       external: true,
@@ -11,6 +12,7 @@ cube(`Products`, {
           columns: [CUBE.supplierId],
         },
       },
+    // end part: productsRollup
     },
 
     combinedRollup: {
