@@ -51,6 +51,12 @@ impl HllSketch {
         });
     }
 
+    pub fn read_hll_storage_spec(data: &[u8]) -> Result<HllSketch> {
+        return Ok(HllSketch {
+            instance: HllInstance::read_hll_storage_spec(data)?,
+        });
+    }
+
     /// Read from the snowflake JSON format, i.e. result of HLL_EXPORT serialized to string.
     pub fn read_snowflake(s: &str) -> Result<HllSketch> {
         return Ok(HllSketch {

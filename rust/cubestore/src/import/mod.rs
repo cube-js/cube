@@ -22,7 +22,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
-use crate::metastore::{is_valid_binary_hll_input, HllFlavour, IdRow};
+use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
@@ -129,10 +129,16 @@ impl ImportFormat {
                                         let hll = HllSketch::read_snowflake(value)?;
                                         TableValue::Bytes(hll.write())
                                     }
-                                    ColumnType::HyperLogLog(f) => {
-                                        assert!(f.imports_from_binary());
+                                    ColumnType::HyperLogLog(HllFlavour::Postgres) => {
                                         let data = base64::decode(value)?;
-                                        is_valid_binary_hll_input(&data, *f)?;
+                                        let hll = HllSketch::read_hll_storage_spec(&data)?;
+                                        TableValue::Bytes(hll.write())
+                                    }
+                                    ColumnType::HyperLogLog(
+                                        f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
+                                    ) => {
+                                        let data = base64::decode(value)?;
+                                        is_valid_plain_binary_hll(&data, *f)?;
                                         TableValue::Bytes(data)
                                     }
                                     ColumnType::Timestamp => {
