@@ -302,6 +302,24 @@ const cubeSchema = Joi.object().keys({
   ))
 });
 
+function formatErrorMessage(error) {
+  const explain = new Map();
+
+  error?.details?.forEach((d) => {
+    d?.context?.details?.forEach((cd) => {
+      if (cd.message != null) explain.set(cd.message, true);
+    });
+  });
+
+  let { message } = error;
+
+  if (explain.size > 0) {
+    message += `\nPossible reasons:\n\t* ${Array.from(explain.keys()).join('\n\t* ')}`;
+  }
+
+  return message;
+}
+
 export class CubeValidator {
   constructor(cubeSymbols) {
     this.cubeSymbols = cubeSymbols;
@@ -315,13 +333,15 @@ export class CubeValidator {
   }
 
   validate(cube, errorReporter) {
-    Joi.validate(cube, cubeSchema, (err) => {
-      if (err) {
-        errorReporter.error(err.message);
-      } else {
-        this.validCubes[cube.name] = true;
-      }
-    });
+    const result = cubeSchema.validate(cube);
+
+    if (result.error != null) {
+      errorReporter.error(formatErrorMessage(result.error), result.error);
+    } else {
+      this.validCubes[cube.name] = true;
+    }
+
+    return result;
   }
 
   isCubeValid(cube) {
