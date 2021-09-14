@@ -4,10 +4,10 @@ module.exports = {
   driverFactory: ({ dataSource }) => {
     if (dataSource === 'suppliers') {
       return new PostgresDriver({
-        database: 'localDB',
-        host: 'postgres',
-        user: 'postgres',
-        password: 'example',
+        database: 'recipes',
+        host: '35.188.28.4',
+        user: 'cube',
+        password: '12345',
         port: '5432',
       })
     }
@@ -15,7 +15,7 @@ module.exports = {
     if (dataSource === 'products') {
       return new PostgresDriver({
         database: 'ecom',
-        host: 'demo-db-recipes.cube.dev',
+        host: 'demo-db.cube.dev',
         user: 'cube',
         password: '12345',
         port: '5432',

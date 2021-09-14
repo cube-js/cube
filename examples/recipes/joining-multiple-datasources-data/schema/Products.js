@@ -6,6 +6,11 @@ cube(`Products`, {
       type:`rollup`,
       external: true,
       dimensions: [CUBE.name, CUBE.supplierId],
+      indexes: {
+        categoryIndex: {
+          columns: [CUBE.supplierId],
+        },
+      },
     },
 
     combinedRollup: {

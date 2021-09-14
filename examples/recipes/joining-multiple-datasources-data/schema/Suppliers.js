@@ -5,7 +5,12 @@ cube(`Suppliers`, {
     suppliersRollup: {
       type:`rollup`,
       external: true,
-      dimensions: [CUBE.id, CUBE.company, CUBE.email]
+      dimensions: [CUBE.id, CUBE.company, CUBE.email],
+      indexes: {
+        categoryIndex: {
+          columns: [CUBE.id],
+        },
+      },
     },
   },
 

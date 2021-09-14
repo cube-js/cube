@@ -2,6 +2,7 @@ version: '2.2'
 
 services:
   cubestore:
+  # ToDo change to the latest image
     image: cubejs/cubestore:arm64-experimental-v2021-07-29
     environment:
       - CUBESTORE_REMOTE_DIR=/cube/data
@@ -21,16 +22,16 @@ services:
     links:
       - cubestore
 
-  postgres:
-    image: postgres
-    restart: always
-    ports:
-      - 5432:5432
-    environment:
-      POSTGRES_PASSWORD: example
-      POSTGRES_DB: localDB
-    volumes:
-      - ./scripts:/docker-entrypoint-initdb.d
+  # postgres:
+  #   image: postgres
+  #   restart: always
+  #   ports:
+  #     - 5432:5432
+  #   environment:
+  #     POSTGRES_PASSWORD: example
+  #     POSTGRES_DB: localDB
+  #   volumes:
+  #     - ./scripts:/docker-entrypoint-initdb.d
 
   # query:
   #   image: cfmanteiga/alpine-bash-curl-jq
