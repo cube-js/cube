@@ -303,18 +303,18 @@ const cubeSchema = Joi.object().keys({
 });
 
 function formatErrorMessage(error) {
-  const explain = new Map();
+  const explain = new Set();
 
   error?.details?.forEach((d) => {
     d?.context?.details?.forEach((cd) => {
-      if (cd.message != null) explain.set(cd.message, true);
+      if (cd.message != null) explain.add(cd.message);
     });
   });
 
   let { message } = error;
 
   if (explain.size > 0) {
-    message += `\nPossible reasons:\n\t* ${Array.from(explain.keys()).join('\n\t* ')}`;
+    message += `\nPossible reasons:\n\t* ${Array.from(explain).join('\n\t* ')}`;
   }
 
   return message;
