@@ -502,6 +502,8 @@ declare module '@cubejs-client/react' {
     sql: string;
   };
 
+  export function useCubeMeta(options?: Omit<LoadMethodOptions, 'subscribe'>): CubeFetchResult<Meta>;
+
   /**
    * @hidden
    */
