@@ -13,7 +13,7 @@ import get from 'lodash/get';
 import last from 'lodash/last';
 import { renameCategory } from '../rename-category';
 
-import 'gatsby-remark-mathjax-ssr/mathjax.css';
+import 'katex/dist/katex.min.css';
 
 import FeedbackBlock from '../components/FeedbackBlock'
 import ScrollLink, {
