@@ -12,9 +12,11 @@ function pad(n, width, z) {
 export default {
   generate: {
     data: () => {
+      const year = Number(getRandomInRange(1998, 1999))
+
       return {
-        year1: pad(getRandomInRange(1990, 1999), 2),
-        year2: 2000,
+        year1: year,
+        year2: year + 1,
         month1: pad(getRandomInRange(1, 12), 2),
         month2: pad(getRandomInRange(1, 12), 2),
         day1: pad(getRandomInRange(1, 28), 2),

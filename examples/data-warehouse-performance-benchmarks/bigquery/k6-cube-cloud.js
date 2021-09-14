@@ -1,5 +1,10 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
+const vus = 30;
+export let options = {
+  vus: vus,
+  duration: '10s',
+};
 
 function getRandomInRange(min, max) {
 	const rand = min + Math.round(Math.random() * (max - min));
@@ -15,9 +20,11 @@ function pad(n, width, z) {
 const cubeQueries = {
   generate: {
     data: () => {
+      const year = Number(getRandomInRange(1998, 1999))
+
       return {
-        year1: pad(getRandomInRange(1990, 1999), 2),
-        year2: 2000,
+        year1: year,
+        year2: year + 1,
         month1: pad(getRandomInRange(1, 12), 2),
         month2: pad(getRandomInRange(1, 12), 2),
         day1: pad(getRandomInRange(1, 28), 2),
@@ -45,7 +52,6 @@ export default function () {
   const payload = `{"query": ${generatedQuery} }`
 
   http.post(cubeUrl, payload, params);
-  sleep(1);
 }
 
 /* 
