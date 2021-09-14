@@ -537,15 +537,15 @@ class ResultSet {
         let currentItem = schema;
 
         yValues.forEach((value, index) => {
-          currentItem[value] = {
+          currentItem[`_${value}`] = {
             key: value,
             memberId: normalizedPivotConfig.y[index] === 'measures'
               ? value
               : normalizedPivotConfig.y[index],
-            children: (currentItem[value] && currentItem[value].children) || {}
+            children: (currentItem[`_${value}`] && currentItem[`_${value}`].children) || {}
           };
 
-          currentItem = currentItem[value].children;
+          currentItem = currentItem[`_${value}`].children;
         });
       }
     });

@@ -460,13 +460,29 @@ export class ApiGateway {
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
+    
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
     try {
-      const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
-      const cubes = metaConfig.map(c => c.config);
+      const metaConfig = await this.getCompilerApi(context).metaConfig({
+        requestId: context.requestId,
+      });
+      const cubes = metaConfig
+        .map((meta) => meta.config)
+        .map((cube) => ({
+          ...cube,
+          measures: cube.measures.filter(visibilityFilter),
+          dimensions: cube.dimensions.filter(visibilityFilter),
+        }));
       res({ cubes });
     } catch (e) {
       this.handleError({
-        e, context, res, requestStarted
+        e,
+        context,
+        res,
+        requestStarted,
       });
     }
   }

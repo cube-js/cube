@@ -15,6 +15,7 @@ import { renameCategory } from '../rename-category';
 
 import 'gatsby-remark-mathjax-ssr/mathjax.css';
 
+import FeedbackBlock from '../components/FeedbackBlock'
 import ScrollLink, {
   SCROLL_OFFSET,
 } from '../components/templates/ScrollSpyLink';
@@ -26,7 +27,12 @@ import { Page, Section, SetScrollSectionsAndGithubUrlFunction } from '../types';
 import GitHubCodeBlock from '../components/GitHubCodeBlock';
 import CubeQueryResultSet from '../components/CubeQueryResultSet';
 import GitHubFolderLink from '../components/GitHubFolderLink';
-import { DangerBox, InfoBox, SuccessBox, WarningBox } from '../components/AlertBox/AlertBox';
+import {
+  DangerBox,
+  InfoBox,
+  SuccessBox,
+  WarningBox,
+} from '../components/AlertBox/AlertBox';
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
@@ -38,7 +44,10 @@ const MyH3 = (props) => {
   const isCustom = startCommentIndex !== -1 && endCommentIndex !== -1;
 
   if (isCustom) {
-    const propsData = props.children?.slice(startCommentIndex + 3, endCommentIndex);
+    const propsData = props.children?.slice(
+      startCommentIndex + 3,
+      endCommentIndex
+    );
 
     if (propsData?.length) {
       const jsonProps = JSON.parse(propsData);
@@ -58,7 +67,20 @@ const MyH3 = (props) => {
   return <h3 name={kebabCase(props.children)} {...props} />;
 };
 
-const components = { DangerBox, InfoBox, SuccessBox, WarningBox, LoomVideo, Grid, GridItem, GitHubCodeBlock, CubeQueryResultSet, GitHubFolderLink, h2: MyH2, h3: MyH3 };
+const components = {
+  DangerBox,
+  InfoBox,
+  SuccessBox,
+  WarningBox,
+  LoomVideo,
+  Grid,
+  GridItem,
+  GitHubCodeBlock,
+  CubeQueryResultSet,
+  GitHubFolderLink,
+  h2: MyH2,
+  h3: MyH3,
+};
 
 const MDX = (props) => (
   <MDXProvider components={components}>
@@ -279,6 +301,7 @@ class DocTemplate extends Component<Props, State> {
   render() {
     const { mdx = {} } = this.props.data;
     const { frontmatter } = mdx;
+    const { isDisableFeedbackBlock } = frontmatter;
 
     return (
       <div>
@@ -287,6 +310,9 @@ class DocTemplate extends Component<Props, State> {
           <div className={styles.docContent}>
             <h1 name="top">{frontmatter.title}</h1>
             <MDX {...this.props} />
+            {!isDisableFeedbackBlock && (
+              <FeedbackBlock page={frontmatter.permalink} />
+            )}
           </div>
         </div>
       </div>
@@ -307,6 +333,7 @@ export const pageQuery = graphql`
         scope
         category
         frameworkOfChoice
+        isDisableFeedbackBlock
       }
     }
   }
