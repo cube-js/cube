@@ -5,4 +5,9 @@
   width: 100%;
   padding: 24px 0;
   border-radius: 3px;
+  @media (max-width: 1023px) {
+    .katex-display>.katex {
+      white-space: normal;
+    }
+  }
 }
