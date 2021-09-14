@@ -13,43 +13,36 @@ export default {
   generate: {
     data: () => {
       return {
-        month1: pad(getRandomInRange(4, 7), 2),
-        month2: pad(getRandomInRange(4, 7), 2),
+        year1: pad(getRandomInRange(1990, 1999), 2),
+        year2: 2000,
+        month1: pad(getRandomInRange(1, 12), 2),
+        month2: pad(getRandomInRange(1, 12), 2),
         day1: pad(getRandomInRange(1, 28), 2),
         day2: pad(getRandomInRange(1, 28), 2),
       }
     },
-    query: ({ month1, month2, day1, day2 }) => {
+    query: ({ year1, year2, month1, month2, day1, day2 }) => {
       return {
         "measures": [
-          "Events.count"
+          "Orders.count"
         ],
         "timeDimensions": [
           {
-            "dimension": "Events.createdAt",
+            "dimension": "Orders.oOrderdate",
             "granularity": "day",
             "dateRange": [
-              `2012-${month1}-${day1}`,
-              `2012-${month2}-${day2}`,
+              `${year1}-${month1}-${day1}`,
+              `${year2}-${month2}-${day2}`
             ]
           }
         ],
         "order": {
-          "Events.count": "desc"
+          "Orders.count": "desc"
         },
         "dimensions": [
-          "Events.repositoryName"
+          "Orders.oOrderstatus"
         ],
-        "filters": [
-          {
-            "member": "Events.type",
-            "operator": "equals",
-            "values": [
-              "WatchEvent"
-            ]
-          }
-        ],
-        "limit": 1000
+        "limit": 10000
       };
     },
   }

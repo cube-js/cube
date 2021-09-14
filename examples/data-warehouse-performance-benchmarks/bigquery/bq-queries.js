@@ -13,29 +13,37 @@ export default {
   generate: {
     data: () => {
       return {
+        year1: pad(getRandomInRange(1990, 1999), 2),
+        year2: 2000,
         month1: pad(getRandomInRange(1, 12), 2),
         month2: pad(getRandomInRange(1, 12), 2),
         day1: pad(getRandomInRange(1, 28), 2),
         day2: pad(getRandomInRange(1, 28), 2),
-        hour1: pad(getRandomInRange(0, 23), 2),
-        hour2: pad(getRandomInRange(0, 23), 2),
       }
     },
-    query: ({ month1, month2, day1, day2, hour1, hour2 }) => {
+    query: ({ year1, year2, month1, month2, day1, day2 }) => {
       return `
         SELECT
-          repository_name,
-          type,
-          DATE_TRUNC(PARSE_DATETIME('%Y-%m-%d %H:%M:%S', created_at), DAY) as day,
-          count(*)
-        FROM \`cube-devrel-team.github.events\`
-        WHERE 
-            type = "WatchEvent" AND
-            PARSE_DATETIME('%Y-%m-%d %H:%M:%S', created_at) > PARSE_DATETIME('%Y-%m-%d %H:%M:%S', '2012-${month1}-${day1} ${hour1}:00:00') AND
-            PARSE_DATETIME('%Y-%m-%d %H:%M:%S', created_at) < PARSE_DATETIME('%Y-%m-%d %H:%M:%S', '2012-${month2}-${day2} ${hour2}:00:00')
-        GROUP BY 1, 2, 3
-        ORDER BY 4 DESC
-        LIMIT 1000;  
+          O_ORDERSTATUS AS Order_Status,
+          DATE_TRUNC(
+              O_ORDERDATE,
+              DAY
+          ) AS Order_Day,
+          COUNT(O_ORDERKEY) AS Order_Key
+        FROM
+          \`cubejs-k8s-cluster.cubejs_benchmarks_tpch_sf100.orders\`
+        WHERE
+          (
+            O_ORDERDATE >= '${year1}-${month1}-${day1}'
+            AND O_ORDERDATE <= '${year2}-${month2}-${day2}'
+          )
+        GROUP BY
+          1,
+          2
+        ORDER BY
+          3 DESC
+        LIMIT
+          10000;
       `;
     },
   }

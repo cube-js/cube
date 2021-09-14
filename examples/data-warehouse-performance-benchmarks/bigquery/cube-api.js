@@ -3,8 +3,8 @@ import cubeQueries from './cube-queries.js';
 const { generate } = cubeQueries;
 
 const cubejsApi = cubejs.default(
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2Mjc5ODkxODh9.toFTRcl7fdfZN-4fm9XSNu4qfpCZ2X8423Jbju8WyYY',
-  { apiUrl: 'https://irish-idalia.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1' }
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MzE2Mjc5OTAsImV4cCI6MTYzNDIxOTk5MH0.-lzwkP76khbyq31M2fKI9YwYYkQBR0obcS4TRwuk7Tc',
+  { apiUrl: 'https://forward-wrightstown.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1' }
 );
 
 async function queryCube () {
