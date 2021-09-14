@@ -6,7 +6,7 @@ describe('Cube Validation', () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
       name: 'name',
-      sql: () => {  },
+      sql: () => '',
       fileName: 'fileName',
       preAggregations: {
         eventsByType: {
@@ -29,7 +29,7 @@ describe('Cube Validation', () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
       name: 'name',
-      sql: () => {  },
+      sql: () => '',
       fileName: 'fileName',
       preAggregations: {
         eventsByType: {
