@@ -1,9 +1,10 @@
 cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
 
+  // end part: suppliersRollup
   preAggregations: {
     suppliersRollup: {
-      type:`rollup`,
+      type: `rollup`,
       external: true,
       dimensions: [CUBE.id, CUBE.company, CUBE.email],
       indexes: {
@@ -13,6 +14,7 @@ cube(`Suppliers`, {
       },
     },
   },
+  // end part: suppliersRollup
 
   dimensions: {
     id: {
@@ -23,14 +25,14 @@ cube(`Suppliers`, {
 
     email: {
       sql: `email`,
-      type: `string`
+      type: `string`,
     },
 
     company: {
       sql: `company`,
-      type: `string`
-    }
+      type: `string`,
+    },
   },
 
-  dataSource: 'suppliers'
+  dataSource: 'suppliers',
 });

@@ -1,10 +1,10 @@
 cube(`Products`, {
   sql: `SELECT * FROM public.products`,
 
+  // start part: productsRollup
   preAggregations: {
-    // start part: productsRollup
     productsRollup: {
-      type:`rollup`,
+      type: `rollup`,
       external: true,
       dimensions: [CUBE.name, CUBE.supplierId],
       indexes: {
@@ -12,8 +12,8 @@ cube(`Products`, {
           columns: [CUBE.supplierId],
         },
       },
-    // end part: productsRollup
     },
+    // end part: productsRollup
 
     combinedRollup: {
       type: `rollupJoin`,
@@ -26,25 +26,25 @@ cube(`Products`, {
   joins: {
     Suppliers: {
       sql: `${CUBE.supplierId} = ${Suppliers.id}`,
-      relationship: `belongsTo`
-    }
+      relationship: `belongsTo`,
+    },
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
     },
     name: {
       sql: `name`,
-      type: `string`
+      type: `string`,
     },
     supplierId: {
       sql: `supplier_id`,
-      type: `number`
-    }
+      type: `number`,
+    },
   },
 
-  dataSource: 'products'
+  dataSource: 'products',
 });
