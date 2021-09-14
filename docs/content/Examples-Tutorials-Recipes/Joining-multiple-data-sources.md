@@ -9,7 +9,8 @@ menuOrder: 6
 ## Use case
 
 Let's imagine we store information about products and their suppliers in
-separate databases. We want to aggregate data from multiple data sources and get data at lightning speed. In the recipe below, we'll learn how to create the
+separate databases. We want to aggregate data from multiple data sources and get
+data at lightning speed. In the recipe below, we'll learn how to create the
 [rollup join](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-rollupjoin)
 between two databases to achieve our goal.
 
