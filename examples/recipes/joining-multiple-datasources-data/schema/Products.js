@@ -14,13 +14,15 @@ cube(`Products`, {
       },
     },
     // end part: productsRollup
-
+    
+    // start part: combinedRollup
     combinedRollup: {
       type: `rollupJoin`,
       dimensions: [Suppliers.email, Suppliers.company, CUBE.name],
       rollups: [Suppliers.suppliersRollup, CUBE.productsRollup],
       external: true,
     },
+    // end part: combinedRollup
   },
 
   joins: {
