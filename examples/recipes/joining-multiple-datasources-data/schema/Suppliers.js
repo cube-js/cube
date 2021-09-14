@@ -1,7 +1,7 @@
 cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
 
-  // end part: suppliersRollup
+  // start part: suppliersRollup
   preAggregations: {
     suppliersRollup: {
       type: `rollup`,
