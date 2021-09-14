@@ -67,6 +67,18 @@ export function getPreAggregationReferences(
   return references;
 }
 
+export function areReferencesEmpty(
+  references: PreAggregationReferences
+): boolean {
+  for (const [, value] of Object.entries(references)) {
+    if (Array.isArray(value) && value.length > 0) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 type PreAggregationDefinitionResult = {
   code: string;
   value: Object;

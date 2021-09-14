@@ -72,16 +72,6 @@ export function QueryTabs({
     ],
   });
 
-  // tmp transition to new format
-  useEffect(() => {
-    if (!queryTabs.activeId && (queryTabs as any).length > 0) {
-      saveTabs({
-        activeId: queryTabs[0].id,
-        tabs: queryTabs as any,
-      });
-    }
-  }, [queryTabs]);
-
   useEffect(() => {
     window['__cubejsPlayground'] = {
       ...window['__cubejsPlayground'],
