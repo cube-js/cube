@@ -28,12 +28,6 @@ cube(`Products`, {
     }
   },
 
-  measures: {
-    count: {
-      type: `count`
-    },
-  },
-
   dimensions: {
     id: {
       sql: `id`,
@@ -44,14 +38,10 @@ cube(`Products`, {
       sql: `name`,
       type: `string`
     },
-    createdAt: {
-      sql: `created_at`,
-      type: `time`
-    },
     supplierId: {
       sql: `supplier_id`,
       type: `number`
-    },
+    }
   },
 
   dataSource: 'products'
