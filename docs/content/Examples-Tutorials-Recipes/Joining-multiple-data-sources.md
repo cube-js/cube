@@ -8,12 +8,10 @@ menuOrder: 6
 
 ## Use case
 
-Let's imagine we store information about products and their suppliers in a
-separate databases. We want to combine a data from multiple data sources and
-using pre-aggreagations for this query. In the recipe below we'll learn how to
-create the
+Let's imagine we store information about products and their suppliers in
+separate databases. We want to aggregate data from multiple data sources and get data at lightning speed. In the recipe below, we'll learn how to create the
 [rollup join](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-rollupjoin)
-between two databases.
+between two databases to achieve our goal.
 
 ## Configuration
 
@@ -49,8 +47,8 @@ pre-aggregations. Let's define it for products and suppliers.
 
 What if we want to get the data from the defined above pre-aggregations in one
 query? We can use the `rollupJoin` pre-aggregation. It will be able to aggregate
-data from the various data sources. Let's define it! Notice that rollup that
-joined should contain dimensions on which they’re joined. In our case is the
+data from various data sources. Let's define it! Notice that the rollup that
+joined should contain dimensions on which they're joined. In our case, is the
 `CUBE.supplierId` dimension in the `Products` cube:
 
 <GitHubCodeBlock
@@ -62,7 +60,7 @@ joined should contain dimensions on which they’re joined. In our case is the
 
 ## Query
 
-Let's get the product names and their suppliers info, such as company name and
+Let's get the product names and their suppliers' info, such as company name and
 email, with the following query:
 
 ```javascript
@@ -81,7 +79,7 @@ email, with the following query:
 
 ## Result
 
-As the result we'll get the data from two pre-aggregations joined into one
+As a result, we'll get the data from two pre-aggregations joined into one
 `rollupJoin`:
 
 ```javascript
