@@ -1,16 +1,49 @@
 const Joi = require('@hapi/joi');
+const cronParser = require('cron-parser');
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
 
 const identifier = Joi.string().regex(identifierRegex, 'identifier');
+
+const regexTimeInterval = Joi.string().custom((value, helper) => {
+  if (value.match(/^(-?\d+) (minute|hour|day|week|month|year)$/)) {
+    return value;
+  } else {
+    return helper.message({ custom: `"${helper.state.path.join('.')}" does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|year)$/` });
+  }
+});
+
 const timeInterval =
   Joi.alternatives([
-    Joi.string().regex(/^(-?\d+) (minute|hour|day|week|month|year)$/, 'time interval'),
+    regexTimeInterval,
     Joi.any().valid('unbounded')
   ]);
-const everyInterval = Joi.string().regex(/^(\d+) (second|minute|hour|day|week)s?$/, 'refresh time interval');
-const everyCronInterval = Joi.string();
-const everyCronTimeZone = Joi.string();
+
+const everyInterval = Joi.string().custom((value, helper) => {
+  if (value.match(/^(\d+) (second|minute|hour|day|week)s?$/)) {
+    return value;
+  } else {
+    return helper.message({ custom: `"${helper.state.path.join('.')}" does not match regexp: /^(\\d+) (second|minute|hour|day|week)s?$/` });
+  }
+});
+
+const everyCronInterval = Joi.string().custom((value, helper) => {
+  try {
+    cronParser.parseExpression(value);
+    return value;
+  } catch (e) {
+    return helper.message({ custom: `"${helper.state.path.join('.')}" CronParser: ${e.toString()}` });
+  }
+});
+
+const everyCronTimeZone = Joi.string().custom((value, helper) => {
+  try {
+    cronParser.parseExpression('0 * * * *', { currentDate: '2020-01-01 00:00:01', tz: value });
+    return value;
+  } catch (e) {
+    return helper.message({ custom: `"${helper.state.path.join('.')}" unknown timezone. Take a look here https://www.npmjs.com/package/cron-parser to get available time zones` });
+  }
+});
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
@@ -114,6 +147,100 @@ const BasePreAggregation = {
   partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter', 'year'),
 };
 
+const PreAggregationsAlternatives = Joi.object().pattern(identifierRegex, Joi.alternatives().try(
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('autoRollup').required(),
+    maxPreAggregations: Joi.number(),
+  })),
+  // OriginalSQL partitioning with references
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('originalSql').required(),
+    timeDimensionReference: Joi.func().required(),
+    partitionGranularity: BasePreAggregation.partitionGranularity.required(),
+  })),
+  // OriginalSQL partitioning without references
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('originalSql').required(),
+    timeDimension: Joi.func().required(),
+    partitionGranularity: BasePreAggregation.partitionGranularity.required(),
+  })),
+  Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
+    type: Joi.any().valid('originalSql').required(),
+  })),
+  // RollupJoin with references
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollupJoin').required(),
+    measureReferences: Joi.func(),
+    dimensionReferences: Joi.func(),
+    segmentReferences: Joi.func(),
+    rollupReferences: Joi.func().required(),
+  })),
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollupJoin').required(),
+    measureReferences: Joi.func(),
+    dimensionReferences: Joi.func(),
+    segmentReferences: Joi.func(),
+    timeDimensionReference: Joi.func().required(),
+    granularity: Joi.any().valid(
+      'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+    ).required(),
+    rollupReferences: Joi.func().required(),
+  })),
+  // RollupJoin without references
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollupJoin').required(),
+    measures: Joi.func(),
+    dimensions: Joi.func(),
+    segments: Joi.func(),
+    rollups: Joi.func().required(),
+  })),
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollupJoin').required(),
+    measures: Joi.func(),
+    dimensions: Joi.func(),
+    segments: Joi.func(),
+    timeDimension: Joi.func().required(),
+    granularity: Joi.any().valid(
+      'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+    ).required(),
+    rollups: Joi.func().required(),
+  })),
+  // Rollup with references
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollup').required(),
+    measureReferences: Joi.func(),
+    dimensionReferences: Joi.func(),
+    segmentReferences: Joi.func()
+  })),
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollup').required(),
+    measureReferences: Joi.func(),
+    dimensionReferences: Joi.func(),
+    segmentReferences: Joi.func(),
+    timeDimensionReference: Joi.func().required(),
+    granularity: Joi.any().valid(
+      'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+    ).required()
+  })),
+  // Rollup without References postfix
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollup').required(),
+    measures: Joi.func(),
+    dimensions: Joi.func(),
+    segments: Joi.func()
+  })),
+  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+    type: Joi.any().valid('rollup').required(),
+    measures: Joi.func(),
+    dimensions: Joi.func(),
+    segments: Joi.func(),
+    timeDimension: Joi.func().required(),
+    granularity: Joi.any().valid(
+      'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
+    ).required()
+  }))
+));
+
 const cubeSchema = Joi.object().keys({
   name: identifier,
   sql: Joi.func().required(),
@@ -128,7 +255,7 @@ const cubeSchema = Joi.object().keys({
       immutable: Joi.boolean().required()
     }),
     Joi.object().keys({
-      every: Joi.alternatives().try(everyInterval, everyCronInterval),
+      every: Joi.alternatives().try(everyInterval, everyCronInterval).required(),
       timezone: everyCronTimeZone,
     })
   ),
@@ -207,107 +334,40 @@ const cubeSchema = Joi.object().keys({
     description: Joi.string(),
     meta: Joi.any()
   })),
-  preAggregations: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('autoRollup').required(),
-      maxPreAggregations: Joi.number(),
-    })),
-    // OriginalSQL partitioning with references
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('originalSql').required(),
-      timeDimensionReference: Joi.func().required(),
-      partitionGranularity: BasePreAggregation.partitionGranularity.required(),
-    })),
-    // OriginalSQL partitioning without references
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('originalSql').required(),
-      timeDimension: Joi.func().required(),
-      partitionGranularity: BasePreAggregation.partitionGranularity.required(),
-    })),
-    Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
-      type: Joi.any().valid('originalSql').required(),
-    })),
-    // RollupJoin with references
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func(),
-      rollupReferences: Joi.func().required(),
-    })),
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func(),
-      timeDimensionReference: Joi.func().required(),
-      granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
-      ).required(),
-      rollupReferences: Joi.func().required(),
-    })),
-    // RollupJoin without references
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required(),
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func(),
-      rollups: Joi.func().required(),
-    })),
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required(),
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func(),
-      timeDimension: Joi.func().required(),
-      granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
-      ).required(),
-      rollups: Joi.func().required(),
-    })),
-    // Rollup with references
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func()
-    })),
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func(),
-      timeDimensionReference: Joi.func().required(),
-      granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
-      ).required()
-    })),
-    // Rollup without References postfix
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func()
-    })),
-    Joi.object().keys(Object.assign({}, BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func(),
-      timeDimension: Joi.func().required(),
-      granularity: Joi.any().valid(
-        'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
-      ).required()
-    }))
-  ))
+  preAggregations: PreAggregationsAlternatives
 });
+
+function formatErrorMessageFromDetails(explain, d) {
+  if (d?.context?.details) {
+    d?.context?.details?.forEach((d2) => formatErrorMessageFromDetails(explain, d2));
+  } else if (d?.message) {
+    let msg = d?.context?.message || d?.message;
+    msg = msg?.replace(`"${d.context?.label}"`, `(${d.context?.label} = ${d.context?.value})`);
+    explain.add(msg);
+  }
+}
+
+const excludedErrorMessages = new Set();
+
+function fillExcludedErrorMessages(d) {
+  d?.context?.valids?.forEach((v) => {
+    excludedErrorMessages.add(`${d?.context?.label} = ${v}`);
+  });
+  d?.context?.details?.forEach((dd) => fillExcludedErrorMessages(dd));
+}
+
+PreAggregationsAlternatives.validate({ eventsByType: { type: 'unknown' } })?.error?.details?.forEach(
+  (d) => fillExcludedErrorMessages(d)
+);
 
 function formatErrorMessage(error) {
   const explain = new Set();
 
-  error?.details?.forEach((d) => {
-    d?.context?.details?.forEach((cd) => {
-      if (cd.message != null) explain.add(cd.message);
+  error?.details?.forEach((d) => formatErrorMessageFromDetails(explain, d));
+
+  excludedErrorMessages.forEach((e) => {
+    explain.forEach((m) => {
+      if (m.indexOf(e) >= 0) explain.delete(m);
     });
   });
 
