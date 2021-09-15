@@ -138,7 +138,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#2630309dee315ba00c07444b9f48219fda15b506"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#5b90bc925612cdf8f9cc7de8945e9fef35cf46fd"
 dependencies = [
  "bitflags",
  "chrono",
@@ -1103,7 +1103,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#9a61c00a20dc5f467529f898bf3ca41d5cd56b55"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#c51bba213a78335ca89a6d9f6aedf6aa8b0c6f80"
 dependencies = [
  "ahash 0.7.4",
  "arrow",
@@ -2884,7 +2884,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#2630309dee315ba00c07444b9f48219fda15b506"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#5b90bc925612cdf8f9cc7de8945e9fef35cf46fd"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3972,7 +3972,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.9.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=b1d144a2cb5cc47ac950fd1d518bc28b4dc33ab9#b1d144a2cb5cc47ac950fd1d518bc28b4dc33ab9"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=c3c77dd2aa408a7cb0c9f27e5e9fc1b101351dcd#c3c77dd2aa408a7cb0c9f27e5e9fc1b101351dcd"
 dependencies = [
  "log",
 ]

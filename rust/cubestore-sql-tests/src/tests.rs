@@ -53,6 +53,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
         t("coalesce", coalesce),
+        t("ilike", ilike),
         t("count_distinct_crash", count_distinct_crash),
         t(
             "count_distinct_group_by_crash",
@@ -1060,6 +1061,76 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
             TableValue::Int(3)
         ])]
     );
+}
+
+async fn ilike(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.strings(t text, pat text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.strings(t, pat) \
+             VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT')",
+        )
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE '%aBA%' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "CABA", "ZABA", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE 'aBA%' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE '%aBA' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "CABA", "ZABA", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE 'aBA' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "aba"]));
+
+    // Compare constant string with a bunch of patterns.
+    // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
+    //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
+    let r = service
+        .exec_query("SELECT pat FROM s.strings WHERE 'aba' ILIKE pat ORDER BY pat")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["%ABA", "%a%b%a%", "%aba%", "aba%"]));
+
+    // Compare array against array.
+    let r = service
+        .exec_query("SELECT t, pat FROM s.strings WHERE t ILIKE pat ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            ("ABa", "%aba%"),
+            ("TTT", "TTT"),
+            ("ZABA", "%a%b%a%"),
+            ("ZZZ", "zzz"),
+            ("aba", "%ABA"),
+        ])
+    );
+
+    // Check NOT ILIKE also works.
+    let r = service
+        .exec_query("SELECT t, pat FROM s.strings WHERE t NOT ILIKE pat ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("CABA", "aba%")]));
 }
 
 async fn coalesce(service: Box<dyn SqlClient>) {
