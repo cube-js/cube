@@ -99,6 +99,7 @@ export type PreAggregationDescription = {
   preAggregationId: string;
   priority: number;
   dataSource: string;
+  external: boolean;
   previewSql: QueryWithParams;
   timezone: string;
   indexesSql: IndexDescription[];
