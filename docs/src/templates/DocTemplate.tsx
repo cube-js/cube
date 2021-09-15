@@ -37,7 +37,22 @@ import { LoomVideo } from '../components/LoomVideo/LoomVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
 
-const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
+const MyH2 = (props) => {
+  const id = kebabCase(props.children);
+  return (
+    <ScrollLink
+      activeClass={styles.scrollspyCurrent}
+      to={id}
+      key={id + Math.random()}
+      className={cx(styles.scrollspyLink, {
+        // [styles.scrollspySubitem]: type === 'h3',
+        // [styles.scrollspyTop]: id === 'top',
+      })}
+    >
+      <h2 name={id} {...props} />
+    </ScrollLink>
+  );
+};
 const MyH3 = (props) => {
   const startCommentIndex = props.children.indexOf('<--');
   const endCommentIndex = props.children.indexOf('-->');
