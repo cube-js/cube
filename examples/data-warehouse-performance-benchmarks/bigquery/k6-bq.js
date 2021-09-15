@@ -1,6 +1,5 @@
 import http from 'k6/http';
-import { sleep } from 'k6';
-const vus = 30;
+const vus = 200;
 export let options = {
   vus: vus,
   duration: '10s',
