@@ -37,8 +37,26 @@ import { LoomVideo } from '../components/LoomVideo/LoomVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
 
+// linkedHTag = React.cloneElement(
+//   item,
+//   { className: styles.hTag },
+//   React.createElement(
+//     ScrollLink,
+//     { to: currentID },
+//     React.createElement(Icon, {
+//       type: 'link',
+//       className: styles.hTagIcon,
+//     }),
+//     item.props.children[0]
+//   )
+// );
+
 const MyH2 = (props) => {
   const id = kebabCase(props.children);
+  const MyIcon = React.createElement(Icon, {
+    type: 'link',
+    className: styles.hTagIcon,
+  });
   return (
     <ScrollLink
       activeClass={styles.scrollspyCurrent}
@@ -49,7 +67,8 @@ const MyH2 = (props) => {
         // [styles.scrollspyTop]: id === 'top',
       })}
     >
-      <h2 name={id} {...props} />
+      {MyIcon}
+      <h2 name={id} {...props} className={styles.hTag} />
     </ScrollLink>
   );
 };
