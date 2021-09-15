@@ -28,7 +28,6 @@ export function PreAggregationStatus({
   external,
   extDbType,
   preAggregationType,
-  ...props
 }: PreAggregationStatusProps) {
   const isVersionGte = useServerCoreVersionGte('0.28.4');
   const { toggleModal } = useRollupDesignerContext();

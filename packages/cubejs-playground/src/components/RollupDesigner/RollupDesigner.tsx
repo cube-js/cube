@@ -10,10 +10,11 @@ import {
   Space,
   Tabs,
   Typography,
+  Skeleton,
 } from 'antd';
 import { useState } from 'react';
 import styled from 'styled-components';
-import { CodeSnippet } from '../../atoms';
+import { CodeSnippet, FatalError } from '../../atoms';
 import { Box, Flex } from '../../grid';
 import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
 import { useCloud } from '../../playground/cloud';
@@ -94,7 +95,8 @@ export function RollupDesigner({
   const isMounted = useIsMounted();
   const token = useToken();
   const { isCloud, ...cloud } = useCloud();
-  const { query, transformedQuery } = useRollupDesignerContext();
+  const { query, transformedQuery, isLoading, error } =
+    useRollupDesignerContext();
 
   const [isCronValid, setCronValidity] = useState<boolean>(true);
   const [settings, setSettings] = useState<RollupSettings>({});
@@ -345,6 +347,33 @@ export function RollupDesigner({
           Add to the Data Schema
         </Button>
       </>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Flex gap={4} style={{ margin: 24 }}>
+        <Box style={{ minWidth: 256 }}>
+          <Skeleton />
+        </Box>
+
+        <Box grow={1}>
+          <Skeleton />
+          <Skeleton />
+        </Box>
+
+        <Box style={{ width: 420, minWidth: 420 }}>
+          <Skeleton />
+        </Box>
+      </Flex>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ margin: '32px 24px' }}>
+        <FatalError error={error} />
+      </div>
     );
   }
 
