@@ -26,7 +26,7 @@ const HeadingLink = ({ id, title, type }: SectionWithoutNodes) => {
     <ScrollLink
       activeClass={styles.scrollspyCurrent}
       to={id}
-      key={id}
+      key={id + Math.random()}
       className={cx(styles.scrollspyLink, {
         [styles.scrollspySubitem]: type === 'h3',
         [styles.scrollspyTop]: id === 'top',
