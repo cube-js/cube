@@ -40,7 +40,11 @@ const timestampDataTypes = [
   1184
 ];
 const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
-const hllTypeParser = (val: string) => Buffer.from(val).toString('base64');
+const hllTypeParser = (val: string) => Buffer.from(
+  // Postgres uses prefix as \x for encoding
+  val.substr(2),
+  'hex'
+).toString('base64');
 
 export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
