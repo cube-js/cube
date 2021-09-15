@@ -80,7 +80,7 @@ email, with the following query:
 
 ## Result
 
-As a result, we'll get the data from two pre-aggregations joined into one
+We'll get the data from two pre-aggregations joined into one
 `rollupJoin`:
 
 ```javascript
