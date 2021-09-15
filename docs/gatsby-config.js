@@ -23,19 +23,19 @@ const config = {
       resolve: 'gatsby-plugin-manifest',
       options: {
         icon: `src/favicon.png`,
-      }
+      },
     },
     {
       resolve: `gatsby-plugin-layout`,
       options: {
-        component: require.resolve(`./src/components/Layout/index.tsx`)
-      }
+        component: require.resolve(`./src/components/Layout/index.tsx`),
+      },
     },
     {
       resolve: `gatsby-plugin-google-analytics`,
       options: {
-        trackingId: "UA-70480064-3"
-      }
+        trackingId: 'UA-70480064-3',
+      },
     },
     {
       resolve: 'gatsby-source-filesystem',
@@ -61,17 +61,16 @@ const config = {
             resolve: 'gatsby-remark-copy-linked-files',
             options: {
               destinationDir: 'content/',
-            }
+            },
           },
           {
             resolve: 'gatsby-remark-images',
             options: {
               linkImagesToOriginal: false,
               maxWidth: 1150,
-              wrapperStyle: 'margin-bottom: 24px'
-            }
+              wrapperStyle: 'margin-bottom: 24px',
+            },
           },
-          `gatsby-remark-mathjax-ssr`,
           {
             resolve: 'gatsby-remark-find-replace',
             options: {
@@ -81,22 +80,23 @@ const config = {
               prefix: '%',
             },
           },
-        ]
-      }
+        ],
+        remarkPlugins: [require('remark-math'), require('remark-html-katex')],
+      },
     },
     {
       resolve: 'gatsby-redirect-from',
       options: {
-        query: 'allMdx'
+        query: 'allMdx',
       },
     },
     {
       resolve: 'gatsby-plugin-react-svg',
       options: {
         rule: {
-          include: /\.inline\.svg$/
-        }
-      }
+          include: /\.inline\.svg$/,
+        },
+      },
     },
     'gatsby-plugin-meta-redirect',
     'gatsby-plugin-percy',

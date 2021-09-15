@@ -3172,6 +3172,11 @@
   resolved "https://registry.yarnpkg.com/@types/json5/-/json5-0.0.29.tgz#ee28707ae94e11d2b827bcbe5270bcea7f3e71ee"
   integrity sha1-7ihweulOEdK4J7y+UnC86n8+ce4=
 
+"@types/katex@^0.11.0":
+  version "0.11.1"
+  resolved "https://registry.yarnpkg.com/@types/katex/-/katex-0.11.1.tgz#34de04477dcf79e2ef6c8d23b41a3d81f9ebeaf5"
+  integrity sha512-DUlIj2nk0YnJdlWgsFuVKcX27MLW0KbKmGVoUHmFr+74FYYNUDAaj9ZqTADvsbE8rfxuVmSFc7KczYn5Y09ozg==
+
 "@types/keyv@*", "@types/keyv@^3.1.1":
   version "3.1.1"
   resolved "https://registry.yarnpkg.com/@types/keyv/-/keyv-3.1.1.tgz#e45a45324fca9dab716ab1230ee249c9fb52cfa7"
@@ -5834,7 +5839,7 @@ command-exists@^1.2.4:
   resolved "https://registry.yarnpkg.com/command-exists/-/command-exists-1.2.9.tgz#c50725af3808c8ab0260fd60b01fbfa25b954f69"
   integrity sha512-LTQ/SGc+s0Xc0Fu5WaKnR0YiygZkm9eKFvyS+fRsU7/ZWFF8ykFM6Pc9aCVf1+xasOOZpO3BAVgVrKvsqKHV7w==
 
-commander@^2.20.0, commander@^2.20.3, commander@^2.8.1:
+commander@^2.19.0, commander@^2.20.0, commander@^2.20.3, commander@^2.8.1:
   version "2.20.3"
   resolved "https://registry.yarnpkg.com/commander/-/commander-2.20.3.tgz#fd485e84c03eb4881c20722ba48035e8531aeb33"
   integrity sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==
@@ -9163,15 +9168,6 @@ gatsby-remark-images@^5:
     unist-util-select "^3.0.4"
     unist-util-visit-parents "^3.1.1"
 
-gatsby-remark-mathjax-ssr@^1:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/gatsby-remark-mathjax-ssr/-/gatsby-remark-mathjax-ssr-1.2.1.tgz#775ef9a8d80eb0863af81c36667b256c8fab4b92"
-  integrity sha512-QKfaQqyl4EvJvi+dCIXyLY+OjqjKrMQwLZdbQ8tFRLt2KXchyDZS2FqFtUda1sfeRPiU3BkWKyhYFkVhOEHEuA==
-  dependencies:
-    mathjax-node "^2.1.1"
-    remark-math "^1.0.6"
-    unist-util-visit "^1.4.1"
-
 gatsby-source-filesystem@^3:
   version "3.6.0"
   resolved "https://registry.yarnpkg.com/gatsby-source-filesystem/-/gatsby-source-filesystem-3.6.0.tgz#369eaef6fe8ae07739594176aedc36606a328849"
@@ -11950,7 +11946,7 @@ jsbn@~0.1.0:
   resolved "https://registry.yarnpkg.com/jsbn/-/jsbn-0.1.1.tgz#a5e654c2e5a2deb5f201d96cefbca80c0ef2f513"
   integrity sha1-peZUwuWi3rXyAdls77yoDA7y9RM=
 
-jsdom@^11.0.0, jsdom@^11.5.1:
+jsdom@^11.5.1:
   version "11.12.0"
   resolved "https://registry.yarnpkg.com/jsdom/-/jsdom-11.12.0.tgz#1a80d40ddd378a1de59656e9e6dc5a3ba8657bc8"
   integrity sha512-y8Px43oyiBM13Zc1z780FrfNLJCXTL40EWlty/LXUtcjykRBNgLlCjWXpfSPBl2iv+N7koQN+dvqszHZgT/Fjw==
@@ -12133,6 +12129,13 @@ junk@^3.1.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/junk/-/junk-3.1.0.tgz#31499098d902b7e98c5d9b9c80f43457a88abfa1"
   integrity sha512-pBxcB3LFc8QVgdggvZWyeys+hnrNWg4OcZIU/1X59k5jQdLBlCsYGRQaz234SqoRLTCgMH00fY0xRJH+F9METQ==
+
+katex@^0.12.0:
+  version "0.12.0"
+  resolved "https://registry.yarnpkg.com/katex/-/katex-0.12.0.tgz#2fb1c665dbd2b043edcf8a1f5c555f46beaa0cb9"
+  integrity sha512-y+8btoc/CK70XqcHqjxiGWBOeIL8upbS0peTPXTvgrh21n1RiWWcIpSWM+4uXq+IAgNh9YYQWdc7LVDPDAEEAg==
+  dependencies:
+    commander "^2.19.0"
 
 keyv@3.0.0:
   version "3.0.0"
@@ -12894,20 +12897,6 @@ math-random@^1.0.1:
   version "1.0.4"
   resolved "https://registry.yarnpkg.com/math-random/-/math-random-1.0.4.tgz#5dd6943c938548267016d4e34f057583080c514c"
   integrity sha512-rUxjysqif/BZQH2yhd5Aaq7vXMSx9NdEsQcyA07uEzIvxgI7zIr33gGsh+RU0/XjmQpCW7RsVof1vlkvQVCK5A==
-
-mathjax-node@^2.1.1:
-  version "2.1.1"
-  resolved "https://registry.yarnpkg.com/mathjax-node/-/mathjax-node-2.1.1.tgz#25c80f494f7540418ffcfa9cc756dfd2150201bd"
-  integrity sha1-JcgPSU91QEGP/Pqcx1bf0hUCAb0=
-  dependencies:
-    is-fullwidth-code-point "^2.0.0"
-    jsdom "^11.0.0"
-    mathjax "^2.7.2"
-
-mathjax@^2.7.2:
-  version "2.7.9"
-  resolved "https://registry.yarnpkg.com/mathjax/-/mathjax-2.7.9.tgz#d6b67955c173e7d719fcb2fc0288662884eb7d3d"
-  integrity sha512-NOGEDTIM9+MrsqnjPEjVGNx4q0GQxqm61yQwSK+/5S59i26wId5IC5gNu9/bu8+CCVl5p9G2IHcAl/wJa+5+BQ==
 
 md5-file@^5.0.0:
   version "5.0.0"
@@ -16933,12 +16922,21 @@ remark-frontmatter@^2.0.0:
   dependencies:
     fault "^1.0.1"
 
-remark-math@^1.0.6:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/remark-math/-/remark-math-1.0.6.tgz#49eb3dd15d298734c9ae21673115389793af4d1b"
-  integrity sha512-I43wU/QOQpXvVFXKjA4FHp5xptK65+5F6yolm8+69/JV0EqSOB64wURUZ3JK50JtnTL8FvwLiH2PZ+fvsBxviA==
+remark-html-katex@3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/remark-html-katex/-/remark-html-katex-3.0.0.tgz#09b047e70a398e0c9c762a21c803e4ce73d39cb6"
+  integrity sha512-T8PqHlQ8ftOPqxh0XoRNSRKHhSOoIJLnmeeOvdsPz2VOy8hMFC4IFVKA6EPdWFzXRZeT+pCjewVh0dg++vVYHQ==
   dependencies:
-    trim-trailing-lines "^1.1.0"
+    "@types/katex" "^0.11.0"
+    katex "^0.12.0"
+    rehype-parse "^7.0.0"
+    unified "^9.0.0"
+    unist-util-visit "^2.0.0"
+
+remark-math@3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/remark-math/-/remark-math-3.0.1.tgz#85a02a15b15cad34b89a27244d4887b3a95185bb"
+  integrity sha512-epT77R/HK0x7NqrWHdSV75uNLwn8g9qTyMqCRCDujL0vj/6T6+yhdrR7mjELWtkse+Fw02kijAaBuVcHBor1+Q==
 
 remark-mdx@1.6.22:
   version "1.6.22"
@@ -19269,7 +19267,7 @@ trim-right@^1.0.1:
   resolved "https://registry.yarnpkg.com/trim-right/-/trim-right-1.0.1.tgz#cb2e1203067e0c8de1f614094b9fe45704ea6003"
   integrity sha1-yy4SAwZ+DI3h9hQJS5/kVwTqYAM=
 
-trim-trailing-lines@^1.0.0, trim-trailing-lines@^1.1.0:
+trim-trailing-lines@^1.0.0:
   version "1.1.4"
   resolved "https://registry.yarnpkg.com/trim-trailing-lines/-/trim-trailing-lines-1.1.4.tgz#bd4abbec7cc880462f10b2c8b5ce1d8d1ec7c2c0"
   integrity sha512-rjUWSqnfTNrjbB9NQWfPMH/xRK1deHeGsHoVfpxJ++XeYXE0d6B1En37AHfw3jtfTU7dzMzZL2jjpe8Qb5gLIQ==
