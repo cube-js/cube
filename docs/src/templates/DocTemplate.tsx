@@ -15,7 +15,7 @@ import { renameCategory } from '../rename-category';
 
 import 'gatsby-remark-mathjax-ssr/mathjax.css';
 
-import FeedbackBlock from '../components/FeedbackBlock'
+import FeedbackBlock from '../components/FeedbackBlock';
 import ScrollLink, {
   SCROLL_OFFSET,
 } from '../components/templates/ScrollSpyLink';
@@ -53,23 +53,22 @@ import { GridItem } from '../components/Grid/GridItem';
 
 const MyH2 = (props) => {
   const id = kebabCase(props.children);
-  const MyIcon = React.createElement(Icon, {
-    type: 'link',
-    className: styles.hTagIcon,
-  });
+
   return (
-    <ScrollLink
-      activeClass={styles.scrollspyCurrent}
-      to={id}
-      key={id + Math.random()}
-      className={cx(styles.scrollspyLink, {
-        // [styles.scrollspySubitem]: type === 'h3',
-        // [styles.scrollspyTop]: id === 'top',
-      })}
-    >
-      {MyIcon}
-      <h2 name={id} {...props} className={styles.hTag} />
-    </ScrollLink>
+    <h2 name={id} className={styles.hTag}>
+      <ScrollLink
+        activeClass={styles.scrollspyCurrent}
+        to={id}
+        key={id + Math.random()}
+        className={cx(styles.scrollspyLink, {
+          // [styles.scrollspySubitem]: type === 'h3',
+          // [styles.scrollspyTop]: id === 'top',
+        })}
+      >
+        <Icon type="link" className={styles.hTagIcon} />
+        {props.children}
+      </ScrollLink>
+    </h2>
   );
 };
 const MyH3 = (props) => {
