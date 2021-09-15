@@ -148,34 +148,34 @@ const BasePreAggregation = {
 };
 
 const PreAggregationsAlternatives = Joi.object().pattern(identifierRegex, Joi.alternatives().try(
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('autoRollup').required(),
     maxPreAggregations: Joi.number(),
-  })),
+  }, BasePreAggregation)),
   // OriginalSQL partitioning with references
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('originalSql').required(),
     timeDimensionReference: Joi.func().required(),
     partitionGranularity: BasePreAggregation.partitionGranularity.required(),
-  })),
+  }, BasePreAggregation)),
   // OriginalSQL partitioning without references
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('originalSql').required(),
     timeDimension: Joi.func().required(),
     partitionGranularity: BasePreAggregation.partitionGranularity.required(),
-  })),
-  Joi.object().keys(Object.assign({}, BasePreAggregationWithoutPartitionGranularity, {
+  }, BasePreAggregation)),
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('originalSql').required(),
-  })),
+  }, BasePreAggregationWithoutPartitionGranularity)),
   // RollupJoin with references
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollupJoin').required(),
     measureReferences: Joi.func(),
     dimensionReferences: Joi.func(),
     segmentReferences: Joi.func(),
     rollupReferences: Joi.func().required(),
-  })),
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  }, BasePreAggregation)),
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollupJoin').required(),
     measureReferences: Joi.func(),
     dimensionReferences: Joi.func(),
@@ -185,16 +185,16 @@ const PreAggregationsAlternatives = Joi.object().pattern(identifierRegex, Joi.al
       'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
     ).required(),
     rollupReferences: Joi.func().required(),
-  })),
+  }, BasePreAggregation)),
   // RollupJoin without references
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollupJoin').required(),
     measures: Joi.func(),
     dimensions: Joi.func(),
     segments: Joi.func(),
     rollups: Joi.func().required(),
-  })),
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  }, BasePreAggregation)),
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollupJoin').required(),
     measures: Joi.func(),
     dimensions: Joi.func(),
@@ -204,15 +204,15 @@ const PreAggregationsAlternatives = Joi.object().pattern(identifierRegex, Joi.al
       'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
     ).required(),
     rollups: Joi.func().required(),
-  })),
+  }, BasePreAggregation)),
   // Rollup with references
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollup').required(),
     measureReferences: Joi.func(),
     dimensionReferences: Joi.func(),
     segmentReferences: Joi.func()
-  })),
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  }, BasePreAggregation)),
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollup').required(),
     measureReferences: Joi.func(),
     dimensionReferences: Joi.func(),
@@ -221,15 +221,15 @@ const PreAggregationsAlternatives = Joi.object().pattern(identifierRegex, Joi.al
     granularity: Joi.any().valid(
       'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
     ).required()
-  })),
+  }, BasePreAggregation)),
   // Rollup without References postfix
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollup').required(),
     measures: Joi.func(),
     dimensions: Joi.func(),
     segments: Joi.func()
-  })),
-  Joi.object().keys(Object.assign({}, BasePreAggregation, {
+  }, BasePreAggregation)),
+  Joi.object().keys(Object.assign({
     type: Joi.any().valid('rollup').required(),
     measures: Joi.func(),
     dimensions: Joi.func(),
@@ -238,7 +238,7 @@ const PreAggregationsAlternatives = Joi.object().pattern(identifierRegex, Joi.al
     granularity: Joi.any().valid(
       'second', 'minute', 'hour', 'day', 'week', 'month', 'year'
     ).required()
-  }))
+  }, BasePreAggregation))
 ));
 
 const cubeSchema = Joi.object().keys({

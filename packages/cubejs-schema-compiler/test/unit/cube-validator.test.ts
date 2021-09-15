@@ -132,7 +132,6 @@ describe('Cube Validation', () => {
       preAggregations: {
         eventsByType: {
           type: 'unknown',
-          partitionGranularity: 'day',
         }
       }
     };
