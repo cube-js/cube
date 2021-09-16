@@ -32,7 +32,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
       refreshKey: {
         every: '0 * * * *',
-        timezone: 'Timezone'
+        timezone: 'AAA'
       }
     };
 
@@ -54,7 +54,6 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
       measures: {
         number: {
-          sql: () => '',
           type: 'suma'
         }
       }
@@ -63,7 +62,55 @@ describe('Cube Validation', () => {
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
-        expect(message).toContain('must be');
+        expect(message).toContain('must be one of [count, number, sum');
+      }
+    });
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
+  it('OriginalSqlSchema', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => '',
+      fileName: 'fileName',
+      preAggregations: {
+        eventsByType: {
+          type: 'originalSql',
+          partitionGranularity: 'day'
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+        expect(message).toContain('timeDimension) is required');
+      }
+    });
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
+  it('RollUpJoinSchema', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => '',
+      fileName: 'fileName',
+      preAggregations: {
+        eventsByType: {
+          type: 'rollupJoin',
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+        expect(message).toContain('granularity) is required');
+        expect(message).toContain('rollups) is required');
       }
     });
 
@@ -79,6 +126,7 @@ describe('Cube Validation', () => {
       preAggregations: {
         eventsByType: {
           type: 'originalSql',
+          originalSql: () => '',
           indexes: {
             number: {
             }
@@ -90,8 +138,8 @@ describe('Cube Validation', () => {
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
-        expect(message).toContain('number.sql = undefined) is required');
-        expect(message).toContain('number.columns = undefined) is required');
+        expect(message).toContain('number.sql) is required');
+        expect(message).toContain('number.columns) is required');
       }
     });
 
@@ -105,17 +153,27 @@ describe('Cube Validation', () => {
       sql: () => '',
       fileName: 'fileName',
       preAggregations: {
-        eventsByType: {
+        distinct: {
           type: 'rollup',
-          partitionGranularity: 'days',
-        }
+          measureReferences: () => '',
+          dimensionReferences: () => '',
+          partitionGranularity: 'month',
+          granularity: 'days',
+          timeDimensionReference: () => '',
+          external: true,
+          refreshKey: {
+            every: '10 minutes',
+            updateWindow: '250 day',
+            incremental: true
+          },
+        },
       }
     };
 
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
-        expect(message).toContain('Possible reasons');
+        expect(message).toContain('must be one of');
         expect(message).not.toContain('rollup) must be');
       }
     });
@@ -131,7 +189,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
       preAggregations: {
         eventsByType: {
-          type: 'unknown',
+          type: 'AAA',
         }
       }
     };
