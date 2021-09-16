@@ -194,13 +194,9 @@ const OriginalSqlSchema = exists(
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
     })
   ),
-  exists(
-    '.originalSql',
-    inherit(BasePreAggregationWithoutPartitionGranularity, {
-      type: Joi.any().valid('originalSql').required(),
-    }),
-    requireOneOf('partitionGranularity', 'originalSql')
-  )
+  inherit(BasePreAggregationWithoutPartitionGranularity, {
+    type: Joi.any().valid('originalSql').required(),
+  })
 );
 
 const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
