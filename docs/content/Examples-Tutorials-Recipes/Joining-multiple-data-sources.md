@@ -16,7 +16,7 @@ between two databases to achieve our goal.
 
 ## Configuration
 
-First of all, we should define our database connections depending on the
+First of all, we should define our database connections with the
 `dataSource` parameter:
 
 <GitHubCodeBlock
