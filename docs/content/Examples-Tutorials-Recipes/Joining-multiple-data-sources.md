@@ -17,7 +17,7 @@ between two databases to achieve our goal.
 ## Configuration
 
 First of all, we should define our database connections with the
-`dataSource` parameter:
+`dataSource` option:
 
 <GitHubCodeBlock
   href="https://github.com/cube-js/cube.js/blob/recipes/cross-datasource-join/examples/recipes/joining-multiple-datasources-data/cube.js"
