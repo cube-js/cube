@@ -269,9 +269,10 @@ export function RollupDesigner({
     const nextSettings: RollupSettings = {};
 
     if (values['refreshKey.checked.every']) {
-      if (values['refreshKey.cron']) {
+      if (values['refreshKey.isCron']) {
         nextSettings.refreshKey = {
-          every: `\`${values['refreshKey.cron']}\``,
+          every: `\`${values['refreshKey.cron'] || ''}\``,
+          timezone: `\`${values['refreshKey.timeZone'] || 'UTC'}\``,
         };
       } else {
         nextSettings.refreshKey = {
