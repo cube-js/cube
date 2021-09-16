@@ -1,0 +1,14 @@
+{
+  "measures": [
+    "Users.totalNumberOfWomen",
+    "Users.numberOfPeopleOfAnyGenderInTheCity",
+    "Users.ratio"
+  ],
+  "filters": [
+    {
+      "member": "Users.cityFilter",
+      "operator": "equals",
+      "values": ["Seattle"]
+    }
+  ]
+}
