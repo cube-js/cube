@@ -1,7 +1,7 @@
 import { CheckOutlined, SearchOutlined } from '@ant-design/icons';
 import { AvailableMembers } from '@cubejs-client/react';
 import { Input, Menu } from 'antd';
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect } from 'react';
 import styled from 'styled-components';
 
 import useDeepMemo from '../../../hooks/deep-memo';
@@ -15,6 +15,10 @@ const StyledMenu = styled(Menu)`
   position: relative;
   max-height: 600px;
   overflow-y: scroll;
+
+  li {
+    font-size: var(--font-size-base);
+  }
 
   .ant-menu-sub.ant-menu-inline {
     background: white;
@@ -82,12 +86,6 @@ const SearchInputWrapper = styled.div`
   }
 `;
 
-type CubesProps = {
-  selectedKeys: string[];
-  memberTypeCubeMap: AvailableMembers;
-  onSelect: (memberType: QueryMemberKey, key: string) => void;
-};
-
 const MEMBER_TYPES = ['measures', 'dimensions', 'segments', 'timeDimensions'];
 
 function filterMembersByCube(
@@ -113,16 +111,23 @@ function filterMembersByCube(
     .filter(Boolean);
 }
 
+type CubesProps = {
+  selectedKeys: string[];
+  openKeys: string[];
+  memberTypeCubeMap: AvailableMembers;
+  firstOpenCubeName: string | null;
+  onSelect: (memberType: QueryMemberKey, key: string) => void;
+  onOpenKeysChange: (openKeys: string[]) => void;
+};
+
 export function Cubes({
   memberTypeCubeMap,
+  openKeys,
   selectedKeys,
+  firstOpenCubeName,
   onSelect,
+  onOpenKeysChange,
 }: CubesProps) {
-  const defaultOpenKeys = selectedKeys.map((key) => key.split('.')[0]);
-  const [firstOpenCubeName] = defaultOpenKeys;
-
-  const [openKeys, setOpenKeys] = useState<string[]>(defaultOpenKeys);
-
   const allCubeKeys = useDeepMemo(() => {
     return getMembersByCube(memberTypeCubeMap).map(({ cubeName }) => cubeName);
   }, [memberTypeCubeMap]);
@@ -135,16 +140,18 @@ export function Cubes({
 
   useLayoutEffect(() => {
     if (firstOpenCubeName) {
-      document.querySelector('[data-menu="cubes"]')?.scroll({
-        top: (
-          document.querySelector(
-            `[data-cube="${firstOpenCubeName}"]`
-          ) as HTMLElement
-        )?.offsetTop,
-        behavior: 'smooth',
-      });
+      setTimeout(() => {
+        document.querySelector('[data-menu="cubes"]')?.scroll({
+          top: (
+            document.querySelector(
+              `[data-cube="${firstOpenCubeName}"]`
+            ) as HTMLElement
+          )?.offsetTop,
+          behavior: 'smooth',
+        });
+      }, 100);
     }
-  }, []);
+  }, [firstOpenCubeName]);
 
   return (
     <>
@@ -165,7 +172,10 @@ export function Cubes({
         onClick={(event) => {
           const { membertype } = (event.domEvent.target as HTMLElement).dataset;
 
-          onSelect(membertype as QueryMemberKey, event.key.toString());
+          onSelect(
+            membertype as QueryMemberKey,
+            event.key.toString().replace('td:', '')
+          );
         }}
       >
         {membersByCube.map((cube) => {
@@ -176,9 +186,9 @@ export function Cubes({
               title={cube.cubeTitle}
               onTitleClick={({ key }) => {
                 if (openKeys.includes(key)) {
-                  setOpenKeys(openKeys.filter((value) => value !== key));
+                  onOpenKeysChange(openKeys.filter((value) => value !== key));
                 } else {
-                  setOpenKeys([...openKeys, key]);
+                  onOpenKeysChange([...openKeys, key]);
                 }
               }}
             >
@@ -196,19 +206,26 @@ export function Cubes({
                         : memberType
                     }
                   >
-                    {cube[memberType].map((member) => (
-                      <Menu.Item key={member.name} data-membertype={memberType}>
-                        <CheckOutlined
-                          style={{
-                            visibility: selectedKeys.includes(member.name)
-                              ? 'visible'
-                              : 'hidden',
-                          }}
-                        />
+                    {cube[memberType].map((member) => {
+                      const key =
+                        memberType === 'timeDimensions'
+                          ? `td:${member.name}`
+                          : member.name;
 
-                        {member.shortTitle}
-                      </Menu.Item>
-                    ))}
+                      return (
+                        <Menu.Item key={key} data-membertype={memberType}>
+                          <CheckOutlined
+                            style={{
+                              visibility: selectedKeys.includes(key)
+                                ? 'visible'
+                                : 'hidden',
+                            }}
+                          />
+
+                          {member.shortTitle}
+                        </Menu.Item>
+                      );
+                    })}
                   </Menu.ItemGroup>
                 );
               })}

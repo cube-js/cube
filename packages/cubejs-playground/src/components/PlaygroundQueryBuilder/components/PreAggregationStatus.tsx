@@ -1,19 +1,12 @@
-import Icon, {
-  ArrowRightOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons';
+import Icon, { ThunderboltFilled } from '@ant-design/icons';
 import { Query } from '@cubejs-client/core';
 import { AvailableMembers } from '@cubejs-client/react';
-import { Alert, Button, Modal, Space, Typography } from 'antd';
+import { Alert, Button, Space, Typography } from 'antd';
 import styled from 'styled-components';
 
-import { Box, Flex } from '../../../grid';
-import { useServerCoreVersionGte, useToggle } from '../../../hooks';
-import { LightningIcon } from '../../../shared/icons/LightningIcon';
-import { RollupDesigner } from '../../RollupDesigner';
+import { useServerCoreVersionGte } from '../../../hooks';
+import { useRollupDesignerContext } from '../../RollupDesigner';
 import { QueryStatus } from './PlaygroundQueryBuilder';
-
-const { Link } = Typography;
 
 const Badge = styled.div`
   display: flex;
@@ -34,10 +27,9 @@ export function PreAggregationStatus({
   external,
   extDbType,
   preAggregationType,
-  ...props
 }: PreAggregationStatusProps) {
   const isVersionGte = useServerCoreVersionGte('0.28.4');
-  const [isModalOpen, toggleModal] = useToggle();
+  const { toggleModal } = useRollupDesignerContext();
 
   // hide it for the time being
   // const renderTime = () => (
@@ -54,7 +46,7 @@ export function PreAggregationStatus({
             <Space size={4}>
               <Icon
                 style={{ color: 'var(--warning-color)' }}
-                component={() => <LightningIcon />}
+                component={() => <ThunderboltFilled />}
               />
             </Space>
           </Badge>
@@ -65,7 +57,7 @@ export function PreAggregationStatus({
             Query was accelerated with pre-aggregation
           </Typography.Text>
         ) : isVersionGte ? (
-          <Button type="link" onClick={toggleModal}>
+          <Button type="link" onClick={() => toggleModal()}>
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
         ) : null}
@@ -90,41 +82,6 @@ export function PreAggregationStatus({
           />
         ) : null}
       </Space>
-
-      <Modal
-        title="Rollup Designer"
-        visible={isModalOpen}
-        bodyStyle={{ padding: 0 }}
-        footer={
-          <Link
-            href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
-            target="_blank"
-          >
-            <Flex justifyContent="center" gap={1}>
-              <Box>
-                <InfoCircleOutlined />
-              </Box>
-
-              <Box>Further reading about pre-aggregations for reference.</Box>
-
-              <Box>
-                <ArrowRightOutlined />
-              </Box>
-            </Flex>
-          </Link>
-        }
-        width={1190}
-        onCancel={toggleModal}
-      >
-        {props.transformedQuery ? (
-          <RollupDesigner
-            apiUrl={props.apiUrl}
-            defaultQuery={props.query}
-            memberTypeCubeMap={props.availableMembers}
-            transformedQuery={props.transformedQuery}
-          />
-        ) : null}
-      </Modal>
     </>
   );
 }

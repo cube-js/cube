@@ -1,4 +1,4 @@
-import { LockOutlined } from '@ant-design/icons';
+import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
@@ -7,8 +7,13 @@ import styled from 'styled-components';
 
 import { Button } from '../../atoms';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
+// import { LightningIcon } from '../../shared/icons/LightningIcon';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
+import {
+  RollupDesignerContext,
+  useRollupDesignerContext,
+} from '../RollupDesigner';
 import {
   PlaygroundQueryBuilder,
   PlaygroundQueryBuilderProps,
@@ -42,14 +47,8 @@ type QueryBuilderContainerProps = {
 export function QueryBuilderContainer({
   apiUrl,
   token,
-  dashboardSource,
   ...props
 }: QueryBuilderContainerProps) {
-  const { location, push } = useHistory();
-
-  const params = new URLSearchParams(location.search);
-  const query = JSON.parse(params.get('query') || 'null');
-
   const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
 
   const currentToken = securityContextToken || token;
@@ -68,50 +67,104 @@ export function QueryBuilderContainer({
 
   return (
     <CubeProvider cubejsApi={cubejsApi}>
-      <ChartRendererStateProvider>
-        <StyledCard bordered={false}>
-          <QueryTabs
-            query={query}
-            sidebar={
-              <Space direction="horizontal">
-                <Button
-                  data-testid="security-context-btn"
-                  icon={<LockOutlined />}
-                  size="small"
-                  type={securityContextToken ? 'primary' : 'default'}
-                  onClick={() => setIsModalOpen(true)}
-                >
-                  {securityContextToken ? 'Edit' : 'Add'} Security Context
-                </Button>
-              </Space>
-            }
-            onTabChange={(tab) => {
-              props.onTabChange?.(tab);
-            }}
-          >
-            {({ id, query, chartType }, saveTab) => (
-              <PlaygroundQueryBuilder
-                queryId={id}
-                apiUrl={apiUrl!}
-                cubejsToken={currentToken!}
-                initialVizState={{
-                  query,
-                  chartType,
-                }}
-                dashboardSource={dashboardSource}
-                schemaVersion={props.schemaVersion}
-                onVizStateChanged={(vizState) => {
-                  saveTab({
-                    query: vizState.query || {},
-                    chartType: vizState.chartType,
-                  });
-                  props.onVizStateChanged?.(vizState);
-                }}
-              />
-            )}
-          </QueryTabs>
-        </StyledCard>
-      </ChartRendererStateProvider>
+      <RollupDesignerContext apiUrl={apiUrl!}>
+        <ChartRendererStateProvider>
+          <StyledCard bordered={false}>
+            <QueryTabsRenderer
+              apiUrl={apiUrl!}
+              token={currentToken!}
+              dashboardSource={props.dashboardSource}
+              securityContextToken={securityContextToken}
+              onTabChange={props.onTabChange}
+              onSecurityContextModalOpen={() => setIsModalOpen(true)}
+            />
+          </StyledCard>
+        </ChartRendererStateProvider>
+      </RollupDesignerContext>
     </CubeProvider>
+  );
+}
+
+type QueryTabsRendererProps = {
+  apiUrl: string;
+  token: string;
+  securityContextToken: string | null;
+  onSecurityContextModalOpen: () => void;
+} & Pick<
+  PlaygroundQueryBuilderProps,
+  'schemaVersion' | 'dashboardSource' | 'onVizStateChanged' | 'onSchemaChange'
+> &
+  Pick<QueryTabsProps, 'onTabChange'>;
+
+function QueryTabsRenderer({
+  apiUrl,
+  token,
+  securityContextToken,
+  dashboardSource,
+  schemaVersion,
+  onSecurityContextModalOpen,
+  ...props
+}: QueryTabsRendererProps) {
+  const { location } = useHistory();
+  const { setQuery, toggleModal } = useRollupDesignerContext();
+
+  const params = new URLSearchParams(location.search);
+  const query = JSON.parse(params.get('query') || 'null');
+
+  return (
+    <QueryTabs
+      query={query}
+      sidebar={
+        <Space direction="horizontal">
+          <Button
+            data-testid="security-context-btn"
+            icon={<LockOutlined />}
+            size="small"
+            type={securityContextToken ? 'primary' : 'default'}
+            onClick={onSecurityContextModalOpen}
+          >
+            {securityContextToken ? 'Edit' : 'Add'} Security Context
+          </Button>
+
+          <Button
+            data-testid="rollup-designer-btn"
+            icon={<ThunderboltOutlined />}
+            size="small"
+            onClick={() => toggleModal()}
+          >
+            Add Rollup to Schema
+          </Button>
+        </Space>
+      }
+      onTabChange={(tab) => {
+        props.onTabChange?.(tab);
+        setQuery(tab.query);
+      }}
+    >
+      {({ id, query, chartType }, saveTab) => (
+        <PlaygroundQueryBuilder
+          queryId={id}
+          apiUrl={apiUrl}
+          cubejsToken={token}
+          initialVizState={{
+            query,
+            chartType,
+          }}
+          dashboardSource={dashboardSource}
+          schemaVersion={schemaVersion}
+          onVizStateChanged={(vizState) => {
+            saveTab({
+              query: vizState.query || {},
+              chartType: vizState.chartType,
+            });
+            props.onVizStateChanged?.(vizState);
+
+            if (vizState.query) {
+              setQuery(vizState.query);
+            }
+          }}
+        />
+      )}
+    </QueryTabs>
   );
 }

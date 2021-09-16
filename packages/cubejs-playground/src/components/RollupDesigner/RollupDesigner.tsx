@@ -1,9 +1,5 @@
 import { EditOutlined, WarningFilled } from '@ant-design/icons';
-import {
-  Query,
-  TimeDimensionBase,
-  TransformedQuery,
-} from '@cubejs-client/core';
+import { isQueryPresent, TimeDimensionBase } from '@cubejs-client/core';
 import { AvailableMembers } from '@cubejs-client/react';
 import {
   Alert,
@@ -11,16 +7,17 @@ import {
   Divider,
   Input,
   notification,
+  Space,
   Tabs,
   Typography,
-  Space,
+  Skeleton,
 } from 'antd';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import styled from 'styled-components';
-
-import { CodeSnippet } from '../../atoms';
+import { CodeSnippet, FatalError } from '../../atoms';
 import { Box, Flex } from '../../grid';
 import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
+import useDeepMemo from '../../hooks/deep-memo';
 import { useCloud } from '../../playground/cloud';
 import { getNameMemberPairs, request } from '../../shared/helpers';
 import { prettifyObject } from '../../utils';
@@ -28,9 +25,11 @@ import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
 import { RollupSettings, Settings } from './components/Settings';
 import { TimeDimension } from './components/TimeDimension';
+import { useRollupDesignerContext } from './Context';
 import {
-  getRollupDefinitionFromReferences,
+  areReferencesEmpty,
   getPreAggregationReferences,
+  getRollupDefinitionFromReferences,
   PreAggregationReferences,
   updateQuery,
 } from './utils';
@@ -46,8 +45,8 @@ const MainBox = styled(Box)`
 `;
 
 const RollupQueryBox = styled.div`
-  padding: 0 24px;
-  background: var(--layout-body-background);
+  padding: 0 24px 32px;
+  background: #f6f6f8;
   width: 420px;
   min-width: 420px;
 
@@ -67,36 +66,55 @@ const RollupQueryBox = styled.div`
   }
 `;
 
+function getSelectedKeys(references: PreAggregationReferences) {
+  const keys = new Set<string>();
+
+  ['measures', 'dimensions', 'timeDimensions', 'segments'].map((memberKey) => {
+    if (memberKey === 'timeDimensions') {
+      const { dimension } = references[memberKey]?.[0] || {};
+
+      if (dimension) {
+        keys.add(`td:${dimension}`);
+      }
+    } else {
+      references[memberKey]?.map((key) => keys.add(key));
+    }
+  });
+
+  return Array.from(keys.values());
+}
+
 type RollupDesignerProps = {
   apiUrl: string;
-  transformedQuery: TransformedQuery;
-  defaultQuery: Query;
   memberTypeCubeMap: AvailableMembers;
 };
 
 export function RollupDesigner({
   apiUrl,
-  defaultQuery,
   memberTypeCubeMap,
-  transformedQuery,
 }: RollupDesignerProps) {
   const isMounted = useIsMounted();
   const token = useToken();
   const { isCloud, ...cloud } = useCloud();
+  const { query, transformedQuery, isLoading, error } =
+    useRollupDesignerContext();
 
   const [isCronValid, setCronValidity] = useState<boolean>(true);
   const [settings, setSettings] = useState<RollupSettings>({});
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
+  const [firstOpenCubeName, setFirstOpenCubeName] = useState<string | null>(
+    null
+  );
 
-  const canBeRolledUp =
-    transformedQuery.leafMeasureAdditive &&
-    !transformedQuery.hasMultipliedMeasures;
+  // todo: avoid
+  const canBeRolledUp = true;
+  const hasNonAdditiveMeasures = Boolean(transformedQuery?.leafMeasureAdditive);
 
-  const canUseMutex = useRef<number>(0);
-  const [matching, setMatching] = useState<boolean>(false);
+  const [matching, setMatching] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [preAggName, setPreAggName] = useState<string>('main');
 
-  const { order, limit, filters, ...matchedQuery } = defaultQuery;
+  const { order, limit, filters, ...matchedQuery } = query || {};
 
   const [timeDimension] = matchedQuery.timeDimensions || [];
 
@@ -115,28 +133,26 @@ export function RollupDesigner({
     getPreAggregationReferences(transformedQuery, segments)
   );
 
-  const selectedKeys = useMemo(() => {
-    const keys = new Set<string>();
+  useDeepEffect(() => {
+    const references = getPreAggregationReferences(transformedQuery, segments);
 
-    ['measures', 'dimensions', 'timeDimensions', 'segments'].map(
-      (memberKey) => {
-        if (memberKey === 'timeDimensions') {
-          const { dimension } = references[memberKey]?.[0] || {};
+    setReferences(references);
 
-          if (dimension) {
-            keys.add(dimension);
-          }
-        } else {
-          references[memberKey]?.map((key) => keys.add(key));
-        }
-      }
+    const openKeys = getSelectedKeys(references).map(
+      (key) => key.split('.')[0]
     );
+    setOpenKeys(openKeys);
+    setFirstOpenCubeName(openKeys[0] || null);
+  }, [transformedQuery, segments]);
 
-    return Array.from(keys.values());
+  const selectedKeys = useDeepMemo(() => {
+    const selectedKeys = getSelectedKeys(references);
+
+    return selectedKeys;
   }, [references]);
 
   useDeepEffect(() => {
-    let mutex = canUseMutex.current;
+    let active = true;
     const { measures, segments, dimensions, timeDimensions } = references;
 
     async function load() {
@@ -156,24 +172,34 @@ export function RollupDesigner({
         }
       );
 
-      if (isMounted() && mutex === canUseMutex.current) {
+      if (isMounted() && active) {
         setMatching(json.canUsePreAggregationForTransformedQuery);
-        canUseMutex.current++;
       }
     }
 
-    if (token != null) {
+    if (token != null && transformedQuery) {
       load();
     }
-  }, [isMounted, references, token, canUseMutex]);
 
-  const cubeName =
-    transformedQuery &&
-    (
-      transformedQuery.leafMeasures[0] ||
-      transformedQuery.sortedDimensions[0] ||
-      'your'
-    ).split('.')[0];
+    return () => (active = false);
+  }, [isMounted, references, token, transformedQuery]);
+
+  const cubeName = useMemo(() => {
+    let cubeName: string | null = null;
+
+    if (transformedQuery) {
+      cubeName = (
+        transformedQuery?.leafMeasures[0] ||
+        transformedQuery?.sortedDimensions[0] ||
+        'CubeName'
+      ).split('.')[0];
+    } else if (!areReferencesEmpty(references)) {
+      const [key] = getSelectedKeys(references);
+      cubeName = key.split('.')[0] || null;
+    }
+
+    return cubeName;
+  }, [transformedQuery, references]);
 
   const indexedMembers = Object.fromEntries(
     getNameMemberPairs([
@@ -185,6 +211,10 @@ export function RollupDesigner({
   );
 
   async function handleAddToSchemaClick() {
+    if (!cubeName) {
+      return;
+    }
+
     const definition = {
       preAggregationName: preAggName,
       cubeName,
@@ -330,16 +360,45 @@ export function RollupDesigner({
           theme="light"
         />
 
-        <Button
-          type="primary"
-          loading={saving}
-          disabled={!isCronValid}
-          style={{ width: '100%' }}
-          onClick={handleAddToSchemaClick}
-        >
-          Add to the Data Schema
-        </Button>
+        {cubeName ? (
+          <Button
+            type="primary"
+            loading={saving}
+            disabled={!isCronValid}
+            style={{ width: '100%' }}
+            onClick={handleAddToSchemaClick}
+          >
+            Add to the Data Schema
+          </Button>
+        ) : null}
       </>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Flex gap={4} style={{ margin: 24 }}>
+        <Box style={{ minWidth: 256 }}>
+          <Skeleton />
+        </Box>
+
+        <Box grow={1}>
+          <Skeleton />
+          <Skeleton />
+        </Box>
+
+        <Box style={{ width: 420, minWidth: 420 }}>
+          <Skeleton />
+        </Box>
+      </Flex>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ margin: '32px 24px' }}>
+        <FatalError error={error} />
+      </div>
     );
   }
 
@@ -351,20 +410,18 @@ export function RollupDesigner({
             <Flex gap={2}>
               <Box style={{ minWidth: 256 }}>
                 <Cubes
+                  openKeys={openKeys}
                   selectedKeys={selectedKeys}
                   memberTypeCubeMap={memberTypeCubeMap}
+                  firstOpenCubeName={firstOpenCubeName}
                   onSelect={(memberType, key) => {
                     handleMemberToggle(memberType)(key);
                   }}
+                  onOpenKeysChange={setOpenKeys}
                 />
               </Box>
 
-              <Box
-                grow={1}
-                style={{
-                  marginTop: 24,
-                }}
-              >
+              <Box grow={1} style={{ marginTop: 24 }}>
                 {references.measures?.length ? (
                   <>
                     <Members
@@ -447,26 +504,27 @@ export function RollupDesigner({
       <RollupQueryBox>
         <Tabs>
           <TabPane tab="Rollup Definition" key="rollup">
-            <Flex
-              direction="column"
-              justifyContent="flex-start"
-              style={{ marginBottom: 64 }}
-            >
-              {!references.timeDimensions.length && (
-                <Box style={{ marginBottom: 24 }}>
-                  <Alert
-                    type="warning"
-                    message="This rollup has no time dimension so it cannot be partitioned"
-                  />
-                </Box>
-              )}
+            <Flex direction="column" justifyContent="flex-start">
+              {!areReferencesEmpty(references) &&
+                !references.timeDimensions.length && (
+                  <Box style={{ marginBottom: 24 }}>
+                    <Alert
+                      type="warning"
+                      message="This rollup has no time dimension so it cannot be partitioned"
+                    />
+                  </Box>
+                )}
 
               {canBeRolledUp ? (
                 <Box style={{ marginBottom: 16 }}>
-                  <Paragraph>
-                    Add the following rollup pre-aggregation
-                    <br /> to the <b>{cubeName}</b> cube:
-                  </Paragraph>
+                  {!areReferencesEmpty(references) ? (
+                    <Paragraph>
+                      Add the following rollup pre-aggregation
+                      <br /> to the <b>{cubeName}</b> cube:
+                    </Paragraph>
+                  ) : (
+                    <Alert type="warning" message="Add some references" />
+                  )}
 
                   <Paragraph style={{ margin: '24px 0 4px' }}>
                     Rollup Name
@@ -484,63 +542,66 @@ export function RollupDesigner({
             </Flex>
           </TabPane>
 
-          <TabPane
-            tab={
-              canBeRolledUp && matching ? (
-                'Query Compatibility'
-              ) : (
-                <Typography.Text>
-                  Query Compatibility
-                  <WarningFilled style={{ color: '#FBBC05' }} />
-                </Typography.Text>
-              )
-            }
-            key="query"
-          >
-            <Flex direction="column" justifyContent="flex-start">
-              <Box style={{ marginBottom: 32 }}>
-                {canBeRolledUp && matching ? (
-                  <Text>This rollup will match the following query:</Text>
+          {isQueryPresent(query) ? (
+            <TabPane
+              tab={
+                canBeRolledUp && matching ? (
+                  'Query Compatibility'
                 ) : (
-                  <Space direction="vertical">
-                    <Alert
-                      type="warning"
-                      message={
-                        <Text>
-                          This rollup does <b>NOT</b> match the following query:
-                        </Text>
-                      }
-                    />
+                  <Typography.Text>
+                    Query Compatibility
+                    <WarningFilled style={{ color: '#FBBC05' }} />
+                  </Typography.Text>
+                )
+              }
+              key="query"
+            >
+              <Flex direction="column" justifyContent="flex-start">
+                <Box style={{ marginBottom: 32 }}>
+                  {canBeRolledUp && matching ? (
+                    <Text>This rollup will match the following query:</Text>
+                  ) : (
+                    <Space direction="vertical">
+                      <Alert
+                        type="warning"
+                        message={
+                          <Text>
+                            This rollup does <b>NOT</b> match the following
+                            query:
+                          </Text>
+                        }
+                      />
 
-                    {!hideMatchRollupButton && (
-                      <Button
-                        type="primary"
-                        ghost
-                        onClick={() => {
-                          setReferences(
-                            getPreAggregationReferences(
-                              transformedQuery,
-                              segments
-                            )
-                          );
-                          setMatching(true);
-                        }}
-                      >
-                        Match Rollup
-                      </Button>
-                    )}
-                  </Space>
-                )}
-              </Box>
+                      {!hideMatchRollupButton && (
+                        <Button
+                          type="primary"
+                          ghost
+                          onClick={() => {
+                            setReferences(
+                              getPreAggregationReferences(
+                                transformedQuery,
+                                segments
+                              )
+                            );
+                            setMatching(true);
+                          }}
+                        >
+                          Match Rollup
+                        </Button>
+                      )}
+                    </Space>
+                  )}
+                </Box>
 
-              <CodeSnippet
-                style={{ minWidth: 200 }}
-                code={prettifyObject(matchedQuery)}
-                copyMessage="Query is copied"
-                theme="light"
-              />
-            </Flex>
-          </TabPane>
+                <CodeSnippet
+                  style={{ minWidth: 200 }}
+                  code={prettifyObject(matchedQuery)}
+                  copyMessage="Query is copied"
+                  theme="light"
+                />
+              </Flex>
+            </TabPane>
+          ) : null}
         </Tabs>
       </RollupQueryBox>
     </Flex>

@@ -95,6 +95,10 @@ declare module '@cubejs-client/core' {
      */
     subscribe?: boolean;
     /**
+     * A Cube.js API instance. If not provided will be taken from `CubeProvider`
+     */
+    cubejsApi?: CubejsApi;
+    /**
      * Function that receives `ProgressResult` on each `Continue wait` message.
      */
     progressCallback?(result: ProgressResult): void;
@@ -860,6 +864,7 @@ declare module '@cubejs-client/core' {
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
+    transformedQueries: TransformedQuery[];
   };
 
   export type Cube = {
@@ -928,6 +933,9 @@ declare module '@cubejs-client/core' {
     ): { title: string; error: string } | TCubeMemberByType<T>;
     defaultTimeDimensionNameFor(memberName: string): string;
     filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): FilterOperator[];
+
+    // todo: types
+    membersGroupedByCube(): any;
   }
 
   /**
@@ -1068,7 +1076,7 @@ declare module '@cubejs-client/core' {
   /**
    * @hidden
    */
-  export function isQueryPresent(query: Query | Query[]): boolean;
+  export function isQueryPresent(query: Query | Query[] | null | undefined): boolean;
   export function movePivotItem(
     pivotConfig: PivotConfig,
     sourceIndex: number,
