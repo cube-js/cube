@@ -45,11 +45,10 @@ pre-aggregations for `Products` and `Suppliers`.
   lang="js"
 />
 
-What if we want to get the data from the defined above pre-aggregations in one
-query? We can use the `rollupJoin` pre-aggregation. It will be able to aggregate
-data from various data sources. Let's define it! Notice that the rollup that
-joined should contain dimensions on which they're joined. In our case, is the
-`CUBE.supplierId` dimension in the `Products` cube:
+Then, we'll also define a `rollupJoin` pre-aggregation. It will enable Cube to aggregate
+data from multiple data sources. Note that the joined rollups
+should contain dimensions on which they're joined. In our case, it's the
+`supplierId` dimension in the `Products` cube:
 
 <GitHubCodeBlock
   href="https://github.com/cube-js/cube.js/blob/recipes/cross-datasource-join/examples/recipes/joining-multiple-datasources-data/schema/Products.js"
