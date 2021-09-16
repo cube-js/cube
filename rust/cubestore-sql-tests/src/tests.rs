@@ -47,6 +47,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
+        t("timestamp_seconds_frac", timestamp_seconds_frac),
         t("column_escaping", column_escaping),
         t("information_schema", information_schema),
         t("case_column_escaping", case_column_escaping),
@@ -891,6 +892,31 @@ async fn timestamp_select(service: Box<dyn SqlClient>) {
     let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
+}
+
+async fn timestamp_seconds_frac(service: Box<dyn SqlClient>) {
+    for s in &[
+        "1970-01-01T00:00:00.123Z",
+        "1970-01-01T00:00:00.123",
+        "1970-01-01 00:00:00.123Z",
+        "1970-01-01 00:00:00.123 UTC",
+    ] {
+        assert_eq!(
+            timestamp_from_string(s).expect(s).get_time_stamp(),
+            123000000,
+            "input {}",
+            s
+        );
+        if s.ends_with("UTC") {
+            // Currently accepted only on ingestion.
+            continue;
+        }
+        let r = service
+            .exec_query(&format!("SELECT to_timestamp('{}')", s))
+            .await
+            .unwrap();
+        assert_eq!(to_rows(&r), rows(&[TimestampValue::new(123000000)]));
+    }
 }
 
 async fn column_escaping(service: Box<dyn SqlClient>) {
