@@ -98,6 +98,8 @@ type IndexDescription = {
 export type PreAggregationDescription = {
   preAggregationId: string;
   priority: number;
+  dataSource: string;
+  external: boolean;
   previewSql: QueryWithParams;
   timezone: string;
   indexesSql: IndexDescription[];
@@ -1019,7 +1021,7 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
-    this.dataSource = options.dataSource;
+    this.dataSource = preAggregation.dataSource;
   }
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
