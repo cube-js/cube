@@ -26,7 +26,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Entity-Attribute-Value Model](https://cube.dev/docs/recipes/entity-attribute-value)
 - [Referencing Dynamic Measures](https://cube.dev/docs/recipes/referencing-dynamic-measures)
 - [Snapshots](https://cube.dev/docs/recipes/snapshots)
-- [Passing Dynamic Values in a Query](https://cube.dev/docs/recipes/passing-dynamic-values-in-a-query)
+- [Passing Dynamic Parameters in a Query](https://cube.dev/docs/recipes/passing-dynamic-parameters-in-a-query)
 
 ### Queries
 

@@ -1,7 +1,7 @@
 {
   "measures": [
     "Users.totalNumberOfWomen",
-    "Users.numberOfWomenInTheCity",
+    "Users.numberOfPeopleOfAnyGenderInTheCity",
     "Users.ratio"
   ],
   "filters": [

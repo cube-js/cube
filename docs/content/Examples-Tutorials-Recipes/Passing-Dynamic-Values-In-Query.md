@@ -1,6 +1,6 @@
 ---
-title: Passing Dynamic Values in a Query
-permalink: /recipes/passing-dynamic-values-in-a-query
+title: Passing Dynamic Parameters in a Query
+permalink: /recipes/passing-dynamic-parameters-in-a-query
 category: Examples & Tutorials
 subCategory: Data schema
 menuOrder: 4
@@ -8,7 +8,7 @@ menuOrder: 4
 
 ## Use case
 
-We want to know the ratio between the number of women in a particular city and
+We want to know the ratio between the number of people in a particular city and
 the total number of women in the country. The user can specify the city for the
 filter. The trick is to get the value of the city from the user and use it in
 the calculation. In the recipe below, we can learn how to join the data table
@@ -27,7 +27,7 @@ users, including city and gender:
 | ... | ...      | ...    | ...             |
 
 To calculate the ratio between the number of women in a particular city and the
-total number of women in the country, we need to define three measures. One of
+total number of people in the country, we need to define three measures. One of
 them can recieve the city value from the filter in a query. Cube will apply this
 filter via the `WHERE` clause to the dataset. So, we need to reshape the dataset
 so that applying this filter wouldn’t affect the calculations. In this use case,
@@ -72,15 +72,15 @@ cube(`Users`, {
       filters: [{ sql: `${CUBE}.gender = 'female'` }],
     },
 
-    numberOfWomenInTheCity: {
+    numberOfPeopleOfAnyGenderInTheCity: {
       sql: 'id',
       type: 'count',
       filters: [{ sql: `${CUBE}.city = ${CUBE}.city_filter` }],
     },
 
     ratio: {
-      title: 'Ratio Women in the City to Total Number of Women',
-      sql: `1.0 * ${CUBE.numberOfWomenInTheCity} / ${CUBE.totalNumberOfWomen}`,
+      title: 'Ratio Women in the City to Total Number of People',
+      sql: `1.0 * ${CUBE.numberOfPeopleOfAnyGenderInTheCity} / ${CUBE.totalNumberOfWomen}`,
       type: `number`,
     },
   },
@@ -103,7 +103,7 @@ filter in the query:
 {
   "measures": [
     "Users.totalNumberOfWomen",
-    "Users.numberOfWomenInTheCity",
+    "Users.numberOfPeopleOfAnyGenderInTheCity",
     "Users.ratio"
   ],
   "filters": [
@@ -125,7 +125,7 @@ can get the ratio we wanted to achieve:
 [
   {
     'Users.totalNumberOfWomen': '259',
-    'Users.numberOfWomenInTheCity': '99',
+    'Users.numberOfPeopleOfAnyGenderInTheCity': '99',
     'Users.ratio': '0.38223938223938223938',
   },
 ];
@@ -134,6 +134,6 @@ can get the ratio we wanted to achieve:
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/passing-dynamic-values-in-query)
+[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/passing-dynamic-parameters-in-query)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.

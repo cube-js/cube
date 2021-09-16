@@ -34,15 +34,15 @@ cube(`Users`, {
       filters: [{ sql: `${CUBE}.gender = 'female'` }],
     },
 
-    numberOfWomenInTheCity: {
+    numberOfPeopleOfAnyGenderInTheCity: {
       sql: 'id',
       type: 'count',
       filters: [{ sql: `${CUBE}.city = ${CUBE}.city_filter` }],
     },
 
     ratio: {
-      title: 'Ratio Women in the City to Total Number of Women',
-      sql: `1.0 * ${CUBE.numberOfWomenInTheCity} / ${CUBE.totalNumberOfWomen}`,
+      title: 'Ratio Women in the City to Total Number of People',
+      sql: `1.0 * ${CUBE.numberOfPeopleOfAnyGenderInTheCity} / ${CUBE.totalNumberOfWomen}`,
       type: `number`,
     },
   },
