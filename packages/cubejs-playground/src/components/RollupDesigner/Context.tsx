@@ -1,10 +1,5 @@
-import { Query, TransformedQuery } from '@cubejs-client/core';
-import {
-  AvailableMembers,
-  useCubeMeta,
-  useDryRun,
-  useLazyDryRun,
-} from '@cubejs-client/react';
+import { CubejsApi, Query, TransformedQuery } from '@cubejs-client/core';
+import { AvailableMembers, useCubeMeta, useDryRun } from '@cubejs-client/react';
 import {
   createContext,
   ReactNode,
@@ -13,7 +8,7 @@ import {
   useState,
 } from 'react';
 
-import { useDeepEffect, useToggle } from '../../hooks';
+import { useToggle } from '../../hooks';
 import { RollupDesignerModal } from './components/RollupDesignerModal';
 
 type RollupDesignerContextProps = {
@@ -35,9 +30,14 @@ export const Context = createContext<RollupDesignerContextProps>(
 type ContextProps = {
   apiUrl: string;
   children: ReactNode;
+  cubejsApi?: CubejsApi;
 };
 
-export function RollupDesignerContext({ children, ...props }: ContextProps) {
+export function RollupDesignerContext({
+  cubejsApi,
+  children,
+  ...props
+}: ContextProps) {
   const [isModalOpen, toggleModal] = useToggle();
   const [error, setError] = useState<Error | null>(null);
   const [query, setQuery] = useState<Query | null>(null);
@@ -52,9 +52,11 @@ export function RollupDesignerContext({ children, ...props }: ContextProps) {
 
   const metaResult = useCubeMeta({
     skip: !isModalOpen,
+    cubejsApi,
   });
   const dryRunResult = useDryRun(query as Query, {
     skip: !isModalOpen || !query,
+    cubejsApi,
   });
 
   useEffect(() => {
@@ -101,6 +103,7 @@ export function RollupDesignerContext({ children, ...props }: ContextProps) {
       }}
     >
       {children}
+
       <RollupDesignerModal apiUrl={props.apiUrl} onAfterClose={reset} />
     </Context.Provider>
   );

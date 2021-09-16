@@ -459,6 +459,8 @@ declare module '@cubejs-client/react' {
    */
   type CubeFetchOptions = {
     skip?: boolean;
+    cubejsApi?: CubejsApi;
+    query?: Query;
   };
 
   /**
@@ -502,7 +504,7 @@ declare module '@cubejs-client/react' {
     sql: string;
   };
 
-  export function useCubeMeta(options?: Omit<LoadMethodOptions, 'subscribe'>): CubeFetchResult<Meta>;
+  export function useCubeMeta(options?: Omit<CubeFetchOptions, 'query'>): CubeFetchResult<Meta>;
 
   /**
    * @hidden

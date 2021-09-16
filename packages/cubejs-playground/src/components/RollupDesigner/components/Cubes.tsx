@@ -112,6 +112,7 @@ function filterMembersByCube(
 }
 
 type CubesProps = {
+  selectedKeys: string[];
   openKeys: string[];
   memberTypeCubeMap: AvailableMembers;
   firstOpenCubeName: string | null;
@@ -122,6 +123,7 @@ type CubesProps = {
 export function Cubes({
   memberTypeCubeMap,
   openKeys,
+  selectedKeys,
   firstOpenCubeName,
   onSelect,
   onOpenKeysChange,
@@ -164,13 +166,16 @@ export function Cubes({
 
       <StyledMenu
         data-menu="cubes"
-        selectedKeys={openKeys}
+        selectedKeys={selectedKeys}
         openKeys={search ? allCubeKeys : openKeys}
         mode="inline"
         onClick={(event) => {
           const { membertype } = (event.domEvent.target as HTMLElement).dataset;
 
-          onSelect(membertype as QueryMemberKey, event.key.toString());
+          onSelect(
+            membertype as QueryMemberKey,
+            event.key.toString().replace('td:', '')
+          );
         }}
       >
         {membersByCube.map((cube) => {
@@ -201,19 +206,26 @@ export function Cubes({
                         : memberType
                     }
                   >
-                    {cube[memberType].map((member) => (
-                      <Menu.Item key={member.name} data-membertype={memberType}>
-                        <CheckOutlined
-                          style={{
-                            visibility: openKeys.includes(member.name)
-                              ? 'visible'
-                              : 'hidden',
-                          }}
-                        />
+                    {cube[memberType].map((member) => {
+                      const key =
+                        memberType === 'timeDimensions'
+                          ? `td:${member.name}`
+                          : member.name;
 
-                        {member.shortTitle}
-                      </Menu.Item>
-                    ))}
+                      return (
+                        <Menu.Item key={key} data-membertype={memberType}>
+                          <CheckOutlined
+                            style={{
+                              visibility: selectedKeys.includes(key)
+                                ? 'visible'
+                                : 'hidden',
+                            }}
+                          />
+
+                          {member.shortTitle}
+                        </Menu.Item>
+                      );
+                    })}
                   </Menu.ItemGroup>
                 );
               })}

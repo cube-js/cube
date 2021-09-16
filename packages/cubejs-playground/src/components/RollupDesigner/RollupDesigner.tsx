@@ -12,11 +12,12 @@ import {
   Typography,
   Skeleton,
 } from 'antd';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { CodeSnippet, FatalError } from '../../atoms';
 import { Box, Flex } from '../../grid';
 import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
+import useDeepMemo from '../../hooks/deep-memo';
 import { useCloud } from '../../playground/cloud';
 import { getNameMemberPairs, request } from '../../shared/helpers';
 import { prettifyObject } from '../../utils';
@@ -45,7 +46,7 @@ const MainBox = styled(Box)`
 
 const RollupQueryBox = styled.div`
   padding: 0 24px 32px;
-  background: var(--layout-body-background);
+  background: #f6f6f8;
   width: 420px;
   min-width: 420px;
 
@@ -73,7 +74,7 @@ function getSelectedKeys(references: PreAggregationReferences) {
       const { dimension } = references[memberKey]?.[0] || {};
 
       if (dimension) {
-        keys.add(dimension);
+        keys.add(`td:${dimension}`);
       }
     } else {
       references[memberKey]?.map((key) => keys.add(key));
@@ -134,14 +135,21 @@ export function RollupDesigner({
 
   useDeepEffect(() => {
     const references = getPreAggregationReferences(transformedQuery, segments);
+
+    setReferences(references);
+
     const openKeys = getSelectedKeys(references).map(
       (key) => key.split('.')[0]
     );
-
-    setReferences(references);
     setOpenKeys(openKeys);
     setFirstOpenCubeName(openKeys[0] || null);
   }, [transformedQuery, segments]);
+
+  const selectedKeys = useDeepMemo(() => {
+    const selectedKeys = getSelectedKeys(references);
+
+    return selectedKeys;
+  }, [references]);
 
   useDeepEffect(() => {
     let active = true;
@@ -176,11 +184,22 @@ export function RollupDesigner({
     return () => (active = false);
   }, [isMounted, references, token, transformedQuery]);
 
-  const cubeName = (
-    transformedQuery?.leafMeasures[0] ||
-    transformedQuery?.sortedDimensions[0] ||
-    'CubeName'
-  ).split('.')[0];
+  const cubeName = useMemo(() => {
+    let cubeName: string | null = null;
+
+    if (transformedQuery) {
+      cubeName = (
+        transformedQuery?.leafMeasures[0] ||
+        transformedQuery?.sortedDimensions[0] ||
+        'CubeName'
+      ).split('.')[0];
+    } else if (!areReferencesEmpty(references)) {
+      const [key] = getSelectedKeys(references);
+      cubeName = key.split('.')[0] || null;
+    }
+
+    return cubeName;
+  }, [transformedQuery, references]);
 
   const indexedMembers = Object.fromEntries(
     getNameMemberPairs([
@@ -192,6 +211,10 @@ export function RollupDesigner({
   );
 
   async function handleAddToSchemaClick() {
+    if (!cubeName) {
+      return;
+    }
+
     const definition = {
       preAggregationName: preAggName,
       cubeName,
@@ -337,15 +360,17 @@ export function RollupDesigner({
           theme="light"
         />
 
-        <Button
-          type="primary"
-          loading={saving}
-          disabled={!isCronValid}
-          style={{ width: '100%' }}
-          onClick={handleAddToSchemaClick}
-        >
-          Add to the Data Schema
-        </Button>
+        {cubeName ? (
+          <Button
+            type="primary"
+            loading={saving}
+            disabled={!isCronValid}
+            style={{ width: '100%' }}
+            onClick={handleAddToSchemaClick}
+          >
+            Add to the Data Schema
+          </Button>
+        ) : null}
       </>
     );
   }
@@ -386,6 +411,7 @@ export function RollupDesigner({
               <Box style={{ minWidth: 256 }}>
                 <Cubes
                   openKeys={openKeys}
+                  selectedKeys={selectedKeys}
                   memberTypeCubeMap={memberTypeCubeMap}
                   firstOpenCubeName={firstOpenCubeName}
                   onSelect={(memberType, key) => {
@@ -491,10 +517,14 @@ export function RollupDesigner({
 
               {canBeRolledUp ? (
                 <Box style={{ marginBottom: 16 }}>
-                  <Paragraph>
-                    Add the following rollup pre-aggregation
-                    <br /> to the <b>{cubeName}</b> cube:
-                  </Paragraph>
+                  {!areReferencesEmpty(references) ? (
+                    <Paragraph>
+                      Add the following rollup pre-aggregation
+                      <br /> to the <b>{cubeName}</b> cube:
+                    </Paragraph>
+                  ) : (
+                    <Alert type="warning" message="Add some references" />
+                  )}
 
                   <Paragraph style={{ margin: '24px 0 4px' }}>
                     Rollup Name

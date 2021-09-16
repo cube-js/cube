@@ -95,6 +95,10 @@ declare module '@cubejs-client/core' {
      */
     subscribe?: boolean;
     /**
+     * A Cube.js API instance. If not provided will be taken from `CubeProvider`
+     */
+    cubejsApi?: CubejsApi;
+    /**
      * Function that receives `ProgressResult` on each `Continue wait` message.
      */
     progressCallback?(result: ProgressResult): void;

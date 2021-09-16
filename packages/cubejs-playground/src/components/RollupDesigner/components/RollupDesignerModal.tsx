@@ -25,6 +25,7 @@ export function RollupDesignerModal({
       visible={isModalOpen}
       bodyStyle={{ padding: 0 }}
       destroyOnClose
+      wrapClassName="rollup-designer"
       footer={
         <Link
           href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
