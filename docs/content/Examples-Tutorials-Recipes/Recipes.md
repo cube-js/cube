@@ -29,6 +29,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Calculating Average and Percentiles](https://cube.dev/docs/recipes/percentiles)
 - [Dynamically Union Tables](/recipes/dynamically-union-tables)
 - [Entity-Attribute-Value Model](/recipes/entity-attribute-value)
+- [Passing Dynamic Parameters in a Query](/recipes/passing-dynamic-parameters-in-a-query)
 - [Referencing Dynamic Measures](/recipes/referencing-dynamic-measures)
 - [Snapshots](/recipes/snapshots)
 
