@@ -28,9 +28,8 @@ First of all, we should define our database connections with the
 
 ## Data schema
 
-To speed up our queries, we'll use the
-[rollup](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-rollup)
-pre-aggregations. Let's define it for products and suppliers.
+First, we'll define [rollup](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-rollup)
+pre-aggregations for `Products` and `Suppliers`.
 
 <GitHubCodeBlock
   href="https://github.com/cube-js/cube.js/blob/recipes/cross-datasource-join/examples/recipes/joining-multiple-datasources-data/schema/Products.js"
