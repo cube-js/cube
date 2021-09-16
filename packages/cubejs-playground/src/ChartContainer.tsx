@@ -7,7 +7,6 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
   SyncOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
@@ -303,7 +302,6 @@ class ChartContainer extends Component<
 
             <Button
               data-testid="json-query-btn"
-              icon={<ThunderboltOutlined />}
               size="small"
               type={showCode === 'query' ? 'primary' : 'default'}
               disabled={!frameworkItem?.supported || isFetchingMeta}

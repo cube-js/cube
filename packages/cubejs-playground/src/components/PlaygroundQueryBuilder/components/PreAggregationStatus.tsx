@@ -1,11 +1,10 @@
-import Icon from '@ant-design/icons';
+import Icon, { ThunderboltFilled } from '@ant-design/icons';
 import { Query } from '@cubejs-client/core';
 import { AvailableMembers } from '@cubejs-client/react';
 import { Alert, Button, Space, Typography } from 'antd';
 import styled from 'styled-components';
 
 import { useServerCoreVersionGte } from '../../../hooks';
-import { LightningIcon } from '../../../shared/icons/LightningIcon';
 import { useRollupDesignerContext } from '../../RollupDesigner';
 import { QueryStatus } from './PlaygroundQueryBuilder';
 
@@ -47,7 +46,7 @@ export function PreAggregationStatus({
             <Space size={4}>
               <Icon
                 style={{ color: 'var(--warning-color)' }}
-                component={() => <LightningIcon />}
+                component={() => <ThunderboltFilled />}
               />
             </Space>
           </Badge>
