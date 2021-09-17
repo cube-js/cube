@@ -15,7 +15,7 @@ module.exports = {
     if (dataSource === 'products') {
       return new PostgresDriver({
         database: 'ecom',
-        host: 'demo-db.cube.dev',
+        host: 'demo-db-recipes.cube.dev',
         user: 'cube',
         password: '12345',
         port: '5432',
