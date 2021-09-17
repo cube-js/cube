@@ -41,7 +41,7 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
     cronParser.parseExpression('0 * * * *', { currentDate: '2020-01-01 00:00:01', tz: value });
     return value;
   } catch (e) {
-    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) unknown timezone. Take a look here https://www.npmjs.com/package/cron-parser to get available time zones` });
+    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) unknown timezone. Take a look here https://cube.dev/docs/schema/reference/cube#supported-timezones to get available time zones` });
   }
 });
 
@@ -99,14 +99,18 @@ const BaseMeasure = {
   meta: Joi.any()
 };
 
-function exists(ref, then, otherwise) {
+function condition(fun, then, otherwise) {
   return Joi.alternatives().conditional(
-    Joi.ref(ref), {
-      is: Joi.exist(),
+    Joi.ref('.'), {
+      is: Joi.custom((value, helper) => (fun(value) ? value : helper.message({}))),
       then,
       otherwise
     }
   );
+}
+
+function defined(a) {
+  return typeof a !== 'undefined';
 }
 
 function inherit(a, b) {
@@ -119,16 +123,16 @@ function requireOneOf(...keys) {
   );
 }
 
-const PreAggregationRefreshKeySchema = exists(
-  '.sql',
+const PreAggregationRefreshKeySchema = condition(
+  (s) => defined(s.sql),
   Joi.object().keys({
     sql: Joi.func().required(),
     // We dont support timezone for this, because it's useless
     // We cannot support cron interval
     every: everyInterval,
   }),
-  exists(
-    '.every',
+  condition(
+    (s) => defined(s.every),
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
       timezone: everyCronTimeZone,
@@ -179,19 +183,19 @@ const AutoRollupSchema = inherit(BasePreAggregation, {
   maxPreAggregations: Joi.number(),
 });
 
-const OriginalSqlSchema = exists(
-  '.partitionGranularity',
-  exists(
-    '.timeDimensionReference',
+const OriginalSqlSchema = condition(
+  (s) => defined(s.partitionGranularity) || defined(s.timeDimension) || defined(s.timeDimensionReference),
+  condition(
+    (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
-      timeDimensionReference: Joi.func().required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
+      timeDimensionReference: Joi.func().required(),
     }),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
-      timeDimension: Joi.func().required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
+      timeDimension: Joi.func().required(),
     })
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
@@ -201,15 +205,15 @@ const OriginalSqlSchema = exists(
 
 const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
 
-const RollUpJoinSchema = exists(
-  '.granularity',
-  exists(
-    '.rollupReferences',
+const RollUpJoinSchema = condition(
+  (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensionReference),
+  condition(
+    (s) => defined(s.rollupReferences) || defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
       granularity: GranularitySchema,
-      rollupReferences: Joi.func().required(),
       timeDimensionReference: Joi.func().required(),
+      rollupReferences: Joi.func().required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
@@ -218,15 +222,15 @@ const RollUpJoinSchema = exists(
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
       granularity: GranularitySchema,
-      rollups: Joi.func().required(),
       timeDimension: Joi.func().required(),
+      rollups: Joi.func().required(),
       measures: Joi.func(),
       dimensions: Joi.func(),
       segments: Joi.func(),
     })
   ),
-  exists(
-    '.rollupReferences',
+  condition(
+    (s) => defined(s.rollupReferences),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
       rollupReferences: Joi.func().required(),
@@ -235,8 +239,8 @@ const RollUpJoinSchema = exists(
       segmentReferences: Joi.func(),
     }),
     // RollupJoin without references
-    exists(
-      '.rollups',
+    condition(
+      (s) => defined(s.rollups),
       inherit(BasePreAggregation, {
         type: Joi.any().valid('rollupJoin').required(),
         rollups: Joi.func().required(),
@@ -244,15 +248,15 @@ const RollUpJoinSchema = exists(
         dimensions: Joi.func(),
         segments: Joi.func(),
       }),
-      requireOneOf('granularity', 'rollups')
+      requireOneOf('granularity', 'rollups', 'timeDimension')
     )
   )
 );
 
-const RollUpSchema = exists(
-  '.granularity',
-  exists(
-    '.timeDimensionReference',
+const RollUpSchema = condition(
+  (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensionReference),
+  condition(
+    (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       timeDimensionReference: Joi.func().required(),
@@ -305,10 +309,10 @@ const PreAggregationsAlternatives = Joi.object().pattern(
   )
 );
 
-const CubeRefreshKeySchema = exists(
-  '.every',
-  exists(
-    '.sql',
+const CubeRefreshKeySchema = condition(
+  (s) => defined(s.every),
+  condition(
+    (s) => defined(s.sql),
     Joi.object().keys({
       sql: Joi.func().required(),
       // We dont support timezone for this, because it's useless
@@ -320,8 +324,8 @@ const CubeRefreshKeySchema = exists(
       timezone: everyCronTimeZone,
     })
   ),
-  exists(
-    '.immutable',
+  condition(
+    (s) => defined(s.immutable),
     Joi.object().keys({
       immutable: Joi.boolean().required()
     }),

@@ -117,6 +117,40 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeTruthy();
   });
 
+  it('RollUpJoinSchema timeDimension', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => '',
+      fileName: 'fileName',
+      preAggregations: {
+        eventsByType: {
+          type: 'rollupJoin',
+          measures: () => '',
+          dimensions: () => '',
+          partitionGranularity: 'month',
+          timeDimension: () => 'td',
+          external: true,
+          rollups: () => 0,
+          refreshKey: {
+            every: '10 minutes',
+            updateWindow: '250 day',
+            incremental: true
+          },
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+        expect(message).toContain('granularity) is required');
+      }
+    });
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
   it('indexes alternatives', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
