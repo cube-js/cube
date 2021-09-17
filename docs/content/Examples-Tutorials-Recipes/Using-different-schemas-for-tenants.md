@@ -9,12 +9,13 @@ menuOrder: 2
 ## Use case
 
 We want to manage user access to different Cubes. In the
-recipe below, we'll learn how to use a different data schemas for various tenants.
+recipe below, we'll learn how to use multiple data schemas for various tenants.
 
 ## Configuration
 
-We have two tenants and we created folders with the data schema for each one inside the `schema` folder. The folders are named such as a tenants. Then we have to tell Cube which data schema path to use for each tenant. We'll use the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function to do it. We'll pass the tenant name into the `repositoryFactory` inside [`securityContext`](https://cube.dev/docs/security/context#top). We also should define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) property for caching schema compilation result.
+We have two tenants and we created folders with the data schema for each one inside the `schema` folder. The folders are named such as a tenants. Then we have to tell Cube which data schema path to use for each tenant. We'll use the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory) option to do it. We'll pass the tenant name into the `repositoryFactory` inside [`securityContext`](https://cube.dev/docs/security/context#top). We also should define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) property for caching schema compilation result.
 Our cube.js file we'll look like this:
+
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
 
@@ -29,60 +30,89 @@ module.exports = {
 
 ## Data schema
 
-In our case we'll get the odd
+In our case we'll get products with odd `id` values for Avocado tenant and with even `id` values for Mango tenant:
+
+```javascript
+// schema/avocado
+cube(`Products`, {
+  sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 1`,
+  
+  ...
+});
+
+// schema/mango
+cube(`Products`, {
+  sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
+  
+  ...
+});
+```
 
 ## Query
 
-To get the number of orders as a manager or operator, we will send two identical
-requests with different JWTs:
+To get the products, we will send two identical queries with different JWTs:
 
 ```javascript
 {
+  "sub": "1234567890",
+  "tenant": "Avocado",
   "iat": 1000000000,
-  "exp": 5000000000,
-  "role": "manager"
+  "exp": 5000000000
 }
 ```
 
 ```javascript
 {
+  "sub": "1234567890",
+  "tenant": "Mango",
   "iat": 1000000000,
-  "exp": 5000000000,
-  "role": "operator"
+  "exp": 5000000000
 }
 ```
 
 ## Result
 
-We have received different data depending on the user's role.
+We have received different data from schemas corresponding to various tenants and located in different folders:
 
 ```javascript
-// Manager
+// Avocado products
 [
   {
-    'Orders.status': 'completed',
-    'Orders.count': '3346',
+    "Products.id": 1,
+    "Products.name": "Generic Fresh Keyboard"
   },
   {
-    'Orders.status': 'shipped',
-    'Orders.count': '3300',
+    "Products.id": 3,
+    "Products.name": "Practical Wooden Keyboard"
   },
+  {
+    "Products.id": 5,
+    "Products.name": "Handcrafted Rubber Chicken"
+  }
 ]
 ```
 
 ```javascript
-// Operator
+// Mango products:
 [
   {
-    'Orders.status': 'processing',
-    'Orders.count': '3354',
+    "Products.id": 2,
+    "Products.name": "Gorgeous Cotton Sausages"
   },
+  {
+    "Products.id": 4,
+    "Products.name": "Handmade Wooden Soap"
+  },
+  {
+    "Products.id": 6,
+    "Products.name": "Handcrafted Plastic Chair"
+  }
 ]
 ```
 
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/role-based-access)
+[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/using-different-schemas-for-tenants)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
