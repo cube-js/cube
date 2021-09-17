@@ -232,7 +232,7 @@ describe('PreAggregations', () => {
 
     test('fail if rollup doesn\'t already exist', async () => {
       await expect(preAggregations.loadAllPreAggregationsIfNeeded(basicQuery))
-        .rejects.toThrowError(/One or more pre-aggregation tables could not be found to satisfy that query/);
+        .rejects.toThrowError(/Your configuration restricts query requests to only be served from pre-aggregations/);
     });
   });
 
