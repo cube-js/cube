@@ -8,13 +8,20 @@ menuOrder: 2
 
 ## Use case
 
-We want to manage user access to different Cubes. In the
-recipe below, we'll learn how to use multiple data schemas for various tenants.
+We want to manage user access to different Cubes. In the recipe below, we'll
+learn how to use multiple data schemas for various tenants.
 
 ## Configuration
 
-We have two tenants and we created folders with the data schema for each one inside the `schema` folder. The folders are named such as a tenants. Then we have to tell Cube which data schema path to use for each tenant. We'll use the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory) option to do it. We'll pass the tenant name into the `repositoryFactory` inside [`securityContext`](https://cube.dev/docs/security/context#top). We also should define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) property for caching schema compilation result.
-Our cube.js file we'll look like this:
+We have two tenants and we created folders with the data schema for each one
+inside the `schema` folder. The folders are named such as a tenants. Then we
+have to tell Cube which data schema path to use for each tenant. We'll use the
+[`repositoryFactory`](https://cube.dev/docs/config#repository-factory) option to
+do it. We'll pass the tenant name into the `repositoryFactory` inside
+[`securityContext`](https://cube.dev/docs/security/context#top). We also should
+define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id)
+property for caching schema compilation result. Our cube.js file we'll look like
+this:
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
@@ -30,20 +37,21 @@ module.exports = {
 
 ## Data schema
 
-In our case we'll get products with odd `id` values for Avocado tenant and with even `id` values for Mango tenant:
+In our case we'll get products with odd `id` values for Avocado tenant and with
+even `id` values for Mango tenant:
 
 ```javascript
 // schema/avocado
 cube(`Products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 1`,
-  
+
   ...
 });
 
 // schema/mango
 cube(`Products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
-  
+
   ...
 });
 ```
@@ -72,22 +80,23 @@ To get the products, we will send two identical queries with different JWTs:
 
 ## Result
 
-We have received different data from schemas corresponding to various tenants and located in different folders:
+We have received different data from schemas corresponding to various tenants
+and located in different folders:
 
 ```javascript
 // Avocado products
 [
   {
-    "Products.id": 1,
-    "Products.name": "Generic Fresh Keyboard"
+    'Products.id': 1,
+    'Products.name': 'Generic Fresh Keyboard',
   },
   {
-    "Products.id": 3,
-    "Products.name": "Practical Wooden Keyboard"
+    'Products.id': 3,
+    'Products.name': 'Practical Wooden Keyboard',
   },
   {
-    "Products.id": 5,
-    "Products.name": "Handcrafted Rubber Chicken"
+    'Products.id': 5,
+    'Products.name': 'Handcrafted Rubber Chicken',
   }
 ]
 ```
@@ -96,16 +105,16 @@ We have received different data from schemas corresponding to various tenants an
 // Mango products:
 [
   {
-    "Products.id": 2,
-    "Products.name": "Gorgeous Cotton Sausages"
+    'Products.id': 2,
+    'Products.name': 'Gorgeous Cotton Sausages',
   },
   {
-    "Products.id": 4,
-    "Products.name": "Handmade Wooden Soap"
+    'Products.id': 4,
+    'Products.name': 'Handmade Wooden Soap',
   },
   {
-    "Products.id": 6,
-    "Products.name": "Handcrafted Plastic Chair"
+    'Products.id': 6,
+    'Products.name': 'Handcrafted Plastic Chair',
   }
 ]
 ```
