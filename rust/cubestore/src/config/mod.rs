@@ -168,6 +168,75 @@ impl CubeServices {
     }
 }
 
+pub struct ValidationMessages {
+    /// Hard errors, config cannot be used. Application must report these and exit.
+    pub errors: Vec<String>,
+    /// Must be reported to the user, but does not stop application from working.
+    pub warnings: Vec<String>,
+}
+
+impl ValidationMessages {
+    pub fn report_and_abort_on_errors(&self) {
+        for w in &self.warnings {
+            log::warn!("{}", w);
+        }
+        for e in &self.errors {
+            log::error!("{}", e);
+        }
+        if !self.errors.is_empty() {
+            log::error!("Cannot proceed with invalid configuration, exiting");
+            std::process::exit(1)
+        }
+    }
+}
+
+/// This method also looks at environment variables and assumes [c] was obtained by calling
+/// `Config::default()`.
+pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+    if is_router(c) && c.metastore_remote_address().is_some() {
+        errors.push(
+            "Router node cannot use remote metastore. Try removing CUBESTORE_META_ADDR".to_string(),
+        );
+    }
+    if !is_router(c) && !c.select_workers().contains(c.server_name()) {
+        warnings.push(format!("Current worker '{}' is missing in CUBESTORE_WORKERS. Please check CUBESTORE_SERVER_NAME and CUBESTORE_WORKERS variables", c.server_name()));
+    }
+
+    let mut router_vars = vec![
+        "CUBESTORE_HTTP_BIND_ADDR",
+        "CUBESTORE_HTTP_PORT",
+        "CUBESTORE_BIND_ADDR",
+        "CUBESTORE_PORT",
+        "CUBESTORE_META_PORT",
+    ];
+    router_vars.retain(|v| env::var(v).is_ok());
+    if !is_router(c) && !router_vars.is_empty() {
+        warnings.push(format!(
+            "The following router variable{} ignored on worker node: {}",
+            if 1 < router_vars.len() { "s" } else { "" },
+            router_vars.join(", ")
+        ));
+    }
+
+    let mut remote_vars = vec![
+        "CUBESTORE_S3_BUCKET",
+        "CUBESTORE_GCS_BUCKET",
+        "CUBESTORE_REMOTE_DIR",
+    ];
+    remote_vars.retain(|v| env::var(v).is_ok());
+    if 1 < remote_vars.len() {
+        warnings.push(format!(
+            "{} variables specified together. Using {}",
+            remote_vars.join(" and "),
+            remote_vars[0],
+        ));
+    }
+
+    ValidationMessages { errors, warnings }
+}
+
 #[derive(Debug, Clone)]
 pub enum FileStoreProvider {
     Local,
@@ -427,10 +496,7 @@ where
 
 impl Config {
     pub fn default() -> Config {
-        let query_timeout = env::var("CUBESTORE_QUERY_TIMEOUT")
-            .ok()
-            .map(|v| v.parse::<u64>().unwrap())
-            .unwrap_or(120);
+        let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -445,7 +511,9 @@ impl Config {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
                             bucket_name,
-                            region: env::var("CUBESTORE_S3_REGION").unwrap(),
+                            region: env::var("CUBESTORE_S3_REGION").expect(
+                                "CUBESTORE_S3_REGION required when CUBESTORE_S3_BUCKET is set",
+                            ),
                             sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
                         }
                     } else if let Ok(bucket_name) = env::var("CUBESTORE_GCS_BUCKET") {
