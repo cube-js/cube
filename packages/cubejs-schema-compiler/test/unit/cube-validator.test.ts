@@ -238,6 +238,30 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeTruthy();
   });
 
+  it('preAggregations deprecated fields', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => '',
+      fileName: 'fileName',
+      preAggregations: {
+        eventsByType: {
+          rollupReferences: () => '',
+          measures: () => '',
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+        expect(message).toContain('are deprecated, please, use');
+      }
+    });
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
   it('No errors', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {

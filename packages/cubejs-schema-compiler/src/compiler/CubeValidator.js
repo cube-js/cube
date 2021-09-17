@@ -205,6 +205,23 @@ const OriginalSqlSchema = condition(
 
 const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
 
+const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences', 'segmentReferences'];
+const NonReferencesFields = ['timeDimension', 'rollups', 'measures', 'dimensions', 'segments', 'segments'];
+
+function hasAnyField(fields, s) {
+  return !fields.every((f) => !defined(s[f]));
+}
+
+function errorOnMixing(schema) {
+  return condition(
+    (s) => hasAnyField(ReferencesFields, s) && hasAnyField(NonReferencesFields, s),
+    Joi.any().forbidden().error(
+      new Error(`[${ReferencesFields.join(', ')}] are deprecated, please, use [${NonReferencesFields.join(', ')}] instead`)
+    ),
+    schema
+  );
+}
+
 const RollUpJoinSchema = condition(
   (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensionReference),
   condition(
@@ -294,18 +311,20 @@ const RollUpSchema = condition(
 
 const PreAggregationsAlternatives = Joi.object().pattern(
   identifierRegex,
-  Joi.alternatives().conditional(
-    Joi.ref('.type'), [
-      { is: 'autoRollup', then: AutoRollupSchema },
-      { is: 'originalSql', then: OriginalSqlSchema },
-      { is: 'rollupJoin', then: RollUpJoinSchema },
-      { is: 'rollup',
-        then: RollUpSchema,
-        otherwise: Joi.object().keys({
-          type: Joi.string().valid('autoRollup', 'originalSql', 'rollupJoin', 'rollup').required()
-        })
-      }
-    ]
+  errorOnMixing(
+    Joi.alternatives().conditional(
+      Joi.ref('.type'), [
+        { is: 'autoRollup', then: AutoRollupSchema },
+        { is: 'originalSql', then: OriginalSqlSchema },
+        { is: 'rollupJoin', then: RollUpJoinSchema },
+        { is: 'rollup',
+          then: RollUpSchema,
+          otherwise: Joi.object().keys({
+            type: Joi.string().valid('autoRollup', 'originalSql', 'rollupJoin', 'rollup').required()
+          })
+        }
+      ]
+    )
   )
 );
 
