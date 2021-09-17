@@ -823,7 +823,7 @@ declare module '@cubejs-client/core' {
     name: string;
     title: string;
     shortTitle: string;
-    isVisible: boolean;
+    isVisible?: boolean;
   };
 
   export type BaseCubeMember = {
@@ -831,7 +831,7 @@ declare module '@cubejs-client/core' {
     name: string;
     title: string;
     shortTitle: string;
-    isVisible: boolean;
+    isVisible?: boolean;
   };
 
   export type TCubeMeasure = BaseCubeMember & {

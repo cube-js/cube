@@ -59,6 +59,10 @@ function filterMembersByKeys(
     });
 }
 
+function visibilityFilter({ isVisible }: CubeMember) {
+  return isVisible === undefined || isVisible;
+}
+
 type MemberDropdownProps = {
   availableCubes: AvailableCube<CubeMember>[];
   showNoMembersPlaceholder?: boolean;
@@ -77,7 +81,7 @@ export default function MemberMenu({
 
   const index = flexSearch.current;
   const hasMembers = availableCubes.some(
-    (cube) => cube.members.filter(({ isVisible }) => isVisible).length > 0
+    (cube) => cube.members.filter(visibilityFilter).length > 0
   );
 
   const indexedMembers = useDeepMemo(() => {
@@ -141,9 +145,7 @@ export default function MemberMenu({
               </SearchMenuItem>
 
               {members.map((cube) => {
-                const members = cube.members.filter(
-                  ({ isVisible }) => isVisible
-                );
+                const members = cube.members.filter(visibilityFilter);
 
                 if (!members.length) {
                   return null;
