@@ -17,12 +17,12 @@ These recipes will show you the best practices of using Cube.js.
 
 - [Role-Based Access](/recipes/role-based-access)
 - [Column-Based Access](/recipes/column-based-access)
-- [Column-Based Access](/recipes/column-based-access)
+- [Using Different Schemas for Tenants](/recipes/using-different-schemas-for-tenants)
 
 ### <--{"id" : "Recipes"}--> Data Sources
 
 - [Enable SSL Connections to the Database](/recipes/enable-ssl-connections-to-database)
-- [Using Different Schemas for Tenants](/recipes/using-different-schemas-for-tenants)
+- [Using Multiple Data Sources](/recipes/multiple-sources-same-schema)
 
 
 ### <--{"id" : "Recipes"}--> Data schema
