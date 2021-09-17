@@ -16,7 +16,7 @@ import { renameCategory } from '../rename-category';
 import 'katex/dist/katex.min.css';
 import '../../static/styles/math.scss'
 
-import FeedbackBlock from '../components/FeedbackBlock'
+import FeedbackBlock from '../components/FeedbackBlock';
 import ScrollLink, {
   SCROLL_OFFSET,
 } from '../components/templates/ScrollSpyLink';
@@ -37,36 +37,10 @@ import {
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
-
-const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
-const MyH3 = (props) => {
-  const startCommentIndex = props.children.indexOf('<--');
-  const endCommentIndex = props.children.indexOf('-->');
-  const isCustom = startCommentIndex !== -1 && endCommentIndex !== -1;
-
-  if (isCustom) {
-    const propsData = props.children?.slice(
-      startCommentIndex + 3,
-      endCommentIndex
-    );
-
-    if (propsData?.length) {
-      const jsonProps = JSON.parse(propsData);
-      const text = props.children.slice(endCommentIndex + 3);
-
-      return (
-        <h3
-          id={kebabCase(jsonProps?.id) + '-' + kebabCase(text)}
-          name={kebabCase(text)}
-          {...props}
-        >
-          {text}
-        </h3>
-      );
-    }
-  }
-  return <h3 name={kebabCase(props.children)} {...props} />;
-};
+import ScrollSpyH2 from '../components/Headers/ScrollSpyH2'
+import ScrollSpyH3 from '../components/Headers/ScrollSpyH3';
+import MyH2 from '../components/Headers/MyH2';
+import MyH3 from '../components/Headers/MyH3';
 
 const components = {
   DangerBox,
@@ -79,12 +53,17 @@ const components = {
   GitHubCodeBlock,
   CubeQueryResultSet,
   GitHubFolderLink,
-  h2: MyH2,
-  h3: MyH3,
+  h2: ScrollSpyH2,
+  h3: ScrollSpyH3,
 };
 
 const MDX = (props) => (
   <MDXProvider components={components}>
+    <MDXRenderer>{props?.data?.mdx?.body}</MDXRenderer>
+  </MDXProvider>
+);
+const MDXForSideMenu = (props) => (
+  <MDXProvider components={{ ...components, h2: MyH2, h3: MyH3 }}>
     <MDXRenderer>{props?.data?.mdx?.body}</MDXRenderer>
   </MDXProvider>
 );
@@ -142,7 +121,7 @@ class DocTemplate extends Component<Props, State> {
       noscrollmenu: false,
     });
     this.createAnchors(
-      <MDX {...this.props} />,
+      <MDXForSideMenu {...this.props} />,
       frontmatter.title,
       getGithubUrl(this.props.pageContext.fileAbsolutePath)
     );
