@@ -318,6 +318,7 @@ declare module '@cubejs-client/react' {
     timeDimensions: AvailableCube<TCubeDimension>[];
   };
 
+  // todo: CubeMember
   export type AvailableCube<T = any> = {
     cubeName: string;
     cubeTitle: string;

@@ -1,5 +1,5 @@
 import { AvailableCube, AvailableMembers } from '@cubejs-client/react';
-import { MemberType, TCubeMember } from '@cubejs-client/core';
+import { MemberType, BaseCubeMember } from '@cubejs-client/core';
 
 export function notEmpty<T>(value: T | null | undefined): value is T {
   return value != null;
@@ -10,7 +10,7 @@ export function ucfirst(s: string): string {
 }
 
 export function getNameMemberPairs(members: AvailableCube[]) {
-  const items: [memberName: string, member: TCubeMember & MemberType][] = [];
+  const items: [memberName: string, member: BaseCubeMember & MemberType][] = [];
 
   members.forEach((cube) =>
     cube.members.forEach((member) => {
@@ -24,10 +24,10 @@ export function getNameMemberPairs(members: AvailableCube[]) {
 export type MembersByCube = {
   cubeName: string;
   cubeTitle: string;
-  measures: TCubeMember[];
-  dimensions: TCubeMember[];
-  segments: TCubeMember[];
-  timeDimensions: TCubeMember[];
+  measures: BaseCubeMember[];
+  dimensions: BaseCubeMember[];
+  segments: BaseCubeMember[];
+  timeDimensions: BaseCubeMember[];
 };
 
 export function getMembersByCube(

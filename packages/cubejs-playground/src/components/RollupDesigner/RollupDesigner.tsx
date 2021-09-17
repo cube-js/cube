@@ -28,6 +28,7 @@ import { TimeDimension } from './components/TimeDimension';
 import { useRollupDesignerContext } from './Context';
 import {
   areReferencesEmpty,
+  buildSettings,
   getPreAggregationReferences,
   getRollupDefinitionFromReferences,
   PreAggregationReferences,
@@ -265,60 +266,6 @@ export function RollupDesigner({
     setSaving(false);
   }
 
-  function handleSettingsChange(values) {
-    const nextSettings: RollupSettings = {};
-
-    if (values['refreshKey.checked.every']) {
-      if (values['refreshKey.cron']) {
-        nextSettings.refreshKey = {
-          every: `\`${values['refreshKey.cron']}\``,
-        };
-      } else {
-        nextSettings.refreshKey = {
-          every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
-        };
-      }
-    }
-
-    if (values['refreshKey.checked.sql'] && values['refreshKey.sql']) {
-      nextSettings.refreshKey = {
-        ...nextSettings.refreshKey,
-        sql: `\`${values['refreshKey.sql']}\``,
-      };
-    }
-
-    if (values.partitionGranularity) {
-      nextSettings.partitionGranularity = `\`${values.partitionGranularity}\``;
-
-      if (values['updateWindow.value']) {
-        const value = [
-          values['updateWindow.value'],
-          values['updateWindow.granularity'],
-        ].join(' ');
-
-        nextSettings.refreshKey = {
-          ...nextSettings.refreshKey,
-          updateWindow: `\`${value}\``,
-        };
-      }
-
-      nextSettings.refreshKey = {
-        ...nextSettings.refreshKey,
-        incremental: values['incrementalRefresh'],
-      };
-    }
-
-    if (Array.isArray(values.indexes) && values.indexes.length > 0) {
-      nextSettings.indexes = {
-        indexName: {
-          columns: values.indexes,
-        },
-      };
-    }
-
-    setSettings(nextSettings);
-  }
-
   function handleMemberToggle(memberType) {
     return (key) => {
       setReferences(updateQuery(references, memberType, key) as any);
@@ -495,7 +442,7 @@ export function RollupDesigner({
                 .concat(references.dimensions)
                 .concat(references.timeDimensions.map((td) => td.dimension))}
               onCronExpressionValidityChange={setCronValidity}
-              onChange={handleSettingsChange}
+              onChange={(values) => setSettings(buildSettings(values))}
             />
           </TabPane>
         </Tabs>

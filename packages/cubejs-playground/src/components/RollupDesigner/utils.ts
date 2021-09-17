@@ -206,3 +206,68 @@ export function flatten(target: Object, opts: FlattenOptions = {}) {
 
   return output;
 }
+
+export function buildSettings(
+  values: Record<string, string | boolean | number>
+) {
+  const nextSettings: RollupSettings = {};
+
+  if (values['refreshKey.checked.every']) {
+    if (
+      values['refreshKey.isCron'] &&
+      (values['refreshKey.cron'] || values['refreshKey.timeZone'])
+    ) {
+      nextSettings.refreshKey = {};
+
+      if (values['refreshKey.cron']) {
+        nextSettings.refreshKey.every = `\`${values['refreshKey.cron']}\``;
+      }
+
+      if (values['refreshKey.timeZone']) {
+        nextSettings.refreshKey.timezone = `\`${values['refreshKey.timeZone']}\``;
+      }
+    } else {
+      nextSettings.refreshKey = {
+        every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
+      };
+    }
+  }
+
+  if (values['refreshKey.checked.sql'] && values['refreshKey.sql']) {
+    nextSettings.refreshKey = {
+      ...nextSettings.refreshKey,
+      sql: `\`${values['refreshKey.sql']}\``,
+    };
+  }
+
+  if (values.partitionGranularity) {
+    nextSettings.partitionGranularity = `\`${values.partitionGranularity}\``;
+
+    if (values['updateWindow.value']) {
+      const value = [
+        values['updateWindow.value'],
+        values['updateWindow.granularity'],
+      ].join(' ');
+
+      nextSettings.refreshKey = {
+        ...nextSettings.refreshKey,
+        updateWindow: `\`${value}\``,
+      };
+    }
+
+    nextSettings.refreshKey = {
+      ...nextSettings.refreshKey,
+      incremental: Boolean(values['incrementalRefresh']),
+    };
+  }
+
+  if (Array.isArray(values.indexes) && values.indexes.length > 0) {
+    nextSettings.indexes = {
+      indexName: {
+        columns: values.indexes,
+      },
+    };
+  }
+
+  return nextSettings;
+}

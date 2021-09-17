@@ -1,4 +1,4 @@
-import { TCubeMember } from '@cubejs-client/core';
+import { BaseCubeMember } from '@cubejs-client/core';
 import { Space, Typography } from 'antd';
 import styled from 'styled-components';
 
@@ -12,7 +12,7 @@ export const MemberType = styled(Typography.Paragraph)`
 
 type MembersProps = {
   title: string;
-  members: TCubeMember[];
+  members: Array<BaseCubeMember | undefined>;
   onRemove: (key: string) => void;
 };
 
@@ -22,13 +22,22 @@ export function Members({ title, members, onRemove }: MembersProps) {
       <MemberType>{title}</MemberType>
 
       <Space wrap>
-        {members.map((member) => (
-          <MemberTag
-            name={member.shortTitle}
-            cubeName={member.title.replace(member.shortTitle, '')}
-            onClose={() => onRemove(member.name)}
-          />
-        ))}
+        {members.map((member) => {
+          if (!member) {
+            console.warn(
+              `Rollup Designer received 'undefined' member as ${title}`
+            );
+            return null;
+          }
+
+          return (
+            <MemberTag
+              name={member.shortTitle}
+              cubeName={member.title.replace(member.shortTitle, '')}
+              onClose={() => onRemove(member.name)}
+            />
+          );
+        })}
       </Space>
     </>
   );

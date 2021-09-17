@@ -1,7 +1,6 @@
 import { QuestionCircleFilled } from '@ant-design/icons';
 import { GRANULARITIES, TimeDimensionGranularity } from '@cubejs-client/core';
 import {
-  Alert,
   Card,
   Checkbox,
   Col,
@@ -17,11 +16,12 @@ import {
   Typography,
 } from 'antd';
 import { isValidCron } from 'cron-validator';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 
-import { Box, Flex } from '../../../grid';
+import { Flex } from '../../../grid';
 import { ucfirst } from '../../../shared/helpers';
+import { timeZones } from '../../../shared/time-zones';
 import { flatten } from '../utils';
 
 const Wrapper = styled.div`
@@ -57,6 +57,7 @@ type RefreshKey = {
   incremental?: boolean;
   updateWindow?: string;
   sql?: string;
+  timezone?: string;
 };
 
 export type RollupSettings = {
@@ -71,7 +72,7 @@ type SettingsProps = {
   hasTimeDimension: boolean;
   members: string[];
   onCronExpressionValidityChange: (valid: boolean) => void;
-  onChange: (values: Record<string, string>) => void;
+  onChange: (values: Record<string, string | boolean>) => void;
 };
 
 export function Settings({
@@ -87,10 +88,12 @@ export function Settings({
         every: true,
         sql: false,
       },
+      isCron: false,
       sql: '',
       value: 1,
       granularity: 'hour',
       cron: '',
+      timeZone: undefined,
     },
     partitionGranularity: '',
     updateWindow: {
@@ -126,6 +129,21 @@ export function Settings({
   }, []);
 
   const [values, setValues] = useState<Record<string, string>>(flattenedValues);
+  const [isCron, toggleCron] = useState(false);
+
+  useEffect(() => {
+    onChange({ ...values, 'refreshKey.isCron': isCron });
+
+    if (!isCron && !isValidCron(values['refreshKey.cron'])) {
+      form.setFields([
+        {
+          name: 'refreshKey.cron',
+          value: '',
+          errors: [],
+        },
+      ]);
+    }
+  }, [isCron]);
 
   return (
     <Form
@@ -134,7 +152,7 @@ export function Settings({
       initialValues={flatten(initialValues)}
       onValuesChange={(values) => {
         setValues((prevValues) => {
-          onChange({ ...prevValues, ...values });
+          onChange({ ...prevValues, ...values, 'refreshKey.isCron': isCron });
 
           Object.keys(values).forEach((field) => {
             const error = form.getFieldError(field);
@@ -161,7 +179,12 @@ export function Settings({
             Specify how often to refresh your pre-aggregated data
           </TitleWithTooltip>
 
-          <Row gutter={8} wrap={false} align="middle">
+          <Typography.Paragraph>
+            If you do not specify any Refresh Key, refreshes will still default
+            to every 1 hour.
+          </Typography.Paragraph>
+
+          <Row gutter={8} wrap={false} align="top">
             <Col flex="85px">
               <Form.Item
                 name="refreshKey.checked.every"
@@ -172,60 +195,101 @@ export function Settings({
             </Col>
 
             <Col flex="auto">
-              <Flex alignItems="center" gap={2}>
-                <Form.Item name="refreshKey.value">
-                  <Input
+              <Flex direction="column" gap={2}>
+                <Space>
+                  <Radio
+                    checked={!isCron}
                     disabled={!values['refreshKey.checked.every']}
-                    type="number"
-                    min={0}
-                    style={{ maxWidth: 80 }}
+                    onClick={() => toggleCron(false)}
                   />
-                </Form.Item>
 
-                <Form.Item name="refreshKey.granularity">
-                  <GranularitySelect
-                    disabled={!values['refreshKey.checked.every']}
-                  />
-                </Form.Item>
-
-                <div style={{ marginBottom: 24 }}>
-                  <Typography.Text>or</Typography.Text>
-                </div>
-
-                <Box grow={1}>
-                  <Form.Item
-                    name="refreshKey.cron"
-                    rules={[
-                      {
-                        validator: (_, value, callback) => {
-                          if (value && !isValidCron(value, { seconds: true })) {
-                            onCronExpressionValidityChange(false);
-                            callback('Cron expression is invalid');
-                          } else {
-                            onCronExpressionValidityChange(true);
-                          }
-                        },
-                      },
-                    ]}
-                  >
+                  <Form.Item name="refreshKey.value" noStyle>
                     <Input
-                      allowClear
-                      placeholder="Cron Expression"
-                      disabled={!values['refreshKey.checked.every']}
+                      disabled={!values['refreshKey.checked.every'] || isCron}
+                      type="number"
+                      min={0}
+                      style={{ maxWidth: 80 }}
                     />
                   </Form.Item>
-                </Box>
+
+                  <Form.Item name="refreshKey.granularity" noStyle>
+                    <GranularitySelect
+                      disabled={!values['refreshKey.checked.every'] || isCron}
+                    />
+                  </Form.Item>
+                </Space>
+
+                <Space align="start" style={{ marginBottom: 32 }}>
+                  <Radio
+                    disabled={!values['refreshKey.checked.every']}
+                    checked={isCron}
+                    style={{ paddingTop: 5 }}
+                    onClick={() => toggleCron(true)}
+                  />
+
+                  <Flex direction="column" gap={1}>
+                    <Form.Item
+                      name="refreshKey.cron"
+                      rules={[
+                        {
+                          validator: (_, value, callback) => {
+                            if (
+                              value &&
+                              !isValidCron(value, { seconds: true })
+                            ) {
+                              onCronExpressionValidityChange(false);
+                              callback('Cron expression is invalid');
+                            } else {
+                              onCronExpressionValidityChange(true);
+                            }
+                          },
+                        },
+                      ]}
+                    >
+                      <Input
+                        allowClear
+                        placeholder="Cron expression e.g. 30 5 * * 5"
+                        disabled={
+                          !values['refreshKey.checked.every'] || !isCron
+                        }
+                      />
+                    </Form.Item>
+
+                    {isCron && values['refreshKey.checked.every'] ? (
+                      <>
+                        <Typography.Paragraph>
+                          <Typography.Link
+                            target="_blank"
+                            href="https://cube.dev/docs/schema/reference/cube#supported-cron-formats"
+                          >
+                            See how to format your cron expression
+                          </Typography.Link>
+                        </Typography.Paragraph>
+
+                        <Typography.Paragraph strong>
+                          Time Zone
+                        </Typography.Paragraph>
+
+                        <Form.Item name="refreshKey.timeZone" noStyle>
+                          <Select
+                            showSearch
+                            style={{ maxWidth: 200 }}
+                            placeholder="Select Time Zone"
+                          >
+                            {timeZones.map((name) => (
+                              <Select.Option key={name} value={name || ''}>
+                                {name}
+                              </Select.Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      </>
+                    ) : null}
+                  </Flex>
+                </Space>
               </Flex>
             </Col>
           </Row>
-
-          {!values['refreshKey.checked.every'] && (
-            <Alert
-              style={{ marginBottom: 24 }}
-              type="info"
-              message="Refresh key always defaults to every 1 hour"
-            />
-          )}
 
           <Row gutter={8}>
             <Col flex="85px">
