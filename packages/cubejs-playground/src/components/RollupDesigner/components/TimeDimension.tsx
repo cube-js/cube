@@ -1,4 +1,4 @@
-import { TCubeMember, TimeDimensionGranularity } from '@cubejs-client/core';
+import { BaseCubeMember, TimeDimensionGranularity } from '@cubejs-client/core';
 import { Space } from 'antd';
 
 import { MemberType } from './Members';
@@ -6,7 +6,7 @@ import { MemberTag } from './MemberTag';
 import { GranularitySelect } from './Settings';
 
 type TimeDimensionProps = {
-  member: TCubeMember | undefined;
+  member: BaseCubeMember | undefined;
   granularity?: TimeDimensionGranularity;
   onGranularityChange: (
     granularity: TimeDimensionGranularity | undefined

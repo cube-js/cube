@@ -3,7 +3,7 @@ import { AvailableCube } from '@cubejs-client/react';
 import { ButtonProps, Input, Menu as AntdMenu } from 'antd';
 import styled from 'styled-components';
 import FlexSearch from 'flexsearch';
-import { CubeMember, TCubeMember } from '@cubejs-client/core';
+import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
 import useDeepMemo from '../hooks/deep-memo';
@@ -62,7 +62,7 @@ function filterMembersByKeys(
 type MemberDropdownProps = {
   availableCubes: AvailableCube<CubeMember>[];
   showNoMembersPlaceholder?: boolean;
-  onClick: (member: TCubeMember) => void;
+  onClick: (member: BaseCubeMember) => void;
 } & ButtonProps;
 
 export default function MemberMenu({

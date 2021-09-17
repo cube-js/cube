@@ -1,4 +1,4 @@
-import { TCubeMember } from '@cubejs-client/core';
+import { BaseCubeMember } from '@cubejs-client/core';
 import { Space, Typography } from 'antd';
 import styled from 'styled-components';
 
@@ -12,7 +12,7 @@ export const MemberType = styled(Typography.Paragraph)`
 
 type MembersProps = {
   title: string;
-  members: Array<TCubeMember | undefined>;
+  members: Array<BaseCubeMember | undefined>;
   onRemove: (key: string) => void;
 };
 
