@@ -1,12 +1,6 @@
 cube(`Products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
   
-  measures: {
-    count: {
-      type: `count`,
-    }
-  },
-  
   dimensions: {
     id: {
       sql: `id`,
