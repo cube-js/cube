@@ -1,10 +1,3 @@
-import { RefObject, useEffect, useRef, useState } from 'react';
-import { Col, Row } from 'antd';
-import {
-  QueryBuilder,
-  SchemaChangeProps,
-  VizState,
-} from '@cubejs-client/react';
 import {
   areQueriesEqual,
   ChartType,
@@ -13,31 +6,38 @@ import {
   Query,
   TransformedQuery,
 } from '@cubejs-client/core';
+import {
+  QueryBuilder,
+  SchemaChangeProps,
+  VizState,
+} from '@cubejs-client/react';
+import { Col, Row } from 'antd';
+import { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { playgroundAction } from '../../../events';
-import MemberGroup from '../../../QueryBuilder/MemberGroup';
-import FilterGroup from '../../../QueryBuilder/FilterGroup';
-import TimeGroup from '../../../QueryBuilder/TimeGroup';
-import SelectChartType from '../../../QueryBuilder/SelectChartType';
-import Settings from '../../../components/Settings/Settings';
-import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
-import { SectionHeader, SectionRow } from '../../../components';
+import { Card, FatalError } from '../../../atoms';
 import ChartContainer from '../../../ChartContainer';
-import { dispatchPlaygroundEvent } from '../../../utils';
+import { SectionHeader, SectionRow } from '../../../components';
+import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
+import Settings from '../../../components/Settings/Settings';
+import DashboardSource from '../../../DashboardSource';
+import { playgroundAction } from '../../../events';
 import {
   useDeepEffect,
   useIsMounted,
   useSecurityContext,
 } from '../../../hooks';
-import { Card, FatalError } from '../../../atoms';
+import FilterGroup from '../../../QueryBuilder/FilterGroup';
+import MemberGroup from '../../../QueryBuilder/MemberGroup';
+import SelectChartType from '../../../QueryBuilder/SelectChartType';
+import TimeGroup from '../../../QueryBuilder/TimeGroup';
 import { UIFramework } from '../../../types';
+import { dispatchPlaygroundEvent } from '../../../utils';
 import {
   useChartRendererState,
   useChartRendererStateMethods,
 } from '../../QueryTabs/ChartRendererStateProvider';
 import { PreAggregationStatus } from './PreAggregationStatus';
-import DashboardSource from '../../../DashboardSource';
 
 const Section = styled.div`
   display: flex;
@@ -152,7 +152,7 @@ function QueryChangeEmitter({
       onChange();
     }
   }, [query1, query2]);
-  
+
   return null;
 }
 

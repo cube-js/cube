@@ -133,6 +133,16 @@ export function Settings({
 
   useEffect(() => {
     onChange({ ...values, 'refreshKey.isCron': isCron });
+
+    if (!isCron && !isValidCron(values['refreshKey.cron'])) {
+      form.setFields([
+        {
+          name: 'refreshKey.cron',
+          value: '',
+          errors: [],
+        },
+      ]);
+    }
   }, [isCron]);
 
   return (
@@ -195,7 +205,7 @@ export function Settings({
 
                   <Form.Item name="refreshKey.value" noStyle>
                     <Input
-                      disabled={!values['refreshKey.checked.every']}
+                      disabled={!values['refreshKey.checked.every'] || isCron}
                       type="number"
                       min={0}
                       style={{ maxWidth: 80 }}
@@ -204,7 +214,7 @@ export function Settings({
 
                   <Form.Item name="refreshKey.granularity" noStyle>
                     <GranularitySelect
-                      disabled={!values['refreshKey.checked.every']}
+                      disabled={!values['refreshKey.checked.every'] || isCron}
                     />
                   </Form.Item>
                 </Space>
@@ -239,7 +249,9 @@ export function Settings({
                       <Input
                         allowClear
                         placeholder="Cron expression e.g. 30 5 * * 5"
-                        disabled={!values['refreshKey.checked.every']}
+                        disabled={
+                          !values['refreshKey.checked.every'] || !isCron
+                        }
                       />
                     </Form.Item>
 

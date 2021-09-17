@@ -148,7 +148,7 @@ declare module '@cubejs-client/core' {
   type UsedPreAggregation = {
     targetTableName: string;
     type: PreAggregationType;
-  }
+  };
 
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
@@ -714,11 +714,11 @@ declare module '@cubejs-client/core' {
 
   export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
   type LogicalAndFilter = {
-    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[]
+    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[];
   };
 
   type LogicalOrFilter = {
-    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[]
+    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[];
   };
 
   type BinaryFilter = {
@@ -816,14 +816,25 @@ declare module '@cubejs-client/core' {
 
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
+  // @see BaseCubeMember
+  // @depreacated
   export type TCubeMember = {
     type: TCubeMemberType;
     name: string;
     title: string;
     shortTitle: string;
+    isVisible: boolean;
   };
 
-  export type TCubeMeasure = TCubeMember & {
+  export type BaseCubeMember = {
+    type: TCubeMemberType;
+    name: string;
+    title: string;
+    shortTitle: string;
+    isVisible: boolean;
+  };
+
+  export type TCubeMeasure = BaseCubeMember & {
     aggType: 'count' | 'number';
     cumulative: boolean;
     cumulativeTotal: boolean;
@@ -834,11 +845,11 @@ declare module '@cubejs-client/core' {
     };
   };
 
-  export type TCubeDimension = TCubeMember & {
+  export type TCubeDimension = BaseCubeMember & {
     suggestFilterValues: boolean;
   };
 
-  export type TCubeSegment = Pick<TCubeMember, 'name' | 'shortTitle' | 'title'>;
+  export type TCubeSegment = Omit<BaseCubeMember, 'type'>;
 
   type TCubeMemberByType<T> = T extends 'measures'
     ? TCubeMeasure
@@ -848,6 +859,8 @@ declare module '@cubejs-client/core' {
     ? TCubeSegment
     : never;
 
+  export type CubeMember = TCubeMeasure | TCubeDimension | TCubeSegment;
+
   /**
    * @deprecated use DryRunResponse
    */
@@ -856,7 +869,7 @@ declare module '@cubejs-client/core' {
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
-    transformedQueries: TransformedQuery[]
+    transformedQueries: TransformedQuery[];
   };
 
   export type DryRunResponse = {
