@@ -95,7 +95,7 @@ combinedRollup: {
   dimensions: [Suppliers.email, Suppliers.company, CUBE.name],
   rollups: [Suppliers.suppliersRollup, CUBE.productsRollup],
   external: true,
-},
+}
 ```
 
 ## Query
