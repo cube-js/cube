@@ -12,25 +12,17 @@ cube(`Orders`, {
   `,
   measures: {
     count: {
-      type: `count`
+      type: `count`,
     },
     totalAmount: {
       sql: `amount`,
-      type: `sum`
-    }
+      type: `sum`,
+    },
   },
   dimensions: {
     status: {
       sql: `status`,
-      type: `string`
-    }
+      type: `string`,
+    },
   },
-  preAggregations: {
-    main: {
-      measures: [Orders.count],
-      refreshKey: {
-        every: `3 day`
-      }
-    }
-  }
 });
