@@ -127,7 +127,7 @@ function QueryTabsRenderer({
           </Button>
 
           <Button
-            data-testid="rollup-designer-btn"
+            data-testid="rd-btn"
             icon={<ThunderboltOutlined />}
             size="small"
             onClick={() => toggleModal()}

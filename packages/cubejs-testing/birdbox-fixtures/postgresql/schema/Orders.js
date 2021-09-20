@@ -10,22 +10,27 @@ cube(`Orders`, {
   UNION ALL
   select 5 as id, 600 as amount, 'shipped' status
   `,
-
   measures: {
     count: {
       type: `count`
     },
-
     totalAmount: {
       sql: `amount`,
       type: `sum`
     }
   },
-
   dimensions: {
     status: {
       sql: `status`,
       type: `string`
+    }
+  },
+  preAggregations: {
+    main: {
+      measures: [Orders.count],
+      refreshKey: {
+        every: `3 day`
+      }
     }
   }
 });

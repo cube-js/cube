@@ -25,7 +25,7 @@ export function RollupDesignerModal({
       visible={isModalOpen}
       bodyStyle={{ padding: 0 }}
       destroyOnClose
-      wrapClassName="rollup-designer"
+      wrapClassName="rd"
       footer={
         <Link
           href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
@@ -48,10 +48,12 @@ export function RollupDesignerModal({
       afterClose={onAfterClose}
       onCancel={() => toggleModal()}
     >
-      <RollupDesigner
-        apiUrl={props.apiUrl}
-        memberTypeCubeMap={memberTypeCubeMap}
-      />
+      <div data-testid="rd-modal">
+        <RollupDesigner
+          apiUrl={props.apiUrl}
+          memberTypeCubeMap={memberTypeCubeMap}
+        />
+      </div>
     </Modal>
   );
 }

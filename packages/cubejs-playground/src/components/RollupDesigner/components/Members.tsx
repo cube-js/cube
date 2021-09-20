@@ -33,7 +33,7 @@ export function Members({ title, members, onRemove }: MembersProps) {
           return (
             <MemberTag
               name={member.shortTitle}
-              cubeName={member.title.replace(member.shortTitle, '')}
+              cubeName={member.title.replace(member.shortTitle, '').trim()}
               onClose={() => onRemove(member.name)}
             />
           );

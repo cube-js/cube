@@ -57,7 +57,11 @@ export function PreAggregationStatus({
             Query was accelerated with pre-aggregation
           </Typography.Text>
         ) : isVersionGte ? (
-          <Button type="link" onClick={() => toggleModal()}>
+          <Button
+            data-testid="not-pre-agg-query-btn"
+            type="link"
+            onClick={() => toggleModal()}
+          >
             Query was not accelerated with pre-aggregation {'->'}
           </Button>
         ) : null}
