@@ -392,17 +392,16 @@ export default {
     this.copyQueryFromProps();
 
     if (isQueryPresent(this.initialQuery)) {
-      await this.cubejsApi
-        .dryRun(this.initialQuery)
-        .then((dryRunResponse) => {
-          this.pivotConfig = ResultSet.getNormalizedPivotConfig(
+      try {
+        const dryRunResponse = await this.cubejsApi.dryRun(this.initialQuery);
+
+        this.pivotConfig = ResultSet.getNormalizedPivotConfig(
             dryRunResponse?.pivotQuery || {},
             this.pivotConfig
-          );
-        })
-        .catch((error) => {
-          console.error(error);
-        });
+        );
+      } catch (error) {
+          console.error(error)
+      }
     }
   },
 
