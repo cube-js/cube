@@ -282,7 +282,7 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          DOCKER_IMAGE=cubejs/cube
+          DOCKER_IMAGE=cubejs/cubestore
           VERSION=noop
           if [ "${{ github.event_name }}" = "schedule" ]; then
             VERSION=nightly
