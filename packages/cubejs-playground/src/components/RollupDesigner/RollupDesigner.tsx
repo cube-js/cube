@@ -117,8 +117,6 @@ export function RollupDesigner({
 
   const { order, limit, filters, ...matchedQuery } = query || {};
 
-  console.log('matched', matchedQuery);
-
   const [timeDimension] = matchedQuery.timeDimensions || [];
 
   // There's nothing we can do to for a rollup to match such query
