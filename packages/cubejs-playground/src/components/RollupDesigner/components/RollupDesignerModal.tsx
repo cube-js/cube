@@ -48,10 +48,12 @@ export function RollupDesignerModal({
       afterClose={onAfterClose}
       onCancel={() => toggleModal()}
     >
-      <RollupDesigner
-        apiUrl={props.apiUrl}
-        memberTypeCubeMap={memberTypeCubeMap}
-      />
+      <div data-testid="rd-modal">
+        <RollupDesigner
+          apiUrl={props.apiUrl}
+          memberTypeCubeMap={memberTypeCubeMap}
+        />
+      </div>
     </Modal>
   );
 }

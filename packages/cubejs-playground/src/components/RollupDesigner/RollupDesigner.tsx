@@ -309,6 +309,7 @@ export function RollupDesigner({
 
         {cubeName ? (
           <Button
+            data-testid="rd-add-btn"
             type="primary"
             loading={saving}
             disabled={!isCronValid}
@@ -353,7 +354,10 @@ export function RollupDesigner({
     <Flex justifyContent="space-between" margin={[0, 0, 2, 0]}>
       <MainBox grow={1}>
         <Tabs style={{ minHeight: '100%' }}>
-          <TabPane tab="Members" key="members">
+          <TabPane
+            tab={<span data-testid="rd-members-tab">Members</span>}
+            key="members"
+          >
             <Flex gap={2}>
               <Box style={{ minWidth: 256 }}>
                 <Cubes
@@ -435,7 +439,10 @@ export function RollupDesigner({
             </Flex>
           </TabPane>
 
-          <TabPane tab="Settings" key="settings">
+          <TabPane
+            tab={<span data-testid="rd-settings-tab">Settings</span>}
+            key="settings"
+          >
             <Settings
               hasTimeDimension={references.timeDimensions.length > 0}
               members={references.measures
@@ -450,7 +457,10 @@ export function RollupDesigner({
 
       <RollupQueryBox>
         <Tabs>
-          <TabPane tab="Rollup Definition" key="rollup">
+          <TabPane
+            tab={<span data-testid="rd-definition-tab">Rollup Definition</span>}
+            key="rollup"
+          >
             <Flex direction="column" justifyContent="flex-start">
               {!areReferencesEmpty(references) &&
                 !references.timeDimensions.length && (
@@ -493,9 +503,9 @@ export function RollupDesigner({
             <TabPane
               tab={
                 canBeRolledUp && matching ? (
-                  'Query Compatibility'
+                  <span data-testid="rd-query-tab">Query Compatibility</span>
                 ) : (
-                  <Typography.Text>
+                  <Typography.Text data-testid="rd-query-tab">
                     Query Compatibility
                     <WarningFilled style={{ color: '#FBBC05' }} />
                   </Typography.Text>
@@ -510,6 +520,7 @@ export function RollupDesigner({
                   ) : (
                     <Space direction="vertical">
                       <Alert
+                        data-testid="rd-incompatible-query"
                         type="warning"
                         message={
                           <Text>
@@ -521,6 +532,7 @@ export function RollupDesigner({
 
                       {!hideMatchRollupButton && (
                         <Button
+                          data-testid="rd-match-rollup-btn"
                           type="primary"
                           ghost
                           onClick={() => {

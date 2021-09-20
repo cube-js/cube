@@ -112,7 +112,8 @@ class ChartContainer extends Component<
       props.iframeRef.current != null &&
       props.chartingLibrary
     ) {
-      const { __cubejsPlayground } = props.iframeRef.current.contentWindow;
+      const { __cubejsPlayground } =
+        props.iframeRef.current.contentWindow || {};
 
       if (!__cubejsPlayground) {
         return {

@@ -205,6 +205,7 @@ export function Settings({
 
                   <Form.Item name="refreshKey.value" noStyle>
                     <Input
+                      data-testid="rd-input-every"
                       disabled={!values['refreshKey.checked.every'] || isCron}
                       type="number"
                       min={0}
@@ -214,6 +215,7 @@ export function Settings({
 
                   <Form.Item name="refreshKey.granularity" noStyle>
                     <GranularitySelect
+                      data-testid="rd-select-every-granularity"
                       disabled={!values['refreshKey.checked.every'] || isCron}
                     />
                   </Form.Item>
