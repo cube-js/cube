@@ -330,6 +330,7 @@ impl<'a> RowParquetReader<'a> {
                                     if levels[i] == 1 {
                                         let value = buffer[cur_value_index].as_bytes();
                                         result.set_interned(i, col_i, TableValueR::Bytes(value));
+                                        cur_value_index += 1;
                                     } else {
                                         result.set_interned(i, col_i, TableValueR::Null);
                                     }
@@ -1173,6 +1174,38 @@ mod tests {
             }
         }
         check_bools(&bools);
+    }
+
+    #[test]
+    fn read_bytes() {
+        const NUM_ROWS: usize = 8;
+        let index = Index::try_new(
+            "index".into(),
+            0,
+            vec![
+                Column::new("id".into(), ColumnType::Int, 0),
+                Column::new("bytes".into(), ColumnType::Bytes, 1),
+            ],
+            1,
+        )
+        .unwrap();
+
+        let file = NamedTempFile::new().unwrap();
+        let file = file.path().to_str().unwrap();
+        let rows = vec![
+            TableValueR::Int(1),
+            TableValueR::Bytes(&[1, 2, 3]),
+            TableValueR::Int(2),
+            TableValueR::Bytes(&[5, 6, 7]),
+        ];
+
+        let mut w = RowParquetWriter::open(&index, file, NUM_ROWS).unwrap();
+        w.write_rows(RowsView::new(&rows, 2)).unwrap();
+        w.close().unwrap();
+
+        let s = ParquetTableStore::new(index, NUM_ROWS);
+        let r = s.read_rows(file).unwrap();
+        assert_eq!(r.all_values(), rows);
     }
 
     #[bench]
