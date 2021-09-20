@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import Helmet from 'react-helmet';
 import { Row, Col } from 'antd';
 
+import { InfoBox } from '../components/AlertBox/AlertBox';
 import MainTab from '../components/templates/MainTab';
 
 import imgGettingStarted from './images/getting-started.svg';
@@ -28,6 +29,15 @@ class IndexPage extends Component<Props> {
       <div className={styles.docContent}>
         <Helmet title="Main | Cube.js Docs" />
         <h1>Documentation</h1>
+
+        <InfoBox >
+
+        The Cube multitenancy workshop is on October 27th at 9-10:30 am PST! If you want to learn why you need multitenancy, how to get started, recipes and more, you will want to attend this event 😀
+        <br />
+        You can register for the workshop at <a href="https://cube.dev/events/multitenancy/">the event page</a>.
+
+        </InfoBox>
+
         <Row>
           <Col span={24}>
             <p>
