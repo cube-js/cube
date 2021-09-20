@@ -205,8 +205,8 @@ const OriginalSqlSchema = condition(
 
 const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
 
-const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences', 'segmentReferences'];
-const NonReferencesFields = ['timeDimension', 'rollups', 'measures', 'dimensions', 'segments', 'segments'];
+const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
+const NonReferencesFields = ['timeDimension', 'rollups', 'measures', 'dimensions', 'segments'];
 
 function hasAnyField(fields, s) {
   return !fields.every((f) => !defined(s[f]));
@@ -466,6 +466,38 @@ function formatErrorMessage(error) {
   }
 
   return message.replace(/ = undefined\) is required/g, ') is required');
+}
+
+function collectFunctionFieldsPatterns(patterns, path, o) {
+  let key = o?.id || o?.key || ((o?.patterns?.length || 0) > 0 ? '*' : undefined);
+  if (o?.schema?.type === 'array' && key && typeof key === 'string') {
+    key = `${key}.0`;
+  }
+
+  // eslint-disable-next-line no-nested-ternary
+  const newPath = key && typeof key === 'string' ? (path.length > 0 ? `${path}.${key}` : key) : path;
+
+  if (o?.schema?.type === 'function') {
+    patterns.add(newPath);
+    return;
+  }
+
+  if (Array.isArray(o)) {
+    o.forEach((v) => collectFunctionFieldsPatterns(patterns, newPath, v));
+  } else if (o instanceof Map) {
+    o.forEach((v, k) => collectFunctionFieldsPatterns(patterns, newPath, v));
+  } else if (o === Object(o)) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const k in o) {
+      if (k !== '$_root') collectFunctionFieldsPatterns(patterns, newPath, o[k]);
+    }
+  }
+}
+
+export function functionFieldsPatterns() {
+  const functionPatterns = new Set();
+  collectFunctionFieldsPatterns(functionPatterns, '', cubeSchema);
+  return Array.from(functionPatterns);
 }
 
 export class CubeValidator {
