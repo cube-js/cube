@@ -15,10 +15,22 @@ let transformPatterns: Array<RegExp> | null = [
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillMemberReferences|drillMembers)$/,
   /^preAggregations\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
   /^preAggregations\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,
-];
+]; // */
+
+const transpiledFields: Set<String> = new Set<String>();
+
+function initTranspiledFields() {
+  transpiledFields.clear();
+  transformPatterns?.forEach((r) => {
+    const fields = r.toString().replace(/.*?([_a-zA-Z|][_a-zA-Z0-9|]*)([^_a-zA-Z0-9|]*)$/, '$1').split('|');
+    fields.forEach((f) => transpiledFields.add(f));
+  });
+}
+
+initTranspiledFields();
 
 function getTransformPatterns() {
-  if (transformPatterns === null) {
+  if (!transformPatterns) {
     transformPatterns = functionFieldsPatterns()
       .filter((p) => p.indexOf('extends') < 0 && p.indexOf('allDefinitions') < 0)
       .map((p) => {
@@ -26,6 +38,8 @@ function getTransformPatterns() {
         return RegExp(`^${p}$`);
       });
     transformPatterns.push(/^contextMembers$/);
+    transformPatterns.push(/\.sql$/);
+    initTranspiledFields();
   }
   return transformPatterns;
 }
@@ -83,7 +97,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
     return {
       ObjectProperty: (path) => {
-        if (path.node.key.type === 'Identifier') {
+        if (path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) {
           const fullPath = this.fullPath(path);
           for (let i = 0; i < patterns.length; i++) {
             const p = patterns[i];
