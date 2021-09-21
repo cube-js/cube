@@ -26,7 +26,6 @@ option:
   lang="js"
 />
 
-
 ## Data schema
 
 First, we'll define
@@ -83,9 +82,8 @@ email, with the following query:
 We'll get the data from two pre-aggregations joined into one `rollupJoin`:
 
 <CubeQueryResultSet
-  api="https://amber-bear.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
-  token=""
-  query={{
+api="https://amber-bear.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1" token=""
+query={{
     "order": {
       "Products.name": "asc"
     },
@@ -95,8 +93,7 @@ We'll get the data from two pre-aggregations joined into one `rollupJoin`:
       "Suppliers.email"
     ],
     "limit": 3
-}}
-/>
+}} />
 
 ```javascript
 // Names of the used pre-aggregations
@@ -113,9 +110,9 @@ We'll get the data from two pre-aggregations joined into one `rollupJoin`:
 
 ## Source code
 
-Please feel free to check out the full source code
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.
+Please feel free to check out the full source code or run it with the
+`docker-compose up` command. You'll see the result, including queried data, in
+the console.
 
 <GitHubFolderLink
   href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/joining-multiple-datasources-data"
