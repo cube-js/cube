@@ -22,7 +22,7 @@ const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 const standardGranularitiesParents = {
   year: 'month',
   quarter: 'month',
-  month: 'day',
+  month: 'week',
   week: 'day',
   day: 'hour',
   hour: 'minute',

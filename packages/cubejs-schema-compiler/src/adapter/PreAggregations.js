@@ -241,6 +241,7 @@ export class PreAggregations {
       .reduce((a, b) => query.minGranularity(a, b), null);
     const granularityHierarchies = query.granularityHierarchies();
     const hasMultipliedMeasures = query.fullKeyQueryAggregateMeasures().multipliedMeasures.length > 0;
+    const filtersEqualsSingleValue = R.all(f => f.operator === 'equals' && f.values.length === 1, query.filters);
 
     return {
       sortedDimensions,
@@ -254,7 +255,8 @@ export class PreAggregations {
       granularityHierarchies,
       hasMultipliedMeasures,
       hasCumulativeMeasures,
-      windowGranularity
+      windowGranularity,
+      filtersEqualsSingleValue
     };
   }
 
@@ -323,7 +325,7 @@ export class PreAggregations {
     };
 
     const canUsePreAggregationNotAdditive = (references) => transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
-      transformedQuery.allFiltersWithinSelectedDimensions &&
+      (transformedQuery.allFiltersWithinSelectedDimensions || transformedQuery.filtersEqualsSingleValue) &&
       R.equals(references.sortedDimensions || references.dimensions, transformedQuery.sortedDimensions) &&
       (
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
