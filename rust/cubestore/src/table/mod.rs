@@ -1,8 +1,15 @@
-use crate::table::data::{Rows, RowsView};
 use crate::util::decimal::Decimal;
 use crate::util::ordfloat::OrdF64;
-use crate::CubeError;
+
+use arrow::array::{
+    Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
+    Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
+    Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
+};
+use arrow::datatypes::{DataType, TimeUnit};
+
 use chrono::{SecondsFormat, TimeZone, Utc};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
@@ -10,6 +17,7 @@ use std::fmt::{Debug, Formatter};
 
 pub mod data;
 pub(crate) mod parquet;
+pub mod redistribute;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub enum TableValue {
@@ -21,6 +29,107 @@ pub enum TableValue {
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
     Boolean(bool),
+}
+
+impl TableValue {
+    pub fn from_columns(a: &[ArrayRef], row: usize) -> Vec<TableValue> {
+        a.iter()
+            .map(|c| TableValue::from_array(c.as_ref(), row))
+            .collect_vec()
+    }
+
+    pub fn from_array(a: &dyn Array, row: usize) -> TableValue {
+        if !a.is_valid(row) {
+            return TableValue::Null;
+        }
+        match a.data_type() {
+            DataType::Int64 => {
+                TableValue::Int(a.as_any().downcast_ref::<Int64Array>().unwrap().value(row))
+            }
+            DataType::Utf8 => TableValue::String(
+                a.as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap()
+                    .value(row)
+                    .to_string(),
+            ),
+            DataType::Binary => TableValue::Bytes(
+                a.as_any()
+                    .downcast_ref::<BinaryArray>()
+                    .unwrap()
+                    .value(row)
+                    .to_vec(),
+            ),
+            DataType::Int64Decimal(0) => TableValue::Decimal(Decimal::new(
+                a.as_any()
+                    .downcast_ref::<Int64Decimal0Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int64Decimal(1) => TableValue::Decimal(Decimal::new(
+                a.as_any()
+                    .downcast_ref::<Int64Decimal1Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int64Decimal(2) => TableValue::Decimal(Decimal::new(
+                a.as_any()
+                    .downcast_ref::<Int64Decimal2Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int64Decimal(3) => TableValue::Decimal(Decimal::new(
+                a.as_any()
+                    .downcast_ref::<Int64Decimal3Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int64Decimal(4) => TableValue::Decimal(Decimal::new(
+                a.as_any()
+                    .downcast_ref::<Int64Decimal4Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int64Decimal(5) => TableValue::Decimal(Decimal::new(
+                a.as_any()
+                    .downcast_ref::<Int64Decimal5Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int64Decimal(10) => TableValue::Decimal(Decimal::new(
+                a.as_any()
+                    .downcast_ref::<Int64Decimal10Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Float64 => TableValue::Float(
+                a.as_any()
+                    .downcast_ref::<Float64Array>()
+                    .unwrap()
+                    .value(row)
+                    .into(),
+            ),
+            DataType::Timestamp(TimeUnit::Microsecond, None) => {
+                TableValue::Timestamp(TimestampValue::new(
+                    1000 * a
+                        .as_any()
+                        .downcast_ref::<TimestampMicrosecondArray>()
+                        .unwrap()
+                        .value(row),
+                ))
+            }
+            DataType::Boolean => TableValue::Boolean(
+                a.as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap()
+                    .value(row),
+            ),
+            other => panic!(
+                "unexpected array type when converting to TableValue: {:?}",
+                other
+            ),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -143,32 +252,6 @@ impl<'a> Ord for RowSortKey<'a> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
     }
-}
-
-pub trait TableStore {
-    fn merge_rows<'a>(
-        &'a self,
-        source_file: Option<&'a str>,
-        dest_files: Vec<String>,
-        rows: RowsView<'a>,
-        sort_key_size: usize,
-    ) -> Result<Vec<(u64, (Row, Row))>, CubeError>;
-
-    fn read_rows(&self, file: &str) -> Result<Rows, CubeError>;
-
-    fn read_filtered_rows(
-        &self,
-        file: &str,
-        columns: &Vec<crate::metastore::Column>,
-        limit: usize,
-    ) -> Result<Rows, CubeError>;
-
-    // fn scan_node(
-    //     &self,
-    //     file: &str,
-    //     columns: &Vec<Column>,
-    //     row_group_filter: Option<Arc<dyn Fn(&RowGroupMetaData) -> bool + Send + Sync>>,
-    // ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError>;
 }
 
 #[cfg(test)]

@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use arrow::array::*;
+use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -11,6 +13,7 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
+use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
@@ -22,6 +25,9 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
+use tempfile::TempDir;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::time::timeout;
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
@@ -44,8 +50,7 @@ use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
-use crate::table::data::{MutRows, Rows, TableValueR};
-use crate::table::{Row, TableValue, TimestampValue};
+use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -54,11 +59,7 @@ use crate::{
     metastore::{Column, ColumnType, MetaStore},
     store::DataFrame,
 };
-use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
-use datafusion::cube_ext;
-use tempfile::TempDir;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use data::create_array_builder;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -306,7 +307,7 @@ impl SqlServiceImpl {
                 item
             } else {
                 return Err(CubeError::user(format!(
-                    "Column {} does noot present in table {}.{}.",
+                    "Column {} is not present in table {}.{}.",
                     column.value, schema_name, table_name
                 )));
             };
@@ -785,19 +786,35 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
     Ok(rolupdb_columns)
 }
 
-fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Rows, CubeError> {
+fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRef>, CubeError> {
     let mut buffer = Vec::new();
-    let mut res = MutRows::new(column.len());
+    let mut builders = column
+        .iter()
+        .map(|c| create_array_builder(c.get_column_type()))
+        .collect_vec();
     for r in chunk {
-        let mut row = res.add_row();
         for i in 0..r.len() {
-            row.set_interned(
-                column[i].get_index(),
-                extract_data(&r[i], column, i, &mut buffer)?,
-            );
+            extract_data(&r[i], &column[i], &mut buffer, builders[i].as_mut())?;
         }
     }
-    Ok(res.freeze())
+    let mut order = (0..column.len()).collect_vec();
+    order.sort_unstable_by_key(|i| column[*i].get_index());
+
+    let mut arrays = Vec::with_capacity(builders.len());
+    for i in order {
+        let b = &mut builders[i];
+        let a = b.finish();
+        assert_eq!(
+            a.len(),
+            chunk.len(),
+            "invalid number of rows: {} in array vs {} in input data. array: {:?}",
+            a.len(),
+            chunk.len(),
+            a
+        );
+        arrays.push(a);
+    }
+    Ok(arrays)
 }
 
 fn decode_byte(s: &str) -> Option<u8> {
@@ -881,78 +898,160 @@ fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a 
 
 fn extract_data<'a>(
     cell: &'a Expr,
-    column: &Vec<&Column>,
-    i: usize,
+    column: &Column,
     buffer: &'a mut Vec<u8>,
-) -> Result<TableValueR<'a>, CubeError> {
-    if let Expr::Value(Value::Null) = cell {
-        return Ok(TableValueR::Null);
-    }
-    let res = {
-        match column[i].get_column_type() {
-            ColumnType::String => {
-                let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
-                    v
-                } else {
-                    return Err(CubeError::user(format!(
-                        "Single quoted string is expected but {:?} found",
-                        cell
-                    )));
-                };
-                TableValueR::String(&val)
+    builder: &mut dyn ArrayBuilder,
+) -> Result<(), CubeError> {
+    let is_null = match cell {
+        Expr::Value(Value::Null) => true,
+        _ => false,
+    };
+    match column.get_column_type() {
+        ColumnType::String => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<StringBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
             }
-            ColumnType::Int => {
-                let val_int = match cell {
-                    Expr::Value(Value::Number(v, _))
-                    | Expr::Value(Value::SingleQuotedString(v)) => v.parse::<i64>(),
-                    Expr::UnaryOp {
-                        op: UnaryOperator::Minus,
-                        expr,
-                    } => {
-                        if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
-                            v.parse::<i64>().map(|v| v * -1)
-                        } else {
-                            return Err(CubeError::user(format!(
-                                "Can't parse int from, {:?}",
-                                cell
-                            )));
-                        }
-                    }
-                    _ => return Err(CubeError::user(format!("Can't parse int from, {:?}", cell))),
-                };
-                if let Err(e) = val_int {
-                    return Err(CubeError::user(format!(
-                        "Can't parse int from, {:?}: {}",
-                        cell, e
-                    )));
+            let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
+                v
+            } else {
+                return Err(CubeError::user(format!(
+                    "Single quoted string is expected but {:?} found",
+                    cell
+                )));
+            };
+            builder.append_value(val)?;
+        }
+        ColumnType::Int => {
+            let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            let val_int = match cell {
+                Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
+                    v.parse::<i64>()
                 }
-                TableValueR::Int(val_int.unwrap())
+                Expr::UnaryOp {
+                    op: UnaryOperator::Minus,
+                    expr,
+                } => {
+                    if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
+                        v.parse::<i64>().map(|v| v * -1)
+                    } else {
+                        return Err(CubeError::user(format!("Can't parse int from, {:?}", cell)));
+                    }
+                }
+                _ => return Err(CubeError::user(format!("Can't parse int from, {:?}", cell))),
+            };
+            if let Err(e) = val_int {
+                return Err(CubeError::user(format!(
+                    "Can't parse int from, {:?}: {}",
+                    cell, e
+                )));
             }
-            t @ ColumnType::Decimal { .. } => {
-                let d = parse_decimal(cell, u8::try_from(t.target_scale()).unwrap())?;
-                TableValueR::Decimal(d)
+            builder.append_value(val_int.unwrap())?;
+        }
+        t @ ColumnType::Decimal { .. } => {
+            let scale = u8::try_from(t.target_scale()).unwrap();
+            let d = match is_null {
+                false => Some(parse_decimal(cell, scale)?),
+                true => None,
+            };
+            let d = d.map(|d| d.raw_value());
+            match scale {
+                0 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal0Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                1 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal1Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                2 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal2Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                3 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal3Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                4 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal4Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                5 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal5Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                10 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal10Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                n => panic!("unhandled target scale: {}", n),
             }
-            ColumnType::Bytes => {
-                let val;
-                if let Expr::Value(v) = cell {
-                    val = parse_binary_string(buffer, v)
-                } else {
-                    return Err(CubeError::user("Corrupted data in query.".to_string()));
-                };
-                return Ok(TableValueR::Bytes(val?));
+        }
+        ColumnType::Bytes => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
             }
-            &ColumnType::HyperLogLog(f) => {
-                let val;
-                if let Expr::Value(v) = cell {
-                    val = parse_hyper_log_log(buffer, v, f)
-                } else {
-                    return Err(CubeError::user("Corrupted data in query.".to_string()));
-                };
-                return Ok(TableValueR::Bytes(val?));
+            let val;
+            if let Expr::Value(v) = cell {
+                val = parse_binary_string(buffer, v)?
+            } else {
+                return Err(CubeError::user("Corrupted data in query.".to_string()));
+            };
+            builder.append_value(val)?;
+        }
+        &ColumnType::HyperLogLog(f) => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
             }
-            ColumnType::Timestamp => match cell {
+            let val;
+            if let Expr::Value(v) = cell {
+                val = parse_hyper_log_log(buffer, v, f)?
+            } else {
+                return Err(CubeError::user("Corrupted data in query.".to_string()));
+            };
+            builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap()
+                .append_value(val)?;
+        }
+        ColumnType::Timestamp => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<TimestampMicrosecondBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            match cell {
                 Expr::Value(Value::SingleQuotedString(v)) => {
-                    TableValueR::Timestamp(timestamp_from_string(v)?)
+                    builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000)?;
                 }
                 x => {
                     return Err(CubeError::user(format!(
@@ -960,23 +1059,43 @@ fn extract_data<'a>(
                         x
                     )))
                 }
-            },
-            ColumnType::Boolean => match cell {
-                Expr::Value(Value::SingleQuotedString(v)) => {
-                    TableValueR::Boolean(v.to_lowercase() == "true")
-                }
-                Expr::Value(Value::Boolean(b)) => TableValueR::Boolean(*b),
+            }
+        }
+        ColumnType::Boolean => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<BooleanBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            let v = match cell {
+                Expr::Value(Value::SingleQuotedString(v)) => v.eq_ignore_ascii_case("true"),
+                Expr::Value(Value::Boolean(b)) => *b,
                 x => {
                     return Err(CubeError::user(format!(
                         "Can't parse boolean from, {:?}",
                         x
                     )))
                 }
-            },
-            ColumnType::Float => TableValueR::Float(parse_float(cell)?.into()),
+            };
+            builder.append_value(v)?;
         }
-    };
-    Ok(res)
+        ColumnType::Float => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<Float64Builder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            let v = parse_float(cell)?;
+            builder.append_value(v)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn timestamp_from_string(v: &str) -> Result<TimestampValue, CubeError> {
@@ -1059,7 +1178,7 @@ mod tests {
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-    use crate::store::{ChunkStore, WALStore};
+    use crate::store::ChunkStore;
 
     use super::*;
 
@@ -1081,13 +1200,7 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
-            let store = ChunkStore::new(
-                meta_store.clone(),
-                remote_fs.clone(),
-                wal_store,
-                rows_per_chunk,
-            );
+            let store = ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -1132,13 +1245,8 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
-            let chunk_store = ChunkStore::new(
-                meta_store.clone(),
-                remote_fs.clone(),
-                store.clone(),
-                rows_per_chunk,
-            );
+            let chunk_store =
+                ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),
