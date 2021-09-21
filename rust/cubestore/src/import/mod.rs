@@ -1,22 +1,29 @@
 use core::mem;
 use core::slice::memchr;
+use std::convert::TryFrom;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
+use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
+use num::ToPrimitive;
 use pin_project_lite::pin_project;
+use tempfile::TempPath;
 use tokio::fs::File;
 use tokio::io::{AsyncBufRead, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio::task::JoinHandle;
+
+use cubehll::HllSketch;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -27,17 +34,12 @@ use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
-use crate::table::data::{MutRows, Rows};
+use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
-use cubehll::HllSketch;
-use datafusion::cube_ext;
-use num::ToPrimitive;
-use std::convert::TryFrom;
-use tempfile::TempPath;
 
 pub mod limits;
 
@@ -454,21 +456,32 @@ impl ImportServiceImpl {
             self.limits.clone(),
             table.clone(),
         );
-        let mut rows = MutRows::new(table.get_row().get_columns().len());
+
+        let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
+            builders.into_iter().map(|mut b| b.finish()).collect_vec()
+        };
+
+        let table_cols = table.get_row().get_columns().as_slice();
+        let mut builders = create_array_builders(table_cols);
+        let mut num_rows = 0;
         while let Some(row) = row_stream.next().await {
             if let Some(row) = row? {
-                rows.add_row_heap_allocated(&row);
-                if rows.num_rows() >= self.config_obj.wal_split_threshold() as usize {
-                    let mut to_add = MutRows::new(table.get_row().get_columns().len());
-                    mem::swap(&mut rows, &mut to_add);
-                    ingestion.queue_data_frame(to_add.freeze()).await?;
+                append_row(&mut builders, table_cols, &row);
+                num_rows += 1;
+
+                if num_rows >= self.config_obj.wal_split_threshold() as usize {
+                    let mut to_add = create_array_builders(table_cols);
+                    mem::swap(&mut builders, &mut to_add);
+                    num_rows = 0;
+
+                    ingestion.queue_data_frame(finish(to_add)).await?;
                 }
             }
         }
 
         mem::drop(tmp_path);
 
-        ingestion.queue_data_frame(rows.freeze()).await?;
+        ingestion.queue_data_frame(finish(builders)).await?;
         ingestion.wait_completion().await
     }
 }
@@ -561,7 +574,7 @@ impl Ingestion {
         }
     }
 
-    pub async fn queue_data_frame(&mut self, rows: Rows) -> Result<(), CubeError> {
+    pub async fn queue_data_frame(&mut self, rows: Vec<ArrayRef>) -> Result<(), CubeError> {
         let active_data_frame = self.limits.acquire_data_frame().await?;
 
         let meta_store = self.meta_store.clone();

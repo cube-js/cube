@@ -413,6 +413,12 @@ pub struct Column {
 
 impl Into<Field> for Column {
     fn into(self) -> Field {
+        (&self).into()
+    }
+}
+
+impl<'a> Into<Field> for &'a Column {
+    fn into(self) -> Field {
         Field::new(
             self.name.as_str(),
             match self.column_type {
@@ -427,7 +433,7 @@ impl Into<Field> for Column {
                 ColumnType::HyperLogLog(_) => DataType::Binary,
                 ColumnType::Float => DataType::Float64,
             },
-            false,
+            true,
         )
     }
 }

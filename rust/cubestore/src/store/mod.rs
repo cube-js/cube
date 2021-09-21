@@ -12,7 +12,7 @@ use crate::metastore::{
     table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL,
 };
 use crate::remotefs::RemoteFs;
-use crate::table::{Row, TableStore, TableValue};
+use crate::table::{Row, TableValue};
 use crate::CubeError;
 use arrow::datatypes::Schema;
 use std::{
@@ -22,17 +22,20 @@ use std::{
 };
 
 use crate::config::injection::DIService;
-use crate::table::data::{cmp_row_key, cmp_row_key_heap, MutRows, Rows};
+use crate::table::data::cmp_partition_key;
 use crate::table::parquet::ParquetTableStore;
-use arrow::array::{Array, Int64Builder, StringBuilder};
+use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
+use datafusion::cube_ext::util::lexcmp_array_rows;
 use futures::future::join_all;
 use itertools::Itertools;
 use log::trace;
 use mockall::automock;
 use std::cmp::Ordering;
 use tokio::task::JoinHandle;
+
+pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct DataFrame {
@@ -148,7 +151,6 @@ crate::di_service!(WALStore, [WALDataStore]);
 
 pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
-    wal_store: Arc<dyn WALDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     chunk_size: usize,
 }
@@ -186,12 +188,11 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     async fn partition_data(
         &self,
         table_id: u64,
-        rows: Rows,
+        rows: Vec<ArrayRef>,
         columns: &[Column],
     ) -> Result<Vec<ChunkUploadJob>, CubeError>;
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
-    async fn get_chunk(&self, chunk: IdRow<Chunk>) -> Result<Rows, CubeError>;
-    async fn download_chunk(&self, chunk: IdRow<Chunk>) -> Result<String, CubeError>;
+    async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
     async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError>;
 }
 
@@ -267,13 +268,11 @@ impl ChunkStore {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
-        wal_store: Arc<dyn WALDataStore>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
             meta_store,
             remote_fs,
-            wal_store,
             chunk_size,
         };
 
@@ -298,33 +297,16 @@ impl ChunkDataStore for ChunkStore {
     async fn partition_data(
         &self,
         table_id: u64,
-        rows: Rows,
+        rows: Vec<ArrayRef>,
         columns: &[Column],
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
-        self.build_index_chunks(&indexes, rows, columns).await
+        self.build_index_chunks(&indexes, rows.into(), columns)
+            .await
     }
 
-    async fn partition(&self, wal_id: u64) -> Result<(), CubeError> {
-        let wal = self.meta_store.get_wal(wal_id).await?;
-        let table_id = wal.get_row().table_id();
-        let data = self.wal_store.get_wal(wal_id).await?;
-        let indexes = self.meta_store.get_table_indexes(table_id).await?;
-        let rows = MutRows::from_heap_allocated(data.columns.len(), data.get_rows()).freeze();
-        let new_chunks: Result<Vec<u64>, CubeError> = join_all(
-            self.build_index_chunks(&indexes, rows, &data.columns)
-                .await?,
-        )
-        .await
-        .into_iter()
-        .map(|c| Ok(c??.get_id()))
-        .collect();
-
-        self.meta_store
-            .activate_wal(wal_id, new_chunks?, indexes.len() as u64)
-            .await?;
-
-        Ok(())
+    async fn partition(&self, _wal_id: u64) -> Result<(), CubeError> {
+        panic!("not used");
     }
 
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError> {
@@ -344,12 +326,18 @@ impl ChunkDataStore for ChunkStore {
         for chunk in chunks.into_iter() {
             let chunk_id = chunk.get_id();
             old_chunks.push(chunk_id);
-            let rows = self.get_chunk(chunk).await?;
+            let batches = self.get_chunk_columns(chunk).await?;
+            let mut columns = Vec::new();
+            for i in 0..batches[0].num_columns() {
+                columns.push(arrow::compute::concat(
+                    &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
+                )?)
+            }
             new_chunks.append(
                 &mut self
-                    .partition_data_frame(partition.get_row().get_index_id(), rows)
+                    .partition_rows(partition.get_row().get_index_id(), columns)
                     .await?,
-            )
+            );
         }
 
         let new_chunk_ids: Result<Vec<u64>, CubeError> = join_all(new_chunks)
@@ -365,7 +353,24 @@ impl ChunkDataStore for ChunkStore {
         Ok(())
     }
 
-    async fn get_chunk(&self, chunk: IdRow<Chunk>) -> Result<Rows, CubeError> {
+    async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError> {
+        let (local_file, index) = self.download_chunk(chunk).await?;
+        Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
+            let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+            Ok(parquet.read_columns(&local_file)?)
+        })
+        .await??)
+    }
+
+    async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError> {
+        let remote_path = ChunkStore::chunk_file_name(chunk);
+        self.remote_fs.delete_file(&remote_path).await?;
+        Ok(())
+    }
+}
+
+impl ChunkStore {
+    async fn download_chunk(&self, chunk: IdRow<Chunk>) -> Result<(String, Index), CubeError> {
         if !chunk.get_row().uploaded() {
             return Err(CubeError::internal(format!(
                 "Trying to get not uploaded chunk: {:?}",
@@ -382,49 +387,21 @@ impl ChunkDataStore for ChunkStore {
             .await?;
         let remote_path = ChunkStore::chunk_file_name(chunk);
         self.remote_fs.download_file(&remote_path).await?;
-        let local_file = self.remote_fs.local_file(&remote_path).await?;
-        Ok(
-            cube_ext::spawn_blocking(move || -> Result<Rows, CubeError> {
-                let parquet = ParquetTableStore::new(index.get_row().clone(), 16384); // TODO config
-                Ok(parquet.read_rows(&local_file)?)
-            })
-            .await??,
-        )
-    }
-
-    async fn download_chunk(&self, chunk: IdRow<Chunk>) -> Result<String, CubeError> {
-        if !chunk.get_row().uploaded() {
-            return Err(CubeError::internal(format!(
-                "Trying to get not uploaded chunk: {:?}",
-                chunk
-            )));
-        }
-        let partition = self
-            .meta_store
-            .get_partition(chunk.get_row().get_partition_id())
-            .await?;
-        self.meta_store
-            .get_index(partition.get_row().get_index_id())
-            .await?;
-        let remote_path = ChunkStore::chunk_file_name(chunk);
-        self.remote_fs.download_file(&remote_path).await?;
-        Ok(self.remote_fs.local_file(&remote_path).await?)
-    }
-
-    async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError> {
-        let remote_path = ChunkStore::chunk_file_name(chunk);
-        self.remote_fs.delete_file(&remote_path).await?;
-        Ok(())
+        Ok((
+            self.remote_fs.local_file(&remote_path).await?,
+            index.into_row(),
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_eq_columns;
     use crate::config::Config;
     use crate::metastore::RocksMetaStore;
     use crate::remotefs::LocalDirRemoteFs;
-    use crate::table::data::MutRows;
+    use crate::table::data::{concat_record_batches, rows_to_columns};
     use crate::{metastore::ColumnType, table::TableValue};
     use rocksdb::{Options, DB};
     use std::fs;
@@ -527,9 +504,7 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
-            let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), 10);
-            let chunk_store =
-                ChunkStore::new(meta_store.clone(), remote_fs.clone(), wal_store.clone(), 10);
+            let chunk_store = ChunkStore::new(meta_store.clone(), remote_fs.clone(), 10);
 
             let col = vec![
                 Column::new("foo_int".to_string(), ColumnType::Int, 0),
@@ -564,17 +539,6 @@ mod tests {
                 .await
                 .unwrap();
 
-            let _ = wal_store.add_wal(table.clone(), data_frame).await;
-            let wal = IdRow::new(1, WAL::new(1, 10));
-            let mut restored_wal: DataFrame = wal_store.get_wal(wal.get_id()).await.unwrap();
-            restored_wal
-                .data
-                .sort_by(|a, b| a.sort_key(a.len() as u64).cmp(&b.sort_key(b.len() as u64)));
-            let restored_wal_not_sorted: DataFrame = wal_store.get_wal(wal.get_id()).await.unwrap();
-            let mut restored_wal_sorted: DataFrame = wal_store.get_wal(wal.get_id()).await.unwrap();
-            restored_wal_sorted
-                .data
-                .sort_by(|a, b| a.sort_key(a.len() as u64).cmp(&b.sort_key(b.len() as u64)));
             let index = meta_store.get_default_index(table.get_id()).await.unwrap();
             let partitions = meta_store
                 .get_active_partitions_by_index_id(index.get_id())
@@ -582,13 +546,9 @@ mod tests {
                 .unwrap();
             let partition = partitions[0].clone();
 
-            let mut rows = MutRows::new(restored_wal.get_columns().len());
-            for r in restored_wal.into_rows() {
-                rows.add_row_heap_allocated(&r);
-            }
-
+            let data = rows_to_columns(&col, data_frame.get_rows().as_slice());
             let chunk = chunk_store
-                .add_chunk(index, partition, rows.freeze())
+                .add_chunk_columns(index, partition, data.clone())
                 .await
                 .unwrap()
                 .await
@@ -599,11 +559,9 @@ mod tests {
                 .await
                 .unwrap();
             let chunk = meta_store.get_chunk(1).await.unwrap();
-            let restored_chunk = chunk_store.get_chunk(chunk).await.unwrap();
-
-            let restored_data = restored_chunk.view().convert_to_heap_allocated();
-            assert_eq!(restored_data, restored_wal_sorted.data);
-            assert_ne!(restored_data, restored_wal_not_sorted.data);
+            let restored_chunk =
+                concat_record_batches(&chunk_store.get_chunk_columns(chunk).await.unwrap());
+            assert_eq_columns!(restored_chunk.columns(), &data);
         }
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(wal_store_path.clone());
@@ -616,10 +574,10 @@ mod tests {
 pub type ChunkUploadJob = JoinHandle<Result<IdRow<Chunk>, CubeError>>;
 
 impl ChunkStore {
-    async fn partition_data_frame(
+    async fn partition_rows(
         &self,
         index_id: u64,
-        mut rows: Rows,
+        mut columns: Vec<ArrayRef>,
     ) -> Result<Vec<JoinHandle<Result<IdRow<Chunk>, CubeError>>>, CubeError> {
         let index = self.meta_store.get_index(index_id).await?;
         let partitions = self
@@ -628,46 +586,51 @@ impl ChunkStore {
             .await?;
         let sort_key_size = index.get_row().sort_key_size() as usize;
 
-        let mut remaining_rows: Vec<usize> = (0..rows.num_rows()).collect_vec();
+        let mut remaining_rows: Vec<u64> = (0..columns[0].len() as u64).collect_vec();
         {
-            let (rows_again, remaining_rows_again) = cube_ext::spawn_blocking(move || {
+            let (columns_again, remaining_rows_again) = cube_ext::spawn_blocking(move || {
+                let sort_key = &columns[0..sort_key_size];
                 remaining_rows.sort_unstable_by(|&a, &b| {
-                    cmp_row_key(sort_key_size, &rows.view()[a], &rows.view()[b])
+                    lexcmp_array_rows(sort_key.iter(), a as usize, b as usize)
                 });
-                (rows, remaining_rows)
+                (columns, remaining_rows)
             })
             .await?;
 
-            rows = rows_again;
+            columns = columns_again;
             remaining_rows = remaining_rows_again;
         }
 
         let mut new_chunks = Vec::new();
 
         for partition in partitions.into_iter() {
+            let min = partition.get_row().get_min_val().as_ref();
+            let max = partition.get_row().get_max_val().as_ref();
             let (to_write, next) = remaining_rows.into_iter().partition::<Vec<_>, _>(|&r| {
-                partition
-                    .get_row()
-                    .get_min_val()
-                    .as_ref()
-                    .map(|min| {
-                        cmp_row_key_heap(sort_key_size, min.values(), &rows.view()[r])
-                            <= Ordering::Equal
-                    })
-                    .unwrap_or(true)
-                    && partition
-                        .get_row()
-                        .get_max_val()
-                        .as_ref()
-                        .map(|max| {
-                            cmp_row_key_heap(sort_key_size, max.values(), &rows.view()[r])
-                                > Ordering::Equal
-                        })
-                        .unwrap_or(true)
+                let r = r as usize;
+                (min.is_none()
+                    || cmp_partition_key(
+                        sort_key_size,
+                        min.unwrap().values().as_slice(),
+                        columns.as_slice(),
+                        r,
+                    ) <= Ordering::Equal)
+                    && (max.is_none()
+                        || cmp_partition_key(
+                            sort_key_size,
+                            max.unwrap().values().as_slice(),
+                            columns.as_slice(),
+                            r,
+                        ) > Ordering::Equal)
             });
             if to_write.len() > 0 {
+                let to_write = UInt64Array::from(to_write);
+                let columns = columns
+                    .iter()
+                    .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
+                    .collect::<Result<Vec<_>, _>>()?;
                 new_chunks.push(
-                    self.add_chunk(index.clone(), partition, rows.copy_some_rows(&to_write))
+                    self.add_chunk_columns(index.clone(), partition, columns)
                         .await?,
                 );
             }
@@ -681,28 +644,23 @@ impl ChunkStore {
 
     /// Processes data into parquet files in the current task and schedules an async file upload.
     /// Join the returned handle to wait for the upload to finish.
-    async fn add_chunk(
+    async fn add_chunk_columns(
         &'a self,
         index: IdRow<Index>,
         partition: IdRow<Partition>,
-        data: Rows,
+        data: Vec<ArrayRef>,
     ) -> Result<ChunkUploadJob, CubeError> {
         let chunk = self
             .meta_store
-            .create_chunk(partition.get_id(), data.num_rows())
+            .create_chunk(partition.get_id(), data[0].len())
             .await?;
         trace!("New chunk allocated during partitioning: {:?}", chunk);
         let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
         let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
         let local_file_copy = local_file.clone();
         cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-            let parquet = ParquetTableStore::new(index.get_row().clone(), 16384); // TODO config
-            parquet.merge_rows(
-                None,
-                vec![local_file_copy],
-                data.view(),
-                index.get_row().sort_key_size() as usize,
-            )?;
+            let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
+            parquet.write_data(&local_file_copy, data)?;
             Ok(())
         })
         .await??;
@@ -718,9 +676,10 @@ impl ChunkStore {
     async fn build_index_chunks(
         &self,
         indexes: &[IdRow<Index>],
-        mut rows: Rows,
+        rows: VecArrayRef,
         columns: &[Column],
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
+        let mut rows = rows.0;
         let mut new_chunks = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();
@@ -733,7 +692,7 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            new_chunks.append(&mut self.partition_data_frame(index.get_id(), remapped).await?);
+            new_chunks.append(&mut self.partition_rows(index.get_id(), remapped).await?);
         }
 
         Ok(new_chunks)
@@ -741,12 +700,12 @@ impl ChunkStore {
 }
 
 fn remap_columns(
-    old: &Rows,
+    old: &[ArrayRef],
     old_columns: &[Column],
     new_columns: &[Column],
-) -> Result<Rows, CubeError> {
-    assert_eq!(old_columns.len(), old.num_columns());
-    let mut new_to_old = Vec::with_capacity(new_columns.len());
+) -> Result<Vec<ArrayRef>, CubeError> {
+    assert_eq!(old_columns.len(), old.len());
+    let mut new = Vec::with_capacity(new_columns.len());
     for new_column in new_columns.iter() {
         let old_column = old_columns
             .iter()
@@ -758,7 +717,22 @@ fn remap_columns(
                     old_columns
                 ))
             })?;
-        new_to_old.push(old_column.get_index());
+        new.push(old[old_column.get_index()].clone());
     }
-    Ok(old.remap_columns(&new_to_old))
+    Ok(new)
+}
+
+/// A wrapper to workaround Rust compiler error when using Vec<ArrayRef> in function arguments.
+/// ``error[E0700]: hidden type for `impl Trait` captures lifetime that does not appear in bounds``
+pub struct VecArrayRef(Vec<ArrayRef>);
+impl From<Vec<ArrayRef>> for VecArrayRef {
+    fn from(v: Vec<ArrayRef>) -> Self {
+        VecArrayRef(v)
+    }
+}
+
+impl Into<Vec<ArrayRef>> for VecArrayRef {
+    fn into(self) -> Vec<ArrayRef> {
+        self.0
+    }
 }

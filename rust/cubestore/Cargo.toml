@@ -25,7 +25,7 @@ serde_bytes = "0.11.5"
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
 cuberpc = { path = "../cuberpc" }
-parquet = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
+parquet = { git = "https://github.com/cube-js/arrow-rs", branch = "cube", features = ["arrow"] }
 arrow = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
 arrow-flight = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
 datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube" }

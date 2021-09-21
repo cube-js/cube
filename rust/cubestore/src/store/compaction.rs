@@ -2,17 +2,33 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::MetaStore;
 use crate::remotefs::RemoteFs;
-use crate::store::ChunkDataStore;
-use crate::table::data::{cmp_row_key, RowsView, TableValueR};
-use crate::table::parquet::ParquetTableStore;
-use crate::table::TableStore;
+use crate::store::{ChunkDataStore, ROW_GROUP_SIZE};
+use crate::table::data::cmp_partition_key;
+use crate::table::parquet::{arrow_schema, ParquetTableStore};
+use crate::table::redistribute::redistribute;
+use crate::table::{Row, TableValue};
 use crate::CubeError;
+use arrow::array::ArrayRef;
+use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
+use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::cube_ext;
+use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::memory::MemoryExec;
+use datafusion::physical_plan::merge_sort::MergeSortExec;
+use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::union::UnionExec;
+use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
-use std::mem::swap;
-use std::sync::Arc;
+use num::Integer;
+use parquet::arrow::ArrowWriter;
+use std::cmp::Ordering;
+use std::fs::File;
+use std::mem::take;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 
 #[async_trait]
 pub trait CompactionService: DIService + Send + Sync {
@@ -74,9 +90,9 @@ impl CompactionService for CompactionServiceImpl {
             .iter()
             .map(|c| c.get_row().get_row_count())
             .sum::<u64>();
-        let total_count = partition.get_row().main_table_row_count() + chunks_row_count;
+        let total_rows = partition.get_row().main_table_row_count() + chunks_row_count;
         let new_partitions_count =
-            div_ceil(total_count, self.config.partition_split_threshold()) as usize;
+            div_ceil(total_rows, self.config.partition_split_threshold()) as usize;
 
         let mut new_partitions = Vec::new();
         for _ in 0..new_partitions_count {
@@ -88,16 +104,15 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let mut data = Vec::new();
-        let mut total_data_rows = 0;
         let num_columns = index.get_row().columns().len();
         for chunk in chunks.iter() {
-            let d = self.chunk_store.get_chunk(chunk.clone()).await?;
-            assert_eq!(num_columns, d.num_columns());
-            total_data_rows += d.num_rows();
-            data.push(d);
+            for b in self.chunk_store.get_chunk_columns(chunk.clone()).await? {
+                assert_eq!(num_columns, b.num_columns());
+                data.push(b)
+            }
         }
 
-        let store = ParquetTableStore::new(index.get_row().clone(), 16384); // TODO config
+        let store = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
         let old_partition_local =
             if let Some(f) = partition.get_row().get_full_name(partition.get_id()) {
                 Some(self.remote_fs.download_file(&f).await?)
@@ -112,34 +127,64 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let new_partition_file_names = new_partition_local_files.clone();
-        let count_and_min_max = cube_ext::spawn_blocking(move || {
-            let mut merge_buffer = Vec::with_capacity(total_data_rows * num_columns);
-            for d in &data {
-                merge_buffer.extend_from_slice(d.all_values());
+        let key_size = index.get_row().sort_key_size() as usize;
+        let (store, new) = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
+            // Concat rows from all chunks.
+            let mut columns = Vec::with_capacity(num_columns);
+            for i in 0..num_columns {
+                let v = arrow::compute::concat(
+                    &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
+                )?;
+                columns.push(v);
             }
-            let sort_key_size = index.get_row().sort_key_size() as usize;
-            sort_rows(
-                &mut merge_buffer,
-                total_data_rows,
-                num_columns,
-                sort_key_size,
-            );
-
-            let rows = RowsView::new(&merge_buffer, num_columns);
-            store.merge_rows(
-                old_partition_local.as_ref().map(|s| s.as_str()),
-                new_partition_file_names,
-                rows,
-                sort_key_size,
-            )
+            // Sort rows from all chunks.
+            let mut sort_key = Vec::with_capacity(key_size);
+            for i in 0..key_size {
+                sort_key.push(SortColumn {
+                    values: columns[i].clone(),
+                    options: Some(SortOptions {
+                        descending: false,
+                        nulls_first: true,
+                    }),
+                });
+            }
+            let indices = lexsort_to_indices(&sort_key, None)?;
+            let mut new = Vec::with_capacity(num_columns);
+            for c in columns {
+                new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
+            }
+            Ok((store, new))
         })
         .await??;
+
+        // Merge and write rows.
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
+            Some(file) => Arc::new(ParquetExec::try_from_path(
+                file.as_str(),
+                None,
+                None,
+                ROW_GROUP_SIZE,
+                1,
+                None,
+            )?),
+            None => Arc::new(EmptyExec::new(false, schema.clone())),
+        };
+
+        let records = merge_chunks(key_size, main_table, new).await?;
+        let count_and_min = write_to_files(
+            records,
+            total_rows as usize,
+            store,
+            new_partition_file_names,
+        )
+        .await?;
 
         let mut filtered_partitions = Vec::new();
 
         for (i, p) in new_partitions
             .into_iter()
-            .zip_longest(count_and_min_max.iter())
+            .zip_longest(count_and_min.iter())
             .enumerate()
         {
             match p {
@@ -172,17 +217,23 @@ impl CompactionService for CompactionServiceImpl {
                     .map(|p| p.get_id())
                     .collect::<Vec<_>>(),
                 chunks.iter().map(|c| c.get_id()).collect(),
-                count_and_min_max
+                count_and_min
                     .iter()
-                    .zip_longest(count_and_min_max.iter().skip(1 as usize))
+                    .zip_longest(count_and_min.iter().skip(1 as usize))
                     .enumerate()
                     .map(|(i, item)| -> Result<_, CubeError> {
                         match item {
-                            EitherOrBoth::Both((c, (min, _)), (_, (next_min, _))) => {
+                            EitherOrBoth::Both((c, min), (_, next_min)) => {
                                 if i == 0 && partition.get_row().get_min_val().is_none() {
-                                    Ok((*c, (None, Some(next_min.clone()))))
+                                    Ok((*c as u64, (None, Some(Row::new(next_min.clone())))))
                                 } else if i < filtered_partitions.len() - 1 {
-                                    Ok((*c, (Some(min.clone()), Some(next_min.clone()))))
+                                    Ok((
+                                        *c as u64,
+                                        (
+                                            Some(Row::new(min.clone())),
+                                            Some(Row::new(next_min.clone())),
+                                        ),
+                                    ))
                                 } else {
                                     Err(CubeError::internal(format!(
                                         "Unexpected state for {} new partitions: {}, {:?}",
@@ -192,10 +243,10 @@ impl CompactionService for CompactionServiceImpl {
                                     )))
                                 }
                             }
-                            EitherOrBoth::Left((c, (min, _))) => {
+                            EitherOrBoth::Left((c, min)) => {
                                 if i == 0 && filtered_partitions.len() == 1 {
                                     Ok((
-                                        *c,
+                                        *c as u64,
                                         (
                                             partition.get_row().get_min_val().clone(),
                                             partition.get_row().get_max_val().clone(),
@@ -203,9 +254,9 @@ impl CompactionService for CompactionServiceImpl {
                                     ))
                                 } else if i == filtered_partitions.len() - 1 {
                                     Ok((
-                                        *c,
+                                        *c as u64,
                                         (
-                                            Some(min.clone()),
+                                            Some(Row::new(min.clone())),
                                             partition.get_row().get_max_val().clone(),
                                         ),
                                     ))
@@ -234,29 +285,137 @@ impl CompactionService for CompactionServiceImpl {
     }
 }
 
-fn sort_rows(
-    values: &mut Vec<TableValueR>,
+/// Writes [records] into [files], trying to split into equally-sized rows, with an additional
+/// restriction that files must have non-intersecting key ranges.
+/// [records] must be sorted and have exactly [num_rows] rows.
+pub(crate) async fn write_to_files(
+    records: SendableRecordBatchStream,
     num_rows: usize,
-    num_columns: usize,
-    sort_key_size: usize,
-) {
-    assert_eq!(values.len(), num_rows * num_columns);
-    let mut rows = (0..num_rows).collect_vec();
-    rows.sort_unstable_by(|l, r| {
-        cmp_row_key(
-            sort_key_size,
-            &values[l * num_columns..l * num_columns + num_columns],
-            &values[r * num_columns..r * num_columns + num_columns],
-        )
+    store: ParquetTableStore,
+    files: Vec<String>,
+) -> Result<Vec<(usize, Vec<TableValue>)>, CubeError> {
+    let schema = Arc::new(store.arrow_schema());
+    let key_size = store.key_size() as usize;
+    let rows_per_file = (num_rows as usize).div_ceil(&files.len());
+    let mut writers = files.into_iter().map(move |f| -> Result<_, CubeError> {
+        Ok(ArrowWriter::try_new(
+            File::create(f)?,
+            schema.clone(),
+            Some(store.writer_props()),
+        )?)
     });
 
-    // TODO: apply permutation without extra memory.
-    let mut result = Vec::with_capacity(values.len());
-    for i in rows {
-        result.extend_from_slice(&values[i * num_columns..i * num_columns + num_columns]);
+    let (write_tx, mut write_rx) = tokio::sync::mpsc::channel(1);
+    let io_job = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
+        let mut writer = writers.next().transpose()?.unwrap();
+        let mut current_writer_i = 0;
+        while let Some((writer_i, batch)) = write_rx.blocking_recv() {
+            debug_assert!(current_writer_i <= writer_i);
+            if current_writer_i != writer_i {
+                writer.close()?;
+
+                writer = writers.next().transpose()?.unwrap();
+                current_writer_i = writer_i;
+            }
+
+            writer.write(&batch)?;
+        }
+
+        writer.close()?;
+        Ok(())
+    });
+
+    // Stats for the current writer.
+    let mut writer_i = Ok(0); // Ok(n) marks active file, Err(n) marks finished file.
+    let mut last_row = Vec::new();
+    // (num_rows, first_row) for all processed writers.
+    let stats = Arc::new(Mutex::new(vec![(0, Vec::new())]));
+    let stats_ref = stats.clone();
+    let mut process_row_group = move |b: RecordBatch| -> Result<_, CubeError> {
+        let stats_ref = stats_ref.clone();
+        let mut stats = stats_ref.lock().unwrap();
+        if let Err(n) = writer_i {
+            writer_i = Ok(n + 1);
+            stats.push((0, Vec::new()));
+            last_row.clear();
+        }
+
+        let (num_rows, first_row) = stats.last_mut().unwrap();
+        let current_writer = writer_i.unwrap();
+
+        if first_row.is_empty() {
+            *first_row = TableValue::from_columns(&b.columns()[0..key_size], 0);
+        }
+        if *num_rows + b.num_rows() < rows_per_file {
+            *num_rows += b.num_rows();
+            return Ok(((current_writer, b), None));
+        }
+        let mut i;
+        if last_row.is_empty() {
+            i = rows_per_file - *num_rows - 1;
+            last_row = TableValue::from_columns(&b.columns()[0..key_size], i);
+            i += 1;
+        } else {
+            i = 0;
+        }
+        // Keep writing into the same file until we see a different key.
+        while i < b.num_rows()
+            && cmp_partition_key(key_size, &last_row, b.columns(), i) == Ordering::Equal
+        {
+            i += 1;
+        }
+        if i == b.num_rows() {
+            *num_rows += b.num_rows();
+            return Ok(((current_writer, b), None));
+        }
+
+        *num_rows += i;
+        writer_i = Err(current_writer); // Next iteration will write into a new file.
+        return Ok((
+            (current_writer, b.slice(0, i)),
+            Some(b.slice(i, b.num_rows() - i)),
+        ));
+    };
+    let err = redistribute(records, ROW_GROUP_SIZE, move |b| {
+        let r = process_row_group(b);
+        let write_tx = write_tx.clone();
+        async move {
+            let (to_write, to_return) = r?;
+            write_tx.send(to_write).await?;
+            return Ok(to_return);
+        }
+    })
+    .await;
+
+    // We want to report IO errors first, `err` will be unhelpful ("channel closed") when IO fails.
+    io_job.await??;
+    err?;
+
+    let stats = take(stats.lock().unwrap().deref_mut());
+    Ok(stats)
+}
+
+async fn merge_chunks(
+    key_size: usize,
+    l: Arc<dyn ExecutionPlan>,
+    r: Vec<ArrayRef>,
+) -> Result<SendableRecordBatchStream, CubeError> {
+    let schema = l.schema();
+    let r = RecordBatch::try_new(schema.clone(), r)?;
+
+    let mut key = Vec::with_capacity(key_size);
+    for i in 0..key_size {
+        let f = schema.field(i);
+        key.push(Column::new(f.name().as_str(), i));
     }
 
-    swap(&mut *values, &mut result)
+    let inputs = UnionExec::new(vec![
+        l,
+        Arc::new(MemoryExec::try_new(&[vec![r]], schema, None)?),
+    ]);
+    Ok(MergeSortExec::try_new(Arc::new(inputs), key)?
+        .execute(0)
+        .await?)
 }
 
 #[cfg(test)]
@@ -265,8 +424,10 @@ mod tests {
     use crate::config::MockConfigObj;
     use crate::metastore::{Column, ColumnType, RocksMetaStore};
     use crate::store::MockChunkDataStore;
-    use crate::table::data::MutRows;
     use crate::table::{Row, TableValue};
+    use arrow::array::StringArray;
+    use arrow::datatypes::Schema;
+    use arrow::record_batch::RecordBatch;
 
     #[tokio::test]
     async fn compaction() {
@@ -308,7 +469,7 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(3).await.unwrap();
 
-        chunk_store.expect_get_chunk().returning(move |i| {
+        chunk_store.expect_get_chunk_columns().returning(move |i| {
             let limit = match i.get_id() {
                 1 => 10,
                 2 => 16,
@@ -317,12 +478,15 @@ mod tests {
                 _ => unimplemented!(),
             };
 
-            let mut rows = MutRows::new(cols.len());
+            let mut strings = Vec::with_capacity(limit);
             for i in 0..limit {
-                rows.add_row()
-                    .set_interned(0, TableValueR::String(&format!("foo{}", i)));
+                strings.push(format!("foo{}", i));
             }
-            Ok(rows.freeze())
+            let schema = Arc::new(Schema::new(vec![(&cols[0]).into()]));
+            Ok(vec![RecordBatch::try_new(
+                schema,
+                vec![Arc::new(StringArray::from(strings))],
+            )?])
         });
 
         config.expect_partition_split_threshold().returning(|| 20);
