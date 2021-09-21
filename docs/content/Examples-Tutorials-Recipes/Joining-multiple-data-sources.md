@@ -19,35 +19,13 @@ between two databases to achieve our goal.
 First of all, we should define our database connections with the `dataSource`
 option:
 
-```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
+<GitHubCodeBlock
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/joining-multiple-datasources-data/cube.js"
+  titleSuffixCount={2}
+  part=""
+  lang="js"
+/>
 
-module.exports = {
-  driverFactory: ({ dataSource }) => {
-    if (dataSource === 'suppliers') {
-      return new PostgresDriver({
-        database: 'recipes',
-        host: 'demo-db-recipes.cube.dev',
-        user: 'cube',
-        password: '12345',
-        port: '5432',
-      });
-    }
-
-    if (dataSource === 'products') {
-      return new PostgresDriver({
-        database: 'ecom',
-        host: 'demo-db-recipes.cube.dev',
-        user: 'cube',
-        password: '12345',
-        port: '5432',
-      });
-    }
-
-    throw new Error('dataSource is undefined');
-  },
-};
-```
 
 ## Data schema
 
@@ -55,48 +33,31 @@ First, we'll define
 [rollup](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-rollup)
 pre-aggregations for `Products` and `Suppliers`.
 
-```javascript
-preAggregations: {
-  productsRollup: {
-    type: `rollup`,
-    external: true,
-    dimensions: [CUBE.name, CUBE.supplierId],
-    indexes: {
-      categoryIndex: {
-        columns: [CUBE.supplierId],
-      }
-    }
-  },
-```
+<GitHubCodeBlock
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/joining-multiple-datasources-data/schema/Products.js"
+  titleSuffixCount={2}
+  part="productsRollup"
+  lang="js"
+/>
 
-```javascript
-preAggregations: {
-  suppliersRollup: {
-    type: `rollup`,
-    external: true,
-    dimensions: [CUBE.id, CUBE.company, CUBE.email],
-    indexes: {
-      categoryIndex: {
-        columns: [CUBE.id],
-      }
-    }
-  }
-}
-```
+<GitHubCodeBlock
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/joining-multiple-datasources-data/schema/Suppliers.js"
+  titleSuffixCount={2}
+  part="suppliersRollup"
+  lang="js"
+/>
 
 Then, we'll also define a `rollupJoin` pre-aggregation. It will enable Cube to
 aggregate data from multiple data sources. Note that the joined rollups should
 contain dimensions on which they're joined. In our case, it's the `supplierId`
 dimension in the `Products` cube:
 
-```javascript
-combinedRollup: {
-  type: `rollupJoin`,
-  dimensions: [Suppliers.email, Suppliers.company, CUBE.name],
-  rollups: [Suppliers.suppliersRollup, CUBE.productsRollup],
-  external: true,
-}
-```
+<GitHubCodeBlock
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/joining-multiple-datasources-data/schema/Products.js"
+  titleSuffixCount={2}
+  part="combinedRollup"
+  lang="js"
+/>
 
 ## Query
 
@@ -121,25 +82,23 @@ email, with the following query:
 
 We'll get the data from two pre-aggregations joined into one `rollupJoin`:
 
-```javascript
-[
-  {
-    "Products.name": "Awesome Cotton Sausages",
-    "Suppliers.company": "Justo Eu Arcu Inc.",
-    "Suppliers.email": "id.risus@luctuslobortisClass.net"
-  },
-  {
-    "Products.name": "Awesome Fresh Keyboard",
-    "Suppliers.company": "Quisque Purus Sapien Limited",
-    "Suppliers.email": "Cras@consectetuercursuset.co.uk"
-  },
-  {
-    "Products.name": "Awesome Rubber Soap",
-    "Suppliers.company": "Tortor Inc.",
-    "Suppliers.email": "Mauris@ac.com"
-  }
-]
+<CubeQueryResultSet
+  api="https://amber-bear.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
+  token=""
+  query={{
+    "order": {
+      "Products.name": "asc"
+    },
+    "dimensions": [
+      "Products.name",
+      "Suppliers.company",
+      "Suppliers.email"
+    ],
+    "limit": 3
+}}
+/>
 
+```javascript
 // Names of the used pre-aggregations
 
 {
@@ -154,7 +113,10 @@ We'll get the data from two pre-aggregations joined into one `rollupJoin`:
 
 ## Source code
 
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/joining-multiple-datasources-data)
+Please feel free to check out the full source code
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
+
+<GitHubFolderLink
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/joining-multiple-datasources-data"
+/>
