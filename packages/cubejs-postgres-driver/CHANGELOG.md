@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.39](https://github.com/cube-js/cube.js/compare/v0.28.38...v0.28.39) (2021-09-22)
+
+
+### Bug Fixes
+
+* **postgres-driver:** Unable to detect type for field "[@parser](https://github.com/parser)" ([#3475](https://github.com/cube-js/cube.js/issues/3475)) ([3e70d47](https://github.com/cube-js/cube.js/commit/3e70d47968524dc051d965b9f981beaaab0200c3))
+
+
+
+
+
 ## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
