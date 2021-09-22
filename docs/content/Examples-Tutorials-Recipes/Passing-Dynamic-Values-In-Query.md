@@ -35,64 +35,12 @@ we can join the data table with itself to multiply the `city` column — applyin
 the filter would remove the multiplication while still allowing to access the
 filter value:
 
-```javascript
-cube(`Users`, {
-  sql: `
-    WITH data AS (
-      SELECT 
-        users.id AS id,
-        users.city AS city,
-        users.gender AS gender
-      FROM public.users
-    ),
-    
-    cities AS (
-      SELECT city
-      FROM data
-    ),
-    
-    grouped AS (
-      SELECT 
-        cities.city AS city_filter,
-        data.id AS id,
-        data.city AS city,
-        data.gender AS gender
-      FROM cities, data
-      GROUP BY 1, 2, 3, 4
-    )
-    
-    SELECT *
-    FROM grouped
-  `,
-
-  measures: {
-    totalNumberOfWomen: {
-      sql: 'id',
-      type: 'count',
-      filters: [{ sql: `${CUBE}.gender = 'female'` }],
-    },
-
-    numberOfPeopleOfAnyGenderInTheCity: {
-      sql: 'id',
-      type: 'count',
-      filters: [{ sql: `${CUBE}.city = ${CUBE}.city_filter` }],
-    },
-
-    ratio: {
-      title: 'Ratio Women in the City to Total Number of People',
-      sql: `1.0 * ${CUBE.numberOfPeopleOfAnyGenderInTheCity} / ${CUBE.totalNumberOfWomen}`,
-      type: `number`,
-    },
-  },
-
-  dimensions: {
-    cityFilter: {
-      sql: `city_filter`,
-      type: `string`,
-    },
-  }
-});
-```
+<GitHubCodeBlock
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/passing-dynamic-parameters-in-query/schema/Users.js"
+  titleSuffixCount={2}
+  part=""
+  lang="js"
+/>
 
 ## Query
 
@@ -121,19 +69,30 @@ filter in the query:
 By joining the data table with itself and using the dimensions defined above, we
 can get the ratio we wanted to achieve:
 
-```javascript
-[
-  {
-    'Users.totalNumberOfWomen': '259',
-    'Users.numberOfPeopleOfAnyGenderInTheCity': '99',
-    'Users.ratio': '0.38223938223938223938',
-  }
-];
-```
+<CubeQueryResultSet
+api="https://reasonable-hochheim.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
+token=""
+query={{
+  "measures": [
+    "Users.totalNumberOfWomen",
+    "Users.numberOfPeopleOfAnyGenderInTheCity",
+    "Users.ratio"
+  ],
+  "filters": [
+    {
+      "member": "Users.cityFilter",
+      "operator": "equals",
+      "values": ["Seattle"]
+    }
+  ]
+}} />
 
 ## Source code
 
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/passing-dynamic-parameters-in-query)
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.
+Please feel free to check out the full source code or run it with the
+`docker-compose up` command. You'll see the result, including queried data, in
+the console.
+
+<GitHubFolderLink
+  href="https://github.com/cube-js/cube.js/tree/master/examples/recipes/passing-dynamic-parameters-in-query"
+/>

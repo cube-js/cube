@@ -82,7 +82,8 @@ email, with the following query:
 We'll get the data from two pre-aggregations joined into one `rollupJoin`:
 
 <CubeQueryResultSet
-api="https://amber-bear.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1" token=""
+api="https://amber-bear.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
+token=""
 query={{
     "order": {
       "Products.name": "asc"
