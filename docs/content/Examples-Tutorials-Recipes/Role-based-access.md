@@ -22,33 +22,12 @@ extension point to manage data access.
 
 Let's add the role verification in the `cube.js` file.
 
-```javascript
-module.exports = {
-  queryRewrite: (query, { securityContext }) => {
-    if (!securityContext.role) {
-      throw new Error('No role found in Security Context!');
-    }
-
-    if (securityContext.role == 'manager') {
-      query.filters.push({
-        member: 'Orders.status',
-        operator: 'equals',
-        values: ['shipped', 'completed'],
-      });
-    }
-
-    if (securityContext.role == 'operator') {
-      query.filters.push({
-        member: 'Orders.status',
-        operator: 'equals',
-        values: ['processing'],
-      });
-    }
-
-    return query;
-  },
-};
-```
+<GitHubCodeBlock
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/role-based-access/cube.js"
+  titleSuffixCount={2}
+  part="productsRollup"
+  lang="js"
+/>
 
 ## Query
 
@@ -75,33 +54,46 @@ requests with different JWTs:
 
 We have received different data depending on the user's role.
 
-```javascript
-// Manager
-[
-  {
-    'Orders.status': 'completed',
-    'Orders.count': '3346',
-  },
-  {
-    'Orders.status': 'shipped',
-    'Orders.count': '3300',
-  },
-]
-```
+Manager's data: 
 
-```javascript
-// Operator
-[
-  {
-    'Orders.status': 'processing',
-    'Orders.count': '3354',
-  },
-]
-```
+<CubeQueryResultSet
+api="https://maroon-lemming.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
+token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoibWFuYWdlciIsImlhdCI6MTAwMDAwMDAwMCwiZXhwIjo1MDAwMDAwMDAwfQ.3n17t_lTumC7Bc4uT7jrPjZMiGQ0rpfyy6fKil9WcC8"
+query={{
+    "dimensions": [
+        "Orders.status"
+    ],
+    "order": {
+        "Orders.count": "desc"
+    },
+    "measures": [
+        "Orders.count"
+    ]
+}} />
+
+Operator's data: 
+
+<CubeQueryResultSet
+api="https://maroon-lemming.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1"
+token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjEwMDAwMDAwMDAsImV4cCI6NTAwMDAwMDAwMH0.8LH7yCpWZ8wnaetJLJVVR6OYQzIGf8B4jdaOpbO9WsM"
+query={{
+    "dimensions": [
+        "Orders.status"
+    ],
+    "order": {
+        "Orders.count": "desc"
+    },
+    "measures": [
+        "Orders.count"
+    ]
+}} />
 
 ## Source code
 
-Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/role-based-access)
-or run it with the `docker-compose up` command. You'll see the result, including
-queried data, in the console.
+Please feel free to check out the full source code or run it with the
+`docker-compose up` command. You'll see the result, including queried data, in
+the console.
+
+<GitHubFolderLink
+  href="https://github.com/cube-js/cube.js/blob/master/examples/recipes/role-based-access"
+/>
