@@ -100,14 +100,10 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       return timestampTypeParser;
     }
 
-    // Sometimes driver returns 19 which is a name type. It's not declared in TypeId & NativeTypeToPostgresType.
-    // If we pass it to getPostgresTypeForField, driver will throw an error
-    if (dataTypeID !== 19) {
+    const typeName = this.getPostgresTypeForField(dataTypeID);
+    if (typeName === 'hll') {
       // We are using base64 encoding as main format for all HLL sketches, but in pg driver it uses binary encoding
-      const typeName = this.getPostgresTypeForField(<any>{ dataTypeID, name: '@parser' });
-      if (typeName && typeName === 'hll') {
-        return hllTypeParser;
-      }
+      return hllTypeParser;
     }
 
     const parser = types.getTypeParser(dataTypeID, format);
@@ -120,18 +116,16 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    */
   protected userDefinedTypes: Record<string, string> | null = null;
 
-  protected getPostgresTypeForField(field: FieldDef): string {
-    if (field.dataTypeID in NativeTypeToPostgresType) {
-      return NativeTypeToPostgresType[field.dataTypeID].toLowerCase();
+  protected getPostgresTypeForField(dataTypeID: number): string | null {
+    if (dataTypeID in NativeTypeToPostgresType) {
+      return NativeTypeToPostgresType[dataTypeID].toLowerCase();
     }
 
-    if (this.userDefinedTypes && field.dataTypeID in this.userDefinedTypes) {
-      return this.userDefinedTypes[field.dataTypeID].toLowerCase();
+    if (this.userDefinedTypes && dataTypeID in this.userDefinedTypes) {
+      return this.userDefinedTypes[dataTypeID].toLowerCase();
     }
 
-    throw new Error(
-      `Unable to detect type for field "${field.name}" with dataTypeID: ${field.dataTypeID}`
-    );
+    return null;
   }
 
   public async testConnection(): Promise<void> {
@@ -172,6 +166,22 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     await this.loadUserDefinedTypes(conn);
   }
 
+  protected mapFields(fields: FieldDef[]) {
+    return fields.map((f) => {
+      const postgresType = this.getPostgresTypeForField(f.dataTypeID);
+      if (!postgresType) {
+        throw new Error(
+          `Unable to detect type for field "${f.name}" with dataTypeID: ${f.dataTypeID}`
+        );
+      }
+
+      return ({
+        name: f.name,
+        type: this.toGenericType(postgresType)
+      });
+    });
+  }
+
   public async stream(
     query: string,
     values: unknown[],
@@ -193,10 +203,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
       return {
         rowStream,
-        types: meta.map((f: any) => ({
-          name: f.name,
-          type: this.toGenericType(this.getPostgresTypeForField(f))
-        })),
+        types: this.mapFields(meta),
         release: async () => {
           await conn.release();
         }
@@ -240,10 +247,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const res = await this.queryResponse(query, values);
     return {
       rows: res.rows,
-      types: res.fields.map(f => ({
-        name: f.name,
-        type: this.toGenericType(this.getPostgresTypeForField(f))
-      })),
+      types: this.mapFields(res.fields),
     };
   }
 
