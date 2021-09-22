@@ -32,10 +32,11 @@ CUBEJS_DB_USER=mongodb_server_user
 CUBEJS_DB_PASS=mongodb_server_password
 ```
 
-If you are connecting to a local `mongobi` connector, which is pointing to a local `mongodb` instance,
-If MongoBI Connector and MongoDB are both running locally, then the above should work.
-To connect to a remote MongoDB instance, first configure `mongosqld` appropriately. See
-[here for an example config file][mongobi-with-remote-db].
+If you are connecting to a local MongoBI Connector, which is pointing to a local
+MongoDB instance, If MongoBI Connector and MongoDB are both running locally,
+then the above should work. To connect to a remote MongoDB instance, first
+configure `mongosqld` appropriately. See [here for an example config
+file][mongobi-with-remote-db].
 
 ## Environment Variables
 
@@ -47,6 +48,24 @@ To connect to a remote MongoDB instance, first configure `mongosqld` appropriate
 | `CUBEJS_DB_USER`     | The username used to connect to the database                            | A valid database username |    ✅    |
 | `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |
 | `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`           |    ❌    |
+
+## Pre-Aggregations
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, MongoDB uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for MongoDB.
+
+### Export Bucket
+
+MongoDB does not support export buckets.
 
 ## SSL
 
@@ -63,10 +82,12 @@ Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. All other
 SSL-related environment variables can be left unset.
 
 [mongodb]: https://www.mongodb.com/
-[mongobi-with-remote-db]: https://docs.mongodb.com/bi-connector/current/reference/mongosqld/#example-configuration-file
+[mongobi-with-remote-db]:
+  https://docs.mongodb.com/bi-connector/current/reference/mongosqld/#example-configuration-file
 [cube-blog-mongodb]:
   https://cube.dev/blog/building-mongodb-dashboard-using-node.js
 [mongobi-download]: https://www.mongodb.com/download-center/bi-connector
 [nodejs-docs-tls-ciphers]:
   https://nodejs.org/docs/latest/api/tls.html#tls_modifying_the_default_tls_cipher_suite
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[self-preaggs-batching]: #batching

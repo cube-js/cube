@@ -12,7 +12,7 @@ permalink: /config/databases/postgres
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### <--{"id" : "Setup"}--> Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -35,6 +35,24 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |
 | `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`           |    ❌    |
 
+## Pre-Aggregations
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, Postgres uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for Postgres.
+
+### Export Bucket
+
+Postgres does not support export buckets.
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube.js and Postgres, set the
@@ -44,7 +62,7 @@ Database][ref-recipe-enable-ssl].
 
 ## Additional Configuration
 
-### <--{"id" : "Additional Configuration"}-->  AWS RDS
+### <--{"id" : "Additional Configuration"}--> AWS RDS
 
 Use `CUBEJS_DB_SSL=true` to enable SSL if you have SSL enabled for your RDS
 cluster. Download the new certificate [here][aws-rds-pem], and provide the
@@ -52,13 +70,13 @@ contents of the downloaded file to `CUBEJS_DB_SSL_CA`. All other SSL-related
 environment variables can be left unset. See [the SSL section][self-ssl] for
 more details. More info on AWS RDS SSL can be found [here][aws-docs-rds-ssl].
 
-### <--{"id" : "Additional Configuration"}-->  Google Cloud SQL
+### <--{"id" : "Additional Configuration"}--> Google Cloud SQL
 
 You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
 `true`. You may also need to set `CUBEJS_DB_SSL_SERVERNAME`, depending on how
 you are [connecting to Cloud SQL][gcp-docs-sql-connect].
 
-### <--{"id" : "Additional Configuration"}-->  Heroku
+### <--{"id" : "Additional Configuration"}--> Heroku
 
 Unless you're using a Private or Shield Heroku Postgres database, Heroku
 Postgres does not currently support verifiable certificates. [Here is the
@@ -87,5 +105,6 @@ module.exports = {
 [heroku-postgres-issue]:
   https://help.heroku.com/3DELT3RK/why-can-t-my-third-party-utility-connect-to-heroku-postgres-with-ssl
 [postgres]: https://www.postgresql.org/
-[self-ssl]: #ssl
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[self-preaggs-batching]: #batching
+[self-ssl]: #ssl

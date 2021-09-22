@@ -52,20 +52,29 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 | `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                            | A valid bucket name from cloud storage                                  |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                    | `gcs`                                                                   |    ❌    |
 
-## SSL
+## Pre-Aggregations
 
-Cube.js does not require any additional configuration to enable SSL as Google
-BigQuery connections are made over HTTPS.
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
 
-## Export bucket
+By default, Google BigQuery uses [batching][self-preaggs-batching] to build
+pre-aggregations.
 
-### <--{"id" : "Export bucket"}--> Google Cloud Storage
+### Batching
+
+No extra configuration is required to configure batching for Google BigQuery.
+
+### Export bucket
 
 <WarningBox>
 
 BigQuery only supports using Google Cloud Storage for export buckets.
 
 </WarningBox>
+
+#### Google Cloud Storage
 
 For [improved pre-aggregation performance with large
 datasets][ref-caching-large-preaggs], enable export bucket functionality by
@@ -84,6 +93,11 @@ CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
 ```
 
+## SSL
+
+Cube.js does not require any additional configuration to enable SSL as Google
+BigQuery connections are made over HTTPS.
+
 [bq]: https://cloud.google.com/bigquery
 [bq-docs-getting-started]:
   https://cloud.google.com/docs/authentication/getting-started
@@ -97,3 +111,4 @@ CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
   https://support.google.com/a/answer/7378726?hl=en
 [ref-caching-large-preaggs]: /using-pre-aggregations#large-pre-aggregations
 [ref-env-var]: /reference/environment-variables#database-connection
+[self-preaggs-batching]: #batching

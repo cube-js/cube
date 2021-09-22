@@ -11,7 +11,7 @@ permalink: /config/databases/mysql
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### <--{"id" : "Setup"}--> Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -34,6 +34,24 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |
 | `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`           |    ❌    |
 
+## Pre-Aggregations
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, MySQL uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for MySQL.
+
+### Export Bucket
+
+MySQL does not support export buckets.
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube.js and MySQL, set the
@@ -43,7 +61,7 @@ Database][ref-recipe-enable-ssl].
 
 ## Additional Configuration
 
-### <--{"id" : "Additional Configuration"}-->  Local/Docker
+### <--{"id" : "Additional Configuration"}--> Local/Docker
 
 To connect to a local MySQL database using a Unix socket, use
 `CUBEJS_DB_SOCKET_PATH`. When doing so, `CUBEJS_DB_HOST` will be ignored.
@@ -54,4 +72,5 @@ SSL section][self-ssl] above for more details.
 
 [mysql]: https://www.mysql.com/
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[self-preaggs-batching]: #batching
 [self-ssl]: #ssl

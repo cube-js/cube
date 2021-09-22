@@ -42,12 +42,21 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`          | The path to the private RSA key folder                                                                                                              | A valid path to the private RSA key                        |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`          | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key         |    ❌    |
 
-## SSL
+## Pre-Aggregations
 
-Cube.js does not require any additional configuration to enable SSL as Snowflake
-connections are made over HTTPS.
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
 
-## Export bucket
+By default, Snowflake uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for Snowflake.
+
+### Export Bucket
 
 Snowflake supports using both AWS S3 and Google Cloud Storage for export bucket
 functionality.
@@ -91,10 +100,16 @@ CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
 CUBEJS_DB_EXPORT_INTEGRATION=gcs_int
 ```
 
+## SSL
+
+Cube.js does not require any additional configuration to enable SSL as Snowflake
+connections are made over HTTPS.
+
 [dbt-docs-snowflake-account]:
   https://docs.getdbt.com/reference/warehouse-profiles/snowflake-profile#account
 [ref-caching-large-preaggs]: /using-pre-aggregations#large-pre-aggregations
 [ref-env-var]: /reference/environment-variables#database-connection
+[self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-connection-options]:
   https://docs.snowflake.com/en/user-guide/nodejs-driver-use.html#additional-connection-options

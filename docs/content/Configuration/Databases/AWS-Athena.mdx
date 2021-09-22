@@ -12,7 +12,7 @@ permalink: /config/databases/aws-athena
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### <--{"id" : "Setup"}--> Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -35,13 +35,38 @@ CUBEJS_AWS_ATHENA_WORKGROUP=primary
 | `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment | A valid S3 path                                  |    ❌    |
 | `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started     | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
 
+## Pre-Aggregations
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Simple        |             ❌             |     ✅      |
+| Batching      |             -              |      -      |
+| Export Bucket |             -              |      -      |
+
+By default, AWS Athena uses a [simple][self-preaggs-simple] strategy to build
+pre-aggregations.
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for AWS Athena.
+
+### Batching
+
+AWS Athena does not support batching.
+
+### Export Bucket
+
+AWS Athena does not support export buckets.
+
 ## SSL
 
 Cube.js does not require any additional configuration to enable SSL as AWS
 Athena connections are made over HTTPS.
 
 [aws-athena]: https://aws.amazon.com/athena
-[aws-athena-workgroup]: https://docs.aws.amazon.com/athena/latest/ug/workgroups-benefits.html
+[aws-athena-workgroup]:
+  https://docs.aws.amazon.com/athena/latest/ug/workgroups-benefits.html
 [aws-s3]: https://aws.amazon.com/s3/
 [aws-docs-athena-access]:
   https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html
@@ -49,3 +74,4 @@ Athena connections are made over HTTPS.
   https://docs.aws.amazon.com/athena/latest/ug/querying.html
 [aws-docs-regions]:
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[self-preaggs-simple]: #simple

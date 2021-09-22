@@ -44,22 +44,29 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |
 | `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`           |    ❌    |
 
-## SSL
+## Pre-Aggregations
 
-To enable SSL-encrypted connections between Cube.js and AWS Redshift, set the
-`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
-configure custom certificates, please check out [Enable SSL Connections to the
-Database][ref-recipe-enable-ssl].
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
 
-## Export bucket
+By default, AWS Redshift uses [batching][self-preaggs-batching] to build
+pre-aggregations.
 
-### <--{"id" : "Export bucket"}--> AWS S3
+### Batching
+
+No extra configuration is required to configure batching for AWS Redshift.
+
+### Export bucket
 
 <WarningBox>
 
 AWS Redshift **only** supports using AWS S3 for export buckets.
 
 </WarningBox>
+
+#### AWS S3
 
 For [improved pre-aggregation performance with large
 datasets][ref-caching-large-preaggs], enable export bucket functionality by
@@ -80,6 +87,13 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
 CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ```
 
+## SSL
+
+To enable SSL-encrypted connections between Cube.js and AWS Redshift, set the
+`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
 [aws-redshift-docs-connection-string]:
   https://docs.aws.amazon.com/redshift/latest/mgmt/configuring-connections.html#connecting-drivers
 [aws-redshift-docs-users]:
@@ -88,3 +102,4 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 [aws-vpc]: https://aws.amazon.com/vpc/
 [ref-caching-large-preaggs]: /using-pre-aggregations#large-pre-aggregations
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[self-preaggs-batching]: #batching
