@@ -222,6 +222,14 @@ export class PreAggregations {
       ) || [];
     }
 
+    function allValuesEq1(map) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const v of map.values()) {
+        if (v !== 1) return false;
+      }
+      return true;
+    }
+
     const sortedTimeDimensions = sortTimeDimensions(query.timeDimensions);
     const hasNoTimeDimensionsWithoutGranularity = !query.timeDimensions.filter(d => !d.granularity).length;
 
@@ -241,7 +249,13 @@ export class PreAggregations {
       .reduce((a, b) => query.minGranularity(a, b), null);
     const granularityHierarchies = query.granularityHierarchies();
     const hasMultipliedMeasures = query.fullKeyQueryAggregateMeasures().multipliedMeasures.length > 0;
-    const filtersEqualsSingleValue = R.all(f => f.operator === 'equals' && f.values.length === 1, query.filters);
+
+    let filterDimensionsSingleValueEqual = this.collectFilterDimensionsWithSingleValueEqual(query.filters);
+
+    filterDimensionsSingleValueEqual = filterDimensionsSingleValueEqual != null &&
+      allValuesEq1(filterDimensionsSingleValueEqual) ? filterDimensionsSingleValueEqual.keys() : null;
+
+    filterDimensionsSingleValueEqual = new Set(filterDimensionsSingleValueEqual);
 
     return {
       sortedDimensions,
@@ -256,8 +270,26 @@ export class PreAggregations {
       hasMultipliedMeasures,
       hasCumulativeMeasures,
       windowGranularity,
-      filtersEqualsSingleValue
+      filterDimensionsSingleValueEqual
     };
+  }
+
+  static collectFilterDimensionsWithSingleValueEqual(filters, map) {
+    map = map || new Map();
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const f of filters) {
+      if (f.operator === 'equals') {
+        map.set(f.dimension, Math.min(map.get(f.dimension) || 2, f.values.length));
+      } else if (f.operator === 'and') {
+        const res = this.collectFilterDimensionsWithSingleValueEqual(f.values, map);
+        if (res == null) return null;
+      } else {
+        return null;
+      }
+    }
+
+    return map;
   }
 
   static transformedQueryToReferences(query) {
@@ -325,7 +357,12 @@ export class PreAggregations {
     };
 
     const canUsePreAggregationNotAdditive = (references) => transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
-      (transformedQuery.allFiltersWithinSelectedDimensions || transformedQuery.filtersEqualsSingleValue) &&
+      (transformedQuery.allFiltersWithinSelectedDimensions ||
+        (
+          references.dimensions.length === transformedQuery.filterDimensionsSingleValueEqual.size &&
+          R.all(d => transformedQuery.filterDimensionsSingleValueEqual.has(d), references.dimensions)
+        )
+      ) &&
       R.equals(references.sortedDimensions || references.dimensions, transformedQuery.sortedDimensions) &&
       (
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
