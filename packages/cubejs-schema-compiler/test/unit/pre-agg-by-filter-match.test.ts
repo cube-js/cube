@@ -294,5 +294,4 @@ describe('Pre Aggregation by filter match tests', () => {
       },
     ]
   ));
-
 });
