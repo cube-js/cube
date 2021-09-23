@@ -10,12 +10,8 @@ cube(`Products`, {
       type: `sum`,
     },
   },
+  
   dimensions: {
-    id: {
-      sql: `id`,
-      type: `number`,
-      primaryKey: true,
-    },
     clientName: {
       sql: `client_name`,
       type: `string`,
