@@ -48,7 +48,7 @@
     "@oclif/command": "^1.8.0",
     "@oclif/config": "^1.17.0",
     "@oclif/errors": "^1.3.4",
-    "@oclif/plugin-help": "^3.2.0",
+    "@oclif/plugin-help": "^3.3.0",
     "@yarnpkg/lockfile": "^1.1.0",
     "body-parser": "^1.19.0",
     "codesandbox-import-utils": "^2.1.12",
