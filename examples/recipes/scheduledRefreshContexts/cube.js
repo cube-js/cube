@@ -5,6 +5,24 @@ module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.env}`,
 
+    scheduledRefreshContexts: async () => [
+      {
+        securityContext: {
+          env: 'testing'
+        },
+      },
+      {
+        securityContext: {
+          env: 'staging'
+        },
+      },
+      {
+        securityContext: {
+          env: 'production'
+        },
+      }
+    ],
+
   // Selects the database connection configuration based on the tenant name
   driverFactory: ({ securityContext }) => {
     if (!securityContext.env) {
