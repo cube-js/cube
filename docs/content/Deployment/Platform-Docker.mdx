@@ -345,6 +345,8 @@ services:
       - CUBEJS_API_SECRET=secret
     volumes:
       - .:/cube/conf
+      # Prevent dev dependencies leaking
+      - .empty:/cube/conf/node_modules/@cubejs-backend/
     depends_on:
       - cubestore_router
       - cube_refresh_worker
