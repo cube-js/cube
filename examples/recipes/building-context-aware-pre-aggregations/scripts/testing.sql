@@ -3,11 +3,11 @@
 CREATE SCHEMA testing;
 
 -- Sequence and defined type
-CREATE SEQUENCE IF NOT EXISTS production.orders_id_seq;
+CREATE SEQUENCE IF NOT EXISTS testing.orders_id_seq;
 
 -- Table Definition
 CREATE TABLE "testing"."orders" (
-    "id" int4 NOT NULL DEFAULT nextval('production.orders_id_seq'::regclass),
+    "id" int4 NOT NULL DEFAULT nextval('testing.orders_id_seq'::regclass),
     "amount" int4,
     "client_name" text,
     "created_at" timestamptz DEFAULT now(),
