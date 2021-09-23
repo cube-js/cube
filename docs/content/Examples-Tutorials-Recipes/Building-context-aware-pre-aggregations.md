@@ -11,8 +11,8 @@ menuOrder: 6
 Using different environments to test a product is good practice. Let's imagine
 we have three environments: testing, staging, and production. We want to use
 multiple database schemas depending on the current environment. In addition, we
-want to use pre-aggregation for each schema. So, in the recipe below, we'll
-learn how dynamically select database schema and create a pre-aggregation with
+want to use pre-aggregation for each schema. In the recipe below, we'll
+learn how to dynamically select database schema and create a pre-aggregation with
 the scheduled update.
 
 ## Data schema
@@ -30,11 +30,11 @@ const {
 
 cube(`Products`, {
   sql: `SELECT * FROM ${env}.Orders`,
-  ...
+  ...,
 }
 ```
 
-To significantly reduce response time, we will define the pre-aggregations.
+To significantly reduce response time, we will define a pre-aggregation.
 We'll also specify the
 [`refreshKey`](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-refresh-key)
 option for keeping pre-aggregations up to date:
