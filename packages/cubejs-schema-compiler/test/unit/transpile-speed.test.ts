@@ -5,15 +5,15 @@ describe('Test Speed', () => {
   it('100 cube', async () => {
     return; // uncomment this to run the test
 
-    const measures = {};
+    const measures: any = {};
 
-    const dimensions = {
+    const dimensions: any = {
       created: {
         sql: 'created',
         type: 'time'
       }
     };
-    const preAggregations = {};
+    const preAggregations: any = {};
     const mTypes = ['count', 'countDistinct', 'sum'];
     const dTypes = ['number', 'string', 'time'];
 

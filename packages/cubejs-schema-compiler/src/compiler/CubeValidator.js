@@ -1,6 +1,13 @@
 const Joi = require('@hapi/joi');
 const cronParser = require('cron-parser');
 
+/* *****************************
+ * ATTENTION:
+ * In case of adding/removing/changing any Joi.func() field that needs to be transpiled,
+ * please run 'cube-validator.test.ts' - transpiledFieldsPatterns
+ * and update CubePropContextTranspiler.transpiledFieldsPatterns
+ **************************** */
+
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
 
 const identifier = Joi.string().regex(identifierRegex, 'identifier');
@@ -379,6 +386,13 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
     }
   ]
 ));
+
+/* *****************************
+ * ATTENTION:
+ * In case of adding/removing/changing any Joi.func() field that needs to be transpiled,
+ * please run 'cube-validator.test.ts' - transpiledFieldsPatterns
+ * and update CubePropContextTranspiler.transpiledFieldsPatterns
+ **************************** */
 
 const cubeSchema = Joi.object().keys({
   name: identifier,
