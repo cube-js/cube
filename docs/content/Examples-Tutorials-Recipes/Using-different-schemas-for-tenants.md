@@ -13,15 +13,23 @@ learn how to use multiple data schemas for various tenants.
 
 ## Configuration
 
-We have two tenants and we created folders with the data schema for each one
-inside the `schema` folder. The folders are named such as a tenants. Then we
-have to tell Cube which data schema path to use for each tenant. We'll use the
-[`repositoryFactory`](https://cube.dev/docs/config#repository-factory) option to
-do it. We'll pass the tenant name into the `repositoryFactory` inside
+We have a folder structure as follows:
+
+```bash
+schema
+├── avocado
+│   └── Products.js
+└── mango
+    └── Products.js
+```
+
+Then we have to tell Cube which data schema path to use for each tenant. We'll
+use the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory)
+option to do it. We'll pass the tenant name into the `repositoryFactory` inside
 [`securityContext`](https://cube.dev/docs/security/context#top). We also should
 define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id)
-property for caching schema compilation result. Our `cube.js` file will look like
-this:
+property for caching schema compilation result. Our `cube.js` file will look
+like this:
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
@@ -37,8 +45,8 @@ module.exports = {
 
 ## Data schema
 
-In our case we'll get products with odd `id` values for the `Avocado` tenant and with
-even `id` values the `Mango` tenant:
+In our case we'll get products with odd `id` values for the `Avocado` tenant and
+with even `id` values the `Mango` tenant:
 
 ```javascript
 // schema/avocado
@@ -97,8 +105,8 @@ and located in different folders:
   {
     'Products.id': 5,
     'Products.name': 'Handcrafted Rubber Chicken',
-  }
-]
+  },
+];
 ```
 
 ```javascript
@@ -115,8 +123,8 @@ and located in different folders:
   {
     'Products.id': 6,
     'Products.name': 'Handcrafted Plastic Chair',
-  }
-]
+  },
+];
 ```
 
 ## Source code
