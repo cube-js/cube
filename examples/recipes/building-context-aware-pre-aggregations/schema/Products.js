@@ -36,5 +36,5 @@ cube(`Products`, {
         every: `1 minute`,
       },
     },
-  },
+  }
 });
