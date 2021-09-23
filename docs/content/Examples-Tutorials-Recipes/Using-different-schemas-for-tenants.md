@@ -20,7 +20,7 @@ have to tell Cube which data schema path to use for each tenant. We'll use the
 do it. We'll pass the tenant name into the `repositoryFactory` inside
 [`securityContext`](https://cube.dev/docs/security/context#top). We also should
 define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id)
-property for caching schema compilation result. Our cube.js file we'll look like
+property for caching schema compilation result. Our `cube.js` file will look like
 this:
 
 ```javascript
@@ -37,8 +37,8 @@ module.exports = {
 
 ## Data schema
 
-In our case we'll get products with odd `id` values for Avocado tenant and with
-even `id` values for Mango tenant:
+In our case we'll get products with odd `id` values for the `Avocado` tenant and with
+even `id` values the `Mango` tenant:
 
 ```javascript
 // schema/avocado
