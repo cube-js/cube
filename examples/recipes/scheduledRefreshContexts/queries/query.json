@@ -1,10 +1,14 @@
 {
-    "dimensions": [
-        "Products.id",
-        "Products.name"
-    ],
-    "order": {
-        "Orders.id": "asc"
-    },
-    "limit": 3
+  "measures": ["Products.amount"],
+  "timeDimensions": [
+    {
+      "dimension": "Products.createdAt",
+      "granularity": "day"
+    }
+  ],
+  "order": {
+    "Products.amount": "desc"
+  },
+  "dimensions": ["Products.clientName"],
+  "limit": 2
 }
