@@ -19,7 +19,7 @@ the scheduled update.
 
 To select the database schema, we will use the
 [`COMPILE_CONTEXT`](https://cube.dev/docs/schema/reference/cube#context-variables-compile-context)
-global variable. Let's pass into it an `env` variable from
+global variable. We'll pass into the `COMPILE_CONTEXT` an `env` variable from
 [`securityContext`](https://cube.dev/docs/security/context) with our environment
 value.
 
@@ -95,6 +95,15 @@ module.exports = {
 Now we can send the query to get the client name and amount for `orders` table
 from multiple schemas using
 [JWT](https://cube.dev/docs/security#generating-json-web-tokens-jwt):
+
+```javascript
+{
+  "sub": "1234567890",
+  "env": "testing",
+  "iat": 1000000000,
+  "exp": 5000000000
+}
+```
 
 ```javascript
 {
