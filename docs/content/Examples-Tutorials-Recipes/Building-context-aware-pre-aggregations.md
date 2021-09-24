@@ -58,7 +58,7 @@ preAggregations: {
 We'll use Cube Store as pre-aggregations storage with
 [Refresh Worker](https://cube.dev/docs/deployment/production-checklist#set-up-refresh-worker),
 updating our pre-aggregations in the background. The problem is Refresh Worker
-does not have a `securityContext` when he started. Because of this, he will not
+does not have a `securityContext` when it started. Because of this, it will not
 be able to figure out which scheme to use to build a pre-aggregation. To fix
 this, we can use the
 [`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
