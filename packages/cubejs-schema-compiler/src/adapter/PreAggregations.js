@@ -208,6 +208,8 @@ export class PreAggregations {
     const measures = (query.measures.concat(query.measureFilters));
     const measurePaths = R.uniq(measures.map(m => m.measure));
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
+    const dimensionsList = query.dimensions.map(dim => dim.dimension);
+
     const leafMeasurePaths =
       R.pipe(
         R.map(m => query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures')),
@@ -222,11 +224,20 @@ export class PreAggregations {
       ) || [];
     }
 
+    function allValuesEq1(map) {
+      if (!map) return false;
+      // eslint-disable-next-line no-restricted-syntax
+      for (const v of map?.values()) {
+        if (v !== 1) return false;
+      }
+      return true;
+    }
+
     const sortedTimeDimensions = sortTimeDimensions(query.timeDimensions);
     const hasNoTimeDimensionsWithoutGranularity = !query.timeDimensions.filter(d => !d.granularity).length;
 
     const allFiltersWithinSelectedDimensions =
-      R.all(d => query.dimensions.map(dim => dim.dimension).indexOf(d) !== -1)(
+      R.all(d => dimensionsList.indexOf(d) !== -1)(
         query.filters.map(f => f.dimension)
       );
 
@@ -242,6 +253,15 @@ export class PreAggregations {
     const granularityHierarchies = query.granularityHierarchies();
     const hasMultipliedMeasures = query.fullKeyQueryAggregateMeasures().multipliedMeasures.length > 0;
 
+    let filterDimensionsSingleValueEqual = this.collectFilterDimensionsWithSingleValueEqual(
+      query.filters,
+      dimensionsList.reduce((map, d) => map.set(d, 1), new Map())
+    );
+
+    filterDimensionsSingleValueEqual = new Set(
+      allValuesEq1(filterDimensionsSingleValueEqual) ? filterDimensionsSingleValueEqual?.keys() : null
+    );
+
     return {
       sortedDimensions,
       sortedTimeDimensions,
@@ -254,8 +274,25 @@ export class PreAggregations {
       granularityHierarchies,
       hasMultipliedMeasures,
       hasCumulativeMeasures,
-      windowGranularity
+      windowGranularity,
+      filterDimensionsSingleValueEqual
     };
+  }
+
+  static collectFilterDimensionsWithSingleValueEqual(filters, map) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const f of filters) {
+      if (f.operator === 'equals') {
+        map.set(f.dimension, Math.min(map.get(f.dimension) || 2, f.values.length));
+      } else if (f.operator === 'and') {
+        const res = this.collectFilterDimensionsWithSingleValueEqual(f.values, map);
+        if (res == null) return null;
+      } else {
+        return null;
+      }
+    }
+
+    return map;
   }
 
   static transformedQueryToReferences(query) {
@@ -323,8 +360,10 @@ export class PreAggregations {
     };
 
     const canUsePreAggregationNotAdditive = (references) => transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
-      transformedQuery.allFiltersWithinSelectedDimensions &&
-      R.equals(references.sortedDimensions || references.dimensions, transformedQuery.sortedDimensions) &&
+      (
+        references.dimensions.length === transformedQuery.filterDimensionsSingleValueEqual.size &&
+        R.all(d => transformedQuery.filterDimensionsSingleValueEqual.has(d), references.dimensions)
+      ) &&
       (
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures)

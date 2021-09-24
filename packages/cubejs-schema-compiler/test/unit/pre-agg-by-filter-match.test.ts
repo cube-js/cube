@@ -1,0 +1,316 @@
+import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { prepareCube } from './PrepareCompiler';
+import { PreAggregations } from '../../src/adapter/PreAggregations';
+
+describe('Pre Aggregation by filter match tests', () => {
+  function getCube(cube) {
+    cube.sql = 'select * from table';
+    cube.dataSource = 'default';
+    cube.measures = {
+      uniqueField: {
+        type: 'countDistinct',
+        sql: 'field',
+      },
+    };
+
+    cube.dimensions.created = {
+      sql: 'created',
+      type: 'time'
+    };
+
+    return prepareCube('cube', cube);
+  }
+
+  function testPreAggregationMatch(
+    expecting: boolean,
+    cubedimensions: Array<String>,
+    preAggdimensions: Array<String>,
+    querydimensions: Array<String>,
+    filters: Array<any>,
+  ) {
+    const aaa: any = {
+      type: 'rollup',
+      measures: ['cube.uniqueField'],
+      dimensions: preAggdimensions.map(d => `cube.${d}`),
+      timeDimension: 'cube.created',
+      granularity: 'day',
+      partitionGranularity: 'month',
+    };
+
+    const cube: any = {
+      dimensions: {},
+      preAggregations: { aaa }
+    };
+
+    cubedimensions.forEach(d => {
+      // @ts-ignore
+      cube.dimensions[d] = { sql: d, type: 'string' };
+    });
+
+    const { compiler, joinGraph, cubeEvaluator } = getCube(cube);
+
+    aaa.sortedDimensions = aaa.dimensions;
+    aaa.sortedDimensions.sort();
+    aaa.sortedTimeDimensions = [[aaa.timeDimension, aaa.granularity]];
+
+    return compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: querydimensions.map(d => `cube.${d}`),
+        measures: ['cube.uniqueField'],
+        timeDimensions: [{
+          dimension: 'cube.created',
+          granularity: 'day',
+          dateRange: { from: '2017-01-01', to: '2017-01-30' }
+        }],
+        timezone: 'America/Los_Angeles',
+        filters
+      });
+
+      const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
+        PreAggregations.transformQueryToCanUseForm(query),
+        aaa
+      );
+
+      expect(usePreAggregation).toEqual(expecting);
+    });
+  }
+
+  it('1 Dimension, 1 Filter', () => testPreAggregationMatch(
+    true,
+    ['type'],
+    ['type'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('1 Dimension, 1 Filter, and', () => testPreAggregationMatch(
+    true,
+    ['type'],
+    ['type'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+      {
+        and: [
+          {
+            member: 'cube.type',
+            operator: 'equals',
+            values: ['aa', 'bbb']
+          },
+          {
+            and: [
+              {
+                member: 'cube.type',
+                operator: 'equals',
+                values: ['aa', 'bbb', 'ccc']
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ));
+
+  it('2 cube dims, 2 pre-agg dims, 1 query dim, 2 Filters', () => testPreAggregationMatch(
+    true,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    ['type'],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['a', 'b']
+      },
+      {
+        member: 'cube.dim2',
+        operator: 'equals',
+        values: ['a']
+      },
+    ]
+  ));
+  
+  it('1 Dimension, 1 Filter, gt', () => testPreAggregationMatch(
+    false,
+    ['type'],
+    ['type'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'gt',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('1 Dimension, 1 Filter by another Dimension', () => testPreAggregationMatch(
+    false,
+    ['type', 'dim2'],
+    ['type'],
+    [],
+    [
+      {
+        member: 'cube.dim2',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('2 Dimensions, 2 Filters', () => testPreAggregationMatch(
+    true,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+      {
+        member: 'cube.dim2',
+        operator: 'equals',
+        values: ['bbb']
+      },
+    ]
+  ));
+
+  it('2 Dimensions, 2 Filters, not eq', () => testPreAggregationMatch(
+    false,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+      {
+        member: 'cube.dim2',
+        operator: 'gt',
+        values: ['bbb']
+      },
+    ]
+  ));
+
+  it('2 Dimensions, 1 Filter', () => testPreAggregationMatch(
+    false,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('2 Dimensions, 1 Filter, 2 Query Dims', () => testPreAggregationMatch(
+    true,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('1 Dimensions, 2 Filter', () => testPreAggregationMatch(
+    false,
+    ['type', 'dim2'],
+    ['type'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+      {
+        member: 'cube.dim2',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('1 Dimensions, 1 Filter, 2 Query Dims', () => testPreAggregationMatch(
+    false,
+    ['type', 'dim2'],
+    ['type'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+      {
+        member: 'cube.dim2',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('1 Dimensions, 1 Filter, 2 Query Dims', () => testPreAggregationMatch(
+    true,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('2 Dimensions, 1 Filter, 1 Query Dim', () => testPreAggregationMatch(
+    true,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    ['dim2'],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+
+  it('3 dims cube, 2 dims pre-agg, 1 Filter, 2 Query Dim', () => testPreAggregationMatch(
+    false,
+    ['type', 'dim2', 'dim3'],
+    ['type', 'dim2'],
+    ['dim2', 'dim3'],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aa']
+      },
+    ]
+  ));
+});
