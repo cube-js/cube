@@ -8,11 +8,11 @@ menuOrder: 6
 
 ## Use case
 
-Using different environments to test a product is good practice. Let's imagine
+Using different environments to test a product is a good practice. Let's imagine
 we have three environments: testing, staging, and production. We want to use
 multiple database schemas depending on the current environment. In addition, we
 want to use pre-aggregation for each schema. In the recipe below, we'll
-learn how to dynamically select database schema and create a pre-aggregation with
+learn how to dynamically select a database schema and create a pre-aggregation with
 the scheduled update.
 
 ## Data schema
