@@ -121,6 +121,25 @@ describe('Pre Aggregation by filter match tests', () => {
     ]
   ));
 
+  it('2 cube dims, 2 pre-agg dims, 1 query dim, 2 Filters', () => testPreAggregationMatch(
+    true,
+    ['type', 'dim2'],
+    ['type', 'dim2'],
+    ['type'],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['a', 'b']
+      },
+      {
+        member: 'cube.dim2',
+        operator: 'equals',
+        values: ['a']
+      },
+    ]
+  ));
+  
   it('1 Dimension, 1 Filter, gt', () => testPreAggregationMatch(
     false,
     ['type'],

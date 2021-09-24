@@ -1,7 +1,20 @@
-import { CubeValidator } from '../../src/compiler/CubeValidator';
+import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
 import { CubeSymbols } from '../../src/compiler/CubeSymbols';
 
 describe('Cube Validation', () => {
+  it('transpiledFieldsPatterns', async () => {
+    const transpiledFieldsPatterns = functionFieldsPatterns()
+      .filter((p) => p.indexOf('extends') < 0 && p.indexOf('allDefinitions') < 0)
+      .map((p) => {
+        p = p.replace(/\./g, '\\.').replace(/\*/g, '[_a-zA-Z][_a-zA-Z0-9]*');
+        return RegExp(`^${p}$`);
+      });
+    transpiledFieldsPatterns.push(/^contextMembers$/);
+    transpiledFieldsPatterns.push(/\.sql$/);
+
+    console.log('CubePropContextTranspiler.transpiledFieldsPatterns =', transpiledFieldsPatterns);
+  });
+
   it('refreshKey alternatives', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
