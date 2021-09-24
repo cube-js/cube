@@ -20,13 +20,14 @@ import { SqlParser } from '../parser/SqlParser';
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
 const standardGranularitiesParents = {
-  year: 'month',
-  quarter: 'month',
-  month: 'day',
-  week: 'day',
-  day: 'hour',
-  hour: 'minute',
-  minute: 'second'
+  year: ['year', 'quarter', 'month', 'month', 'day', 'hour', 'minute', 'second'],
+  quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
+  month: ['month', 'day', 'hour', 'minute', 'second'],
+  week: ['week', 'day', 'hour', 'minute', 'second'],
+  day: ['day', 'hour', 'minute', 'second'],
+  hour: ['hour', 'minute', 'second'],
+  minute: ['minute', 'second'],
+  second: ['second']
 };
 
 const SecondsDurations = {
@@ -48,8 +49,6 @@ export class BaseQuery {
     this.defaultOrder = this.defaultOrder.bind(this);
 
     this.initFromOptions();
-
-    this.granularityParentHierarchyCache = {};
   }
 
   extractDimensionsAndMeasures(filters = []) {
@@ -706,17 +705,8 @@ export class BaseQuery {
     return R.fromPairs(Object.keys(standardGranularitiesParents).map(k => [k, this.granularityParentHierarchy(k)]));
   }
 
-  granularityParent(granularity) {
-    return standardGranularitiesParents[granularity];
-  }
-
   granularityParentHierarchy(granularity) {
-    if (!this.granularityParentHierarchyCache[granularity]) {
-      this.granularityParentHierarchyCache[granularity] = [granularity].concat(
-        this.granularityParent(granularity) ? this.granularityParentHierarchy(this.granularityParent(granularity)) : []
-      );
-    }
-    return this.granularityParentHierarchyCache[granularity];
+    return standardGranularitiesParents[granularity];
   }
 
   minGranularity(granularityA, granularityB) {

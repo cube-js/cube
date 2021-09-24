@@ -234,6 +234,11 @@ export class PreAggregations {
     }
 
     const sortedTimeDimensions = sortTimeDimensions(query.timeDimensions);
+    const timeDimensions = query.timeDimensions && R.sortBy(
+      R.prop(0),
+      query.timeDimensions.map(d => [d.dimension, d.granularity])
+    ) || [];
+
     const hasNoTimeDimensionsWithoutGranularity = !query.timeDimensions.filter(d => !d.granularity).length;
 
     const allFiltersWithinSelectedDimensions =
@@ -265,6 +270,7 @@ export class PreAggregations {
     return {
       sortedDimensions,
       sortedTimeDimensions,
+      timeDimensions,
       measures: measurePaths,
       leafMeasureAdditive,
       leafMeasures: leafMeasurePaths,
@@ -359,7 +365,9 @@ export class PreAggregations {
       )).filter(x => !!x).length > 0;
     };
 
-    const canUsePreAggregationNotAdditive = (references) => transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
+    const canUsePreAggregationNotAdditive = (references) => {
+      const sortedTimeDimensions = references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions);
+      return transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
       (
         references.dimensions.length === transformedQuery.filterDimensionsSingleValueEqual.size &&
         R.all(d => transformedQuery.filterDimensionsSingleValueEqual.has(d), references.dimensions)
@@ -370,8 +378,14 @@ export class PreAggregations {
       ) &&
       R.equals(
         transformedQuery.sortedTimeDimensions,
-        references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions)
-      ) && !transformedQuery.hasCumulativeMeasures;
+        sortedTimeDimensions
+      ) &&
+      (transformedQuery.isAdditive || R.equals(
+        transformedQuery.timeDimensions,
+        sortedTimeDimensions
+      )) &&
+      !transformedQuery.hasCumulativeMeasures;
+    };
 
     // TODO revisit cumulative leaf measure matches
     const canUsePreAggregationLeafMeasureAdditive = (references) => R.all(
