@@ -26,7 +26,7 @@ schema
 Then we have to tell Cube which data schema path to use for each tenant. We'll
 use the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory)
 option to do it. We'll pass the tenant name into the `repositoryFactory` inside
-[`securityContext`](https://cube.dev/docs/security/context#top). We also should
+[`securityContext`](https://cube.dev/docs/security/context#top). We should also
 define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id)
 property for caching schema compilation result. Our `cube.js` file will look
 like this:
@@ -88,7 +88,7 @@ To get the products, we will send two identical queries with different JWTs:
 
 ## Result
 
-We have received different data from schemas corresponding to various tenants
+We received different data from schemas corresponding to various tenants
 and located in different folders:
 
 ```javascript
