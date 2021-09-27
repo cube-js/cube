@@ -1181,6 +1181,7 @@ mod tests {
     use crate::store::ChunkStore;
 
     use super::*;
+    use crate::table::data::{cmp_row_key_heap, cmp_row_markers};
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -1453,7 +1454,7 @@ mod tests {
                 ).await.unwrap();
             }
 
-            join_results.sort_by(|a, b| a.sort_key(1).cmp(&b.sort_key(1)));
+            join_results.sort_by(|a, b| cmp_row_key_heap(1, &a.values(), &b.values()));
 
             let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap();
 
@@ -1945,14 +1946,14 @@ mod tests {
             let mut intervals_set = new_partitions.into_iter()
                 .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
                 .collect::<Vec<_>>();
-            intervals_set.sort_by(|(min_a, _), (min_b, _)| min_a.as_ref().map(|a| a.sort_key(1)).cmp(&min_b.as_ref().map(|a| a.sort_key(1))));
+            intervals_set.sort_by(|(min_a, _), (min_b, _)| cmp_row_markers(1, min_a, min_b));
             let mut expected = vec![
                 (None, Some(Row::new(vec![TableValue::Int(2)]))),
                 (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
                 (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
                 (Some(Row::new(vec![TableValue::Int(27)])), None),
             ].into_iter().collect::<Vec<_>>();
-            expected.sort_by(|(min_a, _), (min_b, _)| min_a.as_ref().map(|a| a.sort_key(1)).cmp(&min_b.as_ref().map(|a| a.sort_key(1))));
+            expected.sort_by(|(min_a, _), (min_b, _)| cmp_row_markers(1, min_a, min_b));
             assert_eq!(intervals_set, expected);
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();

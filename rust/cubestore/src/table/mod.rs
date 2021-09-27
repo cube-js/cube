@@ -171,21 +171,9 @@ pub struct Row {
     values: Vec<TableValue>,
 }
 
-pub struct RowSortKey<'a> {
-    row: &'a Row,
-    sort_key_size: usize,
-}
-
 impl Row {
     pub fn new(values: Vec<TableValue>) -> Row {
         Row { values }
-    }
-
-    pub fn sort_key(&self, sort_key_size: u64) -> RowSortKey {
-        RowSortKey {
-            row: self,
-            sort_key_size: sort_key_size as usize,
-        }
     }
 
     pub fn push(&mut self, val: TableValue) {
@@ -198,37 +186,6 @@ impl Row {
 
     pub fn values(&self) -> &Vec<TableValue> {
         &self.values
-    }
-}
-
-impl<'a> PartialEq for RowSortKey<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        if self.sort_key_size != other.sort_key_size {
-            return false;
-        }
-        for i in 0..self.sort_key_size {
-            if self.row.values[i] != other.row.values[i] {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-impl<'a> Eq for RowSortKey<'a> {}
-
-impl<'a> PartialOrd for RowSortKey<'a> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.sort_key_size != other.sort_key_size {
-            return None;
-        }
-        for i in 0..self.sort_key_size {
-            let ord = cmp_same_types(&self.row.values[i], &other.row.values[i]);
-            if ord != Ordering::Equal {
-                return Some(ord);
-            }
-        }
-        Some(Ordering::Equal)
     }
 }
 
@@ -245,12 +202,6 @@ pub fn cmp_same_types(l: &TableValue, r: &TableValue) -> Ordering {
         (TableValue::Timestamp(a), TableValue::Timestamp(b)) => a.cmp(b),
         (TableValue::Boolean(a), TableValue::Boolean(b)) => a.cmp(b),
         (a, b) => panic!("Can't compare {:?} to {:?}", a, b),
-    }
-}
-
-impl<'a> Ord for RowSortKey<'a> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
     }
 }
 
