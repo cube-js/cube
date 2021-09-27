@@ -73,7 +73,7 @@ mod tests {
     use crate::assert_eq_columns;
     use crate::metastore::{Column, ColumnType, Index};
     use crate::store::{compaction, ROW_GROUP_SIZE};
-    use crate::table::data::{concat_record_batches, rows_to_columns, to_stream};
+    use crate::table::data::{cmp_row_key_heap, concat_record_batches, rows_to_columns, to_stream};
     use crate::table::parquet::{arrow_schema, ParquetTableStore};
     use crate::table::{Row, TableValue};
     use crate::util::decimal::Decimal;
@@ -133,7 +133,7 @@ mod tests {
                 ])
             })
             .collect::<Vec<_>>();
-        first_rows.sort_by(|a, b| a.sort_key(3).cmp(&b.sort_key(3)));
+        first_rows.sort_by(|a, b| cmp_row_key_heap(3, &a.values(), &b.values()));
         let first_cols = rows_to_columns(&store.table.columns(), &first_rows);
         store.write_data(file_name, first_cols.clone()).unwrap();
 
@@ -157,7 +157,7 @@ mod tests {
                 TableValue::Decimal(Decimal::new(i * 10000)),
             ]));
         }
-        to_split.sort_by(|a, b| a.sort_key(3).cmp(&b.sort_key(3)));
+        to_split.sort_by(|a, b| cmp_row_key_heap(3, &a.values(), &b.values()));
 
         let to_split_cols = rows_to_columns(&store.table.columns(), &to_split);
         let schema = Arc::new(arrow_schema(&store.table));
@@ -270,9 +270,7 @@ mod tests {
 
         let w = ParquetTableStore::new(index.clone(), NUM_ROWS);
         w.write_data(file, data.clone()).unwrap();
-
-        let s = ParquetTableStore::new(index, NUM_ROWS);
-        let r = concat_record_batches(&s.read_columns(file).unwrap());
+        let r = concat_record_batches(&w.read_columns(file).unwrap());
         assert_eq_columns!(r.columns(), &data);
     }
 }
