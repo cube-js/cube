@@ -27,17 +27,23 @@ describe('Pre Aggregation by filter match tests', () => {
     preAggdimensions: Array<String>,
     querydimensions: Array<String>,
     filters: Array<any>,
+    preAggSegments: Array<String> | undefined = undefined,
+    querySegments: Array<String> | undefined = undefined
   ) {
     const aaa: any = {
       type: 'rollup',
       measures: ['cube.uniqueField'],
       dimensions: preAggdimensions.map(d => `cube.${d}`),
       timeDimension: 'cube.created',
+      segments: preAggSegments?.map(s => `cube.${s}`),
       granularity: 'day',
       partitionGranularity: 'month',
     };
 
     const cube: any = {
+      segments: {
+        qqq: { sql: 'id > 10000' }
+      },
       dimensions: {},
       preAggregations: { aaa }
     };
@@ -49,6 +55,7 @@ describe('Pre Aggregation by filter match tests', () => {
 
     const { compiler, joinGraph, cubeEvaluator } = getCube(cube);
 
+    if (aaa.segments) aaa.dimensions = aaa.dimensions.concat(aaa.segments);
     aaa.sortedDimensions = aaa.dimensions;
     aaa.sortedDimensions.sort();
     aaa.sortedTimeDimensions = [[aaa.timeDimension, aaa.granularity]];
@@ -63,7 +70,8 @@ describe('Pre Aggregation by filter match tests', () => {
           dateRange: { from: '2017-01-01', to: '2017-01-30' }
         }],
         timezone: 'America/Los_Angeles',
-        filters
+        filters,
+        segments: querySegments?.map(s => `cube.${s}`),
       });
 
       const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
@@ -312,5 +320,30 @@ describe('Pre Aggregation by filter match tests', () => {
         values: ['aa']
       },
     ]
+  ));
+
+  it('1 Segment, 0 Filter', () => testPreAggregationMatch(
+    false,
+    ['type'],
+    [],
+    [],
+    [],
+    ['qqq']
+  ));
+
+  it('1 Segment, 1 Filter', () => testPreAggregationMatch(
+    true,
+    ['type'],
+    ['type'],
+    [],
+    [
+      {
+        member: 'cube.type',
+        operator: 'equals',
+        values: ['aaa']
+      },
+    ],
+    ['qqq'],
+    ['qqq']
   ));
 });

@@ -209,6 +209,7 @@ export class PreAggregations {
     const measurePaths = R.uniq(measures.map(m => m.measure));
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
     const dimensionsList = query.dimensions.map(dim => dim.dimension);
+    const segmentsList = query.segments.map(s => s.segment);
 
     const leafMeasurePaths =
       R.pipe(
@@ -260,7 +261,7 @@ export class PreAggregations {
 
     let filterDimensionsSingleValueEqual = this.collectFilterDimensionsWithSingleValueEqual(
       query.filters,
-      dimensionsList.reduce((map, d) => map.set(d, 1), new Map())
+      dimensionsList.concat(segmentsList).reduce((map, d) => map.set(d, 1), new Map())
     );
 
     filterDimensionsSingleValueEqual = new Set(
