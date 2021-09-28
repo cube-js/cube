@@ -61,7 +61,7 @@
 - name: CUBEJS_TOPIC_NAME
   value: {{ .Values.config.topicName | quote }}
 {{- end }}
-{{- if .Values.global.redis.enabled }}
+{{- if ((.Values.global).redis).enabled }}
 - name: CUBEJS_REDIS_URL
   value: {{ printf "redis://%s-redis-master:6379" .Release.Name }}
 - name: CUBEJS_REDIS_PASSWORD
